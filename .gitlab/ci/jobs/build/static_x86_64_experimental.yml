@@ -12,6 +12,7 @@ include: .gitlab/ci/jobs/build/common.yml
 #   (they do not build experimental executables)
 build:static-x86_64-linux-binaries:
   extends:
+    - .tags_template__build
     - .build_static_binaries_template
     # Even though not many tests depend on static executables, some of those that do
     # are limiting factors in the total duration of pipelines.

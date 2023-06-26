@@ -13,7 +13,9 @@ include: .gitlab/ci/jobs/build/common.yml
 # under the 1GB hard limit set by GitLab.
 # 'build_x86_64-released' builds the released executables.
 build_x86_64-released:
-  extends: .build_x86_64
+  extends:
+    - .tags_template__build
+    - .build_x86_64
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables"
 
@@ -21,7 +23,9 @@ build_x86_64-released:
 # executables, as well as the tezt test suite used by the subsequent
 # 'tezt' jobs and TPS evaluation tool.
 build_x86_64-exp-dev-extra:
-  extends: .build_x86_64
+  extends:
+    - .tags_template__build
+    - .build_x86_64
   variables:
     EXECUTABLE_FILES: "script-inputs/experimental-executables script-inputs/dev-executables"
     BUILD_EXTRA: "src/bin_tps_evaluation/main_tps_evaluation.exe tezt/tests/main.exe"
