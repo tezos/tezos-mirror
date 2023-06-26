@@ -142,7 +142,26 @@ let create_tables =
 
 let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
 
-let alter_tables = [alter_blocks]
+let alter_blocks_reception_add_application_timestamp =
+  "ALTER TABLE blocks_reception ADD COLUMN application_timestamp TEXT"
+
+let update_blocks_reception_set_application_timestamp_to_timestamp =
+  "UPDATE blocks_reception SET application_timestamp = timestamp"
+
+let alter_blocks_reception_drop_timestamp =
+  "ALTER TABLE blocks_reception DROP COLUMN timestamp"
+
+let alter_blocks_reception_add_validation_timestamp =
+  "ALTER TABLE blocks_reception ADD COLUMN validation_timestamp TEXT"
+
+let alter_tables =
+  [
+    alter_blocks;
+    alter_blocks_reception_add_application_timestamp;
+    update_blocks_reception_set_application_timestamp_to_timestamp;
+    alter_blocks_reception_drop_timestamp;
+    alter_blocks_reception_add_validation_timestamp;
+  ]
 
 module Type = struct
   let decode_error x =
