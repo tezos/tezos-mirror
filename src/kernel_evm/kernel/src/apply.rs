@@ -270,11 +270,9 @@ fn apply_deposit<Host: Runtime>(
     };
 
     let is_success = do_deposit(()).is_some();
-    let gas_used =
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5936
-        // This is the same as the EvmHandler London configuration, but it
-        // should be explicit.
-        21_000u64;
+
+    let gas_used = CONFIG.gas_transaction_call;
+
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
