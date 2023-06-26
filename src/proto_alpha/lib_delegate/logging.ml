@@ -89,19 +89,19 @@ let raw_operations_tag =
 let bake_op_count_tag =
   Tag.def ~doc:"Bake Operation Count" "operation_count" Format.pp_print_int
 
-let endorsement_slot_tag =
-  Tag.def ~doc:"Endorsement Slot" "endorsement_slot" Format.pp_print_int
+let attestation_slot_tag =
+  Tag.def ~doc:"Attestation Slot" "attestation_slot" Format.pp_print_int
 
-let endorsement_slots_tag =
+let attestation_slots_tag =
   Tag.def
-    ~doc:"Endorsement Slots"
-    "endorsement_slots"
+    ~doc:"Attestation Slots"
+    "attestation_slots"
     Format.(fun ppf v -> pp_print_int ppf (List.length v))
 
-let denounced_endorsements_slots_tag =
+let denounced_attestations_slots_tag =
   Tag.def
-    ~doc:"Endorsement Slots"
-    "denounced_endorsement_slots"
+    ~doc:"Attestation Slots"
+    "denounced_attestation_slots"
     Format.(pp_print_list pp_print_int)
 
 let denouncement_source_tag =
@@ -138,10 +138,10 @@ let block_header_tag =
   Tag.def ~doc:"Raw block header" "block_header" (fun ppf _ ->
       Format.fprintf ppf "[raw block header]")
 
-let conflicting_endorsements_tag =
+let conflicting_attestations_tag =
   Tag.def
-    ~doc:"Two conflicting endorsements signed by the same key"
-    "conflicting_endorsements"
+    ~doc:"Two conflicting attestations signed by the same key"
+    "conflicting_attestations"
     Format.(
       fun ppf (a, b) ->
         fprintf
@@ -152,10 +152,10 @@ let conflicting_endorsements_tag =
           Operation_hash.pp
           (Operation.hash b))
 
-let conflicting_preendorsements_tag =
+let conflicting_preattestations_tag =
   Tag.def
-    ~doc:"Two conflicting preendorsements signed by the same key"
-    "conflicting_preendorsements"
+    ~doc:"Two conflicting preattestations signed by the same key"
+    "conflicting_preattestations"
     Format.(
       fun ppf (a, b) ->
         fprintf

@@ -191,6 +191,9 @@ Baker
   adaptive inflation feature. They may use the per block votes file,
   or CLI option ``--adaptive-inflation-vote``.
 
+- Rename ``endorsement`` into ``attestation`` for baker errors and events.
+  (MR :gl:`!9195`)
+
 Accuser
 -------
 

@@ -66,21 +66,20 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let proposal = state.level_state.latest_proposal in
   let*! () =
     Events.(
-      emit attempting_preendorse_proposal state.level_state.latest_proposal)
+      emit attempting_preattest_proposal state.level_state.latest_proposal)
   in
   let* () =
     if force then return_unit
     else
       is_acceptable_proposal_for_current_level state proposal >>= function
-      | Invalid -> cctxt#error "Cannot preendorse an invalid proposal"
-      | Outdated_proposal ->
-          cctxt#error "Cannot preendorse an outdated proposal"
+      | Invalid -> cctxt#error "Cannot preattest an invalid proposal"
+      | Outdated_proposal -> cctxt#error "Cannot preattest an outdated proposal"
       | Valid_proposal -> return_unit
   in
   let consensus_list = make_consensus_list state proposal in
   let*! () =
     cctxt#message
-      "@[<v 2>Preendorsing for:@ %a@]"
+      "@[<v 2>Preattesting for:@ %a@]"
       Format.(
         pp_print_list
           ~pp_sep:pp_print_space
@@ -98,20 +97,20 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
   let*! () =
-    Events.(emit attempting_endorse_proposal state.level_state.latest_proposal)
+    Events.(emit attempting_attest_proposal state.level_state.latest_proposal)
   in
   let* () =
     if force then return_unit
     else
       is_acceptable_proposal_for_current_level state proposal >>= function
-      | Invalid -> cctxt#error "Cannot endorse an invalid proposal"
-      | Outdated_proposal -> cctxt#error "Cannot endorse an outdated proposal"
+      | Invalid -> cctxt#error "Cannot attest an invalid proposal"
+      | Outdated_proposal -> cctxt#error "Cannot attest an outdated proposal"
       | Valid_proposal -> return_unit
   in
   let consensus_list = make_consensus_list state proposal in
   let*! () =
     cctxt#message
-      "@[<v 2>Endorsing for:@ %a@]"
+      "@[<v 2>Attesting for:@ %a@]"
       Format.(
         pp_print_list
           ~pp_sep:pp_print_space

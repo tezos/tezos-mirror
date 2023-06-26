@@ -56,11 +56,11 @@ val raw_operations_tag : Operation.raw list Tag.def
 
 val bake_op_count_tag : int Tag.def
 
-val endorsement_slot_tag : int Tag.def
+val attestation_slot_tag : int Tag.def
 
-val endorsement_slots_tag : int list Tag.def
+val attestation_slots_tag : int list Tag.def
 
-val denounced_endorsements_slots_tag : int list Tag.def
+val denounced_attestations_slots_tag : int list Tag.def
 
 val denouncement_source_tag : string Tag.def
 
@@ -76,8 +76,8 @@ val worker_tag : string Tag.def
 
 val block_header_tag : Block_header.t Tag.def
 
-val conflicting_endorsements_tag :
+val conflicting_attestations_tag :
   (Kind.endorsement operation * Kind.endorsement operation) Tag.def
 
-val conflicting_preendorsements_tag :
+val conflicting_preattestations_tag :
   (Kind.preendorsement operation * Kind.preendorsement operation) Tag.def

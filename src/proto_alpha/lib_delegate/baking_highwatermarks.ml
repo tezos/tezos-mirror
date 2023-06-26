@@ -42,9 +42,9 @@ let pp_highwatermark fmt {round; level} =
 
 type error += Block_previously_baked of highwatermark
 
-type error += Block_previously_preendorsed of highwatermark
+type error += Block_previously_preattested of highwatermark
 
-type error += Block_previously_endorsed of highwatermark
+type error += Block_previously_attested of highwatermark
 
 let () =
   register_error_kind
@@ -65,39 +65,38 @@ let () =
     (fun highwatermark -> Block_previously_baked highwatermark) ;
   register_error_kind
     `Permanent
-    ~id:"highwatermarks.block_previously_preendorsed"
-    ~title:"Block previously preendorsed"
-    ~description:
-      "Trying to preendorse a block at a level previously preendorsed"
+    ~id:"highwatermarks.block_previously_preattested"
+    ~title:"Block previously preattested"
+    ~description:"Trying to preattest a block at a level previously preattested"
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "A preendorsement with a higher watermark than the current one (%a) \
-         was already produced."
-        pp_highwatermark
-        highwatermark)
-    highwatermark_encoding
-    (function
-      | Block_previously_preendorsed highwatermark -> Some highwatermark
-      | _ -> None)
-    (fun highwatermark -> Block_previously_preendorsed highwatermark) ;
-  register_error_kind
-    `Permanent
-    ~id:"highwatermarks.block_previously_endorsed"
-    ~title:"Block previously endorsed"
-    ~description:"Trying to endorse a block at a level previously endorsed"
-    ~pp:(fun ppf highwatermark ->
-      Format.fprintf
-        ppf
-        "An endorsement with a higher watermark than the current one (%a) was \
+        "A preattestaion with a higher watermark than the current one (%a) was \
          already produced."
         pp_highwatermark
         highwatermark)
     highwatermark_encoding
     (function
-      | Block_previously_endorsed highwatermark -> Some highwatermark
+      | Block_previously_preattested highwatermark -> Some highwatermark
       | _ -> None)
-    (fun highwatermark -> Block_previously_endorsed highwatermark)
+    (fun highwatermark -> Block_previously_preattested highwatermark) ;
+  register_error_kind
+    `Permanent
+    ~id:"highwatermarks.block_previously_attested"
+    ~title:"Block previously attested"
+    ~description:"Trying to attest a block at a level previously attested"
+    ~pp:(fun ppf highwatermark ->
+      Format.fprintf
+        ppf
+        "An attestation with a higher watermark than the current one (%a) was \
+         already produced."
+        pp_highwatermark
+        highwatermark)
+    highwatermark_encoding
+    (function
+      | Block_previously_attested highwatermark -> Some highwatermark
+      | _ -> None)
+    (fun highwatermark -> Block_previously_attested highwatermark)
 
 module DelegateMap = Map.Make (struct
   type t = Signature.Public_key_hash.t
