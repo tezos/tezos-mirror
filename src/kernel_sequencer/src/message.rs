@@ -41,12 +41,21 @@ pub struct Bytes {
 /// that should be processed from the delayed inbox
 /// and the messages from the sequencer
 ///  
-/// The delayed messages will be processed first
-/// And then the messages will be processed
+/// The number of messages that should be processed
+/// from the delayed inbox is divided into two parts
+/// delayed_messages_prefix and delayed_messages_suffix
+///
+/// Then the messages are processed in the following order:
+/// First, the number specified by `delayed_messages_prefix` will be
+/// processed from the delayed inbox.
+/// Then the `l2_messages` will be processed
+/// Finally, the number specified by `delayed delayed_messages_suffix`
+/// will be processed at the end
 #[derive(NomReader, BinWriter, Clone, Debug, PartialEq, Eq)]
 pub struct Sequence {
     nonce: u32,
-    delayed_messages: u32,
+    delayed_messages_prefix: u32,
+    delayed_messages_suffix: u32,
     #[encoding(dynamic, list)]
     messages: Vec<Bytes>,
     signature: Signature,
@@ -177,7 +186,8 @@ mod tests {
                 .expect("decoding should work"),
             payload: SequencerMsg::Sequence(Sequence {
                 nonce: 0,
-                delayed_messages: 0,
+                delayed_messages_prefix: 0,
+                delayed_messages_suffix: 0,
                 messages: Vec::default(),
                 signature,
             }),
@@ -247,7 +257,8 @@ mod tests {
             payload: SequencerMsg::Sequence(Sequence {
                 nonce: 0,
                 signature,
-                delayed_messages: 5,
+                delayed_messages_prefix: 5,
+                delayed_messages_suffix: 5,
                 messages: Vec::default(),
             }),
         });
