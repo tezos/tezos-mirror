@@ -82,7 +82,11 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
   let* () = Node.config_init node [] in
   let* dal_parameters = Rollup.Dal.Parameters.from_client client in
   let config : Cryptobox.Config.t =
-    {activated = true; use_mock_srs_for_testing = Some dal_parameters.cryptobox}
+    {
+      activated = true;
+      use_mock_srs_for_testing = Some dal_parameters.cryptobox;
+      bootstrap_peers = [];
+    }
   in
   Node.Config_file.update
     node

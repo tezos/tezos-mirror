@@ -437,6 +437,10 @@ module Config_file = struct
           [
             ("activated", `Bool dal_config.activated);
             ("use_mock_srs_for_testing", parameters);
+            ( "bootstrap_peers",
+              `A
+                (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)
+            );
           ])
     in
     let network =

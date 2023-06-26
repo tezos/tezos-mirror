@@ -519,6 +519,7 @@ module Config : sig
   type t = Dal_config.t = {
     activated : bool;
     use_mock_srs_for_testing : parameters option;
+    bootstrap_peers : string list;
   }
 
   val encoding : t Data_encoding.t

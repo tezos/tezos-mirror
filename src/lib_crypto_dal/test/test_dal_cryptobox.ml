@@ -608,6 +608,7 @@ module Test = struct
           {
             activated = true;
             use_mock_srs_for_testing = Some (get_cryptobox_parameters params);
+            bootstrap_peers = [];
           }
         in
         let find_srs_files () : (string * string) Error_monad.tzresult =
@@ -620,7 +621,7 @@ module Test = struct
 
   let find_trusted_setup_files () =
     let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = None}
+      {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
     in
     Cryptobox.Internal_for_tests.reset_initialisation_parameters () ;
     let find_srs_files () : (string * string) Error_monad.tzresult =
@@ -634,7 +635,7 @@ module Test = struct
 
   let find_trusted_setup_files_failure () =
     let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = None}
+      {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
     in
     Cryptobox.Internal_for_tests.reset_initialisation_parameters () ;
     let find_srs_files () : (string * string) Error_monad.tzresult =
