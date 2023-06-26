@@ -42,6 +42,7 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Rename ``endorsement`` into ``attestation`` in protocol errors (MR :gl:`!9192`)
+
 Internal
 --------
-

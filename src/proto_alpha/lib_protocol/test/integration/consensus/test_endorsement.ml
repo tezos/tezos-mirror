@@ -179,7 +179,7 @@ let test_not_smallest_slot () =
   let error_wrong_slot = function
     | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
         {kind; _}
-      when kind = Validate_errors.Consensus.Endorsement ->
+      when kind = Validate_errors.Consensus.Attestation ->
         true
     | _ -> false
   in
@@ -245,7 +245,7 @@ let test_mempool_not_own_slot () =
 
 let error_old_level = function
   | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-    when kind = Validate_errors.Consensus.Endorsement ->
+    when kind = Validate_errors.Consensus.Attestation ->
       true
   | _ -> false
 
@@ -286,7 +286,7 @@ let test_two_levels_too_old () =
 
 let error_future_level = function
   | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
-    when kind = Validate_errors.Consensus.Endorsement ->
+    when kind = Validate_errors.Consensus.Attestation ->
       true
   | _ -> false
 
@@ -325,7 +325,7 @@ let test_two_levels_future () =
 
 let error_old_round = function
   | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
-    when kind = Validate_errors.Consensus.Endorsement ->
+    when kind = Validate_errors.Consensus.Attestation ->
       true
   | _ -> false
 
@@ -363,7 +363,7 @@ let test_many_rounds_too_old () =
 
 let error_future_round = function
   | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
-    when kind = Validate_errors.Consensus.Endorsement ->
+    when kind = Validate_errors.Consensus.Attestation ->
       true
   | _ -> false
 
@@ -409,7 +409,7 @@ let test_wrong_payload_hash () =
   let error_wrong_payload_hash = function
     | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
         {kind; _}
-      when kind = Validate_errors.Consensus.Endorsement ->
+      when kind = Validate_errors.Consensus.Attestation ->
         true
     | _ -> false
   in
@@ -429,7 +429,7 @@ let test_wrong_payload_hash () =
 let assert_conflict_error ~loc res =
   Assert.proto_error ~loc res (function
       | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
-        when kind = Validate_errors.Consensus.Endorsement ->
+        when kind = Validate_errors.Consensus.Attestation ->
           true
       | _ -> false)
 
@@ -631,7 +631,10 @@ let test_endorsement_threshold ~sufficient_threshold () =
   >>=? fun (_, endos) ->
   Block.bake ~operations:endos b >>= fun b ->
   if sufficient_threshold then return_unit
-  else Assert.proto_error_with_info ~loc:__LOC__ b "Not enough endorsements"
+  else
+    Assert.proto_error ~loc:__LOC__ b (function
+        | Validate_errors.Block.Not_enough_attestations _ -> true
+        | _ -> false)
 
 let tests =
   [

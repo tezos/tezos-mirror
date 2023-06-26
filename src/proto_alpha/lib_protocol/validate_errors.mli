@@ -35,11 +35,11 @@ type operation_conflict =
 (** Errors that may arise while validating a consensus operation. *)
 module Consensus : sig
   type consensus_operation_kind =
-    | Preendorsement
-    | Endorsement
+    | Preattestation
+    | Attestation
     | Dal_attestation
 
-  (** Errors for preendorsements and endorsements. *)
+  (** Errors for preattestations and attestations. *)
   type error +=
     | Zero_frozen_deposits of Signature.Public_key_hash.t
     | Consensus_operation_not_allowed
@@ -68,9 +68,9 @@ module Consensus : sig
         expected : Block_payload_hash.t;
         provided : Block_payload_hash.t;
       }
-    | Unexpected_preendorsement_in_block
-    | Unexpected_endorsement_in_block
-    | Preendorsement_round_too_high of {
+    | Unexpected_preattestation_in_block
+    | Unexpected_attestation_in_block
+    | Preattestation_round_too_high of {
         block_round : Round.t;
         provided : Round.t;
       }
@@ -116,7 +116,7 @@ end
 
 (** Errors that may arise while validating an anonymous operation. *)
 module Anonymous : sig
-  type denunciation_kind = Preendorsement | Endorsement | Block
+  type denunciation_kind = Preattestation | Attestation | Block
 
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
@@ -199,7 +199,7 @@ type error += Failing_noop_error
 
 module Block : sig
   type error +=
-    | Not_enough_endorsements of {required : int; provided : int}
+    | Not_enough_attestations of {required : int; provided : int}
     | Inconsistent_validation_passes_in_block of {
         expected : int;
         provided : int;

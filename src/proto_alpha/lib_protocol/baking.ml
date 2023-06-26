@@ -28,45 +28,47 @@ open Alpha_context
 
 type error +=
   | (* `Permanent *)
-      Insufficient_endorsing_power of {
-      endorsing_power : int;
+      Insufficient_attestation_power of {
+      attestation_power : int;
       consensus_threshold : int;
     }
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"baking.insufficient_endorsing_power"
-    ~title:"Insufficient endorsing power"
+    ~id:"baking.insufficient_attestation_power"
+    ~title:"Insufficient attestation power"
     ~description:
-      "The endorsing power is insufficient to satisfy the consensus threshold."
-    ~pp:(fun ppf (endorsing_power, consensus_threshold) ->
+      "The attestation power is insufficient to satisfy the consensus \
+       threshold."
+    ~pp:(fun ppf (attestation_power, consensus_threshold) ->
       Format.fprintf
         ppf
-        "The endorsing power (%d) is insufficient to satisfy the consensus \
+        "The attestation power (%d) is insufficient to satisfy the consensus \
          threshold (%d)."
-        endorsing_power
+        attestation_power
         consensus_threshold)
     Data_encoding.(
-      obj2 (req "endorsing_power" int31) (req "consensus_threshold" int31))
+      obj2 (req "attestation_power" int31) (req "consensus_threshold" int31))
     (function
-      | Insufficient_endorsing_power {endorsing_power; consensus_threshold} ->
-          Some (endorsing_power, consensus_threshold)
+      | Insufficient_attestation_power {attestation_power; consensus_threshold}
+        ->
+          Some (attestation_power, consensus_threshold)
       | _ -> None)
-    (fun (endorsing_power, consensus_threshold) ->
-      Insufficient_endorsing_power {endorsing_power; consensus_threshold})
+    (fun (attestation_power, consensus_threshold) ->
+      Insufficient_attestation_power {attestation_power; consensus_threshold})
 
-let bonus_baking_reward ctxt ~endorsing_power =
+let bonus_baking_reward ctxt ~attestation_power =
   let consensus_threshold = Constants.consensus_threshold ctxt in
   let baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
-  let extra_endorsing_power = endorsing_power - consensus_threshold in
+  let extra_attestation_power = attestation_power - consensus_threshold in
   error_when
-    Compare.Int.(extra_endorsing_power < 0)
-    (Insufficient_endorsing_power {endorsing_power; consensus_threshold})
+    Compare.Int.(extra_attestation_power < 0)
+    (Insufficient_attestation_power {attestation_power; consensus_threshold})
   >>? fun () ->
-  Tez.(baking_reward_bonus_per_slot *? Int64.of_int extra_endorsing_power)
+  Tez.(baking_reward_bonus_per_slot *? Int64.of_int extra_attestation_power)
 
 type ordered_slots = {
   delegate : Signature.public_key_hash;

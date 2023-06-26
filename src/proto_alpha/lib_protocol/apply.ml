@@ -30,7 +30,6 @@
 open Alpha_context
 
 type error +=
-  | Not_enough_endorsements of {required : int; provided : int}
   | Faulty_validation_wrong_slot
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
@@ -51,24 +50,6 @@ type error +=
   | Invalid_staking_parameters_sender
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"operation.not_enough_endorsements"
-    ~title:"Not enough endorsements"
-    ~description:
-      "The block being validated does not include the required minimum number \
-       of endorsements."
-    ~pp:(fun ppf (required, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong number of endorsements (%i), at least %i are expected"
-        provided
-        required)
-    Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
-    (function
-      | Not_enough_endorsements {required; provided} -> Some (required, provided)
-      | _ -> None)
-    (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
   let description =
     "The consensus operation uses an invalid slot. This error should not \
      happen: the operation validation should have failed earlier."
@@ -2678,7 +2659,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~(block_producer : Consensus_key.t) ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let endorsing_power = Consensus.current_endorsement_power ctxt in
+  let attestation_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
     are_endorsements_required ctxt ~level:level.level
   in
@@ -2711,7 +2692,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt, reward_bonus =
     if required_endorsements then
       let* ctxt = record_endorsing_participation ctxt in
-      let*? rewards_bonus = Baking.bonus_baking_reward ctxt ~endorsing_power in
+      let*? rewards_bonus =
+        Baking.bonus_baking_reward ctxt ~attestation_power
+      in
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)
   in

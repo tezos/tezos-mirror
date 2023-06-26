@@ -28,8 +28,8 @@ open Alpha_context
 
 type error +=
   | (* `Permanent *)
-      Insufficient_endorsing_power of {
-      endorsing_power : int;
+      Insufficient_attestation_power of {
+      attestation_power : int;
       consensus_threshold : int;
     }
 
@@ -60,5 +60,5 @@ val endorsing_rights_by_first_slot :
   Level.t ->
   (context * (Consensus_key.pk * int) Slot.Map.t) tzresult Lwt.t
 
-(** Computes the bonus baking reward depending on the endorsing power. *)
-val bonus_baking_reward : context -> endorsing_power:int -> Tez.t tzresult
+(** Computes the bonus baking reward depending on the attestation power. *)
+val bonus_baking_reward : context -> attestation_power:int -> Tez.t tzresult

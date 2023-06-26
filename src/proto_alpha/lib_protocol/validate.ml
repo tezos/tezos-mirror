@@ -448,7 +448,7 @@ module Consensus = struct
   let check_round_before_block ~block_round provided =
     error_unless
       Round.(provided < block_round)
-      (Preendorsement_round_too_high {block_round; provided})
+      (Preattestation_round_too_high {block_round; provided})
 
   let check_level kind expected provided =
     (* We use [if] instead of [error_unless] to avoid computing the
@@ -484,9 +484,9 @@ module Consensus = struct
       | None ->
           (* A preexisting block whose fitness has no locked round
              should contain no preendorsements. *)
-          error Unexpected_preendorsement_in_block
+          error Unexpected_preattestation_in_block
     in
-    let kind = Preendorsement in
+    let kind = Preattestation in
     let*? () = check_round_before_block ~block_round:block_info.round round in
     let*? () = check_level kind vi.current_level.level level in
     let*? () = check_round kind locked_round round in
@@ -513,9 +513,9 @@ module Consensus = struct
          any preendorsements. *)
       error_when
         Block_payload_hash.(expected_payload_hash = zero)
-        Unexpected_preendorsement_in_block
+        Unexpected_preattestation_in_block
     in
-    let kind = Preendorsement in
+    let kind = Preattestation in
     let*? () = check_round_before_block ~block_round:cons_info.round round in
     let*? () = check_level kind vi.current_level.level level in
     (* We cannot check the exact round here in construction mode, because
@@ -606,7 +606,7 @@ module Consensus = struct
           check_mempool_consensus
             vi
             consensus_info
-            Preendorsement
+            Preattestation
             consensus_content
     in
     let*? () =
@@ -638,7 +638,7 @@ module Consensus = struct
     | Error conflict ->
         error
           Validate_errors.Consensus.(
-            Conflicting_consensus_operation {kind = Preendorsement; conflict})
+            Conflicting_consensus_operation {kind = Preattestation; conflict})
 
   let add_preendorsement vs oph (op : Kind.preendorsement operation) =
     let (Single (Preendorsement {slot; level; round; _})) =
@@ -701,9 +701,9 @@ module Consensus = struct
              of the Tenderbake family; this block should not be
              endorsed. This can only happen in tests and test
              networks. *)
-          error Unexpected_endorsement_in_block
+          error Unexpected_attestation_in_block
     in
-    let kind = Endorsement in
+    let kind = Attestation in
     let*? () = check_level kind consensus_info.predecessor_level level in
     let*? () = check_round kind consensus_info.predecessor_round round in
     let*? () = check_payload_hash kind expected_payload_hash bph in
@@ -734,7 +734,7 @@ module Consensus = struct
           check_mempool_consensus
             vi
             consensus_info
-            Endorsement
+            Attestation
             consensus_content
     in
     let*? () =
@@ -766,7 +766,7 @@ module Consensus = struct
     | Error conflict ->
         error
           Validate_errors.Consensus.(
-            Conflicting_consensus_operation {kind = Endorsement; conflict})
+            Conflicting_consensus_operation {kind = Attestation; conflict})
 
   let add_endorsement vs oph (op : Kind.endorsement operation) =
     let (Single (Endorsement {slot; level; round; _})) =
@@ -892,7 +892,7 @@ module Consensus = struct
         | Some (expected, _power) ->
             (* Other preendorsements have already been validated: we check
                that the current operation has the same round as them. *)
-            check_round Preendorsement expected consensus_content.round)
+            check_round Preattestation expected consensus_content.round)
     | Application _ | Partial_validation _ | Mempool -> return_unit
 
   let validate_preendorsement ~check_signature info operation_state block_state
@@ -1410,7 +1410,7 @@ module Anonymous = struct
       operation.protocol_data.contents
     in
     check_double_endorsing_evidence
-      ~consensus_operation:Preendorsement
+      ~consensus_operation:Preattestation
       vi
       op1
       op2
@@ -1420,7 +1420,7 @@ module Anonymous = struct
     let (Single (Double_endorsement_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
-    check_double_endorsing_evidence ~consensus_operation:Endorsement vi op1 op2
+    check_double_endorsing_evidence ~consensus_operation:Attestation vi op1 op2
 
   let check_double_endorsing_evidence_conflict (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
@@ -2764,7 +2764,7 @@ let validate_operation ?(check_signature = true)
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Preendorsement
+            |> wrap_denunciation_conflict Preattestation
           in
           let operation_state =
             add_double_preendorsement_evidence operation_state oph operation
@@ -2778,7 +2778,7 @@ let validate_operation ?(check_signature = true)
               operation_state
               oph
               operation
-            |> wrap_denunciation_conflict Endorsement
+            |> wrap_denunciation_conflict Attestation
           in
           let operation_state =
             add_double_endorsement_evidence operation_state oph operation
@@ -2867,7 +2867,7 @@ let check_endorsement_power vi bs =
     let provided = bs.endorsement_power in
     fail_unless
       Compare.Int.(provided >= required)
-      (Not_enough_endorsements {required; provided})
+      (Not_enough_attestations {required; provided})
   else return_unit
 
 (** Check that the locked round in the fitness and the locked round

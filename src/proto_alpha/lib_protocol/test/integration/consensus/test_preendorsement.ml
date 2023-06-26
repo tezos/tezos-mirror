@@ -65,7 +65,7 @@ let test_consensus_operation_preendorsement_for_future_level () =
     ~level
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
+        when kind = Validate_errors.Consensus.Preattestation ->
           true
       | _ -> false)
     Preendorsement
@@ -83,7 +83,7 @@ let test_consensus_operation_preendorsement_for_old_level () =
     ~level
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
-        when kind = Validate_errors.Consensus.Preendorsement ->
+        when kind = Validate_errors.Consensus.Preattestation ->
           true
       | _ -> false)
     Preendorsement
@@ -128,7 +128,7 @@ let test_unexpected_preendorsements_in_blocks () =
     ~loc:__LOC__
     ~endorsed_block:pred
     ~error:(function
-      | Validate_errors.Consensus.Unexpected_preendorsement_in_block -> true
+      | Validate_errors.Consensus.Unexpected_preattestation_in_block -> true
       | _ -> false)
     Preendorsement
     Application
@@ -145,7 +145,7 @@ let test_too_high_round () =
     ~round
     ~level
     ~error:(function
-      | Validate_errors.Consensus.Preendorsement_round_too_high _ -> true
+      | Validate_errors.Consensus.Preattestation_round_too_high _ -> true
       | _ -> false)
     Preendorsement
     Construction

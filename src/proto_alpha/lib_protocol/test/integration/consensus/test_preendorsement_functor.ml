@@ -96,7 +96,7 @@ end = struct
         (Error
            (function
            | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
-             when kind = Validate_errors.Consensus.Preendorsement ->
+             when kind = Validate_errors.Consensus.Preattestation ->
                true
            | _ -> false))
       ()
@@ -145,7 +145,7 @@ end = struct
            (function
            | Validate_errors.Consensus.Consensus_operation_for_old_level
                {kind; _}
-             when kind = Validate_errors.Consensus.Preendorsement ->
+             when kind = Validate_errors.Consensus.Preattestation ->
                true
            | _ -> false))
       ()
@@ -178,7 +178,7 @@ end = struct
            (function
            | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
                {kind; _}
-             when kind = Validate_errors.Consensus.Preendorsement ->
+             when kind = Validate_errors.Consensus.Preattestation ->
                true
            | _ -> false))
       ()
@@ -212,7 +212,7 @@ end = struct
           (function
           | Validate_errors.Consensus.Consensus_operation_for_old_round
               {kind; _}
-            when kind = Validate_errors.Consensus.Preendorsement ->
+            when kind = Validate_errors.Consensus.Preattestation ->
               true
           | _ -> false)
       else Ok (fun _ -> return_unit)
