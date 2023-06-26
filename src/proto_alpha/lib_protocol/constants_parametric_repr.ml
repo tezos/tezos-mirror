@@ -83,24 +83,6 @@ let dal_encoding =
    you should ensure that there is a proper migration of the constants
    during context migration. See: `Raw_context.prepare_first_block` *)
 
-type tx_rollup = {
-  enable : bool;
-  origination_size : int;
-  hard_size_limit_per_inbox : int;
-  hard_size_limit_per_message : int;
-  commitment_bond : Tez_repr.t;
-  finality_period : int;
-  withdraw_period : int;
-  max_inboxes_count : int;
-  max_messages_per_inbox : int;
-  max_commitments_count : int;
-  cost_per_byte_ema_factor : int;
-  max_ticket_payload_size : int;
-  max_withdrawals_per_batch : int;
-  rejection_max_proof_size : int;
-  sunset_level : int32;
-}
-
 type sc_rollup = {
   enable : bool;
   arith_pvm_enable : bool;
@@ -121,6 +103,7 @@ type zk_rollup = {
   enable : bool;
   origination_size : int;
   min_pending_to_process : int;
+  max_ticket_payload_size : int;
 }
 
 type adaptive_inflation = {
@@ -176,82 +159,11 @@ type t = {
   cache_script_size : int;
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
-  tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
   adaptive_inflation : adaptive_inflation;
 }
-
-let tx_rollup_encoding =
-  let open Data_encoding in
-  conv
-    (fun (c : tx_rollup) ->
-      ( ( c.enable,
-          c.origination_size,
-          c.hard_size_limit_per_inbox,
-          c.hard_size_limit_per_message,
-          c.max_withdrawals_per_batch,
-          c.commitment_bond,
-          c.finality_period,
-          c.withdraw_period,
-          c.max_inboxes_count,
-          c.max_messages_per_inbox ),
-        ( c.max_commitments_count,
-          c.cost_per_byte_ema_factor,
-          c.max_ticket_payload_size,
-          c.rejection_max_proof_size,
-          c.sunset_level ) ))
-    (fun ( ( tx_rollup_enable,
-             tx_rollup_origination_size,
-             tx_rollup_hard_size_limit_per_inbox,
-             tx_rollup_hard_size_limit_per_message,
-             tx_rollup_max_withdrawals_per_batch,
-             tx_rollup_commitment_bond,
-             tx_rollup_finality_period,
-             tx_rollup_withdraw_period,
-             tx_rollup_max_inboxes_count,
-             tx_rollup_max_messages_per_inbox ),
-           ( tx_rollup_max_commitments_count,
-             tx_rollup_cost_per_byte_ema_factor,
-             tx_rollup_max_ticket_payload_size,
-             tx_rollup_rejection_max_proof_size,
-             tx_rollup_sunset_level ) ) ->
-      {
-        enable = tx_rollup_enable;
-        origination_size = tx_rollup_origination_size;
-        hard_size_limit_per_inbox = tx_rollup_hard_size_limit_per_inbox;
-        hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
-        max_withdrawals_per_batch = tx_rollup_max_withdrawals_per_batch;
-        commitment_bond = tx_rollup_commitment_bond;
-        finality_period = tx_rollup_finality_period;
-        withdraw_period = tx_rollup_withdraw_period;
-        max_inboxes_count = tx_rollup_max_inboxes_count;
-        max_messages_per_inbox = tx_rollup_max_messages_per_inbox;
-        max_commitments_count = tx_rollup_max_commitments_count;
-        cost_per_byte_ema_factor = tx_rollup_cost_per_byte_ema_factor;
-        max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
-        rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
-        sunset_level = tx_rollup_sunset_level;
-      })
-    (merge_objs
-       (obj10
-          (req "tx_rollup_enable" bool)
-          (req "tx_rollup_origination_size" int31)
-          (req "tx_rollup_hard_size_limit_per_inbox" int31)
-          (req "tx_rollup_hard_size_limit_per_message" int31)
-          (req "tx_rollup_max_withdrawals_per_batch" int31)
-          (req "tx_rollup_commitment_bond" Tez_repr.encoding)
-          (req "tx_rollup_finality_period" int31)
-          (req "tx_rollup_withdraw_period" int31)
-          (req "tx_rollup_max_inboxes_count" int31)
-          (req "tx_rollup_max_messages_per_inbox" int31))
-       (obj5
-          (req "tx_rollup_max_commitments_count" int31)
-          (req "tx_rollup_cost_per_byte_ema_factor" int31)
-          (req "tx_rollup_max_ticket_payload_size" int31)
-          (req "tx_rollup_rejection_max_proof_size" int31)
-          (req "tx_rollup_sunset_level" int32)))
 
 let sc_rollup_encoding =
   let open Data_encoding in
@@ -320,20 +232,29 @@ let sc_rollup_encoding =
 let zk_rollup_encoding =
   let open Data_encoding in
   conv
-    (fun ({enable; origination_size; min_pending_to_process} : zk_rollup) ->
-      (enable, origination_size, min_pending_to_process))
+    (fun ({
+            enable;
+            origination_size;
+            min_pending_to_process;
+            max_ticket_payload_size;
+          } :
+           zk_rollup) ->
+      (enable, origination_size, min_pending_to_process, max_ticket_payload_size))
     (fun ( zk_rollup_enable,
            zk_rollup_origination_size,
-           zk_rollup_min_pending_to_process ) ->
+           zk_rollup_min_pending_to_process,
+           zk_rollup_max_ticket_payload_size ) ->
       {
         enable = zk_rollup_enable;
         origination_size = zk_rollup_origination_size;
         min_pending_to_process = zk_rollup_min_pending_to_process;
+        max_ticket_payload_size = zk_rollup_max_ticket_payload_size;
       })
-    (obj3
+    (obj4
        (req "zk_rollup_enable" bool)
        (req "zk_rollup_origination_size" int31)
-       (req "zk_rollup_min_pending_to_process" int31))
+       (req "zk_rollup_min_pending_to_process" int31)
+       (req "zk_rollup_max_ticket_payload_size" int31))
 
 let adaptive_inflation_encoding =
   let open Data_encoding in
@@ -442,9 +363,8 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                ( c.tx_rollup,
-                  (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_inflation)) )
-              ) ) ) ) ))
+                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_inflation)) ) )
+          ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -479,9 +399,8 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   ( tx_rollup,
-                     (dal, ((sc_rollup, zk_rollup), adaptive_inflation)) ) ) )
-             ) ) ) ->
+                   (dal, ((sc_rollup, zk_rollup), adaptive_inflation)) ) ) ) )
+         ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -517,7 +436,6 @@ let encoding =
         cache_script_size;
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
-        tx_rollup;
         dal;
         sc_rollup;
         zk_rollup;
@@ -576,9 +494,7 @@ let encoding =
                       (req "cache_stake_distribution_cycles" int8)
                       (req "cache_sampler_state_cycles" int8))
                    (merge_objs
-                      tx_rollup_encoding
+                      (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
-                         (obj1 (req "dal_parametric" dal_encoding))
-                         (merge_objs
-                            (merge_objs sc_rollup_encoding zk_rollup_encoding)
-                            adaptive_inflation_encoding))))))))
+                         (merge_objs sc_rollup_encoding zk_rollup_encoding)
+                         adaptive_inflation_encoding)))))))

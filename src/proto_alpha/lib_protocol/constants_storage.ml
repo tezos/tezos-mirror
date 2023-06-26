@@ -102,8 +102,6 @@ let liquidity_baking_toggle_ema_threshold c =
 
 let parametric c = Raw_context.constants c
 
-let tx_rollup c = (Raw_context.constants c).tx_rollup
-
 let sc_rollup c = (Raw_context.constants c).sc_rollup
 
 let minimal_block_delay c =
@@ -137,66 +135,6 @@ let delegation_over_baking_limit c =
 let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
   constants.percentage_of_frozen_deposits_slashed_per_double_baking
-
-let tx_rollup_enable c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.enable
-
-let tx_rollup_sunset_level c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.sunset_level
-
-let tx_rollup_origination_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.origination_size
-
-let tx_rollup_hard_size_limit_per_inbox c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.hard_size_limit_per_inbox
-
-let tx_rollup_hard_size_limit_per_message c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.hard_size_limit_per_message
-
-let tx_rollup_max_withdrawals_per_batch c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_withdrawals_per_batch
-
-let tx_rollup_commitment_bond c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.commitment_bond
-
-let tx_rollup_finality_period c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.finality_period
-
-let tx_rollup_withdraw_period c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.withdraw_period
-
-let tx_rollup_max_inboxes_count c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_inboxes_count
-
-let tx_rollup_max_messages_per_inbox c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_messages_per_inbox
-
-let tx_rollup_max_commitments_count c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_commitments_count
-
-let tx_rollup_cost_per_byte_ema_factor c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.cost_per_byte_ema_factor
-
-let tx_rollup_max_ticket_payload_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.max_ticket_payload_size
-
-let tx_rollup_rejection_max_proof_size c =
-  let tx_rollup = Raw_context.tx_rollup c in
-  tx_rollup.rejection_max_proof_size
 
 let percentage_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
@@ -277,6 +215,10 @@ let zk_rollup_min_pending_to_process c =
 let zk_rollup_origination_size c =
   let zk_rollup = Raw_context.zk_rollup c in
   zk_rollup.origination_size
+
+let zk_rollup_max_ticket_payload_size c =
+  let zk_rollup = Raw_context.zk_rollup c in
+  zk_rollup.max_ticket_payload_size
 
 let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
 

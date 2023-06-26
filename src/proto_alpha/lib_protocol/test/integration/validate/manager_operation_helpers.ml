@@ -407,13 +407,6 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
     | None -> Gas.Arith.(integral_of_int_exn 5_200_000)
   in
   let dal = {params.constants.dal with feature_enable = flags.dal} in
-  let tx_rollup =
-    {
-      params.constants.tx_rollup with
-      sunset_level = Int32.max_int;
-      enable = flags.toru;
-    }
-  in
   let sc_rollup =
     {
       params.constants.sc_rollup with
@@ -423,14 +416,7 @@ let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
   in
   let zk_rollup = {params.constants.zk_rollup with enable = flags.zkru} in
   let constants =
-    {
-      params.constants with
-      hard_gas_limit_per_block;
-      dal;
-      tx_rollup;
-      zk_rollup;
-      sc_rollup;
-    }
+    {params.constants with hard_gas_limit_per_block; dal; zk_rollup; sc_rollup}
   in
   {params with constants}
 

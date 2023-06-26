@@ -630,7 +630,6 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                  hard_gas_limit_per_block;
                  hard_storage_limit_per_operation;
                  origination_size;
-                 tx_rollup = {origination_size = _tx_rollup_origination_size; _};
                  cost_per_byte;
                  _;
                };

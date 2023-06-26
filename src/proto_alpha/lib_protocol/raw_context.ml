@@ -306,8 +306,6 @@ let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
 
-let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
-
 let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
 
 let[@inline] zk_rollup ctxt = ctxt.back.constants.zk_rollup
@@ -929,27 +927,6 @@ let prepare_first_block ~level ~timestamp ctxt =
       add_constants ctxt param.constants >|= ok
   | Nairobi_017 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let tx_rollup =
-        Constants_parametric_repr.
-          {
-            enable = c.tx_rollup.enable;
-            origination_size = c.tx_rollup.origination_size;
-            hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
-            hard_size_limit_per_message =
-              c.tx_rollup.hard_size_limit_per_message;
-            max_withdrawals_per_batch = c.tx_rollup.max_withdrawals_per_batch;
-            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
-            commitment_bond = c.tx_rollup.commitment_bond;
-            finality_period = c.tx_rollup.finality_period;
-            withdraw_period = c.tx_rollup.withdraw_period;
-            max_inboxes_count = c.tx_rollup.max_inboxes_count;
-            max_messages_per_inbox = c.tx_rollup.max_messages_per_inbox;
-            max_commitments_count = c.tx_rollup.max_commitments_count;
-            cost_per_byte_ema_factor = c.tx_rollup.cost_per_byte_ema_factor;
-            rejection_max_proof_size = c.tx_rollup.rejection_max_proof_size;
-            sunset_level = c.tx_rollup.sunset_level;
-          }
-      in
       let cryptobox_parameters =
         {
           Dal.page_size = c.dal.cryptobox_parameters.page_size;
@@ -998,6 +975,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             enable = c.zk_rollup.enable;
             origination_size = c.zk_rollup.origination_size;
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
+            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
           }
       in
 
@@ -1078,7 +1056,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
             cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-            tx_rollup;
             dal;
             sc_rollup;
             zk_rollup;

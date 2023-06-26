@@ -46,3 +46,5 @@ Minor Changes
 
 Internal
 --------
+
+- Transaction rollup: removed left parameters (:gl:`!8700`)
