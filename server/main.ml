@@ -399,13 +399,15 @@ let operations_callback db_pool g source operations =
             let* () = Db.exec Sql_requests.maybe_insert_source source in
             let* () =
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun (delegate, _) ->
-                  Db.exec Sql_requests.maybe_insert_delegate delegate)
+                (fun (right, _) ->
+                  Db.exec
+                    Sql_requests.maybe_insert_delegate
+                    right.Teztale_lib.Consensus_ops.address)
                 operations
             in
             let* () =
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                (fun (delegate, ops) ->
+                (fun (right, ops) ->
                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                     (fun (op : Teztale_lib.Consensus_ops.received_operation) ->
                       Db.exec
@@ -415,12 +417,12 @@ let operations_callback db_pool g source operations =
                               op.op.hash,
                               op.op.kind = Endorsement,
                               op.op.round ),
-                            delegate ))
+                            right.Teztale_lib.Consensus_ops.address ))
                     ops)
                 operations
             in
             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-              (fun (delegate, ops) ->
+              (fun (right, ops) ->
                 Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                   (fun op ->
                     Db.exec
@@ -428,7 +430,7 @@ let operations_callback db_pool g source operations =
                       Teztale_lib.Consensus_ops.
                         ( ( op.reception_time,
                             op.errors,
-                            delegate,
+                            right.Teztale_lib.Consensus_ops.address,
                             op.op.kind = Endorsement ),
                           (op.op.round, source, level) ))
                   ops)

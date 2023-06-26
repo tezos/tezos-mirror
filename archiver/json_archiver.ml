@@ -390,8 +390,10 @@ let dump_received path ?unaccurate level received_ops =
                    delegate_ops) ->
               match
                 List.partition
-                  (fun (pkh, _) ->
-                    Tezos_crypto.Signature.Public_key_hash.equal pkh delegate)
+                  (fun (right, _) ->
+                    Tezos_crypto.Signature.Public_key_hash.equal
+                      right.Teztale_lib.Consensus_ops.address
+                      delegate)
                   missing
               with
               | (_, new_operations) :: other_ops_by_same_delegate, missing' ->
@@ -415,12 +417,12 @@ let dump_received path ?unaccurate level received_ops =
           | _ :: _ ->
               return
                 (List.fold_left
-                   (fun acc (delegate, ops) ->
+                   (fun acc (right, ops) ->
                      Data.Delegate_operations.
                        {
-                         delegate;
-                         first_slot = 0;
-                         endorsing_power = 0;
+                         delegate = right.Teztale_lib.Consensus_ops.address;
+                         first_slot = right.Teztale_lib.Consensus_ops.first_slot;
+                         endorsing_power = right.Teztale_lib.Consensus_ops.power;
                          operations =
                            List.rev_map
                              (fun Consensus_ops.

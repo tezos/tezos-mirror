@@ -166,12 +166,11 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
               rights
           with
           | ([] | _ :: _ :: _), _ -> assert false
-          | [right], rights' ->
-              ((right.Consensus_ops.address, ops) :: acc, rights'))
+          | [right], rights' -> ((right, ops) :: acc, rights'))
         ([], rights)
         ops
     in
-    (items, List.map (fun right -> right.Consensus_ops.address) missing)
+    (items, missing)
 
   let endorsements_recorder (module A : Archiver.S) cctx current_level =
     let cctx' = Services.wrap_full cctx in
@@ -201,10 +200,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         let full = Compare.Int32.(current_level = level) in
         let endorsements =
           if full then
-            List.fold_left
-              (fun acc delegate -> (delegate, []) :: acc)
-              items
-              missing
+            List.fold_left (fun acc right -> (right, []) :: acc) items missing
           else items
         in
         dump_my_current_endorsements

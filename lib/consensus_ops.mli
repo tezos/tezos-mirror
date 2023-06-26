@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type right = {
+  address : Tezos_crypto.Signature.Public_key_hash.t;
+  first_slot : int;
+  power : int;
+}
+
+type rights = right list
+
+val rights_encoding : rights Data_encoding.t
+
 type operation_kind = Endorsement | Preendorsement
 
 val operation_kind_encoding : operation_kind Data_encoding.encoding
@@ -43,8 +53,7 @@ type received_operation = {
   errors : error list option;
 }
 
-type delegate_ops =
-  (Tezos_crypto.Signature.Public_key_hash.t * received_operation list) list
+type delegate_ops = (right * received_operation list) list
 
 val delegate_ops_encoding : delegate_ops Data_encoding.t
 
@@ -55,13 +64,3 @@ type block_op = {
 }
 
 val block_op_encoding : block_op Data_encoding.encoding
-
-type right = {
-  address : Tezos_crypto.Signature.Public_key_hash.t;
-  first_slot : int;
-  power : int;
-}
-
-type rights = right list
-
-val rights_encoding : rights Data_encoding.t
