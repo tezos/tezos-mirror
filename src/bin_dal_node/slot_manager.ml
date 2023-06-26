@@ -170,9 +170,9 @@ let shards_to_attestors committee =
   let committee = to_array committee in
   fun index -> get_opt committee index
 
-(* This function publishes the shards of a commitment that is waiting for
-   attestion on L1 if this node has those shards on disk and their proofs in
-   memory. *)
+(** This function publishes the shards of a commitment that is waiting for
+    attestion on L1 if this node has those shards on disk and their proofs in
+    memory. *)
 let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
     cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
@@ -251,34 +251,8 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                        |> app_input gs_worker) ;
                      return_unit))
 
-let store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
-    proto_parameters slot_headers node_store gs_worker =
-  let open Lwt_result_syntax in
-  let* () =
-    Store.Legacy.add_slot_headers
-      ~block_level
-      ~block_hash
-      slot_headers
-      node_store
-  in
-  List.iter_es
-    (fun (slot_header, status) ->
-      match status with
-      | Dal_plugin.Succeeded ->
-          let Dal_plugin.{slot_index; commitment; published_level} =
-            slot_header
-          in
-          publish_slot_data
-            ~level_committee
-            node_store
-            gs_worker
-            cryptobox
-            proto_parameters
-            commitment
-            published_level
-            slot_index
-      | Dal_plugin.Failed -> return_unit)
-    slot_headers
+let store_slot_headers ~block_level ~block_hash slot_headers node_store =
+  Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =

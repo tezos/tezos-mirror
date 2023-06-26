@@ -230,7 +230,7 @@ module Handler = struct
       | Starting -> return_unit
       | Ready
           {
-            plugin = (module Dal_plugin);
+            plugin = (module Plugin);
             proto_parameters;
             cryptobox;
             shards_proofs_precomputation = _;
@@ -240,27 +240,48 @@ module Handler = struct
           if Compare.Int32.(block_level < activation_level) then return_unit
           else
             let* block_info =
-              Dal_plugin.block_info
+              Plugin.block_info
                 cctxt
                 ~block:(`Hash (block_hash, 0))
                 ~metadata:`Always
             in
-            let* slot_headers =
-              Dal_plugin.get_published_slot_headers block_info
-            in
+            let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
               Slot_manager.store_slot_headers
-                ~level_committee:(Node_context.fetch_committee ctxt)
-                cryptobox
-                proto_parameters
                 ~block_level
                 ~block_hash
                 slot_headers
                 (Node_context.get_store ctxt)
-                (Node_context.get_gs_worker ctxt)
+            in
+            let* () =
+              (* If a slot header was posted to the L1 and we have the corresponding
+                 data, post it to gossipsub.
+
+                 FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
+                 Should we restrict published slot data to the slots for which
+                 we have the producer role?
+              *)
+              List.iter_es
+                (fun (slot_header, status) ->
+                  match status with
+                  | Dal_plugin.Succeeded ->
+                      let Dal_plugin.{slot_index; commitment; published_level} =
+                        slot_header
+                      in
+                      Slot_manager.publish_slot_data
+                        ~level_committee:(Node_context.fetch_committee ctxt)
+                        (Node_context.get_store ctxt)
+                        (Node_context.get_gs_worker ctxt)
+                        cryptobox
+                        proto_parameters
+                        commitment
+                        published_level
+                        slot_index
+                  | Dal_plugin.Failed -> return_unit)
+                slot_headers
             in
             let*? attested_slots =
-              Dal_plugin.attested_slot_headers
+              Plugin.attested_slot_headers
                 block_hash
                 block_info
                 ~number_of_slots:proto_parameters.number_of_slots

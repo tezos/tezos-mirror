@@ -88,23 +88,30 @@ val add_commitment_shards :
   with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
-(** [store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
-    proto_parameters slot_headers node_store gs_worker] stores [slot_headers]
-    onto the [node_store] associated to the given [block_hash] baked at level
-    [block_level].
-
-    If a slot header's status becomes "waiting for attestation" after this update and
-    this node contains the slot's shards and shards proofs, the corresponding
-    Gossipsub messages are pushed into the GS worker. *)
-val store_slot_headers :
-  level_committee:(level:int32 -> Committee_cache.committee tzresult Lwt.t) ->
-  block_level:int32 ->
-  block_hash:Block_hash.t ->
-  Cryptobox.t ->
-  Dal_plugin.proto_parameters ->
-  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+(** This function publishes the shards of a commitment that is waiting for
+    attestion on L1 if this node has those shards on disk and their proofs in
+    memory. *)
+val publish_slot_data :
+  level_committee:
+    (level:int32 ->
+    Committee_cache.shard_indices Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
   Store.node_store ->
   Gossipsub.Worker.t ->
+  Cryptobox.t ->
+  Dal_plugin.proto_parameters ->
+  Cryptobox.commitment ->
+  int32 ->
+  int ->
+  unit tzresult Lwt.t
+
+(** [store_slot_headers  ~block_level ~block_hash slot_headers node_store]
+    stores [slot_headers] onto the [node_store] associated to the given [block_hash]
+    baked at level [block_level]. *)
+val store_slot_headers :
+  block_level:int32 ->
+  block_hash:Block_hash.t ->
+  (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
+  Store.node_store ->
   unit tzresult Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
