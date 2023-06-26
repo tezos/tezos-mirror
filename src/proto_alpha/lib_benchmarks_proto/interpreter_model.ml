@@ -613,6 +613,18 @@ let pack_alloc_model = function
   | TimeModel _ -> assert false
   | TimeAllocModel {alloc; _} -> Model.Model alloc
 
+let pack_time_alloc_model = function
+  | TimeModel _ -> assert false
+  | TimeAllocModel {name; time; alloc} ->
+      Model.Model
+        (Model.synthesize
+           ~name
+           ~binop:(module SynthesizeTimeAlloc)
+           ~x_label:"time"
+           ~x_model:time
+           ~y_label:"alloc"
+           ~y_model:alloc)
+
 let amplification_loop_iteration = fv "amplification_loop_iteration"
 
 let amplification_loop_model =
@@ -675,3 +687,6 @@ let make_model ?amplification benchmark_type instr_name =
          because the measurement resolution doesn't matter for the allocation *)
       assert (amplification = None) ;
       make_alloc_model instr_name
+
+let make_time_alloc_codegen_model instr_name =
+  pack_time_alloc_model (ir_model instr_name)

@@ -579,7 +579,11 @@ let simple_time_alloc_benchmark ?amplification ?intercept_stack ?more_tags ?salt
     ~name
     ~stack_type
     ~kinstr
-    ()
+    () ;
+  let (Model.Model codegen_model) =
+    Interpreter_model.make_time_alloc_codegen_model (Instr_name name)
+  in
+  register_model_for_code_generation codegen_model
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers for creating benchmarks for [Script_interpreter.next] *)
@@ -729,11 +733,6 @@ let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
       ()
   in
   Registration_helpers.register bench
-
-(* Register only a model for code generation *)
-let register_model_for_code_generation model =
-  let model = Model.make ~conv:Fun.id ~model in
-  Registration.register_model_for_code_generation "interpreter" model
 
 (* ------------------------------------------------------------------------- *)
 (* Sampling helpers *)
