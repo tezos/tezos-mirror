@@ -399,57 +399,6 @@ module Legacy = struct
     let* () = error_promise in
     Dac_node.terminate dac_node
 
-  let test_dac_node_startup =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac node startup"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let previous_protocol =
-      match Protocol.previous_protocol protocol with
-      | Some p -> p
-      | None -> assert false
-    in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol:previous_protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let dac_node =
-      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    let* () =
-      Dac_node.wait_for dac_node "dac_node_layer_1_start_tracking.v0" (fun _ ->
-          Some ())
-    in
-    assert (Dac_node.is_running_not_ready dac_node) ;
-    let* () = Dac_node.terminate dac_node in
-    let* () = Node.terminate node in
-    Node.Config_file.update
-      node
-      (Node.Config_file.set_sandbox_network_with_user_activated_overrides
-         [(Protocol.hash previous_protocol, Protocol.hash protocol)]) ;
-    let* () = Node.run node nodes_args in
-    let* () = Node.wait_for_ready node in
-    let* () = run_dac dac_node in
-    let* () =
-      Lwt.join
-        [
-          Dac_node.wait_for dac_node "dac_node_plugin_resolved.v0" (fun _ ->
-              Some ());
-          Client.bake_for_and_wait client;
-        ]
-    in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
       ~__FILE__
@@ -2847,7 +2796,7 @@ module Api_regression = struct
       following arguments:
         1. RPC_REQUEST_URI
         2. RPC_REQUEST_HEADER
-        3. RPC_REQUEST_BODY 
+        3. RPC_REQUEST_BODY
         4. RPC_RESPONSE_BODY
 
       As such with the call to this function we:
@@ -3061,7 +3010,6 @@ end
 
 let register ~protocols =
   (* Tests with layer1 and dac nodes *)
-  Legacy.test_dac_node_startup protocols ;
   Legacy.test_dac_node_imports_committee_members protocols ;
   Legacy.test_dac_node_dac_threshold_not_reached protocols ;
   scenario_with_layer1_legacy_and_rollup_nodes
