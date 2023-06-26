@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type endpoint = Node of Dac_node.t | Foreign_endpoint of Foreign_endpoint.t
+
 (** The type of a dac client. *)
 type t
 
@@ -31,9 +34,22 @@ type t
 val create :
   ?runner:Runner.t ->
   ?name:string ->
+  ?path:string ->
   ?base_dir:string ->
   ?color:Log.Color.t ->
   Dac_node.t ->
+  t
+
+(** [create_with_endpoint] also creates a new [Dac_client.t], but without
+    assuming the DAC node the client will interact with is a node managed by
+    Tezt. *)
+val create_with_endpoint :
+  ?runner:Runner.t ->
+  ?name:string ->
+  ?path:string ->
+  ?base_dir:string ->
+  ?color:Log.Color.t ->
+  endpoint ->
   t
 
 (** The output of a dac client command.
