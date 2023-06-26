@@ -55,3 +55,9 @@ let typ =
   Check.comparable
     (fun fmt t -> Format.fprintf fmt "%s" (to_string t))
     (fun a b -> Z.compare a b)
+
+let to_le_bytes z =
+  let buffer = Bytes.make 32 '\000' in
+  let bits = Z.to_bits z |> Bytes.of_string in
+  Bytes.blit bits 0 buffer 0 (Bytes.length bits) ;
+  buffer

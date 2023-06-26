@@ -232,9 +232,41 @@ let setup_deposit_contracts ~admin client protocol =
 
   return {fa12 = fa12_address; bridge = bridge_address}
 
+let make_config ?bootstrap_accounts ?ticketer () =
+  let open Sc_rollup_helpers.Installer_kernel_config in
+  let ticketer =
+    Option.fold
+      ~some:(fun ticketer ->
+        let value = Hex.(of_string ticketer |> show) in
+        let to_ = "/evm/ticketer" in
+        [Set {value; to_}])
+      ~none:[]
+      ticketer
+  in
+  let bootstrap_accounts =
+    Option.fold
+      ~some:
+        (Array.fold_left
+           (fun acc Eth_account.{address; _} ->
+             let value =
+               Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
+             in
+             let to_ =
+               sf
+                 "/evm/eth_accounts/%s/balance"
+                 (no_0x address |> String.lowercase_ascii)
+             in
+             Set {value; to_} :: acc)
+           [])
+      ~none:[]
+      bootstrap_accounts
+  in
+  match ticketer @ bootstrap_accounts with [] -> None | res -> Some res
+
 let setup_evm_kernel ?config
     ?(originator_key = Constant.bootstrap1.public_key_hash)
-    ?(rollup_operator_key = Constant.bootstrap1.public_key_hash) ~deposit_admin
+    ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
+    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ~deposit_admin
     protocol =
   let* node, client = setup_l1 protocol in
   let* deposit_addresses =
@@ -246,14 +278,13 @@ let setup_evm_kernel ?config
   in
   (* If a L1 bridge was set up, we make the kernel aware of the address. *)
   let config =
-    match (config, deposit_addresses) with
-    | Some config, _ -> Some config
-    | None, Some {bridge; _} ->
-        let open Sc_rollup_helpers.Installer_kernel_config in
-        let value = Hex.(of_string bridge |> show) in
-        let to_ = "/evm/ticketer" in
-        Some [Set {value; to_}]
-    | _ -> None
+    match config with
+    | Some config -> Some config
+    | None ->
+        let ticketer =
+          Option.map (fun {bridge; _} -> bridge) deposit_addresses
+        in
+        make_config ~bootstrap_accounts ?ticketer ()
   in
   let sc_rollup_node =
     Sc_rollup_node.create
