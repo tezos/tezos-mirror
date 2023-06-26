@@ -1,10 +1,12 @@
 .base-test-doc-scripts-template:
   stage: doc
   needs: []
+  variables:
+    # The default behavior of opam is to use `nproc` to determine its level of
+    # parallelism. This returns the number of CPU of the "host" CI runner
+    # instead of the number of cores a single CI job can reasonably use.
+    OPAMJOBS: "4"
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--no-docs(?:$|[,])/'
-      when: manual
-      allow_failure: true
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
     - if: '$CI_MERGE_REQUEST_ID'
