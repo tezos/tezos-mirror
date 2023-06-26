@@ -983,21 +983,6 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       metrics_addr;
     }
 
-type Error_monad.error += Failed_to_parse_address of (string * string)
-
-let () =
-  (* Parsing of an address failed with an explanation *)
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"config_file.parsing_address_failed"
-    ~title:"Parsing of an address failed"
-    ~description:"Parsing an address failed with an explanation."
-    ~pp:(fun ppf (addr, explanation) ->
-      Format.fprintf ppf "Failed to parse address '%s': %s@." addr explanation)
-    Data_encoding.(obj2 (req "addr" string) (req "explanation" string))
-    (function Failed_to_parse_address s -> Some s | _ -> None)
-    (fun s -> Failed_to_parse_address s)
-
 let to_ipv4 ipv6_l =
   let open Lwt_syntax in
   let convert_or_warn (ipv6, port) =
@@ -1012,99 +997,45 @@ let to_ipv4 ipv6_l =
   in
   List.filter_map_s convert_or_warn ipv6_l
 
-(* Parse an address.
-
-   - [peer] is a string representing the peer.
-
-   - if [no_peer_id_expected] is true, then parsing a representation
-   containing a peer id will result in an error.
-
-   - [default_addr] is the used if no hostname or IP is given or if
-   the hostname "_" is used.
-
-   - [default_port] is the used if port is given. *)
-let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
-    ?(passive = false) peer :
-    (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  match P2p_point.Id.parse_addr_port_id peer with
-  | (Error (P2p_point.Id.Bad_id_format _) | Ok {peer_id = Some _; _})
-    when no_peer_id_expected ->
-      tzfail
-        (Failed_to_parse_address
-           (peer, "no peer identity should be specified here"))
-  | Error err ->
-      tzfail
-        (Failed_to_parse_address (peer, P2p_point.Id.string_of_parsing_error err))
-  | Ok {addr; port; peer_id} ->
-      let service_port =
-        match (port, default_port) with
-        | Some port, _ -> port
-        | None, Some default_port -> default_port
-        | None, None -> default_p2p_port
-      in
-      let service = string_of_int service_port in
-      let node = if addr = "" || addr = "_" then default_addr else addr in
-      let*! l = Lwt_utils_unix.getaddrinfo ~passive ~node ~service in
-      return (List.map (fun point -> (point, peer_id)) l)
-
-let resolve_addrs ?default_port ?passive ?no_peer_id_expected ~default_addr
-    addrs =
-  List.concat_map_es
-    (resolve_addr ~default_addr ?default_port ?passive ?no_peer_id_expected)
-    addrs
-
 let resolve_discovery_addrs discovery_addr =
   let open Lwt_result_syntax in
-  let* addrs =
-    resolve_addr
+  let* points =
+    P2p_resolve.resolve_addr
       ~default_addr:Ipaddr.V4.(to_string broadcast)
       ~default_port:default_discovery_port
       ~passive:true
       discovery_addr
   in
-  let*! addrs = to_ipv4 (List.map fst addrs) in
-  return addrs
+  let*! points = to_ipv4 points in
+  return points
 
 let resolve_listening_addrs listen_addr =
-  let open Lwt_result_syntax in
-  let+ addrs =
-    resolve_addr
-      ~default_addr:"::"
-      ~default_port:default_p2p_port
-      ~passive:true
-      listen_addr
-  in
-  List.map fst addrs
+  P2p_resolve.resolve_addr
+    ~default_addr:"::"
+    ~default_port:default_p2p_port
+    ~passive:true
+    listen_addr
 
 let resolve_rpc_listening_addrs listen_addr =
-  let open Lwt_result_syntax in
-  let+ addrs =
-    resolve_addr
-      ~default_addr:"localhost"
-      ~default_port:default_rpc_port
-      ~passive:true
-      listen_addr
-  in
-  List.map fst addrs
+  P2p_resolve.resolve_addr
+    ~default_addr:"localhost"
+    ~default_port:default_rpc_port
+    ~passive:true
+    listen_addr
 
 let resolve_metrics_addrs ?(default_metrics_port = default_metrics_port)
     metrics_addr =
-  let open Lwt_result_syntax in
-  let+ addrs =
-    resolve_addr
-      ~default_addr:"localhost"
-      ~default_port:default_metrics_port
-      ~passive:true
-      metrics_addr
-  in
-  List.map fst addrs
+  P2p_resolve.resolve_addr
+    ~default_addr:"localhost"
+    ~default_port:default_metrics_port
+    ~passive:true
+    metrics_addr
 
 let resolve_bootstrap_addrs peers =
-  resolve_addrs
-    ~no_peer_id_expected:false
-    ~default_addr:"::"
-    ~default_port:default_p2p_port
+  List.concat_map_es
+    (P2p_resolve.resolve_addr_with_peer_id
+       ~default_addr:"::"
+       ~default_port:default_p2p_port)
     peers
 
 let bootstrap_peers config =

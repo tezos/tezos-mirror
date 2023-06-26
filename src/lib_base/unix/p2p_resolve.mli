@@ -30,9 +30,9 @@ type error += Failed_to_parse_address of (string * string)
 
     The format of [addr] can be either an IP address (v4 or v6) or a
     domain name. If a domain name is provided, a DNS lookup is made
-    (see {!val:Unix.getaddrinfo}.
+    (see {!val:Unix.getaddrinfo}).
 
-    Moreover, a peer id can provided by postfixing the addr with
+    Moreover, a peer id can be provided by postfixing the addr with
     [#<peer_id>]. The peer id should be provided using the b58 format.
 
     An event is emitted if the DNS lookup returned 0 points.

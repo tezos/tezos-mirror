@@ -147,8 +147,6 @@ val read : string -> t tzresult Lwt.t
     is a data directory. *)
 val write : string -> t -> unit tzresult Lwt.t
 
-type error += Failed_to_parse_address of (string * string)
-
 (** [resolve_listening_addrs listening_addr] parses [listening_addr]
    and returns a list of [points].  The default port is
    [default_p2p_port]. Fails if the address could not be parsed. *)
