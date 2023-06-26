@@ -347,6 +347,9 @@ module Models = struct
     end in
     (module M : Model.Model_impl with type arg_type = int * unit)
 
+  let empty_branch_model name =
+    branching_model ~case_0:"empty" ~case_1:"nonempty" name
+
   let max_branching_model ~case_0 ~case_1 name =
     let module M = struct
       type arg_type = unit
@@ -590,8 +593,7 @@ let ir_model instr_or_cont =
       | N_KIter_nonempty -> const1_model name |> m
       | N_KList_enter_body -> list_enter_body_model name |> m
       | N_KList_exit_body -> const1_model name |> m
-      | N_KMap_enter_body_empty -> const1_model name |> m
-      | N_KMap_enter_body_singleton -> const1_model name |> m
+      | N_KMap_enter_body -> empty_branch_model name |> m
       | N_KMap_exit_body -> nlogm_model name |> m
       | N_KLog -> const1_model name |> m)
 

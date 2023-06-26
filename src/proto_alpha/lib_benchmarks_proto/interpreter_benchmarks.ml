@@ -3615,7 +3615,8 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KMap_enter_body_empty
+        ~salt:"_empty"
+        ~name:Interpreter_workload.N_KMap_enter_body
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
@@ -3637,7 +3638,8 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KMap_enter_body_singleton
+        ~salt:"_singleton"
+        ~name:Interpreter_workload.N_KMap_enter_body
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
@@ -3646,15 +3648,6 @@ module Registration_section = struct
               cont = map_enter_body_code [(Script_int.zero, ())];
             })
         ()
-
-    let () =
-      let model =
-        Interpreter_model.Models.max_branching_model
-          ~case_0:"empty_const"
-          ~case_1:"singleton_const"
-          "N_KMap_enter_body"
-      in
-      register_model_for_code_generation model
 
     let () =
       (*
