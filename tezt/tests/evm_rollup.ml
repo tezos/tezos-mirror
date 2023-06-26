@@ -190,6 +190,33 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
   in
   wait_for_application ~sc_rollup_node ~node ~client send ()
 
+let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
+  let requests =
+    List.map
+      (fun tx ->
+        Evm_proxy_server.
+          {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
+      txs
+  in
+  let* hashes = Evm_proxy_server.batch_evm_rpc evm_proxy_server requests in
+  let first_hash =
+    hashes |> JSON.as_list |> List.hd |> Evm_proxy_server.extract_result
+    |> JSON.as_string
+  in
+  (* Let's wait until one of the transactions is injected into a block, and
+      test this block contains the `n` transactions as expected. *)
+  let* receipt =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt
+         ~evm_proxy_server
+         ~transaction_hash:first_hash)
+      ()
+  in
+  return (requests, receipt)
+
 let setup_deposit_contracts ~admin client protocol =
   (* Originates a FA1.2 token. *)
   let fa12_script = Fa12.fa12_reference in
@@ -507,25 +534,8 @@ let test_rpc_getBlockByNumber =
   let* block =
     Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
   in
-  (* For our needs, we just test these two relevant fields for now: *)
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
-  let expected_transactions =
-    Array.(
-      map
-        (fun accounts -> accounts.Eth_account.genesis_mint_tx)
-        Eth_account.bootstrap_accounts
-      |> to_list)
-  in
-  let transactions =
-    match block.transactions with
-    | Empty -> Test.fail "Genesis block shouldn't be empty"
-    | Hash l -> l
-    | Full _ -> Test.fail "Expected only transaction hashes"
-  in
-  Check.(transactions = expected_transactions)
-    (Check.list Check.string)
-    ~error_msg:"Unexpected list of transactions, should be %%R, but got %%L" ;
   unit
 
 let transaction_count_request address =
@@ -646,8 +656,8 @@ let test_l2_blocks_progression =
     @@ Check.((block_number = expected_block_level) int)
          ~error_msg:"Unexpected block number, should be %%R, but got %%L"
   in
+  let* () = check_block_progression ~expected_block_level:1 in
   let* () = check_block_progression ~expected_block_level:2 in
-  let* () = check_block_progression ~expected_block_level:3 in
   unit
 
 (** The info for the "storage.sol" contract.
@@ -1037,36 +1047,52 @@ let test_full_blocks =
       "Check `evm_getBlockByNumber` with full blocks returns the correct \
        informations"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
     setup_past_genesis ~deposit_admin:None protocol
   in
-  let* genesis_block =
+  let txs =
+    read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
+    |> String.trim |> String.split_on_char '\n'
+    |> List.filteri (fun i _ -> i < 5)
+  in
+  let* _requests, receipt =
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
+  in
+  let* block =
     Evm_proxy_server.(
       call_evm_rpc
         evm_proxy_server
         {
           method_ = "eth_getBlockByNumber";
-          parameters = `A [`String "0x0"; `Bool true];
+          parameters =
+            `A [`String (Format.sprintf "%#lx" receipt.blockNumber); `Bool true];
         })
   in
-  let block =
-    genesis_block |> Evm_proxy_server.extract_result |> Block.of_json
+  let block = block |> Evm_proxy_server.extract_result |> Block.of_json in
+  let block_hash =
+    match block.hash with
+    | Some hash -> hash
+    | None -> Test.fail "Expected a hash for the block"
   in
-  let transactions =
-    match block.Block.transactions with
-    | Empty -> Test.fail "Genesis block contains at least 3 transactions."
-    | Hash _ -> Test.fail "Expected full transactions, got hashes"
-    | Full txs -> txs
-  in
-  List.iter
-    (fun (tx : Transaction.transaction_object) ->
-      let index = tx.Transaction.transactionIndex |> Int32.to_int in
-      Check.(
-        (tx.Transaction.hash
-       = Eth_account.bootstrap_accounts.(index).genesis_mint_tx)
-          string)
-        ~error_msg:"Expected transaction hash %R, but got %L")
-    transactions ;
+  let block_number = block.number in
+  (match block.Block.transactions with
+  | Block.Empty -> Test.fail "Expected a non empty block"
+  | Block.Full transactions ->
+      List.iteri
+        (fun index
+             ({blockHash; blockNumber; transactionIndex; _} :
+               Transaction.transaction_object) ->
+          Check.((block_hash = blockHash) string)
+            ~error_msg:
+              (sf "The transaction should be in block %%L but found %%R") ;
+          Check.((block_number = blockNumber) int32)
+            ~error_msg:
+              (sf "The transaction should be in block %%L but found %%R") ;
+          Check.((Int32.of_int index = transactionIndex) int32)
+            ~error_msg:
+              (sf "The transaction should be at index %%L but found %%R"))
+        transactions
+  | Block.Hash _ -> Test.fail "Block is supposed to contain transaction objects") ;
   unit
 
 let test_latest_block =
@@ -1095,7 +1121,7 @@ let test_latest_block =
   let latest_block =
     latest_block |> Evm_proxy_server.extract_result |> Block.of_json
   in
-  Check.((latest_block.Block.number = 2l) int32)
+  Check.((latest_block.Block.number = 1l) int32)
     ~error_msg:"Expected latest being block number %R, but got %L" ;
   unit
 
@@ -1135,29 +1161,8 @@ let test_inject_100_transactions =
     read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
     |> String.trim |> String.split_on_char '\n'
   in
-  let requests =
-    List.map
-      (fun tx ->
-        Evm_proxy_server.
-          {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
-      txs
-  in
-  let* hashes = Evm_proxy_server.batch_evm_rpc evm_proxy_server requests in
-  let first_hash =
-    hashes |> JSON.as_list |> List.hd |> Evm_proxy_server.extract_result
-    |> JSON.as_string
-  in
-  (* Let's wait until one of the transactions is injected into a block, and
-      test this block contains the 100 transactions as expected. *)
-  let* receipt =
-    wait_for_application
-      ~sc_rollup_node
-      ~node
-      ~client
-      (wait_for_transaction_receipt
-         ~evm_proxy_server
-         ~transaction_hash:first_hash)
-      ()
+  let* requests, receipt =
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
   in
   let* block_with_100tx =
     Evm_proxy_server.(
