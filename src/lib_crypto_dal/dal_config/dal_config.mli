@@ -47,6 +47,8 @@ type t = {
           not secure. In this case, the size of a slot, page, the
           erasure code redundancy factor and number of shards must be
           specified. *)
+  bootstrap_peers : string list;
+      (** List of bootstrap peers to use in the DAL p2p. *)
 }
 
 val encoding : t Data_encoding.t
