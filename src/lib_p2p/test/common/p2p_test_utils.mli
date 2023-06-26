@@ -96,6 +96,18 @@ val run_nodes :
   (unit, error trace) result Lwt.t) ->
   (unit, error trace) result Lwt.t
 
+val run_nodes_fd :
+  addr:P2p_addr.t ->
+  ?port:int ->
+  ((unit, unit) Process.Channel.t ->
+  Ipaddr.V6.t ->
+  int ->
+  (unit, error trace) result Lwt.t) ->
+  ((unit, unit) Process.Channel.t ->
+  Lwt_unix.file_descr ->
+  (unit, error trace) result Lwt.t) ->
+  (unit, error trace) result Lwt.t
+
 val raw_accept :
   P2p_io_scheduler.t ->
   Lwt_unix.file_descr ->
