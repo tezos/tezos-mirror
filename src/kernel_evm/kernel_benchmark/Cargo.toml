@@ -13,16 +13,14 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 evm-execution = { path = "../evm_execution" }
 tezos_ethereum = { path = "../ethereum" }
-
 nom = "6.1"
 thiserror = "1.0"
 hex = "0.4"
 rlp = "0.5.2"
 sha3 = { version = "0.10.6", default-features = false }
-
 tezos_data_encoding = "0.5"
-
 primitive-types = { version = "0.11.1", default-features = false }
+evm = { version = "0.35.0", default-features = false }
 
 [dependencies.tezos-smart-rollup-core]
 path = "../../kernel_sdk/core"

@@ -789,6 +789,7 @@ dependencies = [
 name = "kernel-benchmark"
 version = "0.1.0"
 dependencies = [
+ "evm",
  "evm-execution",
  "hex",
  "nom 6.2.1",

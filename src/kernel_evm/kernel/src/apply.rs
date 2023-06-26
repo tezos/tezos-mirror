@@ -19,6 +19,7 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::index_account;
+use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions
@@ -222,6 +223,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         block_constants,
         evm_account_storage,
         precompiles,
+        CONFIG,
         to,
         caller,
         call_data,

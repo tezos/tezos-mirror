@@ -9,7 +9,7 @@
 
 use crate::{error::Error, error::StorageError, storage};
 
-use crate::{parsable, parsing};
+use crate::{parsable, parsing, CONFIG};
 
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use primitive_types::{H160, U256};
@@ -85,6 +85,7 @@ impl Simulation {
             &current_block.constants(),
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             self.to,
             self.from.unwrap_or(default_caller),
             self.data.clone(),
@@ -344,6 +345,7 @@ mod tests {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             callee,
             caller,
             call_data,
