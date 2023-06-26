@@ -233,7 +233,8 @@ let apply_with_gas header ?(operations = []) (pred : Block.t) =
   >|= Environment.wrap_tzresult
   >|=? fun (context, consumed_gas) ->
   let hash = Block_header.hash header in
-  ({Block.hash; header; operations; context}, consumed_gas)
+  ( {Block.hash; header; operations; context; constants = pred.constants},
+    consumed_gas )
 
 let bake_with_gas ?policy ?timestamp ?operation ?operations pred =
   let operations =

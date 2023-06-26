@@ -63,8 +63,7 @@ let assert_cycle_eq ~loc c1 c2 =
     c2
 
 let assert_current_cycle ~loc (blk : Block.t) expected =
-  let open Lwt_result_syntax in
-  let* current_cycle = Block.current_cycle blk in
+  let current_cycle = Block.current_cycle blk in
   assert_cycle_eq ~loc current_cycle expected
 
 let stake ctxt contract amount =
@@ -72,7 +71,13 @@ let stake ctxt contract amount =
   let*?@ entrypoint =
     Protocol.Alpha_context.Entrypoint.of_string_strict ~loc:0 "stake"
   in
-  Op.transaction ctxt ~entrypoint contract contract amount
+  Op.transaction
+    ctxt
+    ~entrypoint
+    ~fee:Protocol.Alpha_context.Tez.zero
+    contract
+    contract
+    amount
 
 let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     ~baking_over_staking_edge =
@@ -94,18 +99,26 @@ let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     ctxt
     ~entrypoint
     ~parameters
+    ~fee:Protocol.Alpha_context.Tez.zero
     delegate
     delegate
     Protocol.Alpha_context.Tez.zero
+
+(** Assert that the staking balance is the expected one. *)
+let assert_total_frozen_stake ~loc block expected =
+  let open Lwt_result_syntax in
+  let* actual = Context.get_total_frozen_stake (B block) in
+  Assert.equal_tez ~loc actual expected
 
 (* Test that:
    - the EMA of the adaptive inflation vote reaches the threshold after the
      expected duration,
    - the launch cycle is set as soon as the threshold is reached,
    - the launch cycle is not reset before it is reached,
-   - once the launch cycle is reached, costaking is allowed. *)
+   - once the launch cycle is reached, costaking is allowed,
+   - costaking increases total_frozen_stake. *)
 let test_launch threshold expected_vote_duration () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
     let ema =
@@ -115,7 +128,7 @@ let test_launch threshold expected_vote_duration () =
     Assert.lt_int32 ~loc threshold ema
   in
   (* Initialize the state with a single delegate. *)
-  let* block, delegate =
+  let constants =
     let default_constants = Default_parameters.constants_test in
     let adaptive_inflation =
       {
@@ -124,11 +137,18 @@ let test_launch threshold expected_vote_duration () =
       }
     in
     let consensus_threshold = 0 in
-    Context.init_with_constants1
-      {default_constants with consensus_threshold; adaptive_inflation}
+    {default_constants with consensus_threshold; adaptive_inflation}
   in
+  let preserved_cycles = constants.preserved_cycles in
+  let* block, delegate = Context.init_with_constants1 constants in
   let delegate_pkh = Context.Contract.pkh delegate in
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 200_000_000_000L)
+  in
 
   (* To test that adaptive inflation is active, we test that
      costaking, a feature only available after the activation, is
@@ -136,14 +156,21 @@ let test_launch threshold expected_vote_duration () =
      explicitely set a positive staking_over_baking_limit to allow
      them. Setting this limit does not immediately take effect but can
      be done before the activation. For these reasons, we set it at
-     the beginning. *)
+     the beginning.
+
+     The baking_over_staking_edge indicates the portion of the rewards
+     sent to the delegate's liquid balance. It's expressed in
+     billionth, with 0 meaning that everything is frozen and one
+     billion meaning that everything is liquid. We send all rewards to
+     the liquid part to ease reasoning about the total frozen
+     stake. *)
   let* block =
     let* operation =
       set_delegate_parameters
         (B block)
         delegate
-        ~staking_over_baking_limit:1
-        ~baking_over_staking_edge:0
+        ~staking_over_baking_limit:1_000_000
+        ~baking_over_staking_edge:1_000_000_000
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
@@ -167,7 +194,7 @@ let test_launch threshold expected_vote_duration () =
         (B block)
         delegate
         wannabe_costaker
-        (Protocol.Alpha_context.Tez.of_mutez_exn 1_000_000_000L)
+        (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
@@ -178,6 +205,16 @@ let test_launch threshold expected_vote_duration () =
   let* block =
     let* operation =
       Op.delegation (B block) wannabe_costaker (Some delegate_pkh)
+    in
+    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+  in
+  (* Self-staking most of the remaining balance. *)
+  let* block =
+    let* operation =
+      stake
+        (B block)
+        delegate
+        (Protocol.Alpha_context.Tez.of_mutez_exn 1_800_000_000_000L)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
@@ -241,30 +278,62 @@ let test_launch threshold expected_vote_duration () =
   (* Check that the current cycle is the one at which the launch is
      planned to happen. *)
   let* () = assert_current_cycle ~loc:__LOC__ block launch_cycle in
-
-  (* Test that the wannabe costaker is now allowed to stake a few
-     mutez. *)
-  let* operation =
-    stake
-      (B block)
-      wannabe_costaker
-      (Protocol.Alpha_context.Tez.of_mutez_exn 10L)
+  (* At this point, only the delegate has frozen any stake and its
+     frozen balance is about 2 million tez (it started with 4 million,
+     sent half to its delegate, and staked the rest). *)
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
   in
-  let* (_block : Block.t) = Block.bake ~operation block in
+
+  (* Test that the wannabe costaker is now allowed to stake almost all
+     its balance. It cannot totally costake it however because this is
+     considered by the protocol as an attempt to empty the account, and
+     emptying delegated accounts is forbidden. *)
+  let* balance = Context.Contract.balance (B block) wannabe_costaker in
+  let*?@ balance_to_stake = Protocol.Alpha_context.Tez.(balance -? one) in
+  let* operation = stake (B block) wannabe_costaker balance_to_stake in
+  let* block = Block.bake ~operation block in
+  (* The costaking operation leads to an increase of the
+     total_frozen_stake but only preserved_cycles after the
+     operation. *)
+  let start_cycle = Block.current_cycle block in
+  let* block =
+    Block.bake_while
+      ~invariant:(fun block ->
+        assert_total_frozen_stake
+          ~loc:__LOC__
+          block
+          (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L))
+      (fun block ->
+        let current_cycle = Block.current_cycle block in
+        Protocol.Alpha_context.Cycle.(
+          current_cycle <= add start_cycle preserved_cycles))
+      block
+  in
+  let* block = Block.bake block in
+  let* () =
+    assert_total_frozen_stake
+      ~loc:__LOC__
+      block
+      (Protocol.Alpha_context.Tez.of_mutez_exn 3_999_999_000_000L)
+  in
   return_unit
 
 let tests =
   [
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launch cycle is set (very low threshold)"
+       inflation launches (very low threshold)"
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
          59l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launch cycle is set (realistic threshold)"
+       inflation launches (realistic threshold)"
       `Slow
       (test_launch
          Default_parameters.constants_test.adaptive_inflation

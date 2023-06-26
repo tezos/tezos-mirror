@@ -35,6 +35,7 @@ type t = {
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
+  constants : Constants.Parametric.t;
 }
 
 type block = t
@@ -475,6 +476,7 @@ let genesis_with_parameters parameters =
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
+    constants = parameters.constants;
   }
 
 let validate_bootstrap_accounts
@@ -640,6 +642,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
     operations = [];
     context;
+    constants;
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
@@ -788,9 +791,11 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     finalize_validation_and_application vstate (Some header.shell)
     >|= Environment.wrap_tzresult
     >|=? fun (validation, result) -> (validation.context, result) )
-  >|=? fun (context, result) ->
+  >>=? fun (context, result) ->
   let hash = Block_header.hash header in
-  ({hash; header; operations; context}, result)
+  (* This function is duplicated from Context to avoid a cyclic dependency *)
+  Alpha_services.Constants.all rpc_ctxt pred >|=? fun constants ->
+  ({hash; header; operations; context; constants = constants.parametric}, result)
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   apply_with_metadata
@@ -870,9 +875,6 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
 
 (********** Cycles ****************)
 
-(* This function is duplicated from Context to avoid a cyclic dependency *)
-let get_constants b = Alpha_services.Constants.all rpc_ctxt b
-
 let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
     ?adaptive_inflation_vote n b =
   List.fold_left_es
@@ -887,8 +889,10 @@ let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
     (1 -- n)
 
 let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote predicate b =
+    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote
+    ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
+  let* () = invariant b in
   let* new_block, metadata =
     bake_with_metadata
       ~baking_mode
@@ -903,17 +907,19 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
       ?policy
       ?liquidity_baking_toggle_vote
       ?adaptive_inflation_vote
+      ~invariant
       predicate
       new_block
   else return b
 
 let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote predicate b =
+    ?adaptive_inflation_vote ?invariant predicate b =
   bake_while_with_metadata
     ?baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
     ?adaptive_inflation_vote
+    ?invariant
     (fun block _metadata -> predicate block)
     b
 
@@ -1029,7 +1035,7 @@ let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
     (1 -- n)
 
 let bake_until_cycle_end ?policy b =
-  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
   let current_level = Int32.rem current_level blocks_per_cycle in
   let delta = Int32.sub blocks_per_cycle current_level in
@@ -1039,15 +1045,15 @@ let bake_until_n_cycle_end ?policy n b =
   List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
 
 let current_cycle b =
-  get_constants b >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
   let current_cycle = Int32.div current_level blocks_per_cycle in
   let current_cycle = Cycle.add Cycle.root (Int32.to_int current_cycle) in
-  return current_cycle
+  current_cycle
 
 let bake_until_cycle ?policy cycle (b : t) =
   let rec loop (b : t) =
-    current_cycle b >>=? fun current_cycle ->
+    let current_cycle = current_cycle b in
     if Cycle.equal cycle current_cycle then return b
     else bake_until_cycle_end ?policy b >>=? fun b -> loop b
   in

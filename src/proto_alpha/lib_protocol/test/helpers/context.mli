@@ -118,6 +118,8 @@ val get_liquidity_baking_cpmm_address : t -> Contract_hash.t tzresult Lwt.t
 
 val get_adaptive_inflation_launch_cycle : t -> Cycle.t option tzresult Lwt.t
 
+val get_total_frozen_stake : t -> Tez.t tzresult Lwt.t
+
 val get_seed_nonce_revelation_tip : t -> Tez.t tzresult Lwt.t
 
 val get_vdf_revelation_tip : t -> Tez.t tzresult Lwt.t

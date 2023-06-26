@@ -278,7 +278,15 @@ let finalize_block st =
     }
   in
   let hash = Block_header.hash header in
-  return {Block.hash; header; operations; context = validation_result.context}
+  let* constants = Alpha_services.Constants.all Block.rpc_ctxt st.predecessor in
+  return
+    {
+      Block.hash;
+      header;
+      operations;
+      context = validation_result.context;
+      constants = constants.parametric;
+    }
 
 let assert_validate_operation_fails expect_failure op block =
   let open Lwt_result_syntax in
