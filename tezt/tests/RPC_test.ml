@@ -90,13 +90,14 @@ let endpoint_of_test_mode_tag node = function
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
-let check_rpc_regression ~test_mode_tag ~test_function ?parameter_overrides
-    ?nodes_args sub_group =
+let check_rpc_regression ~test_mode_tag ~test_function ?supports
+    ?parameter_overrides ?nodes_args sub_group =
   let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
     ~tags:["rpc"; title_tag; sub_group]
+    ?supports
   @@ fun protocol ->
   let* parameter_file =
     patch_protocol_parameters protocol parameter_overrides
@@ -403,6 +404,39 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   unit
 
+let test_adaptive_inflation_on_alpha ?endpoint client =
+  Log.info "Test adaptive inflation parameters retrieval" ;
+
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_supply ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_total_frozen_stake ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_current_yearly_rate ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_current_yearly_rate_exact ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_rewards_per_minute ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_adaptive_inflation_launch_cycle ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_inflation_expected_rewards ()
+  in
+  unit
+
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
@@ -580,6 +614,10 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
+
+(* Test the adaptive inflation RPC. *)
+let test_adaptive_inflation _test_mode_tag _protocol ?endpoint client =
+  test_adaptive_inflation_on_alpha ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -1451,14 +1489,15 @@ let register protocols =
     ~tags:["rpc"; "regression"; "binary"]
     binary_regression_test ;
   let register protocols test_mode_tag =
-    let check_rpc_regression ?parameter_overrides ?nodes_args ~test_function
-        sub_group =
+    let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
+        ~test_function sub_group =
       check_rpc_regression
         ~test_mode_tag
         ?parameter_overrides
         ?nodes_args
         ~test_function
         sub_group
+        ?supports
         protocols
     in
     let check_rpc ?parameter_overrides ?nodes_args ~test_function sub_group =
@@ -1479,6 +1518,10 @@ let register protocols =
       "delegates"
       ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
+    check_rpc_regression
+      "adaptive_inflation"
+      ~supports:Protocol.(From_protocol (number Nairobi + 1))
+      ~test_function:test_adaptive_inflation ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

@@ -1,0 +1,32 @@
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/total_supply
+"20000001000100"
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/total_frozen_stake
+"1000000000000"
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/inflation/current_yearly_rate
+"223.400"
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/inflation/current_yearly_rate_exact
+{ "numerator": "44680105987200", "denominator": "200000010001" }
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/inflation/rewards_per_minute
+"85007812"
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/adaptive_inflation_launch_cycle
+null
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/inflation/expected_rewards
+[ { "cycle": 0, "baking_reward_fixed_portion": "333333",
+    "baking_reward_bonus_per_slot": "1302",
+    "endorsing_reward_per_slot": "2604", "liquidity_baking_subsidy": "83333",
+    "seed_nonce_revelation_tip": "260", "vdf_revelation_tip": "260" },
+  { "cycle": 1, "baking_reward_fixed_portion": "333333",
+    "baking_reward_bonus_per_slot": "1302",
+    "endorsing_reward_per_slot": "2604", "liquidity_baking_subsidy": "83333",
+    "seed_nonce_revelation_tip": "260", "vdf_revelation_tip": "260" },
+  { "cycle": 2, "baking_reward_fixed_portion": "333333",
+    "baking_reward_bonus_per_slot": "1302",
+    "endorsing_reward_per_slot": "2604", "liquidity_baking_subsidy": "83333",
+    "seed_nonce_revelation_tip": "260", "vdf_revelation_tip": "260" } ]
