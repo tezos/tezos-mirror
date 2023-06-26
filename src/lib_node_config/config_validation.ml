@@ -263,7 +263,7 @@ let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   let open Lwt_result_syntax in
   let*! r = resolver addr in
   match r with
-  | Error [Config_file.Failed_to_parse_address (addr, why)] ->
+  | Error [P2p_resolve.Failed_to_parse_address (addr, why)] ->
       return_some
         (mk_alert
            ~event:(Option.value e_parse ~default:cannot_parse_addr)
