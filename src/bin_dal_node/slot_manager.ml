@@ -141,16 +141,144 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     Store.Legacy.save_shard_proofs node_store commitment shard_proofs |> return
   else return_unit
 
+let get_opt array i =
+  if i >= 0 && i < Array.length array then Some array.(i) else None
+
+(** [shards_to_attestors committee] takes a committee [Committee_cache.committee]
+      and returns a function that, given a shard index, yields the pkh of its
+      attestor for that level. *)
+let shards_to_attestors committee =
+  let rec do_n ~n f acc = if n <= 0 then acc else do_n ~n:(n - 1) f (f acc) in
+  let to_array committee =
+    (* We transform the map to a list *)
+    Tezos_crypto.Signature.Public_key_hash.Map.bindings committee
+    (* We sort the list in decreasing order w.r.t. to start_indices. *)
+    |> List.fast_sort (fun (_pkh1, shard_indices1) (_pkh2, shard_indices2) ->
+           shard_indices2.Committee_cache.start_index
+           - shard_indices1.Committee_cache.start_index)
+       (* We fold on the sorted list, starting from bigger start_indices. *)
+    |> List.fold_left
+         (fun accu (pkh, Committee_cache.{start_index = _; offset}) ->
+           (* We put in the accu list as many [pkh] occurrences as the number
+              of shards this pkh should attest, namely, [offset]. *)
+           do_n ~n:offset (fun acc -> pkh :: acc) accu)
+         []
+    (* We build an array from the list. The array indices coincide with shard
+       indices. *)
+    |> Array.of_list
+  in
+  let committee = to_array committee in
+  fun index -> get_opt committee index
+
+(* This function publishes the shards of a commitment that is waiting for
+   attestion on L1 if this node has those shards on disk and their proofs in
+   memory. *)
+let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
+    cryptobox proto_parameters commitment published_level slot_index =
+  let open Lwt_result_syntax in
+  match
+    Store.Shard_proofs_cache.find_opt
+      node_store.in_memory_shard_proofs
+      commitment
+  with
+  | None ->
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5676
+
+          If this happens, we should probably tell the user that
+          something bad happened. Either:
+
+          1. The proofs where not stored properly (an invariant is broken)
+
+          2. The node was restarted (unlikely to happen given the time frame)
+
+          3. The cache was full (unlikely to happen if
+          [shards_proofs_cache_size] is set properly. *)
+      return_unit
+  | Some shard_proofs ->
+      let attestation_level =
+        Int32.(
+          add
+            published_level
+            (of_int proto_parameters.Dal_plugin.attestation_lag))
+      in
+      let* committee = level_committee ~level:attestation_level in
+      let attestor_of_shard = shards_to_attestors committee in
+      let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
+      Store.Shards.read_all node_store.shard_store commitment ~number_of_shards
+      |> Seq_s.iter_ep (function
+             | _, Error [Stored_data.Missing_stored_data s] ->
+                 let*! () =
+                   Event.(
+                     emit loading_shard_data_failed ("Missing stored data " ^ s))
+                 in
+                 return_unit
+             | _, Error err ->
+                 let*! () =
+                   Event.(
+                     emit
+                       loading_shard_data_failed
+                       (Format.asprintf "%a" pp_print_trace err))
+                 in
+                 return_unit
+             | (commitment, shard_index), Ok share -> (
+                 match
+                   ( attestor_of_shard shard_index,
+                     get_opt shard_proofs shard_index )
+                 with
+                 | None, _ ->
+                     failwith
+                       "Invariant broken: no attestor found for shard %d"
+                       shard_index
+                 | _, None ->
+                     failwith
+                       "Invariant broken: no shard proof found for shard %d"
+                       shard_index
+                 | Some pkh, Some shard_proof ->
+                     let message = Gossipsub.{share; shard_proof} in
+                     let topic = Gossipsub.{slot_index; pkh} in
+                     let message_id =
+                       Gossipsub.
+                         {
+                           commitment;
+                           level = published_level;
+                           slot_index;
+                           shard_index;
+                           pkh;
+                         }
+                     in
+                     Gossipsub.Worker.(
+                       Publish_message {message; topic; message_id}
+                       |> app_input gs_worker) ;
+                     return_unit))
+
 let store_slot_headers ~level_committee ~block_level ~block_hash cryptobox
-    proto_parameters slot_headers node_store =
-  Store.Legacy.add_slot_headers
-    ~level_committee
-    ~block_level
-    ~block_hash
-    cryptobox
-    proto_parameters
+    proto_parameters slot_headers node_store gs_worker =
+  let open Lwt_result_syntax in
+  let* () =
+    Store.Legacy.add_slot_headers
+      ~block_level
+      ~block_hash
+      slot_headers
+      node_store
+  in
+  List.iter_es
+    (fun (slot_header, status) ->
+      match status with
+      | Dal_plugin.Succeeded ->
+          let Dal_plugin.{slot_index; commitment; published_level} =
+            slot_header
+          in
+          publish_slot_data
+            ~level_committee
+            node_store
+            gs_worker
+            cryptobox
+            proto_parameters
+            commitment
+            published_level
+            slot_index
+      | Dal_plugin.Failed -> return_unit)
     slot_headers
-    node_store
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
