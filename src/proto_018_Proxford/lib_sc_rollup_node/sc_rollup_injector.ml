@@ -31,103 +31,59 @@ module Block_cache =
   Aches_lwt.Lache.Make_result
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
-module Parameters :
-  PARAMETERS
-    with type state = Node_context.ro
-     and type Tag.t = Configuration.purpose
-     and type Operation.t = L1_operation.t = struct
-  type state = Node_context.ro
+let injector_operation_to_manager :
+    L1_operation.t -> Protocol.Alpha_context.packed_manager_operation = function
+  | Add_messages {messages} -> Manager (Sc_rollup_add_messages {messages})
+  | Cement {rollup; commitment = _} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      Manager (Sc_rollup_cement {rollup})
+  | Publish {rollup; commitment} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let commitment = Sc_rollup_proto_types.Commitment.of_octez commitment in
+      Manager (Sc_rollup_publish {rollup; commitment})
+  | Refute {rollup; opponent; refutation} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let refutation =
+        Sc_rollup_proto_types.Game.refutation_of_octez refutation
+      in
+      Manager (Sc_rollup_refute {rollup; opponent; refutation})
+  | Timeout {rollup; stakers} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let stakers = Sc_rollup_proto_types.Game.index_of_octez stakers in
+      Manager (Sc_rollup_timeout {rollup; stakers})
 
-  let events_section = [Protocol.name; "sc_rollup_node"]
-
-  module Tag : TAG with type t = Configuration.purpose = struct
-    type t = Configuration.purpose
-
-    let compare = Stdlib.compare
-
-    let equal = Stdlib.( = )
-
-    let hash = Hashtbl.hash
-
-    let string_of_tag = Configuration.string_of_purpose
-
-    let pp ppf t = Format.pp_print_string ppf (string_of_tag t)
-
-    let encoding : t Data_encoding.t =
-      let open Data_encoding in
-      string_enum
-        (List.map (fun t -> (string_of_tag t, t)) Configuration.purposes)
-  end
-
-  module Operation = L1_operation
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Very coarse approximation for the number of operation we
-     expect for each block *)
-  let table_estimated_size : Tag.t -> int = function
-    | Publish -> 1
-    | Add_messages -> 100
-    | Cement -> 1
-    | Timeout -> 1
-    | Refute -> 1
-
-  let operation_tag : Operation.t -> Tag.t = function
-    | Add_messages _ -> Add_messages
-    | Cement _ -> Cement
-    | Publish _ -> Publish
-    | Timeout _ -> Timeout
-    | Refute _ -> Refute
-
-  let fee_parameter node_ctxt operation =
-    Node_context.get_fee_parameter node_ctxt (operation_tag operation)
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-     Decide if some batches must have all the operations succeed. See
-     {!Injector_sigs.Parameter.batch_must_succeed}. *)
-  let batch_must_succeed _ = `At_least_one
-
-  let retry_unsuccessful_operation _node_ctxt (_op : Operation.t) status =
-    let open Lwt_syntax in
-    match status with
-    | Backtracked | Skipped | Other_branch ->
-        (* Always retry backtracked or skipped operations, or operations that
-           are on another branch because of a reorg:
-
-           - Commitments are always produced on finalized blocks. They don't
-             need to be recomputed, and as such are valid in another branch.
-
-           - The cementation operations should be re-injected because the node
-             only keeps track of the last cemented level and the last published
-             commitment, without rollbacks.
-
-           - Messages posted to an inbox should be re-emitted (i.e. re-queued)
-             in case of a fork.
-
-           - Timeout should be re-submitted as the timeout may be reached as well
-             on the other branch.
-
-           - Refutation should be re-submitted in case of fork.
-             TODO: https://gitlab.com/tezos/tezos/-/issues/3459
-             maybe check if game exists on other branch as well.
-        *)
-        return Retry
-    | Failed error -> (
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
-           Think about which operations should be retried and when. *)
-        match classify_trace error with
-        | Permanent | Outdated -> return Forget
-        | Branch | Temporary -> return Retry)
-    | Never_included ->
-        (* Forget operations that are never included *)
-        return Forget
-end
+let injector_operation_of_manager :
+    type kind.
+    kind Protocol.Alpha_context.manager_operation -> L1_operation.t option =
+  function
+  | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
+  | Sc_rollup_cement {rollup} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let commitment = Octez_smart_rollup.Commitment.Hash.zero in
+      (* Just for printing *)
+      Some (Cement {rollup; commitment})
+  | Sc_rollup_publish {rollup; commitment} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
+      Some (Publish {rollup; commitment})
+  | Sc_rollup_refute {rollup; opponent; refutation} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let refutation =
+        Sc_rollup_proto_types.Game.refutation_to_octez refutation
+      in
+      Some (Refute {rollup; opponent; refutation})
+  | Sc_rollup_timeout {rollup; stakers} ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
+      Some (Timeout {rollup; stakers})
+  | _ -> None
 
 module Proto_client = struct
   open Protocol_client_context
 
-  type operation = Parameters.Operation.t
+  type operation = L1_operation.t
 
-  type state = Parameters.state
+  type state = Injector.state
 
   type unsigned_operation =
     Tezos_base.Operation.shell_header * packed_contents_list
@@ -153,7 +109,7 @@ module Proto_client = struct
       (Contents contents)
 
   let operation_size op =
-    manager_operation_size (L1_operation.to_manager_operation op)
+    manager_operation_size (injector_operation_to_manager op)
 
   (* The operation size overhead is an upper bound (in practice) of the overhead
      that will be added to a manager operation. To compute it we can use any
@@ -261,10 +217,9 @@ module Proto_client = struct
             operations)
         Lwt.return
 
-  let operation_status (node_ctxt : Node_context.ro) block_hash operation_hash
-      ~index =
+  let operation_status {Injector.cctxt; _} block_hash operation_hash ~index =
     let open Lwt_result_syntax in
-    let* operations = get_block_operations node_ctxt.cctxt block_hash in
+    let* operations = get_block_operations cctxt block_hash in
     match Operation_hash.Map.find_opt operation_hash operations with
     | None -> return_none
     | Some operation -> (
@@ -302,9 +257,7 @@ module Proto_client = struct
     let annotated_operations =
       List.map
         (fun operation ->
-          let (Manager operation) =
-            L1_operation.to_manager_operation operation
-          in
+          let (Manager operation) = injector_operation_to_manager operation in
           Annotated_manager_operation
             (Injection.prepare_manager_operation
                ~fee:Limit.unknown
@@ -403,18 +356,17 @@ module Proto_client = struct
       Operation.encoding_with_legacy_attestation_name
       op
 
-  let time_until_next_block (node_ctxt : Node_context.ro)
+  let time_until_next_block
+      {Injector.minimal_block_delay; delay_increment_per_round; _}
       (header : Tezos_base.Block_header.shell_header option) =
     let open Result_syntax in
-    let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _}
-        =
-      node_ctxt.protocol_constants.Constants.parametric
-    in
     match header with
-    | None ->
-        minimal_block_delay |> Period.to_seconds |> Int64.to_int
-        |> Ptime.Span.of_int_s
+    | None -> minimal_block_delay |> Int64.to_int |> Ptime.Span.of_int_s
     | Some header ->
+        let minimal_block_delay = Period.of_seconds_exn minimal_block_delay in
+        let delay_increment_per_round =
+          Period.of_seconds_exn delay_increment_per_round
+        in
         let next_level_timestamp =
           let* durations =
             Round.Durations.create
@@ -441,6 +393,4 @@ module Proto_client = struct
           (Time.System.now ())
 end
 
-include Injector_functor.Make (Parameters)
-
-let () = register_proto_client Protocol.hash (module Proto_client)
+let () = Injector.register_proto_client Protocol.hash (module Proto_client)

@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,19 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto
+open Octez_smart_rollup_node.Layer1
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Smart_rollup_context_hash"
+(** [fetch_tezos_block cctxt hash] returns a block info given a block hash.
+    Looks for the block in the blocks cache first, and fetches it from the L1
+    node otherwise. *)
+val fetch_tezos_block :
+  t ->
+  Block_hash.t ->
+  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
 
-      let title = "A base58-check encoded hash of a Smart rollup node context"
-
-      let b58check_prefix = "\008\209\216\166"
-
-      let size = None
-    end)
-
-let () = Base58.check_encoded_prefix b58check_encoding "SRCo" 54
+(** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks
+    asynchronously. NOTE: the number of blocks to prefetch must not be greater
+    than the size of the blocks cache otherwise they will be lost. *)
+val prefetch_tezos_blocks : t -> head list -> unit

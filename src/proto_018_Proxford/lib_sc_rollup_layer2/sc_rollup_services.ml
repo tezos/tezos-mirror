@@ -100,8 +100,8 @@ type message_status =
       cemented : bool;
       commitment : Sc_rollup.Commitment.t;
       commitment_hash : Sc_rollup.Commitment.Hash.t;
-      first_published_at_level : Raw_level.t;
-      published_at_level : Raw_level.t;
+      first_published_at_level : int32;
+      published_at_level : int32;
     }
 
 module Encodings = struct
@@ -116,8 +116,8 @@ module Encodings = struct
     obj4
       (req "commitment" Sc_rollup.Commitment.encoding)
       (req "hash" Sc_rollup.Commitment.Hash.encoding)
-      (opt "first_published_at_level" Raw_level.encoding)
-      (opt "published_at_level" Raw_level.encoding)
+      (opt "first_published_at_level" int32)
+      (opt "published_at_level" int32)
 
   let hex_string = conv Bytes.of_string Bytes.to_string bytes
 
@@ -322,8 +322,8 @@ module Encodings = struct
              (req "cemented" bool)
              (req "commitment" Sc_rollup.Commitment.encoding)
              (req "hash" Sc_rollup.Commitment.Hash.encoding)
-             (req "first_published_at_level" Raw_level.encoding)
-             (req "published_at_level" Raw_level.encoding))
+             (req "first_published_at_level" int32)
+             (req "published_at_level" int32))
           (function
             | Committed
                 {

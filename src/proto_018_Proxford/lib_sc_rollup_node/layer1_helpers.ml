@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,45 +24,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of parameter for migration functor {!Make}. *)
-module type MIGRATION_ACTIONS = sig
-  (** Type of store from which data is migrated. *)
-  type from_store
+open Protocol_client_context
 
-  (** Type of store to which the data is migrated. *)
-  type dest_store
+type Layer1.block += Block of Alpha_block_services.block_info
 
-  (** Action or actions to migrate data associated to a block. NOTE:
-      [dest_store] is an empty R/W store initialized in a temporary location. *)
-  val migrate_block_action :
-    from_store -> dest_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
+let fetch cctxt ?metadata ?chain ?block () =
+  let open Lwt_result_syntax in
+  let+ block = Alpha_block_services.info cctxt ?metadata ?chain ?block () in
+  Block block
 
-  (** The final actions to be performed in the migration. In particular, this is
-      where data from the temporary store in [dest_store] in [tmp_dir] should be
-      reported in the actual [storage_dir]. *)
-  val final_actions :
-    storage_dir:string ->
-    tmp_dir:string ->
-    from_store ->
-    dest_store ->
-    unit tzresult Lwt.t
-end
+let extract_header = function
+  | Block block -> block.header.shell
+  | _ ->
+      invalid_arg ("Internal error: Block is not of protocol " ^ Protocol.name)
 
-module type S = sig
-  (** Migration function for the store located in [storage_dir]. *)
-  val migrate : storage_dir:string -> unit tzresult Lwt.t
-end
+let fetch_tezos_block l1_ctxt hash =
+  let open Lwt_result_syntax in
+  let+ block = Layer1.fetch_tezos_block fetch extract_header l1_ctxt hash in
+  match block with
+  | Block block -> block
+  | _ ->
+      Format.kasprintf
+        invalid_arg
+        "Internal error: Block %a is not of protocol %s"
+        Block_hash.pp
+        hash
+        Protocol.name
 
-(** Functor to create and {e register} a migration. *)
-module Make
-    (S_from : Store_sig.S)
-    (S_dest : Store_sig.S)
-    (Actions : MIGRATION_ACTIONS
-                 with type from_store := Store_sigs.ro S_from.t
-                  and type dest_store := Store_sigs.rw S_dest.t) : S
-
-(** Migrate store located in rollup node {e store} directory [storage_dir] if
-    needed. If there is no possible migration path registered to go from the
-    current version to the last {!Store.version}, this function resolves with an
-    error. *)
-val maybe_run_migration : storage_dir:string -> unit tzresult Lwt.t
+let prefetch_tezos_blocks = Layer1.prefetch_tezos_blocks fetch extract_header
