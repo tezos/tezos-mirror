@@ -30,7 +30,7 @@ type t = {
   rpc_addr : P2p_point.Id.t;
   neighbors : neighbor list;
   listen_addr : P2p_point.Id.t;
-  peers : P2p_point.Id.t list;
+  peers : string list;
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
@@ -162,7 +162,7 @@ let encoding : t Data_encoding.t =
        (dft
           "peers"
           ~description:"P2P addresses of remote peers"
-          (list P2p_point.Id.encoding)
+          (list string)
           default_peers)
        (dft
           "expected-pow"
