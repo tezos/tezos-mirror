@@ -149,6 +149,30 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         if Int.equal i i' then (i, e :: l) :: t else x :: pack_by_slot i e t
     | [] -> [(i, [e])]
 
+  (* [couple_ops_to_rights ops rights] returns [(participating,
+     missing)], where [participating] is a list associating delegates
+     with their operations in [ops], and [missing] is the list of
+     delegates which do not have associated operations in [ops].
+
+     TODO: it might be clearer to use a map instead of an association
+     list for [participating]. *)
+  let couple_ops_to_rights ops rights =
+    let items, missing =
+      List.fold_left
+        (fun (acc, rights) (slot, ops) ->
+          match
+            List.partition
+              (fun right -> Int.equal slot right.Consensus_ops.first_slot)
+              rights
+          with
+          | ([] | _ :: _ :: _), _ -> assert false
+          | [right], rights' ->
+              ((right.Consensus_ops.address, ops) :: acc, rights'))
+        ([], rights)
+        ops
+    in
+    (items, List.map (fun right -> right.Consensus_ops.address) missing)
+
   let endorsements_recorder (module A : Archiver.S) cctx current_level =
     let cctx' = Services.wrap_full cctx in
     let* op_stream, _stopper = Services.consensus_operation_stream cctx' in
@@ -173,9 +197,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         let* rights =
           Services.endorsing_rights cctx' ~reference_level:current_level level
         in
-        let items, missing =
-          Services.couple_ops_to_rights endorsements rights
-        in
+        let items, missing = couple_ops_to_rights endorsements rights in
         let full = Compare.Int32.(current_level = level) in
         let endorsements =
           if full then

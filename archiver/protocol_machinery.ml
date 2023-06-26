@@ -36,12 +36,6 @@ module type PROTOCOL_SERVICES = sig
     Int32.t ->
     Consensus_ops.rights tzresult Lwt.t
 
-  val couple_ops_to_rights :
-    (int * 'a) list ->
-    Consensus_ops.rights ->
-    (Tezos_crypto.Signature.public_key_hash * 'a) list
-    * Tezos_crypto.Signature.public_key_hash list
-
   type block_id
 
   module BlockIdMap : Map.S with type key = block_id

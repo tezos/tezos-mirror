@@ -69,23 +69,6 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
 
   module BlockIdMap = Block_hash.Map
 
-  let couple_ops_to_rights ops rights =
-    let items, missing =
-      List.fold_left
-        (fun (acc, rights) (slot, ops) ->
-          match
-            List.partition
-              (fun right -> Int.equal slot right.Consensus_ops.first_slot)
-              rights
-          with
-          | ([] | _ :: _ :: _), _ -> assert false
-          | [right], rights' ->
-              ((right.Consensus_ops.address, ops) :: acc, rights'))
-        ([], rights)
-        ops
-    in
-    (items, List.map (fun right -> right.Consensus_ops.address) missing)
-
   let extract_endorsement
       (_operation_content : Protocol.Alpha_context.packed_operation) =
     (* match operation_content with

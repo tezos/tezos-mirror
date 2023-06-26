@@ -81,26 +81,6 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
 
   module BlockIdMap = Map.Make (Protocol.Block_payload_hash)
 
-  let same_slot slot right = Int.equal slot right.Consensus_ops.first_slot
-
-  (* NB: A delegate is in [missing] if we have seen neither
-     endorsements from him, nor preendorsements. It might be
-     interesting at some point to distinguish these two cases. *)
-  let couple_ops_to_rights ops rights =
-    let items, missing =
-      List.fold_left
-        (fun (acc, remaining_rights) (slot, ops) ->
-          match
-            List.partition (fun right -> same_slot slot right) remaining_rights
-          with
-          | ([] | _ :: _ :: _), _ -> assert false
-          | [right], rights' ->
-              ((right.Consensus_ops.address, ops) :: acc, rights'))
-        ([], rights)
-        ops
-    in
-    (items, List.map (fun right -> right.Consensus_ops.address) missing)
-
   let extract_endorsement
       (operation_content : Protocol.Alpha_context.packed_operation) =
     match operation_content with
