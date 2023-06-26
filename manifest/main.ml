@@ -943,6 +943,7 @@ let _octez_crypto_tests =
       "test_timelock_legacy";
       "test_timelock";
       "test_context_hash";
+      "vectors_secp256k1_keccak256";
     ]
     ~path:"src/lib_crypto/test"
     ~opam:"tezos-crypto"
