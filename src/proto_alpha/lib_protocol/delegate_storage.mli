@@ -137,7 +137,19 @@ val load_forbidden_delegates : Raw_context.t -> Raw_context.t tzresult Lwt.t
     in-memory. *)
 val reset_forbidden_delegates : Raw_context.t -> Raw_context.t Lwt.t
 
-(** Returns the full 'balance' of the implicit contract associated to
+val drain :
+  Raw_context.t ->
+  delegate:Signature.Public_key_hash.t ->
+  destination:Signature.Public_key_hash.t ->
+  (Raw_context.t * bool * Tez_repr.t * Receipt_repr.balance_updates) tzresult
+  Lwt.t
+
+(** The functions in this module are considered too costly to be used in
+    the protocol.
+    They are meant to be used only to answer RPC calls.
+*)
+module For_RPC : sig
+  (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance (given by [balance] or
     [Contract_storage.get_balance]) and of the frozen balance. The frozen
     balance is composed of all frozen bonds associated to the contract (given by
@@ -145,16 +157,10 @@ val reset_forbidden_delegates : Raw_context.t -> Raw_context.t Lwt.t
     (given by [frozen_deposits]) that belongs to the delegate.
 
     Only use this function for RPCs: this is expensive. *)
-val full_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+  val full_balance :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Only use this function for RPCs: this is expensive. *)
-val delegated_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
-val drain :
-  Raw_context.t ->
-  delegate:Signature.Public_key_hash.t ->
-  destination:Signature.Public_key_hash.t ->
-  (Raw_context.t * bool * Tez_repr.t * Receipt_repr.balance_updates) tzresult
-  Lwt.t
+  (** Only use this function for RPCs: this is expensive. *)
+  val delegated_balance :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+end

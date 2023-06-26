@@ -2112,8 +2112,6 @@ module Delegate : sig
     Level.t ->
     (context * punishing_amounts) tzresult Lwt.t
 
-  val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
-
   type level_participation = Participated | Didn't_participate
 
   val record_baking_activity_and_pay_rewards_and_fees :
@@ -2139,8 +2137,6 @@ module Delegate : sig
 
   (** See {!Contract_delegate_storage.delegated_contracts}. *)
   val delegated_contracts : context -> public_key_hash -> Contract.t list Lwt.t
-
-  val delegated_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val registered : context -> public_key_hash -> bool Lwt.t
 
@@ -2236,6 +2232,23 @@ module Delegate : sig
       delegate:public_key_hash ->
       Tez.t ->
       (context * Receipt.balance_updates) tzresult Lwt.t
+  end
+
+  (** The functions in this module are considered too costly to be used in
+  the protocol.
+      They are meant to be used only to answer RPC calls.  *)
+  module For_RPC : sig
+    (** Returns the full 'balance' of the implicit contract associated to
+    a given key, i.e. the sum of the spendable balance (given by [balance] or
+    [Contract_storage.get_balance]) and of the frozen balance. The frozen
+    balance is composed of all frozen bonds associated to the contract (given by
+    [Contract_storage.get_frozen_bonds]) and of the part of the frozen deposits
+    (given by [frozen_deposits]) that belongs to the delegate.
+
+    Only use this function for RPCs: this is expensive. *)
+    val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+
+    val delegated_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
   end
 end
 
