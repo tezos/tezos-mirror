@@ -2372,6 +2372,14 @@ let octez_wasmer =
           c_library_flags = [];
         }
 
+let _octez_wasmer_test =
+  tezt
+    ["test_wasmer"]
+    ~path:"src/lib_wasmer/test"
+    ~opam:"octez-wasmer-test"
+    ~synopsis:"Tests for the Wasmer bindings"
+    ~deps:[octez_wasmer; alcotezt]
+
 let octez_context_encoding =
   public_lib
     "tezos-context.encoding"

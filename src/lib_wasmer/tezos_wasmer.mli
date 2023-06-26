@@ -138,6 +138,8 @@ module Module : sig
 end
 
 module Memory : sig
+  exception Out_of_bounds
+
   module Array : module type of Ctypes.CArray
 
   (** WebAssembly memory *)
@@ -150,8 +152,16 @@ module Memory : sig
   (** [get mem addr] reads a byte at address [addr]. *)
   val get : t -> int -> Unsigned.uint8
 
+  (** [get_string mem addr len] reads [len] bytes from address [addr] in
+      mmemory [mem]. *)
+  val get_string : t -> address:int -> length:int -> string
+
   (** [set mem addr value] sets a byte at address [addr] to [value]. *)
   val set : t -> int -> Unsigned.uint8 -> unit
+
+  (** [set_string mem ~address ~data] writes a series of bytes represented by [data]
+      at address [address] in the provided memory [mem]. *)
+  val set_string : t -> address:int -> data:string -> unit
 
   (** [length mem] gives you the memory size in bytes. *)
   val length : t -> int

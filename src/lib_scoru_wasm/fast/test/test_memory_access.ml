@@ -86,7 +86,7 @@ let test_store_bytes =
   QCheck2.Test.make
     ~count:50
     ~name:"store_bytes behaves the same on both memory implementations"
-    (triple mem_content int32 string)
+    (triple mem_content mem_address string)
     (fun (memory, address, data) ->
       are_equivalent
         memory
@@ -96,10 +96,15 @@ let test_store_bytes =
 let test_load_bytes =
   let open Gen in
   let open QCheck2.Gen in
+  let max_buffer_size =
+    (* This is ~1GiB. We limit the buffer size to avoid the scenario where
+       both variants simply test that they run out of memory. *)
+    1073741823
+  in
   QCheck2.Test.make
     ~count:50
     ~name:"load_bytes behaves the same on both memory implementations"
-    (triple mem_content int32 int)
+    (triple mem_content mem_address (0 -- max_buffer_size))
     (fun (memory, address, size) ->
       are_equivalent
         memory
@@ -112,7 +117,7 @@ let test_store_num =
   QCheck2.Test.make
     ~count:50
     ~name:"store_num behaves the same on both memory implementations"
-    (quad mem_content int32 int32 num)
+    (quad mem_content mem_address int32 num)
     (fun (memory, address, offset, num) ->
       are_equivalent
         memory
