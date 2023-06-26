@@ -265,11 +265,9 @@ module Handler = struct
             shards_proofs_precomputation = _;
             activation_level;
             proto_level;
-          } -> (
-          let block = `Hash (block_hash, 0) in
-          let block_level = header.shell.level in
-          if Compare.Int32.(block_level < activation_level) then return_unit
-          else
+          } ->
+          let process_block block_hash block_level =
+            let block = `Hash (block_hash, 0) in
             let* plugin_opt =
               update_plugin
                 cctxt
@@ -348,8 +346,13 @@ module Handler = struct
                 let*! () =
                   Event.(emit layer1_node_new_head (block_hash, block_level))
                 in
-                return_unit)
+                return_unit
+          in
+          let block_level = header.shell.level in
+          if Compare.Int32.(block_level < activation_level) then return_unit
+          else process_block block_hash block_level
     in
+
     let*! () = Event.(emit layer1_node_tracking_started ()) in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
         If the layer1 node reboots, the rpc stream breaks.*)
