@@ -41,7 +41,7 @@ pub const PATH_KERNEL_BOOT: RefPath = RefPath::assert_from(b"/kernel/boot.wasm")
 /// `T: impl Path` being correctly path-encoded.
 ///
 /// [`Runtime`]: crate::runtime::Runtime
-pub unsafe trait Path {
+pub unsafe trait Path: core::fmt::Debug + core::fmt::Display {
     /// Returns a read-only reference to the underlying path-encoded byte-slice.
     fn as_bytes(&self) -> &[u8];
 
@@ -168,6 +168,12 @@ impl<'a> RefPath<'a> {
         RefPath {
             inner: unsafe { core::str::from_utf8_unchecked(path) },
         }
+    }
+}
+
+impl core::fmt::Display for RefPath<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        self.inner.fmt(f)
     }
 }
 
@@ -357,6 +363,12 @@ mod owned {
         }
     }
 
+    impl core::fmt::Display for OwnedPath {
+        fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+            self.inner.fmt(f)
+        }
+    }
+
     /// Given a prefix and a suffix create a new path that concatenates the two.
     ///
     /// Returns error in case the resulting path is too long.
@@ -490,5 +502,19 @@ mod tests {
         let p3 = concat(&p1, &p2).unwrap();
 
         assert_eq!(b"/a/b/c/d", p3.as_bytes());
+    }
+
+    #[test]
+    fn test_ownedpath_display_roundtrip() {
+        let p1 = OwnedPath::try_from("/hello".to_string()).unwrap();
+
+        assert_eq!(p1.to_string(), "/hello");
+    }
+
+    #[test]
+    fn test_refpath_display_roundtrip() {
+        let p1 = RefPath::assert_from(b"/test/path");
+
+        assert_eq!(p1.to_string(), "/test/path");
     }
 }
