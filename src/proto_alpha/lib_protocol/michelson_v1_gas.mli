@@ -425,7 +425,7 @@ module Cost_of : sig
 
       val list_exit_body : Gas.cost
 
-      val map_enter_body : Gas.cost
+      val map_enter_body : ('k, 'v) Script_typed_ir.map -> Gas.cost
 
       val map_exit_body : 'k -> ('k, 'v) Script_typed_ir.map -> Gas.cost
     end

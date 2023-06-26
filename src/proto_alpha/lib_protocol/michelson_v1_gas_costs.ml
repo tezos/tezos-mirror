@@ -58,15 +58,17 @@ let cost_N_ISapling_verify_update size1 size2 bound_data =
 (* model N_IApply *)
 let cost_N_IApply rec_flag = if rec_flag then S.safe_int 220 else S.safe_int 140
 
-(* N_KIter / N_KMap_enter_body
+(* N_KIter
    The empty_branch_model are used as the models.
    However, the defined cost functions receive nothing. *)
-
 (* model N_KIter *)
 let cost_N_KIter = S.safe_int 10
 
+(* N_KMap_enter_body
+   Removed conversion of [size] for optimization *)
 (* model N_KMap_enter_body *)
-let cost_N_KMap_enter_body = S.safe_int 80
+let cost_N_KMap_enter_body size =
+  if Compare.Int.(size = 0) then S.safe_int 10 else S.safe_int 80
 
 (* N_KList_enter_body
    The generated model receives the length of `xs` as the first argument

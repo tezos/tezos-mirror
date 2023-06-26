@@ -677,7 +677,9 @@ module Cost_of = struct
 
       let list_exit_body = atomic_step_cost cost_N_KList_exit_body
 
-      let map_enter_body = atomic_step_cost cost_N_KMap_enter_body
+      let map_enter_body (type k v) (map : (k, v) Script_typed_ir.map) =
+        let (module Box) = Script_map.get_module map in
+        atomic_step_cost (cost_N_KMap_enter_body Box.size)
 
       let map_exit_body (type k v) (key : k) (map : (k, v) Script_typed_ir.map)
           =
