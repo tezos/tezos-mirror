@@ -613,7 +613,7 @@ let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Toggle_EMA = Toggle_EMA
-module Toggle_votes = Toggle_votes_repr
+module Toggle_votes = Per_block_votes_repr
 
 module Liquidity_baking = struct
   include Liquidity_baking_storage

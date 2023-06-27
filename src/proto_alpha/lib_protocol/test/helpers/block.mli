@@ -282,8 +282,8 @@ val bake_n_with_metadata :
   ?check_size:bool ->
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
-  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
-  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Per_block_votes_repr.toggle_vote ->
   int ->
   block ->
   (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
@@ -298,8 +298,8 @@ val bake_n_with_metadata :
 val bake_while :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
-  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Per_block_votes_repr.toggle_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> bool) ->
   block ->
@@ -310,8 +310,8 @@ val bake_while :
 val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_toggle_vote:Toggle_votes_repr.toggle_vote ->
-  ?adaptive_inflation_vote:Toggle_votes_repr.toggle_vote ->
+  ?liquidity_baking_toggle_vote:Per_block_votes_repr.toggle_vote ->
+  ?adaptive_inflation_vote:Per_block_votes_repr.toggle_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->

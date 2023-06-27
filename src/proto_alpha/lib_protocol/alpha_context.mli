@@ -3848,7 +3848,7 @@ module Block_header : sig
     payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
-    toggle_votes : Toggle_votes_repr.toggle_votes;
+    toggle_votes : Per_block_votes_repr.toggle_votes;
   }
 
   type protocol_data = {contents : contents; signature : signature}
@@ -4731,14 +4731,14 @@ module Toggle_EMA : sig
   end
 end
 
-(** This module re-exports definitions from {!Toggle_votes_repr}. *)
+(** This module re-exports definitions from {!Per_block_votes_repr}. *)
 module Toggle_votes : sig
-  type toggle_vote = Toggle_votes_repr.toggle_vote =
+  type toggle_vote = Per_block_votes_repr.toggle_vote =
     | Toggle_vote_on
     | Toggle_vote_off
     | Toggle_vote_pass
 
-  type toggle_votes = Toggle_votes_repr.toggle_votes = {
+  type toggle_votes = Per_block_votes_repr.toggle_votes = {
     liquidity_baking_vote : toggle_vote;
     adaptive_inflation_vote : toggle_vote;
   }

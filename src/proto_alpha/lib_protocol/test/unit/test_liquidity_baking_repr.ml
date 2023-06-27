@@ -32,21 +32,21 @@
 *)
 
 open Protocol
-module Toggle_EMA = Toggle_votes_repr.Liquidity_baking_toggle_EMA
+module Toggle_EMA = Per_block_votes_repr.Liquidity_baking_toggle_EMA
 
 let ema_of_int32 ema = Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
 
 let ema_to_int32 = Toggle_EMA.to_int32
 
 let compute_new_ema ~toggle_vote ema =
-  Toggle_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema
+  Per_block_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema
   |> ema_to_int32
 
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n toggle_votes initial_ema =
   List.fold_left
     (fun ema toggle_vote ->
-      Toggle_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema)
+      Per_block_votes_repr.compute_new_liquidity_baking_ema ~toggle_vote ema)
     initial_ema
     toggle_votes
   |> ema_to_int32
@@ -171,7 +171,7 @@ let test_ema_decreases_on_bound () =
 
 (* Test that 1385 Off votes are needed to reach the threshold from 0. *)
 let test_ema_many_off () =
-  let open Toggle_votes_repr in
+  let open Per_block_votes_repr in
   ema_of_int32 0l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__
@@ -189,7 +189,7 @@ let test_ema_many_off () =
 
 (* Test that 1385 On votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
 let test_ema_many_on () =
-  let open Toggle_votes_repr in
+  let open Per_block_votes_repr in
   ema_of_int32 2_000_000_000l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__

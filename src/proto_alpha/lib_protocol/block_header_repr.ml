@@ -30,7 +30,7 @@ type contents = {
   payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
-  toggle_votes : Toggle_votes_repr.toggle_votes;
+  toggle_votes : Per_block_votes_repr.toggle_votes;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -106,10 +106,10 @@ let contents_encoding =
          (opt "seed_nonce_hash" Nonce_hash.encoding)
          (req
             "liquidity_baking_toggle_vote"
-            Toggle_votes_repr.liquidity_baking_vote_encoding)
+            Per_block_votes_repr.liquidity_baking_vote_encoding)
          (req
             "adaptive_inflation_vote"
-            Toggle_votes_repr.adaptive_inflation_vote_encoding))
+            Per_block_votes_repr.adaptive_inflation_vote_encoding))
   in
   let binary =
     conv
@@ -144,7 +144,7 @@ let contents_encoding =
             "proof_of_work_nonce"
             (Fixed.bytes Hex Constants_repr.proof_of_work_nonce_size))
          (opt "seed_nonce_hash" Nonce_hash.encoding)
-         (req "toggle_votes" Toggle_votes_repr.toggle_votes_encoding))
+         (req "toggle_votes" Per_block_votes_repr.toggle_votes_encoding))
   in
   def "block_header.alpha.unsigned_contents" @@ splitted ~binary ~json
 

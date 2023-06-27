@@ -931,7 +931,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
   in
   let toggle_votes =
     {
-      Protocol.Toggle_votes_repr.liquidity_baking_vote =
+      Protocol.Per_block_votes_repr.liquidity_baking_vote =
         Baking_configuration.default_votes_config
           .Baking_configuration.liquidity_baking_vote;
       adaptive_inflation_vote =

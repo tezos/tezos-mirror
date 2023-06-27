@@ -287,21 +287,21 @@ let set_adaptive_inflation_enable ctxt =
 
 let update_ema ctxt ~vote =
   Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
-  Toggle_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
+  Per_block_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
   >>=? fun old_ema ->
   let new_ema =
-    Toggle_votes_repr.compute_new_adaptive_inflation_ema
+    Per_block_votes_repr.compute_new_adaptive_inflation_ema
       ~toggle_vote:vote
       old_ema
   in
   Storage.Adaptive_inflation.Launch_ema.update
     ctxt
-    (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
+    (Per_block_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
   >>=? fun ctxt ->
   launch_cycle ctxt >>=? fun launch_cycle ->
   let open Constants_storage in
   (if
-   Toggle_votes_repr.Adaptive_inflation_launch_EMA.(
+   Per_block_votes_repr.Adaptive_inflation_launch_EMA.(
      new_ema < adaptive_inflation_launch_ema_threshold ctxt)
   then return (ctxt, launch_cycle)
   else

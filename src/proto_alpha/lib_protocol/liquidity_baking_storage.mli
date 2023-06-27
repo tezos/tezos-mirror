@@ -38,8 +38,8 @@ val get_cpmm_address : Raw_context.t -> Contract_hash.t tzresult Lwt.t
     see [apply_liquidity_baking_subsidy] in [apply.ml]. *)
 val on_subsidy_allowed :
   Raw_context.t ->
-  toggle_vote:Toggle_votes_repr.toggle_vote ->
+  toggle_vote:Per_block_votes_repr.toggle_vote ->
   (Raw_context.t -> Contract_hash.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  (Raw_context.t * 'a list * Toggle_votes_repr.Liquidity_baking_toggle_EMA.t)
+  (Raw_context.t * 'a list * Per_block_votes_repr.Liquidity_baking_toggle_EMA.t)
   tzresult
   Lwt.t

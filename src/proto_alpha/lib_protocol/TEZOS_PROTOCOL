@@ -92,7 +92,7 @@
         "Bond_id_repr",
         "Vote_repr",
         "Toggle_EMA",
-        "Toggle_votes_repr",
+        "Per_block_votes_repr",
         "Block_header_repr",
         "Destination_repr",
         "Script_int",

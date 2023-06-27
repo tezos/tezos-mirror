@@ -54,10 +54,10 @@ val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 (** [update_ema ctxt ~vote] returns the new context with the new EMA *)
 val update_ema :
   Raw_context.t ->
-  vote:Toggle_votes_repr.toggle_vote ->
+  vote:Per_block_votes_repr.toggle_vote ->
   (Raw_context.t
   * Cycle_repr.t option
-  * Toggle_votes_repr.Adaptive_inflation_launch_EMA.t)
+  * Per_block_votes_repr.Adaptive_inflation_launch_EMA.t)
   tzresult
   Lwt.t
 
