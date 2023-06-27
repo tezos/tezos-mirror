@@ -181,11 +181,12 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
       collected_messages
   else
     let* inbox = Node_context.genesis_inbox node_ctxt in
-    return
-      ( Sc_rollup.Inbox.hash inbox,
-        inbox,
-        Sc_rollup.Inbox.current_witness inbox,
-        [] )
+    let witness = Sc_rollup.Inbox.current_witness inbox in
+    let* () =
+      Node_context.save_messages node_ctxt witness ~block_hash:head.hash []
+    in
+    let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
+    return (inbox_hash, inbox, witness, [])
 
 let start () = Inbox_event.starting ()
 

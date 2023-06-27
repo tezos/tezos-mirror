@@ -814,16 +814,14 @@ let genesis_inbox node_ctxt =
 let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
   let open Lwt_result_syntax in
   let* possible_inbox = find_inbox_by_block_hash node_ctxt block_hash in
-  (* Pre-condition: forall l. (l > genesis_level) => inbox[l] <> None. *)
+  (* Pre-condition: forall l. (l >= genesis_level) => inbox[l] <> None. *)
   match possible_inbox with
   | None ->
       (* The inbox exists for each tezos block the rollup should care about.
-         That is, every block after the origination level. We then join
+         That is, every block at or after the origination level. We then join
          the bandwagon and build the inbox on top of the protocol's inbox
          at the end of the origination level. *)
-      let genesis_level = node_ctxt.genesis_info.level in
-      if block_level = genesis_level then genesis_inbox node_ctxt
-      else if block_level > genesis_level then
+      if block_level >= node_ctxt.genesis_info.level then
         (* Invariant broken, the inbox for this level should exist. *)
         failwith
           "The inbox for block hash %a (level = %ld) is missing."
