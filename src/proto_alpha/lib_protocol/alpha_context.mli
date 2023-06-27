@@ -3130,6 +3130,27 @@ module Sc_rollup : sig
       | Dissection_invalid_successive_states_shape
   end
 
+  module type Generic_pvm_context_sig = sig
+    module Tree :
+      Context.TREE with type key = string list and type value = bytes
+
+    type tree = Tree.tree
+
+    type proof
+
+    val proof_encoding : proof Data_encoding.t
+
+    val proof_before : proof -> Sc_rollup_repr.State_hash.t
+
+    val proof_after : proof -> Sc_rollup_repr.State_hash.t
+
+    val verify_proof :
+      proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+    val produce_proof :
+      Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
+  end
+
   module PVM : sig
     type boot_sector = string
 
@@ -3240,33 +3261,7 @@ module Sc_rollup : sig
   val genesis_state_hash_of : boot_sector:string -> Kind.t -> State_hash.t Lwt.t
 
   module ArithPVM : sig
-    module type P = sig
-      module Tree :
-        Context.TREE with type key = string list and type value = bytes
-
-      type tree = Tree.tree
-
-      val hash_tree : tree -> State_hash.t
-
-      type proof
-
-      val proof_encoding : proof Data_encoding.t
-
-      val proof_before : proof -> State_hash.t
-
-      val proof_after : proof -> State_hash.t
-
-      val verify_proof :
-        proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-      val produce_proof :
-        Tree.t ->
-        tree ->
-        (tree -> (tree * 'a) Lwt.t) ->
-        (proof * 'a) option Lwt.t
-    end
-
-    module Make (C : P) : sig
+    module Make (C : Generic_pvm_context_sig) : sig
       include
         PVM.S
           with type context = C.Tree.t
@@ -3310,33 +3305,9 @@ module Sc_rollup : sig
 
     val well_known_reveal_hash : Sc_rollup_reveal_hash.t
 
-    module type P = sig
-      module Tree :
-        Context.TREE with type key = string list and type value = bytes
-
-      type tree = Tree.tree
-
-      type proof
-
-      val proof_encoding : proof Data_encoding.t
-
-      val proof_before : proof -> State_hash.t
-
-      val proof_after : proof -> State_hash.t
-
-      val verify_proof :
-        proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-      val produce_proof :
-        Tree.t ->
-        tree ->
-        (tree -> (tree * 'a) Lwt.t) ->
-        (proof * 'a) option Lwt.t
-    end
-
     module type Make_wasm = module type of Wasm_2_0_0.Make
 
-    module Make (Wasm_backend : Make_wasm) (C : P) : sig
+    module Make (Wasm_backend : Make_wasm) (C : Generic_pvm_context_sig) : sig
       include
         PVM.S
           with type context = C.Tree.t

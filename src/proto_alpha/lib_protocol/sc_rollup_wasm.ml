@@ -129,26 +129,6 @@ module V2_0_0 = struct
 
   module type Make_wasm = module type of Wasm_2_0_0.Make
 
-  module type P = sig
-    module Tree : TreeS
-
-    type tree = Tree.tree
-
-    type proof
-
-    val proof_encoding : proof Data_encoding.t
-
-    val proof_before : proof -> State_hash.t
-
-    val proof_after : proof -> State_hash.t
-
-    val verify_proof :
-      proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-    val produce_proof :
-      Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
-  end
-
   module type S = sig
     include Sc_rollup_PVM_sig.S
 
@@ -180,7 +160,9 @@ module V2_0_0 = struct
      The Make_backend is a functor that creates the backend of the PVM.
      The Conext provides the tree and the proof types.
   *)
-  module Make (Make_backend : Make_wasm) (Context : P) :
+  module Make
+      (Make_backend : Make_wasm)
+      (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree

@@ -64,31 +64,12 @@ module V2_0_0 : sig
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module type P = sig
-    module Tree :
-      Context.TREE with type key = string list and type value = bytes
-
-    type tree = Tree.tree
-
-    type proof
-
-    val proof_encoding : proof Data_encoding.t
-
-    val proof_before : proof -> Sc_rollup_repr.State_hash.t
-
-    val proof_after : proof -> Sc_rollup_repr.State_hash.t
-
-    val verify_proof :
-      proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
-
-    val produce_proof :
-      Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
-  end
-
   module type Make_wasm = module type of Wasm_2_0_0.Make
 
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
-  module Make (Lib_scoru_Wasm : Make_wasm) (Context : P) :
+  module Make
+      (Lib_scoru_Wasm : Make_wasm)
+      (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
