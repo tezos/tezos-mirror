@@ -5,6 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  tezos-test-helpers
   tezt
   str
   bls12-381
@@ -131,6 +132,7 @@
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
+  -open Tezos_test_helpers
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos

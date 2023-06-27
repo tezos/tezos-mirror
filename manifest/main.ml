@@ -475,17 +475,6 @@ let octez_test_helpers =
              complains that the alias is empty. *)
           alias_rule "runtest_js" ~action:(S "progn");
         ]
-    ~modules:
-      [
-        "assert";
-        "lwt_assert";
-        "qcheck2_helpers";
-        "qcheck_extra";
-        "qcheck_helpers";
-        "random_pure";
-        "roundtrip";
-        "testable";
-      ]
 
 let octez_expect_helper =
   public_lib
@@ -7584,6 +7573,7 @@ let () =
   let make_tezt_exe test_libs =
     let deps =
       [
+        octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
         str;
         bls12_381;

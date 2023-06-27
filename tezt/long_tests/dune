@@ -12,6 +12,7 @@
             tezos-time-measurement
             data-encoding
             tezos-event-logging
+            tezos-test-helpers
             )
  (flags (:standard
           -open Tezt
@@ -21,5 +22,6 @@
           -open Tezt_performance_regression
           -open Tezos_lwt_result_stdlib
           -open Tezos_event_logging
+          -open Tezos_test_helpers
           (:include %{workspace_root}/macos-link-flags.sexp)
          )))
