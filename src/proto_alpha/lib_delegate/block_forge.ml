@@ -56,7 +56,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
-          toggle_votes =
+          per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
               adaptive_inflation_vote;
@@ -498,7 +498,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce;
-          toggle_votes =
+          per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
               adaptive_inflation_vote;

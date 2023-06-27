@@ -114,7 +114,7 @@
   Zk_rollup_circuit_public_inputs_repr
   Bond_id_repr
   Vote_repr
-  Toggle_EMA
+  Votes_EMA_repr
   Per_block_votes_repr
   Block_header_repr
   Destination_repr
@@ -382,7 +382,7 @@
   zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
-  toggle_EMA.ml toggle_EMA.mli
+  votes_EMA_repr.ml votes_EMA_repr.mli
   per_block_votes_repr.ml per_block_votes_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
@@ -652,7 +652,7 @@
   zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
-  toggle_EMA.ml toggle_EMA.mli
+  votes_EMA_repr.ml votes_EMA_repr.mli
   per_block_votes_repr.ml per_block_votes_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
@@ -906,7 +906,7 @@
   zk_rollup_circuit_public_inputs_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
-  toggle_EMA.ml toggle_EMA.mli
+  votes_EMA_repr.ml votes_EMA_repr.mli
   per_block_votes_repr.ml per_block_votes_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli

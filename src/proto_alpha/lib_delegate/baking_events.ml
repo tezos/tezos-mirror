@@ -797,7 +797,7 @@ module Actions = struct
       ~level:Notice
       ~msg:"Voting {value} for liquidity baking toggle vote"
       ( "value",
-        Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
 
   let vote_for_adaptive_inflation =
     declare_1
@@ -806,7 +806,7 @@ module Actions = struct
       ~level:Notice
       ~msg:"Voting {value} for adaptive inflation vote"
       ( "value",
-        Protocol.Alpha_context.Toggle_votes.adaptive_inflation_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding )
 
   let no_dal_node =
     declare_0
@@ -1020,7 +1020,7 @@ module Per_block_votes = struct
       ~level:Notice
       ~msg:"liquidity baking toggle vote = {value}"
       ( "value",
-        Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
 
   let per_block_vote_file_fail =
     declare_1
@@ -1038,7 +1038,7 @@ module Per_block_votes = struct
       ~level:Notice
       ~msg:"adaptive inflation vote = {value}"
       ( "value",
-        Protocol.Alpha_context.Toggle_votes.adaptive_inflation_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding )
 end
 
 module Selection = struct

@@ -76,10 +76,10 @@ type nonce_config = Deterministic | Random
 
 type state_recorder_config = Filesystem | Disabled
 
-type toggle_votes_config = {
+type per_block_votes_config = {
   vote_file : string option;
-  liquidity_baking_vote : Protocol.Alpha_context.Toggle_votes.toggle_vote;
-  adaptive_inflation_vote : Protocol.Alpha_context.Toggle_votes.toggle_vote;
+  liquidity_baking_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
+  adaptive_inflation_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
 }
 
 type t = {
@@ -88,7 +88,7 @@ type t = {
   validation : validation_config;
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
-  toggle_votes : toggle_votes_config;
+  per_block_votes : per_block_votes_config;
   force_apply : bool;
   force : bool;
   state_recorder : state_recorder_config;
@@ -117,9 +117,9 @@ let default_user_activated_upgrades = []
 let default_votes_config =
   {
     vote_file = None;
-    liquidity_baking_vote = Protocol.Alpha_context.Toggle_votes.Toggle_vote_pass;
+    liquidity_baking_vote = Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
     adaptive_inflation_vote =
-      Protocol.Alpha_context.Toggle_votes.Toggle_vote_pass;
+      Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
   }
 
 let default_force = false
@@ -137,7 +137,7 @@ let default_config =
     validation = default_validation_config;
     retries_on_failure = default_retries_on_failure_config;
     user_activated_upgrades = default_user_activated_upgrades;
-    toggle_votes = default_votes_config;
+    per_block_votes = default_votes_config;
     force_apply = default_force_apply;
     force = default_force;
     state_recorder = default_state_recorder_config;
@@ -169,7 +169,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     nonce;
     retries_on_failure;
     user_activated_upgrades;
-    toggle_votes = votes;
+    per_block_votes = votes;
     force_apply;
     force;
     state_recorder;
@@ -237,14 +237,14 @@ let user_activate_upgrades_config_encoding =
   list (tup2 int32 Protocol_hash.encoding)
 
 let liquidity_baking_toggle_vote_config_encoding =
-  Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding
+  Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding
 
 let adaptive_inflation_vote_config_encoding =
-  Protocol.Alpha_context.Toggle_votes.adaptive_inflation_vote_encoding
+  Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
 
-let toggle_votes_config_encoding =
+let per_block_votes_config_encoding =
   let open Data_encoding in
-  def (String.concat "." [Protocol.name; "toggle_votes_config"])
+  def (String.concat "." [Protocol.name; "per_block_votes_config"])
   @@ conv
        (fun {vote_file; liquidity_baking_vote; adaptive_inflation_vote} ->
          (vote_file, liquidity_baking_vote, adaptive_inflation_vote))
@@ -295,7 +295,7 @@ let encoding : t Data_encoding.t =
               nonce;
               retries_on_failure;
               user_activated_upgrades;
-              toggle_votes;
+              per_block_votes;
               force_apply;
               force;
               state_recorder;
@@ -307,7 +307,7 @@ let encoding : t Data_encoding.t =
              nonce,
              retries_on_failure,
              user_activated_upgrades,
-             toggle_votes,
+             per_block_votes,
              force_apply,
              force,
              state_recorder ),
@@ -317,7 +317,7 @@ let encoding : t Data_encoding.t =
                 nonce,
                 retries_on_failure,
                 user_activated_upgrades,
-                toggle_votes,
+                per_block_votes,
                 force_apply,
                 force,
                 state_recorder ),
@@ -328,7 +328,7 @@ let encoding : t Data_encoding.t =
            nonce;
            retries_on_failure;
            user_activated_upgrades;
-           toggle_votes;
+           per_block_votes;
            force_apply;
            force;
            state_recorder;
@@ -344,7 +344,7 @@ let encoding : t Data_encoding.t =
              (req
                 "user_activated_upgrades"
                 user_activate_upgrades_config_encoding)
-             (req "votes" toggle_votes_config_encoding)
+             (req "votes" per_block_votes_config_encoding)
              (req "force_apply" force_apply_config_encoding)
              (req "force" force_config_encoding)
              (req "state_recorder" state_recorder_config_encoding))

@@ -289,21 +289,21 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     liquidity_baking_vote;
     adaptive_inflation_vote;
   } =
-    state.global_state.config.toggle_votes
+    state.global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
   (let default =
-     Protocol.Alpha_context.Toggle_votes.
+     Protocol.Alpha_context.Per_block_votes.
        {liquidity_baking_vote; adaptive_inflation_vote}
    in
    match vote_file with
    | Some per_block_vote_file ->
-       Per_block_vote_file.read_toggle_votes_no_fail
+       Per_block_vote_file.read_per_block_votes_no_fail
          ~default
          ~per_block_vote_file
    | None -> Lwt.return default)
   >>= fun {liquidity_baking_vote; adaptive_inflation_vote} ->
-  (* Cache last toggle vote to use in case of vote file errors *)
+  (* Cache last per-block votes to use in case of vote file errors *)
   let updated_state =
     {
       updated_state with
@@ -313,9 +313,9 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
           config =
             {
               updated_state.global_state.config with
-              toggle_votes =
+              per_block_votes =
                 {
-                  updated_state.global_state.config.toggle_votes with
+                  updated_state.global_state.config.per_block_votes with
                   liquidity_baking_vote;
                   adaptive_inflation_vote;
                 };

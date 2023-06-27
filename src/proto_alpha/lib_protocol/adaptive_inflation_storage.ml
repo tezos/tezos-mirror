@@ -291,7 +291,7 @@ let update_ema ctxt ~vote =
   >>=? fun old_ema ->
   let new_ema =
     Per_block_votes_repr.compute_new_adaptive_inflation_ema
-      ~toggle_vote:vote
+      ~per_block_vote:vote
       old_ema
   in
   Storage.Adaptive_inflation.Launch_ema.update
