@@ -646,7 +646,12 @@ let get_dal_attestations state ~level =
           | Tezos_dal_node_services.Services.Types.Not_in_committee ->
               return acc
           | Attestable_slots attestation ->
-              return ((delegate, attestation) :: acc))
+              if List.exists Fun.id attestation then
+                return ((delegate, attestation) :: acc)
+              else
+                (* No slot is attested, no need to send an attestation, at least
+                   for now. *)
+                return acc)
         []
         delegates
       >>=? fun attestations ->
