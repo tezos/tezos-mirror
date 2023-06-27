@@ -216,18 +216,12 @@ let refresh_users =
   fun db_pool users ->
     Lwt_mutex.with_lock mutex (fun () ->
         let query =
-          Caqti_request.Infix.(Caqti_type.(unit ->* tup2 string string))
+          Caqti_request.Infix.(
+            Caqti_type.(unit ->* tup2 string Sql_requests.Type.bcrypt_hash))
             "SELECT name, password FROM nodes WHERE password IS NOT NULL"
         in
-        Lwt.map
-          (function
-            | Ok users_from_db ->
-                users :=
-                  List.map
-                    (fun (u, p) -> (u, Bcrypt.hash_of_string p))
-                    users_from_db ;
-                Ok ()
-            | Error _ as e -> e)
+        Lwt_result.map
+          (fun users_from_db -> users := users_from_db)
           (Caqti_lwt.Pool.use
              (fun (module Db : Caqti_lwt.CONNECTION) ->
                Db.collect_list query ())
@@ -237,9 +231,9 @@ let refresh_users =
     If the user already exists, password is updated.
   *)
 let upsert_user db_pool login password =
-  let password = Bcrypt.string_of_hash password in
   let query =
-    Caqti_request.Infix.(Caqti_type.(tup2 string string ->. unit))
+    Caqti_request.Infix.(
+      Caqti_type.(tup2 string Sql_requests.Type.bcrypt_hash ->. unit))
       "INSERT INTO nodes(name, password) VALUES ($1, $2) ON CONFLICT (name) DO \
        UPDATE SET password = $2"
   in

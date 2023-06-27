@@ -225,6 +225,12 @@ module Type = struct
                      Tezos_error_monad.Error_monad.error_encoding)
                   s))
            Caqti_type.octets))
+
+  let bcrypt_hash =
+    Caqti_type.custom
+      ~encode:(fun x -> Ok (Bcrypt.string_of_hash x))
+      ~decode:(fun x -> Ok (Bcrypt.hash_of_string x))
+      Caqti_type.octets
 end
 
 let maybe_insert_source =

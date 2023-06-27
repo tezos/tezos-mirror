@@ -33,6 +33,8 @@ module Type : sig
   val public_key_hash : Tezos_crypto.Signature.public_key_hash Caqti_type.t
 
   val errors : Tezos_error_monad.TzCore.error list option Caqti_type.t
+
+  val bcrypt_hash : Bcrypt.hash Caqti_type.t
 end
 
 val env : Caqti_driver_info.t -> string -> Caqti_query.t
