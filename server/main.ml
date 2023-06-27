@@ -85,7 +85,7 @@ let with_source_authentification =
     Same as [with_source_authentification], but [users] is a list of admins instead of regular users.
 *)
 let with_admin_authentification =
-  with_authentification "Wrong login" "Who are you?"
+  with_authentification "Not an admin/Wrong login" "Who are you?"
 
 (** [post_only_endpoint] checks authorization and runs the callback passed as parameter if allowed,
     or returns an error responses.
