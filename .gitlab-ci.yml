@@ -15,7 +15,7 @@ build:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v17.0", "v17.1"]
+        OCTEZ_BRANCH: ["v17.1"]
   tags:
     - ${ARCH}
   variables:
@@ -43,7 +43,7 @@ docker:
   parallel:
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v17.0"]
+        OCTEZ_BRANCH: ["v17.1"]
         TARGET: ["server", "archiver"]
   needs:
     - job: "build"
