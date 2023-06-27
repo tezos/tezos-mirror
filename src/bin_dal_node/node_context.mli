@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type head_info = {
+  proto : int; (* the [proto_level] from the head's shell header *)
+  level : int32;
+}
+
 (** A [ready_ctx] value contains globally needed informations for a running dal
     node. It is available when both cryptobox is initialized and the plugin
     for dal has been loaded.
@@ -36,10 +41,10 @@ type ready_ctxt = {
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
   activation_level : Int32.t;
-      (** The level at which the DAL node will start tracking the Octez node. *)
-  proto_level : int;
-      (** Index of the protocol of the L1 head, called [proto_level] in the
-          block's shell header. *)
+      (** The level at which the DAL node will start tracking the L1 node. *)
+  plugin_proto : int;  (** Protocol level of the plugin. *)
+  last_seen_head : head_info option;
+      (** The level of the last seen head of the L1 node. *)
 }
 
 (** The status of the dal node *)
@@ -66,7 +71,7 @@ val init :
 exception Status_already_ready
 
 (** [set_ready ctxt dal_plugin cryptobox proto_parameters activation_level
-    proto_index] updates in place the status value to [Ready], and initializes
+    plugin_proto] updates in place the status value to [Ready], and initializes
     the inner [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
@@ -79,11 +84,16 @@ val set_ready :
   int ->
   unit
 
-(** Updates the plugin and the protocol level. Should *)
+(** Updates the plugin and the protocol level. *)
 val update_plugin_in_ready :
   t -> (module Tezos_dal_node_lib.Dal_plugin.T) -> int -> unit
 
 type error += Node_not_ready
+
+(** Updates the [last_seen_head] field of the "ready context" with the given
+    info.  Assumes the node's status is ready. Otherwise it returns
+    [Node_not_ready]. *)
+val update_last_seen_head : t -> head_info -> unit tzresult
 
 (** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
     propagates [Node_not_ready] if status is not ready yet. If called multiple

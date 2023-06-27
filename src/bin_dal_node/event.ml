@@ -90,9 +90,17 @@ let layer1_node_new_head =
   declare_2
     ~section
     ~name:"dal_node_layer_1_new_head"
-    ~msg:"Head of layer 1's node updated to {hash} at level {level}"
-    ~level:Notice
+    ~msg:"Head of Layer 1 node updated to {hash} at level {level}"
+    ~level:Info
     ("hash", Block_hash.encoding)
+    ("level", Data_encoding.int32)
+
+let layer1_node_final_block =
+  declare_1
+    ~section
+    ~name:"dal_node_layer_1_new_final_block"
+    ~msg:"Layer 1 node's block at level {level} is final"
+    ~level:Notice
     ("level", Data_encoding.int32)
 
 let layer1_node_tracking_started =
