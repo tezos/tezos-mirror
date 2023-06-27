@@ -2659,8 +2659,9 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
 
 let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~liquidity_baking_toggle_ema ~adaptive_inflation_toggle_ema
-    ~implicit_operations_results ~migration_balance_updates
-    ~(block_producer : Consensus_key.t) ~(payload_producer : Consensus_key.t) =
+    ~adaptive_inflation_launch_cycle ~implicit_operations_results
+    ~migration_balance_updates ~(block_producer : Consensus_key.t)
+    ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
   let attestation_power = Consensus.current_endorsement_power ctxt in
@@ -2749,6 +2750,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         balance_updates;
         liquidity_baking_toggle_ema;
         adaptive_inflation_toggle_ema;
+        adaptive_inflation_launch_cycle;
         implicit_operations_results;
         dal_attestation;
       }
@@ -2799,7 +2801,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
     ctxt;
     liquidity_baking_toggle_ema;
     adaptive_inflation_toggle_ema;
-    adaptive_inflation_launch_cycle = _;
+    adaptive_inflation_launch_cycle;
     implicit_operations_results;
     migration_balance_updates;
     op_count;
@@ -2841,6 +2843,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~predecessor_hash
           ~liquidity_baking_toggle_ema
           ~adaptive_inflation_toggle_ema
+          ~adaptive_inflation_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer
@@ -2872,6 +2875,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               adaptive_inflation_toggle_ema;
+              adaptive_inflation_launch_cycle;
               implicit_operations_results;
               dal_attestation = None;
             } )
@@ -2895,6 +2899,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~predecessor_hash:shell.predecessor
           ~liquidity_baking_toggle_ema
           ~adaptive_inflation_toggle_ema
+          ~adaptive_inflation_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer
