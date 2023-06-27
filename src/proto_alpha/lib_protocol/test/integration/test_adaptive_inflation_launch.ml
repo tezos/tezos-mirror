@@ -67,13 +67,9 @@ let assert_current_cycle ~loc (blk : Block.t) expected =
   assert_cycle_eq ~loc current_cycle expected
 
 let stake ctxt contract amount =
-  let open Lwt_result_wrap_syntax in
-  let*?@ entrypoint =
-    Protocol.Alpha_context.Entrypoint.of_string_strict ~loc:0 "stake"
-  in
   Op.transaction
     ctxt
-    ~entrypoint
+    ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
     ~fee:Protocol.Alpha_context.Tez.zero
     contract
     contract
@@ -81,12 +77,7 @@ let stake ctxt contract amount =
 
 let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
     ~baking_over_staking_edge =
-  let open Lwt_result_wrap_syntax in
-  let*?@ entrypoint =
-    Protocol.Alpha_context.Entrypoint.of_string_strict
-      ~loc:0
-      "set_delegate_parameters"
-  in
+  let entrypoint = Protocol.Alpha_context.Entrypoint.set_delegate_parameters in
   let parameters =
     Protocol.Alpha_context.Script.lazy_expr
       (Expr.from_string

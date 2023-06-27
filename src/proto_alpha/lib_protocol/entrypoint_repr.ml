@@ -159,6 +159,14 @@ let remove_delegate = of_string_strict_exn "remove_delegate"
 
 let deposit = of_string_strict_exn "deposit"
 
+let stake = of_string_strict_exn "stake"
+
+let unstake = of_string_strict_exn "unstake"
+
+let finalize_unstake = of_string_strict_exn "finalize_unstake"
+
+let set_delegate_parameters = of_string_strict_exn "set_delegate_parameters"
+
 let is_deposit = ( = ) deposit
 
 let is_root = ( = ) root
@@ -212,6 +220,10 @@ let smart_encoding =
       builtin_case 3 set_delegate;
       builtin_case 4 remove_delegate;
       builtin_case 5 deposit;
+      builtin_case 6 stake;
+      builtin_case 7 unstake;
+      builtin_case 8 finalize_unstake;
+      builtin_case 9 set_delegate_parameters;
       case
         (Tag 255)
         ~title:"named"

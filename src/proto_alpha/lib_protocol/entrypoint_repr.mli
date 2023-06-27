@@ -56,6 +56,18 @@ val remove_delegate : t
 (** Deposit entrypoint "deposit" *)
 val deposit : t
 
+(** Entrypoint "stake" *)
+val stake : t
+
+(** Entrypoint "unstake" *)
+val unstake : t
+
+(** Entrypoint "finalize_unstake" *)
+val finalize_unstake : t
+
+(** Entrypoint "set_delegate_parameters" *)
+val set_delegate_parameters : t
+
 (** Checks whether an entrypoint is the deposit entrypoint *)
 val is_deposit : t -> bool
 
