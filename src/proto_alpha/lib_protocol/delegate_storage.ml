@@ -311,10 +311,29 @@ module For_RPC = struct
       delegate
       pseudotokens
     >>=? fun own_frozen_deposits ->
+    (Unstake_requests_storage.prepare_finalize_unstake
+       ctxt
+       (Contract_repr.Implicit delegate)
+     >>=? function
+     | None -> return Tez_repr.zero
+     | Some {finalizable; unfinalizable} ->
+         Lwt.return
+           ( List.fold_left_e
+               (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+               Tez_repr.zero
+               unfinalizable.requests
+           >>? fun sum_unfinalizable ->
+             List.fold_left_e
+               (fun acc (_, _cycle, tz) -> Tez_repr.(acc +? tz))
+               sum_unfinalizable
+               finalizable ))
+    >>=? fun unstaked_frozen ->
+    Lwt.return Tez_repr.(own_frozen_deposits +? unstaked_frozen)
+    >>=? fun all_frozen ->
     let delegate_contract = Contract_repr.Implicit delegate in
     Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
     >>=? fun balance_and_frozen_bonds ->
-    Lwt.return Tez_repr.(own_frozen_deposits +? balance_and_frozen_bonds)
+    Lwt.return Tez_repr.(all_frozen +? balance_and_frozen_bonds)
 
   let delegated_balance ctxt delegate =
     staking_balance ctxt delegate >>=? fun staking_balance ->

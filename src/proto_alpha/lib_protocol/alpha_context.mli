@@ -2238,12 +2238,15 @@ module Delegate : sig
   the protocol.
       They are meant to be used only to answer RPC calls.  *)
   module For_RPC : sig
-    (** Returns the full 'balance' of the implicit contract associated to
-    a given key, i.e. the sum of the spendable balance (given by [balance] or
-    [Contract_storage.get_balance]) and of the frozen balance. The frozen
-    balance is composed of all frozen bonds associated to the contract (given by
-    [Contract_storage.get_frozen_bonds]) and of the part of the frozen deposits
-    (given by [frozen_deposits]) that belongs to the delegate.
+    (** Returns the full 'balance' of the implicit contract associated to a
+        given key, i.e. the sum of the spendable balance (given by [balance] or
+        [Contract_storage.get_balance]) and of the frozen balance of the
+        contract.
+
+        The frozen balance is composed of all frozen bonds associated to the
+        contract (given by [Contract_storage.get_frozen_bonds]), all unstaked
+        frozen deposits, and of the fraction of the frozen deposits that
+        actually belongs to the delegate and not to its costakers.
 
     Only use this function for RPCs: this is expensive. *)
     val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
