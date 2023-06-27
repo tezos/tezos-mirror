@@ -260,7 +260,8 @@ let test_payload_producer_gets_evidence_rewards () =
   let divider =
     Int64.add
       2L
-      (Int64.of_int c.parametric.adaptive_inflation.staking_over_baking_limit)
+      (Int64.of_int
+         c.parametric.adaptive_inflation.staking_over_baking_global_limit)
   in
   let evidence_reward = Test_tez.(slashed_amount /! divider) in
   let expected_reward =

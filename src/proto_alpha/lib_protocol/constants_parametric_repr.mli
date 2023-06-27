@@ -91,7 +91,7 @@ type zk_rollup = {
 }
 
 type adaptive_inflation = {
-  staking_over_baking_limit
+  staking_over_baking_global_limit
     (* Global maximum costake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
   staking_over_delegation_edge : (* Weight of staking over delegation. *) int;

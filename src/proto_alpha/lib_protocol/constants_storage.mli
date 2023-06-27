@@ -134,7 +134,7 @@ val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
 
 val adaptive_inflation_enable : Raw_context.t -> bool
 
-val adaptive_inflation_staking_over_baking_limit : Raw_context.t -> int
+val adaptive_inflation_staking_over_baking_global_limit : Raw_context.t -> int
 
 val adaptive_inflation_staking_over_delegation_edge : Raw_context.t -> int
 

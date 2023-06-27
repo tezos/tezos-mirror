@@ -142,7 +142,8 @@ end = struct
       Int64.add
         2L
         (Int64.of_int
-           constants.parametric.adaptive_inflation.staking_over_baking_limit)
+           constants.parametric.adaptive_inflation
+             .staking_over_baking_global_limit)
     in
     let denun_reward = Test_tez.(lost_deposit /! divider) in
     (* if the baker is the endorser, he'll only loose half of the deposits *)

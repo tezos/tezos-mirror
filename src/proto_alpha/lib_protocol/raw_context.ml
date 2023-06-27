@@ -982,7 +982,7 @@ let prepare_first_block ~level ~timestamp ctxt =
       let adaptive_inflation =
         Constants_parametric_repr.
           {
-            staking_over_baking_limit = 5;
+            staking_over_baking_global_limit = 5;
             staking_over_delegation_edge = 2;
             launch_ema_threshold =
               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l;

@@ -68,11 +68,11 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let delegate_contract = Contract_repr.Implicit delegate in
   let slashing_percentage = get_percentage ctxt in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let staking_over_baking_limit =
-    Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt
+  let staking_over_baking_global_limit =
+    Constants_storage.adaptive_inflation_staking_over_baking_global_limit ctxt
   in
-  let staking_over_baking_limit_plus_two =
-    Int64.add (Int64.of_int staking_over_baking_limit) 2L
+  let staking_over_baking_global_limit_plus_two =
+    Int64.add (Int64.of_int staking_over_baking_global_limit) 2L
   in
   let compute_reward_and_burn (frozen_deposits : Deposits_repr.t) =
     let open Result_syntax in
@@ -86,7 +86,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
       else (false, punish_value)
     in
     let* reward =
-      Tez_repr.(punishing_amount /? staking_over_baking_limit_plus_two)
+      Tez_repr.(punishing_amount /? staking_over_baking_global_limit_plus_two)
     in
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     (should_forbid, {reward; amount_to_burn})
