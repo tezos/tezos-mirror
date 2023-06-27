@@ -383,7 +383,7 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
+  let add_slot_headers ~block_level slot_headers node_store =
     let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388

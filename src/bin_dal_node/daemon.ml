@@ -292,7 +292,6 @@ module Handler = struct
                 let* () =
                   Slot_manager.store_slot_headers
                     ~block_level
-                    ~block_hash
                     slot_headers
                     (Node_context.get_store ctxt)
                 in

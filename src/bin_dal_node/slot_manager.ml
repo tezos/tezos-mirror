@@ -251,8 +251,8 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                        |> app_input gs_worker) ;
                      return_unit))
 
-let store_slot_headers ~block_level ~block_hash slot_headers node_store =
-  Store.Legacy.add_slot_headers ~block_level ~block_hash slot_headers node_store
+let store_slot_headers ~block_level slot_headers node_store =
+  Store.Legacy.add_slot_headers ~block_level slot_headers node_store
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
