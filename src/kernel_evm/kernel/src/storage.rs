@@ -72,6 +72,9 @@ const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
 /// Subpath where blocks are indexed.
 const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 
+/// Subpath where transactions are indexed
+const TRANSACTIONS_INDEX: RefPath = BLOCK_TRANSACTIONS;
+
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
 /// The size of a 256 bit hash. Size in bytes.
@@ -374,9 +377,15 @@ pub fn store_transaction_receipts<Host: Runtime>(
     host: &mut Host,
     receipts: &[TransactionReceipt],
 ) -> Result<(), Error> {
+    let mut transaction_hashes_index = init_transaction_hashes_index()?;
     for receipt in receipts {
+        // For each transaction hash there exists a receipt and an object. As
+        // such the indexing must be done either with the objects or the
+        // receipts otherwise they would be indexed twice. We chose to index
+        // hashes using the receipts.
+        index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
         let receipt_path = receipt_path(&receipt.hash)?;
-        store_transaction_receipt(&receipt_path, host, receipt)?;
+        store_transaction_receipt(&receipt_path, host, receipt)?
     }
     Ok(())
 }
@@ -667,6 +676,12 @@ pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
     IndexableStorage::new(&RefPath::from(&path))
 }
 
+/// Get the index of transactions
+pub fn init_transaction_hashes_index() -> Result<IndexableStorage, StorageError> {
+    let path = concat(&EVM_INDEXES, &TRANSACTIONS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
+}
+
 pub fn index_account(
     host: &mut impl Runtime,
     address: &H160,
@@ -717,6 +732,16 @@ pub fn index_block(
 ) -> Result<(), Error> {
     blocks_index
         .push_value(host, block_hash.as_bytes())
+        .map_err(Error::from)
+}
+
+pub fn index_transaction_hash(
+    host: &mut impl Runtime,
+    transaction_hash: &[u8],
+    transaction_hashes_index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    transaction_hashes_index
+        .push_value(host, transaction_hash)
         .map_err(Error::from)
 }
 
