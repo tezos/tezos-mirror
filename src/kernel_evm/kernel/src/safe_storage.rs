@@ -4,15 +4,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::upgrade::CONFIG_INTERPRETER_PATH;
-use crate::upgrade::KERNEL_BOOT_PATH;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{Runtime, RuntimeError, ValueType},
+    KERNEL_BOOT_PATH,
 };
+use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
@@ -163,14 +163,11 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn promote_upgrade(&mut self) -> Result<(), RuntimeError> {
-        let safe_config_interpr_path = safe_path(&CONFIG_INTERPRETER_PATH)?;
-        match self.0.store_read(&safe_config_interpr_path, 0, 0) {
+        let safe_kernel_boot_path = safe_path(&TMP_REVEAL_PATH)?;
+        match self.0.store_read(&safe_kernel_boot_path, 0, 0) {
             Ok(_) => {
                 // Upgrade detected
-                let safe_kernel_boot_path = safe_path(&KERNEL_BOOT_PATH)?;
-                self.0
-                    .store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)?;
-                self.0.store_delete(&safe_config_interpr_path)
+                self.0.store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)
             }
             Err(_) => {
                 // No on-going upgrade detected

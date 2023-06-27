@@ -35,7 +35,7 @@ pub enum StorageError {
 #[derive(Debug)]
 pub enum UpgradeProcessError {
     InvalidUpgradeNonce,
-    ConfigSerialisation(tezos_data_encoding::enc::BinError),
+    InternalUpgrade(&'static str),
 }
 
 #[derive(Debug)]

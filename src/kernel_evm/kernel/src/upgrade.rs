@@ -9,14 +9,11 @@ use crate::error::UpgradeProcessError;
 use crate::parsing::{SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE};
 use libsecp256k1::{Message, PublicKey, Signature};
 use sha3::{Digest, Keccak256};
-use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
-use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
-use tezos_smart_rollup_installer_config::binary::owned::{
-    OwnedConfigInstruction, OwnedConfigProgram,
-};
+use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
+use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/5894, define the dictator key
 // via the config installer set function
@@ -52,44 +49,17 @@ pub fn check_dictator_signature(
     }
 }
 
-// Boot path for kernels
-pub const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
-// Path that will contain the config interpretation.
-pub const CONFIG_INTERPRETER_PATH: RefPath =
-    RefPath::assert_from(b"/installer/config_interpreter");
-
-// TODO: https://gitlab.com/tezos/tezos/-/issues/5907, expose an explicit kernel
-// upgrade function in the SDK that would move most of the code below.
 pub fn upgrade_kernel<Host: Runtime>(
     host: &mut Host,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
 ) -> Result<(), Error> {
     debug_msg!(host, "Kernel upgrade initialisation.\n");
-    let root_hash = root_hash.to_vec();
 
-    // Create config consisting of a reveal instruction.
-    let reveal_instructions = vec![OwnedConfigInstruction::reveal_instr(
-        root_hash.into(),
-        OwnedPath::from(KERNEL_BOOT_PATH),
-    )];
+    let config_program = upgrade_reveal_flow(root_hash);
+    eval_config_program(host, &config_program)
+        .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    let mut kernel_config = Vec::new();
-    OwnedConfigProgram(reveal_instructions)
-        .bin_write(&mut kernel_config)
-        .map_err(UpgradeProcessError::ConfigSerialisation)?;
-
-    host.store_write_all(&CONFIG_INTERPRETER_PATH, &kernel_config)?;
-
-    if let Err(e) = installer_kernel::install_kernel(host, CONFIG_INTERPRETER_PATH) {
-        debug_msg!(
-            host,
-            "Error \"{}\" was detected during kernel installation.\n",
-            e
-        );
-    } else {
-        debug_msg!(host, "Kernel is ready to be upgraded.\n");
-    }
-
+    debug_msg!(host, "Kernel is ready to be upgraded.\n");
     Ok(())
 }
 
@@ -100,6 +70,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
     use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
+    use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
     use tezos_smart_rollup_mock::MockHost;
 
     #[test]
@@ -149,7 +120,7 @@ mod tests {
         upgrade_kernel(&mut host, root_hash.into())
             .expect("Kernel upgrade must succeed.");
 
-        let boot_kernel = host.store_read_all(&KERNEL_BOOT_PATH).unwrap();
+        let boot_kernel = host.store_read_all(&TMP_REVEAL_PATH).unwrap();
         assert_eq!(original_kernel, boot_kernel);
     }
 }
