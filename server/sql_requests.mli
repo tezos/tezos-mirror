@@ -41,7 +41,7 @@ val env : Caqti_driver_info.t -> string -> Caqti_query.t
 
 val create_tables : string list
 
-val alter_tables : string list
+val alter_tables : string list list
 
 val maybe_insert_source : (string, unit, [`Zero]) Caqti_request.t
 

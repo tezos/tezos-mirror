@@ -160,12 +160,14 @@ let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
 
 let alter_tables =
   [
-    alter_blocks;
-    alter_blocks_reception_add_application_timestamp;
-    update_blocks_reception_set_application_timestamp_to_timestamp;
-    alter_blocks_reception_drop_timestamp;
-    alter_blocks_reception_add_validation_timestamp;
-    alter_nodes;
+    [alter_blocks];
+    [
+      alter_blocks_reception_add_application_timestamp;
+      update_blocks_reception_set_application_timestamp_to_timestamp;
+      alter_blocks_reception_drop_timestamp;
+      alter_blocks_reception_add_validation_timestamp;
+    ];
+    [alter_nodes];
   ]
 
 module Type = struct

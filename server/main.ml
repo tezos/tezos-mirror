@@ -264,16 +264,28 @@ let maybe_create_tables db_pool =
 let maybe_alter_tables db_pool =
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.with_transaction (fun () ->
-          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-            (fun req ->
-              Lwt.bind
-                (Db.exec
-                   (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
-                   ())
-                (* IF NOT EXISTS expression not supported by sqlite instead ignore error if column already exists *)
-                  (fun _ -> Lwt.return_ok ()))
-            Sql_requests.alter_tables))
+      Lwt.map
+        (fun () -> Ok ())
+        (Lwt_list.iter_s
+           (fun reqs ->
+             Lwt.bind
+               (Db.with_transaction (fun () ->
+                    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                      (fun req ->
+                        Db.exec
+                          (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
+                          ())
+                      reqs))
+               (function
+                 | Ok () -> Lwt.return_unit
+                 | Error e ->
+                     Lwt_io.eprintlf
+                       "\"ALTER TABLE ADD COLUMN IF NOT EXISTS\" expression is \
+                        not supported by sqlite, if the following error is \
+                        because the column already exists ignore it:\n\
+                        %s"
+                       (Caqti_error.show e)))
+           Sql_requests.alter_tables))
     db_pool
 
 let maybe_alter_and_create_tables db_pool =
