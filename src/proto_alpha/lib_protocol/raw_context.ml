@@ -1020,7 +1020,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             double_baking_punishment_times_100
             (Tez_repr.to_mutez c.minimal_stake)
         in
-        1 + Int64.to_int percentage_rounded_down
+        Int64.to_int percentage_rounded_down
       in
       let delegation_over_baking_limit =
         (100 / c.frozen_deposits_percentage) - 1

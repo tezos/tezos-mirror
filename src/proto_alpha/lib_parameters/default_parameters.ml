@@ -178,7 +178,7 @@ let constants_mainnet =
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     max_slashing_period = 2;
     delegation_over_baking_limit = 9;
-    percentage_of_frozen_deposits_slashed_per_double_baking = 11;
+    percentage_of_frozen_deposits_slashed_per_double_baking = 10;
     percentage_of_frozen_deposits_slashed_per_double_endorsement = 50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
