@@ -595,6 +595,11 @@ let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
   in
   Registration_helpers.register bench
 
+(* Register only a model for code generation *)
+let register_model_for_code_generation model =
+  let model = Model.make ~conv:Fun.id ~model in
+  Registration.register_model_for_code_generation "interpreter" model
+
 (* ------------------------------------------------------------------------- *)
 (* Sampling helpers *)
 
@@ -1099,8 +1104,7 @@ module Registration_section = struct
 
     let () =
       benchmark_with_fixed_stack
-        ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"_none"
+        ~name:Interpreter_workload.N_IOpt_map_none
         ~stack:(None, ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})
@@ -1108,12 +1112,20 @@ module Registration_section = struct
 
     let () =
       benchmark_with_fixed_stack
-        ~name:Interpreter_workload.N_IOpt_map
-        ~salt:"_some"
+        ~name:Interpreter_workload.N_IOpt_map_some
         ~stack:(Some (), ((), eos))
         ~stack_type:(option unit @$ unit @$ bot)
         ~kinstr:(IOpt_map {loc = dummy_loc; body = halt; k = halt})
         ()
+
+    let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"none_const"
+          ~case_1:"some_const"
+          "N_IOpt_map"
+      in
+      register_model_for_code_generation model
   end
 
   module Ors = struct
@@ -2225,31 +2237,70 @@ module Registration_section = struct
         ()
 
     let () =
-      (*
-        ILoop ->
-        either
-        - IHalt (false on top of stack)
-        - IPush false ; IHalt (true on top of stack)
-       *)
       let push_false = IPush (dummy_loc, bool, false, halt) in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ILoop
+      (* The case true is on top of stack
+         ILoop ->
+         IPush false ->
+         IHalt
+      *)
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_in
+        ~stack:(true, eos)
+        ~stack_type:(bool @$ bot)
+        ~kinstr:(ILoop (dummy_loc, push_false, halt))
+        () ;
+      (* The case false is on top of stack
+         ILoop ->
+         IHalt
+      *)
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_out
+        ~stack:(false, eos)
         ~stack_type:(bool @$ bot)
         ~kinstr:(ILoop (dummy_loc, push_false, halt))
         ()
 
     let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"in_const"
+          ~case_1:"out_const"
+          "N_ILoop"
+      in
+      register_model_for_code_generation model
+
+    let () =
+      let cons_r = ICons_right (dummy_loc, unit, halt) in
+      (*
+          ILoop_left ->
+          ICons_right ->
+          IHalt
+       *)
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_left_in
+        ~stack:(L (), eos)
+        ~stack_type:(cor unit unit @$ bot)
+        ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
+        () ;
       (*
         ILoop_left ->
-        ICons_right ->
         IHalt
        *)
-      let cons_r = ICons_right (dummy_loc, unit, halt) in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ILoop_left
+      benchmark_with_fixed_stack
+        ~name:Interpreter_workload.N_ILoop_left_out
+        ~stack:(R (), eos)
         ~stack_type:(cor unit unit @$ bot)
         ~kinstr:(ILoop_left (dummy_loc, cons_r, halt))
         ()
+
+    let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"in_const"
+          ~case_1:"out_const"
+          "N_ILoop_left"
+      in
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -2356,7 +2407,7 @@ module Registration_section = struct
         IHalt
        *)
       simple_benchmark
-        ~name:Interpreter_workload.N_ILambda
+        ~name:Interpreter_workload.N_ILambda_lam
         ~stack_type:(unit @$ bot)
         ~kinstr:(ILambda (dummy_loc, dummy_lambda, halt))
         ()
@@ -2367,11 +2418,19 @@ module Registration_section = struct
         IHalt
        *)
       simple_benchmark
-        ~name:Interpreter_workload.N_ILambda
-        ~salt:"_rec"
+        ~name:Interpreter_workload.N_ILambda_lamrec
         ~stack_type:(unit @$ bot)
         ~kinstr:(ILambda (dummy_loc, dummy_lambda_rec, halt))
         ()
+
+    let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"lam_const"
+          ~case_1:"lamrec_const"
+          "N_ILambda"
+      in
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -3415,8 +3474,7 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KIter
-        ~salt:"_empty"
+        ~name:Interpreter_workload.N_KIter_empty
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont = KIter (IDrop (dummy_loc, halt), Some unit, [], KNil) in
           let stack = ((), eos) in
@@ -3434,14 +3492,22 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~name:Interpreter_workload.N_KIter
-        ~salt:"_nonempty"
+        ~name:Interpreter_workload.N_KIter_nonempty
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont = KIter (IDrop (dummy_loc, halt), Some unit, [()], KNil) in
           let stack = ((), eos) in
           let stack_type = unit @$ bot in
           fun () -> Ex_stack_and_cont {stack; cont; stack_type})
         ()
+
+    let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"empty_const"
+          ~case_1:"nonempty_const"
+          "N_KIter"
+      in
+      register_model_for_code_generation model
 
     let () =
       (*
@@ -3549,8 +3615,7 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~salt:"_empty"
-        ~name:Interpreter_workload.N_KMap_enter_body
+        ~name:Interpreter_workload.N_KMap_enter_body_empty
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
@@ -3572,8 +3637,7 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~salt:"_singleton"
-        ~name:Interpreter_workload.N_KMap_enter_body
+        ~name:Interpreter_workload.N_KMap_enter_body_singleton
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
@@ -3582,6 +3646,15 @@ module Registration_section = struct
               cont = map_enter_body_code [(Script_int.zero, ())];
             })
         ()
+
+    let () =
+      let model =
+        Interpreter_model.Models.max_branching_model
+          ~case_0:"empty_const"
+          ~case_1:"singleton_const"
+          "N_KMap_enter_body"
+      in
+      register_model_for_code_generation model
 
     let () =
       (*

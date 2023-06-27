@@ -63,6 +63,11 @@ type parameter_info = Namespace.t list
 *)
 val register : ?add_timer:bool -> Benchmark.t -> unit
 
+(** [register_model_for_code_generation s model] registers a model [model] with
+    a local model name [s] for code generation.
+    Use [register] if a model is associated with a benchmark. *)
+val register_model_for_code_generation : string -> 'a Model.t -> unit
+
 (** Register a {!type:Tezos_clic.command} for the command line *)
 val add_command : unit Tezos_clic.command -> unit
 
