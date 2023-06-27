@@ -321,8 +321,6 @@ end)
 
   include X
 
-  let int i = X.int (snap_to_grid ~inverse_scaling ~resolution i)
-
   let float f =
     let int = cast_to_int max_relative_error cast_mode f in
     let pretty_int = snap_to_grid ~inverse_scaling ~resolution int in
