@@ -86,7 +86,7 @@ module type T = sig
     level:int32 ->
     (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [attested_slot_headers hash block_info number_of_slots] reads the metadata
+  (** [attested_slot_headers block_info number_of_slots] reads the metadata
       of the given [block_info] and constructs the list of attested slots
       headers.
 
@@ -96,10 +96,7 @@ module type T = sig
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
   val attested_slot_headers :
-    Block_hash.t ->
-    block_info ->
-    number_of_slots:int ->
-    slot_index list tzresult
+    block_info -> number_of_slots:int -> slot_index list tzresult
 end
 
 val register : (module T) -> unit

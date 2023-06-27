@@ -326,7 +326,6 @@ module Handler = struct
                 in
                 let*? attested_slots =
                   Plugin.attested_slot_headers
-                    block_hash
                     block_info
                     ~number_of_slots:proto_parameters.number_of_slots
                 in

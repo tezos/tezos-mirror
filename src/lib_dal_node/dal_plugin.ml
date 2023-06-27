@@ -70,10 +70,7 @@ module type T = sig
     (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val attested_slot_headers :
-    Block_hash.t ->
-    block_info ->
-    number_of_slots:int ->
-    slot_index list tzresult
+    block_info -> number_of_slots:int -> slot_index list tzresult
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
