@@ -49,7 +49,9 @@ module Topic_score = struct
 
   let first_message_deliveries_decay = 0.5
 
-  let mesh_message_deliveries_weight = ~-.1.0
+  (* This part of the score is deactivated because we cannot predict a
+     delivery weight. *)
+  let mesh_message_deliveries_weight = 0.
 
   let mesh_message_deliveries_window = Span.of_float_s 0.01
 
@@ -61,7 +63,9 @@ module Topic_score = struct
 
   let mesh_message_deliveries_decay = 0.5
 
-  let mesh_failure_penalty_weight = ~-.1.
+  (* This part of the score is deactivated because we cannot predict a
+     delivery weight. *)
+  let mesh_failure_penalty_weight = 0.
 
   let mesh_failure_penalty_decay = 0.5
 
