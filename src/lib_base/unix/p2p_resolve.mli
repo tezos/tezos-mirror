@@ -23,39 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+type error += Failed_to_parse_address of (string * string)
 
-type t = {
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
-  listen_addr : P2p_point.Id.t;
-      (** The TCP address and port at which this instance can be reached. *)
-  peers : string list;  (** A list of P2P peers to connect to at startup. *)
-  expected_pow : float;  (** Expected P2P identity's PoW. *)
-  network_name : string;
-      (** A string that identifies the network's name. E.g. dal-sandbox. *)
-  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
-  profile : Services.Types.profile option;
-      (** Profile allowing to know the topics of interest. *)
-}
+(** [resolve_addr_with_peer_id ~default_addr ~default_port ?passive
+    addr] parses [addr] to return the corresponding points.
 
-(** [default] is the default configuration. *)
-val default : t
+    The format of [addr] can be either an IP address (v4 or v6) or a
+    domain name. If a domain name is provided, a DNS lookup is made
+    (see {!val:Unix.getaddrinfo}).
 
-(** [store_path config] returns a path for the store *)
-val store_path : t -> string
+    Moreover, a peer id can be provided by postfixing the addr with
+    [#<peer_id>]. The peer id should be provided using the b58 format.
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
+    An event is emitted if the DNS lookup returned 0 points.
 
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
+    The error [Failed_to_parse_address] is returned if the parsing failed.  *)
+val resolve_addr_with_peer_id :
+  default_addr:string ->
+  default_port:int ->
+  ?passive:bool ->
+  string ->
+  (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
 
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
-val identity_file : t -> string
+(** [resolve_addr] is the same as [resolve_addr_with_peer_id] but no
+    peer id is expected.
 
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
-val peers_file : t -> string
+    A warning event is emitted if a peer_id was provided.
+*)
+val resolve_addr :
+  default_addr:string ->
+  default_port:int ->
+  ?passive:bool ->
+  string ->
+  P2p_point.Id.t list tzresult Lwt.t

@@ -125,11 +125,10 @@ module Term = struct
   let peers =
     let open Cmdliner in
     let default_list = Configuration_file.default.peers in
-    let default_port = snd Configuration_file.default.listen_addr in
     let doc = "A list of points at which peers can be reached." in
     Arg.(
       value
-      & opt (list (p2p_point_arg ~default_port)) default_list
+      & opt (list string) default_list
       & info ~docs ~doc ~docv:"ADDR:PORT,..." ["peers"])
 
   let term process =
@@ -196,7 +195,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
   profile : Services.Types.profile option;
-  peers : P2p_point.Id.t list;
+  peers : string list;
 }
 
 type t = Run | Config_init

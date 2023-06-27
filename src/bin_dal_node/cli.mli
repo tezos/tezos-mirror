@@ -42,7 +42,7 @@ type options = {
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
   profile : Services.Types.profile option;
       (** Profile of the DAL node used for tracking shards. *)
-  peers : P2p_point.Id.t list;  (** DAL nodes to connect to. *)
+  peers : string list;  (** DAL nodes to connect to. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

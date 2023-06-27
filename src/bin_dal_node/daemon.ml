@@ -357,6 +357,13 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store =
       ^ Printexc.to_string exn
       |> Stdlib.failwith)
 
+let resolve peers =
+  List.concat_map_es
+    (Tezos_base_unix.P2p_resolve.resolve_addr
+       ~default_addr:"::"
+       ~default_port:(Configuration_file.default.listen_addr |> snd))
+    peers
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -410,9 +417,10 @@ let run ~data_dir configuration_override =
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
+  let* points = resolve peers in
   (* activate the p2p instance. *)
   let*! () =
-    Gossipsub.Transport_layer.activate ~additional_points:peers transport_layer
+    Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
 
   let _ = RPC_server.install_finalizer rpc_server in
