@@ -45,7 +45,7 @@ let compute_new_ema ~per_block_vote ema =
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n per_block_votes initial_ema =
   List.fold_left
-    (fun ema toggle_vote ->
+    (fun ema per_block_vote ->
       Per_block_votes_repr.compute_new_liquidity_baking_ema ~per_block_vote ema)
     initial_ema
     per_block_votes
@@ -132,7 +132,9 @@ let test_ema_increases_off_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~per_block_vote:Per_block_vote_off ema) old_ema)
+        (Int32.sub
+           (compute_new_ema ~per_block_vote:Per_block_vote_off ema)
+           old_ema)
         1_000_000l)
     ema_range
 
@@ -165,7 +167,9 @@ let test_ema_decreases_on_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~per_block_vote:Per_block_vote_on ema) old_ema)
+        (Int32.sub
+           (compute_new_ema ~per_block_vote:Per_block_vote_on ema)
+           old_ema)
         1_000_000l)
     ema_range
 

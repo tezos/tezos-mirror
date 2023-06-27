@@ -114,7 +114,8 @@ let test_launch threshold expected_vote_duration () =
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
     let ema =
-      Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA.to_int32
+      Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
+      .to_int32
         metadata.adaptive_inflation_toggle_ema
     in
     Assert.lt_int32 ~loc threshold ema
@@ -249,7 +250,10 @@ let test_launch threshold expected_vote_duration () =
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   (* We bake one more block to end the vote and set the feature to launch. *)
   let* block, metadata =
-    Block.bake_n_with_metadata ~adaptive_inflation_vote:Per_block_vote_on 1 block
+    Block.bake_n_with_metadata
+      ~adaptive_inflation_vote:Per_block_vote_on
+      1
+      block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
   let* () = assert_level ~loc:__LOC__ block expected_vote_duration in

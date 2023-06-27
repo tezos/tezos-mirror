@@ -1947,7 +1947,8 @@ type application_state = {
   op_count : int;
   migration_balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_inflation_toggle_ema : Per_block_votes.Adaptive_inflation_launch_EMA.t;
+  adaptive_inflation_toggle_ema :
+    Per_block_votes.Adaptive_inflation_launch_EMA.t;
   adaptive_inflation_launch_cycle : Cycle.t option;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
@@ -2584,7 +2585,9 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       current_level
       ~round:block_data_contents.payload_round
   in
-  let per_block_vote = block_data_contents.per_block_votes.liquidity_baking_vote in
+  let per_block_vote =
+    block_data_contents.per_block_votes.liquidity_baking_vote
+  in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in

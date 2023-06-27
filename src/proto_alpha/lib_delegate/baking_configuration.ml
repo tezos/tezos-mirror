@@ -79,7 +79,8 @@ type state_recorder_config = Filesystem | Disabled
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_inflation_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
+  adaptive_inflation_vote :
+    Protocol.Alpha_context.Per_block_votes.per_block_vote;
 }
 
 type t = {
@@ -117,7 +118,8 @@ let default_user_activated_upgrades = []
 let default_votes_config =
   {
     vote_file = None;
-    liquidity_baking_vote = Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
+    liquidity_baking_vote =
+      Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
     adaptive_inflation_vote =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
   }

@@ -806,7 +806,8 @@ module Actions = struct
       ~level:Notice
       ~msg:"Voting {value} for adaptive inflation vote"
       ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
+      )
 
   let no_dal_node =
     declare_0
@@ -1038,7 +1039,8 @@ module Per_block_votes = struct
       ~level:Notice
       ~msg:"adaptive inflation vote = {value}"
       ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding )
+        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
+      )
 end
 
 module Selection = struct

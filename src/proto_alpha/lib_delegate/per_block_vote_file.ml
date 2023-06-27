@@ -46,7 +46,8 @@ let vote_file_content_encoding =
        (obj2
           (req
              "liquidity_baking_toggle_vote"
-             Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding)
+             Protocol.Alpha_context.Per_block_votes
+             .liquidity_baking_vote_encoding)
           (opt
              "adaptive_inflation_vote"
              Protocol.Alpha_context.Per_block_votes

@@ -147,7 +147,7 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
-let toggle_vote_parameter =
+let per_block_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Per_block_votes in
@@ -169,7 +169,7 @@ let liquidity_baking_toggle_vote_arg =
        abstain. Note that this \"option\" is mandatory!"
     ~long:"liquidity-baking-toggle-vote"
     ~placeholder:"vote"
-    toggle_vote_parameter
+    per_block_vote_parameter
 
 let adaptive_inflation_vote_arg =
   Tezos_clic.arg
@@ -180,7 +180,7 @@ let adaptive_inflation_vote_arg =
        vote, default value is \"pass\"."
     ~long:"adaptive-inflation-vote"
     ~placeholder:"vote"
-    toggle_vote_parameter
+    per_block_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -527,7 +527,7 @@ let run_baker
   >>= fun per_block_vote_file ->
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
-     the toggle votes. *)
+     the per-block votes. *)
   Per_block_vote_file.load_per_block_votes_config
     ~default_liquidity_baking_vote:liquidity_baking_vote
     ~default_adaptive_inflation_vote:adaptive_inflation_vote

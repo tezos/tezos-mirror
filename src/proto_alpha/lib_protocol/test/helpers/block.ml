@@ -306,8 +306,8 @@ module Forge = struct
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
-      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass) ~payload_hash
-      ~payload_round shell_header =
+      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
+      ~payload_hash ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
       shell_header
@@ -1031,7 +1031,6 @@ let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
       b
   in
   (b, metadata.liquidity_baking_toggle_ema)
-
 
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in

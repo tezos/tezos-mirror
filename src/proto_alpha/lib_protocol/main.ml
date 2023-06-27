@@ -417,7 +417,8 @@ let init chain_id ctxt block_header =
          payload_round = Alpha_context.Round.zero;
          per_block_votes =
            {
-             liquidity_baking_vote = Alpha_context.Per_block_votes.Per_block_vote_pass;
+             liquidity_baking_vote =
+               Alpha_context.Per_block_votes.Per_block_vote_pass;
              adaptive_inflation_vote =
                Alpha_context.Per_block_votes.Per_block_vote_pass;
            };

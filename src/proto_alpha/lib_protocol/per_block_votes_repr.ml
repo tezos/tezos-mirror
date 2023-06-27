@@ -26,7 +26,10 @@
 
 (** Options available for per-block votes *)
 
-type per_block_vote = Per_block_vote_on | Per_block_vote_off | Per_block_vote_pass
+type per_block_vote =
+  | Per_block_vote_on
+  | Per_block_vote_off
+  | Per_block_vote_pass
 
 type per_block_votes = {
   liquidity_baking_vote : per_block_vote;

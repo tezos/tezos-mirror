@@ -138,7 +138,10 @@ let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     if i < expected_level then
       Block.bake_n ~liquidity_baking_toggle_vote:Per_block_vote_on n_vote_on blk
       >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_toggle_vote:Per_block_vote_off n_vote_off blk
+      Block.bake_n
+        ~liquidity_baking_toggle_vote:Per_block_vote_off
+        n_vote_off
+        blk
       >>=? fun blk ->
       Block.bake_n
         ~liquidity_baking_toggle_vote:Per_block_vote_pass
@@ -247,7 +250,10 @@ let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
     if i < level then
       Block.bake_n ~liquidity_baking_toggle_vote:Per_block_vote_on n_vote_on blk
       >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_toggle_vote:Per_block_vote_off n_vote_off blk
+      Block.bake_n
+        ~liquidity_baking_toggle_vote:Per_block_vote_off
+        n_vote_off
+        blk
       >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
     else return blk
   in
@@ -450,48 +456,48 @@ let tests =
       `Quick
       (liquidity_baking_subsidies 64);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting Per_block_vote_off \
-       baking one block longer"
+      "liquidity baking toggle vote with 100% of bakers voting \
+       Per_block_vote_off baking one block longer"
       `Quick
       (liquidity_baking_toggle_100 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting Per_block_vote_off \
-       baking two blocks longer"
+      "liquidity baking toggle vote with 100% of bakers voting \
+       Per_block_vote_off baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_100 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 100% of bakers voting Per_block_vote_off \
-       baking 100 blocks longer"
+      "liquidity baking toggle vote with 100% of bakers voting \
+       Per_block_vote_off baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_100 100);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting Per_block_vote_off \
-       baking one block longer"
+      "liquidity baking toggle vote with 80% of bakers voting \
+       Per_block_vote_off baking one block longer"
       `Quick
       (liquidity_baking_toggle_80 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting Per_block_vote_off \
-       baking two blocks longer"
+      "liquidity baking toggle vote with 80% of bakers voting \
+       Per_block_vote_off baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_80 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 80% of bakers voting Per_block_vote_off \
-       baking 100 blocks longer"
+      "liquidity baking toggle vote with 80% of bakers voting \
+       Per_block_vote_off baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_80 100);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting Per_block_vote_off \
-       baking one block longer"
+      "liquidity baking toggle vote with 60% of bakers voting \
+       Per_block_vote_off baking one block longer"
       `Quick
       (liquidity_baking_toggle_60 1);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting Per_block_vote_off \
-       baking two blocks longer"
+      "liquidity baking toggle vote with 60% of bakers voting \
+       Per_block_vote_off baking two blocks longer"
       `Quick
       (liquidity_baking_toggle_60 2);
     Tztest.tztest
-      "liquidity baking toggle vote with 60% of bakers voting Per_block_vote_off \
-       baking 100 blocks longer"
+      "liquidity baking toggle vote with 60% of bakers voting \
+       Per_block_vote_off baking 100 blocks longer"
       `Quick
       (liquidity_baking_toggle_60 100);
     Tztest.tztest
