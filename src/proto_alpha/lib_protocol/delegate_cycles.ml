@@ -48,54 +48,28 @@ let update_activity ctxt last_cycle =
 
 let update_initial_frozen_deposits ctxt ~new_cycle =
   Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
-  let max_slashable_period = Constants_storage.max_slashing_period ctxt in
-  (* We want to be able to slash for at most [max_slashable_period] *)
-  (match Cycle_repr.(sub new_cycle (max_slashable_period - 1)) with
-  | None ->
-      Storage.Tenderbake.First_level_of_protocol.get ctxt
-      >>=? fun first_level_of_protocol ->
-      let cycle_eras = Raw_context.cycle_eras ctxt in
-      let level =
-        Level_repr.level_from_raw ~cycle_eras first_level_of_protocol
-      in
-      return level.cycle
-  | Some cycle -> return cycle)
-  >>=? fun from_cycle ->
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
-  let cycles = Cycle_repr.(from_cycle ---> to_cycle) in
-  (match Cycle_repr.pred from_cycle with
+  (match Cycle_repr.pred new_cycle with
   | None -> return Signature.Public_key_hash.Set.empty
-  | Some cleared_cycle -> (
-      Stake_storage.find_selected_distribution ctxt cleared_cycle
-      >|=? fun cleared_cycle_delegates ->
-      match cleared_cycle_delegates with
+  | Some last_cycle -> (
+      Stake_storage.find_selected_distribution ctxt last_cycle
+      >|=? fun last_cycle_distribution ->
+      match last_cycle_distribution with
       | None -> Signature.Public_key_hash.Set.empty
-      | Some delegates ->
+      | Some distribution ->
           List.fold_left
-            (fun set (d, _) -> Signature.Public_key_hash.Set.add d set)
+            (fun delegates (d, _) ->
+              Signature.Public_key_hash.Set.add d delegates)
             Signature.Public_key_hash.Set.empty
-            delegates))
-  >>=? fun cleared_cycle_delegates ->
-  List.fold_left_es
-    (fun delegates_to_remove (cycle : Cycle_repr.t) ->
-      Stake_storage.get_selected_distribution ctxt cycle
-      >|=? fun active_stakes ->
-      List.fold_left
-        (fun delegates_to_remove (delegate, _stake) ->
-          let delegates_to_remove =
-            Signature.Public_key_hash.Set.remove delegate delegates_to_remove
-          in
-          delegates_to_remove)
-        delegates_to_remove
-        active_stakes)
-    cleared_cycle_delegates
-    cycles
-  >>=? fun delegates_to_remove ->
+            distribution))
+  >>=? fun last_cycle_delegates ->
   Stake_storage.get_selected_distribution ctxt new_cycle
   >>=? fun selection_for_new_cycle ->
   List.fold_left_es
-    (fun ctxt (delegate, Stake_repr.{frozen; delegated = _}) ->
+    (fun (ctxt, delegates_to_remove)
+         (delegate, Stake_repr.{frozen; delegated = _}) ->
+      let delegates_to_remove =
+        Signature.Public_key_hash.Set.remove delegate delegates_to_remove
+      in
       let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
@@ -108,11 +82,11 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
         (* If the delegate's current deposit remains at zero then we add it to
            the forbidden set. *)
         Delegate_storage.forbid_delegate ctxt delegate >>= fun ctxt ->
-        return ctxt
-      else return ctxt)
-    ctxt
+        return (ctxt, delegates_to_remove)
+      else return (ctxt, delegates_to_remove))
+    (ctxt, last_cycle_delegates)
     selection_for_new_cycle
-  >>=? fun ctxt ->
+  >>=? fun (ctxt, delegates_to_remove) ->
   Signature.Public_key_hash.Set.fold_es
     (fun delegate ctxt ->
       let delegate_contract = Contract_repr.Implicit delegate in
