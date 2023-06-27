@@ -63,8 +63,14 @@ pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
 pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
-/// Path where Ethereum accounts are stored
-const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/indexes/accounts");
+/// Path where all indexes are stored.
+const EVM_INDEXES: RefPath = RefPath::assert_from(b"/indexes");
+
+/// Path where Ethereum accounts are stored.
+const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
+
+/// Subpath where blocks are indexed.
+const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
@@ -257,6 +263,9 @@ fn store_block<Host: Runtime>(
     block: &L2Block,
     block_path: &OwnedPath,
 ) -> Result<(), Error> {
+    let mut index = init_blocks_index()?;
+    index_block(host, &block.hash, &mut index)?;
+
     store_block_number(host, block_path, block.number)?;
     store_block_hash(host, block_path, &block.hash)?;
     store_block_transactions(host, block_path, &block.transactions)?;
@@ -648,7 +657,14 @@ pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u16, 
 
 /// Get the index of accounts.
 pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
-    IndexableStorage::new(&EVM_ACCOUNTS_INDEX)
+    let path = concat(&EVM_INDEXES, &ACCOUNTS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
+}
+
+/// Get the index of blocks.
+pub fn init_blocks_index() -> Result<IndexableStorage, StorageError> {
+    let path = concat(&EVM_INDEXES, &BLOCKS_INDEX)?;
+    IndexableStorage::new(&RefPath::from(&path))
 }
 
 pub fn index_account(
@@ -692,6 +708,16 @@ pub fn get_and_increment_deposit_nonce<Host: Runtime>(
     let new_nonce = nonce + 1;
     host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
     Ok(nonce)
+}
+
+pub fn index_block(
+    host: &mut impl Runtime,
+    block_hash: &H256,
+    blocks_index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    blocks_index
+        .push_value(host, block_hash.as_bytes())
+        .map_err(Error::from)
 }
 
 pub(crate) mod internal_for_tests {
