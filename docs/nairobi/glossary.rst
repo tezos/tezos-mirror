@@ -16,6 +16,7 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
+.. _def_context:
 .. _def_context_nairobi:
 
 _`Context`
@@ -42,6 +43,7 @@ _`Fitness` (a.k.a. score, weight)
 _`Height`
     See level_.
 
+.. _def_level:
 .. _def_level_nairobi:
 
 _`Level` (a.k.a. block height)
@@ -85,6 +87,7 @@ _`Weight`
 Protocol
 --------
 
+.. _def_accuser:
 .. _def_accuser_nairobi:
 
 _`Accuser`
@@ -97,6 +100,7 @@ _`Accuser`
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
+.. _def_account:
 .. _def_account_nairobi:
 
 _`Account`
@@ -144,6 +148,7 @@ _`Constant`
 _`Contract`
     See account_.
 
+.. _def_cycle:
 .. _def_cycle_nairobi:
 
 _`Cycle`
@@ -155,9 +160,10 @@ _`Cycle`
     numbers of cycles.
 
     The length of a cycle is a (parametric) protocol
-    :ref:`constant<Constants>`, and thus might change across different
+    constant_, and thus might change across different
     Tezos protocols.
 
+.. _def_delegate:
 .. _def_delegate_nairobi:
 
 _`Delegate`
@@ -174,6 +180,7 @@ _`Delegation`
     its `baking rights`_ and `endorsing rights`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
+.. _def_double_signing:
 .. _def_double_signing_nairobi:
 
 _`Double signing`
@@ -201,6 +208,7 @@ _`Endorsing`
 _`Endorsing rights`
     See `baking rights`_.
 
+.. _def_fee:
 .. _def_fee_nairobi:
 
 _`Fee`
@@ -213,6 +221,7 @@ _`Fee`
 
     See also `burn`_.
 
+.. _def_gas:
 .. _def_gas_nairobi:
 
 _`Gas`
@@ -220,6 +229,7 @@ _`Gas`
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
 
+.. _def_implicit_account:
 .. _def_implicit_account_nairobi:
 
 _`Implicit account`
@@ -253,6 +263,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
+.. _def_minimal_stake:
 .. _def_minimal_stake_nairobi:
 
 _`Minimal stake`
@@ -268,12 +279,14 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
+.. _def_origination:
 .. _def_origination_nairobi:
 
 _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
+.. _def_round:
 .. _def_round_nairobi:
 
 _`Round`

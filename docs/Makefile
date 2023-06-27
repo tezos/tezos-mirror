@@ -15,17 +15,15 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = mumbai nairobi oxford
+NAMED_PROTOS  = nairobi oxford
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-mumbai_long   = PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1
 nairobi_long  = PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf
 oxford_long   = ProxfordLcjScHFgpTURyTjcKR88D5juu1jGgT18pPUoGTVgxiA
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-mumbai_short  = PtMumbai
 nairobi_short = PtNairob
 oxford_short  = Proxford
 alpha_short   = alpha
@@ -114,23 +112,23 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) mumbai
-	$(CHECKXREFS) -l nairobi
+	$(CHECKXREFS) nairobi
 	$(CHECKXREFS) -l oxford
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
-	scripts/test_doc_scripts.sh install-bin-bionic
 	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-fedora36
-	scripts/test_doc_scripts.sh install-bin-rc-bionic
+	scripts/test_doc_scripts.sh install-bin-jammy
+	scripts/test_doc_scripts.sh install-bin-fedora37
+	scripts/test_doc_scripts.sh install-bin-fedora38
 	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-fedora36
+	scripts/test_doc_scripts.sh install-bin-rc-jammy
+	scripts/test_doc_scripts.sh install-bin-rc-fedora37
+	scripts/test_doc_scripts.sh install-bin-rc-fedora38
 	scripts/test_doc_scripts.sh install-opam-scratch
-	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-release-sources-buster
-	scripts/test_doc_scripts.sh compile-sources-buster
+	scripts/test_doc_scripts.sh compile-release-sources-bullseye
+	scripts/test_doc_scripts.sh compile-sources-bullseye
 
 # build dune targets together to avoid concurrent dunes
 docexes:
@@ -174,7 +172,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/mumbai" || true
+	@ln -s active "$(BUILDDIR)/nairobi" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -233,4 +231,4 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt mumbai/octez-*.html nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html

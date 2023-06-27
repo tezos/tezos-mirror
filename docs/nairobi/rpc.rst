@@ -78,6 +78,7 @@
   
 
 
+.. _rpc_index:
 .. _rpc_index_nairobi :
 
 Nairobi RPCs - Reference

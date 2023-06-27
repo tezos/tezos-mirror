@@ -100,7 +100,7 @@ that is needed to refer to a certain state of the shielded pool.
 In order to ensure the correctness of a transaction, given that there
 is information that we wish to remain secret, the spender must also
 generate proofs that various good properties are true.
-Thanks to the use of `SNARKs <https://z.cash/technology/zksnarks/>`_
+Thanks to the use of `SNARKs <https://z.cash/learn/what-are-zk-snarks/>`_
 these proofs are very succinct in size, fast to verify and they don't
 reveal any private information.
 

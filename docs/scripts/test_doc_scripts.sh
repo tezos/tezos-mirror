@@ -12,10 +12,10 @@
 # Therefore, mind keeping in sync the list of scenarios with both the Makefile
 # and the CI (file .gitlab/ci/doc/doc-scripts.yml).
 
-# Ubuntu Bionic Beaver 18.04 LTS:
-UBUNTU_BIONIC=public.ecr.aws/lts/ubuntu:18.04_stable
 # Ubuntu Focal Fossa 20.04 LTS:
 UBUNTU_FOCAL=public.ecr.aws/lts/ubuntu:20.04_stable
+# Ubuntu Ubuntu 22.04 LTS (Jammy Jellyfish):
+UBUNTU_JAMMY=public.ecr.aws/lts/ubuntu:22.04_stable
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 DOCS_DIR="$(dirname "$SCRIPT_DIR")"
@@ -25,20 +25,21 @@ usage () {
 usage:
   $0 <test-name>
 where <test-name> can be:
-* install-bin-bionic
 * install-bin-focal
-* install-bin-fedora36
-* install-bin-rc-bionic
+* install-bin-jammy
+* install-bin-fedora37
+* install-bin-fedora38
 * install-bin-rc-focal
-* install-bin-rc-fedora36
+* install-bin-rc-jammy
+* install-bin-rc-fedora37
+* install-bin-rc-fedora38
 * install-opam-scratch
-* install-opam-bionic
 * install-opam-focal
-* compile-release-sources-buster
-* compile-sources-buster
-* install-python-bionic
+* compile-release-sources-bullseye
+* compile-sources-bullseye
 * install-python-focal
-* install-python-buster
+* install-python-jammy
+* install-python-bullseye
 !EOF
 }
 
@@ -51,47 +52,50 @@ fi
 
 for test_case in "$@"; do
     case "$test_case" in
-        "install-bin-bionic" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh
-            ;;
         "install-bin-focal" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh
             ;;
-        "install-bin-fedora36" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:36 /Scripts/install-bin-fedora.sh
+        "install-bin-jammy" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh
             ;;
-        "install-bin-rc-bionic" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh rc
+        "install-bin-fedora37" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh
+            ;;
+        "install-bin-fedora38" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh
             ;;
         "install-bin-rc-focal" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_FOCAL /Scripts/install-bin-ubuntu.sh rc
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_FOCAL" /Scripts/install-bin-ubuntu.sh rc
             ;;
-        "install-bin-rc-fedora36" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:36 /Scripts/install-bin-fedora.sh rc
+        "install-bin-rc-jammy" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts "$UBUNTU_JAMMY" /Scripts/install-bin-ubuntu.sh rc
+            ;;
+        "install-bin-rc-fedora37" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:37 /Scripts/install-bin-fedora.sh rc
+            ;;
+        "install-bin-rc-fedora38" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts fedora:38 /Scripts/install-bin-fedora.sh rc
             ;;
         "install-opam-scratch" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged $UBUNTU_BIONIC /Scripts/install-opam-scratch.sh
-            ;;
-        "install-opam-bionic" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-18.04 /Scripts/install-opam.sh
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged "$UBUNTU_FOCAL" /Scripts/install-opam-scratch.sh
             ;;
         "install-opam-focal" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-20.04 /Scripts/install-opam.sh
             ;;
-        "compile-release-sources-buster" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh tezos/tezos latest-release
+        "compile-release-sources-bullseye" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos latest-release
             ;;
-        "compile-sources-buster" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh tezos/tezos master
-            ;;
-        "install-python-bionic" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts $UBUNTU_BIONIC /Scripts/install-python-debian-ubuntu.sh
+        "compile-sources-bullseye" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-11 /Scripts/compile-sources.sh tezos/tezos master
             ;;
         "install-python-focal" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts $UBUNTU_FOCAL /Scripts/install-python-debian-ubuntu.sh
+            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_FOCAL" /Scripts/install-python-debian-ubuntu.sh
             ;;
-        "install-python-buster" )
-            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts debian:buster /Scripts/install-python-debian-ubuntu.sh
+        "install-python-jammy" )
+            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts "$UBUNTU_JAMMY" /Scripts/install-python-debian-ubuntu.sh
+            ;;
+        "install-python-bullseye" )
+            docker run --rm -i -v "$DOCS_DIR/developer":/Scripts debian:11 /Scripts/install-python-debian-ubuntu.sh
             ;;
         * )
             echo "unknown test name: '$test_case'"

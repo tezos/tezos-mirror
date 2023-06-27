@@ -251,7 +251,7 @@ Environment
 
 Currently Octez is being developed for Linux x86_64, mostly for
 Debian/Ubuntu and Arch Linux. The following OSes are also reported to
-work: macOS (x86_64), Arch Linux ARM (aarch64), Debian Linux (buster),
+work: macOS (x86_64), Arch Linux ARM (aarch64), Debian Linux (bullseye),
 Ubuntu Linux (focal). A Windows port is feasible and might be
 developed in the future.
 
@@ -396,7 +396,7 @@ If you plan to contribute to the Octez codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
 
-**TL;DR**: From a fresh Debian Buster x86_64, you typically want to select a source branch in the Octez repository, e.g.:
+**TL;DR**: From a fresh Debian Bullseye x86_64, you typically want to select a source branch in the Octez repository, e.g.:
 
 .. literalinclude:: compile-sources.sh
   :language: shell

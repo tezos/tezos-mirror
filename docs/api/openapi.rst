@@ -65,19 +65,6 @@ and specific to the Nairobi protocol can be found at:
 
 - `nairobi-mempool-openapi.json (version 17.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/nairobi-mempool-openapi.json>`_
 
-Mumbai RPCs
------------
-
-The OpenAPI specification for RPCs which are specific to the Mumbai (``PtMumbai``)
-protocol can be found at:
-
-- `mumbai-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-openapi.json>`_
-
-The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Mumbai protocol can be found at:
-
-- `mumbai-mempool-openapi.json (version 16.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/mumbai-mempool-openapi.json>`_
-
 .. _openapi_generate:
 
 How to Generate

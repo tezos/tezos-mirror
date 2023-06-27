@@ -155,7 +155,7 @@ _`Cycle`
     numbers of cycles.
 
     The length of a cycle is a (parametric) protocol
-    :ref:`constant<Constants>`, and thus might change across different
+    constant_, and thus might change across different
     Tezos protocols.
 
 .. _def_delegate_alpha:

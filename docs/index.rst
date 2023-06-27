@@ -175,23 +175,13 @@ Platform developers are also provided reference materials for internal APIs of O
 
 .. toctree::
    :maxdepth: 2
-   :caption: Mumbai Protocol doc:
+   :caption: Nairobi Protocol doc:
    :hidden:
 
    active/protocol
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Nairobi Protocol doc:
-   :hidden:
-
-   nairobi/protocol
-   nairobi/glossary
-   nairobi/cli-commands
-   nairobi/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -245,7 +235,6 @@ Platform developers are also provided reference materials for internal APIs of O
    :hidden:
 
    protocols/naming
-   protocols/016_mumbai
    protocols/017_nairobi
    protocols/018_oxford
    protocols/alpha

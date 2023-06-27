@@ -33,10 +33,10 @@ apt-get install -y software-properties-common </dev/null
 sudo add-apt-repository -y $REPO && sudo apt-get update
 sudo apt-get install -y tezos-client
 sudo apt-get install -y tezos-node
-sudo apt-get install -y tezos-baker-ptmumbai
-sudo apt-get install -y tezos-accuser-ptmumbai
+sudo apt-get install -y tezos-baker-ptnairob
+sudo apt-get install -y tezos-accuser-ptnairob
 # [test executables]
 octez-client --version
 octez-node --version
-octez-baker-PtMumbai --version
-octez-accuser-PtMumbai --version
+octez-baker-PtNairob --version
+octez-accuser-PtNairob --version
