@@ -262,8 +262,8 @@ module Forge = struct
 
   let make_contents ~payload_hash ~payload_round
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(liquidity_baking_toggle_vote = Toggle_votes.Toggle_vote_pass)
-      ?(adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass)
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash () =
     Block_header.
       {
@@ -271,7 +271,7 @@ module Forge = struct
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        toggle_votes =
+        per_block_votes =
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
             adaptive_inflation_vote;
