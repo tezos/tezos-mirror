@@ -27,14 +27,6 @@ type error +=
   | Dal_feature_disabled
   | Dal_slot_index_above_hard_limit of {given : int; limit : int}
   | Dal_attestation_unexpected_size of {expected : int; got : int}
-  | Dal_publish_slot_header_future_level of {
-      provided : Raw_level_repr.t;
-      expected : Raw_level_repr.t;
-    }
-  | Dal_publish_slot_header_past_level of {
-      provided : Raw_level_repr.t;
-      expected : Raw_level_repr.t;
-    }
   | Dal_publish_slot_header_invalid_index of {
       given : Dal_slot_index_repr.t;
       maximum : Dal_slot_index_repr.t;
@@ -117,54 +109,6 @@ let () =
     (fun (given, limit) ->
       Dal_slot_index_above_hard_limit
         {given = Int64.to_int given; limit = Int64.to_int limit}) ;
-  let description = "Unexpected level in the future in slot header" in
-  register_error_kind
-    `Temporary
-    ~id:"dal_publish_slot_header_future_level"
-    ~title:"DAL slot header future level"
-    ~description
-    ~pp:(fun ppf (provided, expected) ->
-      Format.fprintf
-        ppf
-        "%s: Provided %a. Expected %a."
-        description
-        Raw_level_repr.pp
-        provided
-        Raw_level_repr.pp
-        expected)
-    (obj2
-       (req "provided" Raw_level_repr.encoding)
-       (req "got" Raw_level_repr.encoding))
-    (function
-      | Dal_publish_slot_header_future_level {provided; expected} ->
-          Some (provided, expected)
-      | _ -> None)
-    (fun (provided, expected) ->
-      Dal_publish_slot_header_future_level {provided; expected}) ;
-  let description = "Unexpected level in the past in slot header" in
-  register_error_kind
-    `Branch
-    ~id:"dal_publish_slot_header_past_level"
-    ~title:"DAL slot header past level"
-    ~description
-    ~pp:(fun ppf (provided, expected) ->
-      Format.fprintf
-        ppf
-        "%s: Provided %a. Expected %a."
-        description
-        Raw_level_repr.pp
-        provided
-        Raw_level_repr.pp
-        expected)
-    (obj2
-       (req "provided" Raw_level_repr.encoding)
-       (req "got" Raw_level_repr.encoding))
-    (function
-      | Dal_publish_slot_header_past_level {provided; expected} ->
-          Some (provided, expected)
-      | _ -> None)
-    (fun (provided, expected) ->
-      Dal_publish_slot_header_past_level {provided; expected}) ;
   let description = "Bad index for slot header" in
   register_error_kind
     `Permanent

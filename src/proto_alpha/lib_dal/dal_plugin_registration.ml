@@ -82,17 +82,14 @@ module Plugin = struct
         =
       match op with
       | Dal_publish_slot_header operation ->
-          ( operation.published_level,
-            operation.slot_index,
-            operation.commitment,
-            status_of_result result )
+          (operation.slot_index, operation.commitment, status_of_result result)
           :: acc
       | _ -> acc
     in
     Layer1_services.(
       process_manager_operations [] block.operations {apply; apply_internal})
-    |> List.map_es (fun (published_level, slot_index, commitment, status) ->
-           let published_level = Raw_level.to_int32 published_level in
+    |> List.map_es (fun (slot_index, commitment, status) ->
+           let published_level = block.header.shell.level in
            let slot_index = Dal.Slot_index.to_int slot_index in
            return Dal_plugin.({published_level; slot_index; commitment}, status))
 

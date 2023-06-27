@@ -33,20 +33,16 @@
 module Publish_slot_header : sig
   (** A "publish slot header" operation contains
 
-      - a [published_level] which is the block level this operation
-     should be included to.
-      
       - a [slot_index] which is the slot index associated with the
      commitment.
 
       - a [commitment] which is a commitment to the slot data published
      onto the DAL
 
-      - a [commitment_proof] which aims to prove that the size 
+      - a [commitment_proof] which aims to prove that the size
      of the slot data does not exceed a limit set by the
      protocol. *)
   type t = {
-    published_level : Raw_level_repr.t;
     slot_index : Dal_slot_index_repr.t;
     commitment : Dal_slot_repr.Commitment.t;
     commitment_proof : Dal_slot_repr.Commitment_proof.t;
@@ -55,10 +51,6 @@ module Publish_slot_header : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
-
-  (** [check_level ~current_level operation] check whether the
-     [operation.published_level] equals [current_level]. *)
-  val check_level : current_level:Raw_level_repr.t -> t -> unit tzresult
 
   (** [slot_header ~cryptobox ~number_of_slots ~current_level
      operation] constructs a valid slot header. This function can fail

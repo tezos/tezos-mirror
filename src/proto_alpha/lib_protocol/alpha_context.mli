@@ -2569,7 +2569,6 @@ module Dal : sig
   module Operations : sig
     module Publish_slot_header : sig
       type t = {
-        published_level : Raw_level.t;
         slot_index : Slot_index.t;
         commitment : Slot.Commitment.t;
         commitment_proof : Slot.Commitment_proof.t;
@@ -2578,8 +2577,6 @@ module Dal : sig
       val encoding : t Data_encoding.t
 
       val pp : Format.formatter -> t -> unit
-
-      val check_level : current_level:Raw_level.t -> t -> unit tzresult
 
       val slot_header :
         cryptobox:cryptobox ->
@@ -2636,14 +2633,6 @@ module Dal_errors : sig
     | Dal_feature_disabled
     | Dal_slot_index_above_hard_limit of {given : int; limit : int}
     | Dal_attestation_unexpected_size of {expected : int; got : int}
-    | Dal_publish_slot_header_future_level of {
-        provided : Raw_level.t;
-        expected : Raw_level.t;
-      }
-    | Dal_publish_slot_header_past_level of {
-        provided : Raw_level.t;
-        expected : Raw_level.t;
-      }
     | Dal_publish_slot_header_invalid_index of {
         given : Dal.Slot_index.t;
         maximum : Dal.Slot_index.t;

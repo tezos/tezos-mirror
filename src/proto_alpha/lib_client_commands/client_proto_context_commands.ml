@@ -3292,7 +3292,7 @@ let commands_rw () =
         in
         let slot_header =
           Alpha_context.Dal.Operations.Publish_slot_header.
-            {published_level; slot_index; commitment; commitment_proof}
+            {slot_index; commitment; commitment_proof}
         in
         let* _res =
           dal_publish
