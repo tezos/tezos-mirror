@@ -101,6 +101,39 @@ let assert_total_frozen_stake ~loc block expected =
   let* actual = Context.get_total_frozen_stake (B block) in
   Assert.equal_tez ~loc actual expected
 
+(* Assert that the voting power of a delegate in the next vote listing
+   will be the expected one. The expectation is computed based on the
+   expected self-staked, delegated, and costaked tez. The delegate's
+   own liquid balance is measured at the level at which the listing
+   will be taken to account for future rewards. *)
+let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
+    ~expected_delegated ~expected_costaked =
+  let open Lwt_result_syntax in
+  (* Wait until the first block of the next voting period. *)
+  let* block =
+    let* period_info = Context.Vote.get_current_period (B block) in
+    let remaining_blocks = Int32.to_int period_info.remaining in
+    Block.bake_n remaining_blocks block
+  in
+  let* balance = Context.Contract.balance (B block) (Implicit delegate) in
+  let balance = Protocol.Alpha_context.Tez.to_mutez balance in
+  let expected_liquid = Int64.add balance expected_delegated in
+  let expected_frozen = Int64.add expected_staked expected_costaked in
+  let* constants = Context.get_constants (B block) in
+  let staking_over_delegation_edge =
+    Int64.of_int
+      constants.parametric.adaptive_inflation.staking_over_delegation_edge
+  in
+  let expected_power =
+    if ai_enabled then
+      Int64.add
+        expected_frozen
+        (Int64.div expected_liquid staking_over_delegation_edge)
+    else Int64.add expected_frozen expected_liquid
+  in
+  let* actual = Context.get_voting_power (B block) delegate in
+  Assert.equal_int64 ~loc actual expected_power
+
 (* Test that:
    - the EMA of the adaptive inflation vote reaches the threshold after the
      expected duration,
@@ -190,12 +223,21 @@ let test_launch threshold expected_vote_duration () =
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
   let* block =
-    let* operation = Op.revelation (B block) wannabe_costaker_account.pk in
+    let* operation =
+      Op.revelation
+        ~fee:Protocol.Alpha_context.Tez.zero
+        (B block)
+        wannabe_costaker_account.pk
+    in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
   let* block =
     let* operation =
-      Op.delegation (B block) wannabe_costaker (Some delegate_pkh)
+      Op.delegation
+        ~fee:Protocol.Alpha_context.Tez.zero
+        (B block)
+        wannabe_costaker
+        (Some delegate_pkh)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in
@@ -256,6 +298,16 @@ let test_launch threshold expected_vote_duration () =
       i
       "Staking for a non-delegate while co-staking is disabled"
   in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:false
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:2_000_000_000_000L
+      ~expected_costaked:0L
+  in
 
   let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
   (* Bake until the activation. *)
@@ -277,6 +329,16 @@ let test_launch threshold expected_vote_duration () =
       ~loc:__LOC__
       block
       (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
+  in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:true
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:2_000_000_000_000L
+      ~expected_costaked:0L
   in
 
   (* Test that the wannabe costaker is now allowed to stake almost all
@@ -310,6 +372,16 @@ let test_launch threshold expected_vote_duration () =
       ~loc:__LOC__
       block
       (Protocol.Alpha_context.Tez.of_mutez_exn 3_999_999_000_000L)
+  in
+  let* () =
+    assert_voting_power
+      ~loc:__LOC__
+      block
+      delegate_pkh
+      ~ai_enabled:true
+      ~expected_staked:2_000_000_000_000L
+      ~expected_delegated:1_000_000L
+      ~expected_costaked:1_999_999_000_000L
   in
   return_unit
 
