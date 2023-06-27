@@ -56,6 +56,7 @@ val init :
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
+  Metrics.t ->
   t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)

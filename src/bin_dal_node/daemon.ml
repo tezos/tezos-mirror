@@ -449,7 +449,16 @@ let run ~data_dir configuration_override =
   in
   let* store = Store.init config in
   let cctxt = Rpc_context.make endpoint in
-  let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
+  let*! metrics_server = Metrics.launch config.metrics_addr in
+  let ctxt =
+    Node_context.init
+      config
+      store
+      gs_worker
+      transport_layer
+      cctxt
+      metrics_server
+  in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
   let* dal_config = fetch_dal_config cctxt in
@@ -461,7 +470,6 @@ let run ~data_dir configuration_override =
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
-
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Start daemon to resolve current protocol plugin *)

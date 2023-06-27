@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,55 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type 'a t
+type t = {shutdown : unit Lwt.u; server : unit Lwt.t}
 
-val emit : 'a t -> 'a -> unit Lwt.t
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
-val emit__dont_wait__use_with_care : 'a t -> 'a -> unit
+let shutdown t =
+  Lwt.wakeup t.shutdown () ;
+  t.server
 
-val starting_node : unit t
+let shutdown_on_exit t =
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+      shutdown t)
 
-val shutdown_node : int t
-
-val store_is_ready : unit t
-
-val rpc_server_is_ready : P2p_point.Id.t t
-
-val node_is_ready : unit t
-
-val data_dir_not_found : string t
-
-val fetched_slot : (int * int) t
-
-val layer1_node_new_head : (Block_hash.t * int32) t
-
-val layer1_node_tracking_started : unit t
-
-val protocol_plugin_resolved : Protocol_hash.t t
-
-val daemon_error : Error_monad.tztrace t
-
-(** An event emitted at startup when the configuration of the node is read from
-    disk. *)
-val configuration_loaded : unit t
-
-(** Storing a slot content event. The given parameter is the slot's commitment
-    hash. *)
-val stored_slot_content : Cryptobox.Commitment.t t
-
-(** Storing a slot's shards event. The given parameters are the slot's
-    commitment hash and the number of its shards. *)
-val stored_slot_shards : (Cryptobox.Commitment.t * int) t
-
-(** Decoding a value failed. See {!Types.kind} for kind of considered
-    values. *)
-val decoding_data_failed : Types.kind t
-
-(** Loading shard data from disk failed. *)
-val loading_shard_data_failed : string t
-
-(** Validating a message received via Gossipsub/P2P failed. *)
-val message_validation_error : (Gossipsub.message_id * string) t
-
-(** Emitted when the metrics server starts *)
-val starting_metrics_server : (string * int) t
+let launch (addr, port) =
+  let open Lwt_syntax in
+  let host = Ipaddr.V6.to_string addr in
+  let* () = Event.(emit starting_metrics_server) (host, port) in
+  let* ctx = Conduit_lwt_unix.init ~src:host () in
+  let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+  let mode = `TCP (`Port port) in
+  let callback = Metrics_server.callback in
+  let stop, shutdown = Lwt.task () in
+  let server =
+    Cohttp_lwt_unix.Server.create
+      ~stop
+      ~ctx
+      ~mode
+      (Cohttp_lwt_unix.Server.make ~callback ())
+  in
+  let t = {shutdown; server} in
+  let (_ : Lwt_exit.clean_up_callback_id) = shutdown_on_exit t in
+  Lwt.return t
