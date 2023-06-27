@@ -303,6 +303,8 @@ let insert_received_block =
     "INSERT INTO blocks_reception (application_timestamp, \
      validation_timestamp, block, source) SELECT ?, ?, blocks.id, nodes.id \
      FROM blocks, nodes WHERE blocks.hash = ? AND nodes.name = ? ON CONFLICT \
-     DO UPDATE SET application_timestamp = COALESCE(application_timestamp, \
+     (block, source) DO UPDATE SET application_timestamp = \
+     COALESCE(blocks_reception.application_timestamp, \
      excluded.application_timestamp), validation_timestamp = \
-     COALESCE(validation_timestamp, excluded.validation_timestamp)"
+     COALESCE(blocks_reception.validation_timestamp, \
+     excluded.validation_timestamp)"
