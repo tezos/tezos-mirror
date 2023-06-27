@@ -82,17 +82,14 @@ type CallOutcome = (ExitReason, Vec<u8>);
 /// address will be `None`.
 type CreateOutcome = (ExitReason, Option<H160>, Vec<u8>);
 
+/// Wrap ethereum errors in the SputnikVM errors
+///
+/// This function wraps critical errors that indicate something is wrong
+/// with the kernel or rollup node into errors that can be passed on to
+/// SputnikVM execution. This is needed if an error occurs in a callback
+/// called by SputnikVM.
 fn ethereum_error_to_exit_reason(exit_reason: EthereumError) -> ExitReason {
-    match exit_reason {
-        EthereumError::MachineExitError(err) => {
-            ExitReason::Fatal(ExitFatal::CallErrorAsFatal(err))
-        }
-        EthereumError::FatalMachineError(err) => ExitReason::Fatal(err),
-        EthereumError::CallRevert => ExitReason::Revert(ExitRevert::Reverted),
-        _ => ExitReason::Fatal(ExitFatal::Other(Cow::from(
-            "Internal error in EVM interpreter",
-        ))),
-    }
+    ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason))))
 }
 
 /// Data related to the current transaction layer
@@ -187,18 +184,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         runtime: &mut evm::Runtime,
     ) -> Result<ExitReason, EthereumError> {
         match runtime.run(self) {
-            Capture::Exit(ExitReason::Succeed(exit_succeed)) => {
-                Ok(ExitReason::Succeed(exit_succeed))
-            }
-            Capture::Exit(ExitReason::Revert(exit_revert)) => {
-                Ok(ExitReason::Revert(exit_revert))
-            }
-            Capture::Exit(ExitReason::Error(error)) => {
-                Err(EthereumError::MachineExitError(error))
-            }
-            Capture::Exit(ExitReason::Fatal(error)) => {
-                Err(EthereumError::FatalMachineError(error))
-            }
+            Capture::Exit(reason) => Ok(reason),
             Capture::Trap(_) => Err(EthereumError::InternalTrapError),
         }
     }
@@ -229,13 +215,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Execute a transfer between two accounts
+    ///
+    /// In case the transfer succeeds, the function returns
+    /// `Ok(ExitReason::Succeed(ExitSucceed::Returned))`. In case the
+    /// transaction fails, but execution doesn't encounter non-contract or
+    /// -account errors, it returns `Ok(ExitReason::Error(err))`, where `err`
+    /// indicates what went wrong (insufficient balance, etc.). In case of
+    /// critical errors in the rollup node or kernel, an `Err(err)` is returned,
+    /// where `err` indicates what went wrong, eg, a storage error.
     fn execute_transfer(
         &mut self,
         from: H160,
         to: H160,
         value: U256,
         gas_limit: Option<u64>,
-    ) -> Result<(), EthereumError> {
+    ) -> Result<ExitReason, EthereumError> {
         debug_msg!(self.host, "Executing a transfer");
 
         // TODO let transfers cost gas
@@ -243,21 +237,36 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if value == U256::zero() {
             // Nothing to transfer so succeeds by default
-            Ok(())
+            Ok(ExitReason::Succeed(ExitSucceed::Returned))
         } else if let Some(mut from_account) = self.get_account(from) {
             let mut to_account = self.get_or_create_account(to)?;
 
-            from_account.balance_remove(self.host, value)?;
-            to_account
-                .balance_add(self.host, value)
-                .map_err(EthereumError::from)
+            match from_account.balance_remove(self.host, value) {
+                Ok(_) => {
+                    to_account
+                        .balance_add(self.host, value)
+                        .map_err(EthereumError::from)?;
+                    Ok(ExitReason::Succeed(ExitSucceed::Returned))
+                }
+                Err(AccountStorageError::BalanceUnderflow(_)) => {
+                    debug_msg!(
+                        self.host,
+                        "Transaction failture - balance underflow on account {:?} - withdraw {:?}",
+                        from_account,
+                        value
+                    );
+
+                    Ok(ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                        ExitError::OutOfFund,
+                    )))
+                }
+                Err(err) => Err(EthereumError::from(err)),
+            }
         } else {
             debug_msg!(self.host, "'from' account {:?} is empty", from);
             // Accounts of zero balance by default, so this must be
             // an underflow.
-            Err(EthereumError::EthereumAccountError(
-                AccountStorageError::BalanceUnderflow,
-            ))
+            Ok(ExitReason::Error(ExitError::OutOfFund))
         }
     }
 
@@ -282,7 +291,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
         if self.evm_account_storage.stack_depth() >= MAXIMUM_TRANSACTION_DEPTH {
-            return Err(EthereumError::MachineExitError(ExitError::CallTooDeep));
+            return Ok((
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::CallTooDeep)),
+                None,
+                vec![],
+            ));
         }
 
         let context = Context {
@@ -359,7 +372,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         if self.evm_account_storage.stack_depth() > MAXIMUM_TRANSACTION_DEPTH {
             debug_msg!(self.host, "Execution beyond the call limit of 1024");
-            return Err(EthereumError::MachineExitError(ExitError::CallTooDeep));
+
+            return Ok((
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::CallTooDeep)),
+                None,
+                vec![],
+            ));
         }
 
         // TODO: check gas
@@ -372,12 +390,29 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
         if let Some(transfer) = transfer {
-            self.execute_transfer(
+            match self.execute_transfer(
                 transaction_context.context.caller,
                 address,
                 transfer.value,
                 gas_limit,
-            )?;
+            )? {
+                r @ ExitReason::Fatal(_) => {
+                    return Ok((r, None, vec![]));
+                }
+                r @ ExitReason::Error(_) => {
+                    return Ok((r, None, vec![]));
+                }
+                r @ ExitReason::Revert(_) => {
+                    // A transfer cannot revert - this implies internal error in
+                    // EVM execution
+                    return Err(EthereumError::InconsistentState(Cow::from(
+                        "Transfer returned revert",
+                    )));
+                }
+                ExitReason::Succeed(_) => {
+                    // Otherwise result is ok and we do nothing and continue
+                }
+            }
         }
 
         self.increment_nonce(transaction_context.context.caller)?;
@@ -484,15 +519,16 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         let transfer_cost = self.config.gas_transaction_call;
 
-        let gas_result = self
-            .gasometer
-            .record_cost(transfer_cost)
-            .map_err(EthereumError::from);
+        let gas_result = self.gasometer.record_cost(transfer_cost);
 
-        let tx_result = gas_result.and_then(|_| {
-            self.execute_transfer(from, to, value, gas_limit)?;
-            Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![]))
-        });
+        let tx_result = match gas_result {
+            Ok(()) => Ok((
+                self.execute_transfer(from, to, value, gas_limit)?,
+                None,
+                vec![],
+            )),
+            Err(err) => Ok((ExitReason::Error(err), None, vec![])),
+        };
 
         self.end_initial_transaction(tx_result)
     }
@@ -762,7 +798,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         execution_result: Result<CreateOutcome, EthereumError>,
     ) -> Result<ExecutionOutcome, EthereumError> {
         match execution_result {
-            Ok((r @ ExitReason::Succeed(_), new_address, result)) => {
+            Ok((ExitReason::Succeed(r), new_address, result)) => {
+                debug_msg!(
+                    self.host,
+                    "The initial transaction ended with success: {:?}",
+                    r
+                );
+
                 self.commit_initial_transaction(new_address, result)
             }
             Ok((ExitReason::Revert(ExitRevert::Reverted), _, _)) => {
@@ -775,8 +817,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     error
                 );
 
+                self.rollback_initial_transaction()
+            }
+            Ok((ExitReason::Fatal(ExitFatal::Other(cow_str)), _, _)) => {
                 self.rollback_initial_transaction()?;
-                Err(EthereumError::MachineExitError(error))
+                Err(EthereumError::WrappedError(cow_str))
             }
             Ok((ExitReason::Fatal(fatal_error), _, _)) => {
                 debug_msg!(
@@ -785,23 +830,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     fatal_error
                 );
 
-                self.rollback_initial_transaction()?;
-                Err(EthereumError::FatalMachineError(fatal_error))
+                self.rollback_initial_transaction()
             }
             Err(EthereumError::EthereumAccountError(
-                AccountStorageError::BalanceUnderflow,
-            )) => self.rollback_initial_transaction(),
-            Err(EthereumError::MachineExitError(ExitError::OutOfGas)) => {
+                AccountStorageError::BalanceUnderflow(path),
+            )) => {
                 debug_msg!(
                     self.host,
-                    "The initial transaction ended because it ran out of gas"
+                    "Initial transaction failed because of account underflow at {:?}",
+                    path
                 );
 
                 self.rollback_initial_transaction()
             }
-            Err(EthereumError::FatalMachineError(ExitFatal::CallErrorAsFatal(
-                ExitError::OutOfGas,
-            ))) => self.rollback_initial_transaction(),
             Err(err) => {
                 debug_msg!(
                     self.host,
@@ -920,9 +961,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn end_inter_transaction<T>(
         &mut self,
         execution_result: Result<CreateOutcome, EthereumError>,
+        promote_error: bool,
     ) -> Capture<CreateOutcome, T> {
         if let Ok((ref r @ ExitReason::Succeed(_), _, _)) = execution_result {
-            debug_msg!(self.host, "Intermediate transaction with: {:?}", r);
+            debug_msg!(self.host, "Intermediate transaction ended with: {:?}", r);
 
             if let Err(err) = self.commit_inter_transaction() {
                 debug_msg!(
@@ -931,7 +973,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     err
                 );
 
-                // Beware that we may not be able to recover from this error.
                 return Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![]));
             }
         } else if let Err(err) = self.rollback_inter_transaction() {
@@ -941,11 +982,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 err
             );
 
-            // Beware that we may not be able to recover from this error.
             return Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![]));
         }
 
         match execution_result {
+            Ok((ExitReason::Error(err), _, _)) => {
+                if promote_error {
+                    Capture::Exit((
+                        ExitReason::Fatal(ExitFatal::CallErrorAsFatal(err)),
+                        None,
+                        vec![],
+                    ))
+                } else {
+                    Capture::Exit((ExitReason::Error(err), None, vec![]))
+                }
+            }
             Ok(res) => Capture::Exit(res),
             Err(err) => Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![])),
         }
@@ -1139,7 +1190,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             let result =
                 self.execute_create(caller, scheme, value, init_code, target_gas);
 
-            self.end_inter_transaction(result)
+            self.end_inter_transaction(result, false)
         }
     }
 
@@ -1152,17 +1203,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         is_static: bool,
         context: Context,
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
-        fn remap_capture<T>(
-            capture: Capture<CreateOutcome, T>,
-        ) -> Capture<CallOutcome, T> {
-            match capture {
-                Capture::Exit((reason, _, value)) => Capture::Exit((reason, value)),
-                Capture::Trap(x) => Capture::Trap(x),
-            }
-        }
-
         if let Err(err) = self.begin_inter_transaction(is_static) {
-            // Beware that we may not be able to recover from this error.
             return Capture::Exit((ethereum_error_to_exit_reason(err), vec![]));
         }
 
@@ -1174,7 +1215,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             TransactionContext::from_context(context),
         );
 
-        remap_capture(self.end_inter_transaction(result))
+        match self.end_inter_transaction(result, true) {
+            Capture::Exit((reason, _, value)) => {
+                debug_msg!(self.host, "Call ended with reason: {:?}", reason);
+                Capture::Exit((reason, value))
+            }
+            Capture::Trap(x) => Capture::Trap(x),
+        }
     }
 
     fn pre_validate(
@@ -1564,7 +1611,7 @@ mod test {
         input_value.to_big_endian(&mut input);
 
         let address = H160::from_low_u64_be(118);
-        let gas_limit: Option<u64> = None;
+        let gas_limit: Option<u64> = Some(10_000_000_000_u64);
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1621,15 +1668,20 @@ mod test {
 
         match result {
             Ok(result) => {
-                panic!("Expected to fail, but got Ok({:?})", result);
-            }
-            Err(EthereumError::FatalMachineError(ExitFatal::CallErrorAsFatal(
-                ExitError::CallTooDeep,
-            ))) => {
-                assert_eq!(handler.gas_used(), 5);
+                let expected_result = (
+                    ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                        ExitError::CallTooDeep,
+                    )),
+                    None,
+                    vec![],
+                );
+                assert_eq!(result, expected_result);
             }
             Err(err) => {
-                panic!("Expected a too-many-calls error, but got {:?}", err);
+                panic!(
+                    "Expected call to fail because of call depth, but got {:?}",
+                    err
+                );
             }
         }
     }
@@ -1967,11 +2019,12 @@ mod test {
 
         match result {
             Ok(result) => {
-                panic!("Got Ok, but this was supposed to fail (got {:?})", result);
-            }
-            Err(EthereumError::EthereumAccountError(
-                AccountStorageError::BalanceUnderflow,
-            )) => {
+                let expected_result = (
+                    ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfFund)),
+                    None,
+                    vec![],
+                );
+                assert_eq!(result, expected_result);
                 assert_eq!(get_balance(&mut handler, &caller), U256::from(99_u32));
                 assert_eq!(get_balance(&mut handler, &address), U256::zero());
                 assert_eq!(handler.gas_used(), 0);

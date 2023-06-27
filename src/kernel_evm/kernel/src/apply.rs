@@ -9,9 +9,6 @@ use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use evm_execution::EthereumError::{
-    EthereumAccountError, EthereumStorageError, InternalTrapError,
-};
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
@@ -230,14 +227,13 @@ pub fn apply_transaction<Host: Runtime>(
         Some(value),
     ) {
         Ok(outcome) => Some(outcome),
-        Err(InternalTrapError | EthereumAccountError(_) | EthereumStorageError(_)) => {
+        Err(err) => {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
             // Because the proposal's state is unclear, and we do not have a sequencer
             // if an error that leads to a durable storage corruption is caught, we
             // invalidate the entire proposal.
-            return Err(Error::InvalidRunTransaction);
+            return Err(Error::InvalidRunTransaction(err));
         }
-        Err(_) => None,
     };
 
     let gas_used = match &execution_outcome {
