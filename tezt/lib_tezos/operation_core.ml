@@ -539,7 +539,6 @@ module Manager = struct
       }
     | Origination of {code : JSON.u; storage : JSON.u; balance : int}
     | Dal_publish_slot_header of {
-        level : int;
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
         proof : Tezos_crypto_dal.Cryptobox.commitment_proof;
@@ -561,8 +560,8 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~level ~index ~commitment ~proof =
-    Dal_publish_slot_header {level; index; commitment; proof}
+  let dal_publish_slot_header ~index ~commitment ~proof =
+    Dal_publish_slot_header {index; commitment; proof}
 
   let origination ?(init_balance = 0) ~code ~init_storage () =
     Origination {code; storage = init_storage; balance = init_balance}
@@ -607,12 +606,11 @@ module Manager = struct
           ("balance", json_of_tez balance);
           ("script", script);
         ]
-    | Dal_publish_slot_header {level; index; commitment; proof} ->
+    | Dal_publish_slot_header {index; commitment; proof} ->
         let slot_header =
           `O
             [
               ("slot_index", json_of_int index);
-              ("published_level", json_of_int level);
               ("commitment", json_of_commitment commitment);
               ("commitment_proof", json_of_commitment_proof proof);
             ]

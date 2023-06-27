@@ -451,7 +451,6 @@ module Manager : sig
      operation for the data-availability layer that publishes a
      slot. *)
   val dal_publish_slot_header :
-    level:int ->
     index:int ->
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
