@@ -946,6 +946,14 @@ let prepare_first_block ~level ~timestamp ctxt =
             cryptobox_parameters;
           }
       in
+      let reveal_activation_level :
+          Constants_parametric_repr.sc_rollup_reveal_activation_level =
+        {
+          raw_data = {blake2B = Raw_level_repr.root};
+          metadata = Raw_level_repr.root;
+          dal_page = Raw_level_repr.root;
+        }
+      in
       let sc_rollup =
         Constants_parametric_repr.
           {
@@ -967,6 +975,7 @@ let prepare_first_block ~level ~timestamp ctxt =
               c.sc_rollup.max_number_of_stored_cemented_commitments;
             max_number_of_parallel_games =
               c.sc_rollup.max_number_of_parallel_games;
+            reveal_activation_level;
           }
       in
       let zk_rollup =

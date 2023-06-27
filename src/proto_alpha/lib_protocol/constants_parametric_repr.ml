@@ -83,6 +83,32 @@ let dal_encoding =
    you should ensure that there is a proper migration of the constants
    during context migration. See: `Raw_context.prepare_first_block` *)
 
+type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
+
+type sc_rollup_reveal_activation_level = {
+  raw_data : sc_rollup_reveal_hashing_schemes;
+  metadata : Raw_level_repr.t;
+  dal_page : Raw_level_repr.t;
+}
+
+let sc_rollup_reveal_hashing_schemes_encoding =
+  let open Data_encoding in
+  conv
+    (fun t -> t.blake2B)
+    (fun blake2B -> {blake2B})
+    (obj1 (req "Blake2B" Raw_level_repr.encoding))
+
+let sc_rollup_reveal_activation_level_encoding :
+    sc_rollup_reveal_activation_level Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun t -> (t.raw_data, t.metadata, t.dal_page))
+    (fun (raw_data, metadata, dal_page) -> {raw_data; metadata; dal_page})
+    (obj3
+       (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
+       (req "metadata" Raw_level_repr.encoding)
+       (req "dal_page" Raw_level_repr.encoding))
+
 type sc_rollup = {
   enable : bool;
   arith_pvm_enable : bool;
@@ -97,6 +123,7 @@ type sc_rollup = {
   timeout_period_in_blocks : int;
   max_number_of_stored_cemented_commitments : int;
   max_number_of_parallel_games : int;
+  reveal_activation_level : sc_rollup_reveal_activation_level;
 }
 
 type zk_rollup = {
@@ -181,7 +208,8 @@ let sc_rollup_encoding =
         ( c.number_of_sections_in_dissection,
           c.timeout_period_in_blocks,
           c.max_number_of_stored_cemented_commitments,
-          c.max_number_of_parallel_games ) ))
+          c.max_number_of_parallel_games,
+          c.reveal_activation_level ) ))
     (fun ( ( sc_rollup_enable,
              sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
@@ -194,7 +222,8 @@ let sc_rollup_encoding =
            ( sc_rollup_number_of_sections_in_dissection,
              sc_rollup_timeout_period_in_blocks,
              sc_rollup_max_number_of_cemented_commitments,
-             sc_rollup_max_number_of_parallel_games ) ) ->
+             sc_rollup_max_number_of_parallel_games,
+             sc_rollup_reveal_activation_level ) ) ->
       {
         enable = sc_rollup_enable;
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
@@ -211,6 +240,7 @@ let sc_rollup_encoding =
         max_number_of_stored_cemented_commitments =
           sc_rollup_max_number_of_cemented_commitments;
         max_number_of_parallel_games = sc_rollup_max_number_of_parallel_games;
+        reveal_activation_level = sc_rollup_reveal_activation_level;
       })
     (merge_objs
        (obj9
@@ -223,11 +253,14 @@ let sc_rollup_encoding =
           (req "smart_rollup_max_lookahead_in_blocks" int32)
           (req "smart_rollup_max_active_outbox_levels" int32)
           (req "smart_rollup_max_outbox_messages_per_level" int31))
-       (obj4
+       (obj5
           (req "smart_rollup_number_of_sections_in_dissection" uint8)
           (req "smart_rollup_timeout_period_in_blocks" int31)
           (req "smart_rollup_max_number_of_cemented_commitments" int31)
-          (req "smart_rollup_max_number_of_parallel_games" int31)))
+          (req "smart_rollup_max_number_of_parallel_games" int31)
+          (req
+             "smart_rollup_reveal_activation_level"
+             sc_rollup_reveal_activation_level_encoding)))
 
 let zk_rollup_encoding =
   let open Data_encoding in

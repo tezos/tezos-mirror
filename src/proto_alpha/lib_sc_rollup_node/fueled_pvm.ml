@@ -128,9 +128,13 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
         mode, they will be made. *)
   let eval_until_input (node_ctxt : _ Node_context.t) reveal_map level
       message_index ~fuel start_tick failing_ticks state =
-    let is_reveal_enabled _ _ = true in
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
+    let is_reveal_enabled =
+      Sc_rollup.is_reveal_enabled_predicate
+        node_ctxt.protocol_constants.parametric.sc_rollup
+          .reveal_activation_level
+    in
     let module PVM = (val node_ctxt.pvm) in
     let metadata = Node_context.metadata node_ctxt in
     let dal_attestation_lag =

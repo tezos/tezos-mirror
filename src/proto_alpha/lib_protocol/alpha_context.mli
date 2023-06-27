@@ -804,6 +804,14 @@ module Constants : sig
 
     val dal_encoding : dal Data_encoding.t
 
+    type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}
+
+    type sc_rollup_reveal_activation_level = {
+      raw_data : sc_rollup_reveal_hashing_schemes;
+      metadata : Raw_level.t;
+      dal_page : Raw_level.t;
+    }
+
     type sc_rollup = {
       enable : bool;
       arith_pvm_enable : bool;
@@ -818,6 +826,7 @@ module Constants : sig
       timeout_period_in_blocks : int;
       max_number_of_stored_cemented_commitments : int;
       max_number_of_parallel_games : int;
+      reveal_activation_level : sc_rollup_reveal_activation_level;
     }
 
     type zk_rollup = {
@@ -983,6 +992,9 @@ module Constants : sig
   val sc_rollup_number_of_sections_in_dissection : context -> int
 
   val max_number_of_stored_cemented_commitments : context -> int
+
+  val sc_rollup_reveal_activation_level :
+    context -> Parametric.sc_rollup_reveal_activation_level
 
   val zk_rollup_enable : context -> bool
 
@@ -2879,6 +2891,9 @@ module Sc_rollup : sig
     | Request_dal_page of Dal.Page.t
 
   type is_reveal_enabled = Raw_level.t -> reveal -> bool
+
+  val is_reveal_enabled_predicate :
+    Constants.Parametric.sc_rollup_reveal_activation_level -> is_reveal_enabled
 
   type input_request =
     | No_input_required
