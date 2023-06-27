@@ -84,11 +84,7 @@ let get_value_in_storage sc_rollup_client address nth =
     sc_rollup_client
     ~pvm_kind
     ~operation:Sc_rollup_client.Value
-    ~key:
-      (Printf.sprintf
-         "/evm/eth_accounts/%s/storage/%064x"
-         (Helpers.normalize address)
-         nth)
+    ~key:(Durable_storage_path.storage address ~key:(hex_256_of nth) ())
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
   let*! value = get_value_in_storage evm_setup.sc_rollup_client address nth in
@@ -106,10 +102,7 @@ let get_storage_size sc_rollup_client ~address =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:
-        (Printf.sprintf
-           "/evm/eth_accounts/%s/storage"
-           (Helpers.normalize address))
+      ~key:(Durable_storage_path.storage address ())
   in
   return (List.length storage)
 
@@ -261,7 +254,7 @@ let make_config ?bootstrap_accounts ?ticketer () =
     Option.fold
       ~some:(fun ticketer ->
         let value = Hex.(of_string ticketer |> show) in
-        let to_ = "/evm/ticketer" in
+        let to_ = Durable_storage_path.ticketer in
         [Set {value; to_}])
       ~none:[]
       ticketer
@@ -274,9 +267,7 @@ let make_config ?bootstrap_accounts ?ticketer () =
              let value =
                Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
              in
-             let to_ =
-               sf "/evm/eth_accounts/%s/balance" (Helpers.normalize address)
-             in
+             let to_ = Durable_storage_path.balance address in
              Set {value; to_} :: acc)
            [])
       ~none:[]
@@ -720,7 +711,7 @@ let test_l2_deploy_simple_storage =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:"/evm/eth_accounts"
+      ~key:Durable_storage_path.eth_accounts
   in
   (* check tx status*)
   let* () = check_tx_succeeded ~endpoint ~tx in
@@ -836,7 +827,7 @@ let test_l2_deploy_erc20 =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:"/evm/eth_accounts"
+      ~key:Durable_storage_path.eth_accounts
   in
   Check.(
     list_mem
@@ -1410,7 +1401,7 @@ let test_preinitialized_evm_kernel =
     ~tags:["evm"; "dictator"; "config"]
     ~title:"Creates a kernel with an initialized dictator key"
   @@ fun protocol ->
-  let dictator_key_path = "/dictator_key" in
+  let dictator_key_path = Durable_storage_path.dictator in
   let dictator_key = Eth_account.bootstrap_accounts.(0).address in
   let config =
     Sc_rollup_helpers.Installer_kernel_config.
