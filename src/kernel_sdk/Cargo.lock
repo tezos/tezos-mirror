@@ -1339,6 +1339,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",

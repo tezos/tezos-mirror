@@ -70,3 +70,41 @@ fn append_content<Host: Runtime>(
 
     Ok(size_written)
 }
+
+#[cfg(test)]
+mod test {
+    use super::reveal_root_hash_to_store;
+    use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+    use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
+    use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+    use tezos_smart_rollup_mock::MockHost;
+
+    const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
+
+    fn preliminary_upgrade(host: &mut MockHost) -> (PreimageHash, Vec<u8>) {
+        let kernel = [1_u8; 1000];
+
+        let save_preimages = |_hash: PreimageHash, preimage: Vec<u8>| {
+            host.set_preimage(preimage);
+        };
+        (
+            prepare_preimages(&kernel, save_preimages).unwrap(),
+            kernel.to_vec(),
+        )
+    }
+
+    #[test]
+    fn test_reveal_root_hash_to_store() {
+        let mut host = MockHost::default();
+        let (root_hash, original_kernel) = preliminary_upgrade(&mut host);
+
+        reveal_root_hash_to_store(&mut host, root_hash.as_ref(), &TMP_REVEAL_PATH)
+            .expect("Reveal root hash to store should succeed.");
+
+        let stored_kernel = host
+            .store_read(&TMP_REVEAL_PATH, 0, MAX_FILE_CHUNK_SIZE)
+            .expect("Stored root hash should be readable.");
+
+        assert_eq!(stored_kernel, original_kernel)
+    }
+}
