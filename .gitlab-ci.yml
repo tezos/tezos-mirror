@@ -27,6 +27,9 @@ workflow:
     # Allow 'Test release tag' pipelines for dry running release tag
     # pipelines in the nomadic-labs/tezos CI.
     - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+    # Allow 'Test non-release tag' pipelines for dry running non-release tag
+    # pipelines in the nomadic-labs/tezos CI.
+    - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
     # Allow 'Scheduled pipeline for extended tests' pipelines
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
     # Disallow all other pipelines
@@ -93,6 +96,7 @@ stages:
   - prepare_release
   - publish_release_gitlab
   - publish_release
+  - publish_package_gitlab
   - manual
 
 # Trigger
@@ -157,6 +161,11 @@ include:
   - local: .gitlab/ci/pipelines/release_tag_test.yml
     rules:
       - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+
+  # Test non-release tag
+  - local: .gitlab/ci/pipelines/non_release_tag_test.yml
+    rules:
+      - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-(rc|beta)\d*)?$/'
 
   # Scheduled pipeline for extended tests
   - local: .gitlab/ci/pipelines/schedule_extended_test.yml
