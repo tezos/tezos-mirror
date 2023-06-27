@@ -55,10 +55,6 @@ type full_evm_setup = {
 
 let hex_256_of n = Printf.sprintf "%064x" n
 
-let no_0x s =
-  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
-  else s
-
 let evm_proxy_server_version proxy_server =
   let endpoint = Evm_proxy_server.endpoint proxy_server in
   let get_version_url = endpoint ^ "/version" in
@@ -91,7 +87,7 @@ let get_value_in_storage sc_rollup_client address nth =
     ~key:
       (Printf.sprintf
          "/evm/eth_accounts/%s/storage/%064x"
-         (String.lowercase_ascii @@ no_0x address)
+         (Helpers.normalize address)
          nth)
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
@@ -113,7 +109,7 @@ let get_storage_size sc_rollup_client ~address =
       ~key:
         (Printf.sprintf
            "/evm/eth_accounts/%s/storage"
-           (String.lowercase_ascii @@ no_0x address))
+           (Helpers.normalize address))
   in
   return (List.length storage)
 
@@ -279,9 +275,7 @@ let make_config ?bootstrap_accounts ?ticketer () =
                Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
              in
              let to_ =
-               sf
-                 "/evm/eth_accounts/%s/balance"
-                 (no_0x address |> String.lowercase_ascii)
+               sf "/evm/eth_accounts/%s/balance" (Helpers.normalize address)
              in
              Set {value; to_} :: acc)
            [])
@@ -735,7 +729,7 @@ let test_l2_deploy_simple_storage =
   Check.(
     list_mem
       string
-      (String.lowercase_ascii @@ no_0x contract_address)
+      (Helpers.normalize contract_address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
   unit
@@ -847,7 +841,7 @@ let test_l2_deploy_erc20 =
   Check.(
     list_mem
       string
-      (no_0x @@ String.lowercase_ascii address)
+      (Helpers.normalize address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
 
