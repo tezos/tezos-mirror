@@ -141,27 +141,24 @@ pub mod evaluation {
     /// Here's an example of how you can use this function:
     /// ```
     /// use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
+    /// use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
     /// use tezos_smart_rollup_host::KERNEL_BOOT_PATH;
     /// use tezos_smart_rollup_host::path::OwnedPath;
     /// use tezos_smart_rollup_host::path::RefPath;
     /// use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigInstruction;
     /// use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigProgram;
+    /// use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
     /// use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
     /// use tezos_smart_rollup_host::runtime::Runtime;
     ///
-    /// const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
     ///
     /// pub fn upgrade_kernel(host: &mut impl Runtime) -> Result<(), &'static str> {
-    ///     let root_hash = [0; PREIMAGE_HASH_SIZE].to_vec();
+    ///     let root_hash = [0; PREIMAGE_HASH_SIZE];
     ///
     ///     // Create config consisting of a reveal instruction.
-    ///     let reveal_instruction =
-    ///     OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
-    ///         root_hash.to_vec().into(),
-    ///         OwnedPath::from(&TMP_REVEAL_PATH),
-    ///     )]);
+    ///     let config_program = upgrade_reveal_flow(root_hash);
     ///
-    ///     eval_config_program(host, &reveal_instruction)?;
+    ///     eval_config_program(host, &config_program)?;
     ///     Runtime::store_move(host, &TMP_REVEAL_PATH, &KERNEL_BOOT_PATH)
     ///         .map_err(|_| "Upgrade completion failed.")
     /// }
@@ -174,5 +171,23 @@ pub mod evaluation {
             eval_config_instr(host, config_instr)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub mod promote {
+    use super::owned::{OwnedConfigInstruction, OwnedConfigProgram};
+    use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+
+    pub const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
+
+    pub fn upgrade_reveal_flow(
+        root_hash: [u8; PREIMAGE_HASH_SIZE],
+    ) -> OwnedConfigProgram {
+        OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
+            root_hash.to_vec().into(),
+            OwnedPath::from(&TMP_REVEAL_PATH),
+        )])
     }
 }
