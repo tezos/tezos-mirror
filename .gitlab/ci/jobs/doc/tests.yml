@@ -88,6 +88,10 @@ install_bin_rc_fedora_37:
     - .base-test-doc-scripts-template
   script:
     - ./docs/introduction/install-opam.sh
+  rules:
+    # temporarily disable until these jobs are optimized
+    - when: manual
+      allow_failure: true
 
 install_opam_focal:
   image: ocaml/opam:ubuntu-20.04
