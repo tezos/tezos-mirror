@@ -814,7 +814,14 @@ module Cost_of = struct
     let check_printable s =
       atomic_step_cost (cost_CHECK_PRINTABLE (String.length s))
 
-    let merge_cycle = atomic_step_cost cost_TY_EQ
+    let ty_eq ty1 ty2 =
+      (* Assumes O(1) access to the size of a type *)
+      let size1 = Script_typed_ir.(ty_size ty1 |> Type_size.to_int) in
+      let size2 = Script_typed_ir.(ty_size ty2 |> Type_size.to_int) in
+      atomic_step_cost (cost_TY_EQ (Saturation_repr.min size1 size2))
+
+    (* The gas cost for comparing a type with a type of size 1 *)
+    let ty_eq_prim = atomic_step_cost (cost_TY_EQ (Saturation_repr.safe_int 1))
 
     let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE
 
