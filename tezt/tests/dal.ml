@@ -665,6 +665,8 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
   let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let lag = parameters.attestation_lag in
+  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
   let* _ =
     dal_attestations
       ~nb_slots
@@ -688,6 +690,10 @@ let test_slot_management_logic _protocol parameters cryptobox node client
         (* Field is part of the encoding when the feature flag is true *)
     | Some x -> x
   in
+  Check.(
+    (Array.length attestation >= 2)
+      int
+      ~error_msg:"The attestation should refer to at least 2 slots, got %L") ;
   Check.(
     (attestation.(0) = false)
       bool
@@ -870,6 +876,9 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   unit
 
+(* This function builds a slot with the given content, and makes the given DAL
+   node to compute and store the corresponding commitment and shards by calling
+   relevant RPCs. It returns the commitment and its proof. *)
 let split_slot dal_node ~slot_size content =
   let slot = Rollup.Dal.make_slot ~slot_size content in
   let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
@@ -1115,6 +1124,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   (* Attest slots slot0 = (2, 0) and slot2_b = (2,4), bake and wait
      two seconds so that the DAL node updates its state. *)
   let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let lag = parameters.attestation_lag in
+  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
   let* _op_hash = dal_attestations ~nb_slots (List.map fst attested) client in
   let* () = Client.bake_for_and_wait client in
   let* () = Lwt_unix.sleep 2.0 in
@@ -1453,16 +1464,14 @@ let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
   let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
   if bake then Client.bake_for_and_wait client else unit
 
-let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
-
 let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     sc_rollup_node sc_rollup_address _node client _pvm_name =
   (* Check that the rollup node downloaded the confirmed slots to which it is
      subscribed:
 
-     0. run dl node.
+     0. Run a DAL node.
 
-     1. Send three slots to dal node and obtain corresponding headers.
+     1. Send three slots to DAL node and obtain corresponding headers.
 
      2. Run rollup node for an originated rollup.
 
@@ -1478,8 +1487,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      7. Only slots 1 and 2 are attested. No slot is currently pre-downloaded by
      the rollup.
 
-     8. Bake a block so that the rollup node interprets the previously published
-     & attested slot(s).
+     8. Bake `attestation_lag` blocks so that the rollup node interprets the
+     previously published & attested slot(s).
 
      9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
      and slot 1 has not been downloaded.
@@ -1487,9 +1496,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let split_slot = split_slot dal_node ~slot_size in
 
-  (* 0. run dl node. *)
-
-  (* 1. Send three slots to dal node and obtain corresponding headers. *)
+  Log.info
+    "Step 1: send three slots to DAL node and obtain corresponding headers" ;
   let slot_contents_0 = " 10 " in
   let* commitment_0, proof_0 = split_slot slot_contents_0 in
   let slot_contents_1 = " 200 " in
@@ -1497,7 +1505,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let slot_contents_2 = " 400 " in
   let* commitment_2, proof_2 = split_slot slot_contents_2 in
 
-  (* 2. Run rollup node for an originated rollup. *)
+  Log.info "Step 2: run rollup node for an originated rollup" ;
   let* genesis_info =
     RPC.Client.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
@@ -1515,10 +1523,11 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       "Current level has moved past origination level (current = %L, expected \
        = %R)" ;
 
-  (* 3. Setting the parameters of the PVM. Rollup node subscribes to slots 0, 2,
-     4 and 6. *)
+  Log.info
+    "Step 3: set the PVM parameters; rollup node subscribes to slots 0, 2, 4 \
+     and 6" ;
   let number_of_slots = parameters.number_of_slots in
-  let attestation_lag = 1 in
+  let attestation_lag = parameters.attestation_lag in
   let number_of_pages = 256 in
   let subscribed_slots = "0:2:4:6" in
   let messages =
@@ -1533,7 +1542,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   in
   let* () = send_messages client messages in
 
-  (* 4. Publish the three slot headers for slots with indexes 0, 1 and 2. *)
+  Log.info "Step 4: publish the slot headers for indexes 0, 1, and 2" ;
   let* _op_hash =
     publish_slot_header
       ~source:Constant.bootstrap1
@@ -1558,7 +1567,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       ~proof:proof_2
       client
   in
-  (* 5. Check that the slot_headers are fetched by the rollup node. *)
+
+  Log.info "Step 5: check that the slot headers are fetched by the rollup node" ;
   let* () = Client.bake_for_and_wait client in
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 2)
@@ -1575,21 +1585,26 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
 
-  (* 6. Attest only slots 1 and 2. *)
+  Log.info "Step 6: attest only slots 1 and 2" ;
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let nb_slots = parameters.number_of_slots in
+  let* () =
+    repeat (attestation_lag - 1) (fun () -> Client.bake_for_and_wait client)
+  in
   let* _ops_hashes = dal_attestations ~nb_slots [2; 1] client in
   let* () = Client.bake_for_and_wait client in
   let* slot_confirmed_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (slots_published_level + attestation_lag)
   in
-  Check.(slot_confirmed_level = slots_published_level + 1)
+  Check.(slot_confirmed_level = slots_published_level + attestation_lag)
     Check.int
     ~error_msg:
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
 
-  (* 7. Check that two slots have been attested. *)
+  Log.info "Step 7: check that the two slots have been attested" ;
   let*! downloaded_slots =
     Sc_rollup_client.get_dal_processed_slots ~hooks sc_rollup_client
   in
@@ -1605,21 +1620,27 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       "Unexpected number of slots that have been either downloaded or \
        unconfirmed (current = %L, expected = %R)" ;
 
-  (* 8. Bake a block so that the rollup node interprets the previously published
-     & attested slot(s). *)
-  let* () = Client.bake_for_and_wait client in
+  Log.info
+    "Step 8: bake attestation_lag blocks so that the rollup node interprets \
+     the previously published & attested slot(s)" ;
+  let* () =
+    repeat attestation_lag (fun () -> Client.bake_for_and_wait client)
+  in
 
   let* level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (slot_confirmed_level + 1)
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (slot_confirmed_level + attestation_lag)
   in
-  Check.(level = slot_confirmed_level + 1)
+  Check.(level = slot_confirmed_level + attestation_lag)
     Check.int
     ~error_msg:
       "Current level has moved past slot attestation level (current = %L, \
        expected = %R)" ;
 
-  (* 9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
-     and slot 1 has not been downloaded. *)
+  Log.info
+    "Step 9: verify that the rollup node has downloaded slot 2; slot 0 is \
+     unconfirmed, and slot 1 has not been downloaded" ;
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
   let*! downloaded_slots =
     Sc_rollup_client.get_dal_processed_slots
@@ -1629,7 +1650,8 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let downloaded_confirmed_slots =
     List.filter (fun (_i, s) -> String.equal s "confirmed") downloaded_slots
   in
-  (* 10. Check the first page of the two attested slots' content. *)
+
+  Log.info "Step 10: check the first page of the two attested slots' content" ;
   let expected_number_of_confirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots = expected_number_of_confirmed_slots)
@@ -3235,6 +3257,7 @@ let register ~protocols =
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~attestation_lag:1
     ~attestation_threshold:100
     "dal attestor with bake for"
     (test_attestor ~with_baker_daemon:false)
