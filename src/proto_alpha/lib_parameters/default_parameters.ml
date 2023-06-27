@@ -90,7 +90,7 @@ let default_dal =
     {
       feature_enable = false;
       number_of_slots = 256;
-      attestation_lag = 1;
+      attestation_lag = 4;
       attestation_threshold = 50;
       blocks_per_epoch = 32l;
       cryptobox_parameters = default_cryptobox_parameters;
