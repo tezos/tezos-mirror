@@ -36,6 +36,7 @@
   irmin-pack
   irmin-pack.unix
   irmin
+  prometheus-app
   tezos-dal-016-PtMumbai
   tezos-dal-017-PtNairob
   tezos-dal-018-Proxford
