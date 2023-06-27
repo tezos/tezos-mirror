@@ -25,8 +25,16 @@
 
 let merge
     Cli.
-      {data_dir; rpc_addr; expected_pow; listen_addr; endpoint; profile; peers}
-    configuration =
+      {
+        data_dir;
+        rpc_addr;
+        expected_pow;
+        listen_addr;
+        endpoint;
+        metrics_addr;
+        profile;
+        peers;
+      } configuration =
   Configuration_file.
     {
       configuration with
@@ -37,6 +45,8 @@ let merge
         Option.value ~default:configuration.expected_pow expected_pow;
       endpoint = Option.value ~default:configuration.endpoint endpoint;
       profile = Option.either profile configuration.profile;
+      metrics_addr =
+        Option.value ~default:configuration.metrics_addr metrics_addr;
       peers = peers @ configuration.peers;
     }
 

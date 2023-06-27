@@ -42,6 +42,7 @@ type options = {
   endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
   profile : Services.Types.profile option;
       (** Profile of the DAL node used for tracking shards. *)
+  metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)
 }
 

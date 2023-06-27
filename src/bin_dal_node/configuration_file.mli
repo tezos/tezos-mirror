@@ -36,6 +36,8 @@ type t = {
   network_name : string;
       (** A string that identifies the network's name. E.g. dal-sandbox. *)
   endpoint : Uri.t;  (** Endpoint of a Tezos node *)
+  metrics_addr : P2p_point.Id.t;
+      (** The metrics server used to export metrics *)
   profile : Services.Types.profile option;
       (** Profile allowing to know the topics of interest. *)
 }

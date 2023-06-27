@@ -162,11 +162,25 @@ module Term = struct
       & opt (list string) default_list
       & info ~docs ~doc ~docv:"ADDR:PORT,..." ["peers"])
 
+  let metrics_addr =
+    let open Cmdliner in
+    let doc = "Address on which to provide metrics over HTTP." in
+    let default_port = Configuration_file.default.metrics_addr |> snd in
+    Arg.(
+      value
+      & opt (some (p2p_point_arg ~default_port)) None
+      & info
+          ~docs
+          ~doc
+          ~docv:
+            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+          ["metrics-addr"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ endpoint $ attestor_profile $ producer_profile $ peers))
+       $ endpoint $ metrics_addr $ attestor_profile $ producer_profile $ peers))
 end
 
 module Run = struct
@@ -226,6 +240,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
   profile : Services.Types.profile option;
+  metrics_addr : P2p_point.Id.t option;
   peers : string list;
 }
 
@@ -233,7 +248,7 @@ type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
-      attestor_opt producer_opt peers =
+      metrics_addr attestor_opt producer_opt peers =
     let profile =
       match (attestor_opt, producer_opt) with
       | None, None -> None
@@ -251,7 +266,16 @@ let make ~run =
     in
     run
       subcommand
-      {data_dir; rpc_addr; expected_pow; listen_addr; endpoint; profile; peers}
+      {
+        data_dir;
+        rpc_addr;
+        expected_pow;
+        listen_addr;
+        endpoint;
+        profile;
+        metrics_addr;
+        peers;
+      }
     |> function
     | Ok v -> `Ok v
     | Error error ->
