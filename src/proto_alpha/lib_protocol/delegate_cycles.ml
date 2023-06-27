@@ -66,27 +66,18 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
             delegates))
   >>=? fun cleared_cycle_delegates ->
   List.fold_left_es
-    (fun (maxima, delegates_to_remove) (cycle : Cycle_repr.t) ->
+    (fun delegates_to_remove (cycle : Cycle_repr.t) ->
       Stake_storage.get_selected_distribution ctxt cycle
       >|=? fun active_stakes ->
       List.fold_left
-        (fun (maxima, delegates_to_remove)
-             (delegate, Stake_repr.{frozen; delegated = _}) ->
-          let maxima =
-            Signature.Public_key_hash.Map.update
-              delegate
-              (function
-                | None -> Some frozen
-                | Some maximum -> Some (Tez_repr.max maximum frozen))
-              maxima
-          in
+        (fun delegates_to_remove (delegate, _stake) ->
           let delegates_to_remove =
             Signature.Public_key_hash.Set.remove delegate delegates_to_remove
           in
-          (maxima, delegates_to_remove))
-        (maxima, delegates_to_remove)
+          delegates_to_remove)
+        delegates_to_remove
         active_stakes)
-    (Signature.Public_key_hash.Map.empty, cleared_cycle_delegates)
+    cleared_cycle_delegates
     cycles
 
 let update_initial_frozen_deposits ctxt ~new_cycle =
@@ -107,7 +98,7 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
-  >>=? fun (_maxima, delegates_to_remove) ->
+  >>=? fun delegates_to_remove ->
   Stake_storage.get_selected_distribution ctxt new_cycle
   >>=? fun selection_for_new_cycle ->
   List.fold_left_es
