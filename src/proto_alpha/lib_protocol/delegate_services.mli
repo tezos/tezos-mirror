@@ -67,6 +67,8 @@ type info = {
   pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
 }
 
+type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
+
 val info_encoding : info Data_encoding.t
 
 val info :
@@ -92,6 +94,12 @@ val frozen_deposits :
   'a ->
   Signature.Public_key_hash.t ->
   Tez.t shell_tzresult Lwt.t
+
+val unstaked_frozen_deposits :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  deposit_per_cycle list shell_tzresult Lwt.t
 
 val staking_balance :
   'a #RPC_context.simple ->
