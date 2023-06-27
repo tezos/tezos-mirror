@@ -187,11 +187,16 @@ fn bytes_hash(bytes: &[u8]) -> H256 {
 }
 
 /// Turn an Ethereum address - a H160 - into a valid path
-pub fn account_path(address: &H160) -> Result<OwnedPath, AccountStorageError> {
+pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
-    OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
+    OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
 }
 impl EthereumAccount {
+    pub fn from_address(address: &H160) -> Result<Self, DurableStorageError> {
+        let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
+        Ok(path.into())
+    }
+
     /// Get the **nonce** for the Ethereum account. Default value is zero, so an account will
     /// _always_ have this **nonce**.
     pub fn nonce(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
