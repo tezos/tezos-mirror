@@ -9,8 +9,7 @@
 //! to storage, account balances, block constants, _and transaction state_.
 
 use crate::account_storage::{
-    account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
-    CODE_HASH_DEFAULT,
+    account_path, EthereumAccount, EthereumAccountStorage, CODE_HASH_DEFAULT,
 };
 use crate::storage;
 use crate::transaction::TransactionContext;
@@ -241,26 +240,22 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         } else if let Some(mut from_account) = self.get_account(from) {
             let mut to_account = self.get_or_create_account(to)?;
 
-            match from_account.balance_remove(self.host, value) {
-                Ok(_) => {
-                    to_account
-                        .balance_add(self.host, value)
-                        .map_err(EthereumError::from)?;
-                    Ok(ExitReason::Succeed(ExitSucceed::Returned))
-                }
-                Err(AccountStorageError::BalanceUnderflow(_)) => {
-                    debug_msg!(
-                        self.host,
-                        "Transaction failture - balance underflow on account {:?} - withdraw {:?}",
-                        from_account,
-                        value
-                    );
+            if from_account.balance_remove(self.host, value)? {
+                to_account
+                    .balance_add(self.host, value)
+                    .map_err(EthereumError::from)?;
+                Ok(ExitReason::Succeed(ExitSucceed::Returned))
+            } else {
+                debug_msg!(
+                    self.host,
+                    "Transaction failture - balance underflow on account {:?} - withdraw {:?}",
+                    from_account,
+                    value
+                );
 
-                    Ok(ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
-                        ExitError::OutOfFund,
-                    )))
-                }
-                Err(err) => Err(EthereumError::from(err)),
+                Ok(ExitReason::Fatal(ExitFatal::CallErrorAsFatal(
+                    ExitError::OutOfFund,
+                )))
             }
         } else {
             debug_msg!(self.host, "'from' account {:?} is empty", from);
@@ -832,17 +827,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 self.rollback_initial_transaction()
             }
-            Err(EthereumError::EthereumAccountError(
-                AccountStorageError::BalanceUnderflow(path),
-            )) => {
-                debug_msg!(
-                    self.host,
-                    "Initial transaction failed because of account underflow at {:?}",
-                    path
-                );
-
-                self.rollback_initial_transaction()
-            }
             Err(err) => {
                 debug_msg!(
                     self.host,
@@ -1288,9 +1272,15 @@ mod test {
         let mut account = handler.get_or_create_account(*address).unwrap();
         let old_balance = account.balance(handler.borrow_host()).unwrap();
         match old_balance.cmp(&new_balance) {
-            Ordering::Greater => account
-                .balance_remove(handler.borrow_host(), old_balance - new_balance)
-                .unwrap(),
+            Ordering::Greater => {
+                // we require that fund removal goes fine
+                assert!(
+                    account
+                        .balance_remove(handler.borrow_host(), old_balance - new_balance)
+                        .unwrap(),
+                    "Could not set balance of account"
+                )
+            }
             Ordering::Less => account
                 .balance_add(handler.borrow_host(), new_balance - old_balance)
                 .unwrap(),

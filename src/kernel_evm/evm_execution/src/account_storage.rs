@@ -35,12 +35,6 @@ pub enum AccountStorageError {
     /// stored in an unsigned 256 bit integer.
     #[error("Account balance overflow")]
     BalanceOverflow,
-    /// Some account balance became less than zero. Only positive
-    /// integers in 256 bit range can be stored. Error parameter is
-    /// the string representation of the path to the account where
-    /// underflow happened.
-    #[error("Account balance underflow")]
-    BalanceUnderflow(String),
     /// Technically, the Ethereum account nonce can overflow if
     /// an account does an incredible number of transactions.
     #[error("Nonce overflow")]
@@ -271,12 +265,13 @@ impl EthereumAccount {
 
     /// Remove an amount in Wei from the balance of an account. If the account doesn't hold
     /// enough funds, this will underflow, in which case the account is unaffected, but the
-    /// function call will return an error.
+    /// function call will return `Ok(false)`. In case the removal went without underflow,
+    /// ie the account held enough funds, the function returns `Ok(true)`.
     pub fn balance_remove(
         &mut self,
         host: &mut impl Runtime,
         amount: U256,
-    ) -> Result<(), AccountStorageError> {
+    ) -> Result<bool, AccountStorageError> {
         let path = concat(&self.path, &BALANCE_PATH)?;
 
         let value = self.balance(host)?;
@@ -287,8 +282,9 @@ impl EthereumAccount {
 
             host.store_write(&path, &new_value_bytes, 0)
                 .map_err(AccountStorageError::from)
+                .map(|_| true)
         } else {
-            Err(AccountStorageError::BalanceUnderflow(self.path.to_string()))
+            Ok(false)
         }
     }
 
@@ -665,10 +661,7 @@ mod test {
 
         a1.balance_add(&mut host, v1)
             .expect("Could not add first value to balance");
-        assert_eq!(
-            a1.balance_remove(&mut host, v2).unwrap_err(),
-            AccountStorageError::BalanceUnderflow("/eth_accounts.2/dfkjd".to_string())
-        );
+        assert_eq!(a1.balance_remove(&mut host, v2), Ok(false),);
 
         storage
             .commit_transaction(&mut host)
