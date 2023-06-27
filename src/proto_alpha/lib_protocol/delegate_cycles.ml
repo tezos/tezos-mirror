@@ -107,14 +107,16 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
-  >>=? fun (maxima, delegates_to_remove) ->
-  Signature.Public_key_hash.Map.fold_es
-    (fun delegate maximum_stake_to_be_deposited ctxt ->
+  >>=? fun (_maxima, delegates_to_remove) ->
+  Stake_storage.get_selected_distribution ctxt new_cycle
+  >>=? fun selection_for_new_cycle ->
+  List.fold_left_es
+    (fun ctxt (delegate, Stake_repr.{frozen; delegated = _}) ->
       let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
         delegate_contract
-        maximum_stake_to_be_deposited
+        frozen
       >>=? fun ctxt ->
       Frozen_deposits_storage.get ctxt delegate_contract >>=? fun deposits ->
       let current_amount = deposits.current_amount in
@@ -124,8 +126,8 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
         Delegate_storage.forbid_delegate ctxt delegate >>= fun ctxt ->
         return ctxt
       else return ctxt)
-    maxima
     ctxt
+    selection_for_new_cycle
   >>=? fun ctxt ->
   Signature.Public_key_hash.Set.fold_es
     (fun delegate ctxt ->
