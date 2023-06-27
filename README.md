@@ -12,7 +12,7 @@ It is splitted in 2 parts:
 ## Building
 
 - Install dependencies by doing `opam install octez caqti-lwt
-  caqti-driver-sqlite3 caqti-driver-postgresql`
+  caqti-driver-sqlite3 caqti-driver-postgresql safepass`
 - clone this repo, `cd teztale` and do `make`
 
 (As an alternative to install dependencies, clone this repo at the
