@@ -201,7 +201,8 @@ let get_head db_pool =
 (** Fetch allowed users' logins from db. *)
 let get_users db_pool =
   let query =
-    Caqti_request.Infix.(Caqti_type.(unit ->* string)) "SELECT login FROM users"
+    Caqti_request.Infix.(Caqti_type.(unit ->* string))
+      "SELECT name FROM nodes WHERE password IS NOT NULL"
   in
   with_caqti_error
     (Caqti_lwt.Pool.use
@@ -216,7 +217,7 @@ let refresh_users =
     Lwt_mutex.with_lock mutex (fun () ->
         let query =
           Caqti_request.Infix.(Caqti_type.(unit ->* tup2 string string))
-            "SELECT login, password FROM users"
+            "SELECT name, password FROM nodes WHERE password IS NOT NULL"
         in
         Lwt.map
           (function
@@ -239,8 +240,8 @@ let upsert_user db_pool login password =
   let password = Bcrypt.string_of_hash password in
   let query =
     Caqti_request.Infix.(Caqti_type.(tup2 string string ->. unit))
-      "INSERT INTO users(login, password) VALUES ($1, $2) ON CONFLICT (login) \
-       DO UPDATE SET password = $2"
+      "INSERT INTO nodes(name, password) VALUES ($1, $2) ON CONFLICT (name) DO \
+       UPDATE SET password = $2"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query (login, password))
@@ -250,7 +251,7 @@ let upsert_user db_pool login password =
 let delete_user db_pool login =
   let query =
     Caqti_request.Infix.(Caqti_type.(string ->. unit))
-      "DELETE FROM users WHERE login = $1"
+      "UPDATE nodes SET password = NULL WHERE name = $1"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query login)

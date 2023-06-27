@@ -40,7 +40,9 @@ let create_nodes =
   "CREATE TABLE IF NOT EXISTS nodes(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  name TEXT UNIQUE NOT NULL,\n\
-  \  comment TEXT)"
+  \  comment TEXT,\n\
+  \  password $(BYTES) -- node can't feed if NULL\n\
+  \  )"
 
 let create_blocks =
   "CREATE TABLE IF NOT EXISTS blocks(\n\
@@ -104,12 +106,6 @@ let create_endorsing_rights =
   \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
   \   UNIQUE (level, delegate))"
 
-let create_users =
-  "CREATE TABLE IF NOT EXISTS users(\n\
-  \   id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
-  \   login $(BYTES) UNIQUE NOT NULL,\n\
-  \   password $(BYTES) UNIQUE NOT NULL)"
-
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"
@@ -139,7 +135,6 @@ let create_tables =
     create_operations_reception;
     create_operations_inclusion;
     create_endorsing_rights;
-    create_users;
     create_endorsing_rights_level_idx;
     create_operations_level_idx;
     create_blocks_reception_block_idx;
@@ -161,6 +156,8 @@ let alter_blocks_reception_drop_timestamp =
 let alter_blocks_reception_add_validation_timestamp =
   "ALTER TABLE blocks_reception ADD COLUMN validation_timestamp TEXT"
 
+let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
+
 let alter_tables =
   [
     alter_blocks;
@@ -168,6 +165,7 @@ let alter_tables =
     update_blocks_reception_set_application_timestamp_to_timestamp;
     alter_blocks_reception_drop_timestamp;
     alter_blocks_reception_add_validation_timestamp;
+    alter_nodes;
   ]
 
 module Type = struct
