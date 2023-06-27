@@ -4735,7 +4735,9 @@ module Adaptive_inflation : sig
   val update_ema :
     context ->
     vote:Toggle_votes.toggle_vote ->
-    (context * Toggle_votes.Adaptive_inflation_launch_EMA.t) tzresult Lwt.t
+    (context * Cycle.t option * Toggle_votes.Adaptive_inflation_launch_EMA.t)
+    tzresult
+    Lwt.t
 
   val launch_cycle : context -> Cycle.t option tzresult Lwt.t
 end

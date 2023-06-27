@@ -274,22 +274,24 @@ let update_ema ctxt ~vote =
     ctxt
     (Toggle_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
   >>=? fun ctxt ->
+  launch_cycle ctxt >>=? fun launch_cycle ->
   let open Constants_storage in
   (if
    Toggle_votes_repr.Adaptive_inflation_launch_EMA.(
      new_ema < adaptive_inflation_launch_ema_threshold ctxt)
-  then return ctxt
+  then return (ctxt, launch_cycle)
   else
-    launch_cycle ctxt >>=? function
+    match launch_cycle with
     | Some _ ->
         (* the feature is already set to launch, do nothing to avoid postponing it. *)
-        return ctxt
+        return (ctxt, launch_cycle)
     | None ->
         (* set the feature to activate in a few cycles *)
         let current_cycle = (Level_storage.current ctxt).cycle in
         let delay = 1 + preserved_cycles ctxt + max_slashing_period ctxt in
-        activate ctxt ~cycle:(Cycle_repr.add current_cycle delay))
-  >|=? fun ctxt -> (ctxt, new_ema)
+        let cycle = Cycle_repr.add current_cycle delay in
+        activate ctxt ~cycle >|=? fun ctxt -> (ctxt, Some cycle))
+  >|=? fun (ctxt, launch_cycle) -> (ctxt, launch_cycle, new_ema)
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
