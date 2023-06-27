@@ -462,62 +462,48 @@ module Loops (Archiver : Archiver.S) = struct
                       Shell_services.Blocks.protocols
                         cctx
                         ~chain:cctx#chain
-                        ~block:(`Hash (hash, 0))
+                        ~block:
+                          (`Level
+                            (Int32.pred
+                               header.Block_header.shell.Block_header.level))
                         ()
                     in
                     match proto_result with
                     | Error e -> Lwt.return ((fun _ _ _ _ _ -> fail e), None)
-                    | Ok Shell_services.Blocks.{current_protocol; next_protocol}
-                      ->
-                        if Protocol_hash.equal current_protocol next_protocol
-                        then
-                          let recorder =
-                            Protocol_hash.Table.find
-                              validated_block_machine
-                              next_protocol
-                          in
-                          match recorder with
-                          | None ->
-                              let*! () =
-                                Lwt_fmt.eprintf
-                                  "no block recorder found for protocol %a@."
-                                  Protocol_hash.pp
-                                  current_protocol
+                    | Ok Shell_services.Blocks.{next_protocol; _} -> (
+                        let recorder =
+                          Protocol_hash.Table.find
+                            validated_block_machine
+                            next_protocol
+                        in
+                        match recorder with
+                        | None ->
+                            let*! () =
+                              Lwt_fmt.eprintf
+                                "no block recorder found for protocol %a@."
+                                Protocol_hash.pp
+                                next_protocol
+                            in
+                            Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
+                        | Some get_validated_block ->
+                            let recorder cctx level hash header reception_time =
+                              let* block_data =
+                                get_validated_block
+                                  cctx
+                                  level
+                                  hash
+                                  header
+                                  reception_time
                               in
-                              Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some get_validated_block ->
-                              let recorder cctx level hash header reception_time
-                                  =
-                                let* block_data =
-                                  get_validated_block
-                                    cctx
-                                    level
-                                    hash
-                                    header
-                                    reception_time
-                                in
-                                let () = Archiver.add_block ~level block_data in
-                                return_unit
-                              in
-                              Lwt.return
-                                ( recorder,
-                                  Some
-                                    ( recorder,
-                                      header.Block_header.shell
-                                        .Block_header.proto_level ) )
-                        else
-                          let*! () =
-                            Lwt_fmt.eprintf
-                              "skipping block %a, migrating from protocol %a \
-                               to %a@."
-                              Block_hash.pp
-                              hash
-                              Protocol_hash.pp
-                              current_protocol
-                              Protocol_hash.pp
-                              next_protocol
-                          in
-                          Lwt.return ((fun _ _ _ _ _ -> return_unit), None))
+                              let () = Archiver.add_block ~level block_data in
+                              return_unit
+                            in
+                            Lwt.return
+                              ( recorder,
+                                Some
+                                  ( recorder,
+                                    header.Block_header.shell
+                                      .Block_header.proto_level ) )))
               in
               let reception =
                 {
