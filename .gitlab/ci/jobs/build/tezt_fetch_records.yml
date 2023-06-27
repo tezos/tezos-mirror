@@ -3,6 +3,7 @@
 # for future merge request pipelines.
 tezt:fetch-records:
   extends:
+    - .tags_template__build
     - .build_template
   stage: build
   script:

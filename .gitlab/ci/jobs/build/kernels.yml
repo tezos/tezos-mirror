@@ -1,5 +1,6 @@
 build_kernels:
   extends:
+    - .tags_template__build
     - .kernels_template
   stage: build
   needs: [trigger]
