@@ -379,12 +379,12 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       let*? () =
         error_unless allowed Staking_for_nondelegate_while_costaking_disabled
       in
-      let* {staking_over_baking_limit; _} =
+      let* {staking_over_baking_limit_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
       in
       let forbidden =
         Signature.Public_key_hash.(delegate <> sender)
-        && Compare.Int32.(staking_over_baking_limit = 0l)
+        && Compare.Int32.(staking_over_baking_limit_millionth = 0l)
       in
       let*? () =
         error_when forbidden Staking_to_delegate_that_refuses_costaking
@@ -482,15 +482,20 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
   in
   return (ctxt, result, [])
 
-let apply_set_delegate_parameters ~ctxt ~delegate ~staking_over_baking_limit
-    ~baking_over_staking_edge ~before_operation =
+let apply_set_delegate_parameters ~ctxt ~delegate
+    ~staking_over_baking_limit_millionth ~baking_over_staking_edge_billionth
+    ~before_operation =
   let open Lwt_result_syntax in
-  let staking_over_baking_limit = Z.to_int32 staking_over_baking_limit in
-  let baking_over_staking_edge = Z.to_int32 baking_over_staking_edge in
+  let staking_over_baking_limit_millionth =
+    Z.to_int32 staking_over_baking_limit_millionth
+  in
+  let baking_over_staking_edge_billionth =
+    Z.to_int32 baking_over_staking_edge_billionth
+  in
   let*? t =
     Staking_parameters_repr.make
-      ~staking_over_baking_limit
-      ~baking_over_staking_edge
+      ~staking_over_baking_limit_millionth
+      ~baking_over_staking_edge_billionth
   in
   let* is_delegate = Contract.is_delegate ctxt delegate in
   let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
@@ -1016,12 +1021,13 @@ let apply_manager_operation :
             ( _,
               D_Pair,
               [
-                Int (_, staking_over_baking_limit);
+                Int (_, staking_over_baking_limit_millionth);
                 Prim
                   ( _,
                     D_Pair,
                     [
-                      Int (_, baking_over_staking_edge); Prim (_, D_Unit, [], []);
+                      Int (_, baking_over_staking_edge_billionth);
+                      Prim (_, D_Unit, [], []);
                     ],
                     [] );
               ],
@@ -1029,8 +1035,8 @@ let apply_manager_operation :
           apply_set_delegate_parameters
             ~ctxt
             ~delegate:source
-            ~staking_over_baking_limit
-            ~baking_over_staking_edge
+            ~staking_over_baking_limit_millionth
+            ~baking_over_staking_edge_billionth
             ~before_operation:ctxt_before_op
       | ( ( "default" | "stake" | "unstake" | "finalize_unstake"
           | "set_delegate_parameters" ),

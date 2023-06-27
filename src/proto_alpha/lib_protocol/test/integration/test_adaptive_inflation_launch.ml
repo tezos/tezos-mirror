@@ -76,7 +76,7 @@ let stake ctxt contract amount =
     amount
 
 let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
-    ~baking_over_staking_edge =
+    ~baking_over_staking_edge_billionth =
   let entrypoint = Protocol.Alpha_context.Entrypoint.set_delegate_parameters in
   let parameters =
     Protocol.Alpha_context.Script.lazy_expr
@@ -84,7 +84,7 @@ let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
          (Printf.sprintf
             "Pair %d (Pair %d Unit)"
             staking_over_baking_limit
-            baking_over_staking_edge))
+            baking_over_staking_edge_billionth))
   in
   Op.transaction
     ctxt
@@ -194,7 +194,7 @@ let test_launch threshold expected_vote_duration () =
         (B block)
         delegate
         ~staking_over_baking_limit:1_000_000
-        ~baking_over_staking_edge:1_000_000_000
+        ~baking_over_staking_edge_billionth:1_000_000_000
     in
     Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
   in

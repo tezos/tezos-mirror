@@ -24,16 +24,19 @@
 (*****************************************************************************)
 
 type t = {
-  staking_over_baking_limit : int32; (* in 1/1_000_000th *)
-  baking_over_staking_edge : int32; (* as a portion of 1_000_000_000 *)
+  staking_over_baking_limit_millionth : int32;
+  baking_over_staking_edge_billionth : int32;
 }
 
-let maximum_baking_over_staking_edge =
-  (* max is 1 expressed in portions of 1_000_000_000 *)
+let maximum_baking_over_staking_edge_billionth =
+  (* max is 1 (1_000_000_000 billionth) *)
   1_000_000_000l
 
 let default =
-  {staking_over_baking_limit = 0l; baking_over_staking_edge = 1_000_000_000l}
+  {
+    staking_over_baking_limit_millionth = 0l;
+    baking_over_staking_edge_billionth = 1_000_000_000l;
+  }
 
 type error += Invalid_staking_parameters
 
@@ -48,29 +51,43 @@ let () =
     (function Invalid_staking_parameters -> Some () | _ -> None)
     (fun () -> Invalid_staking_parameters)
 
-let make ~staking_over_baking_limit ~baking_over_staking_edge =
+let make ~staking_over_baking_limit_millionth
+    ~baking_over_staking_edge_billionth =
   if
-    Compare.Int32.(staking_over_baking_limit < 0l)
-    || Compare.Int32.(baking_over_staking_edge < 0l)
+    Compare.Int32.(staking_over_baking_limit_millionth < 0l)
+    || Compare.Int32.(baking_over_staking_edge_billionth < 0l)
     || Compare.Int32.(
-         baking_over_staking_edge > maximum_baking_over_staking_edge)
+         baking_over_staking_edge_billionth
+         > maximum_baking_over_staking_edge_billionth)
   then Error ()
-  else Ok {staking_over_baking_limit; baking_over_staking_edge}
+  else
+    Ok {staking_over_baking_limit_millionth; baking_over_staking_edge_billionth}
 
 let encoding =
   let open Data_encoding in
   conv_with_guard
-    (fun {staking_over_baking_limit; baking_over_staking_edge} ->
-      (staking_over_baking_limit, baking_over_staking_edge))
-    (fun (staking_over_baking_limit, baking_over_staking_edge) ->
+    (fun {
+           staking_over_baking_limit_millionth;
+           baking_over_staking_edge_billionth;
+         } ->
+      (staking_over_baking_limit_millionth, baking_over_staking_edge_billionth))
+    (fun ( staking_over_baking_limit_millionth,
+           baking_over_staking_edge_billionth ) ->
       Result.map_error
         (fun () -> "Invalid staking parameters")
-        (make ~staking_over_baking_limit ~baking_over_staking_edge))
+        (make
+           ~staking_over_baking_limit_millionth
+           ~baking_over_staking_edge_billionth))
     (obj2
-       (req "staking_over_baking_limit" int32)
-       (req "baking_over_staking_edge" int32))
+       (req "staking_over_baking_limit_millionth" int32)
+       (req "baking_over_staking_edge_billionth" int32))
 
-let make ~staking_over_baking_limit ~baking_over_staking_edge =
-  match make ~staking_over_baking_limit ~baking_over_staking_edge with
+let make ~staking_over_baking_limit_millionth
+    ~baking_over_staking_edge_billionth =
+  match
+    make
+      ~staking_over_baking_limit_millionth
+      ~baking_over_staking_edge_billionth
+  with
   | Error () -> Result_syntax.tzfail Invalid_staking_parameters
   | Ok _ as ok -> ok

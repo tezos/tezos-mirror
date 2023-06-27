@@ -181,12 +181,12 @@ let get_stakes_for_selected_index ctxt index =
           delegate
           delegate_own_pseudotokens
       in
-      let* {staking_over_baking_limit; _} =
+      let* {staking_over_baking_limit_millionth; _} =
         Delegate_staking_parameters.of_delegate ctxt delegate
       in
       let staking_over_baking_limit_millionth =
         let delegate_staking_over_baking_limit_millionth =
-          Int64.of_int32 staking_over_baking_limit
+          Int64.of_int32 staking_over_baking_limit_millionth
         in
         Compare.Int64.min
           staking_over_baking_global_limit_millionth
