@@ -73,7 +73,7 @@ struct
       make_bench:
         ((unit -> 'a) -> unit -> unit Tezos_benchmark.Generator.benchmark) ->
       unit ->
-      (module Benchmark.Simple_with_num) =
+      Benchmark.simple_with_num =
    fun ?(check = fun () -> ()) ~name ~generator ~make_bench () ->
     let free_variable = fv (Format.asprintf "%s_const" name) in
     let model =
@@ -201,7 +201,7 @@ struct
       encoding:a Data_encoding.t ->
       generator:(Random.State.t -> a) ->
       unit ->
-      (module Benchmark.Simple_with_num) =
+      Benchmark.simple_with_num =
    fun ?check ~name ~encoding ~generator () ->
     fixed_size_shared
       ?check

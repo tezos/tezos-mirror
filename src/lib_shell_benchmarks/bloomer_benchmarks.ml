@@ -36,8 +36,7 @@ let const_time_model ~const_name ~name =
     ~conv:(fun () -> ())
     ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
 
-let make_bench ~name ~info ~model ~generator ~make_bench :
-    (module Benchmark.Simple) =
+let make_bench ~name ~info ~model ~generator ~make_bench : Benchmark.simple =
   let module Bench = struct
     type config = unit
 
@@ -69,7 +68,7 @@ let make_bench ~name ~info ~model ~generator ~make_bench :
       let generator () = generator rng_state in
       make_bench generator
 
-    let model = model
+    let model = model ~name
   end in
   (module Bench)
 
@@ -87,10 +86,7 @@ let () =
   @@ make_bench
        ~name:"bloomer_mem"
        ~info:"Benchmarking Bloomer.mem"
-       ~model:
-         (const_time_model
-            ~name:(ns "bloomer_mem")
-            ~const_name:"bloomer_mem_const")
+       ~model:(const_time_model ~const_name:"bloomer_mem_const")
        ~generator:(fun _rng_state ->
          let bloomer = make_bloomer () in
          let string = "test" in
@@ -108,10 +104,7 @@ let () =
   @@ make_bench
        ~name:"bloomer_add"
        ~info:"Benchmarking Bloomer.add"
-       ~model:
-         (const_time_model
-            ~name:(ns "bloomer_add")
-            ~const_name:"bloomer_add_const")
+       ~model:(const_time_model ~const_name:"bloomer_add_const")
        ~generator:(fun _rng_state -> make_bloomer ())
        ~make_bench:(fun generator ->
          let bloomer = generator () in
