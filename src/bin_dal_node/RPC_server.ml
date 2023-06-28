@@ -135,15 +135,22 @@ end
 
 module Profile_handlers = struct
   let patch_profiles ctxt () profiles =
+    let open Lwt_result_syntax in
     let gs_worker = Node_context.get_gs_worker ctxt in
     call_handler2 ctxt (fun store {proto_parameters; _} ->
-        List.iter_es
-          (Profile_manager.add_profile
-             proto_parameters
-             store
-             (Node_context.get_profile_ctxt ctxt)
-             gs_worker)
-          profiles)
+        let+ pctxt =
+          List.fold_left_es
+            (fun profile_ctxt profile ->
+              Profile_manager.add_profile
+                profile_ctxt
+                proto_parameters
+                store
+                gs_worker
+                profile)
+            (Node_context.get_profile_ctxt ctxt)
+            profiles
+        in
+        Node_context.set_profile_ctxt ctxt pctxt)
 
   let get_profiles ctxt () () =
     call_handler1 ctxt (fun store ->

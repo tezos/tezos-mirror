@@ -31,13 +31,9 @@ module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
 (** A profile context stores profile-specific data used by the daemon.  *)
-type t = {
-  mutable producers : Slot_set.t;
-  mutable seen_committee_members : Pkh_set.t;
-}
+type t = {producers : Slot_set.t; seen_committee_members : Pkh_set.t}
 
-let empty () =
-  {producers = Slot_set.empty; seen_committee_members = Pkh_set.empty}
+let empty = {producers = Slot_set.empty; seen_committee_members = Pkh_set.empty}
 
 let init_attestor number_of_slots gs_worker pkh =
   List.iter
@@ -46,14 +42,20 @@ let init_attestor number_of_slots gs_worker pkh =
     Utils.Infix.(0 -- (number_of_slots - 1))
 
 let init_producer ctxt slot_index =
-  ctxt.producers <- Slot_set.add slot_index ctxt.producers
+  {ctxt with producers = Slot_set.add slot_index ctxt.producers}
 
-let add_profile proto_parameters node_store ctxt gs_worker profile =
+let add_profile ctxt proto_parameters node_store gs_worker profile =
+  let open Lwt_result_syntax in
   let Dal_plugin.{number_of_slots; _} = proto_parameters in
-  (match profile with
-  | Services.Types.Attestor pkh -> init_attestor number_of_slots gs_worker pkh
-  | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index) ;
-  Store.Legacy.add_profile node_store profile |> Lwt_result.ok
+  let ctxt =
+    match profile with
+    | Services.Types.Attestor pkh ->
+        init_attestor number_of_slots gs_worker pkh ;
+        ctxt
+    | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index
+  in
+  let*! () = Store.Legacy.add_profile node_store profile in
+  return ctxt
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
@@ -74,11 +76,10 @@ let resolve_pending_for_producer gs_worker committee ctxt =
       ctxt.producers
       seen_committee_members
   in
-  ctxt.seen_committee_members <- seen_committee_members
+  {ctxt with seen_committee_members}
 
 let on_new_head ctxt gs_worker committee =
-  resolve_pending_for_producer gs_worker committee ctxt ;
-  Lwt_result_syntax.return_unit
+  resolve_pending_for_producer gs_worker committee ctxt
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 

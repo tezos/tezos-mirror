@@ -184,13 +184,18 @@ module Handler = struct
           in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
           let* () =
-            Option.iter_es
-              (Profile_manager.add_profile
-                 proto_parameters
-                 (Node_context.get_store ctxt)
-                 (Node_context.get_profile_ctxt ctxt)
-                 (Node_context.get_gs_worker ctxt))
-              config.Configuration_file.profile
+            match config.Configuration_file.profile with
+            | None -> return_unit
+            | Some profile ->
+                let+ pctxt =
+                  Profile_manager.add_profile
+                    (Node_context.get_profile_ctxt ctxt)
+                    proto_parameters
+                    (Node_context.get_store ctxt)
+                    (Node_context.get_gs_worker ctxt)
+                    profile
+                in
+                Node_context.set_profile_ctxt ctxt pctxt
           in
           Node_context.set_ready
             ctxt
@@ -297,11 +302,12 @@ module Handler = struct
             let* committee =
               Node_context.fetch_committee ctxt ~level:block_level
             in
-            let* () =
+            let () =
               Profile_manager.on_new_head
                 (Node_context.get_profile_ctxt ctxt)
                 (Node_context.get_gs_worker ctxt)
                 committee
+              |> Node_context.set_profile_ctxt ctxt
             in
             let*! () =
               Event.(emit layer1_node_new_head (block_hash, block_level))

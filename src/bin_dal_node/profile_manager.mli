@@ -28,24 +28,22 @@
 (** A profile manager context stores profile-specific data used by the daemon.  *)
 type t
 
-(** Create an empty profile manager context. *)
-val empty : unit -> t
+(** The empty profile manager context. *)
+val empty : t
 
 (** Adds a profile to the dal [node_store]. If already present,
     the store does not change. *)
 val add_profile :
+  t ->
   Dal_plugin.proto_parameters ->
   Store.node_store ->
-  t ->
   Gossipsub.Worker.t ->
   Services.Types.profile ->
-  unit tzresult Lwt.t
+  t tzresult Lwt.t
 
-(** [perform_pending_actions c gs_worker get_committee] performs profile-related
-    actions that depend on the current head, more precisely on the availability
-    of a [get_committee] function. *)
-val on_new_head :
-  t -> Gossipsub.Worker.t -> Committee_cache.committee -> unit tzresult Lwt.t
+(** [on_new_head c gs_worker committee] performs profile-related
+    actions that depend on the current head, more precisely on the current committee. *)
+val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> t
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
