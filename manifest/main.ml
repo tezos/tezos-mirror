@@ -4337,6 +4337,8 @@ module Protocol : sig
 
   val benchmarks_proto_exn : t -> target
 
+  val octez_sc_rollup : t -> target option
+
   val octez_sc_rollup_layer2 : t -> target option
 
   val octez_sc_rollup_node : t -> target option
@@ -4456,14 +4458,16 @@ end = struct
     parameters : target option;
     benchmarks_proto : target option;
     baking : target option;
+    octez_sc_rollup : target option;
     octez_sc_rollup_layer2 : target option;
     octez_sc_rollup_node : target option;
   }
 
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
-      ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup_layer2
-      ?octez_sc_rollup_node ?baking ~status ~name ~main ~embedded () =
+      ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
+      ?octez_sc_rollup_layer2 ?octez_sc_rollup_node ?baking ~status ~name ~main
+      ~embedded () =
     {
       status;
       name;
@@ -4481,6 +4485,7 @@ end = struct
       parameters;
       benchmarks_proto;
       baking;
+      octez_sc_rollup;
       octez_sc_rollup_layer2;
       octez_sc_rollup_node;
     }
@@ -4540,6 +4545,8 @@ end = struct
   let benchmarks_proto_exn p = mandatory "benchmarks_proto" p p.benchmarks_proto
 
   let baking_exn p = mandatory "baking" p p.baking
+
+  let octez_sc_rollup p = p.octez_sc_rollup
 
   let octez_sc_rollup_layer2 p = p.octez_sc_rollup_layer2
 
@@ -5543,6 +5550,7 @@ let hash = Protocol.hash
             octez_shell_services |> open_;
             octez_plompiler |> if_ N.(number >= 015);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
+            octez_sc_rollup |> if_some |> if_ N.(number >= 018) |> open_;
           ]
     in
     let _plugin_tests =
@@ -6465,6 +6473,7 @@ let hash = Protocol.hash
          ?parameters
          ?benchmarks_proto
          ?baking
+         ?octez_sc_rollup
          ?octez_sc_rollup_layer2
          ?octez_sc_rollup_node
          ()
@@ -7534,6 +7543,7 @@ let octez_scoru_wasm_regressions =
         octez_scoru_wasm_helpers;
         octez_test_helpers;
         Protocol.(main alpha);
+        Protocol.(octez_sc_rollup alpha) |> if_some |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]

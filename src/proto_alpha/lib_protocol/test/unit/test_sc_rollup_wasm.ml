@@ -92,7 +92,7 @@ module Full_Wasm =
 let test_initial_state_hash_wasm_pvm () =
   let open Alpha_context in
   let open Lwt_result_syntax in
-  let empty = Sc_rollup_helpers.make_empty_tree () in
+  let empty = Sc_rollup_helpers.Wasm_pvm.make_empty_state () in
   let*! state = Sc_rollup_helpers.Wasm_pvm.initial_state ~empty in
   let*! hash = Sc_rollup_helpers.Wasm_pvm.state_hash state in
   let expected = Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash in

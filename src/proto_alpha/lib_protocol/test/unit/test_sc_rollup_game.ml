@@ -243,8 +243,8 @@ let test_invalid_serialized_inbox_proof () =
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
   let dal_snapshot = Dal.Slots_history.genesis in
   let dal_parameters = Default_parameters.constants_mainnet.dal in
-  let ctxt = Sc_rollup_helpers.make_empty_context () in
-  let empty = Tezos_context_memory.Context_binary.Tree.empty ctxt in
+  let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
+  let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
   let*! state = Arith_pvm.initial_state ~empty in
   (* We evaluate the boot sector, so the [input_requested] is a
      [First_after]. *)

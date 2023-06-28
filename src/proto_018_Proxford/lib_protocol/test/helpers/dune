@@ -18,7 +18,8 @@
   tezos-protocol-plugin-018-Proxford
   tezos-shell-services
   octez-plompiler
-  tezos-crypto-dal)
+  tezos-crypto-dal
+  tezos-smart-rollup-018-Proxford)
  (flags
   (:standard)
   -open Tezos_test_helpers
@@ -30,4 +31,5 @@
   -open Tezos_client_018_Proxford
   -open Tezos_protocol_plugin_018_Proxford
   -open Tezos_shell_services
-  -open Tezos_crypto_dal))
+  -open Tezos_crypto_dal
+  -open Tezos_smart_rollup_018_Proxford))

@@ -32,6 +32,9 @@ let originated_rollup op =
   in
   Contract.Internal_for_tests.originated_contract nonce
 
+module Arith_pvm = Pvm_in_memory.Arith
+module Wasm_pvm = Pvm_in_memory.Wasm
+
 module Make_in_memory_context (Context : sig
   type tree
 
@@ -90,19 +93,8 @@ struct
     .tree_proof_encoding
 end
 
-module In_memory_context =
-  Make_in_memory_context (Tezos_context_memory.Context_binary)
 module Wrong_in_memory_context =
   Make_in_memory_context (Tezos_context_memory.Context)
-
-module Arith_pvm :
-  Sc_rollup.PVM.S
-    with type context = In_memory_context.Tree.t
-     and type state = In_memory_context.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.ArithPVM.Make (In_memory_context)
 
 module Wrong_arith_pvm :
   Sc_rollup.PVM.S
@@ -112,19 +104,6 @@ module Wrong_arith_pvm :
       Tezos_context_memory.Context.Proof.tree
       Tezos_context_memory.Context.Proof.t =
   Sc_rollup.ArithPVM.Make (Wrong_in_memory_context)
-
-module Wasm_pvm :
-  Sc_rollup.PVM.S
-    with type context = In_memory_context.Tree.t
-     and type state = In_memory_context.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
-
-let make_empty_context = Tezos_context_memory.Context_binary.make_empty_context
-
-let make_empty_tree = Tezos_context_memory.Context_binary.make_empty_tree
 
 let genesis_commitment ~boot_sector ~origination_level kind =
   let open Lwt_syntax in

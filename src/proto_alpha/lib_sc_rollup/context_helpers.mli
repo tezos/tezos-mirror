@@ -27,14 +27,10 @@ open Protocol.Alpha_context
 (** [In_memory] is a context that can be used to instantiate an Arith
     or Wasm PVM. It's signature is
     {!Protocol.Alpha_context.Sc_rollup.Generic_pvm_context_sig} *)
-module In_memory : sig
-  include
-    Sc_rollup.Generic_pvm_context_sig
-      with type Tree.tree = Tezos_context_memory.Context_binary.tree
-       and type Tree.t = Tezos_context_memory.Context_binary.t
-       and type proof =
-        Tezos_context_memory.Context.Proof.tree
-        Tezos_context_memory.Context.Proof.t
-
-  val make_empty_context : ?root:string -> unit -> Tree.t
-end
+module In_memory :
+  Sc_rollup.Generic_pvm_context_sig
+    with type Tree.tree = Tezos_context_memory.Context_binary.tree
+     and type Tree.t = Tezos_context_memory.Context_binary.t
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t
