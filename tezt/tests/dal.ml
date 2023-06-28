@@ -353,7 +353,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Operation.Manager.(
       inject
         ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment ~proof]
+        [make @@ dal_publish_slot_header ~index:0 ~commitment ~proof]
         client)
   in
   let* mempool = Mempool.get_mempool client in
@@ -411,44 +411,41 @@ let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
   in
   iter 1
 
-let publish_slot ?counter ?force ~source ?level ?fee ?error ~index ~commitment
-    ~proof node client =
-  let level =
-    match level with Some level -> level | None -> 1 + Node.get_level node
-  in
+let publish_slot ?counter ?force ~source ?fee ?error ~index ~commitment ~proof
+    client =
   Operation.Manager.(
     inject
       ?error
       ?force
       [
         make ~source ?fee ?counter
-        @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
+        @@ dal_publish_slot_header ~index ~commitment ~proof;
       ]
       client)
 
-let publish_dummy_slot ~source ?level ?error ?fee ~index ~message cryptobox =
+let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox message)
   in
-  publish_slot ~source ?level ?fee ?error ~index ~commitment ~proof
+  publish_slot ~source ?fee ?error ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for a different
    slot leads to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?level ?fee
-    ~index cryptobox =
+let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
+    cryptobox =
   let commitment, _proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox "a")
   in
   let _commitment, proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox "b")
   in
-  publish_slot ~source ?level ?fee ~index ~commitment ~proof
+  publish_slot ~source ?fee ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for the "same"
    slot contents but represented using a different [slot_size] leads
    to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?level
-    ?fee ~index parameters cryptobox =
+let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
+    ~index parameters cryptobox =
   let cryptobox_params =
     {
       parameters.Rollup.Dal.Parameters.cryptobox with
@@ -463,11 +460,9 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?level
   let _commitment, proof =
     Rollup.Dal.(Commitment.dummy_commitment cryptobox' msg)
   in
-  publish_slot ~source ?level ?fee ~index ~commitment ~proof
+  publish_slot ~source ?fee ~index ~commitment ~proof
 
-let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof node
-    client =
-  let level = 1 + Node.get_level node in
+let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof client =
   let commitment = Cryptobox.Commitment.of_b58check_opt commitment in
   let proof =
     Data_encoding.Json.destruct
@@ -480,7 +475,7 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment ~proof node
         inject
           [
             make ~source ~fee
-            @@ dal_publish_slot_header ~index ~level ~commitment ~proof;
+            @@ dal_publish_slot_header ~index ~commitment ~proof;
           ]
           client)
   | _ -> assert false
@@ -578,39 +573,8 @@ let check_dal_raw_context node =
 
 let test_slot_management_logic _protocol parameters cryptobox node client
     _bootstrap_key =
-  Log.info "Inject some invalid slot headers" ;
   let*! () = Client.reveal ~src:"bootstrap6" client in
   let* () = Client.bake_for_and_wait client in
-  let* (`OpHash _) =
-    let error =
-      rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
-    in
-    publish_dummy_slot
-      ~source:Constant.bootstrap5
-      ~fee:3_000
-      ~level:4
-      ~index:2
-      ~message:"a"
-      ~error
-      cryptobox
-      node
-      client
-  in
-  let* (`OpHash _) =
-    let error =
-      rex ~opts:[`Dotall] "Unexpected level in the past in slot header"
-    in
-    publish_dummy_slot
-      ~source:Constant.bootstrap5
-      ~fee:3_000
-      ~level:2
-      ~index:2
-      ~message:"a"
-      ~error
-      cryptobox
-      node
-      client
-  in
   Log.info "Inject some valid slot headers" ;
   let* (`OpHash oph1) =
     publish_dummy_slot
@@ -619,7 +583,6 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       ~index:0
       ~message:"a"
       cryptobox
-      node
       client
   in
   let* (`OpHash oph2) =
@@ -629,7 +592,6 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       ~index:1
       ~message:"b"
       cryptobox
-      node
       client
   in
   let* (`OpHash oph3) =
@@ -639,7 +601,6 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       ~index:0
       ~message:"c"
       cryptobox
-      node
       client
   in
   let* (`OpHash oph4) =
@@ -649,17 +610,14 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       ~index:1
       ~message:"d"
       cryptobox
-      node
       client
   in
   let* (`OpHash oph5) =
     publish_dummy_slot_with_wrong_proof_for_same_content
       ~source:Constant.bootstrap5
       ~fee:3_000
-      ~level:3
       ~index:2
       cryptobox
-      node
       client
   in
   (* Check another operation now because we are lacking of bootstrap accounts. *)
@@ -668,11 +626,9 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     publish_dummy_slot_with_wrong_proof_for_different_slot_size
       ~source:bootstrap6
       ~fee:3_000
-      ~level:3
       ~index:2
       parameters
       cryptobox
-      node
       client
   in
   let* mempool = Mempool.get_mempool client in
@@ -832,7 +788,6 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
       ~index:10
       ~message:" TEST!!! "
       cryptobox
-      node
       client
   in
   let validated = h5 :: validated in
@@ -988,17 +943,7 @@ let publish_and_store_slot ?with_proof ?counter ?force ?level ?(fee = 1_200)
       (`String proof)
   in
   let* _ =
-    publish_slot
-      ~level:slot_level
-      ?counter
-      ?force
-      ~source
-      ~fee
-      ~index
-      ~commitment
-      ~proof
-      node
-      client
+    publish_slot ?counter ?force ~source ~fee ~index ~commitment ~proof client
   in
   return (index, slot_commitment)
 
@@ -1511,7 +1456,7 @@ let send_messages ?(bake = true) ?(src = Constant.bootstrap2.alias)
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
 let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
-    sc_rollup_node sc_rollup_address node client _pvm_name =
+    sc_rollup_node sc_rollup_address _node client _pvm_name =
   (* Check that the rollup node downloaded the confirmed slots to which it is
      subscribed:
 
@@ -1595,7 +1540,6 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       ~index:0
       ~commitment:commitment_0
       ~proof:proof_0
-      node
       client
   in
   let* _op_hash =
@@ -1604,7 +1548,6 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       ~index:1
       ~commitment:commitment_1
       ~proof:proof_1
-      node
       client
   in
   let* _op_hash =
@@ -1613,7 +1556,6 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
       ~index:2
       ~commitment:commitment_2
       ~proof:proof_2
-      node
       client
   in
   (* 5. Check that the slot_headers are fetched by the rollup node. *)
@@ -1855,7 +1797,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let level = Node.get_level node + 1 in
   let publish source ~index message =
     let* _op_hash =
-      publish_dummy_slot ~source ~level ~index ~message cryptobox node client
+      publish_dummy_slot ~source ~index ~message cryptobox client
     in
     unit
   in
@@ -1938,9 +1880,9 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.alias)
   in
-  let publish source ~level ~index message =
+  let publish source ~index message =
     let* _op_hash =
-      publish_dummy_slot ~source ~level ~index ~message cryptobox node client
+      publish_dummy_slot ~source ~index ~message cryptobox client
     in
     unit
   in
@@ -1950,7 +1892,7 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
     let slot_content =
       Format.asprintf "content at level %d index %d" level index
     in
-    let* () = publish source ~level ~index slot_content in
+    let* () = publish source ~index slot_content in
     let* _commitment, _proof = split_slot dal_node slot_content ~slot_size in
     unit
   in

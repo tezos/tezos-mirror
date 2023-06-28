@@ -93,23 +93,14 @@ let apply_attestation ctxt op =
       Ok (Dal.Attestation.record_attested_shards ctxt attestation shards)
 
 (* This function should fail if we don't want the operation to be
-   propagated over the L1 gossip network. Because this is a manger
+   propagated over the L1 gossip network. Because this is a manager
    operation, there are already checks to ensure the source of
    operation has enough fees. Among the various checks, there are
    checks that cannot fail unless the source of the operation is
    malicious (or if there is a bug). In that case, it is better to
-   ensure fees will be taken. However, for the check of level, this is
-   not true. In particular, in term of UX, we can imagine a source of
-   an operation to emit its operation a bit ahead of time. Hence, we
-   do not want to propagate an operation that has a wrong level. This
-   way, if the operation is emitted in advance, it will stay in the
-   prevalidator/mempool of the node on which the operation will be
-   injected. It will be injected once the validation succeeds,
-   i.e. the operation can be included into the next block. *)
-let validate_publish_slot_header ctxt operation =
-  assert_dal_feature_enabled ctxt >>? fun () ->
-  let current_level = (Level.current ctxt).level in
-  Dal.Operations.Publish_slot_header.check_level ~current_level operation
+   ensure fees will be taken. *)
+let validate_publish_slot_header ctxt _operation =
+  assert_dal_feature_enabled ctxt
 
 let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->

@@ -25,7 +25,6 @@
 
 module Publish_slot_header = struct
   type t = {
-    published_level : Raw_level_repr.t;
     slot_index : Dal_slot_index_repr.t;
     commitment : Dal_slot_repr.Commitment.t;
     commitment_proof : Dal_slot_repr.Commitment_proof.t;
@@ -34,46 +33,26 @@ module Publish_slot_header = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {published_level; slot_index; commitment; commitment_proof} ->
-        (published_level, slot_index, commitment, commitment_proof))
-      (fun (published_level, slot_index, commitment, commitment_proof) ->
-        {published_level; slot_index; commitment; commitment_proof})
-      (obj4
-         (req "published_level" Raw_level_repr.encoding)
+      (fun {slot_index; commitment; commitment_proof} ->
+        (slot_index, commitment, commitment_proof))
+      (fun (slot_index, commitment, commitment_proof) ->
+        {slot_index; commitment; commitment_proof})
+      (obj3
          (req "slot_index" Dal_slot_index_repr.encoding)
          (req "commitment" Dal_slot_repr.Commitment.encoding)
          (req "commitment_proof" Dal_slot_repr.Commitment_proof.encoding))
 
-  let pp fmt {published_level; slot_index; commitment; commitment_proof = _} =
+  let pp fmt {slot_index; commitment; commitment_proof = _} =
     Format.fprintf
       fmt
-      "published_level: %a, slot_index: %a, commitment: %a"
-      Raw_level_repr.pp
-      published_level
+      "slot_index: %a, commitment: %a"
       Dal_slot_index_repr.pp
       slot_index
       Dal.Commitment.pp
       commitment
 
-  let check_level ~current_level {published_level; _} =
-    let open Result_syntax in
-    let* () =
-      error_when
-        Raw_level_repr.(current_level < published_level)
-        (Dal_errors_repr.Dal_publish_slot_header_future_level
-           {provided = published_level; expected = current_level})
-    in
-    let* () =
-      error_when
-        Raw_level_repr.(current_level > published_level)
-        (Dal_errors_repr.Dal_publish_slot_header_past_level
-           {provided = published_level; expected = current_level})
-    in
-    return_unit
-
   let slot_header ~cryptobox ~number_of_slots ~current_level
-      ({published_level; slot_index; commitment; commitment_proof} as operation)
-      =
+      ({slot_index; commitment; commitment_proof} as operation) =
     let open Result_syntax in
     let* max_slot_index =
       Dal_slot_index_repr.of_int ~number_of_slots (number_of_slots - 1)
@@ -87,7 +66,6 @@ module Publish_slot_header = struct
         (Dal_errors_repr.Dal_publish_slot_header_invalid_index
            {given = slot_index; maximum = max_slot_index})
     in
-    let* () = check_level ~current_level operation in
     let* proof_ok =
       Dal_slot_repr.Header.verify_commitment
         cryptobox
@@ -102,5 +80,5 @@ module Publish_slot_header = struct
     in
     return
       Dal_slot_repr.Header.
-        {id = {published_level; index = slot_index}; commitment}
+        {id = {published_level = current_level; index = slot_index}; commitment}
 end
