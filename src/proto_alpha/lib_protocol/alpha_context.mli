@@ -4908,6 +4908,9 @@ module Unstake_requests : sig
     unfinalizable : stored_requests;
   }
 
+  val prepared_finalize_unstake_encoding :
+    prepared_finalize_unstake Data_encoding.encoding
+
   val prepare_finalize_unstake :
     context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
 

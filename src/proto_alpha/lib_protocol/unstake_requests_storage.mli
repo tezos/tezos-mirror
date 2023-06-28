@@ -41,6 +41,9 @@ type prepared_finalize_unstake = {
   unfinalizable : stored_requests;
 }
 
+val prepared_finalize_unstake_encoding :
+  prepared_finalize_unstake Data_encoding.encoding
+
 (** [prepare_finalize_unstake ctxt contract] preprocesses a [finalize_unstake]
     for [contract]. It returns a list of transfers [(d, c, a)] to do from
     delegate's [d] unstaked frozen deposits for cycle [c] of amount [a] in

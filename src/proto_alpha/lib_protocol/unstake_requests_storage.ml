@@ -26,15 +26,47 @@
 type finalizable =
   (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
 
+let finalizable_encoding =
+  let open Data_encoding in
+  let elt_encoding =
+    obj3
+      (req "delegate" Signature.Public_key_hash.encoding)
+      (req "cycle" Cycle_repr.encoding)
+      (req "amount" Tez_repr.encoding)
+  in
+  list elt_encoding
+
 type stored_requests = Storage.Unstake_request.t = {
   delegate : Signature.Public_key_hash.t;
   requests : (Cycle_repr.t * Tez_repr.t) list;
 }
 
+let stored_requests_encoding =
+  let open Data_encoding in
+  let request_encoding =
+    obj2 (req "cycle" Cycle_repr.encoding) (req "amount" Tez_repr.encoding)
+  in
+  conv
+    (fun {delegate; requests} -> (delegate, requests))
+    (fun (delegate, requests) -> {delegate; requests})
+    (obj2
+       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "requests" (list request_encoding)))
+
 type prepared_finalize_unstake = {
   finalizable : finalizable;
   unfinalizable : stored_requests;
 }
+
+let prepared_finalize_unstake_encoding :
+    prepared_finalize_unstake Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {finalizable; unfinalizable} -> (finalizable, unfinalizable))
+    (fun (finalizable, unfinalizable) -> {finalizable; unfinalizable})
+    (obj2
+       (req "finalizable" finalizable_encoding)
+       (req "unfinalizable" stored_requests_encoding))
 
 let z100 = Z.of_int 100
 
