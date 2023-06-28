@@ -400,7 +400,7 @@ let adaptive_inflation_encoding =
        (req "staking_over_baking_global_limit" uint8)
        (req "staking_over_delegation_edge" uint8)
        (req "adaptive_inflation_launch_ema_threshold" int32)
-       (req " adaptive_rewards_params" adaptive_rewards_params_encoding))
+       (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
 let reward_weights_encoding =
   let open Data_encoding in
