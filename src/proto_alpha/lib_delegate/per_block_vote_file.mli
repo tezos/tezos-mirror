@@ -72,11 +72,14 @@ val read_per_block_votes_no_fail :
   per_block_vote_file:string ->
   Per_block_votes.per_block_votes Lwt.t
 
-(** Load a liquidity baking configuration given two possible
-    arguments. If neither are provided, it fails. Otherwise, it tries,
-    in priority, to read the [per_block_vote_file_arg] file if it is
-    given and loads a config using its content. Otherwise, the
-    [toggle_vote_arg] is used. *)
+(** Load a configuration of per-block votes. Liquidity baking toggle
+    vote is mandatory, it has to come from either the per-block vote
+    file [per_block_vote_file] or from
+    [default_liquidity_baking_vote]. If a vote cannot be determined
+    from those values, this function fails. Adaptive inflation feature
+    vote is optional. Priority is given to the values in the
+    [per_block_vote_file] file for all votes at the time of the block
+    (the file is freshly read each time). *)
 val load_per_block_votes_config :
   default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
   default_adaptive_inflation_vote:Per_block_votes.per_block_vote option ->
