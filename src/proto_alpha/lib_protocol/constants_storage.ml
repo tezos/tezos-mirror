@@ -224,8 +224,8 @@ let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
 
 let adaptive_inflation_enable c = Raw_context.adaptive_inflation_enable c
 
-let adaptive_inflation_staking_over_baking_limit c =
-  (adaptive_inflation c).staking_over_baking_limit
+let adaptive_inflation_staking_over_baking_global_limit c =
+  (adaptive_inflation c).staking_over_baking_global_limit
 
 let adaptive_inflation_staking_over_delegation_edge c =
   (adaptive_inflation c).staking_over_delegation_edge

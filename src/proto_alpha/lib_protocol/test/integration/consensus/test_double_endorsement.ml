@@ -127,7 +127,7 @@ let test_valid_double_endorsement_evidence () =
     Int64.add
       2L
       (Int64.of_int
-         csts.parametric.adaptive_inflation.staking_over_baking_limit)
+         csts.parametric.adaptive_inflation.staking_over_baking_global_limit)
   in
   let evidence_reward = Test_tez.(frozen_deposits_after /! divider) in
   let expected_reward = Test_tez.(baking_reward +! evidence_reward) in

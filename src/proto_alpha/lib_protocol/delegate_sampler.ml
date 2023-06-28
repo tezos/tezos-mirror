@@ -156,12 +156,14 @@ let get_stakes_for_selected_index ctxt index =
   let delegation_over_baking_limit =
     Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
   in
-  let global_staking_over_baking_limit_millionth =
+  let staking_over_baking_global_limit_millionth =
     Int64.(
       mul
         1_000_000L
         (of_int
-           (Constants_storage.adaptive_inflation_staking_over_baking_limit ctxt)))
+           (Constants_storage
+            .adaptive_inflation_staking_over_baking_global_limit
+              ctxt)))
   in
   Stake_storage.fold_snapshot
     ctxt
@@ -187,7 +189,7 @@ let get_stakes_for_selected_index ctxt index =
           Int64.of_int32 staking_over_baking_limit
         in
         Compare.Int64.min
-          global_staking_over_baking_limit_millionth
+          staking_over_baking_global_limit_millionth
           delegate_staking_over_baking_limit_millionth
       in
       let staking_over_baking_limit_plus_1_millionth =

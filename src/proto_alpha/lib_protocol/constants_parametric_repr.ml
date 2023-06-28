@@ -107,7 +107,7 @@ type zk_rollup = {
 }
 
 type adaptive_inflation = {
-  staking_over_baking_limit : int;
+  staking_over_baking_global_limit : int;
   staking_over_delegation_edge : int;
   launch_ema_threshold : int32;
 }
@@ -260,23 +260,23 @@ let adaptive_inflation_encoding =
   let open Data_encoding in
   conv
     (fun {
-           staking_over_baking_limit;
+           staking_over_baking_global_limit;
            staking_over_delegation_edge;
            launch_ema_threshold;
          } ->
-      ( staking_over_baking_limit,
+      ( staking_over_baking_global_limit,
         staking_over_delegation_edge,
         launch_ema_threshold ))
-    (fun ( staking_over_baking_limit,
+    (fun ( staking_over_baking_global_limit,
            staking_over_delegation_edge,
            launch_ema_threshold ) ->
       {
-        staking_over_baking_limit;
+        staking_over_baking_global_limit;
         staking_over_delegation_edge;
         launch_ema_threshold;
       })
     (obj3
-       (req "staking_over_baking_limit" uint8)
+       (req "staking_over_baking_global_limit" uint8)
        (req "staking_over_delegation_edge" uint8)
        (req "adaptive_inflation_launch_ema_threshold" int32))
 
