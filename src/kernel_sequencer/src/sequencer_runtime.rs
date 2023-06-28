@@ -11,7 +11,7 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
 };
 
-use crate::{delayed_inbox::read_input, routing::FilterBehavior};
+use crate::{delayed_inbox::read_input, routing::FilterBehavior, storage::map_user_path};
 
 pub struct SequencerRuntime<R>
 where
@@ -55,7 +55,8 @@ where
     }
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
-        self.host.store_has(path)
+        let path = map_user_path(path)?;
+        self.host.store_has(&path)
     }
 
     fn store_read<T: Path>(
@@ -64,7 +65,8 @@ where
         from_offset: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read(path, from_offset, max_bytes)
+        let path = map_user_path(path)?;
+        self.host.store_read(&path, from_offset, max_bytes)
     }
 
     fn store_read_slice<T: Path>(
@@ -73,11 +75,13 @@ where
         from_offset: usize,
         buffer: &mut [u8],
     ) -> Result<usize, RuntimeError> {
-        self.host.store_read_slice(path, from_offset, buffer)
+        let path = map_user_path(path)?;
+        self.host.store_read_slice(&path, from_offset, buffer)
     }
 
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read_all(path)
+        let path = map_user_path(path)?;
+        self.host.store_read_all(&path)
     }
 
     fn store_write<T: Path>(
@@ -86,15 +90,18 @@ where
         src: &[u8],
         at_offset: usize,
     ) -> Result<(), RuntimeError> {
-        self.host.store_write(path, src, at_offset)
+        let path = map_user_path(path)?;
+        self.host.store_write(&path, src, at_offset)
     }
 
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
-        self.host.store_delete(path)
+        let path = map_user_path(path)?;
+        self.host.store_delete(&path)
     }
 
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
-        self.host.store_count_subkeys(prefix)
+        let prefix = map_user_path(prefix)?;
+        self.host.store_count_subkeys(&prefix)
     }
 
     fn store_move(
@@ -102,7 +109,9 @@ where
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        self.host.store_move(from_path, to_path)
+        let from_path = map_user_path(from_path)?;
+        let to_path = map_user_path(to_path)?;
+        self.host.store_move(&from_path, &to_path)
     }
 
     fn store_copy(
@@ -110,7 +119,9 @@ where
         from_path: &impl Path,
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
-        self.host.store_copy(from_path, to_path)
+        let from_path = map_user_path(from_path)?;
+        let to_path = map_user_path(to_path)?;
+        self.host.store_copy(&from_path, &to_path)
     }
 
     fn reveal_preimage(
@@ -122,7 +133,8 @@ where
     }
 
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.host.store_value_size(path)
+        let path = map_user_path(path)?;
+        self.host.store_value_size(&path)
     }
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {

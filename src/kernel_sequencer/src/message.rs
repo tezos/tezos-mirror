@@ -224,8 +224,6 @@ mod tests {
         let mut bin: Vec<u8> = Vec::new();
         sequence.bin_write(&mut bin).unwrap();
 
-        println!("{:?}", bin);
-
         // Deserializing
         let (_, msg_read) = KernelMessage::nom_read(&bin).expect("deserialization should work");
 
@@ -267,8 +265,6 @@ mod tests {
         let mut bin: Vec<u8> = Vec::new();
         sequence.bin_write(&mut bin).unwrap();
         enc::put_bytes(&[0x01, 0x02, 0x03, 0x04], &mut bin);
-
-        println!("{:?}", bin);
 
         // Deserializing
         let (remaining, msg_read) =
