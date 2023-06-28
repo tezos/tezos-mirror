@@ -943,6 +943,7 @@ let _octez_crypto_tests =
       "test_timelock_legacy";
       "test_timelock";
       "test_context_hash";
+      "vectors_secp256k1_keccak256";
     ]
     ~path:"src/lib_crypto/test"
     ~opam:"tezos-crypto"
@@ -7503,6 +7504,20 @@ let _octez_evm_chunker_exe =
     ~synopsis:"EVM kernel transaction chunker"
     ~opam:"octez-evm-chunker"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; evm_proxy_lib]
+
+let _octez_evm_signer_exe =
+  private_exe
+    "octez_evm_upgrade_signer"
+    ~path:"src/bin_evm_proxy/upgrade_signer"
+    ~synopsis:"EVM upgrade message"
+    ~opam:"octez-evm-upgrade-signer"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_clic;
+        evm_proxy_lib;
+      ]
 
 let octez_scoru_wasm_regressions =
   private_lib

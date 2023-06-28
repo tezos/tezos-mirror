@@ -90,7 +90,7 @@ fn produce_and_upgrade<Host: Runtime>(
     }
     let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash);
     if upgrade_status.is_ok() {
-        let kernel_upgrade_nonce = u32::from_le_bytes(kernel_upgrade.nonce);
+        let kernel_upgrade_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
         store_kernel_upgrade_nonce(host, kernel_upgrade_nonce)?;
     }
     upgrade_status

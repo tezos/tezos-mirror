@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,6 +83,58 @@ let test_of_bytes_without_validation () =
       assert (Some pk = pk2))
     [Ed25519; Secp256k1; P256; Bls]
 
+let secp256k1_sig_to_hex signature =
+  Hex.show @@ Hex.of_string
+  @@ Data_encoding.Binary.to_string_exn Signature.Secp256k1.encoding signature
+
+let get_secp256k1_secret_key sk =
+  Option.value_f ~default:(fun () -> failwith "Invalid secret key.")
+  @@ Option.bind
+       (Hex.to_string (`Hex sk))
+       (Data_encoding.Binary.of_string_opt
+          Signature.Secp256k1.Secret_key.encoding)
+
+let test_secp256k1_keccak256 () =
+  let get_signed_msgs secret_key =
+    List.map
+      (fun msg ->
+        Signature.Secp256k1.sign_keccak256 secret_key (String.to_bytes msg))
+      Vectors_secp256k1_keccak256.msgs
+  in
+  let verify_signatures ~pk ~sigs =
+    Result.value_f ~default:(fun () ->
+        failwith "Signature verification failed.")
+    @@ List.iter2
+         ~when_different_lengths:(fun () ->
+           failwith "Different lengths in the given signatures.")
+         (fun msg expected_sig ->
+           let check_outcome =
+             Signature.Secp256k1.check_keccak256
+               pk
+               expected_sig
+               (String.to_bytes msg)
+           in
+           Alcotest.(
+             check bool "verify secp256k1-keccak256 sigs" check_outcome true))
+         Vectors_secp256k1_keccak256.msgs
+         sigs
+  in
+  List.iteri
+    (fun i key ->
+      let sk = get_secp256k1_secret_key key in
+      let pk = Signature.Secp256k1.Secret_key.to_public_key sk in
+      let sigs = get_signed_msgs sk in
+      let hex_sigs = List.map secp256k1_sig_to_hex sigs in
+      let expected_sigs = Vectors_secp256k1_keccak256.sigs.(i) in
+      verify_signatures ~pk ~sigs ;
+      Alcotest.(
+        check
+          (list string)
+          "equal secp256k1-keccak256 sigs"
+          hex_sigs
+          expected_sigs))
+    Vectors_secp256k1_keccak256.keys
+
 let tests =
   [
     ( "signature",
@@ -90,5 +143,8 @@ let tests =
         ( "test_of_bytes_without_validation",
           `Quick,
           test_of_bytes_without_validation );
+        ( "secp256k1-keccak256 scheme implementation integrity",
+          `Quick,
+          test_secp256k1_keccak256 );
       ] );
   ]
