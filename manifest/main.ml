@@ -644,7 +644,6 @@ let octez_lwt_result_stdlib_bare_functor_outputs =
     ~internal_name:"bare_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_bare_sigs =
   public_lib
@@ -653,7 +652,6 @@ let octez_lwt_result_stdlib_bare_sigs =
     ~internal_name:"bare_sigs"
     ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_functor_outputs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_bare_structs =
   public_lib
@@ -662,7 +660,6 @@ let octez_lwt_result_stdlib_bare_structs =
     ~internal_name:"bare_structs"
     ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_sigs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_functor_outputs =
   public_lib
@@ -671,7 +668,6 @@ let octez_lwt_result_stdlib_traced_functor_outputs =
     ~internal_name:"traced_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt; octez_lwt_result_stdlib_bare_sigs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_sigs =
   public_lib
@@ -686,7 +682,6 @@ let octez_lwt_result_stdlib_traced_sigs =
         octez_lwt_result_stdlib_bare_structs;
         octez_lwt_result_stdlib_traced_functor_outputs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_structs =
   public_lib
@@ -700,7 +695,6 @@ let octez_lwt_result_stdlib_traced_structs =
         octez_lwt_result_stdlib_traced_sigs;
         octez_lwt_result_stdlib_bare_structs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib =
   public_lib
@@ -717,7 +711,6 @@ let octez_lwt_result_stdlib =
         octez_lwt_result_stdlib_traced_sigs;
         octez_lwt_result_stdlib_traced_structs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_examples_traces =
   public_lib
@@ -730,7 +723,6 @@ let octez_lwt_result_stdlib_examples_traces =
         octez_lwt_result_stdlib_bare_structs;
         octez_lwt_result_stdlib_traced_sigs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let _octez_lwt_result_stdlib_tests =
   tezt
@@ -758,7 +750,7 @@ let _octez_lwt_result_stdlib_tests =
         qcheck_alcotest;
         octez_test_helpers |> open_;
       ]
-    ~opam_with_test:Only_on_64_arch
+    ~dune_with_test:Only_on_64_arch
 
 let octez_error_monad =
   octez_lib

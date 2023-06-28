@@ -44,7 +44,7 @@
 (rule
  (alias runtest)
  (package tezos-lwt-result-stdlib)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (enabled_if (and %{arch_sixtyfour} (<> false %{env:RUNTEZTALIAS=true})))
  (action (run %{dep:./main.exe})))
 
 (rule

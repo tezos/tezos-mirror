@@ -20,6 +20,6 @@ depends: [
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] { with-test & arch != "arm32" & arch != "x86_32" }
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: error-aware stdlib replacement"
