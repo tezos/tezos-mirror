@@ -33,7 +33,6 @@ module Request : sig
         (** Request to register new L2 messages in the queue. *)
     | New_head : Layer1.head -> (unit, error trace) t
         (** Request to handle a new L1 head. *)
-    | Batch : (unit, error trace) t  (** Request to produce batches. *)
 
   type view = View : _ t -> view
 

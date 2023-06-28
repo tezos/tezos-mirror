@@ -27,7 +27,6 @@ module Request = struct
   type ('a, 'b) t =
     | Register : string list -> (L2_message.hash list, error trace) t
     | New_head : Layer1.head -> (unit, error trace) t
-    | Batch : (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -54,12 +53,6 @@ module Request = struct
              (req "block" Layer1.head_encoding))
           (function View (New_head b) -> Some ((), b) | _ -> None)
           (fun ((), b) -> View (New_head b));
-        case
-          (Tag 2)
-          ~title:"Batch"
-          (obj1 (req "request" (constant "batch")))
-          (function View Batch -> Some () | _ -> None)
-          (fun () -> View Batch);
       ]
 
   let pp ppf (View r) =
@@ -73,5 +66,4 @@ module Request = struct
           Block_hash.pp
           hash
           level
-    | Batch -> Format.pp_print_string ppf "batch"
 end
