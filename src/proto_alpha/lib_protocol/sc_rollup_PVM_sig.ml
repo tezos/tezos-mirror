@@ -217,7 +217,7 @@ let reveal_encoding =
     case
       ~title:"Reveal_metadata"
       (Tag 1)
-      (obj1 (kind "reveal_kind"))
+      (obj1 (kind "reveal_metadata"))
       (function Reveal_metadata -> Some () | _ -> None)
       (fun () -> Reveal_metadata)
   in
@@ -225,7 +225,9 @@ let reveal_encoding =
     case
       ~title:"Request_dal_page"
       (Tag 2)
-      (obj2 (kind "reveal_kind") (req "page_id" Dal_slot_repr.Page.encoding))
+      (obj2
+         (kind "request_dal_page")
+         (req "page_id" Dal_slot_repr.Page.encoding))
       (function Request_dal_page s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Request_dal_page s)
   in
