@@ -183,6 +183,17 @@ module type REFUTATION_COORDINATOR = sig
   val shutdown : unit -> unit Lwt.t
 end
 
+(** Protocol specific constants for the batcher. *)
+module type BATCHER_CONSTANTS = sig
+  (** Maximum size of an L2 message allowed by the prototcol, which is
+      {!val:Protocol.Constants_repr.sc_rollup_message_size_limit}. *)
+  val message_size_limit : int
+
+  (** Maximum size in bytes of an batch of L2 messages that can fit in an
+      operation on L1. It is protocol dependent. *)
+  val protocol_max_batch_size : int
+end
+
 (** Protocol specific batcher. NOTE: The batcher has to be stopped and the new
     one restarted on protocol change. *)
 module type BATCHER = sig
@@ -291,6 +302,8 @@ module type S = sig
   module Publisher : PUBLISHER
 
   module Refutation_coordinator : REFUTATION_COORDINATOR
+
+  module Batcher_constants : BATCHER_CONSTANTS
 
   module Batcher : BATCHER
 
