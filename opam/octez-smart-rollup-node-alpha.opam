@@ -34,10 +34,8 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "octez-injector"
   "octez-smart-rollup-node-lib"
-  "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
   "tezos-version"
-  "tezos-clic"
   "tezos-client-commands"
 ]
 conflicts: [

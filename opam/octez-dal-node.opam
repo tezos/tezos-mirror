@@ -20,7 +20,6 @@ depends: [
   "tezos-dal-node-services"
   "tezos-layer2-store"
   "tezos-store"
-  "tezos-gossipsub"
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "prometheus-app" { >= "1.2" }

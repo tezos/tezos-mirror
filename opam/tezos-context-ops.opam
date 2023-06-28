@@ -11,8 +11,6 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "tezos-protocol-environment"
-  "tezos-shell-context"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

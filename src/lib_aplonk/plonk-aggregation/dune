@@ -3,10 +3,10 @@
 
 (library
  (name aggregation)
- (public_name octez-plonk.aggregation)
+ (public_name octez-libs.octez-plonk.aggregation)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-plonk
+  octez-libs.octez-plonk
   octez-libs.octez-bls12-381-polynomial)
  (preprocess (pps ppx_repr))
  (flags

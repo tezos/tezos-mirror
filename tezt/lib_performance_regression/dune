@@ -3,7 +3,7 @@
 
 (library
  (name tezt_performance_regression)
- (public_name tezt-performance-regression)
+ (public_name octez-libs.tezt-performance-regression)
  (libraries
   tezt
   uri

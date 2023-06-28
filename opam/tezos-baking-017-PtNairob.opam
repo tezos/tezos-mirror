@@ -11,15 +11,12 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "tezos-clic"
   "tezos-version"
   "tezos-protocol-017-PtNairob"
   "tezos-protocol-plugin-017-PtNairob"
-  "tezos-protocol-environment"
   "tezos-client-base"
   "tezos-client-017-PtNairob"
   "tezos-client-commands"
-  "tezos-shell-context"
   "tezos-context-ops"
   "tezos-dal-node-services"
   "lwt-canceler" { >= "0.3" & < "0.4" }

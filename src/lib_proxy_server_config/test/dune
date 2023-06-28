@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   tezos-proxy-server-config
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   octez-alcotezt
   uri)

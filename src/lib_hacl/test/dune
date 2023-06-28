@@ -17,7 +17,7 @@
   octez-libs.tezos-hacl
   qcheck-alcotest
   octez-alcotezt
-  tezos-test-helpers)
+  octez-libs.tezos-test-helpers)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

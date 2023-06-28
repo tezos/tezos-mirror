@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-client-base"
-  "tezos-protocol-environment"
   "tezos-protocol-genesis"
   "tezos-client-commands"
   "tezos-proxy"

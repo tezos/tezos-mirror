@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-stdlib
-  tezos-clic
+  octez-libs.tezos-clic
   lwt.unix
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -30,7 +30,7 @@
 
 (rule
  (alias runtest)
- (package tezos-clic)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

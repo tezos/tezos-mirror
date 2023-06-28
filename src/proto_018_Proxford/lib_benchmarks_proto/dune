@@ -20,10 +20,10 @@
   tezos-shell-benchmarks
   octez-libs.tezos-micheline
   tezos-018-Proxford-test-helpers
-  tezos-sapling
+  octez-libs.tezos-sapling
   tezos-client-018-Proxford
   tezos-protocol-plugin-018-Proxford
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

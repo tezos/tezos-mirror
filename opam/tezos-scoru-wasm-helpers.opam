@@ -13,7 +13,6 @@ depends: [
   "ppx_import"
   "ppx_deriving"
   "octez-libs"
-  "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
   "tezos-webassembly-interpreter-extra"
 ]

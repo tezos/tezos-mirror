@@ -10,7 +10,7 @@
   octez-alcotezt
   bigstring
   lwt.unix
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest)
  (library_flags (:standard -linkall))
  (flags

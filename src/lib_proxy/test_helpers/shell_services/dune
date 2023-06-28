@@ -6,7 +6,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-shell-services
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-core
   octez-libs.tezos-context.memory
   lwt.unix

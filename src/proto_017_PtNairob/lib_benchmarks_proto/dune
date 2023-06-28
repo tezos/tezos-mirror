@@ -20,10 +20,10 @@
   tezos-shell-benchmarks
   octez-libs.tezos-micheline
   tezos-017-PtNairob-test-helpers
-  tezos-sapling
+  octez-libs.tezos-sapling
   tezos-client-017-PtNairob
   tezos-protocol-plugin-017-PtNairob
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

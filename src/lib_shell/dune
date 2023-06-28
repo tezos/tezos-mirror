@@ -15,15 +15,15 @@
   octez-libs.tezos-context
   tezos-store
   tezos-store.shared
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   tezos-context-ops
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   octez-libs.tezos-p2p
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-shell-services
   octez-libs.tezos-p2p-services
   tezos-protocol-updater
-  tezos-requester
+  octez-libs.tezos-requester
   octez-libs.tezos-workers
   tezos-validation
   octez-libs.tezos-version

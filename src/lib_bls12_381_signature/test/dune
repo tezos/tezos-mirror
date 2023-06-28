@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   bls12-381
-  octez-bls12-381-signature
+  octez-libs.octez-bls12-381-signature
   octez-alcotezt
   integers_stubs_js)
  (library_flags (:standard -linkall))
@@ -29,7 +29,7 @@
 
 (rule
  (alias runtest)
- (package octez-bls12-381-signature)
+ (package octez-libs)
  (deps (glob_files_rec test_vectors/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))

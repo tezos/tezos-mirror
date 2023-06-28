@@ -12,7 +12,7 @@
   octez-libs.tezos-rpc
   octez-libs.tezos-context
   tezos-context-ops
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   octez-libs.tezos-shell-services
   tezos-protocol-updater
   octez-libs.tezos-stdlib-unix

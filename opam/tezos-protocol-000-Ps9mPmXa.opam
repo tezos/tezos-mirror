@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-protocol-environment"
+  "octez-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

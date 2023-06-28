@@ -10,9 +10,8 @@ license: "Apache-2.0"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-webassembly-interpreter"
-  "lwt" { >= "5.6.0" }
   "octez-libs"
+  "lwt" { >= "5.6.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

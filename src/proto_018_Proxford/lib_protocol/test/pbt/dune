@@ -11,7 +11,7 @@
   tezos-client-018-Proxford
   tezos-protocol-018-Proxford
   octez-libs.tezos-context.merkle_proof_encoding
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   tezos-018-Proxford-test-helpers
   octez-alcotezt
   qcheck-alcotest

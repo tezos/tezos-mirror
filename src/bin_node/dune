@@ -23,7 +23,7 @@
   tezos-store.unix-snapshots
   octez-libs.tezos-context
   tezos-validation
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   octez-libs.tezos-workers
   tezos-protocol-updater
   cmdliner

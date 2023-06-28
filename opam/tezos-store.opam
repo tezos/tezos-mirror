@@ -16,9 +16,7 @@ depends: [
   "tezos-validation"
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
-  "tezos-protocol-environment"
   "tezos-context-ops"
-  "tezos-shell-context"
   "tezos-protocol-updater"
   "lwt-watcher" { = "0.2" }
   "camlzip" { >= "1.11" & < "1.12" }
@@ -32,7 +30,6 @@ depends: [
   "tezos-protocol-alpha" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
   "octez-alcotezt" {with-test}
-  "tezos-test-helpers" {with-test}
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }

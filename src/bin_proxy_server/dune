@@ -19,7 +19,7 @@
   octez-libs.tezos-rpc-http-client-unix
   octez-libs.tezos-rpc-http-server
   octez-libs.tezos-shell-services
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   tezos-version.value
   uri
   (select void_for_linking-tezos-client-genesis from

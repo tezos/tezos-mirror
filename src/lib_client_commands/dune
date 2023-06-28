@@ -8,8 +8,8 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-rpc
-  tezos-clic
-  tezos-clic.unix
+  octez-libs.tezos-clic
+  octez-libs.tezos-clic.unix
   tezos-client-base
   octez-libs.tezos-shell-services
   octez-libs.tezos-p2p-services

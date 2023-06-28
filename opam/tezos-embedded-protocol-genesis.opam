@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-protocol-genesis"
   "tezos-protocol-updater"
-  "tezos-protocol-environment"
+  "octez-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

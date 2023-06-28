@@ -26,7 +26,7 @@
   octez-libs.tezos-crypto-dal
   tezos-store.unix
   tezos-store.shared
-  tezos-gossipsub
+  octez-libs.tezos-gossipsub
   tezos-dal-node-lib.gossipsub
   octez-libs.tezos-p2p
   octez-libs.tezos-p2p-services

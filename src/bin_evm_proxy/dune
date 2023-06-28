@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-clic
+  octez-libs.tezos-clic
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
   tezos-version.value

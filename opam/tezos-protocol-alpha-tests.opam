@@ -21,12 +21,9 @@ depends: [
   "tezos-benchmark-alpha" {with-test}
   "tezos-benchmark-type-inference-alpha" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "tezos-test-helpers" {with-test}
   "tezos-smart-rollup-alpha" {with-test}
   "tezos-client-base" {with-test}
-  "tezos-protocol-environment" {with-test}
   "tezos-scoru-wasm-helpers" {with-test}
-  "tezos-scoru-wasm" {with-test}
   "tezos-webassembly-interpreter-extra" {with-test}
 ]
 build: [

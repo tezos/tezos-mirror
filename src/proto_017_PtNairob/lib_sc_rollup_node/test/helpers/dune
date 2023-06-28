@@ -10,7 +10,7 @@
   tezos-protocol-017-PtNairob
   tezos-protocol-017-PtNairob.parameters
   tezos-client-017-PtNairob
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   qcheck-core
   logs.lwt

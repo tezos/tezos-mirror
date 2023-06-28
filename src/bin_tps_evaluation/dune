@@ -19,7 +19,7 @@
   tezos-protocol-alpha
   tezt
   octez-libs.tezt-tezos
-  tezt-performance-regression
+  octez-libs.tezt-performance-regression
   uri)
  (link_flags
   (:standard)

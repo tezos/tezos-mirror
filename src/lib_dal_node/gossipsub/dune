@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-crypto-dal
-  tezos-gossipsub
+  octez-libs.tezos-gossipsub
   octez-libs.tezos-p2p
   octez-libs.tezos-p2p-services
   octez-libs.tezos-crypto)

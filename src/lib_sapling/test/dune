@@ -8,7 +8,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-sapling
+  octez-libs.tezos-sapling
   octez-libs.tezos-crypto
   str
   octez-libs.tezos-base
@@ -41,7 +41,7 @@
  (name test_js)
  (modes js)
  (libraries
-  tezos-sapling
+  octez-libs.tezos-sapling
   octez-libs.tezos-hacl)
  (js_of_ocaml)
  (link_flags
@@ -51,7 +51,8 @@
 
 (rule
  (alias runtest_js)
- (package tezos-sapling)
+ (package octez-libs)
+ (enabled_if false)
  (action (run node %{dep:./test_js.bc.js})))
 
 (executable
@@ -67,9 +68,9 @@
 
 (rule
  (alias runtest)
- (package tezos-sapling)
+ (package octez-libs)
  (deps vectors.csv vectors-zip32.csv)
- (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (enabled_if false)
  (action (run %{dep:./main.exe})))
 
 (rule

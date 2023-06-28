@@ -5,25 +5,25 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-plonk.aggregation
-  octez-plonk.plonk-test)
+  octez-libs.octez-plonk.aggregation
+  octez-libs.octez-plonk.plonk-test)
  (modules main test_polynomial_commitment))
 
 (rule
  (alias runtest)
- (package octez-plonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe} -q) (diff? test-quick.expected test.output)))))
 
 (rule
  (alias runtest_slow)
- (package octez-plonk)
+ (package octez-libs)
  (action (run %{exe:main.exe})))
 
 (rule
  (alias runtest_slow_with_regression)
- (package octez-plonk)
+ (package octez-libs)
  (action
   (setenv RANDOM_SEED 42
    (progn (run %{exe:main.exe}) (diff? test-slow.expected test.output)))))

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_webassembly_interpreter)
- (public_name tezos-webassembly-interpreter)
+ (public_name octez-libs.tezos-webassembly-interpreter)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-lwt-result-stdlib

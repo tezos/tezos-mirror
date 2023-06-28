@@ -9,7 +9,7 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-event-logging-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))

@@ -8,9 +8,9 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   octez-alcotezt
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   lwt.unix)
  (library_flags (:standard -linkall))
@@ -39,7 +39,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-environment)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

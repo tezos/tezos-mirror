@@ -13,8 +13,6 @@ depends: [
   "ppx_import"
   "ppx_deriving"
   "octez-libs"
-  "tezos-test-helpers"
-  "tezos-scoru-wasm"
   "tezos-scoru-wasm-durable-snapshot"
   "tezos-scoru-wasm-fast"
   "tezos-scoru-wasm-helpers"

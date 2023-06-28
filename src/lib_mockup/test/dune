@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-libs.tezos-rpc
   tezos-mockup
   tezos-mockup-registration

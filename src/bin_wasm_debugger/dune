@@ -8,14 +8,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   octez-libs.tezos-tree-encoding
   octez-libs.tezos-base.unix
   yaml
   tezos-client-alpha
-  tezos-scoru-wasm
+  octez-libs.tezos-scoru-wasm
   tezos-scoru-wasm-helpers
-  tezos-webassembly-interpreter
+  octez-libs.tezos-webassembly-interpreter
   tezos-webassembly-interpreter-extra
   tezos-version.value)
  (link_flags

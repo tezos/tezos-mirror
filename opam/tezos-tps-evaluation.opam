@@ -21,7 +21,6 @@ depends: [
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
   "tezt" { >= "3.1.1" }
-  "tezt-performance-regression"
   "uri" { >= "3.1.0" }
 ]
 build: [

@@ -13,9 +13,7 @@ depends: [
   "ppx_import"
   "ppx_deriving"
   "octez-libs"
-  "tezos-scoru-wasm"
   "tezos-scoru-wasm-helpers"
-  "tezos-test-helpers"
   "tezos-protocol-alpha"
   "tezos-smart-rollup-alpha"
   "tezt" { >= "3.1.1" }

@@ -7,17 +7,17 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   octez-libs.tezos-stdlib-unix
   tezos-protocol-018-Proxford
   tezos-client-018-Proxford
   tezos-protocol-018-Proxford.parameters
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   tezos-protocol-plugin-018-Proxford
   octez-libs.tezos-shell-services
-  octez-plompiler
+  octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal
   tezos-smart-rollup-018-Proxford)
  (flags

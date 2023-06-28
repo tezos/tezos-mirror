@@ -15,7 +15,6 @@ depends: [
   "tezos-client-base"
   "tezos-protocol-updater"
   "tezos-client-base-unix"
-  "tezos-gossipsub"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

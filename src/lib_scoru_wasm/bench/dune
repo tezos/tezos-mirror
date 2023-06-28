@@ -8,9 +8,9 @@
  (libraries
   octez-libs.tezos-base
   tezt
-  tezos-webassembly-interpreter
+  octez-libs.tezos-webassembly-interpreter
   octez-libs.tezos-context.memory
-  tezos-scoru-wasm
+  octez-libs.tezos-scoru-wasm
   tezos-scoru-wasm-helpers
   lwt.unix)
  (preprocess (pps ppx_deriving.show))

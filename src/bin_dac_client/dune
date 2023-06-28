@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands

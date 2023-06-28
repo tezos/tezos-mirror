@@ -16,7 +16,6 @@ depends: [
   "lwt" { >= "5.6.0" }
   "tezos-proxy"
   "tezos-proxy-server-config"
-  "tezos-shell-context"
   "tezos-version"
   "uri" { >= "3.1.0" }
 ]

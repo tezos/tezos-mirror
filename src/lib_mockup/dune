@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   tezos-client-base
   octez-libs.tezos-shell-services
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   uri)
  (flags
   (:standard)
@@ -29,7 +29,7 @@
   octez-libs.tezos-rpc
   octez-libs.tezos-p2p-services
   octez-libs.tezos-p2p
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-client
@@ -52,7 +52,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-client-commands
   tezos-client-base
   tezos-mockup

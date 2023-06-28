@@ -2915,8 +2915,16 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     | [] -> ["MIT"]
     | licenses -> licenses
   in
+  (* Used to remove any duplicates in extra_authors. *)
+  let rec deduplicate known acc = function
+    | [] -> List.rev acc
+    | author :: tail ->
+        if String_set.mem author known then deduplicate known acc tail
+        else deduplicate (String_set.add author known) (author :: acc) tail
+  in
   let extra_authors =
     List.concat_map (fun internal -> internal.Target.extra_authors) internals
+    |> deduplicate String_set.empty []
   in
   {
     maintainer = "contact@tezos.com";

@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-shell-services
   tezos-client-base
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   tezos-protocol-genesis
   tezos-protocol-genesis.lifted
   tezos-client-commands

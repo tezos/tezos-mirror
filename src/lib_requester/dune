@@ -3,7 +3,7 @@
 
 (library
  (name tezos_requester)
- (public_name tezos-requester)
+ (public_name octez-libs.tezos-requester)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
