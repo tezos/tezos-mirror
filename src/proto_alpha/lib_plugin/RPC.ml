@@ -3747,6 +3747,69 @@ module Validators = struct
       ()
 end
 
+module Staking = struct
+  let path =
+    RPC_path.(
+      open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
+
+  let stakers_encoding =
+    let open Data_encoding in
+    let staker_enconding =
+      obj2
+        (req "staker" Alpha_context.Contract.implicit_encoding)
+        (req "frozen_deposits" Tez.encoding)
+    in
+    list staker_enconding
+
+  module S = struct
+    let stakers =
+      RPC_service.get_service
+        ~description:
+          "Returns the list of accounts that stake to a given delegate \
+           together with their share of the frozen deposits."
+        ~query:RPC_query.empty
+        ~output:stakers_encoding
+        RPC_path.(path / "stakers")
+  end
+
+  let contract_stake ctxt ~delegator_contract ~delegate =
+    let open Alpha_context in
+    let open Lwt_result_syntax in
+    let* staked_balance =
+      Staking_pseudotokens.For_RPC.staked_balance
+        ctxt
+        ~contract:delegator_contract
+        ~delegate
+    in
+    if not Tez.(staked_balance = zero) then
+      let delegator_pkh =
+        match delegator_contract with
+        | Contract.Implicit pkh -> pkh
+        | Contract.Originated _ -> assert false
+        (* Originated contracts cannot stake *)
+      in
+      return @@ Some (delegator_pkh, staked_balance)
+    else return_none
+
+  let check_delegate_registered ctxt pkh =
+    Delegate.registered ctxt pkh >>= function
+    | true -> return_unit
+    | false -> tzfail (Delegate_services.Not_registered pkh)
+
+  let register () =
+    Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
+        let open Lwt_result_syntax in
+        let* () = check_delegate_registered ctxt pkh in
+        let*! delegators = Delegate.delegated_contracts ctxt pkh in
+        List.filter_map_es
+          (fun delegator_contract ->
+            contract_stake ctxt ~delegator_contract ~delegate:pkh)
+          delegators)
+
+  let stakers ctxt block pkh =
+    RPC_context.make_call1 S.stakers ctxt block pkh () ()
+end
+
 module S = struct
   open Data_encoding
 
@@ -3812,6 +3875,7 @@ let register () =
   Validators.register () ;
   Sc_rollup.register () ;
   Dal.register () ;
+  Staking.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then tzfail Negative_level_offset
       else
