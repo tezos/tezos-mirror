@@ -438,11 +438,11 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   let query_string = if force_metadata then [("force_metadata", "")] else [] in
   make ~query_string GET path Fun.id
 
-let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
+let get_chain_mempool_pending_operations ?(chain = "main") ?version ?validated
     ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ Query_arg.opt_bool "applied" applied
+    @ Query_arg.opt_bool "validated" validated
     @ Query_arg.opt_bool "refused" refused
     @ Query_arg.opt_bool "outdated" outdated
     @ Query_arg.opt_bool "branch_delayed" branch_delayed
@@ -458,11 +458,11 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     ["chains"; chain; "mempool"; "pending_operations"]
     Fun.id
 
-let get_chain_mempool_monitor_operations ?(chain = "main") ?version ?applied
+let get_chain_mempool_monitor_operations ?(chain = "main") ?version ?validated
     ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
   let query_string =
     Query_arg.opt "version" Fun.id version
-    @ Query_arg.opt_bool "applied" applied
+    @ Query_arg.opt_bool "validated" validated
     @ Query_arg.opt_bool "refused" refused
     @ Query_arg.opt_bool "outdated" outdated
     @ Query_arg.opt_bool "branch_delayed" branch_delayed

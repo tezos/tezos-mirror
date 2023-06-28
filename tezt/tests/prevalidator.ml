@@ -103,16 +103,16 @@ module Revamped = struct
     mempool_notify_waiter
 
   (* Call the [/chains/[chain]/mempool/pending_operations] RPC and
-     check that in the returned mempool, each field [applied],
+     check that in the returned mempool, each field [validated],
      [branch_delayed], etc. contains exactly the operation hashes
      listed in the argument of the same name. Omitted arguments
      default to the empty list. *)
-  let check_mempool ?applied ?branch_delayed ?branch_refused ?refused ?outdated
-      ?unprocessed client =
+  let check_mempool ?validated ?branch_delayed ?branch_refused ?refused
+      ?outdated ?unprocessed client =
     let* mempool = Mempool.get_mempool client in
     return
       (Mempool.check_mempool
-         ?applied
+         ?validated
          ?branch_delayed
          ?branch_refused
          ?refused
@@ -179,12 +179,13 @@ module Revamped = struct
         additional_bootstrap_accounts
     in
 
-    log_step 3 "Check operations are all classified as 'Applied'." ;
+    log_step 3 "Check operations are all classified as 'Validated'." ;
     let* mempool = Mempool.get_mempool client in
     let error_msg =
-      "some operations not classified as 'applied: expected length %R, got %L"
+      "some operations not classified as 'validated: expected length %R, got %L"
     in
-    Check.((List.length mempool.applied = number_of_operations) int ~error_msg) ;
+    Check.(
+      (List.length mempool.validated = number_of_operations) int ~error_msg) ;
 
     log_step 4 "Bake a block with an empty mempool." ;
     let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
@@ -200,17 +201,18 @@ module Revamped = struct
     let* () = Client.endorse_for client ~protocol ~force:true in
     let* mempool_with_endorsement = Mempool.get_mempool client in
 
-    log_step 7 "Check endorsement is applied." ;
+    log_step 7 "Check endorsement is validated." ;
     let mempool_diff =
       Mempool.symmetric_diff mempool_after_empty_block mempool_with_endorsement
     in
-    (* [mempool_diff] should contain only the applied endorsement. *)
+    (* [mempool_diff] should contain only the validated endorsement. *)
     let mempool_expected =
       let open Mempool in
-      try {empty with applied = [List.hd mempool_diff.applied]}
-      with Not_found -> {empty with applied = ["<applied field was empty>"]}
+      try {empty with validated = [List.hd mempool_diff.validated]}
+      with Not_found ->
+        {empty with validated = ["<validated field was empty>"]}
     in
-    let error_msg = "endorsement is not applied: expected %L, got %R" in
+    let error_msg = "endorsement is not validated: expected %L, got %R" in
     Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
 
     log_step 8 "Bake with an empty mempool twice." ;
@@ -224,7 +226,7 @@ module Revamped = struct
     let* last_mempool = Mempool.get_mempool client in
 
     log_step 9 "Check endorsement is classified 'Outdated'." ;
-    let error_msg = "one applied operation was lost: expected %L, got %R" in
+    let error_msg = "one validated operation was lost: expected %L, got %R" in
     Check.((mempool_with_endorsement = last_mempool) Mempool.typ ~error_msg) ;
     let error_msg =
       "endorsement is not classified as 'outdated': length expected %L, got %R"
@@ -269,8 +271,8 @@ module Revamped = struct
     in
     Log.info "%s injected on node1." oph ;
 
-    log_step 3 "Check that the operation %s is classified as 'Applied'." oph ;
-    let* () = check_mempool ~applied:[oph] client1 in
+    log_step 3 "Check that the operation %s is classified as 'Validated'." oph ;
+    let* () = check_mempool ~validated:[oph] client1 in
 
     log_step
       4
@@ -427,9 +429,9 @@ module Revamped = struct
 
     log_step
       3
-      "Check that the operation %s is applied in the node's mempool."
+      "Check that the operation %s is validated in the node's mempool."
       oph1 ;
-    let* () = check_mempool ~applied:[oph1] client in
+    let* () = check_mempool ~validated:[oph1] client in
 
     log_step 4 "Forge and inject an operation with the same manager." ;
     let* (`OpHash oph2) =
@@ -446,7 +448,7 @@ module Revamped = struct
       5
       "Check that the operation %s is branch_delayed in the node's mempool."
       oph2 ;
-    let* () = check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client in
+    let* () = check_mempool ~validated:[oph1] ~branch_delayed:[oph2] client in
 
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ =
@@ -454,9 +456,9 @@ module Revamped = struct
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
 
-    log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
+    log_step 7 "Check that the node's mempool contains %s as validated." oph2 ;
     let* mempool = Mempool.get_mempool client in
-    let expected_mempool = {Mempool.empty with applied = [oph2]} in
+    let expected_mempool = {Mempool.empty with validated = [oph2]} in
     Check.(
       (expected_mempool = mempool)
         Mempool.classified_typ
@@ -516,15 +518,15 @@ module Revamped = struct
 
     log_step
       4
-      "Ensure that the first operation is applied and that the second is \
+      "Ensure that the first operation is validated and that the second is \
        branch_delayed on node1." ;
-    let* () = check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client1 in
+    let* () = check_mempool ~validated:[oph1] ~branch_delayed:[oph2] client1 in
 
     log_step
       5
-      "Ensure that the first operation is applied on node2 and that no other \
+      "Ensure that the first operation is validated on node2 and that no other \
        operation is in the mempool." ;
-    let* () = check_mempool ~applied:[oph1] client2 in
+    let* () = check_mempool ~validated:[oph1] client2 in
 
     log_step 6 "Bake a block on node2." ;
     let* _ = bake_for ~empty:false ~protocol node1 client2 in
@@ -533,7 +535,7 @@ module Revamped = struct
       7
       "Check that the second operation has not been baked because it was not \
        propagated to node2. And check that it is now branch_refused in node1 \
-       because it used the same counter as the applied operation." ;
+       because it used the same counter as the validated operation." ;
     check_mempool ~branch_refused:[oph2] client1
 
   (** This test checks the one operation per manager per block restriction on
@@ -541,7 +543,7 @@ module Revamped = struct
       We inject two operations with the same manager (and same counter) on two
       differents nodes.
       The first operation is propagated to a third node and classified as
-      applied. Then the second operation is propagated to the third node we
+      validated. Then the second operation is propagated to the third node we
       check that the second operation is classified as branch_delayed *)
   let one_operation_per_manager_per_block_restriction_propagation =
     Protocol.register_test
@@ -597,13 +599,13 @@ module Revamped = struct
     log_step
       4
       "Propagate %s from node1 to node3 and check that it is classified as \
-       applied."
+       validated."
       oph1 ;
     let* () = Client.Admin.trust_address client3 ~peer:node1
     and* () = Client.Admin.trust_address client1 ~peer:node3 in
     let* () = Client.Admin.connect_address ~peer:node1 client3 in
     let* () = synchronize_mempool client3 node3 in
-    let* () = check_mempool ~applied:[oph1] client3 in
+    let* () = check_mempool ~validated:[oph1] client3 in
 
     log_step
       5
@@ -614,7 +616,7 @@ module Revamped = struct
     and* () = Client.Admin.trust_address client2 ~peer:node3 in
     let* () = Client.Admin.connect_address ~peer:node2 client3 in
     let* () = synchronize_mempool client3 node3 in
-    check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client3
+    check_mempool ~validated:[oph1] ~branch_delayed:[oph2] client3
 
   (** This test checks that an operation branch_delayed is still branch_delayed
       after a flush either because of the one operation per manager per block or
@@ -678,11 +680,12 @@ module Revamped = struct
 
     log_step
       5
-      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      "Check that the mempool contains %s as validated and %s as \
+       branch_delayed."
       oph2
       oph1 ;
     let* () =
-      check_mempool ~applied:[oph2] ~branch_delayed:[oph1; oph3] client
+      check_mempool ~validated:[oph2] ~branch_delayed:[oph1; oph3] client
     in
 
     log_step 6 "Flush the mempool." ;
@@ -701,21 +704,21 @@ module Revamped = struct
 
     log_step
       8
-      "Check that if %s is applied then %s is branch_delayed or the other way \
-       around."
+      "Check that if %s is validated then %s is branch_delayed or the other \
+       way around."
       oph2
       oph3 ;
     let* mempool = Mempool.get_mempool client in
     Check.(
-      (((List.mem oph2 mempool.branch_delayed && List.mem oph3 mempool.applied)
-       || (List.mem oph3 mempool.branch_delayed && List.mem oph2 mempool.applied)
-       )
+      (((List.mem oph2 mempool.branch_delayed && List.mem oph3 mempool.validated)
+       || List.mem oph3 mempool.branch_delayed
+          && List.mem oph2 mempool.validated)
       = true)
         bool
         ~error_msg:
           (sf
-             "applied should contain either %s or %s and branch_delayed should \
-              contain the other one"
+             "validated should contain either %s or %s and branch_delayed \
+              should contain the other one"
              oph2
              oph3)) ;
     unit
@@ -725,7 +728,7 @@ module Revamped = struct
 
       Check that:
 
-      - operations from distinct managers are [applied] without issue;
+      - operations from distinct managers are [validated] without issue;
 
       - a second operation from the same manager with the same fee
         cannot be injected at all with [~force:false];
@@ -734,7 +737,7 @@ module Revamped = struct
         injected with [~force:true], gets classified as [branch_delayed];
 
       - another operation from the same manager with twice the fee
-        gets [applied] and causes the old operation to be reclassified as
+        gets [validated] and causes the old operation to be reclassified as
         [outdated]. *)
   let one_operation_per_manager_per_block_inject_isolated_node =
     Protocol.register_test
@@ -758,7 +761,7 @@ module Revamped = struct
     log_step
       2
       "Inject transfers from [source1] and [source2] with fee [%d] and correct \
-       counters. Check that both are applied (i.e. the manager restriction \
+       counters. Check that both are validated (i.e. the manager restriction \
        does not prevent similar operations from distinct managers)."
       fee ;
     let* (`OpHash oph1) =
@@ -773,7 +776,7 @@ module Revamped = struct
           [make ~source:source2 ~fee @@ transfer ~dest:Constant.bootstrap3 ()]
           client)
     in
-    let* () = check_mempool ~applied:[oph1; oph2] client in
+    let* () = check_mempool ~validated:[oph1; oph2] client in
 
     let signer =
       if Protocol.number protocol >= 15 then Constant.bootstrap1
@@ -809,7 +812,7 @@ module Revamped = struct
       (int_of_string fee_needed_to_replace = expected_fee_needed_to_replace)
         int
         ~error_msg:"The recommended fee is %L but expected %R.") ;
-    let* () = check_mempool ~applied:[oph1; oph2] client in
+    let* () = check_mempool ~validated:[oph1; oph2] client in
 
     log_step
       4
@@ -825,14 +828,14 @@ module Revamped = struct
           client)
     in
     let* () =
-      check_mempool ~applied:[oph1; oph2] ~branch_delayed:[oph1bis] client
+      check_mempool ~validated:[oph1; oph2] ~branch_delayed:[oph1bis] client
     in
 
     log_step
       5
       "Inject a new transfer from [source2] with a much higher fee than the \
        first one from the same source. Check that the new operation is \
-       [applied] while the old one has become [outdated]." ;
+       [validated] while the old one has become [outdated]." ;
     let* (`OpHash oph2bis) =
       Operation.Manager.(
         inject
@@ -843,13 +846,13 @@ module Revamped = struct
           client)
     in
     check_mempool
-      ~applied:[oph1; oph2bis]
+      ~validated:[oph1; oph2bis]
       ~branch_delayed:[oph1bis]
       ~outdated:[oph2]
       client
 
-  (** This test checks that an operation applied is not reclassified and stays
-      applied after the ban of a branch_delayed operation. *)
+  (** This test checks that an operation validated is not reclassified and stays
+      validated after the ban of a branch_delayed operation. *)
   let one_operation_per_manager_per_block_ban =
     Protocol.register_test
       ~__FILE__
@@ -895,10 +898,11 @@ module Revamped = struct
 
     log_step
       4
-      "Check that the mempool contains %s as applied and %s as branch_delayed."
+      "Check that the mempool contains %s as validated and %s as \
+       branch_delayed."
       oph2
       oph1 ;
-    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph1] client in
+    let* () = check_mempool ~validated:[oph2] ~branch_delayed:[oph1] client in
 
     log_step 5 "Ban the operation %s." oph1 ;
     let to_reclassified = ref false in
@@ -914,11 +918,11 @@ module Revamped = struct
 
     log_step
       6
-      "Check that the mempool contains %s as applied and that %s is not in the \
-       mempool anymore."
+      "Check that the mempool contains %s as validated and that %s is not in \
+       the mempool anymore."
       oph2
       oph1 ;
-    let* () = check_mempool ~applied:[oph2] client in
+    let* () = check_mempool ~validated:[oph2] client in
 
     log_step 7 "Check that no flush have been triggered after the ban." ;
     Check.(
@@ -927,7 +931,7 @@ module Revamped = struct
         ~error_msg:"A flush has been triggered after the ban.") ;
     unit
 
-  (* This test checks that on a ban of an applied operation the flush respect
+  (* This test checks that on a ban of a validated operation, the flush respects
      the 1M invariant. *)
   let one_operation_per_manager_per_block_flush_on_ban =
     Protocol.register_test
@@ -979,13 +983,13 @@ module Revamped = struct
 
     log_step
       5
-      "Check that the mempool contains %s and %s as applied, %s as \
+      "Check that the mempool contains %s and %s as validated, %s as \
        branch_delayed."
       oph1
       oph2
       oph3 ;
     let* () =
-      check_mempool ~applied:[oph1; oph2] ~branch_delayed:[oph3] client
+      check_mempool ~validated:[oph1; oph2] ~branch_delayed:[oph3] client
     in
 
     log_step 5 "Ban the operation %s." oph1 ;
@@ -997,15 +1001,15 @@ module Revamped = struct
     log_step
       6
       "Check that %s is not in the mempool anymore and that one operation is \
-       applied and the other is branch_delayed between %s and %s."
+       validated and the other is branch_delayed between %s and %s."
       oph1
       oph2
       oph3 ;
     let* mempool = Mempool.get_mempool client in
     Check.(
-      (List.length mempool.applied = 1)
+      (List.length mempool.validated = 1)
         int
-        ~error_msg:"applied mempool should contain only one operation, got %L") ;
+        ~error_msg:"validated mempool should contain only one operation, got %L") ;
     Check.(
       (List.length mempool.branch_delayed = 1)
         int
@@ -1233,13 +1237,13 @@ module Revamped = struct
         client
     in
 
-    log_step 4 "Check that both endorsements are in the applied mempool." ;
+    log_step 4 "Check that both endorsements are in the validated mempool." ;
     let* mempool = Mempool.get_mempool client in
     Check.(
-      (2 = List.length mempool.applied)
+      (2 = List.length mempool.validated)
         int
         ~error_msg:
-          "number of mempool applied operations expected to be %L, got %R") ;
+          "number of mempool validated operations expected to be %L, got %R") ;
 
     log_step 5 "Bake two empty block to force endorsements to be outdated." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
@@ -1306,18 +1310,18 @@ module Revamped = struct
         client1
     in
     let* () = notify_in_node2 in
-    let* () = check_mempool ~applied:[oph2; oph1] client2 in
+    let* () = check_mempool ~validated:[oph2; oph1] client2 in
 
     log_step 3 "Ban %s on node 2." oph1 ;
     let* _ =
       RPC.Client.call client2
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
-    let* () = check_mempool ~applied:[oph2] client2 in
+    let* () = check_mempool ~validated:[oph2] client2 in
 
     log_step 4 "Try to reinject the banned operation in Node 2." ;
     let* _ = inject_op1 node2 client2 in
-    let* () = check_mempool ~applied:[oph2] client2 in
+    let* () = check_mempool ~validated:[oph2] client2 in
 
     log_step 5 "Add node3 connected only to node2." ;
     let* node3, client3 =
@@ -1332,7 +1336,7 @@ module Revamped = struct
 
     log_step 6 "Check %s is not in node3's mempool." oph1 ;
     let* () = synchronize_mempool client3 node3 in
-    let* () = check_mempool ~applied:[oph2] client2 in
+    let* () = check_mempool ~validated:[oph2] client2 in
 
     log_step
       7
@@ -1383,7 +1387,7 @@ module Revamped = struct
     log_step 2 "Inject two transfers op1 and op2." ;
     let* (`OpHash oph1) = inject_op ~wait:true `A in
     let* (`OpHash oph2) = inject_op ~wait:true `B in
-    let* () = check_mempool ~applied:[oph1; oph2] client1 in
+    let* () = check_mempool ~validated:[oph1; oph2] client1 in
 
     log_step 3 "Ban op1 and ensure the operation is not in the mempool." ;
     (* We ban twice to check banning an operation is idempotent. *)
@@ -1395,11 +1399,11 @@ module Revamped = struct
       RPC.Client.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
-    let* () = check_mempool ~applied:[oph2] client1 in
+    let* () = check_mempool ~validated:[oph2] client1 in
 
     log_step 4 "Inject op3." ;
     let* (`OpHash oph3) = inject_op ~wait:true `C in
-    let* () = check_mempool ~applied:[oph3; oph2] client1 in
+    let* () = check_mempool ~validated:[oph3; oph2] client1 in
 
     log_step 5 "Ban op2 and op1 again." ;
     let* _ =
@@ -1410,7 +1414,7 @@ module Revamped = struct
       RPC.Client.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
     in
-    let* () = check_mempool ~applied:[oph3] client1 in
+    let* () = check_mempool ~validated:[oph3] client1 in
 
     log_step 6 "Check that reinjecting op1 fails." ;
     let wait_reinject_op1_banned =
@@ -1418,7 +1422,7 @@ module Revamped = struct
     in
     let _ = inject_op ~wait:false `A in
     let* () = wait_reinject_op1_banned in
-    let* () = check_mempool ~applied:[oph3] client1 in
+    let* () = check_mempool ~validated:[oph3] client1 in
 
     log_step 7 "Unban op1, successfully reinject op1." ;
     let* _ =
@@ -1426,7 +1430,7 @@ module Revamped = struct
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph1)) ()
     in
     let* _ = inject_op ~wait:true `A in
-    let* () = check_mempool ~applied:[oph3; oph1] client1 in
+    let* () = check_mempool ~validated:[oph3; oph1] client1 in
 
     log_step 8 "Check that reinjecting op2 still fails." ;
     let wait_reinject_op2_banned =
@@ -1442,7 +1446,7 @@ module Revamped = struct
     in
 
     let* _ = inject_op ~wait:true `B in
-    let* () = check_mempool ~applied:[oph3; oph2; oph1] client1 in
+    let* () = check_mempool ~validated:[oph3; oph2; oph1] client1 in
 
     log_step 10 "Ban op1 again, check that reinjecting it fails." ;
     let* _ =
@@ -1455,7 +1459,7 @@ module Revamped = struct
     in
     let _ = inject_op ~wait:false `A in
     let* () = wait_reinject_op1_banned_again in
-    let* () = check_mempool ~applied:[oph3; oph2] client1 in
+    let* () = check_mempool ~validated:[oph3; oph2] client1 in
 
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
     let* _ =
@@ -1466,7 +1470,7 @@ module Revamped = struct
       RPC.Client.call client1
       @@ RPC.post_chain_mempool_unban_operation ~data:(Data (`String oph2)) ()
     in
-    check_mempool ~applied:[oph3; oph2] client1
+    check_mempool ~validated:[oph3; oph2] client1
 
   (* This tests ban operations and then use the `unban_all` RPC on
      those operation. We check those operations are then propagated if
@@ -1520,7 +1524,7 @@ module Revamped = struct
     let* (`OpHash oph4) = inject_op ~wait:true `D client2 in
 
     log_step 3 "Ban the first three of these operations." ;
-    let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
+    let* () = check_mempool ~validated:[oph4; oph3; oph2; oph1] client1 in
     let* _ =
       RPC.Client.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph1)) ()
@@ -1533,7 +1537,7 @@ module Revamped = struct
       RPC.Client.call client1
       @@ RPC.post_chain_mempool_ban_operation ~data:(Data (`String oph3)) ()
     in
-    let* () = check_mempool ~applied:[oph4] client1 in
+    let* () = check_mempool ~validated:[oph4] client1 in
 
     log_step 4 "Unban all operations." ;
     (* We expect to receive three operations are the synchronisation. *)
@@ -1546,9 +1550,10 @@ module Revamped = struct
     let* () = synchronize_mempool client1 node1 in
     let* () = wait1 and* () = wait2 and* () = wait3 in
 
-    Log.info "Step 5: Check that node 1 contains the right applied operations." ;
-    let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
-    check_mempool ~applied:[oph4; oph3; oph2; oph1] client2
+    Log.info
+      "Step 5: Check that node 1 contains the right validated operations." ;
+    let* () = check_mempool ~validated:[oph4; oph3; oph2; oph1] client1 in
+    check_mempool ~validated:[oph4; oph3; oph2; oph1] client2
 
   let test_full_mempool =
     Protocol.register_test
@@ -1604,8 +1609,8 @@ module Revamped = struct
            Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4]
     in
 
-    log_step 3 "Check these operations are applied in mempool." ;
-    let* () = check_mempool ~applied:ops client1 in
+    log_step 3 "Check these operations are validated in mempool." ;
+    let* () = check_mempool ~validated:ops client1 in
 
     log_step
       4
@@ -1648,12 +1653,12 @@ module Revamped = struct
     in
 
     log_step 6 "Check that this extra operation is branch_delayed." ;
-    let* () = check_mempool ~applied:ops ~branch_delayed:[oph5] client1 in
+    let* () = check_mempool ~validated:ops ~branch_delayed:[oph5] client1 in
 
     log_step
       7
       "Check that the new operation is not propagated as part of a mempool." ;
-    let* () = check_mempool ~applied:ops client2 in
+    let* () = check_mempool ~validated:ops client2 in
 
     log_step 8 "Inject an extra operation with more fees for same gas." ;
     let* (`OpHash oph6) =
@@ -1669,16 +1674,16 @@ module Revamped = struct
 
     log_step
       9
-      "Check that this extra operation is applied and replaces one with lower \
-       fees." ;
+      "Check that this extra operation is validated and replaces one with \
+       lower fees." ;
     let removed_oph, kept_ops =
       match ops with
       | [] -> assert false
-      | removed :: applied -> (removed, applied)
+      | removed :: validated -> (removed, validated)
     in
     let* () =
       check_mempool
-        ~applied:(oph6 :: kept_ops)
+        ~validated:(oph6 :: kept_ops)
         ~branch_delayed:[removed_oph; oph5]
         client1
     in
@@ -1686,7 +1691,7 @@ module Revamped = struct
     log_step 10 "Check that this new operation is propagated." ;
     let* () =
       check_mempool
-        ~applied:(oph6 :: kept_ops)
+        ~validated:(oph6 :: kept_ops)
         ~branch_delayed:[removed_oph]
         client2
     in
@@ -1702,7 +1707,7 @@ module Revamped = struct
     in
     let* () =
       check_mempool
-        ~applied:(oph6 :: kept_ops)
+        ~validated:(oph6 :: kept_ops)
         ~branch_delayed:[removed_oph; oph5]
         client1
     in
@@ -1765,7 +1770,7 @@ module Revamped = struct
         ~gas_limit
         client1
     in
-    let* () = check_mempool ~applied:[oph1] client1 in
+    let* () = check_mempool ~validated:[oph1] client1 in
 
     log_step 3 "Inject an operation with more fees, with different source" ;
     let* (`OpHash oph2) =
@@ -1779,7 +1784,7 @@ module Revamped = struct
         ~gas_limit
         client1
     in
-    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph1] client1 in
+    let* () = check_mempool ~validated:[oph2] ~branch_delayed:[oph1] client1 in
 
     log_step
       4
@@ -1796,7 +1801,7 @@ module Revamped = struct
         client1
     in
     let* () =
-      check_mempool ~applied:[oph3] ~branch_delayed:[oph1; oph2] client1
+      check_mempool ~validated:[oph3] ~branch_delayed:[oph1; oph2] client1
     in
 
     log_step
@@ -1815,7 +1820,7 @@ module Revamped = struct
     in
     let* () =
       check_mempool
-        ~applied:[oph4]
+        ~validated:[oph4]
         ~branch_delayed:[oph1; oph2]
         ~outdated:[oph3]
         client1
@@ -1887,24 +1892,26 @@ module Revamped = struct
     in
     let* mempool = Mempool.get_mempool client in
     Check.(
-      (List.length mempool.applied = 1)
+      (List.length mempool.validated = 1)
         int
-        ~error_msg:"Expected only %R applied op, got %L") ;
+        ~error_msg:"Expected only %R validated op, got %L") ;
 
     log_step
       4
-      "Inject two valid operations and check that they are in the applied \
+      "Inject two valid operations and check that they are in the validated \
        mempool" ;
     let* injected_ops =
       Operation.(inject_operations [List.nth ops 2; List.nth ops 3] client)
     in
     let injected_ops = List.map (fun (`OpHash op) -> op) injected_ops in
-    let* () = check_mempool ~applied:(injected_ops @ mempool.applied) client in
+    let* () =
+      check_mempool ~validated:(injected_ops @ mempool.validated) client
+    in
 
     log_step
       5
       "Force inject two operations, an invalid one and a valid one. Check that \
-       the first one is `branch_refused` and the second is in the applied \
+       the first one is `branch_refused` and the second is in the validated \
        mempool" ;
     let* injected_ops2 =
       Operation.(
@@ -1912,17 +1919,17 @@ module Revamped = struct
     in
     let injected_ops2 = List.map (fun (`OpHash op) -> op) injected_ops2 in
     check_mempool
-      ~applied:((List.nth injected_ops2 1 :: injected_ops) @ mempool.applied)
+      ~validated:((List.nth injected_ops2 1 :: injected_ops) @ mempool.validated)
       ~branch_refused:[List.nth injected_ops2 0]
       client
 
   (** This test injects a well-formed batch of manager operations and
-      checks that it is [applied] in the mempool. *)
+      checks that it is [validated] in the mempool. *)
   let test_inject_manager_batch =
     Protocol.register_test
       ~__FILE__
       ~title:"Inject manager batch"
-      ~tags:["mempool"; "manager"; "batch"; "injection"; "applied"]
+      ~tags:["mempool"; "manager"; "batch"; "injection"; "validated"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* _node, client =
@@ -1948,23 +1955,25 @@ module Revamped = struct
       Operation.Manager.inject batch client
     in
 
-    log_step 3 "Check that the batch is correctly [applied] in the mempool." ;
+    log_step 3 "Check that the batch is correctly [validated] in the mempool." ;
     let* mempool_json =
-      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+      RPC.Client.call client
+      @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
     in
     let mempool = Mempool.of_json mempool_json in
-    Mempool.check_mempool ~applied:[oph] mempool ;
+    Mempool.check_mempool ~validated:[oph] mempool ;
     Log.info
-      "The mempool contains exactly one [applied] operation with the correct \
+      "The mempool contains exactly one [validated] operation with the correct \
        hash." ;
     let batch_payloads =
-      JSON.(mempool_json |-> "applied" |=> 0 |-> "contents" |> as_list)
+      JSON.(mempool_json |-> "validated" |=> 0 |-> "contents" |> as_list)
     in
     Check.(
       (List.compare_length_with batch_payloads n_transactions = 0)
         int
-        ~error_msg:"The [applied] batch has a wrong number of manager payloads.") ;
-    Log.info "The [applied] batch as the correct number of manager payloads." ;
+        ~error_msg:
+          "The [validated] batch has a wrong number of manager payloads.") ;
+    Log.info "The [validated] batch as the correct number of manager payloads." ;
     unit
 
   (** Runs a network of three nodes, one of which has a disabled mempool.
@@ -2037,11 +2046,11 @@ module Revamped = struct
     in
     log_step
       4
-      "Ensure that the operation is applied on first two nodes, but not on the \
-       third." ;
-    let* () = check_mempool ~applied:[oph1] client1 in
-    let* () = check_mempool ~applied:[oph1] client2 in
-    let* () = check_mempool ~applied:[] client3 in
+      "Ensure that the operation is validated on first two nodes, but not on \
+       the third." ;
+    let* () = check_mempool ~validated:[oph1] client1 in
+    let* () = check_mempool ~validated:[oph1] client2 in
+    let* () = check_mempool ~validated:[] client3 in
     log_step
       5
       "Check that injecting an operation into the node with disabled mempool \

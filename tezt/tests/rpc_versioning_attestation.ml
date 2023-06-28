@@ -77,7 +77,7 @@ let check_kind json kind =
 
 let check_version ~version ~use_legacy_name ~check ~rpc ~get_name ~data client =
   let* t = RPC.Client.call client @@ rpc ~version data in
-  return (check t (get_name use_legacy_name))
+  return (check ~use_legacy_name t (get_name use_legacy_name))
 
 let check_unknown_version ~version ~rpc ~data client =
   let*? p = RPC.Client.spawn client @@ rpc ~version data in
@@ -379,7 +379,7 @@ module Parse = struct
       ~version
       (`A [JSON.unannotate raw])
 
-  let check_parsed_kind json kind =
+  let check_parsed_kind ~use_legacy_name:_ json kind =
     check_kind JSON.(json |> as_list |> List.hd) kind
 
   let create_raw_op ~protocol op client =
@@ -484,7 +484,7 @@ module Mempool = struct
       Operation.inject ~force:true ~request:`Inject consensus_op client
     in
 
-    let check json =
+    let check ~use_legacy_name:_ json =
       check_kind JSON.(json |-> "refused" |> as_list |> List.hd)
     in
     let get_name = Operation.Consensus.kind_to_string kind in
@@ -527,8 +527,12 @@ module Mempool = struct
       Operation.inject ~force:true ~request:`Inject consensus_op client
     in
 
-    let check json =
-      check_kind JSON.(json |-> "applied" |> as_list |> List.hd)
+    let check ~use_legacy_name json =
+      check_kind
+        JSON.(
+          json
+          |-> (if use_legacy_name then "applied" else "validated")
+          |> as_list |> List.hd)
     in
     let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
     check_rpc_versions
@@ -818,7 +822,7 @@ module Run_Simulate = struct
 
       let rpc ~version data = get_rpc rpc ~version data in
       check_rpc_versions
-        ~check:check_kind
+        ~check:(fun ~use_legacy_name:_ -> check_kind)
         ~rpc
         ~get_name:(Operation.Anonymous.kind_to_string double_evidence_kind)
         ~data:op_json
@@ -912,7 +916,9 @@ module Preapply = struct
           consensus_op
       in
       let get_name = Operation.Consensus.kind_to_string kind in
-      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      let check ~use_legacy_name:_ json =
+        check_kind JSON.(json |> as_list |> List.hd)
+      in
       check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
     in
     let* () = preapply_op ~use_legacy_name:true in
@@ -949,7 +955,9 @@ module Preapply = struct
           double_consensus_evidence_op
       in
       let get_name = Operation.Anonymous.kind_to_string double_evidence_kind in
-      let check json = check_kind JSON.(json |> as_list |> List.hd) in
+      let check ~use_legacy_name:_ json =
+        check_kind JSON.(json |> as_list |> List.hd)
+      in
       check_rpc_versions ~check ~rpc ~get_name ~data:consensus_json client
     in
     let* () = preapply_op ~use_legacy_name:true in

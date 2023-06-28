@@ -730,6 +730,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           'a,
           'b,
           < version : version
+          ; applied : bool option
           ; validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool
@@ -762,6 +763,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           'a,
           'b,
           < version : version
+          ; applied : bool option
           ; validated : bool
           ; branch_delayed : bool
           ; branch_refused : bool

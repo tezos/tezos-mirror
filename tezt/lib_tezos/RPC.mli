@@ -451,7 +451,7 @@ val get_chain_block_operations_validation_pass :
 val get_chain_mempool_pending_operations :
   ?chain:string ->
   ?version:string ->
-  ?applied:bool ->
+  ?validated:bool ->
   ?branch_delayed:bool ->
   ?branch_refused:bool ->
   ?refused:bool ->
@@ -467,7 +467,7 @@ val get_chain_mempool_pending_operations :
 val get_chain_mempool_monitor_operations :
   ?chain:string ->
   ?version:string ->
-  ?applied:bool ->
+  ?validated:bool ->
   ?branch_delayed:bool ->
   ?branch_refused:bool ->
   ?refused:bool ->

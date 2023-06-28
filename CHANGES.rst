@@ -92,11 +92,13 @@ Node
   ``preattestation``, ``double_attestation_evidence`` and
   ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8840`)
 
-- Added version ``2`` to RPC ``POST ../mempool/pending_operations``. It can be
+- Added version ``2`` to RPC ``GET ../mempool/pending_operations``. It can be
   used by calling the RPC with the parameter ``?version=2`` (default version is
   still ``1``). Version ``2`` allows the RPC to output ``attestation``,
   ``preattestation``, ``double_attestation_evidence`` and
-  ``double_preattestation_evidence`` kinds in the JSON result. (MR :gl:`!8960`)
+  ``double_preattestation_evidence`` kinds in the JSON result. This version
+  also renames the ``applied`` field of the result to ``validated``
+  (MRs :gl:`!8960`, :gl:`!9143`)
 
 - RPCs ``/helpers/scripts/run_operation`` and
   ``/helpers/scripts/simulate_operation`` can now take JSON formatted operations
@@ -140,7 +142,7 @@ Node
   the "reverting its effect if it was applied" part since operations
   are never applied.) (MR :gl:`!8857`)
 
-- Added version ``1`` to RPC ``POST ../mempool/monitor_operations``. It can be
+- Added version ``1`` to RPC ``GET ../mempool/monitor_operations``. It can be
   used by calling the RPC with the parameter ``?version=1`` (default version is
   still ``0``). Version ``1`` allows the RPC to output ``attestation``,
   ``preattestation``, ``double_attestation_evidence`` and
@@ -172,6 +174,10 @@ Node
 - Improved the performance of block validation: the block validation time has
   been reduced by half on average, resulting in a reduced propagation time
   through the network. (MR :gl:`!9100`)
+
+- Added ``validated`` argument for ``GET ../mempool/monitor_operations`` and
+  ``GET ../mempool/pending_operations``. ``applied`` argument of these RPCs is
+  deprecated. (MR :gl:`!9143`)
 
 Client
 ------

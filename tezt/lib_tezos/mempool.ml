@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type t = {
-  applied : string list;
+  validated : string list;
   branch_delayed : string list;
   branch_refused : string list;
   refused : string list;
@@ -40,7 +40,7 @@ let typ : t Check.typ =
   convert
     (fun mempool ->
       sort
-        (mempool.applied
+        (mempool.validated
         @ sort mempool.branch_delayed
         @ sort mempool.branch_refused
         @ sort mempool.refused @ sort mempool.outdated
@@ -54,7 +54,7 @@ let classified_typ : t Check.typ =
   convert
     (fun mempool ->
       [
-        sort mempool.applied;
+        sort mempool.validated;
         sort mempool.branch_delayed;
         sort mempool.branch_refused;
         sort mempool.refused;
@@ -65,7 +65,7 @@ let classified_typ : t Check.typ =
 
 let empty =
   {
-    applied = [];
+    validated = [];
     branch_delayed = [];
     branch_refused = [];
     refused = [];
@@ -80,7 +80,7 @@ let symmetric_diff left right =
       @ filter (fun op -> not (mem op left)) right)
   in
   {
-    applied = diff left.applied right.applied;
+    validated = diff left.validated right.validated;
     branch_delayed = diff left.branch_delayed right.branch_delayed;
     branch_refused = diff left.branch_refused right.branch_refused;
     refused = diff left.refused right.refused;
@@ -93,23 +93,23 @@ let of_json mempool_json =
   let get_hashes classification =
     List.map get_hash JSON.(mempool_json |-> classification |> as_list)
   in
-  let applied = get_hashes "applied" in
+  let validated = get_hashes "validated" in
   let branch_delayed = get_hashes "branch_delayed" in
   let branch_refused = get_hashes "branch_refused" in
   let refused = get_hashes "refused" in
   let outdated = get_hashes "outdated" in
   let unprocessed = get_hashes "unprocessed" in
-  {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
+  {validated; branch_delayed; branch_refused; refused; outdated; unprocessed}
 
-let get_mempool ?endpoint ?hooks ?chain ?(applied = true)
+let get_mempool ?endpoint ?hooks ?chain ?(validated = true)
     ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
     ?(outdated = true) ?(validation_passes = []) client =
   let* mempool_json =
     RPC.Client.call client ?hooks ?endpoint
     @@ RPC.get_chain_mempool_pending_operations
          ?chain
-         ~version:"1"
-         ~applied
+         ~version:"2"
+         ~validated
          ~branch_delayed
          ~branch_refused
          ~refused
@@ -119,10 +119,11 @@ let get_mempool ?endpoint ?hooks ?chain ?(applied = true)
   in
   return (of_json mempool_json)
 
-let check_mempool ?(applied = []) ?(branch_delayed = []) ?(branch_refused = [])
-    ?(refused = []) ?(outdated = []) ?(unprocessed = []) mempool =
+let check_mempool ?(validated = []) ?(branch_delayed = [])
+    ?(branch_refused = []) ?(refused = []) ?(outdated = []) ?(unprocessed = [])
+    mempool =
   let expected_mempool =
-    {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
+    {validated; branch_delayed; branch_refused; refused; outdated; unprocessed}
   in
   Check.(
     (expected_mempool = mempool)

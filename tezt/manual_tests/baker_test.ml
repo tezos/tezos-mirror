@@ -72,35 +72,36 @@ let init_status expected_consensus_ops =
 (* This function only returns when all operations have been processed by the
    prevalidator, this should avoid analysing mempool where operation are not yet
    classified *)
-let rec get_mempool ?applied ?branch_delayed client =
+let rec get_mempool ?validated ?branch_delayed client =
   let* mempool =
     Mempool.get_mempool
-      ?applied
+      ?validated
       ?branch_delayed
       ~refused:false
       ~outdated:false
       ~branch_refused:false
       client
   in
-  if mempool.unprocessed <> [] then get_mempool ?applied ?branch_delayed client
+  if mempool.unprocessed <> [] then
+    get_mempool ?validated ?branch_delayed client
   else return mempool
 
-(* This function checks that all [ophs] are included in the applied or
+(* This function checks that all [ophs] are included in the validated or
    branch_delayed mempool. *)
-let check_ophs_in_mempool ~applied ophs (mempool : Mempool.t) =
+let check_ophs_in_mempool ~validated ophs (mempool : Mempool.t) =
   let ophs_seen =
     List.for_all
       (fun op ->
         List.mem
           op
-          (if applied then mempool.applied else mempool.branch_delayed))
+          (if validated then mempool.validated else mempool.branch_delayed))
       ophs
   in
   if not ophs_seen then
     failwith
       (sf
          "Not all expected operations are classified as %s in the mempool"
-         (if applied then "applied" else "branch_delayed"))
+         (if validated then "validated" else "branch_delayed"))
 
 (* This test checks that the baker can start to pre-attest a proposal before
    the block application finishes in the node. On Mumbai, pre-attestation should
@@ -127,7 +128,7 @@ let baker_early_preattestation_test =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, Some Constants_mainnet))
       (* Hard_gas_limit_per_block is increased to be able to propose block that
-         take multiple second to be applied by a node. *)
+         take multiple second to be validated by a node. *)
       [(["hard_gas_limit_per_block"], `String "10_000_000")]
   in
   let* () =
@@ -301,7 +302,7 @@ let baker_early_preattestation_test =
   Log.info
     "While waiting for the round 0 to finish, craft multiple operations that \
      consume a lot of gas unit and inject them on %s. The goal is to craft a \
-     block that take a significant time to be applied at level: %d."
+     block that take a significant time to be validated at level: %d."
     (Node.name node1)
     test_lvl ;
   let* ops = craft_heavy_mempool client1 contract_hash bootstraps in
@@ -316,11 +317,11 @@ let baker_early_preattestation_test =
   in
 
   Log.info
-    "Ensure that these operations are applied in the %s mempool."
+    "Ensure that these operations are validated in the %s mempool."
     (Node.name node1) ;
   let* mempool = get_mempool ~branch_delayed:false client1 in
   check_ophs_in_mempool
-    ~applied:true
+    ~validated:true
     (List.map (fun (`OpHash oph) -> oph) transactions_ophs)
     mempool ;
 
@@ -462,28 +463,28 @@ let baker_early_preattestation_test =
     test_lvl ;
   let* _baker = Baker.continue baker1 in
 
-  let preattestation_should_be_applied = Protocol.(number protocol > 16) in
+  let preattestation_should_be_validated = Protocol.(number protocol > 16) in
 
   (* Wait for the pre-attestations to be included and for the pqc to be reached
      before application *)
   let get_preattestation_mempool =
     get_mempool
-      ~applied:preattestation_should_be_applied
-      ~branch_delayed:(not preattestation_should_be_applied)
+      ~validated:preattestation_should_be_validated
+      ~branch_delayed:(not preattestation_should_be_validated)
   in
-  let* () = if preattestation_should_be_applied then pqc_t1 else unit
+  let* () = if preattestation_should_be_validated then pqc_t1 else unit
   and* () = preattestation_t1 in
   let* mempool1 = get_preattestation_mempool client1 in
 
-  let* () = if preattestation_should_be_applied then pqc_t2 else unit
+  let* () = if preattestation_should_be_validated then pqc_t2 else unit
   and* () = preattestation_t2 in
   let* mempool2 = get_preattestation_mempool client2 in
   Log.info
     "%s have proposed, both baker have pre-attested for their delegates%s"
     (Baker.name baker1)
-    (if preattestation_should_be_applied then
+    (if preattestation_should_be_validated then
      " and the pqc is reached. Ensure that the pre-attestations are injected \
-      in the nodes as applied operation"
+      in the nodes as validated operation"
     else
       ". Ensure that the pre-attestations are injected in the nodes as \
        branch_delayed operation") ;
@@ -491,17 +492,17 @@ let baker_early_preattestation_test =
   let expected_preattestations status_a status_b =
     List.of_seq
     @@
-    if preattestation_should_be_applied then
+    if preattestation_should_be_validated then
       String_set.to_seq
         (String_set.union !status_a.preattestations !status_b.preattestations)
     else String_set.to_seq !status_a.preattestations
   in
   check_ophs_in_mempool
-    ~applied:preattestation_should_be_applied
+    ~validated:preattestation_should_be_validated
     (expected_preattestations status1 status2)
     mempool1 ;
   check_ophs_in_mempool
-    ~applied:preattestation_should_be_applied
+    ~validated:preattestation_should_be_validated
     (expected_preattestations status2 status1)
     mempool2 ;
 
@@ -510,22 +511,22 @@ let baker_early_preattestation_test =
      it." ;
   (* Wait for the attestations to be included *)
   let* () = attestations_t1 in
-  let* mempool1 = get_mempool ~applied:true ~branch_delayed:false client1 in
+  let* mempool1 = get_mempool ~validated:true ~branch_delayed:false client1 in
 
   let* () = attestations_t2 in
-  let* mempool2 = get_mempool ~applied:true ~branch_delayed:false client2 in
+  let* mempool2 = get_mempool ~validated:true ~branch_delayed:false client2 in
   Log.info
-    "Ensure that the attestations as well as the pre-attestations are applied \
-     in the mempools" ;
+    "Ensure that the attestations as well as the pre-attestations are \
+     validated in the mempools" ;
   check_ophs_in_mempool
-    ~applied:true
+    ~validated:true
     (List.of_seq
     @@ Seq.append
          (String_set.to_seq !status1.preattestations)
          (String_set.to_seq !status1.attestations))
     mempool1 ;
   check_ophs_in_mempool
-    ~applied:true
+    ~validated:true
     (List.of_seq
     @@ Seq.append
          (String_set.to_seq !status2.preattestations)
