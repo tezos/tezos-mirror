@@ -94,9 +94,12 @@ end
 
 module type MOD_ARITH = functor (L : LIB) -> sig
   open L
+  open L.Encodings
 
   (* type of modular integers *)
   type mod_int
+
+  val mod_int_encoding : (S.t list, mod_int repr, mod_int) encoding
 
   (* label to refer to this set of parameters *)
   val label : string
@@ -138,6 +141,12 @@ module type MOD_ARITH = functor (L : LIB) -> sig
 
   val scalars_of_mod_int : mod_int repr -> scalar list repr t
 
+  (* [bytes_of_mod_int padded n] returns a Boolean list representing the little
+     endian bit decomposition of the given integer [n]. The default length of
+     the list is [nb_limbs] * [base]. If padded is true, padding with zeros is
+     done to get the length multiple of 8. *)
+  val bytes_of_mod_int : ?padded:bool -> mod_int repr -> Bytes.bl repr t
+
   val constant : Z.t -> mod_int repr t
 
   val zero : mod_int repr t
@@ -167,6 +176,10 @@ module type MOD_ARITH = functor (L : LIB) -> sig
   (* Inversion of a non-invertible value (mod [modulus]) will make
      the circuit unsatisfiable *)
   val inv : mod_int repr -> mod_int repr t
+
+  val add_constant : mod_int repr -> Z.t -> mod_int repr t
+
+  val mul_constant : mod_int repr -> Z.t -> mod_int repr t
 end
 
 (* Checks that the parameters are sound for implementing modular arithmetic,
@@ -520,9 +533,12 @@ functor
   ->
   struct
     open L
+    open L.Encodings
     include Params
 
     type mod_int = scalar list
+
+    let mod_int_encoding = atomic_list_encoding scalar_encoding
 
     let nb_limbs = Utils.min_nb_limbs ~modulus ~base
 
@@ -556,6 +572,23 @@ functor
       >* ret ls
 
     let scalars_of_mod_int n = ret n
+
+    let pad_bytes b =
+      let len8 = Bytes.length b mod 8 in
+      if len8 = 0 then ret b
+      else
+        let* b_false = Bool.constant false in
+        let zeros = List.init (8 - len8) (fun _i -> b_false) in
+        ret @@ to_list (of_list b @ zeros)
+
+    (* n is in a big-endian form = [n_k; ..; n_0] *)
+    let bytes_of_mod_int ?(padded = false) n =
+      let nb_bits = Z.log2 base in
+      let* sn = scalars_of_mod_int n in
+      let* bln = mapM (bits_of_scalar ~nb_bits) (List.rev @@ of_list sn) in
+      let bln = List.map of_list bln in
+      let res = to_list (List.concat bln) in
+      if padded then pad_bytes res else ret res
 
     let constant n = mapM Num.constant @@ scalar_limbs_of_z n <$> to_list
 
@@ -655,6 +688,14 @@ functor
         ~qm_bound:(fst bounds_mul)
         ~ts_bounds:(snd bounds_mul)
         diff
+
+    let add_constant xs n =
+      let* n = constant n in
+      add xs n
+
+    let mul_constant xs n =
+      let* n = constant n in
+      mul xs n
   end
 
 module ArithMod25519 = Make (struct

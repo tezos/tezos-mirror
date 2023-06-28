@@ -196,9 +196,26 @@ module ModArith (M : Plompiler__.Gadget_mod_arith.MOD_ARITH) (L : LIB) = struct
         ([!(-1); !2], !2, false);
       ]
 
+  let bytes_of_mod_int_circuit ~expected x () =
+    let* z_exp = input ~kind:`Public expected in
+    let* x = ModArith.input_mod_int x in
+    let* z = ModArith.bytes_of_mod_int ~padded:true x in
+    assert_equal z_exp z
+
+  let tests_bytes_of_mod_int =
+    let m = ModArith.modulus in
+    let valid = true in
+    let name = "ModArith.test_bytes_of_mod_int" ^ name_suffix valid in
+    List.init 5 (fun _i ->
+        let x = random_mod_int ~modulus:m () in
+        let expected =
+          Bytes.input_bytes ~le:true @@ Stdlib.Bytes.of_string @@ Z.to_bits x
+        in
+        test ~valid ~name (bytes_of_mod_int_circuit ~expected x))
+
   let tests =
     tests_mod_add @ tests_mod_sub @ tests_mod_neg @ tests_mod_constant
-    @ tests_mod_mul
+    @ tests_mod_mul @ tests_bytes_of_mod_int
 end
 
 module ModArith_prime (M : Plompiler__.Gadget_mod_arith.MOD_ARITH) (L : LIB) =

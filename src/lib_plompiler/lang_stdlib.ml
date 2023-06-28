@@ -103,11 +103,11 @@ module type LIB = sig
   module Bytes : sig
     type bl = bool list
 
-    val input_bytes : ?le:bool -> bytes -> bl Input.t
+    val input_bytes : le:bool -> bytes -> bl Input.t
 
-    val constant : ?le:bool -> bytes -> bl repr t
+    val constant : le:bool -> bytes -> bl repr t
 
-    val constant_uint32 : ?le:bool -> Stdint.uint32 -> bl repr t
+    val constant_uint32 : le:bool -> Stdint.uint32 -> bl repr t
 
     (* length in bits *)
     val length : bl repr -> int
@@ -612,9 +612,9 @@ module Lib (C : COMMON) = struct
 
     let input_bitlist l = Input.list (List.map Input.bool l)
 
-    let input_bytes ?le b = input_bitlist @@ Utils.bitlist ?le b
+    let input_bytes ~le b = input_bitlist @@ Utils.bitlist ~le b
 
-    let constant ?(le = false) b =
+    let constant ~le b =
       let bl = Utils.bitlist ~le b in
       let* ws =
         foldM
@@ -626,7 +626,7 @@ module Lib (C : COMMON) = struct
       in
       ret @@ to_list @@ List.rev ws
 
-    let constant_uint32 ?(le = false) u32 =
+    let constant_uint32 ~le u32 =
       let b = Stdlib.Bytes.create 4 in
       Stdint.Uint32.to_bytes_big_endian u32 b 0 ;
       constant ~le b

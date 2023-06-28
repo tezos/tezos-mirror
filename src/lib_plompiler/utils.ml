@@ -42,8 +42,8 @@ let alpha = Z.(shift_left one (Z.numbits S.order) - S.order)
   - : int = 256
 *)
 
-let bitlist : ?le:bool -> bytes -> bool list =
- fun ?(le = false) b ->
+let bitlist : le:bool -> bytes -> bool list =
+ fun ~le b ->
   let l = Bytes.length b in
   (* Depending on endianess we start, stop and step in different directions. *)
   let start = if le then 0 else l - 1 in
@@ -73,8 +73,8 @@ let bitlist : ?le:bool -> bytes -> bool list =
 (* Takes a list of booleans (typically from the Plompiler Bytes representation)
    and returns OCaml Bytes. Works only if the input length is a multiple of a
    byte. *)
-let of_bitlist : ?le:bool -> bool list -> bytes =
- fun ?(le = false) bl ->
+let of_bitlist : le:bool -> bool list -> bytes =
+ fun ~le bl ->
   assert (List.length bl mod 8 = 0) ;
   let rec loop_byte acc rest =
     match rest with
@@ -148,6 +148,19 @@ let bool_list_of_z : ?nb_bits:int -> Z.t -> bool list =
         aux (b :: bits) (Z.div z two) (n - 1)
   in
   aux [] z @@ Option.value ~default:(Z.numbits z) nb_bits
+
+let split_exactly list size_chunk =
+  let len = List.length list in
+  let nb_chunks = len / size_chunk in
+  assert (len = size_chunk * nb_chunks) ;
+  List.init nb_chunks (fun i ->
+      let array = Array.of_list list in
+      let array = Array.sub array (i * size_chunk) size_chunk in
+      Array.to_list array)
+
+let bool_list_change_endianness b =
+  assert (List.length b mod 8 = 0) ;
+  split_exactly b 8 |> List.rev |> List.concat
 
 module Z = struct
   include Z

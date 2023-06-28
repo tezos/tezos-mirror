@@ -755,8 +755,8 @@ functor
       assert_equal z z'
 
     let tests_add =
-      let i = input_bytes @@ Stdlib.Bytes.of_string "\008" in
-      let o = input_bytes @@ Stdlib.Bytes.of_string "\016" in
+      let i = input_bytes ~le:false @@ Stdlib.Bytes.of_string "\008" in
+      let o = input_bytes ~le:false @@ Stdlib.Bytes.of_string "\016" in
       [
         test ~valid:true ~name:"Bytes.test_add" @@ test_add i i o;
         test ~valid:false ~name:"Bytes.test_add" @@ test_add o o i;
@@ -770,11 +770,11 @@ functor
       assert_equal z z'
 
     let tests_xor =
-      let i = input_bytes @@ bytes_of_hex "08" in
-      let o = input_bytes @@ bytes_of_hex "00" in
-      let i1 = input_bytes @@ bytes_of_hex "510e527f" in
-      let i2 = input_bytes @@ bytes_of_hex "00000041" in
-      let o1 = input_bytes @@ bytes_of_hex "510e523e" in
+      let i = input_bytes ~le:false @@ bytes_of_hex "08" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "00" in
+      let i1 = input_bytes ~le:false @@ bytes_of_hex "510e527f" in
+      let i2 = input_bytes ~le:false @@ bytes_of_hex "00000041" in
+      let o1 = input_bytes ~le:false @@ bytes_of_hex "510e523e" in
       [
         test ~valid:true ~name:"Bytes.test_xor" @@ test_xor i i o;
         test ~valid:true ~name:"Bytes.blake" @@ test_xor i1 i2 o1;
@@ -789,9 +789,9 @@ functor
       assert_equal o o'
 
     let tests_concat =
-      let a = input_bytes @@ bytes_of_hex "08" in
-      let b = input_bytes @@ bytes_of_hex "01" in
-      let o = input_bytes @@ bytes_of_hex "0801" in
+      let a = input_bytes ~le:false @@ bytes_of_hex "08" in
+      let b = input_bytes ~le:false @@ bytes_of_hex "01" in
+      let o = input_bytes ~le:false @@ bytes_of_hex "0801" in
       [test ~valid:true ~name:"Bytes.test_concat" @@ test_concat a b o]
 
     let test_ifthenelse_bytes b l r z () =
@@ -803,8 +803,8 @@ functor
       assert_equal z o
 
     let tests_ifthenelse_bytes =
-      let l = input_bytes @@ bytes_of_hex "01" in
-      let r = input_bytes @@ bytes_of_hex "00" in
+      let l = input_bytes ~le:false @@ bytes_of_hex "01" in
+      let r = input_bytes ~le:false @@ bytes_of_hex "00" in
       [
         test ~valid:true ~name:"Bytes.test_ifthenelse"
         @@ test_ifthenelse_bytes (Input.bool true) l r l;
@@ -823,8 +823,8 @@ functor
     let tests_rotate_left =
       List.map
         (fun (i, a, b) ->
-          let a = input_bytes @@ Stdlib.Bytes.of_string a in
-          let b = input_bytes @@ Stdlib.Bytes.of_string b in
+          let a = input_bytes ~le:false @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes ~le:false @@ Stdlib.Bytes.of_string b in
           test ~valid:true ~name:"Bytes.test_rotate_left"
           @@ test_rotate_left a i b)
         [
@@ -870,8 +870,8 @@ functor
     let tests_rotate_right =
       List.map
         (fun (i, a, b) ->
-          let a = input_bytes @@ Stdlib.Bytes.of_string a in
-          let b = input_bytes @@ Stdlib.Bytes.of_string b in
+          let a = input_bytes ~le:false @@ Stdlib.Bytes.of_string a in
+          let b = input_bytes ~le:false @@ Stdlib.Bytes.of_string b in
           test ~valid:true ~name:"Bytes.test_rotate_right"
           @@ test_rotate_right a i b)
         [
@@ -914,8 +914,8 @@ functor
       assert_equal z z'
 
     let tests_not =
-      let i = Bytes.input_bytes @@ bytes_of_hex "0F" in
-      let o = Bytes.input_bytes @@ bytes_of_hex "F0" in
+      let i = Bytes.input_bytes ~le:false @@ bytes_of_hex "0F" in
+      let o = Bytes.input_bytes ~le:false @@ bytes_of_hex "F0" in
       [
         test ~valid:true ~name:"Bytes.test_not" @@ test_not i o;
         test ~valid:true ~name:"Bytes.test_not" @@ test_not o i;
@@ -931,9 +931,9 @@ functor
     let tests_band =
       List.map
         (fun (valid, a, b, o) ->
-          let a = Bytes.input_bytes @@ bytes_of_hex a in
-          let b = Bytes.input_bytes @@ bytes_of_hex b in
-          let o = Bytes.input_bytes @@ bytes_of_hex o in
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
+          let o = Bytes.input_bytes ~le:false @@ bytes_of_hex o in
           test ~valid ~name:"Bytes.test_band" @@ test_band a b o)
         [
           (true, "00", "00", "00");
@@ -955,8 +955,8 @@ functor
     let tests_shift_left =
       List.map
         (fun (i, a, b) ->
-          let a = Bytes.input_bytes @@ bytes_of_hex a in
-          let b = Bytes.input_bytes @@ bytes_of_hex b in
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
           test ~valid:true ~name:"Bytes.test_shift_left"
           @@ test_shift_left a i b)
         [
@@ -980,8 +980,8 @@ functor
     let tests_shift_right =
       List.map
         (fun (i, a, b) ->
-          let a = Bytes.input_bytes @@ bytes_of_hex a in
-          let b = Bytes.input_bytes @@ bytes_of_hex b in
+          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
+          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
           test ~valid:true ~name:"Bytes.test_shift_right"
           @@ test_shift_right a i b)
         [

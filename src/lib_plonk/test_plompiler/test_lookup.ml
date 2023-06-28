@@ -73,9 +73,9 @@ functor
     let tests_bor_bytes =
       List.map
         (fun (valid, a, b, o) ->
-          let a = Bytes.(input_bytes @@ Stdlib.Bytes.of_string a) in
-          let b = Bytes.(input_bytes @@ Stdlib.Bytes.of_string b) in
-          let o = Bytes.(input_bytes @@ Stdlib.Bytes.of_string o) in
+          let a = Bytes.(input_bytes ~le:false @@ Stdlib.Bytes.of_string a) in
+          let b = Bytes.(input_bytes ~le:false @@ Stdlib.Bytes.of_string b) in
+          let o = Bytes.(input_bytes ~le:false @@ Stdlib.Bytes.of_string o) in
           test ~valid ~name:"Bool.test_bor_bytes" @@ test_bor_bytes a b o)
         [(true, "\0011", "\0101", "\0111"); (false, "\0000", "\0000", "\0001")]
 

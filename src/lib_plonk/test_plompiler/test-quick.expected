@@ -1864,6 +1864,72 @@ Constraints: 2381
 Schnorr.test_circuit_verify_optimized:
 Constraints: 867
 
+Edwards25519.test_add:
+Constraints: 41
+
+Edwards25519.test_add_optimized:
+Constraints: 41
+
+Edwards25519.test_add:
+Constraints: 41
+
+Edwards25519.test_add_optimized:
+Constraints: 41
+
+Edwards25519.test_add:
+Constraints: 41
+
+Edwards25519.test_add_optimized:
+Constraints: 41
+
+Edwards25519.test_cond_add:
+Constraints: 48
+
+Edwards25519.test_cond_add_optimized:
+Constraints: 47
+
+Edwards25519.test_scalar_mul:
+Constraints: 15
+
+Edwards25519.test_scalar_mul_optimized:
+Constraints: 8
+
+Edwards25519.test_scalar_mul:
+Constraints: 15
+
+Edwards25519.test_scalar_mul_optimized:
+Constraints: 8
+
+Edwards25519.test_scalar_mul:
+Constraints: 310
+
+Edwards25519.test_scalar_mul_optimized:
+Constraints: 305
+
+Edwards25519.test_is_on_curve:
+Constraints: 29
+
+Edwards25519.test_is_on_curve_optimized:
+Constraints: 27
+
+Edwards25519.test_multi_scalar_mul:
+Constraints: 495
+
+Edwards25519.test_multi_scalar_mul_optimized:
+Constraints: 485
+
+Edwards25519.test_to_compressed_bytes:
+Constraints: 1532
+
+Edwards25519.test_to_compressed_bytes_optimized:
+Constraints: 561
+
+Edwards25519.test_to_compressed_bytes:
+Constraints: 1532
+
+Edwards25519.test_to_compressed_bytes_optimized:
+Constraints: 561
+
 Merkle.test_merkle_pos:
 Constraints: 1945
 
@@ -2194,6 +2260,36 @@ Constraints: 11
 ModArith.test_mod_mul_25519_optimized:
 Constraints: 11
 
+ModArith.test_bytes_of_mod_int_25519:
+Constraints: 1023
+
+ModArith.test_bytes_of_mod_int_25519_optimized:
+Constraints: 283
+
+ModArith.test_bytes_of_mod_int_25519:
+Constraints: 1023
+
+ModArith.test_bytes_of_mod_int_25519_optimized:
+Constraints: 283
+
+ModArith.test_bytes_of_mod_int_25519:
+Constraints: 1023
+
+ModArith.test_bytes_of_mod_int_25519_optimized:
+Constraints: 283
+
+ModArith.test_bytes_of_mod_int_25519:
+Constraints: 1023
+
+ModArith.test_bytes_of_mod_int_25519_optimized:
+Constraints: 283
+
+ModArith.test_bytes_of_mod_int_25519:
+Constraints: 1023
+
+ModArith.test_bytes_of_mod_int_25519_optimized:
+Constraints: 283
+
 ModArith.test_mod_div_25519:
 Constraints: 9
 
@@ -2613,6 +2709,36 @@ Constraints: 9
 
 ModArith.test_mod_mul_64_optimized:
 Constraints: 9
+
+ModArith.test_bytes_of_mod_int_64:
+Constraints: 256
+
+ModArith.test_bytes_of_mod_int_64_optimized:
+Constraints: 70
+
+ModArith.test_bytes_of_mod_int_64:
+Constraints: 256
+
+ModArith.test_bytes_of_mod_int_64_optimized:
+Constraints: 70
+
+ModArith.test_bytes_of_mod_int_64:
+Constraints: 256
+
+ModArith.test_bytes_of_mod_int_64_optimized:
+Constraints: 70
+
+ModArith.test_bytes_of_mod_int_64:
+Constraints: 256
+
+ModArith.test_bytes_of_mod_int_64_optimized:
+Constraints: 70
+
+ModArith.test_bytes_of_mod_int_64:
+Constraints: 256
+
+ModArith.test_bytes_of_mod_int_64_optimized:
+Constraints: 70
 
 Edwards.test_add:
 Constraints: 4
