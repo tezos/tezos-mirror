@@ -30,7 +30,7 @@ open Tezos_scoru_wasm
 type eval_step =
   | Tick  (** Tick per tick *)
   | Result  (** Up to Eval (Result (SK_Result _ | SK_Trap _)) *)
-  | Kernel_run  (** Up to the end of the current `kernal_run` *)
+  | Kernel_run  (** Up to the end of the current `kernel_run` *)
   | Inbox  (** Until input requested *)
 
 (* Possible commands for the REPL. *)
@@ -51,6 +51,7 @@ type commands =
   | Reveal_metadata
   | Profile of bool
   | Unknown of string
+  | Help
   | Stop
 
 let parse_eval_step = function
@@ -60,60 +61,200 @@ let parse_eval_step = function
   | "inbox" -> Some Inbox
   | _ -> None
 
-let parse_memory_commands full_command = function
+let parse_memory_commands = function
   | ["at"; address; "for"; length; "bytes"] -> (
       match (Int32.of_string_opt address, int_of_string_opt length) with
-      | Some address, Some length -> Show_memory (address, length, `Hex)
-      | _, _ -> Unknown full_command)
+      | Some address, Some length -> Some (Show_memory (address, length, `Hex))
+      | _, _ -> None)
   | ["at"; address; "for"; length; "bytes"; "as"; "string"] -> (
       match (Int32.of_string_opt address, int_of_string_opt length) with
-      | Some address, Some length -> Show_memory (address, length, `String)
-      | _, _ -> Unknown full_command)
+      | Some address, Some length ->
+          Some (Show_memory (address, length, `String))
+      | _, _ -> None)
   | ["at"; address; "as"; kind] -> (
       match
         (Int32.of_string_opt address, integer_value_kind_of_string kind)
       with
       | Some address, Some kind ->
-          Show_memory (address, value_kind_length kind, kind)
-      | _, _ -> Unknown full_command)
-  | _ -> Unknown full_command
+          Some (Show_memory (address, value_kind_length kind, kind))
+      | _, _ -> None)
+  | _ -> None
+
+(* Documentation for commands type *)
+type command_description = {
+  parse : string list -> commands option;
+  documentation : string;
+}
+
+(* Parsing and documentation of each possible command *)
+let rec commands_docs =
+  [
+    {
+      parse =
+        (function
+        | "time" :: rst -> try_parse rst |> Option.map (fun x -> Time x)
+        | _ -> None);
+      documentation =
+        "time <command>: Executes <command> and returns the time required for \
+         its execution.";
+    };
+    {
+      parse = (function ["show"; "inbox"] -> Some Show_inbox | _ -> None);
+      documentation =
+        "show inbox: Prints the current input buffer and the number of \
+         messages it contains.";
+    };
+    {
+      parse =
+        (function
+        | ["show"; "outbox"; "at"; "level"; level] ->
+            Int32.of_string_opt level |> Option.map (fun l -> Show_outbox l)
+        | _ -> None);
+      documentation =
+        "show outbox at level <level>: Prints the outbox messages for <level>.";
+    };
+    {
+      parse = (function ["show"; "status"] -> Some Show_status | _ -> None);
+      documentation = "show status: Shows the state of the PVM.";
+    };
+    {
+      parse =
+        (function
+        | ["show"; "durable"; "storage"] -> Some Show_durable_storage
+        | _ -> None);
+      documentation =
+        "show durable storage: Prints the durable storage from the root of the \
+         tree.";
+    };
+    {
+      parse =
+        (function
+        | ["show"; "subkeys"; path] | ["ls"; path] -> Some (Show_subkeys path)
+        | ["show"; "subkeys"] | ["ls"] -> Some (Show_subkeys "/")
+        | _ -> None);
+      documentation =
+        "show subkeys [<path>] | ls [<path>]: Prints the direct subkeys under \
+         <path> (default '/')";
+    };
+    {
+      parse =
+        (function
+        | ["show"; "key"; key] -> Some (Show_key (key, `Hex))
+        | ["show"; "key"; key; "as"; kind] ->
+            printable_value_kind_of_string kind
+            |> Option.map (fun kind -> Show_key (key, kind))
+        | _ -> None);
+      documentation =
+        "show key <key> [as <kind>]: Looks for given <key> in durable storage \
+         and prints its value in <kind> format. Prints errors if <key> is \
+         invalid or not existing.";
+    };
+    {
+      parse =
+        (function
+        | ["dump"; "function"; "symbols"] -> Some Dump_function_symbols
+        | _ -> None);
+      documentation =
+        "dump function symbols: Pretty-prints the parsed functions custom \
+         section. The result will be empty if the kernel is in `wast` format \
+         or has been stripped of its custom sections.";
+    };
+    {
+      parse =
+        (function
+        | ["step"; step] -> parse_eval_step step |> Option.map (fun s -> Step s)
+        | _ -> None);
+      documentation =
+        "step <eval_step>: Depending on <eval_step>:\n\
+        \          - tick: Run for a tick.\n\
+        \          - result: Run up to the end of `kernel_run` but before \
+         rebooting of waiting for reboot, before the memory is flushed.\n\
+        \          - kernel_run: Run up to the end of the current `kernel_run` \
+         with padding up to the maximum ticks per reboot for the current \
+         version of the PVM.\n\
+        \          - inbox: Run until the next inbox level. Loads the next \
+         inbox if the interpreter is waiting for inputs.";
+    };
+    {
+      parse = (function ["load"; "inputs"] -> Some Load_inputs | _ -> None);
+      documentation =
+        "load inputs: If the kernel is waiting for inputs, go the the next \
+         level and load the next inbox.";
+    };
+    {
+      parse =
+        (function
+        | ["reveal"; "preimage"] -> Some (Reveal_preimage None)
+        | ["reveal"; "preimage"; hex_encoded_preimage] ->
+            Some (Reveal_preimage (Some hex_encoded_preimage))
+        | _ -> None);
+      documentation =
+        "reveal preimage [<hex_encoded_preimage>]: Checks the current state is \
+         waiting for a preimage, parses <hex_encoded_preimage> as an \
+         hexadecimal representation of the data or uses the builtin if none is \
+         given, and does a reveal step.";
+    };
+    {
+      parse =
+        (function ["reveal"; "metadata"] -> Some Reveal_metadata | _ -> None);
+      documentation =
+        "reveal metadata: While in a reveal step, print the current metadata \
+         from PVM.";
+    };
+    {
+      parse =
+        (fun command -> match command with ["stop"] -> Some Stop | _ -> None);
+      documentation = "stop: Stops the execution of the current session.";
+    };
+    {
+      parse = (function ["bench"] -> Some Bench | _ -> None);
+      documentation = "bench: Benchmarking tool.";
+    };
+    {
+      parse =
+        (function
+        | ["profile"] -> Some (Profile false)
+        | ["profile"; "--collapsed"] -> Some (Profile true)
+        | _ -> None);
+      documentation =
+        "profile [--collapsed]: Profile the execution of a full inbox and \
+         outputs a flamegraph compatible stack fill in the temporary directory \
+         of the system. `--collapsed` reduces the size of the resulting file \
+         by merging the identical stacks, at the cost of not being able to \
+         track the call stack on a time basis.";
+    };
+    {
+      parse =
+        (function
+        | "show" :: "memory" :: rest -> parse_memory_commands rest | _ -> None);
+      documentation =
+        "show memory at <address> for <length> bytes [as string] | show memory \
+         at <address> as <kind>: Loads the <length> bytes at <address> in the \
+         memory, and prints it in its hexadecimal (or string) representation.\n\
+         The command is only available if the memory hasn't been flushed and \
+         during the evaluation of the kernel, i.e. after `step result` or \
+         `step tick`.";
+    };
+    {
+      parse = (function ["help"] | ["man"] -> Some Help | _ -> None);
+      documentation =
+        "help: Provide documentation about the available commands.";
+    };
+  ]
+
+and try_parse command =
+  let rec go = function
+    | [] -> None
+    | command_docs :: commands_docs -> (
+        match command_docs.parse command with
+        | None -> go commands_docs
+        | command -> command)
+  in
+  go commands_docs
 
 let parse_commands s =
-  let command = String.split_no_empty ' ' (String.trim s) in
-  let rec go = function
-    | "time" :: rst ->
-        let cmd = go rst in
-        Time cmd
-    | ["show"; "inbox"] -> Show_inbox
-    | ["show"; "outbox"; "at"; "level"; level] -> (
-        match Int32.of_string_opt level with
-        | Some l -> Show_outbox l
-        | None -> Unknown s)
-    | ["show"; "status"] -> Show_status
-    | ["show"; "durable"; "storage"] -> Show_durable_storage
-    | ["show"; "subkeys"; path] | ["ls"; path] -> Show_subkeys path
-    | ["show"; "subkeys"] | ["ls"] -> Show_subkeys "/"
-    | ["show"; "key"; key] -> Show_key (key, `Hex)
-    | ["show"; "key"; key; "as"; kind] -> (
-        match printable_value_kind_of_string kind with
-        | Some kind -> Show_key (key, kind)
-        | None -> Unknown s)
-    | "show" :: "memory" :: rest -> parse_memory_commands s rest
-    | ["dump"; "function"; "symbols"] -> Dump_function_symbols
-    | ["step"; step] -> (
-        match parse_eval_step step with Some s -> Step s | None -> Unknown s)
-    | ["load"; "inputs"] -> Load_inputs
-    | ["reveal"; "preimage"] -> Reveal_preimage None
-    | ["reveal"; "preimage"; hex_encoded_preimage] ->
-        Reveal_preimage (Some hex_encoded_preimage)
-    | ["reveal"; "metadata"] -> Reveal_metadata
-    | ["stop"] -> Stop
-    | ["bench"] -> Bench
-    | ["profile"] -> Profile false
-    | ["profile"; "--collapsed"] -> Profile true
-    | _ -> Unknown s
-  in
-  go command
+  let commands = try_parse (String.split_no_empty ' ' (String.trim s)) in
+  match commands with None -> Unknown s | Some cmd -> cmd
 
 let build_metadata config =
   Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Metadata.(
@@ -733,6 +874,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Lwt.return_ok (tree, inboxes, level)
       | Unknown s ->
           let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
+          return ()
+      | Help ->
+          let*! () =
+            List.iter_s
+              (fun command_docs ->
+                Lwt_io.printl ("  " ^ command_docs.documentation))
+              commands_docs
+          in
           return ()
       | Stop -> return ()
     in
