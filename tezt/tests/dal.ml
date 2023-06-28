@@ -925,7 +925,7 @@ let () =
   | _ -> None
 
 let publish_and_store_slot ?with_proof ?counter ?force ?level ?(fee = 1_200)
-    node client dal_node source index content ~slot_size =
+    node client dal_node source ~index content ~slot_size =
   let slot_level =
     match level with Some level -> level | None -> 1 + Node.get_level node
   in
@@ -958,7 +958,7 @@ let publish_and_store_slot ?with_proof ?counter ?force ?level ?(fee = 1_200)
   let* _ =
     publish_slot ?counter ?force ~source ~fee ~index ~commitment ~proof client
   in
-  return (index, slot_commitment)
+  return slot_commitment
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
@@ -1031,20 +1031,32 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
   let level = Node.get_level node in
   let pub_level = level + 1 in
-  let publish ?fee =
-    publish_and_store_slot ~level:pub_level ?fee node client dal_node ~slot_size
+  let publish ?fee source ~index content =
+    let* commitment =
+      publish_and_store_slot
+        ~level:pub_level
+        ?fee
+        node
+        client
+        dal_node
+        ~slot_size
+        source
+        ~index
+        content
+    in
+    return (index, commitment)
   in
   let* () =
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let* slot0 = publish Constant.bootstrap1 0 "test0" in
-  let* slot1 = publish Constant.bootstrap2 1 "test1" in
+  let* slot0 = publish Constant.bootstrap1 ~index:0 "test0" in
+  let* slot1 = publish Constant.bootstrap2 ~index:1 "test1" in
   let* () =
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
   in
-  let* slot2_a = publish Constant.bootstrap3 4 ~fee:1_200 "test4_a" in
-  let* slot2_b = publish Constant.bootstrap4 4 ~fee:1_350 "test4_b" in
-  let* slot3 = publish Constant.bootstrap5 5 ~fee:1 "test5" in
+  let* slot2_a = publish Constant.bootstrap3 ~index:4 ~fee:1_200 "test4_a" in
+  let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:1_350 "test4_b" in
+  let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot =
       Rollup.Dal.make_slot ~slot_size "never associated to a slot_id"
@@ -1198,7 +1210,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
   let publish = publish_and_store_slot node client dal_node ~slot_size in
-  let* _slot_index, slot_header = publish Constant.bootstrap1 0 slot_content in
+  let* slot_header = publish Constant.bootstrap1 ~index:0 slot_content in
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
   let number_of_shards =
@@ -2140,7 +2152,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
         l1_client
         dal_node
         source
-        slot_index
+        ~index:slot_index
         (sf " %d " payload)
     in
     incr counter ;
@@ -2901,7 +2913,8 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
 
   (* Posting a DAL message to DAL node and to L1 *)
   let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
-  let* slot_index, slot_commitment =
+  let slot_index = 0 in
+  let* slot_commitment =
     let slot_size = crypto_params.slot_size in
     let slot_content = generate_dummy_slot slot_size in
     publish_and_store_slot
@@ -2911,7 +2924,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       dal_node1
       ~slot_size
       Constant.bootstrap1
-      0
+      ~index:slot_index
       slot_content
   in
 
@@ -3056,7 +3069,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
     repeat_i num_slots (fun i ->
         let slot_index = i - 1 in
         let account = Account.Bootstrap.keys.(slot_index) in
-        let* _slot_index, _slot_commitment =
+        let* _slot_commitment =
           publish_and_store_slot
             ~with_proof:true
             node
@@ -3064,7 +3077,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
             dal_node1
             ~slot_size
             account
-            slot_index
+            ~index:slot_index
             slot_content
         in
         unit)
@@ -3108,7 +3121,8 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   (* Now, we'll inject a new slot for the next published_level in
      dal_node1. Since it's pruned, dal_node2 will be notified via IHave
      messages, to which it will respond by IWant messages. *)
-  let* slot_index, commitment =
+  let slot_index = 0 in
+  let* commitment =
     publish_and_store_slot
       ~with_proof:true
       node
@@ -3116,7 +3130,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       dal_node1
       ~slot_size
       account1
-      0
+      ~index:slot_index
       slot_content
   in
 
