@@ -25,7 +25,7 @@ let cost_N_ILsl_bytes size1 size2 =
     let size1 = S.safe_int size1 in
     let size2 = S.safe_int size2 in
     let v1 = size1 in
-    let v0 = S.sub size2 (S.safe_int 5) in
+    let v0 = S.sub size2 (S.safe_int 1) in
     ((S.safe_int 60) +
        ((((v1 lsr 1) + (v1 lsr 4)) + (v1 lsr 5)) + (v1 lsr 6)))
       + (S.safe_int 0)
