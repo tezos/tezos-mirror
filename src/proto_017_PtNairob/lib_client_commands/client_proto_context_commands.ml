@@ -2722,16 +2722,18 @@ let commands_rw () =
                     {address = rollup_address; _});
               _;
             } ->
-            let* alias = Soru_alias.of_fresh cctxt force alias in
-            let* () = Soru_alias.add ~force cctxt alias rollup_address in
-            let*! () =
-              cctxt#message
-                {|Smart rollup %a memorized as "%s"|}
-                Sc_rollup.Address.pp
-                rollup_address
-                alias
-            in
-            return_unit
+            if dry_run then return_unit
+            else
+              let* alias = Soru_alias.of_fresh cctxt force alias in
+              let* () = Soru_alias.add ~force cctxt alias rollup_address in
+              let*! () =
+                cctxt#message
+                  {|Smart rollup %a memorized as "%s"|}
+                  Sc_rollup.Address.pp
+                  rollup_address
+                  alias
+              in
+              return_unit
         | _ -> return_unit);
     command
       ~group
