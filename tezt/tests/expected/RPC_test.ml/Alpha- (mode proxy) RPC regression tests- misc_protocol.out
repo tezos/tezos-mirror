@@ -57,7 +57,13 @@
   "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,
   "staking_over_baking_global_limit": 5, "staking_over_delegation_edge": 2,
-  "adaptive_inflation_launch_ema_threshold": 1600000000 }
+  "adaptive_inflation_launch_ema_threshold": 1600000000,
+  "adaptive_rewards_params":
+    { "reward_ratio_min": { "numerator": "1", "denominator": "200" },
+      "reward_ratio_max": { "numerator": "1", "denominator": "10" },
+      "max_bonus": "50000000000000", "growth_rate": "115740740",
+      "center_dz": { "numerator": "1", "denominator": "2" },
+      "radius_dz": { "numerator": "1", "denominator": "50" } } }
 
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
