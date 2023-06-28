@@ -159,7 +159,7 @@ module Handler = struct
             (message_id, err)) ;
         `Invalid
 
-  let resolve_plugin_and_set_ready config ctxt cctxt =
+  let resolve_plugin_and_set_ready config dal_config ctxt cctxt =
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
     let open Lwt_result_syntax in
@@ -182,7 +182,6 @@ module Handler = struct
           let* proto_parameters =
             Dal_plugin.get_constants `Main (`Head 0) cctxt
           in
-          let* dal_config = fetch_dal_config cctxt in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
           let* () =
             Option.iter_es
@@ -417,7 +416,11 @@ let run ~data_dir configuration_override =
   let ctxt = Node_context.init config store gs_worker transport_layer cctxt in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
-  let* points = resolve peers in
+  let* dal_config = fetch_dal_config cctxt in
+  (* Resolve:
+     - [peers] from DAL node config file and CLI.
+     - [dal_config.bootstrap_peers] from the L1 network config. *)
+  let* points = resolve (peers @ dal_config.bootstrap_peers) in
   (* activate the p2p instance. *)
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
@@ -427,7 +430,8 @@ let run ~data_dir configuration_override =
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Start daemon to resolve current protocol plugin *)
   let* () =
-    daemonize [Handler.resolve_plugin_and_set_ready config ctxt cctxt]
+    daemonize
+      [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
   in
   (* Start never-ending monitoring daemons *)
   daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
