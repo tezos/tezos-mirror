@@ -1380,7 +1380,7 @@ evaluate the WASM PVM without relying on any node and network:
 
 .. code:: sh
 
-  octez-smart-rollup-wasm-debugger "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
+  octez-smart-rollup-wasm-debugger --kernel "${WASM_FILE}" --inputs "${JSON_INPUTS}" --rollup "${SOR_ADDR}"
 
 ``octez-smart-rollup-wasm-debugger`` takes the target WASM kernel to be debugged as argument, either as a ``.wasm`` file (the binary
 representation of WebAssembly modules) or as a ``.wast`` file (its textual

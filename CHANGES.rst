@@ -267,6 +267,8 @@ Smart Rollup client
 
 Smart Rollup WASM Debugger
 --------------------------
+- Changed the syntax for the ``octez-smart-rollup-wasm-debugger`` to have the ``--kernel``
+  argument before the kernel file. (MR :gl:`!9318`)
 
 Data Availability Committee (DAC)
 ----------------------------------

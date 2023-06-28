@@ -139,13 +139,18 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
           Lwt.return_ok dirpath
         else Error_monad.failwith "%s is not a valid directory" dirpath)
 
-  let wasm_param =
-    let open Lwt_result_syntax in
-    Tezos_clic.(
-      param
-        ~name:"module"
-        ~desc:"wasm or wast file"
-        (parameter (fun _ filename -> return filename)))
+  let wasm_parameter =
+    Tezos_clic.parameter (fun _ filename ->
+        if Sys.file_exists filename then Lwt_result.return filename
+        else Error_monad.failwith "%s is not a valid file" filename)
+
+  let wasm_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"kernel file"
+      ~long:"kernel"
+      ~placeholder:"kernel.wasm"
+      wasm_parameter
 
   let input_arg =
     let open Tezos_clic in
@@ -198,41 +203,6 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       ~placeholder:"preimage-dir"
       dir_parameter
 
-  let main_command =
-    let open Tezos_clic in
-    let open Lwt_result_syntax in
-    command
-      ~desc:"Start the eval loop"
-      (args3 input_arg rollup_arg preimage_directory_arg)
-      (wasm_param @@ stop)
-      (fun (inputs, rollup_arg, preimage_directory) wasm_file version ->
-        let version =
-          Option.value
-            ~default:
-              Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0
-              .current_version
-            version
-        in
-        let config =
-          Config.config ?destination:rollup_arg ?preimage_directory ()
-        in
-        let*? binary =
-          if Filename.check_suffix wasm_file ".wasm" then Ok true
-          else if Filename.check_suffix wasm_file ".wast" then Ok false
-          else error_with "Kernels should have .wasm or .wast file extension"
-        in
-        let* tree, extra = start version binary wasm_file in
-        let* inboxes =
-          match inputs with
-          | Some inputs -> Messages.parse_inboxes inputs config
-          | None -> return []
-        in
-        let+ _tree = repl tree inboxes 0l config extra in
-        ())
-
-  (* List of program commands *)
-  let commands = [main_command]
-
   let version_parameter =
     Tezos_clic.parameter (fun _ v ->
         let open Tezos_scoru_wasm.Wasm_pvm_state in
@@ -248,22 +218,49 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
                   (fun fmt str -> fprintf fmt "'%s'" str))
               (List.map fst versions))
 
+  let version_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"The initial version of the WASM PVM"
+      ~short:'p'
+      ~long:"pvm-version"
+      ~placeholder:"VERSION"
+      version_parameter
+
   let global_options =
     Tezos_clic.(
-      args1
-        (arg
-           ~doc:"The initial version of the WASM PVM"
-           ~short:'p'
-           ~long:"pvm-version"
-           ~placeholder:"VERSION"
-           version_parameter))
+      args5 wasm_arg input_arg rollup_arg preimage_directory_arg version_arg)
 
-  let dispatch initial_ctx args =
+  let dispatch args =
     let open Lwt_result_syntax in
-    let* ctx, remaining_args =
-      Tezos_clic.parse_global_options global_options initial_ctx args
+    let* (wasm_file, inputs, rollup_arg, preimage_directory, version), _ =
+      Tezos_clic.parse_global_options global_options () args
     in
-    Tezos_clic.dispatch commands ctx remaining_args
+    let version =
+      Option.value
+        ~default:
+          Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.current_version
+        version
+    in
+    let config = Config.config ?destination:rollup_arg ?preimage_directory () in
+    let*? wasm_file =
+      match wasm_file with
+      | Some wasm_file -> Ok wasm_file
+      | None -> error_with "A kernel file must be provided"
+    in
+    let*? binary =
+      if Filename.check_suffix wasm_file ".wasm" then Ok true
+      else if Filename.check_suffix wasm_file ".wast" then Ok false
+      else error_with "Kernels should have .wasm or .wast file extension"
+    in
+    let* tree, extra = start version binary wasm_file in
+    let* inboxes =
+      match inputs with
+      | Some inputs -> Messages.parse_inboxes inputs config
+      | None -> return []
+    in
+    let+ _tree = repl tree inboxes 0l config extra in
+    ()
 
   let main () =
     ignore
@@ -273,12 +270,19 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
           (if Unix.isatty Unix.stdout then Ansi else Plain)
           Short) ;
     let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
-    let result = Lwt_main.run (dispatch () args) in
+    let result = Lwt_main.run (dispatch args) in
     match result with
     | Ok _ -> ()
     | Error [Tezos_clic.Version] ->
         let version = Tezos_version_value.Bin_version.version_string in
         Format.printf "%s\n" version ;
+        exit 0
+    | Error [Tezos_clic.Help command] ->
+        Tezos_clic.usage
+          Format.std_formatter
+          ~executable_name:(Filename.basename Sys.executable_name)
+          ~global_options
+          (match command with None -> [] | Some c -> [c]) ;
         exit 0
     | Error e ->
         Format.eprintf
@@ -287,8 +291,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
             fun ppf errs ->
               pp_cli_errors
                 ppf
-                ~executable_name:"octez-wasm-debugger"
-                ~global_options:no_options
+                ~executable_name:(Filename.basename Sys.executable_name)
+                ~global_options
                 ~default:pp
                 errs)
           e ;

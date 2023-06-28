@@ -13,7 +13,7 @@ To learn about the changes in the current version of the SDK, see the
 A kernel is a 32bit *WebAssembly* program that runs on a Smart Rollup. It decides how the Rollup
 handles input messages, updates the Rollup state, and when to output messages targetting Layer 1.
 
-While any programming-language with WebAssembly-compilation support _could_ be used for writing
+While any programming-language with WebAssembly-compilation support *could* be used for writing
 a Rollup kernel, Rust is an excellent fit due to first-class WASM support, deterministic runtime,
 and safe memory management.
 
@@ -124,7 +124,7 @@ You can test this kernel by using the [`octez-smart-rollup-wasm-debugger`](https
 echo '[[], []]' > inputs.json
 
 # Run the kernel:
-octez-smart-rollup-wasm-debugger kernel.wasm --inputs inputs.json
+octez-smart-rollup-wasm-debugger --kernel kernel.wasm --inputs inputs.json
 ```
 
 Once in the debugger, you can run the following commands to test the kernel:
