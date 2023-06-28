@@ -70,6 +70,7 @@ type application_state = {
   migration_balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Toggle_votes.Liquidity_baking_toggle_EMA.t;
   adaptive_inflation_toggle_ema : Toggle_votes.Adaptive_inflation_launch_EMA.t;
+  adaptive_inflation_launch_cycle : Cycle.t option;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }

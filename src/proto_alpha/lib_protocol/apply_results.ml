@@ -2600,6 +2600,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Toggle_votes.Liquidity_baking_toggle_EMA.t;
   adaptive_inflation_toggle_ema : Toggle_votes.Adaptive_inflation_launch_EMA.t;
+  adaptive_inflation_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t option;
 }
@@ -2620,6 +2621,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               adaptive_inflation_toggle_ema;
+              adaptive_inflation_launch_cycle;
               implicit_operations_results;
               dal_attestation;
             } ->
@@ -2632,9 +2634,12 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              adaptive_inflation_toggle_ema,
-             implicit_operations_results ),
-           (proposer_active_key, baker_active_key, consumed_gas, dal_attestation)
-         ))
+             adaptive_inflation_launch_cycle ),
+           ( implicit_operations_results,
+             proposer_active_key,
+             baker_active_key,
+             consumed_gas,
+             dal_attestation ) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -2644,8 +2649,9 @@ let block_metadata_encoding =
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 adaptive_inflation_toggle_ema,
-                implicit_operations_results ),
-              ( proposer_active_key,
+                adaptive_inflation_launch_cycle ),
+              ( implicit_operations_results,
+                proposer_active_key,
                 baker_active_key,
                 consumed_gas,
                 dal_attestation ) ) ->
@@ -2660,6 +2666,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            adaptive_inflation_toggle_ema;
+           adaptive_inflation_launch_cycle;
            implicit_operations_results;
            dal_attestation;
          })
@@ -2678,10 +2685,11 @@ let block_metadata_encoding =
              (req
                 "adaptive_inflation_toggle_ema"
                 Toggle_votes.Adaptive_inflation_launch_EMA.encoding)
+             (opt "adaptive_inflation_activation_cycle" Cycle.encoding))
+          (obj5
              (req
                 "implicit_operations_results"
-                (list successful_manager_operation_result_encoding)))
-          (obj4
+                (list successful_manager_operation_result_encoding))
              (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
