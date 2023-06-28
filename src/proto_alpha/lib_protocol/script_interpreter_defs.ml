@@ -465,15 +465,15 @@ let rec kundip :
     (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
     c ->
     u ->
-    (d, w, b, t) kinstr ->
-    a * s * (e, z, b, t) kinstr =
- fun w accu stack k ->
+    (d, w, b, t) continuation ->
+    a * s * (e, z, b, t) continuation =
+ fun w accu stack ks ->
   match w with
-  | KPrefix (loc, ty, w) ->
-      let k = IPush (loc, ty, accu, k) in
+  | KPrefix (_loc, ty, w) ->
+      let ks = KUndip (accu, Some ty, ks) in
       let accu, stack = stack in
-      kundip w accu stack k
-  | KRest -> (accu, stack, k)
+      kundip w accu stack ks
+  | KRest -> (accu, stack, ks)
 
 (* [apply ctxt gas ty v lam] specializes [lam] by fixing its first
    formal argument to [v]. The type of [v] is represented by [ty]. *)

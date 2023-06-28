@@ -1888,18 +1888,6 @@ module Stack_utils = struct
       | Ex_split_failwith {location; arg_ty; _} ->
           return @@ IFailwith (location, arg_ty)
 
-  (** [dipn_stack_ty witness stack_ty] returns the type of the stack
-    on which instructions inside dipped block will be operating. *)
-  let rec dipn_stack_ty :
-      type a s e z c u d w.
-      (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
-      (c, u) stack_ty ->
-      (a, s) stack_ty =
-   fun witness stack ->
-    match (witness, stack) with
-    | KPrefix (_, _, witness'), Item_t (_, sty) -> dipn_stack_ty witness' sty
-    | KRest, sty -> sty
-
   (** [instrument_cont logger sty] creates a function instrumenting
     continuations starting from the stack type described by [sty].
     Instrumentation consists in wrapping inner continuations in
@@ -2317,15 +2305,7 @@ module Logger (Base : Logger_base) = struct
               let {ifailwith} = ifailwith in
               (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
           | IDipn (_, _n, n', b, k) ->
-              let accu, stack, restore_prefix = kundip n' accu stack k in
-              let dipped_sty = dipn_stack_ty n' sty in
-              let*? sty' = kinstr_final_stack_type dipped_sty b in
-              let ks =
-                match sty' with
-                | None -> KCons (restore_prefix, ks)
-                | Some sty' ->
-                    instrument_cont logger sty' @@ KCons (restore_prefix, ks)
-              in
+              let accu, stack, ks = kundip n' accu stack (KCons (k, ks)) in
               (step [@ocaml.tailcall]) g gas b ks accu stack
           | IView
               (_, (View_signature {output_ty; _} as view_signature), stack_ty, k)
