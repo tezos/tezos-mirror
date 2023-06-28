@@ -125,7 +125,10 @@ module Term = struct
   let peers =
     let open Cmdliner in
     let default_list = Configuration_file.default.peers in
-    let doc = "A list of points at which peers can be reached." in
+    let doc =
+      "An additional peer list to expand the bootstrap peers from \
+       dal_config.bootstrap_peers."
+    in
     Arg.(
       value
       & opt (list string) default_list
