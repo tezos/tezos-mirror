@@ -40,15 +40,13 @@ let test_raw_scenario time () =
   let open Timelock in
   (* Creator creating chest. *)
   let timelock_precomputed_tuple = precompute_timelock ~time () in
-  let locked, proof =
-    proof_of_vdf_tuple rsa2048 ~time timelock_precomputed_tuple
-  in
+  let locked, proof = proof_of_vdf_tuple ~time timelock_precomputed_tuple in
   (* Not creator opening chest. *)
-  assert (verify rsa2048 ~time locked proof) ;
-  let proof_2 = unlock_and_prove rsa2048 ~time locked in
-  assert (verify rsa2048 ~time locked proof_2) ;
-  let sym_key_1 = timelock_proof_to_symmetric_key rsa2048 proof in
-  let sym_key_2 = timelock_proof_to_symmetric_key rsa2048 proof_2 in
+  assert (verify ~time locked proof) ;
+  let proof_2 = unlock_and_prove ~time locked in
+  assert (verify ~time locked proof_2) ;
+  let sym_key_1 = timelock_proof_to_symmetric_key proof in
+  let sym_key_2 = timelock_proof_to_symmetric_key proof_2 in
   assert (sym_key_1 = sym_key_2) ;
   let message = Bytes.of_string "rzersef" in
   let c = encrypt sym_key_2 message in
@@ -59,13 +57,13 @@ let test_raw_scenario time () =
 
 let bench () =
   let open Timelock in
-  let locked = gen_locked_value_unsafe rsa2048 in
+  let locked = gen_locked_value_unsafe () in
   (* Corresponds to ~1s, increases linearly *)
   let time = 10_000 in
-  let proof = unlock_and_prove rsa2048 ~time locked in
+  let proof = unlock_and_prove ~time locked in
   let start_bench = Unix.gettimeofday () in
   for _i = 0 to 100 do
-    let _ = prove rsa2048 ~time locked proof.vdf_tuple.unlocked_value in
+    let _ = prove ~time locked proof.vdf_tuple.unlocked_value in
     ()
   done ;
   let end_bench = Unix.gettimeofday () in
@@ -89,9 +87,7 @@ let test_high_level_negative () =
   (* Opening Bogus *)
   (* The opener, opens to garbage *)
   let wrong_time = 1000 in
-  let proof_wrong =
-    unlock_and_prove rsa2048 ~time:wrong_time chest.locked_value
-  in
+  let proof_wrong = unlock_and_prove ~time:wrong_time chest.locked_value in
   let unlocked_wrong = proof_wrong.vdf_tuple.unlocked_value in
   let vdf_wrong = proof_wrong.vdf_tuple.vdf_proof in
   let proof_incorrect_unlocked =
@@ -122,20 +118,20 @@ let test_low_level_negative () =
   let open Timelock in
   let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
   let chest, chest_key = create_chest_and_chest_key ~payload ~time () in
-  let proof = unlock_and_prove chest.rsa_public ~time chest.locked_value in
+  let proof = unlock_and_prove ~time chest.locked_value in
   let incorrect_proofs =
     let open Internal_for_tests in
     let g, g' =
       let locked = locked_value_to_z chest_key.vdf_tuple.locked_value in
-      (locked |> Z.to_string, Z.(locked + one |> to_string))
+      (locked, Z.(locked + one))
     in
     let c, c' =
       let challenge = unlocked_value_to_z chest_key.vdf_tuple.unlocked_value in
-      (challenge |> Z.to_string, Z.(challenge + one |> to_string))
+      (challenge, Z.(challenge + one))
     in
     let pi, pi' =
       let proof = vdf_proof_to_z chest_key.vdf_tuple.vdf_proof in
-      (proof |> Z.to_string, Z.(proof + one |> to_string))
+      (proof, Z.(proof + one))
     in
     [
       {vdf_tuple = to_vdf_tuple_unsafe g' c pi; nonce = chest_key.nonce};
@@ -169,32 +165,22 @@ let test_wesolowski () =
   let open Internal_for_tests in
   let payload = Bytes.of_string "fdgfnhfd" and time = 10 in
   let chest, chest_key = create_chest_and_chest_key ~payload ~time () in
-  let rsa, g, c, pi =
-    ( rsa_public_to_z chest.rsa_public,
-      locked_value_to_z chest_key.vdf_tuple.locked_value,
+  let g, c, pi =
+    ( locked_value_to_z chest_key.vdf_tuple.locked_value,
       unlocked_value_to_z chest_key.vdf_tuple.unlocked_value,
       vdf_proof_to_z chest_key.vdf_tuple.vdf_proof )
   in
   (* Memory intensive proof generation *)
   let pi_high_memory =
     let l =
-      hash_to_prime
-        chest.rsa_public
-        ~time
-        chest.locked_value
-        chest_key.vdf_tuple.unlocked_value
+      hash_to_prime ~time chest.locked_value chest_key.vdf_tuple.unlocked_value
     in
     let exponent = Z.(pow (of_int 2) time / l) in
-    Z.powm g exponent rsa
+    Z.powm g exponent rsa2048
   in
-  let tuple_high_memory =
-    to_vdf_tuple_unsafe
-      (Z.to_string g)
-      (Z.to_string c)
-      (Z.to_string pi_high_memory)
-  in
+  let tuple_high_memory = to_vdf_tuple_unsafe g c pi_high_memory in
   assert (Z.(equal pi pi_high_memory)) ;
-  assert (verify_wesolowski chest.rsa_public ~time tuple_high_memory) ;
+  assert (verify_wesolowski ~time tuple_high_memory) ;
   ()
 
 let tests =
