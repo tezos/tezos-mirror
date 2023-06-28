@@ -36,13 +36,9 @@ let add_profile proto_parameters node_store gs_worker profile =
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 
-let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
+let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
-  let* shard_indexes =
-    Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
-    |> Errors.other_lwt_result
-  in
-  let expected_number_of_shards = List.length shard_indexes in
+  let expected_number_of_shards = List.length shard_indices in
   if expected_number_of_shards = 0 then return Services.Types.Not_in_committee
   else
     let published_level =
@@ -67,7 +63,7 @@ let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
           Store.Shards.are_shards_available
             store.shard_store
             commitment
-            shard_indexes
+            shard_indices
           |> Errors.other_lwt_result
     in
     let all_slot_indexes =
