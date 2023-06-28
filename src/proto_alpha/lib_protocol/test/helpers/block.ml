@@ -793,9 +793,8 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     >|=? fun (validation, result) -> (validation.context, result) )
   >>=? fun (context, result) ->
   let hash = Block_header.hash header in
-  (* This function is duplicated from Context to avoid a cyclic dependency *)
-  Alpha_services.Constants.all rpc_ctxt pred >|=? fun constants ->
-  ({hash; header; operations; context; constants = constants.parametric}, result)
+  Alpha_services.Constants.parametric rpc_ctxt pred >|=? fun constants ->
+  ({hash; header; operations; context; constants}, result)
 
 let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
   apply_with_metadata
@@ -1019,30 +1018,19 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
     (1 -- n)
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
-let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
+let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
     ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
-  let initial_ema = Toggle_votes.Liquidity_baking_toggle_EMA.zero in
-  List.fold_left_es
-    (fun (b, _toggle_ema) _ ->
-      bake_with_metadata
-        ~baking_mode
-        ?policy
-        ?liquidity_baking_toggle_vote
-        ?adaptive_inflation_vote
-        b
-      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_toggle_ema))
-    (b, initial_ema)
-    (1 -- n)
-
-let bake_until_cycle_end ?policy b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
-  let current_level = Int32.rem current_level blocks_per_cycle in
-  let delta = Int32.sub blocks_per_cycle current_level in
-  bake_n ?policy (Int32.to_int delta) b
-
-let bake_until_n_cycle_end ?policy n b =
-  List.fold_left_es (fun b _ -> bake_until_cycle_end ?policy b) b (1 -- n)
+  let open Lwt_result_syntax in
+  let+ b, metadata =
+    bake_n_with_metadata
+      ?baking_mode
+      ?policy
+      ?liquidity_baking_toggle_vote
+      ?adaptive_inflation_vote
+      n
+      b
+  in
+  (b, metadata.liquidity_baking_toggle_ema)
 
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
@@ -1052,9 +1040,16 @@ let current_cycle b =
   current_cycle
 
 let bake_until_cycle ?policy cycle (b : t) =
-  let rec loop (b : t) =
-    let current_cycle = current_cycle b in
-    if Cycle.equal cycle current_cycle then return b
-    else bake_until_cycle_end ?policy b >>=? fun b -> loop b
+  let open Lwt_result_syntax in
+  let* final_block_of_previous_cycle =
+    bake_while ?policy (fun block -> Cycle.(current_cycle block < cycle)) b
   in
-  loop b
+  bake ?policy final_block_of_previous_cycle
+
+let bake_until_cycle_end ?policy b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.succ cycle) b
+
+let bake_until_n_cycle_end ?policy n b =
+  let cycle = current_cycle b in
+  bake_until_cycle ?policy (Cycle.add cycle n) b

@@ -317,7 +317,7 @@ val bake_while_with_metadata :
   block ->
   block tzresult Lwt.t
 
-val current_cycle : t -> Cycle.t
+val current_cycle : block -> Cycle.t
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,
     that is [blocks_per_cycle - (l % blocks_per_cycle)]. *)
