@@ -22,13 +22,13 @@ trace
     [ 10
       -3
       (Pair 10 -3) ]
-  - location: 29 (just consumed gas: 0)
+  - location: 29 (just consumed gas: 0.010)
     [ -3
       (Pair 10 -3) ]
   - location: 31 (just consumed gas: 0.020)
     [ 3
       (Pair 10 -3) ]
-  - location: 29 (just consumed gas: 0.025)
+  - location: 29 (just consumed gas: 0.035)
     [ 10
       3
       (Pair 10 -3) ]
@@ -71,7 +71,7 @@ trace
       (Pair 10 -3)
       (Some (Pair -3 1))
       (Some (Pair 3 1)) ]
-  - location: 41 (just consumed gas: 0)
+  - location: 41 (just consumed gas: 0.010)
     [ -3
       (Pair 10 -3)
       (Some (Pair -3 1))
@@ -81,7 +81,7 @@ trace
       (Pair 10 -3)
       (Some (Pair -3 1))
       (Some (Pair 3 1)) ]
-  - location: 41 (just consumed gas: 0.025)
+  - location: 41 (just consumed gas: 0.035)
     [ 10
       3
       (Pair 10 -3)
@@ -108,12 +108,12 @@ trace
       (Some (Pair 3 1))
       (Some (Pair -3 1))
       (Some (Pair 3 1)) ]
-  - location: 49 (just consumed gas: 0)
+  - location: 49 (just consumed gas: 0.023)
     [ (Some (Pair -3 1))
       (Some (Pair 3 1)) ]
   - location: 52 (just consumed gas: 0.010)
     [ (Pair (Some (Pair -3 1)) (Some (Pair 3 1))) ]
-  - location: 49 (just consumed gas: 0.025)
+  - location: 49 (just consumed gas: 0.035)
     [ (Some (Pair 3 1))
       (Pair (Some (Pair -3 1)) (Some (Pair 3 1))) ]
   - location: 49 (just consumed gas: 0.010)
@@ -124,12 +124,12 @@ trace
     [ (Some (Pair -3 1))
       (Some (Pair 3 1))
       (Pair (Some (Pair -3 1)) (Some (Pair 3 1))) ]
-  - location: 53 (just consumed gas: 0)
+  - location: 53 (just consumed gas: 0.010)
     [ (Some (Pair 3 1))
       (Pair (Some (Pair -3 1)) (Some (Pair 3 1))) ]
   - location: 55 (just consumed gas: 0.010)
     [ (Pair (Some (Pair 3 1)) (Some (Pair -3 1)) (Some (Pair 3 1))) ]
-  - location: 53 (just consumed gas: 0.025)
+  - location: 53 (just consumed gas: 0.035)
     [ (Some (Pair -3 1))
       (Pair (Some (Pair 3 1)) (Some (Pair -3 1)) (Some (Pair 3 1))) ]
   - location: 56 (just consumed gas: 0.010)

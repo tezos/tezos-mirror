@@ -35,7 +35,7 @@ trace
       2
       3
       4 ]
-  - location: 22 (just consumed gas: 0)
+  - location: 22 (just consumed gas: 0.010)
     [ 1
       2
       3
@@ -51,7 +51,7 @@ trace
     [ 4 ]
   - location: 27 (just consumed gas: 0.010)
     [  ]
-  - location: 22 (just consumed gas: 0.025)
+  - location: 22 (just consumed gas: 0.035)
     [ 5 ]
   - location: 28 (just consumed gas: 0.010)
     [ {}

@@ -20,7 +20,7 @@ trace
     [ "Hi"
       (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
   - location: 17 (just consumed gas: 0.010)
@@ -29,7 +29,7 @@ trace
   - location: 18 (just consumed gas: 0.010)
     [ { "Hi" }
       (Pair "Hi" { "Hi" } None) ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ "Hi"
       { "Hi" }
       (Pair "Hi" { "Hi" } None) ]
@@ -39,13 +39,13 @@ trace
   - location: 20 (just consumed gas: 0.010)
     [ (Some True)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 21 (just consumed gas: 0)
+  - location: 21 (just consumed gas: 0.010)
     [ (Pair "Hi" { "Hi" } None) ]
   - location: 24 (just consumed gas: 0.010)
     [ (Pair { "Hi" } None) ]
   - location: 25 (just consumed gas: 0.010)
     [ { "Hi" } ]
-  - location: 21 (just consumed gas: 0.025)
+  - location: 21 (just consumed gas: 0.035)
     [ (Some True)
       { "Hi" } ]
   - location: 26 (just consumed gas: 0.010)

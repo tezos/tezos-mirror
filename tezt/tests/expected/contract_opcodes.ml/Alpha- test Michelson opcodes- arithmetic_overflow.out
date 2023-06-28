@@ -27,7 +27,7 @@ trace
     [ (Pair (Left (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 1 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 1 257) ]
   - location: 17 (just consumed gas: 0.010)
     [ 1
@@ -63,7 +63,7 @@ trace
     [ (Pair (Left (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 123 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 123 257) ]
   - location: 17 (just consumed gas: 0.010)
     [ 123
@@ -99,7 +99,7 @@ trace
     [ (Pair (Right (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 1 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 1 257) ]
   - location: 20 (just consumed gas: 0.010)
     [ 1
@@ -135,7 +135,7 @@ trace
     [ (Pair (Right (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 123 257)) ]
-  - location: 15 (just consumed gas: 0)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair 123 257) ]
   - location: 20 (just consumed gas: 0.010)
     [ 123
@@ -171,7 +171,7 @@ trace
     [ (Pair (Left Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Left Unit) ]
-  - location: 10 (just consumed gas: 0)
+  - location: 10 (just consumed gas: 0.010)
     [ Unit ]
   - location: 12 (just consumed gas: 0.010)
     [ 922337203685477580700
@@ -211,7 +211,7 @@ trace
     [ (Pair (Right Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Right Unit) ]
-  - location: 10 (just consumed gas: 0)
+  - location: 10 (just consumed gas: 0.010)
     [ Unit ]
   - location: 21 (just consumed gas: 0.010)
     [ 10

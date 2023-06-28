@@ -18,26 +18,26 @@ trace
     [ 2
       (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 28 (just consumed gas: 0)
+  - location: 28 (just consumed gas: 0.010)
     [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 30 (just consumed gas: 0.010)
     [ 3
       (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 28 (just consumed gas: 0.025)
+  - location: 28 (just consumed gas: 0.035)
     [ 2
       3
       (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 31 (just consumed gas: 0)
+  - location: 31 (just consumed gas: 0.023)
     [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 34 (just consumed gas: 0.010)
     [ 12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 31 (just consumed gas: 0.025)
+  - location: 31 (just consumed gas: 0.035)
     [ 3
       12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
@@ -54,14 +54,14 @@ trace
       12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 35 (just consumed gas: 0)
+  - location: 35 (just consumed gas: 0.027)
     [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 38 (just consumed gas: 0.010)
     [ 16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 35 (just consumed gas: 0.025)
+  - location: 35 (just consumed gas: 0.035)
     [ 12
       16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
@@ -86,14 +86,14 @@ trace
       16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 39 (just consumed gas: 0)
+  - location: 39 (just consumed gas: 0.031)
     [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 42 (just consumed gas: 0.010)
     [ 10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 39 (just consumed gas: 0.025)
+  - location: 39 (just consumed gas: 0.035)
     [ 16
       10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
@@ -127,14 +127,14 @@ trace
       10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 43 (just consumed gas: 0)
+  - location: 43 (just consumed gas: 0.035)
     [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 46 (just consumed gas: 0.010)
     [ 14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 43 (just consumed gas: 0.025)
+  - location: 43 (just consumed gas: 0.035)
     [ 10
       14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
@@ -178,14 +178,14 @@ trace
       14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 47 (just consumed gas: 0)
+  - location: 47 (just consumed gas: 0.039)
     [ (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 50 (just consumed gas: 0.010)
     [ 19
       (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 47 (just consumed gas: 0.025)
+  - location: 47 (just consumed gas: 0.035)
     [ 14
       19
       (Pair 9 18 6 8 11 4 13 15 5 1)
@@ -240,14 +240,14 @@ trace
       19
       (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 51 (just consumed gas: 0)
+  - location: 51 (just consumed gas: 0.043)
     [ (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 54 (just consumed gas: 0.010)
     [ 9
       (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 51 (just consumed gas: 0.025)
+  - location: 51 (just consumed gas: 0.035)
     [ 19
       9
       (Pair 18 6 8 11 4 13 15 5 1)
@@ -314,14 +314,14 @@ trace
       9
       (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 55 (just consumed gas: 0)
+  - location: 55 (just consumed gas: 0.047)
     [ (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 58 (just consumed gas: 0.010)
     [ 18
       (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 55 (just consumed gas: 0.025)
+  - location: 55 (just consumed gas: 0.035)
     [ 9
       18
       (Pair 6 8 11 4 13 15 5 1)
@@ -401,14 +401,14 @@ trace
       18
       (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 59 (just consumed gas: 0)
+  - location: 59 (just consumed gas: 0.051)
     [ (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 62 (just consumed gas: 0.010)
     [ 6
       (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 59 (just consumed gas: 0.025)
+  - location: 59 (just consumed gas: 0.035)
     [ 18
       6
       (Pair 8 11 4 13 15 5 1)
@@ -502,14 +502,14 @@ trace
       6
       (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 63 (just consumed gas: 0)
+  - location: 63 (just consumed gas: 0.055)
     [ (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 66 (just consumed gas: 0.010)
     [ 8
       (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 63 (just consumed gas: 0.025)
+  - location: 63 (just consumed gas: 0.035)
     [ 6
       8
       (Pair 11 4 13 15 5 1)
@@ -618,14 +618,14 @@ trace
       8
       (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 67 (just consumed gas: 0)
+  - location: 67 (just consumed gas: 0.059)
     [ (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 70 (just consumed gas: 0.010)
     [ 11
       (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 67 (just consumed gas: 0.025)
+  - location: 67 (just consumed gas: 0.035)
     [ 8
       11
       (Pair 4 13 15 5 1)
@@ -750,14 +750,14 @@ trace
       11
       (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 71 (just consumed gas: 0)
+  - location: 71 (just consumed gas: 0.063)
     [ (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 74 (just consumed gas: 0.010)
     [ 4
       (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 71 (just consumed gas: 0.025)
+  - location: 71 (just consumed gas: 0.035)
     [ 11
       4
       (Pair 13 15 5 1)
@@ -899,14 +899,14 @@ trace
       4
       (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 75 (just consumed gas: 0)
+  - location: 75 (just consumed gas: 0.067)
     [ (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 78 (just consumed gas: 0.010)
     [ 13
       (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 75 (just consumed gas: 0.025)
+  - location: 75 (just consumed gas: 0.035)
     [ 4
       13
       (Pair 15 5 1)
@@ -1066,14 +1066,14 @@ trace
       13
       (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 79 (just consumed gas: 0)
+  - location: 79 (just consumed gas: 0.071)
     [ (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 82 (just consumed gas: 0.010)
     [ 15
       (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 79 (just consumed gas: 0.025)
+  - location: 79 (just consumed gas: 0.035)
     [ 13
       15
       (Pair 5 1)
@@ -1252,14 +1252,14 @@ trace
       15
       (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 83 (just consumed gas: 0)
+  - location: 83 (just consumed gas: 0.075)
     [ (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 86 (just consumed gas: 0.010)
     [ 5
       1
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 83 (just consumed gas: 0.025)
+  - location: 83 (just consumed gas: 0.035)
     [ 15
       5
       1
@@ -2104,14 +2104,14 @@ trace
       5
       1
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 156 (just consumed gas: 0)
+  - location: 156 (just consumed gas: 0.075)
     [ 5
       1
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 159 (just consumed gas: 0.010)
     [ (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 156 (just consumed gas: 0.025)
+  - location: 156 (just consumed gas: 0.035)
     [ 15
       (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2294,14 +2294,14 @@ trace
       15
       (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 160 (just consumed gas: 0)
+  - location: 160 (just consumed gas: 0.071)
     [ 15
       (Pair 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 163 (just consumed gas: 0.010)
     [ (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 160 (just consumed gas: 0.025)
+  - location: 160 (just consumed gas: 0.035)
     [ 13
       (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2465,14 +2465,14 @@ trace
       13
       (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 164 (just consumed gas: 0)
+  - location: 164 (just consumed gas: 0.067)
     [ 13
       (Pair 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 167 (just consumed gas: 0.010)
     [ (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 164 (just consumed gas: 0.025)
+  - location: 164 (just consumed gas: 0.035)
     [ 4
       (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2618,14 +2618,14 @@ trace
       4
       (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 168 (just consumed gas: 0)
+  - location: 168 (just consumed gas: 0.063)
     [ 4
       (Pair 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 171 (just consumed gas: 0.010)
     [ (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 168 (just consumed gas: 0.025)
+  - location: 168 (just consumed gas: 0.035)
     [ 11
       (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2754,14 +2754,14 @@ trace
       11
       (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 172 (just consumed gas: 0)
+  - location: 172 (just consumed gas: 0.059)
     [ 11
       (Pair 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 175 (just consumed gas: 0.010)
     [ (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 172 (just consumed gas: 0.025)
+  - location: 172 (just consumed gas: 0.035)
     [ 8
       (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2874,14 +2874,14 @@ trace
       8
       (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 176 (just consumed gas: 0)
+  - location: 176 (just consumed gas: 0.055)
     [ 8
       (Pair 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 179 (just consumed gas: 0.010)
     [ (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 176 (just consumed gas: 0.025)
+  - location: 176 (just consumed gas: 0.035)
     [ 6
       (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -2979,14 +2979,14 @@ trace
       6
       (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 180 (just consumed gas: 0)
+  - location: 180 (just consumed gas: 0.051)
     [ 6
       (Pair 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 183 (just consumed gas: 0.010)
     [ (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 180 (just consumed gas: 0.025)
+  - location: 180 (just consumed gas: 0.035)
     [ 18
       (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3070,14 +3070,14 @@ trace
       18
       (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 184 (just consumed gas: 0)
+  - location: 184 (just consumed gas: 0.047)
     [ 18
       (Pair 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 187 (just consumed gas: 0.010)
     [ (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 184 (just consumed gas: 0.025)
+  - location: 184 (just consumed gas: 0.035)
     [ 9
       (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3148,14 +3148,14 @@ trace
       9
       (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 188 (just consumed gas: 0)
+  - location: 188 (just consumed gas: 0.043)
     [ 9
       (Pair 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 191 (just consumed gas: 0.010)
     [ (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 188 (just consumed gas: 0.025)
+  - location: 188 (just consumed gas: 0.035)
     [ 19
       (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3214,14 +3214,14 @@ trace
       19
       (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 192 (just consumed gas: 0)
+  - location: 192 (just consumed gas: 0.039)
     [ 19
       (Pair 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 195 (just consumed gas: 0.010)
     [ (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 192 (just consumed gas: 0.025)
+  - location: 192 (just consumed gas: 0.035)
     [ 14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3269,14 +3269,14 @@ trace
       14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 196 (just consumed gas: 0)
+  - location: 196 (just consumed gas: 0.035)
     [ 14
       (Pair 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 199 (just consumed gas: 0.010)
     [ (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 196 (just consumed gas: 0.025)
+  - location: 196 (just consumed gas: 0.035)
     [ 10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3314,14 +3314,14 @@ trace
       10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 200 (just consumed gas: 0)
+  - location: 200 (just consumed gas: 0.031)
     [ 10
       (Pair 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 203 (just consumed gas: 0.010)
     [ (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 200 (just consumed gas: 0.025)
+  - location: 200 (just consumed gas: 0.035)
     [ 16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3350,14 +3350,14 @@ trace
       16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 204 (just consumed gas: 0)
+  - location: 204 (just consumed gas: 0.027)
     [ 16
       (Pair 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 207 (just consumed gas: 0.010)
     [ (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 204 (just consumed gas: 0.025)
+  - location: 204 (just consumed gas: 0.035)
     [ 12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3378,14 +3378,14 @@ trace
       12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 208 (just consumed gas: 0)
+  - location: 208 (just consumed gas: 0.023)
     [ 12
       (Pair 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 211 (just consumed gas: 0.010)
     [ (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 208 (just consumed gas: 0.025)
+  - location: 208 (just consumed gas: 0.035)
     [ 3
       (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3399,14 +3399,14 @@ trace
       3
       (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 212 (just consumed gas: 0)
+  - location: 212 (just consumed gas: 0.010)
     [ 3
       (Pair 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
   - location: 214 (just consumed gas: 0.010)
     [ (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
-  - location: 212 (just consumed gas: 0.025)
+  - location: 212 (just consumed gas: 0.035)
     [ 2
       (Pair 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1)
       (Pair 2 3 12 16 10 14 19 9 18 6 8 11 4 13 15 5 1) ]
@@ -3417,9 +3417,9 @@ trace
     [ 0 ]
   - location: 219 (just consumed gas: 0.010)
     [ True ]
-  - location: 220 (just consumed gas: 0)
+  - location: 220 (just consumed gas: 0.010)
     [  ]
-  - location: 220 (just consumed gas: 0.015)
+  - location: 220 (just consumed gas: 0.025)
     [  ]
   - location: 226 (just consumed gas: 0.010)
     [ Unit ]

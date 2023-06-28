@@ -11,11 +11,11 @@ trace
     [ (Pair (Left True) (Left "X")) ]
   - location: 11 (just consumed gas: 0.010)
     [ (Left True) ]
-  - location: 12 (just consumed gas: 0)
+  - location: 12 (just consumed gas: 0.010)
     [ True ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right True) ]
-  - location: 12 (just consumed gas: 0.015)
+  - location: 12 (just consumed gas: 0.025)
     [ (Right True) ]
   - location: 19 (just consumed gas: 0.010)
     [ {}
