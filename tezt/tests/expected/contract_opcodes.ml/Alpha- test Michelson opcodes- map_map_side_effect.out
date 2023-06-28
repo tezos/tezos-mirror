@@ -22,14 +22,7 @@ trace
     [  ]
   - location: 17 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 14 (just consumed gas: 0.035)
-    [ 10
-      0 ]
-  - location: 14 (just consumed gas: 0.010)
-    [ {}
-      10
-      0 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.045)
     [ {}
       10
       0 ]
@@ -77,14 +70,7 @@ trace
     [  ]
   - location: 17 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 14 (just consumed gas: 0.035)
-    [ 10
-      0 ]
-  - location: 14 (just consumed gas: 0.010)
-    [ { Elt "foo" 1 }
-      10
-      0 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.045)
     [ { Elt "foo" 1 }
       10
       0 ]
@@ -127,14 +113,7 @@ trace
       0 ]
   - location: 33 (just consumed gas: 0.035)
     [ 11 ]
-  - location: 30 (just consumed gas: 0.035)
-    [ 10
-      11 ]
-  - location: 30 (just consumed gas: 0.010)
-    [ 11
-      10
-      11 ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.045)
     [ 11
       10
       11 ]
@@ -182,14 +161,7 @@ trace
     [  ]
   - location: 17 (just consumed gas: 0.010)
     [ 0 ]
-  - location: 14 (just consumed gas: 0.035)
-    [ 15
-      0 ]
-  - location: 14 (just consumed gas: 0.010)
-    [ { Elt "bar" 5 ; Elt "foo" 1 }
-      15
-      0 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.045)
     [ { Elt "bar" 5 ; Elt "foo" 1 }
       15
       0 ]
@@ -232,14 +204,7 @@ trace
       0 ]
   - location: 33 (just consumed gas: 0.035)
     [ 20 ]
-  - location: 30 (just consumed gas: 0.035)
-    [ 15
-      20 ]
-  - location: 30 (just consumed gas: 0.010)
-    [ 20
-      15
-      20 ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.045)
     [ 20
       15
       20 ]
@@ -282,14 +247,7 @@ trace
       20 ]
   - location: 33 (just consumed gas: 0.035)
     [ 36 ]
-  - location: 30 (just consumed gas: 0.035)
-    [ 15
-      36 ]
-  - location: 30 (just consumed gas: 0.010)
-    [ 16
-      15
-      36 ]
-  - location: 30 (just consumed gas: 0)
+  - location: 30 (just consumed gas: 0.045)
     [ 16
       15
       36 ]

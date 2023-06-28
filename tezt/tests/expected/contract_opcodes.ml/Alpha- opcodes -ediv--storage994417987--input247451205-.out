@@ -113,14 +113,7 @@ trace
       None ]
   - location: 52 (just consumed gas: 0.010)
     [ (Pair None None) ]
-  - location: 49 (just consumed gas: 0.035)
-    [ None
-      (Pair None None) ]
-  - location: 49 (just consumed gas: 0.010)
-    [ None
-      None
-      (Pair None None) ]
-  - location: 49 (just consumed gas: 0)
+  - location: 49 (just consumed gas: 0.045)
     [ None
       None
       (Pair None None) ]

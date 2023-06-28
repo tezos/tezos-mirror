@@ -33,32 +33,7 @@ trace
     [  ]
   - location: 23 (just consumed gas: 0.010)
     [ 6 ]
-  - location: 20 (just consumed gas: 0.035)
-    [ 5
-      6 ]
-  - location: 20 (just consumed gas: 0.010)
-    [ 4
-      5
-      6 ]
-  - location: 20 (just consumed gas: 0.010)
-    [ 3
-      4
-      5
-      6 ]
-  - location: 20 (just consumed gas: 0.010)
-    [ 2
-      3
-      4
-      5
-      6 ]
-  - location: 20 (just consumed gas: 0.010)
-    [ 1
-      2
-      3
-      4
-      5
-      6 ]
-  - location: 20 (just consumed gas: 0)
+  - location: 20 (just consumed gas: 0.075)
     [ 1
       2
       3
