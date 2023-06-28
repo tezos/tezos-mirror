@@ -266,7 +266,12 @@ let test_launch threshold expected_vote_duration () =
           .to_int32
             metadata.adaptive_inflation_toggle_ema
         in
-        Compare.Int32.(ema < threshold))
+        let launch_cycle = metadata.adaptive_inflation_launch_cycle in
+        let cond = Compare.Int32.(ema < threshold) in
+        assert (
+          if cond then Option.is_none launch_cycle
+          else Option.is_some launch_cycle) ;
+        cond)
       block
   in
   (* At this point we are on the last block before the end of the vote. *)
@@ -310,6 +315,14 @@ let test_launch threshold expected_vote_duration () =
   in
 
   let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
+  let* () =
+    (* Check that the block metadata information about the launch cycle
+       is consistent with the RPC. *)
+    let* cycle =
+      Assert.get_some ~loc:__LOC__ metadata.adaptive_inflation_launch_cycle
+    in
+    assert_cycle_eq ~loc:__LOC__ launch_cycle cycle
+  in
   (* Bake until the activation. *)
   let* block = Block.bake_until_cycle launch_cycle block in
   let* block, metadata = Block.bake_n_with_metadata 1 block in
