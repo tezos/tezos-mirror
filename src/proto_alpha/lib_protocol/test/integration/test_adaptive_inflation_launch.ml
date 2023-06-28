@@ -116,7 +116,7 @@ let test_launch threshold expected_vote_duration () =
     let ema =
       Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
       .to_int32
-        metadata.adaptive_inflation_toggle_ema
+        metadata.adaptive_inflation_vote_ema
     in
     Assert.lt_int32 ~loc threshold ema
   in
@@ -233,7 +233,7 @@ let test_launch threshold expected_vote_duration () =
         let ema =
           Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
           .to_int32
-            metadata.adaptive_inflation_toggle_ema
+            metadata.adaptive_inflation_vote_ema
         in
         let launch_cycle = metadata.adaptive_inflation_launch_cycle in
         let cond = Compare.Int32.(ema < threshold) in

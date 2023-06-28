@@ -2599,8 +2599,7 @@ type block_metadata = {
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_inflation_toggle_ema :
-    Per_block_votes.Adaptive_inflation_launch_EMA.t;
+  adaptive_inflation_vote_ema : Per_block_votes.Adaptive_inflation_launch_EMA.t;
   adaptive_inflation_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t option;
@@ -2621,7 +2620,7 @@ let block_metadata_encoding =
               deactivated;
               balance_updates;
               liquidity_baking_toggle_ema;
-              adaptive_inflation_toggle_ema;
+              adaptive_inflation_vote_ema;
               adaptive_inflation_launch_cycle;
               implicit_operations_results;
               dal_attestation;
@@ -2634,7 +2633,7 @@ let block_metadata_encoding =
              deactivated,
              balance_updates,
              liquidity_baking_toggle_ema,
-             adaptive_inflation_toggle_ema,
+             adaptive_inflation_vote_ema,
              adaptive_inflation_launch_cycle ),
            ( implicit_operations_results,
              proposer_active_key,
@@ -2649,7 +2648,7 @@ let block_metadata_encoding =
                 deactivated,
                 balance_updates,
                 liquidity_baking_toggle_ema,
-                adaptive_inflation_toggle_ema,
+                adaptive_inflation_vote_ema,
                 adaptive_inflation_launch_cycle ),
               ( implicit_operations_results,
                 proposer_active_key,
@@ -2666,7 +2665,7 @@ let block_metadata_encoding =
            deactivated;
            balance_updates;
            liquidity_baking_toggle_ema;
-           adaptive_inflation_toggle_ema;
+           adaptive_inflation_vote_ema;
            adaptive_inflation_launch_cycle;
            implicit_operations_results;
            dal_attestation;
@@ -2684,7 +2683,7 @@ let block_metadata_encoding =
                 "liquidity_baking_toggle_ema"
                 Per_block_votes.Liquidity_baking_toggle_EMA.encoding)
              (req
-                "adaptive_inflation_toggle_ema"
+                "adaptive_inflation_vote_ema"
                 Per_block_votes.Adaptive_inflation_launch_EMA.encoding)
              (opt "adaptive_inflation_activation_cycle" Cycle.encoding))
           (obj5
