@@ -9,7 +9,8 @@
 //! to storage, account balances, block constants, _and transaction state_.
 
 use crate::account_storage::{
-    account_path, EthereumAccount, EthereumAccountStorage, CODE_HASH_DEFAULT,
+    account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
+    CODE_HASH_DEFAULT,
 };
 use crate::storage;
 use crate::transaction::TransactionContext;
@@ -533,7 +534,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
     ) -> Result<EthereumAccount, EthereumError> {
         self.evm_account_storage
-            .get_or_create(self.host, &account_path(&address)?)
+            .get_or_create(
+                self.host,
+                &account_path(&address).map_err(AccountStorageError::from)?,
+            )
             .map_err(EthereumError::from)
     }
 
@@ -589,7 +593,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     "Failed to increment nonce for account {:?}",
                     address
                 );
-                Err(EthereumError::from(err))
+                Err(EthereumError::from(AccountStorageError::from(err)))
             }
         }
     }
@@ -626,7 +630,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         debug_msg!(self.host, "Deleting contract at {:?}", address);
 
         self.evm_account_storage
-            .delete(self.host, &account_path(&address)?)
+            .delete(
+                self.host,
+                &account_path(&address).map_err(AccountStorageError::from)?,
+            )
             .map_err(EthereumError::from)
     }
 

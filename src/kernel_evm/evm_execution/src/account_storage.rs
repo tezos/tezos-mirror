@@ -13,6 +13,8 @@ use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_storage::storage::Storage;
 use thiserror::Error;
 
+use crate::DurableStorageError;
+
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32_usize;
 
@@ -20,13 +22,13 @@ pub const WORD_SIZE: usize = 32_usize;
 /// interface.
 #[derive(Error, Eq, PartialEq, Clone, Debug)]
 pub enum AccountStorageError {
-    /// Some runtime error happened while using durable storage
-    #[error("Runtime error: {0:?}")]
-    RuntimeError(host::runtime::RuntimeError),
-    /// Some error happened while constructing the path to some
-    /// resource.
-    #[error("Path error: {0:?}")]
-    PathError(host::path::PathError),
+    /// The account does not hold enough Ether for a transaction
+    #[error("Insufficient Ether")]
+    NotEnoughEther,
+    /// Some error happened while using durable storage, either from an invalid
+    /// path or a runtime error.
+    #[error("Durable storage error: {0:?}")]
+    DurableStorageError(#[from] DurableStorageError),
     /// Some error occurred while using the transaction storage
     /// API.
     #[error("Transaction storage API error: {0:?}")]
@@ -49,13 +51,13 @@ impl From<tezos_smart_rollup_storage::StorageError> for AccountStorageError {
 
 impl From<host::path::PathError> for AccountStorageError {
     fn from(error: host::path::PathError) -> Self {
-        AccountStorageError::PathError(error)
+        AccountStorageError::DurableStorageError(DurableStorageError::from(error))
     }
 }
 
 impl From<host::runtime::RuntimeError> for AccountStorageError {
     fn from(error: host::runtime::RuntimeError) -> Self {
-        AccountStorageError::RuntimeError(error)
+        AccountStorageError::DurableStorageError(DurableStorageError::from(error))
     }
 }
 
@@ -185,11 +187,16 @@ fn bytes_hash(bytes: &[u8]) -> H256 {
 }
 
 /// Turn an Ethereum address - a H160 - into a valid path
-pub fn account_path(address: &H160) -> Result<OwnedPath, AccountStorageError> {
+pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
-    OwnedPath::try_from(path_string).map_err(AccountStorageError::from)
+    OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
 }
 impl EthereumAccount {
+    pub fn from_address(address: &H160) -> Result<Self, DurableStorageError> {
+        let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
+        Ok(path.into())
+    }
+
     /// Get the **nonce** for the Ethereum account. Default value is zero, so an account will
     /// _always_ have this **nonce**.
     pub fn nonce(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
