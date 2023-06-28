@@ -836,10 +836,20 @@ module Constants : sig
       max_ticket_payload_size : int;
     }
 
+    type adaptive_rewards_params = {
+      reward_ratio_min : Q.t;
+      reward_ratio_max : Q.t;
+      max_bonus : int64;
+      growth_rate : int64;
+      center_dz : Q.t;
+      radius_dz : Q.t;
+    }
+
     type adaptive_inflation = {
       staking_over_baking_global_limit : int;
       staking_over_delegation_edge : int;
       launch_ema_threshold : int32;
+      adaptive_rewards_params : adaptive_rewards_params;
     }
 
     type reward_weights = {

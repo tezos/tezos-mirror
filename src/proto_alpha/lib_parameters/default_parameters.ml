@@ -247,6 +247,15 @@ let constants_mainnet =
         staking_over_baking_global_limit = 5;
         staking_over_delegation_edge = 2;
         launch_ema_threshold = 1_600_000_000l;
+        adaptive_rewards_params =
+          {
+            reward_ratio_min = Q.(5 // 1000);
+            reward_ratio_max = Q.(1 // 10);
+            max_bonus = 50_000_000_000_000L;
+            growth_rate = 115_740_740L;
+            center_dz = Q.(1 // 2);
+            radius_dz = Q.(1 // 50);
+          };
       };
   }
 

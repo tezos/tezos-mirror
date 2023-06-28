@@ -133,10 +133,20 @@ type zk_rollup = {
   max_ticket_payload_size : int;
 }
 
+type adaptive_rewards_params = {
+  reward_ratio_min : Q.t;
+  reward_ratio_max : Q.t;
+  max_bonus : int64;
+  growth_rate : int64;
+  center_dz : Q.t;
+  radius_dz : Q.t;
+}
+
 type adaptive_inflation = {
   staking_over_baking_global_limit : int;
   staking_over_delegation_edge : int;
   launch_ema_threshold : int32;
+  adaptive_rewards_params : adaptive_rewards_params;
 }
 
 type reward_weights = {
@@ -289,6 +299,80 @@ let zk_rollup_encoding =
        (req "zk_rollup_min_pending_to_process" int31)
        (req "zk_rollup_max_ticket_payload_size" int31))
 
+let extremum_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num > Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Extremum Parameter: only positive values allowed")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let center_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
+          Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Parameter: dead zone center can only be between 0 \
+             and 1")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let radius_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Parameter: dead zone radius must be non-negative")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
+let adaptive_rewards_params_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           reward_ratio_min;
+           reward_ratio_max;
+           max_bonus;
+           growth_rate;
+           center_dz;
+           radius_dz;
+         } ->
+      ( reward_ratio_min,
+        reward_ratio_max,
+        max_bonus,
+        growth_rate,
+        center_dz,
+        radius_dz ))
+    (fun ( reward_ratio_min,
+           reward_ratio_max,
+           max_bonus,
+           growth_rate,
+           center_dz,
+           radius_dz ) ->
+      {
+        reward_ratio_min;
+        reward_ratio_max;
+        max_bonus;
+        growth_rate;
+        center_dz;
+        radius_dz;
+      })
+    (obj6
+       (req "reward_ratio_min" extremum_encoding)
+       (req "reward_ratio_max" extremum_encoding)
+       (req "max_bonus" int64)
+       (req "growth_rate" int64)
+       (req "center_dz" center_encoding)
+       (req "radius_dz" radius_encoding))
+
 let adaptive_inflation_encoding =
   let open Data_encoding in
   conv
@@ -296,22 +380,27 @@ let adaptive_inflation_encoding =
            staking_over_baking_global_limit;
            staking_over_delegation_edge;
            launch_ema_threshold;
+           adaptive_rewards_params;
          } ->
       ( staking_over_baking_global_limit,
         staking_over_delegation_edge,
-        launch_ema_threshold ))
+        launch_ema_threshold,
+        adaptive_rewards_params ))
     (fun ( staking_over_baking_global_limit,
            staking_over_delegation_edge,
-           launch_ema_threshold ) ->
+           launch_ema_threshold,
+           adaptive_rewards_params ) ->
       {
         staking_over_baking_global_limit;
         staking_over_delegation_edge;
         launch_ema_threshold;
+        adaptive_rewards_params;
       })
-    (obj3
+    (obj4
        (req "staking_over_baking_global_limit" uint8)
        (req "staking_over_delegation_edge" uint8)
-       (req "adaptive_inflation_launch_ema_threshold" int32))
+       (req "adaptive_inflation_launch_ema_threshold" int32)
+       (req " adaptive_rewards_params" adaptive_rewards_params_encoding))
 
 let reward_weights_encoding =
   let open Data_encoding in

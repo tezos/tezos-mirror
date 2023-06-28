@@ -101,12 +101,24 @@ type zk_rollup = {
   max_ticket_payload_size : int;
 }
 
+type adaptive_rewards_params = {
+  reward_ratio_min : (* Maximum yearly inflation rate *) Q.t;
+  reward_ratio_max : (* Minimum yearly inflation rate *) Q.t;
+  max_bonus : (* Maximum reward bonus value *) int64;
+  growth_rate : (* Bonus value's groth rate *) int64;
+  center_dz : (* Center for bonus *) Q.t;
+  radius_dz :
+    (* Minimum distance from center required for non-zero growth *) Q.t;
+}
+
 type adaptive_inflation = {
   staking_over_baking_global_limit
     (* Global maximum costake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
   staking_over_delegation_edge : (* Weight of staking over delegation. *) int;
   launch_ema_threshold : (* Threshold of the activation vote *) int32;
+  adaptive_rewards_params :
+    (* Parameters for the reward mechanism *) adaptive_rewards_params;
 }
 
 type reward_weights = {

@@ -988,6 +988,21 @@ let prepare_first_block ~level ~timestamp ctxt =
           }
       in
 
+      let adaptive_rewards_params =
+        Constants_parametric_repr.
+          {
+            reward_ratio_min = Q.(5 // 1000) (* 0.5% *);
+            reward_ratio_max = Q.(1 // 10) (* 10% *);
+            max_bonus = 50_000_000_000_000L (* 5% *);
+            growth_rate =
+              115_740_740L
+              (* 0.01 * [bonus_unit] / second_per_day
+                 For each % and each day, grows the bonus by 0.01% *);
+            center_dz = Q.(1 // 2) (* 50% *);
+            radius_dz = Q.(1 // 50) (* 2% *);
+          }
+      in
+
       let adaptive_inflation =
         Constants_parametric_repr.
           {
@@ -995,6 +1010,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             staking_over_delegation_edge = 2;
             launch_ema_threshold =
               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l;
+            adaptive_rewards_params;
           }
       in
 
