@@ -34,6 +34,7 @@ type t = {
   rev_tickets : operation_receipt list;
   header : Block_header.t;
   delegate : Account.t;
+  constants : Constants.Parametric.t;
 }
 
 type incremental = t
@@ -126,7 +127,15 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ~predecessor:predecessor.header.shell
   >|= fun state ->
   Environment.wrap_tzresult state >|? fun state ->
-  {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
+  {
+    predecessor;
+    state;
+    rev_operations = [];
+    rev_tickets = [];
+    header;
+    delegate;
+    constants = predecessor.constants;
+  }
 
 let detect_script_failure :
     type kind. kind Apply_results.operation_metadata -> _ =
@@ -278,16 +287,13 @@ let finalize_block st =
     }
   in
   let hash = Block_header.hash header in
-  let* constants =
-    Alpha_services.Constants.parametric Block.rpc_ctxt st.predecessor
-  in
   return
     {
       Block.hash;
       header;
       operations;
       context = validation_result.context;
-      constants;
+      constants = st.constants;
     }
 
 let assert_validate_operation_fails expect_failure op block =
