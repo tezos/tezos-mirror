@@ -323,7 +323,7 @@ let tar = external_lib "tar" V.True
 let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
 let tezos_rust_lib =
-  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.5")
+  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.6")
 
 let tezos_sapling_parameters =
   opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")

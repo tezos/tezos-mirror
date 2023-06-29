@@ -19,7 +19,7 @@ depends: [
   "tezos-stdlib"
   "tezos-crypto"
   "tezos-error-monad"
-  "tezos-rust-libs" { = "1.5" }
+  "tezos-rust-libs" { = "1.6" }
   "tezos-sapling-parameters" { >= "1.1.0" }
   "tezos-lwt-result-stdlib"
   "tezos-hacl" {with-test}

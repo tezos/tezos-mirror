@@ -52,6 +52,9 @@ module Store : sig
 
   (** [create engine] instantiate a WebAssembly runtime store. *)
   val create : Engine.t -> t
+
+  (** [delete store] destroys the handle to the WebAssembly store. *)
+  val delete : t -> unit
 end
 
 module Ref : sig
