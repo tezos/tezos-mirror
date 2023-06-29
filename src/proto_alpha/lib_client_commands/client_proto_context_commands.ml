@@ -2623,20 +2623,22 @@ let commands_rw () =
                     {address = rollup_address; _});
               _;
             } ->
-            let* alias =
-              Smart_rollup_alias.Address.of_fresh cctxt force alias
-            in
-            let* () =
-              Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
-            in
-            let*! () =
-              cctxt#message
-                {|Smart rollup %a memorized as "%s"|}
-                Sc_rollup.Address.pp
-                rollup_address
-                alias
-            in
-            return_unit
+            if dry_run then return_unit
+            else
+              let* alias =
+                Smart_rollup_alias.Address.of_fresh cctxt force alias
+              in
+              let* () =
+                Smart_rollup_alias.Address.add ~force cctxt alias rollup_address
+              in
+              let*! () =
+                cctxt#message
+                  {|Smart rollup %a memorized as "%s"|}
+                  Sc_rollup.Address.pp
+                  rollup_address
+                  alias
+              in
+              return_unit
         | _ -> return_unit);
     command
       ~group
