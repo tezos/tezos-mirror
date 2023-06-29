@@ -1845,7 +1845,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let slot3_content = "slot 3" in
   let* _commitment, _proof = store_slot slot1_content in
   let* _commitment, _proof = store_slot slot3_content in
-  Log.info "Publish slots 1 and 2 (inject and bake)." ;
+  Log.info "Publish slots 1 and 2 (inject and bake two blocks)." ;
   let level = Node.get_level node + 1 in
   let publish source ~index message =
     let* _op_hash =
@@ -1855,7 +1855,12 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   in
   let* () = publish Constant.bootstrap1 ~index:0 slot1_content in
   let* () = publish Constant.bootstrap2 ~index:2 slot2_content in
-  let wait_block_processing = wait_for_layer1_block_processing dal_node level in
+  let wait_block_processing =
+    wait_for_layer1_block_processing dal_node (level + 1)
+  in
+  (* bake two blocks: at [level + 1] the commitments are published, at [level +
+     2] the commitments become final *)
+  let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
   let* () = wait_block_processing in
   Log.info "Check attestability of slots." ;
