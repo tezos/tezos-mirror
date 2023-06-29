@@ -304,7 +304,8 @@ let test_total_stake ~user_is_delegate () =
 
 let check_delegated_balance_is ctxt ~loc delegate expected_balance =
   (* Fetch the delegated balance of d. *)
-  Delegate.delegated_balance ctxt delegate >>>=? fun delegated_balance ->
+  Delegate.For_RPC.delegated_balance ctxt delegate
+  >>>=? fun delegated_balance ->
   (* Check that the delegated balance of [delegate] is as explected. *)
   Assert.equal_tez ~loc delegated_balance expected_balance
 

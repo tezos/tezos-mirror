@@ -460,11 +460,11 @@ let register () =
           return delegates) ;
   register1 ~chunked:false S.info (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
-      Delegate.full_balance ctxt pkh >>=? fun full_balance ->
+      Delegate.For_RPC.full_balance ctxt pkh >>=? fun full_balance ->
       Delegate.frozen_deposits ctxt pkh >>=? fun frozen_deposits ->
       Delegate.staking_balance ctxt pkh >>=? fun staking_balance ->
       Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
-      Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
+      Delegate.For_RPC.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
       Delegate.last_cycle_before_deactivation ctxt pkh >>=? fun grace_period ->
       Vote.get_delegate_info ctxt pkh >>=? fun voting_info ->
@@ -488,7 +488,7 @@ let register () =
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (check_delegate_registered ctxt pkh)
-      >>=? fun () -> Delegate.full_balance ctxt pkh) ;
+      >>=? fun () -> Delegate.For_RPC.full_balance ctxt pkh) ;
   register1 ~chunked:false S.current_frozen_deposits (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
@@ -521,7 +521,7 @@ let register () =
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
-      Delegate.delegated_balance ctxt pkh) ;
+      Delegate.For_RPC.delegated_balance ctxt pkh) ;
   register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.deactivated ctxt pkh) ;
