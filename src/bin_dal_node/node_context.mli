@@ -81,6 +81,12 @@ type error += Node_not_ready
     times, it replaces current values for [ready_ctxt] with new ones *)
 val get_ready : t -> ready_ctxt tzresult
 
+(** [get_profile_ctxt ctxt] returns the profile context.  *)
+val get_profile_ctxt : t -> Profile_manager.t
+
+(** [set_profile_ctxt ctxt pctxt] sets the profile context.  *)
+val set_profile_ctxt : t -> Profile_manager.t -> unit
+
 (** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration_file.t
 

@@ -590,6 +590,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   let app_output_stream t = t.app_output_stream
 
+  let is_subscribed state topic =
+    GS.Introspection.(has_joined topic (view state.gossip_state))
+
   let pp_list pp_elt =
     Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
 

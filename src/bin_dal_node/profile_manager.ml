@@ -27,22 +27,57 @@
    Node profiles should be stored into the memory as well
    so that we can cache them *)
 
-let add_profile proto_parameters node_store gs_worker profile =
+module Slot_set = Set.Make (Int)
+module Pkh_set = Signature.Public_key_hash.Set
+
+(** A profile context stores profile-specific data used by the daemon.  *)
+type t = {producers : Slot_set.t}
+
+let empty = {producers = Slot_set.empty}
+
+let init_attestor number_of_slots gs_worker pkh =
+  List.iter
+    (fun slot_index ->
+      Join Gossipsub.{slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
+    Utils.Infix.(0 -- (number_of_slots - 1))
+
+let init_producer ctxt slot_index =
+  {producers = Slot_set.add slot_index ctxt.producers}
+
+let add_profile ctxt proto_parameters node_store gs_worker profile =
   let open Lwt_result_syntax in
-  let*! () =
-    Store.Legacy.add_profile proto_parameters node_store gs_worker profile
+  let Dal_plugin.{number_of_slots; _} = proto_parameters in
+  let ctxt =
+    match profile with
+    | Services.Types.Attestor pkh ->
+        init_attestor number_of_slots gs_worker pkh ;
+        ctxt
+    | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index
   in
-  return_unit
+  let*! () = Store.Legacy.add_profile node_store profile in
+  return ctxt
+
+(* TODO https://gitlab.com/tezos/tezos/-/issues/5934
+   We need a mechanism to ease the tracking of newly added/removed topics. *)
+let join_topics_for_producer gs_worker committee ctxt =
+  Slot_set.iter
+    (fun slot_index ->
+      Signature.Public_key_hash.Map.iter
+        (fun pkh _shards ->
+          let topic = Gossipsub.{slot_index; pkh} in
+          if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
+            Join topic |> Gossipsub.Worker.(app_input gs_worker))
+        committee)
+    ctxt.producers
+
+let on_new_head ctxt gs_worker committee =
+  join_topics_for_producer gs_worker committee ctxt
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 
-let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
+let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
-  let* shard_indexes =
-    Node_context.fetch_assigned_shard_indices ctxt ~pkh ~level:attested_level
-    |> Errors.other_lwt_result
-  in
-  let expected_number_of_shards = List.length shard_indexes in
+  let expected_number_of_shards = List.length shard_indices in
   if expected_number_of_shards = 0 then return Services.Types.Not_in_committee
   else
     let published_level =
@@ -67,7 +102,7 @@ let get_attestable_slots ctxt store proto_parameters pkh ~attested_level =
           Store.Shards.are_shards_available
             store.shard_store
             commitment
-            shard_indexes
+            shard_indices
           |> Errors.other_lwt_result
     in
     let all_slot_indexes =

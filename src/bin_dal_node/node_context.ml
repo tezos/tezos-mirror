@@ -44,6 +44,7 @@ type t = {
   committee_cache : Committee_cache.t;
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
+  mutable profile_ctxt : Profile_manager.t;
 }
 
 let init config store gs_worker transport_layer cctxt =
@@ -66,6 +67,7 @@ let init config store gs_worker transport_layer cctxt =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
     gs_worker;
     transport_layer;
+    profile_ctxt = Profile_manager.empty;
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters activation_level =
@@ -110,6 +112,10 @@ let get_ready ctxt =
   match ctxt.status with
   | Ready ctxt -> Ok ctxt
   | Starting -> fail [Node_not_ready]
+
+let get_profile_ctxt ctxt = ctxt.profile_ctxt
+
+let set_profile_ctxt ctxt pctxt = ctxt.profile_ctxt <- pctxt
 
 let get_config ctxt = ctxt.config
 

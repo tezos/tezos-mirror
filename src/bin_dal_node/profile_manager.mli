@@ -25,14 +25,25 @@
 
 (** This module provides different handlers related to DAL profiles. *)
 
+(** A profile manager context stores profile-specific data used by the daemon.  *)
+type t
+
+(** The empty profile manager context. *)
+val empty : t
+
 (** Adds a profile to the dal [node_store]. If already present,
     the store does not change. *)
 val add_profile :
+  t ->
   Dal_plugin.proto_parameters ->
   Store.node_store ->
   Gossipsub.Worker.t ->
   Services.Types.profile ->
-  unit tzresult Lwt.t
+  t tzresult Lwt.t
+
+(** [on_new_head c gs_worker committee] performs profile-related
+    actions that depend on the current head, more precisely on the current committee. *)
+val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
@@ -41,10 +52,9 @@ val get_profiles :
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
-  Node_context.t ->
+  shard_indices:int list ->
   Store.node_store ->
   Dal_plugin.proto_parameters ->
-  Tezos_crypto.Signature.public_key_hash ->
   attested_level:int32 ->
   (Services.Types.attestable_slots, [Errors.decoding | Errors.other]) result
   Lwt.t
