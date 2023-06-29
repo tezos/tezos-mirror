@@ -179,6 +179,13 @@ Node
   ``GET ../mempool/pending_operations``. ``applied`` argument of these RPCs is
   deprecated. (MR :gl:`!9143`)
 
+- Removed the warning ``no prevalidator filter found for protocol
+  ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im`` that was
+  emitted at node start-up, because it is normal for ``Genesis`` not
+  to have a prevalidator filter. The warning will still be issued if
+  no prevalidator filter is found later on for a different
+  protocol. (MR :gl:`!9261`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
