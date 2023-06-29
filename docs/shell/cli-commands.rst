@@ -85,3 +85,12 @@ DAC client manual (Experimental)
 ================================
 .. raw:: html
         :file: ../api/octez-dac-client.html
+
+
+.. _smart_rollup_node_manual:
+
+Smart rollup node manual
+========================
+
+.. raw:: html
+         :file: ../api/octez-smart-rollup-node.html

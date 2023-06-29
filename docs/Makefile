@@ -71,7 +71,9 @@ manuals: \
 		./scripts/man2txt.py > api/octez-node.txt
 	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
 		./scripts/man2txt.py > api/octez-proxy-server.txt
-	
+	@../octez-smart-rollup-node man -verbosity 3 -format html | \
+		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
+
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
 odoc: docexes
