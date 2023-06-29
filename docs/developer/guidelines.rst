@@ -658,7 +658,7 @@ Lwtreslib provides additional combinators ``List.concat_map_s``,
 ``List.concat_map_e``, and ``List.concat_map_es`` to replace the non-vanilla
 compositions.
 
-Check the :package-api:`online documentation <tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`.
+Check the :package-api:`online documentation <octez-libs/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`.
 
 Coding conventions
 ------------------
