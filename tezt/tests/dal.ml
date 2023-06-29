@@ -1915,17 +1915,15 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
    (one would have to take into account the distribution of shard indexes to
    delegates).
 
-   Slots are published by baking with `bake for`, because when running the baker
-   daemon, it is not possible to control the time of publishing of a slot, which
-   is successful only if done for the right level.
+   There are two variants of the test: with and without the baker daemon. See
+   below for the version not using the daemon (only using `bake for`).
 
-   There are two variants of the test. (1) Without the baker daemon, the
-   attestation lag is 1, meaning that `bake for` also emits the expected
-   attestations. (2) With the baker daemon, which is started after all slots are
-   published, the attestation lag is chosen big enough so that the baker can
-   attest the already published slots while running. *)
-let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
-    dal_node =
+   In this version, slots are still published by baking with `bake for`, because
+   when running the baker daemon, it is harder to control the time of publishing
+   of a slot. See the end-to-end tests for a version without `bake for`.
+*)
+let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
+    =
   Check.((parameters.Rollup.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
   let dal_node_endpoint = Rollup.Dal.endpoint dal_node in
@@ -1953,7 +1951,7 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
     let* _commitment, _proof = store_slot dal_node slot_content ~slot_size in
     unit
   in
-  let publish_and_bake ~init_level ~target_level delegates =
+  let publish_and_bake ~init_level ~target_level =
     Log.info
       "Publish (inject and bake) a slot header at each level from %d to %d."
       init_level
@@ -1962,9 +1960,8 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
       if level > target_level then return ()
       else
         let* () = publish_and_store level in
-        let* () =
-          Client.bake_for_and_wait ~keys:delegates ~dal_node_endpoint client
-        in
+        (* bake (and attest) with all available delegates to go faster *)
+        let* () = Client.bake_for_and_wait ~keys:[] ~dal_node_endpoint client in
         let* _ = Node.wait_for_level node level in
         iter (level + 1)
     in
@@ -1997,72 +1994,48 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
        we add 2 for "safety"; see discussion (D) below. *)
     intermediary_level + 2 + 2
   in
-  if with_baker_daemon then
-    (* We want [max_level - attestation_lag < first_level], so that the
-       delegates that attest at the last level baked by `bake for` (that is, at
-       [max_level]) have no published slot to attest, in order not interfere
-       with the attestations done by the baker daemon. *)
-    Check.((parameters.attestation_lag > max_level - first_level) int)
-      ~error_msg:
-        "attestation_lag (%L) should be higher than [max_level - first_level] \
-         (which is %R)"
-  else
-    Check.((parameters.attestation_lag = 1) int)
-      ~error_msg:"attestation_lag (%L) should be 1" ;
+  (* We want [max_level - attestation_lag < first_level], so that the
+     delegates that attest at the last level baked by `bake for` (that is, at
+     [max_level]) have no published slot to attest, in order not interfere
+     with the attestations done by the baker daemon. *)
+  Check.((parameters.attestation_lag > max_level - first_level) int)
+    ~error_msg:
+      "attestation_lag (%L) should be higher than [max_level - first_level] \
+       (which is %R)" ;
   let wait_block_processing =
     wait_for_layer1_block_processing dal_node max_level
   in
-  (* Publish and bake. When [with_baker_deamon = false], we have
-     [attestation_lag = 1] so `bake for` would lead to the delegates attesting
-     for the slots published at the previous level; hence it is important how
-     many delegates attest. When [with_baker_deamon = true], this distinction
-     does not matter, as there are no published slots to attest during the
-     period when `bake for` is used; the delegates will attest the published
-     slot later, when the baker daemon is running. *)
-  let* () =
-    publish_and_bake
-      ~init_level:first_level
-      ~target_level:intermediary_level
-      all_delegates
-  in
-  let* () =
-    publish_and_bake
-      ~init_level:(intermediary_level + 1)
-      ~target_level:max_level
-      (List.tl all_delegates)
-  in
+  let* () = publish_and_bake ~init_level:first_level ~target_level:max_level in
   let* () = wait_block_processing in
   let* first_not_attested_published_level =
-    if with_baker_daemon then (
-      let last_level_of_first_baker =
-        intermediary_level + parameters.attestation_lag
-      in
-      let last_level_of_second_baker = max_level + parameters.attestation_lag in
-      Log.info
-        "Run the first baker for all delegates till at least level %d."
-        last_level_of_first_baker ;
-      let* () = run_baker all_delegates last_level_of_first_baker in
-      (* (D) We tried to stop the baker as soon as it reaches
-         [intermediary_level + attestation_lag], but it may have baked a few
-         blocks more *)
-      let node_level = Node.get_level node in
-      let first_not_attested_published_level =
-        node_level + 1 - parameters.attestation_lag
-      in
-      Log.info
-        "The first baker baked till level %d. Therefore \
-         first_not_attested_published_level is %d."
-        node_level
-        first_not_attested_published_level ;
-      Log.info
-        "Run the second baker for some (not all) delegates till at least level \
-         %d."
-        last_level_of_second_baker ;
-      if first_not_attested_published_level >= max_level then
-        Test.fail "test not checking for unattested slots; adjust parameters" ;
-      let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
-      return first_not_attested_published_level)
-    else return intermediary_level
+    let last_level_of_first_baker =
+      intermediary_level + parameters.attestation_lag
+    in
+    let last_level_of_second_baker = max_level + parameters.attestation_lag in
+    Log.info
+      "Run the first baker for all delegates till at least level %d."
+      last_level_of_first_baker ;
+    let* () = run_baker all_delegates last_level_of_first_baker in
+    (* (D) We tried to stop the baker as soon as it reaches
+       [intermediary_level + attestation_lag], but it may have baked a few
+       blocks more *)
+    let node_level = Node.get_level node in
+    let first_not_attested_published_level =
+      node_level + 1 - parameters.attestation_lag
+    in
+    Log.info
+      "The first baker baked till level %d. Therefore \
+       first_not_attested_published_level is %d."
+      node_level
+      first_not_attested_published_level ;
+    Log.info
+      "Run the second baker for some (not all) delegates till at least level \
+       %d."
+      last_level_of_second_baker ;
+    if first_not_attested_published_level >= max_level then
+      Test.fail "test not checking for unattested slots; adjust parameters" ;
+    let* () = run_baker (List.tl all_delegates) last_level_of_second_baker in
+    return first_not_attested_published_level
   in
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =
@@ -2099,6 +2072,116 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
          (expected_status = status)
            string
            ~error_msg:"Expected status %L (got %R)")) ;
+      check_attestations (level + 1)
+  in
+  check_attestations first_level
+
+(* This is the version of [test_attestor_with_daemon] that does not use the
+   baker daemon, only `bake for`. *)
+let test_attestor_with_bake_for _protocol parameters cryptobox node client
+    dal_node =
+  Check.((parameters.Rollup.Dal.Parameters.attestation_threshold = 100) int)
+    ~error_msg:"attestation_threshold value (%L) should be 100" ;
+  let dal_node_endpoint = Rollup.Dal.endpoint dal_node in
+  let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let slot_size = parameters.cryptobox.slot_size in
+  let lag = parameters.attestation_lag in
+  let slot_idx level = level mod number_of_slots in
+  let num_bakers = Array.length Account.Bootstrap.keys in
+  let all_delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.map (fun key -> key.Account.alias)
+  in
+  let not_all_delegates = List.tl all_delegates in
+
+  (* Test goal: the published slot at a level in [first_level,
+     intermediary_level] should be attested, the one at a level in
+     [intermediary_level + 1, last_checked_level] should not be attested. *)
+  let attested_levels = 2 in
+  let unattested_levels = 2 in
+  let first_level = Node.get_level node + 1 in
+  let intermediary_level = first_level + attested_levels - 1 in
+  let last_checked_level = intermediary_level + unattested_levels - 1 in
+  let last_level = last_checked_level + lag + 1 in
+
+  (* Publish and bake with client *)
+  let publish source ~index message =
+    let* _op_hash =
+      publish_dummy_slot ~source ~index ~message cryptobox client
+    in
+    unit
+  in
+  let publish_and_store level =
+    let source = Account.Bootstrap.keys.(level mod num_bakers) in
+    let index = slot_idx level in
+    let slot_content =
+      Format.asprintf "content at level %d index %d" level index
+    in
+    let* () = publish source ~index slot_content in
+    let* _commitment, _proof = store_slot dal_node slot_content ~slot_size in
+    unit
+  in
+  let publish_and_bake ~from_level ~to_level delegates =
+    Log.info
+      "Publish (inject and bake) a slot header at each level from %d to %d."
+      from_level
+      to_level ;
+    let rec iter level =
+      if level > to_level then return ()
+      else
+        let* () = publish_and_store level in
+        let* () =
+          Client.bake_for_and_wait ~keys:delegates ~dal_node_endpoint client
+        in
+        let* _ = Node.wait_for_level node level in
+        iter (level + 1)
+    in
+    iter from_level
+  in
+  let wait_block_processing =
+    wait_for_layer1_block_processing dal_node last_level
+  in
+
+  let* () =
+    publish_and_bake
+      ~from_level:first_level
+      ~to_level:(intermediary_level + lag)
+      all_delegates
+  in
+  let* () =
+    publish_and_bake
+      ~from_level:(intermediary_level + lag + 1)
+      ~to_level:last_level
+      not_all_delegates
+  in
+  let* _lvl = wait_block_processing in
+
+  Log.info "Check the attestation status of the published slots." ;
+  let rec check_attestations level =
+    if level > last_checked_level then return ()
+    else
+      let* slot_headers =
+        RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers level)
+      in
+      Check.(
+        (1 = List.length slot_headers)
+          int
+          ~error_msg:"Expected a single header (got %R headers)") ;
+      let Rollup.Dal.RPC.{slot_level; slot_index; status; _} =
+        List.hd slot_headers
+      in
+      Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
+      Check.(
+        (slot_idx level = slot_index)
+          int
+          ~error_msg:"Expected index %L (got %R)") ;
+      let expected_status =
+        if level <= intermediary_level then "attested" else "unattested"
+      in
+      Check.(
+        (expected_status = status)
+          string
+          ~error_msg:"Expected status %L (got %R)") ;
       check_attestations (level + 1)
   in
   check_attestations first_level
@@ -3391,17 +3474,16 @@ let register ~protocols =
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~attestation_lag:1
     ~attestation_threshold:100
     "dal attestor with bake for"
-    (test_attestor ~with_baker_daemon:false)
+    test_attestor_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
     ~attestation_lag:8
     ~activation_timestamp:Now
     "dal attestor with baker daemon"
-    (test_attestor ~with_baker_daemon:true)
+    test_attestor_with_daemon
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
