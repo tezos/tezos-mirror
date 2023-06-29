@@ -33,6 +33,8 @@ type eval_step =
   | Kernel_run  (** Up to the end of the current `kernel_run` *)
   | Inbox  (** Until input requested *)
 
+type profile_options = {collapse : bool; with_time : bool}
+
 (* Possible commands for the REPL. *)
 type commands =
   | Bench
@@ -49,7 +51,7 @@ type commands =
   | Load_inputs
   | Reveal_preimage of string option
   | Reveal_metadata
-  | Profile of bool
+  | Profile of profile_options
   | Unknown of string
   | Help
   | Stop
@@ -79,6 +81,16 @@ let parse_memory_commands = function
           Some (Show_memory (address, value_kind_length kind, kind))
       | _, _ -> None)
   | _ -> None
+
+let parse_profile_options =
+  let set_option profile_options = function
+    | "--collapsed" ->
+        Option.map (fun opts -> {opts with collapse = true}) profile_options
+    | "--without-time" ->
+        Option.map (fun opts -> {opts with with_time = false}) profile_options
+    | _ -> None
+  in
+  List.fold_left set_option (Some {collapse = false; with_time = true})
 
 (* Documentation for commands type *)
 type command_description = {
@@ -213,15 +225,20 @@ let rec commands_docs =
     {
       parse =
         (function
-        | ["profile"] -> Some (Profile false)
-        | ["profile"; "--collapsed"] -> Some (Profile true)
+        | "profile" :: options ->
+            parse_profile_options options
+            |> Option.map (fun opts -> Profile opts)
         | _ -> None);
       documentation =
-        "profile [--collapsed]: Profile the execution of a full inbox and \
-         outputs a flamegraph compatible stack fill in the temporary directory \
-         of the system. `--collapsed` reduces the size of the resulting file \
-         by merging the identical stacks, at the cost of not being able to \
-         track the call stack on a time basis.";
+        "profile <option>: Profiles the execution of a full inbox and outputs \
+         a flamegraph compatible stack fill in the temporary directory of the \
+         system. \n\
+         Options:\n\
+        \ - `--collapsed`: reduces the size of the resulting file by merging \
+         the identical stacks, at the cost of not being able to track the call \
+         stack on a time basis.\n\
+        \ - `--without-time`: does not profile the time (can have an impact on \
+         performance if the kernel does too many function calls).";
     };
     {
       parse =
@@ -390,7 +407,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     close_out file ;
     Format.printf "Profiling result can be found in %s\n%!" path
 
-  let eval_and_profile ~collapse config extra tree =
+  let eval_and_profile ~collapse ~with_time config extra tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         Format.printf
@@ -402,11 +419,33 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Prof.eval_and_profile
             ~write_debug
             ~reveal_builtins:(reveals config)
+            with_time
             extra.functions
             tree
         in
         produce_flamegraph ~collapse ~max_depth:100 graph ;
-        Format.printf "The execution took %a ticks.\n%!" Z.pp_print ticks ;
+        let pvm_steps =
+          Profiling.aggregate_toplevel_time_and_ticks (fst graph)
+        in
+        let full_ticks, full_time = Profiling.full_ticks_and_time pvm_steps in
+        Format.printf
+          "----------------------\n\
+           Detailed results:\n\
+           %a\n\n\
+           Full execution: %a ticks%a\n\
+           Full execution with padding: %a ticks\n\
+           ----------------------\n\
+           %!"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+             Profiling.pp_ticks_and_time)
+          pvm_steps
+          Z.pp_print
+          full_ticks
+          Profiling.pp_time_opt
+          full_time
+          Z.pp_print
+          ticks ;
         tree)
 
   let set_raw_message_input_step level counter encoded_message tree =
@@ -483,16 +522,16 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return (tree, ticks, inboxes, level)
         | Error _ -> return' (eval_until_input_requested config tree))
 
-  let profile ~collapse level inboxes config extra tree =
+  let profile ~collapse ~with_time level inboxes config extra tree =
     let open Lwt_result_syntax in
     let*! status = check_input_request tree in
     match status with
     | Ok () ->
         let* tree, inboxes, level = load_inputs inboxes level tree in
-        let* tree = eval_and_profile ~collapse config extra tree in
+        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
         return (tree, inboxes, level)
     | Error _ ->
-        let* tree = eval_and_profile ~collapse config extra tree in
+        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
         return (tree, inboxes, level)
 
   let pp_input_request ppf = function
@@ -867,9 +906,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Reveal_metadata ->
           let*! tree = reveal_metadata config tree in
           return ~tree ()
-      | Profile collapse ->
+      | Profile {collapse; with_time} ->
           let* tree, inboxes, level =
-            profile ~collapse level inboxes config extra tree
+            profile ~collapse ~with_time level inboxes config extra tree
           in
           Lwt.return_ok (tree, inboxes, level)
       | Unknown s ->

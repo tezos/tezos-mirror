@@ -109,6 +109,12 @@ let sub_opt_times t1 t2 =
   | Some t1, Some t2 -> Some (Ptime.Span.sub t1 t2)
   | _, _ -> None
 
+(* Same semantics as [sub_opt_times] but returns [Some (t1 + t2)] instead. *)
+let add_opt_times t1 t2 =
+  match (t1, t2) with
+  | Some t1, Some t2 -> Some (Ptime.Span.add t1 t2)
+  | _, _ -> None
+
 (** [end_function_call current_tick current_function call_stack] implements an
     ending call. Please refer to the prelude of the file. *)
 let end_function_call current_tick current_time current_function call_stack =
@@ -531,3 +537,40 @@ let pp_collapsed_flamegraph ~max_depth pp_call ppf call_stack =
 let pp_flamegraph ~collapse ~max_depth pp_call ppf call_stack =
   if collapse then pp_collapsed_flamegraph ~max_depth pp_call ppf call_stack
   else pp_callstack_as_flamegraph ~max_depth pp_call ppf call_stack
+
+(** [aggregate_toplevel_time_and_ticks ~call_stack] counts the time and ticks
+    spent in each toplevel phases during an execution. *)
+let aggregate_toplevel_time_and_ticks = function
+  | Node _ -> []
+  | Toplevel nodes ->
+      let aggregate = function
+        | Toplevel _ -> assert false
+        | Node (call, _, _, _) as node ->
+            let ticks, time =
+              fold_call_stack
+                (fun (acc_ticks, acc_time) _ ticks time ->
+                  (Z.add ticks acc_ticks, add_opt_times acc_time time))
+                (Z.zero, Some Ptime.Span.zero)
+                node
+            in
+            (call, ticks, time)
+      in
+      List.map aggregate nodes
+
+let full_ticks_and_time toplevel_result =
+  List.fold_left
+    (fun (acc_ticks, acc_time) (_, ticks, time) ->
+      (Z.add ticks acc_ticks, add_opt_times acc_time time))
+    (Z.zero, Some Ptime.Span.zero)
+    toplevel_result
+
+let pp_ticks_and_time ppf (call, ticks, time) =
+  Format.fprintf
+    ppf
+    "%a: %a ticks%a"
+    pp_call
+    call
+    Z.pp_print
+    ticks
+    pp_time_opt
+    time
