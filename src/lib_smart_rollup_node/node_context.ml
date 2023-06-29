@@ -756,6 +756,13 @@ let protocol_of_level node_ctxt level =
   in
   Lwt.return (find protocols)
 
+let last_seen_protocol node_ctxt =
+  let open Lwt_result_syntax in
+  let+ protocols = Store.Protocols.read node_ctxt.store.protocols in
+  match protocols with
+  | None | Some [] -> None
+  | Some (p :: _) -> Some p.protocol
+
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
