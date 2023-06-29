@@ -24,6 +24,8 @@ build:
     # architectures.
     # See https://gitlab.com/tezos/tezos/-/issues/1788
     BLST_PORTABLE: "yes"
+    TARGET: "server"
+    TEST: "foo bar"
   before_script:
     - sudo apt update
   script:
@@ -55,10 +57,10 @@ docker:
     - ${ARCH}
   before_script:
     - apk --no-cache add curl jq
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - 'PARENT_JOB_ID=`curl -L ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs\?job_token=${CI_JOB_TOKEN}\&scope=success | jq ".[] | select(.name == \"build: [${ARCH}, ${OCTEZ_BRANCH}]\") | .id"`'
     - curl -L -o artifacts.zip ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${PARENT_JOB_ID}/artifacts\?job_token=${CI_JOB_TOKEN} && unzip artifacts.zip && rm artifacts.zip
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build -t ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG} -f Dockerfile.${TARGET} .
     - docker push ${CI_REGISTRY_IMAGE}/${TARGET}-${ARCH}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
   rules:
@@ -84,9 +86,10 @@ manifest:
       artifacts: false
   tags:
     - devops
-  script:
+  before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker manifest create ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG} $(for i in $ARCH ; do echo "--amend ${CI_REGISTRY_IMAGE}/${TARGET}-$$i:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}" ; done)
+  script:
+    - docker manifest create ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG} `for i in ${ARCH} ; do echo "--amend ${CI_REGISTRY_IMAGE}/${TARGET}-$i:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest push ${CI_REGISTRY_IMAGE}/${TARGET}:${OCTEZ_BRANCH}-${CI_COMMIT_REF_SLUG}
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
