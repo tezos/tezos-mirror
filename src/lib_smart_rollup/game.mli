@@ -23,31 +23,84 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type dissection_chunk = {state_hash : State_hash.t option; tick : Z.t}
+module V1 : sig
+  type dissection_chunk = {state_hash : State_hash.t option; tick : Z.t}
 
-type step = Dissection of dissection_chunk list | Proof of string
+  type step = Dissection of dissection_chunk list | Proof of string
 
-type refutation =
-  | Start of {
-      player_commitment_hash : Commitment.Hash.t;
-      opponent_commitment_hash : Commitment.Hash.t;
-    }
-  | Move of {choice : Z.t; step : step}
+  type refutation =
+    | Start of {
+        player_commitment_hash : Commitment.Hash.t;
+        opponent_commitment_hash : Commitment.Hash.t;
+      }
+    | Move of {choice : Z.t; step : step}
 
-type index = {
-  alice : Signature.Public_key_hash.t;
-  bob : Signature.Public_key_hash.t;
-}
+  type index = {
+    alice : Signature.Public_key_hash.t;
+    bob : Signature.Public_key_hash.t;
+  }
 
-val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+  val dissection_chunk_encoding : dissection_chunk Data_encoding.t
 
-val dissection_encoding : dissection_chunk list Data_encoding.t
+  val dissection_encoding : dissection_chunk list Data_encoding.t
 
-val step_encoding : step Data_encoding.t
+  val step_encoding : step Data_encoding.t
 
-val refutation_encoding : refutation Data_encoding.t
+  val refutation_encoding : refutation Data_encoding.t
 
-val index_encoding : index Data_encoding.t
+  val index_encoding : index Data_encoding.t
 
-val make_index :
-  Signature.Public_key_hash.t -> Signature.Public_key_hash.t -> index
+  val make_index :
+    Signature.Public_key_hash.t -> Signature.Public_key_hash.t -> index
+
+  type player = Alice | Bob
+
+  type game_state =
+    | Dissecting of {
+        dissection : dissection_chunk list;
+        default_number_of_sections : int;
+      }
+    | Final_move of {
+        agreed_start_chunk : dissection_chunk;
+        refuted_stop_chunk : dissection_chunk;
+      }
+
+  type t = {
+    turn : player;
+    inbox_snapshot : Inbox.V1.history_proof;
+    dal_snapshot : Dal.Slot_history.t;
+    start_level : int32;
+    inbox_level : int32;
+    game_state : game_state;
+  }
+
+  type conflict = {
+    other : Signature.Public_key_hash.t;
+    their_commitment : Commitment.t;
+    our_commitment : Commitment.t;
+    parent_commitment : Commitment.Hash.t;
+  }
+
+  val game_state_equal : game_state -> game_state -> bool
+
+  val player_encoding : player Data_encoding.t
+
+  val game_state_encoding : game_state Data_encoding.t
+
+  val encoding : t Data_encoding.t
+
+  val conflict_encoding : conflict Data_encoding.t
+end
+
+include Versioned_data.S with type t = V1.t
+
+include
+  module type of V1
+    with type dissection_chunk = V1.dissection_chunk
+     and type step = V1.step
+     and type refutation = V1.refutation
+     and type index = V1.index
+     and type player = V1.player
+     and type game_state = V1.game_state
+     and type conflict = V1.conflict
+     and type t = V1.t
