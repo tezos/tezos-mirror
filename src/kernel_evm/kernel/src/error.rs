@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
-use evm_execution::EthereumError;
+use evm_execution::{DurableStorageError, EthereumError};
 use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_ethereum::signatures::SigError;
@@ -21,10 +21,11 @@ pub enum TransferError {
     InvalidAddressFormat(Utf8Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum StorageError {
     Path(PathError),
     Runtime(RuntimeError),
+    IndexOutOfBounds,
     AccountInitialisation,
     GenesisAccountInitialisation,
     InvalidLoadValue { expected: usize, actual: usize },
@@ -48,6 +49,17 @@ pub enum Error {
     UpgradeError(UpgradeProcessError),
     InvalidSignature(SigError),
     InvalidSignatureCheck,
+}
+
+impl From<PathError> for StorageError {
+    fn from(e: PathError) -> Self {
+        Self::Path(e)
+    }
+}
+impl From<RuntimeError> for StorageError {
+    fn from(e: RuntimeError) -> Self {
+        Self::Runtime(e)
+    }
 }
 
 impl From<PathError> for Error {
@@ -76,5 +88,22 @@ impl From<DecoderError> for Error {
 impl From<UpgradeProcessError> for Error {
     fn from(e: UpgradeProcessError) -> Self {
         Self::UpgradeError(e)
+    }
+}
+
+impl From<StorageError> for Error {
+    fn from(e: StorageError) -> Self {
+        Self::Storage(e)
+    }
+}
+
+impl From<DurableStorageError> for Error {
+    fn from(e: DurableStorageError) -> Self {
+        match e {
+            DurableStorageError::PathError(e) => Self::Storage(StorageError::Path(e)),
+            DurableStorageError::RuntimeError(e) => {
+                Self::Storage(StorageError::Runtime(e))
+            }
+        }
     }
 }

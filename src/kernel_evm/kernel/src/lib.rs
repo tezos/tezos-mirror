@@ -30,6 +30,7 @@ mod blueprint;
 mod error;
 mod genesis;
 mod inbox;
+mod indexable_storage;
 mod parsing;
 mod safe_storage;
 mod simulation;

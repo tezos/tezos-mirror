@@ -9,7 +9,8 @@ use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
-use crate::storage::{self};
+use crate::indexable_storage::IndexableStorage;
+use crate::storage::{self, init_account_index};
 use evm_execution::account_storage::init_account_storage;
 use evm_execution::account_storage::EthereumAccountStorage;
 use evm_execution::precompiles;
@@ -123,6 +124,7 @@ fn compute<Host: Runtime>(
     next_level: U256,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
+    accounts_index: &mut IndexableStorage,
 ) -> Result<L2Block, Error> {
     let mut valid_txs = Vec::new();
     let mut receipts_infos = Vec::new();
@@ -143,6 +145,7 @@ fn compute<Host: Runtime>(
             tx_hash,
             index,
             evm_account_storage,
+            accounts_index,
         )? {
             valid_txs.push(tx_hash);
             receipts_infos.push(receipt_info);
@@ -173,6 +176,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     let mut current_block = storage::read_current_block(host)?;
     let mut evm_account_storage =
         init_account_storage().map_err(|_| Error::Storage(AccountInitialisation))?;
+    let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
 
     for proposal in queue.proposals {
@@ -183,6 +187,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
             current_block.number + 1,
             &precompiles,
             &mut evm_account_storage,
+            &mut accounts_index,
         )
         .map(|new_block| current_block = new_block)?;
     }
@@ -195,6 +200,7 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::genesis;
     use crate::inbox::Transaction;
+    use crate::indexable_storage::internal_for_tests::length;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
@@ -667,5 +673,81 @@ mod tests {
 
         assert_eq!(sender_balance, U256::from(9999999999500000000u64));
         assert_eq!(dest_balance, U256::from(500000000u64))
+    }
+
+    #[test]
+    //Test accounts are indexed at the end of the block production
+    fn test_accounts_are_indexed() {
+        let mut host = MockHost::default();
+        let accounts_index = init_account_index().unwrap();
+        let _ = genesis::init_block(&mut host);
+
+        let tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            tx: dummy_eth_transaction_zero(),
+        };
+
+        let transactions = vec![tx];
+
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
+        };
+
+        let indexed_accounts = length(&host, &accounts_index).unwrap();
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let indexed_accounts_after_produce = length(&host, &accounts_index).unwrap();
+
+        // The sender and receiver have never been indexed yet, and are indexed
+        // whether the transaction succeeds or not.
+        assert_eq!(
+            indexed_accounts_after_produce,
+            indexed_accounts + 2,
+            "The new accounts haven't been indexed"
+        )
+    }
+
+    #[test]
+    //Test accounts are indexed at the end of the block production
+    fn test_accounts_are_indexed_once() {
+        let mut host = MockHost::default();
+        let accounts_index = init_account_index().unwrap();
+        let _ = genesis::init_block(&mut host);
+
+        let tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            tx: dummy_eth_transaction_zero(),
+        };
+
+        let transactions = vec![tx];
+
+        let queue = Queue {
+            proposals: vec![Blueprint {
+                transactions: transactions.clone(),
+            }],
+            kernel_upgrade: None,
+        };
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let indexed_accounts = length(&host, &accounts_index).unwrap();
+
+        let next_queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
+        };
+
+        produce(&mut host, next_queue).expect("The block production failed.");
+
+        let indexed_accounts_after_second_produce =
+            length(&host, &accounts_index).unwrap();
+
+        // The sender and receiver have never been indexed yet
+        assert_eq!(
+            indexed_accounts, indexed_accounts_after_second_produce,
+            "Accounts have been indexed twice"
+        )
     }
 }

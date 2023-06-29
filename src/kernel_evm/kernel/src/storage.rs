@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
 
+use crate::indexable_storage::IndexableStorage;
+use evm_execution::account_storage::EthereumAccount;
 use hex::ToHex;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
@@ -53,6 +55,9 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 
 pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
+
+/// Path where Ethereum accounts are stored
+const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/evm/indexes/accounts");
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
@@ -639,6 +644,28 @@ pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u16, 
     let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
         bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
     Ok(u16::from_le_bytes(slice_of_bytes))
+}
+
+/// Get the index of accounts.
+pub fn init_account_index() -> Result<IndexableStorage, StorageError> {
+    IndexableStorage::new(&EVM_ACCOUNTS_INDEX)
+}
+
+pub fn index_account(
+    host: &mut impl Runtime,
+    address: &H160,
+    index: &mut IndexableStorage,
+) -> Result<(), Error> {
+    let account = EthereumAccount::from_address(address)?;
+    // A new account is created whether when it receives assets for the
+    // first time, or when it is created through a contract deployment, by
+    // construction it should be indexed at this specific times.
+    if account.indexed(host)? {
+        Ok(())
+    } else {
+        index.push_value(host, address.as_bytes())?;
+        account.set_indexed(host).map_err(Error::from)
+    }
 }
 
 pub(crate) mod internal_for_tests {
