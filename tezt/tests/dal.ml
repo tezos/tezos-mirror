@@ -883,7 +883,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
 (* This function builds a slot with the given content, and makes the given DAL
    node to compute and store the corresponding commitment and shards by calling
    relevant RPCs. It returns the commitment and its proof. *)
-let split_slot dal_node ~slot_size content =
+let store_slot dal_node ~slot_size content =
   let slot = Rollup.Dal.make_slot ~slot_size content in
   let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
   let* () =
@@ -898,7 +898,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let* slot_commitment, _proof = split_slot dal_node ~slot_size slot_content in
+  let* slot_commitment, _proof = store_slot dal_node ~slot_size slot_content in
   let* received_slot =
     RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot slot_commitment)
   in
@@ -1272,8 +1272,8 @@ let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
   let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
   let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let* slot_header1, _proof1 = split_slot dal_node1 ~slot_size "content1" in
-  let* slot_header2, _proof2 = split_slot dal_node2 ~slot_size "content2" in
+  let* slot_header1, _proof1 = store_slot dal_node1 ~slot_size "content1" in
+  let* slot_header2, _proof2 = store_slot dal_node2 ~slot_size "content2" in
   Check.(
     (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
   Check.(
@@ -1507,16 +1507,16 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and slot 1 has not been downloaded.
   *)
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let split_slot = split_slot dal_node ~slot_size in
+  let store_slot = store_slot dal_node ~slot_size in
 
   Log.info
     "Step 1: send three slots to DAL node and obtain corresponding headers" ;
   let slot_contents_0 = " 10 " in
-  let* commitment_0, proof_0 = split_slot slot_contents_0 in
+  let* commitment_0, proof_0 = store_slot slot_contents_0 in
   let slot_contents_1 = " 200 " in
-  let* commitment_1, proof_1 = split_slot slot_contents_1 in
+  let* commitment_1, proof_1 = store_slot slot_contents_1 in
   let slot_contents_2 = " 400 " in
-  let* commitment_2, proof_2 = split_slot slot_contents_2 in
+  let* commitment_2, proof_2 = store_slot slot_contents_2 in
 
   Log.info "Step 2: run rollup node for an originated rollup" ;
   let* genesis_info =
@@ -1820,14 +1820,14 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
 let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
     client dal_node =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let split_slot = split_slot dal_node ~slot_size in
+  let store_slot = store_slot dal_node ~slot_size in
   let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   Log.info "Inject the shards of slots 1 and 3." ;
   let slot1_content = "slot 1" in
   let slot2_content = "slot 2" in
   let slot3_content = "slot 3" in
-  let* _commitment, _proof = split_slot slot1_content in
-  let* _commitment, _proof = split_slot slot3_content in
+  let* _commitment, _proof = store_slot slot1_content in
+  let* _commitment, _proof = store_slot slot3_content in
   Log.info "Publish slots 1 and 2 (inject and bake)." ;
   let level = Node.get_level node + 1 in
   let publish source ~index message =
@@ -1928,7 +1928,7 @@ let test_attestor ~with_baker_daemon protocol parameters cryptobox node client
       Format.asprintf "content at level %d index %d" level index
     in
     let* () = publish source ~index slot_content in
-    let* _commitment, _proof = split_slot dal_node slot_content ~slot_size in
+    let* _commitment, _proof = store_slot dal_node slot_content ~slot_size in
     unit
   in
   let publish_and_bake ~init_level ~target_level delegates =
