@@ -43,20 +43,18 @@
 
 *)
 
-open Protocol
-open Alpha_context
-open Sc_rollup.Game
+open Game
+open Refutation_game_helpers
 
-let node_role ~self Sc_rollup.Game.Index.{alice; bob} =
-  if Sc_rollup.Staker.equal alice self then Alice
-  else if Sc_rollup.Staker.equal bob self then Bob
+let node_role ~self {alice; bob} =
+  if Signature.Public_key_hash.equal alice self then Alice
+  else if Signature.Public_key_hash.equal bob self then Bob
   else (* By validity of [ongoing_game] RPC. *)
     assert false
 
-type role = Our_turn of {opponent : public_key_hash} | Their_turn
+type role = Our_turn of {opponent : Signature.public_key_hash} | Their_turn
 
-let turn ~self (game : Octez_smart_rollup.Game.t) players =
-  let Sc_rollup.Game.Index.{alice; bob} = players in
+let turn ~self game ({alice; bob} as players) =
   match (node_role ~self players, game.turn) with
   | Alice, Alice -> Our_turn {opponent = bob}
   | Bob, Bob -> Our_turn {opponent = alice}
@@ -75,311 +73,33 @@ let inject_next_move node_ctxt source ~refutation ~opponent =
   let* _hash = Injector.add_pending_operation ~source refute_operation in
   return_unit
 
-(** This function computes the inclusion/membership proof of the page
-      identified by [page_id] in the slot whose data are provided in
-      [slot_data]. *)
-let page_membership_proof params page_index slot_data =
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4048
-     Rely on DAL node to compute page membership proof and drop
-     the dal-crypto dependency from the rollup node. *)
-  let proof =
-    let open Result_syntax in
-    (* The computation of the page's proof below can be a bit costly. In fact,
-       it involves initialising a cryptobox environment and some non-trivial
-       crypto processing. *)
-    let* dal = Cryptobox.make params in
-    let* polynomial = Cryptobox.polynomial_from_slot dal slot_data in
-    Cryptobox.prove_page dal polynomial page_index
-  in
-  let open Lwt_result_syntax in
-  match proof with
-  | Ok proof -> return proof
-  | Error e ->
-      failwith
-        "%s"
-        (match e with
-        | `Fail s -> "Fail " ^ s
-        | `Page_index_out_of_range -> "Page_index_out_of_range"
-        | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
-        | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
-            Cryptobox.string_of_commit_error commit_error)
-
-(** When the PVM is waiting for a Dal page input, this function attempts to
-      retrieve the page's content from the store, the data of its slot. Then it
-      computes the proof that the page is part of the slot and returns the
-      content along with the proof.
-
-      If the PVM is not waiting for a Dal page input, or if the slot is known to
-      be unconfirmed on L1, this function returns [None]. If the data of the
-      slot are not saved to the store, the function returns a failure
-      in the error monad. *)
-let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
-    (dal_params : Dal.parameters) start_state =
-  let open Lwt_result_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! input_request = PVM.is_input_state start_state in
-  match input_request with
-  | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
-      let Dal.Page.{slot_id; page_index} = page_id in
-      let* pages =
-        Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
-      in
-      match pages with
-      | None -> return_none (* The slot is not confirmed. *)
-      | Some pages -> (
-          let pages_per_slot = dal_params.slot_size / dal_params.page_size in
-          (* check invariant that pages' length is correct. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4031
-             It's better to do the check when the slots are saved into disk. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-             This check is not resilient to dal parameters change. *)
-          match List.nth_opt pages page_index with
-          | Some content ->
-              let* page_proof =
-                page_membership_proof dal_params page_index
-                @@ Bytes.concat Bytes.empty pages
-              in
-              return_some (content, page_proof)
-          | None ->
-              failwith
-                "Page index %d too big or negative.\n\
-                 Number of pages in a slot is %d."
-                page_index
-                pages_per_slot))
-  | _ -> return_none
-
-let metadata (node_ctxt : _ Node_context.t) =
-  let address =
-    Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
-  in
-  let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
-  Sc_rollup.Metadata.{address; origination_level}
-
-let generate_proof (node_ctxt : _ Node_context.t)
-    (game : Octez_smart_rollup.Game.t) start_state =
-  let open Lwt_result_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let snapshot =
-    Sc_rollup_proto_types.Inbox.history_proof_of_octez game.inbox_snapshot
-  in
-  (* NOTE: [snapshot_level_int32] below refers to the level of the snapshotted
-     inbox (from the skip list) which also matches [game.start_level - 1]. *)
-  let snapshot_level_int32 =
-    (Octez_smart_rollup.Inbox.Skip_list.content game.inbox_snapshot).level
-  in
-  let get_snapshot_head () =
-    let+ hash = Node_context.hash_of_level node_ctxt snapshot_level_int32 in
-    Layer1.{hash; level = snapshot_level_int32}
-  in
-  let* context =
-    let* start_hash = Node_context.hash_of_level node_ctxt game.inbox_level in
-    let+ context = Node_context.checkout_context node_ctxt start_hash in
-    Context.index context
-  in
-  let* dal_slots_history =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
-    else return Dal.Slots_history.genesis
-  in
-  let* dal_slots_history_cache =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
-    else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
-  in
-  (* We fetch the value of protocol constants at block snapshot level
-     where the game started. *)
-  let* parametric_constants =
-    let cctxt = node_ctxt.cctxt in
-    Protocol.Constants_services.parametric
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, `Level snapshot_level_int32)
-  in
-  let dal_l1_parameters = parametric_constants.dal in
-  let dal_parameters = dal_l1_parameters.cryptobox_parameters in
-  let dal_attestation_lag = dal_l1_parameters.attestation_lag in
-
-  let* page_info =
-    page_info_from_pvm_state
-      ~dal_attestation_lag
-      node_ctxt
-      dal_parameters
-      start_state
-  in
-  let module P = struct
-    include PVM
-
-    let context = context
-
-    let state = start_state
-
-    let reveal hash =
-      let open Lwt_syntax in
-      let* res =
-        Reveals.get
-          ~data_dir:node_ctxt.data_dir
-          ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
-          ~hash
-      in
-      match res with Ok data -> return @@ Some data | Error _ -> return None
-
-    module Inbox_with_history = struct
-      let inbox = snapshot
-
-      let get_history inbox_hash =
-        let open Lwt_syntax in
-        let+ inbox =
-          Node_context.find_inbox
-            node_ctxt
-            (Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash)
-        in
-        match inbox with
-        | Error err ->
-            Format.kasprintf
-              Stdlib.failwith
-              "Refutation game: Cannot get inbox history for %a, %a"
-              Sc_rollup.Inbox.Hash.pp
-              inbox_hash
-              pp_print_trace
-              err
-        | Ok inbox ->
-            Option.map
-              (fun i ->
-                Sc_rollup.Inbox.take_snapshot
-                  (Sc_rollup_proto_types.Inbox.of_octez i))
-              inbox
-
-      let get_payloads_history witness =
-        Lwt.map
-          (WithExceptions.Result.to_exn_f
-             ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
-        @@
-        let open Lwt_result_syntax in
-        let* {is_first_block; predecessor; predecessor_timestamp; messages} =
-          Node_context.get_messages
-            node_ctxt
-            (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
-               witness)
-        in
-        let*? hist =
-          Inbox.payloads_history_of_messages
-            ~is_first_block
-            ~predecessor
-            ~predecessor_timestamp
-            messages
-        in
-        return hist
-    end
-
-    module Dal_with_history = struct
-      let confirmed_slots_history = dal_slots_history
-
-      let get_history ptr =
-        Dal.Slots_history.History_cache.find ptr dal_slots_history_cache
-        |> Lwt.return
-
-      let dal_attestation_lag = dal_attestation_lag
-
-      let dal_parameters = dal_parameters
-
-      let page_info = page_info
-    end
-  end in
-  let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick start_state in
-  let* proof =
-    trace
-      (Sc_rollup_node_errors.Cannot_produce_proof
-         {
-           inbox_level = game.inbox_level;
-           start_tick = Sc_rollup.Tick.to_z start_tick;
-         })
-    @@ (Sc_rollup.Proof.produce
-          ~metadata
-          (module P)
-          (Raw_level.of_int32_exn game.inbox_level)
-       >|= Environment.wrap_tzresult)
-  in
-  let*? pvm_step =
-    Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module PVM) proof.pvm_step
-    |> Environment.wrap_tzresult
-  in
-  let unserialized_proof = {proof with pvm_step} in
-  let*! res =
-    Sc_rollup.Proof.valid
-      ~metadata
-      snapshot
-      (Raw_level.of_int32_exn game.inbox_level)
-      dal_slots_history
-      dal_parameters
-      ~dal_attestation_lag
-      ~pvm:(module PVM)
-      unserialized_proof
-    >|= Environment.wrap_tzresult
-  in
-  assert (Result.is_ok res) ;
-  let proof =
-    Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof
-  in
-  return proof
-
 type pvm_intermediate_state =
-  | Hash of Octez_smart_rollup.State_hash.t
+  | Hash of State_hash.t
   | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
 
 let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     our_view =
   let open Lwt_result_syntax in
-  let state_of_tick ?start_state tick =
-    Interpreter.state_of_tick
-      node_ctxt
-      ?start_state
-      ~tick:(Sc_rollup.Tick.to_z tick)
-      (Raw_level.of_int32_exn last_level)
-  in
-  let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} =
-    Sc_rollup_proto_types.State_hash.of_octez state_hash
-  in
   let start_hash, start_tick, start_state =
     match ok with
     | Hash hash, tick -> (hash, tick, None)
     | Evaluated ({state_hash; _} as state), tick ->
         (state_hash, tick, Some state)
   in
-  let start_chunk =
-    Sc_rollup.Dissection_chunk.
-      {
-        state_hash = Some (Sc_rollup_proto_types.State_hash.of_octez start_hash);
-        tick = Sc_rollup.Tick.of_z start_tick;
-      }
-  in
+  let start_chunk = Game.{state_hash = Some start_hash; tick = start_tick} in
   let our_state, our_tick = our_view in
   let our_state_hash =
-    Option.map
-      (fun Pvm_plugin_sig.{state_hash; _} ->
-        Sc_rollup_proto_types.State_hash.of_octez state_hash)
-      our_state
+    Option.map (fun Pvm_plugin_sig.{state_hash; _} -> state_hash) our_state
   in
-  let our_stop_chunk =
-    Sc_rollup.Dissection_chunk.
-      {state_hash = our_state_hash; tick = Sc_rollup.Tick.of_z our_tick}
-  in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+  let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
   let* dissection =
-    Game_helpers.make_dissection
-      ~state_of_tick
-      ~state_hash_of_eval_state
-      ?start_state
+    make_dissection
+      node_ctxt
+      ~start_state
       ~start_chunk
       ~our_stop_chunk
-    @@ PVM.new_dissection
-         ~start_chunk
-         ~our_stop_chunk
-         ~default_number_of_sections
-  in
-  let dissection =
-    List.map Sc_rollup_proto_types.Game.dissection_chunk_to_octez dissection
+      ~default_number_of_sections
+      ~last_level
   in
   let*! () =
     Refutation_game_event.computed_dissection
@@ -414,11 +134,7 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
           | Evaluated ok_state, _ -> Some ok_state
         in
         let* our =
-          Interpreter.state_of_tick
-            node_ctxt
-            ?start_state
-            ~tick
-            (Raw_level.of_int32_exn game.inbox_level)
+          state_of_tick node_ctxt ?start_state ~tick game.inbox_level
         in
         match (their_hash, our) with
         | None, None ->
@@ -460,10 +176,7 @@ let next_move node_ctxt ~opponent (game : Octez_smart_rollup.Game.t) =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
-      Interpreter.state_of_tick
-        node_ctxt
-        ~tick:start_tick
-        (Raw_level.of_int32_exn game.inbox_level)
+      state_of_tick node_ctxt ~tick:start_tick game.inbox_level
     in
     match start_state with
     | None ->
@@ -502,11 +215,7 @@ let play_next_move node_ctxt game self opponent =
 let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let open Lwt_result_syntax in
   let timeout_operation =
-    L1_operation.Timeout
-      {
-        rollup = node_ctxt.rollup_address;
-        stakers = Sc_rollup_proto_types.Game.index_to_octez stakers;
-      }
+    L1_operation.Timeout {rollup = node_ctxt.rollup_address; stakers}
   in
   let source =
     Node_context.get_operator node_ctxt Timeout |> Option.value ~default:self
@@ -515,39 +224,16 @@ let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let* _hash = Injector.add_pending_operation ~source timeout_operation in
   return_unit
 
-let timeout_reached ~self head_block node_ctxt staker1 staker2 =
-  let open Lwt_result_syntax in
-  let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-  let* game_result =
-    Plugin.RPC.Sc_rollup.timeout_reached
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, head_block)
-      (Sc_rollup_proto_types.Address.of_octez rollup_address)
-      staker1
-      staker2
-  in
-  let open Sc_rollup.Game in
-  match game_result with
-  | Some (Loser {loser; _}) ->
-      let is_it_me = Signature.Public_key_hash.(self = loser) in
-      if is_it_me then return_none else return (Some loser)
-  | _ -> return_none
-
 let play node_ctxt ~self game opponent =
   let open Lwt_result_syntax in
-  let index = Sc_rollup.Game.Index.make self opponent in
-  let head_block = `Head 0 in
+  let index = make_index self opponent in
   match turn ~self game index with
   | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
-  | Their_turn -> (
-      let* timeout_reached =
-        timeout_reached ~self head_block node_ctxt self opponent
-      in
-      match timeout_reached with
-      | Some opponent ->
-          let*! () = Refutation_game_event.timeout_detected opponent in
-          play_timeout node_ctxt self index
-      | None -> return_unit)
+  | Their_turn ->
+      let* timeout_reached = timeout_reached node_ctxt ~self ~opponent in
+      when_ timeout_reached @@ fun () ->
+      let*! () = Refutation_game_event.timeout_detected opponent in
+      play_timeout node_ctxt self index
 
 let play_opening_move node_ctxt self
     (conflict : Octez_smart_rollup.Game.conflict) =
