@@ -779,3 +779,7 @@ module Protocol_inbox_with_ctxt = struct
     in
     return (block, list_of_messages)
 end
+
+let is_reveal_enabled_default =
+  Sc_rollup.is_reveal_enabled_predicate
+    Default_parameters.constants_mainnet.sc_rollup.reveal_activation_level

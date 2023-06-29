@@ -869,7 +869,7 @@ module Arith_test_pvm = struct
     let rec go ~our_states fuel (tick : int) state =
       let* input_request =
         is_input_state
-          ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+          ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
           state
       in
       match fuel with
@@ -1341,7 +1341,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
       ~metadata
       (module P)
       game.inbox_level
-      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
   in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 

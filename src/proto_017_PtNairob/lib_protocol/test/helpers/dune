@@ -28,6 +28,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_protocol_017_PtNairob
   -open Tezos_client_017_PtNairob
+  -open Tezos_protocol_017_PtNairob_parameters
   -open Tezos_protocol_plugin_017_PtNairob
   -open Tezos_shell_services
   -open Tezos_crypto_dal))

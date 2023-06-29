@@ -12,6 +12,7 @@
   tezos-test-helpers
   tezos-protocol-alpha
   tezos-smart-rollup-alpha
+  tezos-protocol-alpha.parameters
   tezt)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags

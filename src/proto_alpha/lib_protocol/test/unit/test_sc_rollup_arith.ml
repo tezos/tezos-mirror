@@ -130,7 +130,9 @@ let boot boot_sector f =
 let test_boot () =
   let open Sc_rollup_helpers.Arith_pvm in
   boot "" @@ fun _ctxt state ->
-  is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
+  is_input_state
+    ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+    state
   >>= function
   | Needs_reveal Reveal_metadata -> return ()
   | Initial | Needs_reveal _ | First_after _ ->
@@ -155,7 +157,7 @@ let test_metadata () =
   let*! state = set_input input state in
   let*! input_request =
     is_input_state
-      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
       state
   in
   match input_request with
@@ -171,7 +173,9 @@ let test_input_message () =
   let input = Sc_rollup_helpers.make_external_input "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
+  is_input_state
+    ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+    state
   >>= function
   | Initial | Needs_reveal _ | First_after _ ->
       failwith
@@ -603,7 +607,7 @@ let test_filter_internal_message () =
     let*! state = set_input input state in
     let*! input_state =
       is_input_state
-        ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+        ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
         state
     in
     match input_state with
@@ -633,7 +637,7 @@ let test_filter_internal_message () =
     let*! state = set_input input state in
     let*! input_state =
       is_input_state
-        ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+        ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
         state
     in
     match input_state with
