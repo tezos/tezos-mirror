@@ -167,20 +167,25 @@ let compute_bonus =
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
   fun ~base_total_rewards_per_minute ~total_supply ~total_frozen_stake ~bonus ->
-    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-    let q_total_frozen_stake =
-      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-    in
-    let stake_ratio =
-      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
-    in
-    let q_base_total_rewards_per_minute =
-      Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
-    in
-    let f = compute_reward_coeff_ratio ~stake_ratio ~bonus in
-    let f = Q.div f q_min_per_year (* = inflation per minute *) in
-    let f = Q.mul f q_total_supply (* = rewards per minute *) in
-    Q.div f q_base_total_rewards_per_minute
+    if Compare.Int64.equal (Tez_repr.to_mutez base_total_rewards_per_minute) 0L
+    then Q.one
+    else
+      let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
+      let q_total_frozen_stake =
+        Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
+      in
+      let stake_ratio =
+        Q.div
+          q_total_frozen_stake
+          q_total_supply (* = portion of frozen stake *)
+      in
+      let q_base_total_rewards_per_minute =
+        Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
+      in
+      let f = compute_reward_coeff_ratio ~stake_ratio ~bonus in
+      let f = Q.div f q_min_per_year (* = inflation per minute *) in
+      let f = Q.mul f q_total_supply (* = rewards per minute *) in
+      Q.div f q_base_total_rewards_per_minute
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
