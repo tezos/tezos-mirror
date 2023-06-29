@@ -104,6 +104,7 @@ let of_int32_non_negative l =
 
 let encoding =
   Data_encoding.conv_with_guard
+    ~schema:Data_encoding.positive_int32_schema
     to_int32
     (fun l ->
       match of_int32 l with

@@ -3520,6 +3520,22 @@ type tag_size = [`Uint8 | `Uint16]
 
 type json_schema
 
+(** Defines a JSON schema for positive 32-bit integers (ranging from 0 to
+    [Int32.max_int] inclusive), primarily for encoding purposes in
+    [raw_level_repr.ml].
+
+    To keep the protocol concise and manageable, we choose to use ad-hoc
+    schemas rather than exporting the entire data-encoding library's schema
+    types and constructors. This approach enables us to address specific
+    cases effectively without burdening the codebase with a complex and
+    unnecessary schema definition.
+
+    In most situations, the default schemas should suffice. However, when
+    dealing with exceptional cases, targeted fixes can be implemented.
+    One potential trade-off is that changes to the environment may be
+    necessary when such cases arise.*)
+val positive_int32_schema : json_schema
+
 (** The type descriptors for values of type ['a]. *)
 type 'a t
 
