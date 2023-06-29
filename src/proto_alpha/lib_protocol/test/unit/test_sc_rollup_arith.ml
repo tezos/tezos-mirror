@@ -128,7 +128,7 @@ let boot boot_sector f =
   pre_boot boot_sector @@ fun ctxt state -> eval state >>= f ctxt
 
 let test_boot () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
   boot "" @@ fun _ctxt state ->
   is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
   >>= function
@@ -139,14 +139,16 @@ let test_boot () =
       failwith "After booting, the machine must be waiting for input."
 
 let test_metadata () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
+  let open Alpha_context in
+  let open Alpha_context.Sc_rollup in
   let open Lwt_result_syntax in
   boot "" @@ fun _ctxt state ->
   let metadata =
-    Sc_rollup_metadata_repr.
+    Metadata.
       {
         address = Sc_rollup_repr.Address.zero;
-        origination_level = Raw_level_repr.root;
+        origination_level = Raw_level.root;
       }
   in
   let input = Reveal (Metadata metadata) in
@@ -164,9 +166,9 @@ let test_metadata () =
          state."
 
 let test_input_message () =
-  let open Sc_rollup_PVM_sig in
+  let open Sc_rollup_helpers.Arith_pvm in
   boot "" @@ fun _ctxt state ->
-  let input = Sc_rollup_helpers.make_external_input_repr "MESSAGE" in
+  let input = Sc_rollup_helpers.make_external_input "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
@@ -539,6 +541,7 @@ let test_initial_state_hash_arith_pvm () =
 
 let dummy_internal_transfer address =
   let open Lwt_result_syntax in
+  let open Alpha_context.Sc_rollup in
   let* ctxt =
     let* block, _baker, _contract, _src2 = Contract_helpers.init () in
     let+ incr = Incremental.begin_construction block in
@@ -563,11 +566,11 @@ let dummy_internal_transfer address =
     >|= Environment.wrap_tzresult
   in
   let transfer =
-    Sc_rollup_inbox_message_repr.Internal
+    Inbox_message.Internal
       (Transfer {payload; sender; source; destination = address})
   in
   let*? serialized_transfer =
-    Environment.wrap_tzresult (Sc_rollup_inbox_message_repr.serialize transfer)
+    Environment.wrap_tzresult (Inbox_message.serialize transfer)
   in
   return serialized_transfer
 
@@ -585,11 +588,14 @@ let test_filter_internal_message () =
   (* We will set an input where the destination is the same as the one given
      in the static metadata. The pvm should process the input. *)
   let* () =
+    let open Sc_rollup_helpers.Arith_pvm in
+    let open Alpha_context in
+    let open Alpha_context.Sc_rollup in
     let* internal_transfer = dummy_internal_transfer address in
     let input =
       Inbox_message
         {
-          inbox_level = Raw_level_repr.root;
+          inbox_level = Raw_level.root;
           message_counter = Z.zero;
           payload = internal_transfer;
         }
@@ -608,6 +614,9 @@ let test_filter_internal_message () =
   (* We will set an input where the destination is *not* the same as the
      one given in the static metadata. The pvm should ignore the input. *)
   let* () =
+    let open Sc_rollup_helpers.Arith_pvm in
+    let open Alpha_context in
+    let open Alpha_context.Sc_rollup in
     let dummy_address =
       Sc_rollup_repr.Address.of_b58check_exn
         "sr1Fq8fPi2NjhWUXtcXBggbL6zFjZctGkmso"
@@ -616,7 +625,7 @@ let test_filter_internal_message () =
     let input =
       Inbox_message
         {
-          inbox_level = Raw_level_repr.root;
+          inbox_level = Raw_level.root;
           message_counter = Z.zero;
           payload = internal_transfer;
         }
