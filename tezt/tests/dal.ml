@@ -65,7 +65,7 @@ let redundancy_factor_param redundancy_factor =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
+let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
     ?(node_arguments = []) () =
   (* Temporary setup to initialise the node. *)
@@ -95,7 +95,9 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 5)
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in
   let* additional_account_keys =
-    Client.stresstest_gen_keys additional_bootstrap_accounts client
+    if additional_bootstrap_accounts > 0 then
+      Client.stresstest_gen_keys additional_bootstrap_accounts client
+    else return []
   in
   let additional_bootstrap_accounts =
     List.map (fun x -> (x, None, false)) additional_account_keys
@@ -188,8 +190,9 @@ let with_dal_node tezos_node tezos_client f key =
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = ["layer1"]) ?attestation_lag
-    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
+let scenario_with_layer1_node ?(tags = ["layer1"])
+    ?additional_bootstrap_accounts ?attestation_lag ?custom_constants
+    ?commitment_period ?challenge_window ?(dal_enable = true)
     ?event_sections_levels ?node_arguments ?activation_timestamp
     ?minimal_block_delay ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
@@ -200,6 +203,7 @@ let scenario_with_layer1_node ?(tags = ["layer1"]) ?attestation_lag
     (fun protocol ->
       with_layer1
         ~custom_constants
+        ?additional_bootstrap_accounts
         ?minimal_block_delay
         ?delay_increment_per_round
         ?attestation_lag
@@ -3183,6 +3187,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
+    ~additional_bootstrap_accounts:1
     "dal basic logic"
     test_slot_management_logic
     protocols ;
