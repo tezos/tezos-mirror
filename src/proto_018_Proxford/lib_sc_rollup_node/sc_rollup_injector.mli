@@ -23,8 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Injector_sigs.S
-    with type state := Node_context.ro
-     and type tag := Configuration.purpose
-     and type operation := L1_operation.t
+(** Manager operation for a given L1 operation. *)
+val injector_operation_to_manager :
+  L1_operation.t -> Protocol.Alpha_context.packed_manager_operation
+
+(** L1 operation corresponding to a manager operation if any. *)
+val injector_operation_of_manager :
+  'a Protocol.Alpha_context.manager_operation -> L1_operation.t option

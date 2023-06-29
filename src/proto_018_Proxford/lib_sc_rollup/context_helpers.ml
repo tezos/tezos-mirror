@@ -22,6 +22,32 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol.Alpha_context
+
+module type P = sig
+  module Tree :
+    Tezos_context_sigs.Context.TREE
+      with type key = string list
+       and type value = bytes
+
+  type tree = Tree.tree
+
+  val hash_tree : tree -> Sc_rollup.State_hash.t
+
+  type proof
+
+  val proof_encoding : proof Data_encoding.t
+
+  val proof_before : proof -> Sc_rollup.State_hash.t
+
+  val proof_after : proof -> Sc_rollup.State_hash.t
+
+  val verify_proof :
+    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
+end
 
 module In_memory = struct
   open Tezos_context_memory

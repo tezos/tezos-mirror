@@ -299,5 +299,6 @@ null
             [ "[SC_ROLLUP_INBOX_HASH]",
               "[SC_ROLLUP_INBOX_HASH]",
               "[SC_ROLLUP_INBOX_HASH]" ] } },
-  "messages": [ "31352d31", "31352d32", "31352d33", "31352d34", "31352d35" ],
+  "messages":
+    [ "0131352d31", "0131352d32", "0131352d33", "0131352d34", "0131352d35" ],
   "initial_tick": "1430000000000", "num_ticks": "99000000000" }
