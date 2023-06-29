@@ -186,6 +186,13 @@ Node
   no prevalidator filter is found later on for a different
   protocol. (MR :gl:`!9261`)
 
+- Added version ``1`` to RPCs ``GET ../blocks/<block>``, and ``GET
+  ../blocks/<blocks>/operations``. It can be used by calling the RPC with the
+  parameter ``?version=1`` (default version is still ``0``). Version ``1``
+  allows the RPC to output ``attestation``, ``preattestation``,
+  ``double_attestation_evidence`` and ``double_preattestation_evidence`` kinds
+  in the JSON result. (MR :gl:`!9008`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

@@ -277,8 +277,9 @@ let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 
-let get_chain_block ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block] Fun.id
+let get_chain_block ?(chain = "main") ?(block = "head") ?version () =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make ~query_string GET ["chains"; chain; "blocks"; block] Fun.id
 
 type block_metadata = {
   protocol : string;
@@ -418,11 +419,16 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "header"; "protocol_data"]
     Fun.id
 
-let get_chain_block_operations ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
+let get_chain_block_operations ?(chain = "main") ?(block = "head") ?version
+    ?(force_metadata = false) () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ if force_metadata then [("force_metadata", "")] else []
+  in
+  make ~query_string GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
 
 let get_chain_block_operations_validation_pass ?(chain = "main")
-    ?(block = "head") ?(force_metadata = false) ?operation_offset
+    ?(block = "head") ?version ?(force_metadata = false) ?operation_offset
     ~validation_pass () =
   let path =
     [
@@ -435,7 +441,10 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
     ]
     @ match operation_offset with None -> [] | Some m -> [string_of_int m]
   in
-  let query_string = if force_metadata then [("force_metadata", "")] else [] in
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @ if force_metadata then [("force_metadata", "")] else []
+  in
   make ~query_string GET path Fun.id
 
 let get_chain_mempool_pending_operations ?(chain = "main") ?version ?validated
