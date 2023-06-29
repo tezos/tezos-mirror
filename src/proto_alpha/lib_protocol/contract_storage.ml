@@ -781,3 +781,62 @@ let simulate_spending ctxt ~balance ~amount source =
   return (new_balance, still_allocated)
 
 let get_total_supply ctxt = Storage.Contract.Total_supply.get ctxt
+
+module For_RPC = struct
+  let get_staked_balance ctxt = function
+    | Contract_repr.Originated _ -> return_none
+    | Implicit _ as contract -> (
+        Storage.Contract.Delegate.find ctxt contract >>=? function
+        | None -> return_none
+        | Some delegate ->
+            Staking_pseudotokens_storage.costaking_pseudotokens_balance
+              ctxt
+              contract
+            >>=? fun pseudotokens ->
+            Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+              ctxt
+              delegate
+              pseudotokens
+            >>=? fun own_frozen_deposits -> return (Some own_frozen_deposits))
+
+  let get_unstaked_balance ctxt = function
+    | Contract_repr.Originated _ -> return_none
+    | Implicit _ as contract -> (
+        Unstake_requests_storage.prepare_finalize_unstake ctxt contract
+        >>=? function
+        | None -> return_some (Tez_repr.zero, Tez_repr.zero)
+        | Some {finalizable; unfinalizable} ->
+            List.fold_left_es
+              (fun acc (_cycle, tz) -> Lwt.return Tez_repr.(acc +? tz))
+              Tez_repr.zero
+              unfinalizable.requests
+            >>=? fun sum_unfinalizable ->
+            List.fold_left_es
+              (fun acc (_, _cycle, tz) -> Lwt.return Tez_repr.(acc +? tz))
+              Tez_repr.zero
+              finalizable
+            >>=? fun sum_finalizable ->
+            return_some (sum_unfinalizable, sum_finalizable))
+
+  let get_unstaked_frozen_balance ctxt contract =
+    get_unstaked_balance ctxt contract >>=? function
+    | None -> return_none
+    | Some (amount, _) -> return_some amount
+
+  let get_unstaked_finalizable_balance ctxt contract =
+    get_unstaked_balance ctxt contract >>=? function
+    | None -> return_none
+    | Some (_, amount) -> return_some amount
+
+  let get_full_balance ctxt contract =
+    get_balance_and_frozen_bonds ctxt contract >>=? fun balance_n_frozen ->
+    get_staked_balance ctxt contract >>=? fun s ->
+    let staked = Option.value ~default:Tez_repr.zero s in
+    get_unstaked_balance ctxt contract >>=? fun us ->
+    let u_frozen, u_final =
+      Option.value ~default:(Tez_repr.zero, Tez_repr.zero) us
+    in
+    Lwt.return
+      Tez_repr.(
+        balance_n_frozen +? staked >>? ( +? ) u_frozen >>? ( +? ) u_final)
+end
