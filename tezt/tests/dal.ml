@@ -920,31 +920,9 @@ let () =
            e)
   | _ -> None
 
-let store_slot_and_patch_commitment l1_node dal_node ~slot_size ?with_proof
-    ?level ~index content =
+let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
+    dal_node source ~index content ~slot_size =
   let* commitment, proof = store_slot dal_node ~slot_size ?with_proof content in
-  let slot_level =
-    match level with Some level -> level | None -> 1 + Node.get_level l1_node
-  in
-  let* () =
-    RPC.call
-      dal_node
-      (Rollup.Dal.RPC.patch_commitment commitment ~slot_level ~slot_index:index)
-  in
-  return (commitment, proof)
-
-let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) l1_node
-    client dal_node source ?level ~index content ~slot_size =
-  let* commitment, proof =
-    store_slot_and_patch_commitment
-      l1_node
-      dal_node
-      ~slot_size
-      ?with_proof
-      ?level
-      ~index
-      content
-  in
   let* _ =
     publish_slot_header
       ?counter
@@ -1032,9 +1010,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let publish ?fee source ~index content =
     let* commitment =
       publish_and_store_slot
-        ~level:pub_level
         ?fee
-        node
         client
         dal_node
         ~slot_size
@@ -1044,13 +1020,11 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     in
     return (index, commitment)
   in
-  let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
-  in
   let* slot0 = publish Constant.bootstrap1 ~index:0 "test0" in
   let* slot1 = publish Constant.bootstrap2 ~index:1 "test1" in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
+    (* The slot headers are not yet in a block. *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
   let* slot2_a = publish Constant.bootstrap3 ~index:4 ~fee:1_200 "test4_a" in
   let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:1_350 "test4_b" in
@@ -1072,7 +1046,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:5
+    (* The slot headers are still not yet in a block. *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
   (* slot2_a and slot3 will not be included as successfull, slot2_b has better
      fees for slot 4. While slot3's fee is too low. slot4 is not injected
@@ -1089,7 +1064,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = wait_block_processing in
 
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:5
+    (* There are 4 published slots: slot0, slot1, slot2_a, and slot2_b *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
   in
   let* slot_headers =
     RPC.call
@@ -1142,7 +1118,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = Lwt_unix.sleep 2.0 in
 
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:5
+    (* The number of published slots has not changed *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
   in
 
   (* Slot confirmed. *)
@@ -1177,6 +1154,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
             ~error_msg:"slot4 is not expected to have a header"))
       [slot4]
   in
+  (* The number of published slots has not changed *)
   let* () =
     check_published_level_headers
       ~__LOC__
@@ -1184,7 +1162,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       ~number_of_headers:0
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:5
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
   in
   check_published_level_headers
     ~__LOC__
@@ -1207,7 +1185,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
-  let publish = publish_and_store_slot node client dal_node ~slot_size in
+  let publish = publish_and_store_slot client dal_node ~slot_size in
   let* slot_header = publish Constant.bootstrap1 ~index:0 slot_content in
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
@@ -2145,8 +2123,6 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
         ~slot_size
         ~force:true
         ~counter:!counter
-        ~level:publish_level
-        l1_node
         l1_client
         dal_node
         source
@@ -2917,7 +2893,6 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
     let slot_content = generate_dummy_slot slot_size in
     publish_and_store_slot
       ~with_proof:true
-      node
       client
       dal_node1
       ~slot_size
@@ -3070,7 +3045,6 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
         let* _slot_commitment =
           publish_and_store_slot
             ~with_proof:true
-            node
             client
             dal_node1
             ~slot_size
@@ -3123,7 +3097,6 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   let* commitment =
     publish_and_store_slot
       ~with_proof:true
-      node
       client
       dal_node1
       ~slot_size
