@@ -74,7 +74,7 @@ docker:
 
 manifest:
   stage: manifest
-  image: manifest
+  image: docker
   parallel:
     matrix:
       - OCTEZ_BRANCH: ["v17.1"]
