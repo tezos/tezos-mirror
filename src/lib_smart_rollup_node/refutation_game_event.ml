@@ -23,12 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2880
    Add corresponding .mli file. *)
 
-let section = [Protocol.name; "sc_rollup_node"; "refutation_game"]
+let section = ["sc_rollup_node"; "refutation_game"]
 
 module Simple = struct
   include Internal_event.Simple
@@ -41,7 +39,7 @@ module Simple = struct
         "The rollup node has been slashed because of a timeout issued by \
          {address}"
       ~level:Notice
-      ("address", Tezos_crypto.Signature.Public_key_hash.encoding)
+      ("address", Signature.Public_key_hash.encoding)
 
   let invalid_move =
     declare_0
@@ -79,10 +77,10 @@ module Simple = struct
          {our_commitment_hash} at level {level} with staker {other} that hash \
          issued commitment {their_commitment_hash}."
       ~level:Notice
-      ("our_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("our_commitment_hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
       ("other", Signature.Public_key_hash.encoding)
-      ("their_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("their_commitment_hash", Commitment.Hash.encoding)
 
   let timeout_detected =
     declare_1
@@ -91,17 +89,7 @@ module Simple = struct
       ~msg:
         "The rollup node has detected that opponent {other} can be timed out."
       ~level:Notice
-      ("other", Sc_rollup.Staker.encoding)
-
-  let dissection_chunk_encoding =
-    let open Data_encoding in
-    let open Sc_rollup.Dissection_chunk in
-    conv
-      (fun {state_hash; tick} -> (state_hash, tick))
-      (fun (state_hash, tick) -> {state_hash; tick})
-      (obj2
-         (opt "state" Sc_rollup.State_hash.encoding)
-         (req "tick" Sc_rollup.Tick.encoding))
+      ("other", Signature.Public_key_hash.encoding)
 
   let computed_dissection =
     declare_4

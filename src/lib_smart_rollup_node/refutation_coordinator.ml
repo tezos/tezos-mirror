@@ -28,32 +28,7 @@ module Player = Refutation_player
 module Pkh_map = Signature.Public_key_hash.Map
 module Pkh_table = Signature.Public_key_hash.Table
 
-type state = {
-  node_ctxt : Node_context.rw;
-  cctxt : Protocol_client_context.full;
-  pending_opponents : unit Pkh_table.t;
-}
-
-let get_conflicts cctxt head_block rollup staker =
-  let open Lwt_result_syntax in
-  let+ conflicts =
-    Plugin.RPC.Sc_rollup.conflicts cctxt (cctxt#chain, head_block) rollup staker
-  in
-  List.map Sc_rollup_proto_types.Game.conflict_to_octez conflicts
-
-let get_ongoing_games cctxt head_block rollup staker =
-  let open Lwt_result_syntax in
-  let+ games =
-    Plugin.RPC.Sc_rollup.ongoing_refutation_games
-      cctxt
-      (cctxt#chain, head_block)
-      rollup
-      staker
-  in
-  List.map
-    (fun (game, staker1, staker2) ->
-      (Sc_rollup_proto_types.Game.to_octez game, staker1, staker2))
-    games
+type state = {node_ctxt : Node_context.rw; pending_opponents : unit Pkh_table.t}
 
 let untracked_conflicts opponent_players conflicts =
   List.filter
@@ -74,9 +49,8 @@ let make_game_map self ongoing_games =
     Pkh_map.empty
     ongoing_games
 
-let on_process Layer1.{hash; level} state =
+let on_process Layer1.{level; _} state =
   let node_ctxt = state.node_ctxt in
-  let head_block = `Hash (hash, 0) in
   let open Lwt_result_syntax in
   let refute_signer = Node_context.get_operator node_ctxt Refute in
   match refute_signer with
@@ -85,9 +59,14 @@ let on_process Layer1.{hash; level} state =
       return_unit
   | Some self ->
       let Node_context.{rollup_address; _} = node_ctxt in
+      let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
+      let module Plugin = (val plugin) in
       (* Current conflicts in L1 *)
       let* conflicts =
-        get_conflicts state.cctxt head_block rollup_address self
+        Plugin.Refutation_game_helpers.get_conflicts
+          state.node_ctxt.cctxt
+          rollup_address
+          self
       in
       (* Map of opponents the node is playing against to the corresponding
          player worker *)
@@ -99,7 +78,10 @@ let on_process Layer1.{hash; level} state =
       let new_conflicts = untracked_conflicts opponent_players conflicts in
       (* L1 ongoing games *)
       let* ongoing_games =
-        get_ongoing_games state.cctxt head_block rollup_address self
+        Plugin.Refutation_game_helpers.get_ongoing_games
+          state.node_ctxt.cctxt
+          rollup_address
+          self
       in
       (* Map between opponents and their corresponding games *)
       let ongoing_game_map = make_game_map self ongoing_games in
@@ -135,10 +117,7 @@ let on_process Layer1.{hash; level} state =
 module Types = struct
   type nonrec state = state
 
-  type parameters = {
-    node_ctxt : Node_context.rw;
-    cctxt : Protocol_client_context.full;
-  }
+  type parameters = Node_context.rw
 end
 
 module Name = struct
@@ -174,8 +153,8 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt; cctxt} =
-    return {node_ctxt; cctxt; pending_opponents = Pkh_table.create 5}
+  let on_launch _w () node_ctxt =
+    Lwt_result.return {node_ctxt; pending_opponents = Pkh_table.create 5}
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
@@ -204,10 +183,7 @@ let worker_promise, worker_waker = Lwt.task ()
 let start node_ctxt =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.Coordinator.starting () in
-  let cctxt =
-    new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt
-  in
-  let+ worker = Worker.launch table () {node_ctxt; cctxt} (module Handlers) in
+  let+ worker = Worker.launch table () node_ctxt (module Handlers) in
   Lwt.wakeup worker_waker worker
 
 let init node_ctxt =
@@ -218,18 +194,19 @@ let init node_ctxt =
       return_unit
   | Lwt.Fail exn ->
       (* Worker crashed, not recoverable. *)
-      fail [Sc_rollup_node_errors.No_refutation_coordinator; Exn exn]
+      fail [Rollup_node_errors.No_refutation_coordinator; Exn exn]
   | Lwt.Sleep ->
       (* Never started, start it. *)
       start node_ctxt
 
 (* This is a refutation coordinator for a single scoru *)
 let worker =
+  let open Result_syntax in
   lazy
     (match Lwt.state worker_promise with
-    | Lwt.Return worker -> ok worker
+    | Lwt.Return worker -> return worker
     | Lwt.Fail _ | Lwt.Sleep ->
-        error Sc_rollup_node_errors.No_refutation_coordinator)
+        tzfail Rollup_node_errors.No_refutation_coordinator)
 
 let process b =
   let open Lwt_result_syntax in

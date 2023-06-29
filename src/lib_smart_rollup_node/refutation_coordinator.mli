@@ -32,15 +32,16 @@
 (** Initiatilize the refuation coordinator. *)
 val init : Node_context.rw -> unit tzresult Lwt.t
 
-(** Process a new l1 head. This means that the coordinator will:
+(** [process head] processes a new l1 head. This means that the coordinator
+    will:
     {ol
       {li Gather all existing conflicts}
-      {li Launch new refutation players for each conflict that doesn't
-          have a player in this node}
+      {li Launch new refutation players for each conflict concerning
+          the operator that doesn't have a player in this node}
       {li Kill all players whose conflict has disappeared from L1}
       {li Make all players play a step in the refutation}
     }
-  *)
+*)
 val process : Layer1.head -> unit tzresult Lwt.t
 
 (** Shutdown the refutation coordinator. *)

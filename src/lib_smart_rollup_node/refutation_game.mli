@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,25 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Component for managing refutation games.
-    This module is implemented as a single worker in the rollup node,
-    which takes care of processing new L1 heads, and coordinating
-    the refutation game players. (See {!Refutation_player}).
-*)
+(** This module implements the refutation game logic of the rollup node. *)
 
-(** Initiatilize the refuation coordinator. *)
-val init : Node_context.rw -> unit tzresult Lwt.t
+(** [play_opening_move node_ctxt self conflict] injects the opening refutation
+    game move for [conflict]. *)
+val play_opening_move :
+  [< `Read | `Write > `Read] Node_context.t ->
+  Signature.public_key_hash ->
+  Octez_smart_rollup.Game.conflict ->
+  (unit, tztrace) result Lwt.t
 
-(** Process a new l1 head. This means that the coordinator will:
-    {ol
-      {li Gather all existing conflicts}
-      {li Launch new refutation players for each conflict that doesn't
-          have a player in this node}
-      {li Kill all players whose conflict has disappeared from L1}
-      {li Make all players play a step in the refutation}
-    }
-  *)
-val process : Layer1.head -> unit tzresult Lwt.t
-
-(** Shutdown the refutation coordinator. *)
-val shutdown : unit -> unit Lwt.t
+(** [play head_block plugin node_ctxt ~self game opponent] injects the next move
+    in the refutation [game] played by [self] and [opponent]. *)
+val play :
+  Node_context.rw ->
+  self:Signature.public_key_hash ->
+  Octez_smart_rollup.Game.t ->
+  Signature.public_key_hash ->
+  (unit, tztrace) result Lwt.t

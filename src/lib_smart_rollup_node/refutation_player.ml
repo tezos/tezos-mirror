@@ -76,7 +76,7 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w _name Types.{node_ctxt; self; conflict} =
-    return
+    Lwt_result.return
       Types.{node_ctxt; self; opponent = conflict.other; last_move_cache = None}
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
@@ -114,7 +114,7 @@ let init node_ctxt ~self ~conflict =
   in
   let worker_promise, worker_waker = Lwt.task () in
   let* worker =
-    trace Sc_rollup_node_errors.Refutation_player_failed_to_start
+    trace Rollup_node_errors.Refutation_player_failed_to_start
     @@ Worker.launch
          table
          conflict.other
@@ -123,10 +123,11 @@ let init node_ctxt ~self ~conflict =
   in
   let () = Lwt.wakeup worker_waker worker in
   let worker =
+    let open Result_syntax in
     match Lwt.state worker_promise with
-    | Lwt.Return worker -> ok worker
+    | Lwt.Return worker -> return worker
     | Lwt.Fail _ | Lwt.Sleep ->
-        error Sc_rollup_node_errors.Refutation_player_failed_to_start
+        tzfail Rollup_node_errors.Refutation_player_failed_to_start
   in
   Lwt.return worker
 
