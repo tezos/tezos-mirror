@@ -847,8 +847,7 @@ module Revamped = struct
     in
     check_mempool
       ~validated:[oph1; oph2bis]
-      ~branch_delayed:[oph1bis]
-      ~outdated:[oph2]
+      ~branch_delayed:[oph1bis; oph2]
       client
 
   (** This test checks that an operation validated is not reclassified and stays
@@ -1819,11 +1818,7 @@ module Revamped = struct
         client1
     in
     let* () =
-      check_mempool
-        ~validated:[oph4]
-        ~branch_delayed:[oph1; oph2]
-        ~outdated:[oph3]
-        client1
+      check_mempool ~validated:[oph4] ~branch_delayed:[oph1; oph2; oph3] client1
     in
     unit
 

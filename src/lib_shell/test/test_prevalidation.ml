@@ -235,7 +235,7 @@ let assert_rejected_by_full_mempool ~__LOC__ = function
 
 let assert_replacement ~__LOC__ = function
   (* Replaced by the protocol *)
-  | `Outdated [Validation_errors.Operation_replacement _] -> ()
+  | `Branch_delayed [Validation_errors.Operation_replacement _] -> ()
   (* Replaced by the filter *)
   | `Branch_delayed [Validation_errors.Removed_from_full_mempool _] -> ()
   | classification ->

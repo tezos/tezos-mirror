@@ -83,11 +83,15 @@ let op_is_validated ~__LOC__ nodes opH =
       unit)
     [nodes.main.client; nodes.observer.client]
 
-let op_is_outdated ~__LOC__ nodes opH =
+let op_is_branch_delayed ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
       let* mempool = Mempool.get_mempool client in
-      Memchecks.check_operation_is_in_mempool ~__LOC__ `Outdated mempool opH ;
+      Memchecks.check_operation_is_in_mempool
+        ~__LOC__
+        `Branch_delayed
+        mempool
+        opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
 
@@ -266,7 +270,7 @@ let replacement_fees_equal_to_threshold =
     ~op2:replacement_op
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation just above replacement threshold. *)
@@ -278,7 +282,7 @@ let replacement_fees_above_threshold =
     ~op2:{replacement_op with fee = replacement_op.fee + 1}
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation just above replacement threshold of the
@@ -293,7 +297,7 @@ let third_operation_fees_below_replacement_threshold =
     ~op2
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ~op3:{default_op with fee = minimal_replacement_fee op2.fee - 1}
     ~incheck3:check_branch_delayed
     ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_validated ~__LOC__ nodes h2)
@@ -311,10 +315,10 @@ let third_operation_fees_equal_to_replacement_threshold =
     ~op2
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ~op3:{op2 with fee = minimal_replacement_fee op2.fee}
     ~incheck3:check_validated
-    ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_outdated ~__LOC__ nodes h2)
+    ~postcheck3:(fun nodes _h1 h2 _h3 -> op_is_branch_delayed ~__LOC__ nodes h2)
     ()
 
 (* Fees of 2nd operation equal to replacement threshold, but the gas is also
@@ -428,7 +432,7 @@ let replace_simple_op_with_a_batched =
     ~size2:2
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ()
 
 (* Replacing a batched operation not possible due to low fees *)
@@ -454,7 +458,7 @@ let replace_batched_op_with_simple_one =
     ~op2:replacement_op
     ~incheck1:check_validated
     ~incheck2:check_validated
-    ~postcheck2:(fun nodes h1 _h2 -> op_is_outdated ~__LOC__ nodes h1)
+    ~postcheck2:(fun nodes h1 _h2 -> op_is_branch_delayed ~__LOC__ nodes h1)
     ()
 
 (* Fees of 2nd operation are bigger than the account's supply. *)
