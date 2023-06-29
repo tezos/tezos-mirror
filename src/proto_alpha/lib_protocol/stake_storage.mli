@@ -59,11 +59,10 @@ val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
     minimal required stake. The folding process starts with [init]. Each element of the
-    list is a pair [pkh, stake], where [pkh] is the public key hash of the
-    delegate and [stake] is the staking balance of the delegate. *)
+    list is the public key hash of a delegate. *)
 val fold :
   Raw_context.t ->
-  f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Signature.Public_key_hash.t -> 'a -> 'a tzresult Lwt.t) ->
   order:[`Sorted | `Undefined] ->
   'a ->
   'a tzresult Lwt.t

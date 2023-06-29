@@ -112,7 +112,8 @@ let update_listings ctxt =
       ctxt
       (ctxt, 0L)
       ~order:`Sorted
-      ~f:(fun (delegate, stake) (ctxt, total) ->
+      ~f:(fun delegate (ctxt, total) ->
+        let* stake = Stake_storage.get_staking_balance ctxt delegate in
         let delegate_contract = Contract_repr.Implicit delegate in
         let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
         let frozen = deposits.current_amount in

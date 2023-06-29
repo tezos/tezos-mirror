@@ -168,10 +168,7 @@ let fold ctxt ~f ~order init =
     ctxt
     ~order
     ~init:(Ok init)
-    ~f:(fun delegate () acc ->
-      acc >>?= fun acc ->
-      get_staking_balance ctxt delegate >>=? fun stake ->
-      f (delegate, stake) acc)
+    ~f:(fun delegate () acc -> acc >>?= fun acc -> f delegate acc)
 
 let fold_snapshot ctxt ~index ~f ~init =
   Storage.Stake.Active_delegates_with_minimal_stake.fold_snapshot
