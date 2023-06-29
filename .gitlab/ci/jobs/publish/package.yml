@@ -1,4 +1,5 @@
 package:create_package:
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
   stage: publish_package_gitlab
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false
