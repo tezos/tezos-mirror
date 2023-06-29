@@ -5,6 +5,5 @@ package:create_package:
   dependencies:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries
-    - docker:merge_manifests
   script:
     - ${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh
