@@ -91,6 +91,11 @@ type 'function_call call_stack =
   | Node of 'function_call * Z.t * 'function_call call_stack list
   | Toplevel of 'function_call call_stack list
 
+let rec fold_call_stack f acc = function
+  | Node (call, ticks, substacks) ->
+      List.fold_left (fold_call_stack f) (f acc call ticks) substacks
+  | Toplevel substacks -> List.fold_left (fold_call_stack f) acc substacks
+
 (** [end_function_call current_tick current_function call_stack] implements an
     ending call. Please refer to the prelude of the file. *)
 let end_function_call current_tick current_function call_stack =
