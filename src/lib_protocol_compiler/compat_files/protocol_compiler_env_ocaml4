@@ -1,0 +1,2 @@
+let () = Clflags.unsafe_string := false
+let env = Env.initial_safe_string

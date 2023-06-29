@@ -65,7 +65,17 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Octez_protocol_compiler)
- (modules Native))
+ (modules Protocol_compiler_env Native))
+
+(rule
+ (target protocol_compiler_env.ml)
+ (action (copy compat_files/protocol_compiler_env_ocaml4 %{target}))
+ (enabled_if (< %{ocaml_version} 5)))
+
+(rule
+ (target protocol_compiler_env.ml)
+ (action (copy compat_files/protocol_compiler_env_ocaml5 %{target}))
+ (enabled_if (>= %{ocaml_version} 5)))
 
 (install
  (package octez-protocol-compiler)

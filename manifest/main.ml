@@ -2931,10 +2931,28 @@ let octez_protocol_compiler_native =
         octez_protocol_compiler_lib |> open_;
         compiler_libs_optcomp;
       ]
-    ~modules:["Native"]
+    ~modules:["Protocol_compiler_env"; "Native"]
     ~dune:
       Dune.
         [
+          target_rule
+            "protocol_compiler_env.ml"
+            ~action:
+              [
+                S "copy";
+                S "compat_files/protocol_compiler_env_ocaml4";
+                S "%{target}";
+              ]
+            ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "protocol_compiler_env.ml"
+            ~action:
+              [
+                S "copy";
+                S "compat_files/protocol_compiler_env_ocaml5";
+                S "%{target}";
+              ]
+            ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
           install
             [V [S "final_protocol_versions"]]
             ~package:"octez-protocol-compiler"
