@@ -55,7 +55,7 @@ let node_role ~self Sc_rollup.Game.Index.{alice; bob} =
 
 type role = Our_turn of {opponent : public_key_hash} | Their_turn
 
-let turn ~self game players =
+let turn ~self (game : Octez_smart_rollup.Game.t) players =
   let Sc_rollup.Game.Index.{alice; bob} = players in
   match (node_role ~self players, game.turn) with
   | Alice, Alice -> Our_turn {opponent = bob}
@@ -70,11 +70,7 @@ let inject_next_move node_ctxt source ~refutation ~opponent =
   let open Lwt_result_syntax in
   let refute_operation =
     L1_operation.Refute
-      {
-        rollup = node_ctxt.Node_context.rollup_address;
-        refutation = Sc_rollup_proto_types.Game.refutation_to_octez refutation;
-        opponent;
-      }
+      {rollup = node_ctxt.Node_context.rollup_address; refutation; opponent}
   in
   let* _hash = Injector.add_pending_operation ~source refute_operation in
   return_unit
@@ -159,23 +155,24 @@ let metadata (node_ctxt : _ Node_context.t) =
   let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
   Sc_rollup.Metadata.{address; origination_level}
 
-let generate_proof (node_ctxt : _ Node_context.t) game start_state =
+let generate_proof (node_ctxt : _ Node_context.t)
+    (game : Octez_smart_rollup.Game.t) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let snapshot = game.inbox_snapshot in
+  let snapshot =
+    Sc_rollup_proto_types.Inbox.history_proof_of_octez game.inbox_snapshot
+  in
   (* NOTE: [snapshot_level_int32] below refers to the level of the snapshotted
      inbox (from the skip list) which also matches [game.start_level - 1]. *)
   let snapshot_level_int32 =
-    Raw_level.to_int32 (Sc_rollup.Inbox.Skip_list.content snapshot).level
+    (Octez_smart_rollup.Inbox.Skip_list.content game.inbox_snapshot).level
   in
   let get_snapshot_head () =
     let+ hash = Node_context.hash_of_level node_ctxt snapshot_level_int32 in
     Layer1.{hash; level = snapshot_level_int32}
   in
   let* context =
-    let* start_hash =
-      Node_context.hash_of_level node_ctxt (Raw_level.to_int32 game.inbox_level)
-    in
+    let* start_hash = Node_context.hash_of_level node_ctxt game.inbox_level in
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
@@ -294,10 +291,13 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
     trace
       (Sc_rollup_node_errors.Cannot_produce_proof
          {
-           inbox_level = Raw_level.to_int32 game.inbox_level;
+           inbox_level = game.inbox_level;
            start_tick = Sc_rollup.Tick.to_z start_tick;
          })
-    @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
+    @@ (Sc_rollup.Proof.produce
+          ~metadata
+          (module P)
+          (Raw_level.of_int32_exn game.inbox_level)
        >|= Environment.wrap_tzresult)
   in
   let*? pvm_step =
@@ -309,7 +309,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
     Sc_rollup.Proof.valid
       ~metadata
       snapshot
-      game.inbox_level
+      (Raw_level.of_int32_exn game.inbox_level)
       dal_slots_history
       dal_parameters
       ~dal_attestation_lag
@@ -317,10 +317,14 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
       unserialized_proof
     >|= Environment.wrap_tzresult
   in
-  if Result.is_ok res then return proof else assert false
+  assert (Result.is_ok res) ;
+  let proof =
+    Data_encoding.Binary.to_string_exn Sc_rollup.Proof.encoding proof
+  in
+  return proof
 
 type pvm_intermediate_state =
-  | Hash of Sc_rollup.State_hash.t
+  | Hash of Octez_smart_rollup.State_hash.t
   | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
 
 let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
@@ -331,7 +335,7 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
       node_ctxt
       ?start_state
       ~tick:(Sc_rollup.Tick.to_z tick)
-      last_level
+      (Raw_level.of_int32_exn last_level)
   in
   let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} =
     Sc_rollup_proto_types.State_hash.of_octez state_hash
@@ -340,10 +344,14 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     match ok with
     | Hash hash, tick -> (hash, tick, None)
     | Evaluated ({state_hash; _} as state), tick ->
-        (Sc_rollup_proto_types.State_hash.of_octez state_hash, tick, Some state)
+        (state_hash, tick, Some state)
   in
   let start_chunk =
-    Sc_rollup.Dissection_chunk.{state_hash = Some start_hash; tick = start_tick}
+    Sc_rollup.Dissection_chunk.
+      {
+        state_hash = Some (Sc_rollup_proto_types.State_hash.of_octez start_hash);
+        tick = Sc_rollup.Tick.of_z start_tick;
+      }
   in
   let our_state, our_tick = our_view in
   let our_state_hash =
@@ -353,7 +361,8 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
       our_state
   in
   let our_stop_chunk =
-    Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
+    Sc_rollup.Dissection_chunk.
+      {state_hash = our_state_hash; tick = Sc_rollup.Tick.of_z our_tick}
   in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let* dissection =
@@ -367,6 +376,9 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
          ~start_chunk
          ~our_stop_chunk
          ~default_number_of_sections
+  in
+  let dissection =
+    List.map Sc_rollup_proto_types.Game.dissection_chunk_to_octez dissection
   in
   let*! () =
     Refutation_game_event.computed_dissection
@@ -382,7 +394,8 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     performs a new dissection of the execution trace or provides a refutation
     proof to serve as the next move of the [game]. *)
 let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
-    game dissection =
+    (game : Octez_smart_rollup.Game.t)
+    (dissection : Octez_smart_rollup.Game.dissection_chunk list) =
   let open Lwt_result_syntax in
   let rec traverse ok = function
     | [] ->
@@ -393,8 +406,7 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
         tzfail
           Sc_rollup_node_errors
           .Unreliable_tezos_node_returning_inconsistent_game
-    | Sc_rollup.Dissection_chunk.{state_hash = their_hash; tick} :: dissection
-      -> (
+    | Octez_smart_rollup.Game.{state_hash = their_hash; tick} :: dissection -> (
         let start_state =
           match ok with
           | Hash _, _ -> None
@@ -404,8 +416,8 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
           Interpreter.state_of_tick
             node_ctxt
             ?start_state
-            ~tick:(Sc_rollup.Tick.to_z tick)
-            game.inbox_level
+            ~tick
+            (Raw_level.of_int32_exn game.inbox_level)
         in
         match (their_hash, our) with
         | None, None ->
@@ -414,15 +426,12 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
             assert false
         | Some _, None | None, Some _ -> return (ok, (our, tick))
         | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
-            if
-              Sc_rollup.State_hash.equal
-                (Sc_rollup_proto_types.State_hash.of_octez our_hash)
-                their_hash
-            then traverse (Evaluated our_state, tick) dissection
+            if Octez_smart_rollup.State_hash.equal our_hash their_hash then
+              traverse (Evaluated our_state, tick) dissection
             else return (ok, (our, tick)))
   in
   match dissection with
-  | Sc_rollup.Dissection_chunk.{state_hash = Some hash; tick} :: dissection ->
+  | {state_hash = Some hash; tick} :: dissection ->
       let* ok, ko = traverse (Hash hash, tick) dissection in
       let* dissection =
         new_dissection
@@ -435,7 +444,7 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
       in
       let _, choice = ok in
       let _, ko_tick = ko in
-      let chosen_section_len = Sc_rollup.Tick.distance ko_tick choice in
+      let chosen_section_len = Z.abs (Z.sub choice ko_tick) in
       return (choice, chosen_section_len, dissection)
   | [] | {state_hash = None; _} :: _ ->
       (*
@@ -446,14 +455,14 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
       tzfail
         Sc_rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
 
-let next_move node_ctxt ~opponent game =
+let next_move node_ctxt ~opponent (game : Octez_smart_rollup.Game.t) =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
       Interpreter.state_of_tick
         node_ctxt
-        ~tick:(Sc_rollup.Tick.to_z start_tick)
-        game.inbox_level
+        ~tick:start_tick
+        (Raw_level.of_int32_exn game.inbox_level)
     in
     match start_state with
     | None ->
@@ -463,7 +472,7 @@ let next_move node_ctxt ~opponent game =
     | Some {state = start_state; _} ->
         let* proof = generate_proof node_ctxt game start_state in
         let choice = start_tick in
-        return (Move {choice; step = Proof proof})
+        return (Octez_smart_rollup.Game.Move {choice; step = Proof proof})
   in
 
   match game.game_state with
@@ -477,7 +486,9 @@ let next_move node_ctxt ~opponent game =
           dissection
       in
       if Z.(equal chosen_section_len one) then final_move choice
-      else return (Move {choice; step = Dissection dissection})
+      else
+        return
+          (Octez_smart_rollup.Game.Move {choice; step = Dissection dissection})
   | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
       let choice = agreed_start_chunk.tick in
       final_move choice
@@ -537,15 +548,18 @@ let play node_ctxt ~self game opponent =
           play_timeout node_ctxt self index
       | None -> return_unit)
 
-let play_opening_move node_ctxt self conflict =
+let play_opening_move node_ctxt self
+    (conflict : Octez_smart_rollup.Game.conflict) =
   let open Lwt_syntax in
-  let open Sc_rollup.Refutation_storage in
   let* () = Refutation_game_event.conflict_detected conflict in
   let player_commitment_hash =
-    Sc_rollup.Commitment.hash_uncarbonated conflict.our_commitment
+    Octez_smart_rollup.Commitment.hash conflict.our_commitment
   in
   let opponent_commitment_hash =
-    Sc_rollup.Commitment.hash_uncarbonated conflict.their_commitment
+    Octez_smart_rollup.Commitment.hash conflict.their_commitment
   in
-  let refutation = Start {player_commitment_hash; opponent_commitment_hash} in
+  let refutation =
+    Octez_smart_rollup.Game.Start
+      {player_commitment_hash; opponent_commitment_hash}
+  in
   inject_next_move node_ctxt self ~refutation ~opponent:conflict.other

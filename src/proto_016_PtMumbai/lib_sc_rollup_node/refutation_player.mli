@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
 (** Worker module for a single refutation game player.  The node's refutation
     coordinator will spawn a new refutation player for each refutation game.
 *)
@@ -40,20 +37,20 @@ type worker = Worker.infinite Worker.queue Worker.t
     is passed, the worker will play the opening move for [conflict].  *)
 val init_and_play :
   Node_context.rw ->
-  self:public_key_hash ->
-  conflict:Sc_rollup.Refutation_storage.conflict ->
-  game:Sc_rollup.Game.t option ->
+  self:Signature.public_key_hash ->
+  conflict:Game.conflict ->
+  game:Game.t option ->
   level:int32 ->
   unit tzresult Lwt.t
 
 (** [play worker game ~level] makes the [worker] play the next move depending
       on the [game] state for their conflict.
   *)
-val play : worker -> Sc_rollup.Game.t -> level:int32 -> unit Lwt.t
+val play : worker -> Game.t -> level:int32 -> unit Lwt.t
 
 (** Shutdown a refutaiton game player. *)
 val shutdown : worker -> unit Lwt.t
 
 (** [current_games ()] lists the opponents' this node is playing refutation
     games against, alongside the worker that takes care of each game. *)
-val current_games : unit -> (public_key_hash * worker) list
+val current_games : unit -> (Signature.public_key_hash * worker) list

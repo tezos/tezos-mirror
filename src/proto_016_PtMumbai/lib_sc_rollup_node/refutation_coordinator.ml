@@ -23,10 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Refutation_coordinator_types
-include Refutation_game
 module Player = Refutation_player
 module Pkh_map = Signature.Public_key_hash.Map
 module Pkh_table = Signature.Public_key_hash.Table
@@ -37,27 +34,34 @@ type state = {
   pending_opponents : unit Pkh_table.t;
 }
 
-let get_conflicts cctxt head_block address key =
-  Plugin.RPC.Sc_rollup.conflicts
-    cctxt
-    (cctxt#chain, head_block)
-    (Sc_rollup_proto_types.Address.of_octez address)
-    key
+let get_conflicts cctxt head_block rollup staker =
+  let open Lwt_result_syntax in
+  let+ conflicts =
+    Plugin.RPC.Sc_rollup.conflicts
+      cctxt
+      (cctxt#chain, head_block)
+      (Sc_rollup_proto_types.Address.of_octez rollup)
+      staker
+  in
+  List.map Sc_rollup_proto_types.Game.conflict_to_octez conflicts
 
-let get_ongoing_games cctxt head_block address key =
-  Plugin.RPC.Sc_rollup.ongoing_refutation_games
-    cctxt
-    (cctxt#chain, head_block)
-    (Sc_rollup_proto_types.Address.of_octez address)
-    key
+let get_ongoing_games cctxt head_block rollup staker =
+  let open Lwt_result_syntax in
+  let+ games =
+    Plugin.RPC.Sc_rollup.ongoing_refutation_games
+      cctxt
+      (cctxt#chain, head_block)
+      (Sc_rollup_proto_types.Address.of_octez rollup)
+      staker
+  in
+  List.map
+    (fun (game, staker1, staker2) ->
+      (Sc_rollup_proto_types.Game.to_octez game, staker1, staker2))
+    games
 
 let untracked_conflicts opponent_players conflicts =
   List.filter
-    (fun conflict ->
-      not
-      @@ Pkh_map.mem
-           conflict.Sc_rollup.Refutation_storage.other
-           opponent_players)
+    (fun conflict -> not @@ Pkh_map.mem conflict.Game.other opponent_players)
     conflicts
 
 (* Transform the list of ongoing games [(Game.t * pkh * pkh) list]
@@ -107,7 +111,7 @@ let on_process Layer1.{hash; level} state =
       let* () =
         List.iter_ep
           (fun conflict ->
-            let other = conflict.Sc_rollup.Refutation_storage.other in
+            let other = conflict.Octez_smart_rollup.Game.other in
             Pkh_table.replace state.pending_opponents other () ;
             let game = Pkh_map.find_opt other ongoing_game_map in
             Player.init_and_play node_ctxt ~self ~conflict ~game ~level)

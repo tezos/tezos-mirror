@@ -23,24 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-
 (** This module implements the refutation game logic of the rollup node. *)
 
 (** [play_opening_move node_ctxt self conflict] injects the opening refutation
     game move for [conflict]. *)
 val play_opening_move :
   [< `Read | `Write > `Read] Node_context.t ->
-  public_key_hash ->
-  Sc_rollup.Refutation_storage.conflict ->
+  Signature.public_key_hash ->
+  Octez_smart_rollup.Game.conflict ->
   (unit, tztrace) result Lwt.t
 
 (** [play head_block node_ctxt ~self game opponent] injects the next move in the
     refutation [game] played by [self] and [opponent]. *)
 val play :
   Node_context.rw ->
-  self:public_key_hash ->
-  Sc_rollup.Game.t ->
-  public_key_hash ->
+  self:Signature.public_key_hash ->
+  Octez_smart_rollup.Game.t ->
+  Signature.public_key_hash ->
   (unit, tztrace) result Lwt.t

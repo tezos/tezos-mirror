@@ -23,23 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Refutation_player_types
 open Refutation_game
 
 module Types = struct
   type state = {
     node_ctxt : Node_context.rw;
-    self : public_key_hash;
-    opponent : public_key_hash;
-    mutable last_move_cache : (Sc_rollup.Game.game_state * int32) option;
+    self : Signature.public_key_hash;
+    opponent : Signature.public_key_hash;
+    mutable last_move_cache :
+      (Octez_smart_rollup.Game.game_state * int32) option;
   }
 
   type parameters = {
     node_ctxt : Node_context.rw;
-    self : public_key_hash;
-    conflict : Sc_rollup.Refutation_storage.conflict;
+    self : Signature.public_key_hash;
+    conflict : Octez_smart_rollup.Game.conflict;
   }
 end
 
@@ -110,8 +109,8 @@ let init node_ctxt ~self ~conflict =
   let open Lwt_result_syntax in
   let*! () =
     Refutation_game_event.Player.started
-      conflict.Sc_rollup.Refutation_storage.other
-      conflict.Sc_rollup.Refutation_storage.our_commitment
+      conflict.Game.other
+      conflict.Game.our_commitment
   in
   let worker_promise, worker_waker = Lwt.task () in
   let* worker =
@@ -131,10 +130,6 @@ let init node_ctxt ~self ~conflict =
   in
   Lwt.return worker
 
-(* Number of levels the player waits until trying to play
-   for a game state it already played for. *)
-let buffer_levels = 5l
-
 (* Play if:
     - There's a new game state to play against or
     - The current level is past the buffer for re-playing in the
@@ -144,19 +139,17 @@ let should_move ~level game last_move_cache =
   match last_move_cache with
   | None -> true
   | Some (last_move_game_state, last_move_level) ->
-      (not
-         (Sc_rollup.Game.game_state_equal
-            game.Sc_rollup.Game.game_state
-            last_move_game_state))
-      || Int32.(sub level last_move_level > buffer_levels)
+      (not (Game.game_state_equal game.Game.game_state last_move_game_state))
+      || Int32.(
+           sub level last_move_level
+           > of_int Configuration.refutation_player_buffer_levels)
 
 let play w game ~(level : int32) =
   let open Lwt_syntax in
   let state = Worker.state w in
   if should_move ~level game state.last_move_cache then (
     let* pushed = Worker.Queue.push_request w (Request.Play game) in
-    if pushed then
-      state.last_move_cache <- Some (game.Sc_rollup.Game.game_state, level) ;
+    if pushed then state.last_move_cache <- Some (game.Game.game_state, level) ;
     return_unit)
   else return_unit
 
