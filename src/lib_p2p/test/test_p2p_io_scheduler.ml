@@ -39,21 +39,19 @@ end)
 exception Error of error list
 
 let rec listen ?port addr =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let tentative_port = match port with None -> 0 | Some port -> port in
-  let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
-  let main_socket = Lwt_unix.(socket ~cloexec:true PF_INET6 SOCK_STREAM 0) in
-  Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-  Lwt.catch
-    (fun () ->
-      let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port)) in
-      Lwt_unix.listen main_socket 50 ;
-      return (main_socket, tentative_port))
-    (function
-      | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
-        when port = None ->
-          listen addr
-      | exn -> Lwt.fail exn)
+  let*! sock =
+    P2p_fd.create_listening_socket ~backlog:50 ~addr tentative_port
+  in
+  match sock with
+  | Ok sock -> return (sock, tentative_port)
+  | Error
+      (P2p_fd.Failed_to_open_listening_socket
+         {reason = Unix.EADDRINUSE | Unix.EADDRNOTAVAIL; _}
+      :: _) ->
+      listen ?port addr
+  | Error err -> Lwt.return_error err
 
 let accept main_socket =
   let open Lwt_syntax in
@@ -195,25 +193,20 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
 *)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
-  let open Lwt_syntax in
-  let* () = Tezos_base_unix.Internal_event_unix.init () in
+  let open Lwt_result_syntax in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let* main_socket, port = listen ?port addr in
   let* server_node =
-    let* r =
-      Process.detach
-        ~prefix:"server: "
-        (fun (_ : (unit, unit) Process.Channel.t) ->
-          server
-            ?display_client_stat
-            ?max_download_speed
-            ~read_buffer_size
-            ?read_queue_size
-            main_socket
-            n)
-    in
-    match r with
-    | Error err -> Lwt.fail (Error err)
-    | Ok node -> Lwt.return node
+    Process.detach
+      ~prefix:"server: "
+      (fun (_ : (unit, unit) Process.Channel.t) ->
+        server
+          ?display_client_stat
+          ?max_download_speed
+          ~read_buffer_size
+          ?read_queue_size
+          main_socket
+          n)
   in
 
   let client n =
@@ -221,7 +214,9 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
     Process.detach ~prefix (fun (_ : (unit, unit) Process.Channel.t) ->
         let* () =
           Lwt.catch
-            (fun () -> Lwt_unix.close main_socket)
+            (fun () ->
+              let*! () = Lwt_unix.close main_socket in
+              return_unit)
             (function
               (* the connection was already closed *)
               | Unix.Unix_error (EBADF, _, _) -> return_unit
@@ -229,10 +224,8 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  let* r = List.map_es client (1 -- n) in
-  match r with
-  | Error err -> Lwt.fail (Error err)
-  | Ok client_nodes -> Process.wait_all (server_node :: client_nodes)
+  let* client_nodes = List.map_es client (1 -- n) in
+  Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 
