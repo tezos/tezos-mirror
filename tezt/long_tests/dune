@@ -3,7 +3,7 @@
  (libraries tezt
             octez-libs.tezt-tezos
             tezt-performance-regression
-            tezos-lwt-result-stdlib
+            octez-libs.tezos-lwt-result-stdlib
             tezos-alpha-test-helpers
             octez-libs.tezos-micheline
             tezos-openapi
