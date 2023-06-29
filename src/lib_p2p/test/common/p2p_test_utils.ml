@@ -257,7 +257,7 @@ let accept ?(id = id1) ?(proof_of_work_target = proof_of_work_target) sched
 
 let raw_connect sched addr port =
   let open Lwt_result_syntax in
-  let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  let*! fd = P2p_fd.socket () in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   let* () = P2p_fd.connect fd uaddr in
   let fd = P2p_io_scheduler.register sched fd in

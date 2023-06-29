@@ -84,7 +84,7 @@ let test_correct_incoming_connection_number =
       (`Make_default_pool ())
       (`Dependencies dependencies)
   in
-  let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
+  let*! fd = P2p_fd.socket () in
   Alcotest.(
     check'
       int

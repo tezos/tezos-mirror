@@ -54,6 +54,17 @@ type close_reason =
   | `Unexpected_error of exn
   | `Unexpected_error_when_closing of exn * exn ]
 
+(** Type describing an opening failure for the listening socket. *)
+type listening_socket_open_failure = {
+  reason : Unix.error;  (** The error we are re-raising *)
+  address : P2p_addr.t;  (** The interface we are trying to listen to *)
+  port : int;  (** The port we are trying to listen to *)
+}
+
+(** Type of an error in case of the listening
+    socket fails to open. *)
+type error += Failed_to_open_listening_socket of listening_socket_open_failure
+
 val pp_close_reason : Format.formatter -> close_reason -> unit
 
 (** [id t] returns a unique, positive, identifier for t. Identifiers
@@ -79,7 +90,23 @@ val close : t -> (unit, [`Unexpected_error of exn]) result Lwt.t
 val write : t -> Bytes.t -> (unit, close_reason) result Lwt.t
 
 (** Returns a fresh fd. This call always succeed. *)
-val socket : Lwt_unix.socket_domain -> Lwt_unix.socket_type -> int -> t Lwt.t
+val socket : unit -> t Lwt.t
+
+(** [create_listening_socket ?reuse_port ~backlog ?addr port] creates
+    a socket that listens on [addr] or [Ipaddr.V6.unspecified] if
+    [addr] is not provided and on [port].
+
+   [reuse_port] is used to set Unix socket option [SO_REUSEPORT]. If
+   [reuse_port] is not provided this option is set to false.
+   [SO_REUSEADDR] is set to true.
+
+   [backlog] set the maximum number of pending connections. *)
+val create_listening_socket :
+  ?reuse_port:bool ->
+  backlog:int ->
+  ?addr:Ipaddr.V6.t ->
+  int ->
+  Lwt_unix.file_descr tzresult Lwt.t
 
 (** [connect fd addr] connect [fd] to [addr]. *)
 val connect :
