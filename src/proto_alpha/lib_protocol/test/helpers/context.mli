@@ -71,6 +71,9 @@ val get_endorsing_power_for_delegate :
 val get_cumulated_endorsing_power_for_delegate :
   t -> levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
 
+val get_current_voting_power :
+  t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
+
 val get_voting_power :
   t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
 

@@ -168,6 +168,8 @@ let get_cumulated_endorsing_power_for_delegate ctxt ~levels pkh =
     0
     levels
 
+let get_current_voting_power = Delegate_services.current_voting_power rpc_ctxt
+
 let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
