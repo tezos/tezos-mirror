@@ -3,6 +3,9 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
+use primitive_types::{H160, U256};
+use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
@@ -12,7 +15,10 @@ use crate::parsing::{
     Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
 };
 use crate::simulation;
-use crate::storage::{read_kernel_upgrade_nonce, store_last_info_per_level_timestamp};
+use crate::storage::{
+    get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
+    store_last_info_per_level_timestamp,
+};
 
 use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
 use crate::upgrade::check_dictator_signature;
@@ -21,9 +27,22 @@ use crate::Error;
 use tezos_ethereum::transaction::TransactionHash;
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Deposit {
+    pub amount: U256,
+    pub gas_price: U256,
+    pub receiver: H160,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TransactionContent {
+    Ethereum(EthereumTransactionCommon),
+    Deposit(Deposit),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub tx_hash: TransactionHash,
-    pub tx: EthereumTransactionCommon,
+    pub content: TransactionContent,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -41,11 +60,17 @@ pub struct InboxContent {
 pub fn read_input<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
 
     match input {
-        Some(input) => Ok(InputResult::parse(input, smart_rollup_address)),
+        Some(input) => Ok(InputResult::parse(
+            host,
+            input,
+            smart_rollup_address,
+            ticketer,
+        )),
         None => Ok(InputResult::NoInput),
     }
 }
@@ -68,7 +93,8 @@ fn handle_transaction_chunk<Host: Runtime>(
     if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
     {
         if let Ok(tx) = EthereumTransactionCommon::from_rlp_bytes(&data) {
-            return Ok(Some(Transaction { tx_hash, tx }));
+            let content = TransactionContent::Ethereum(tx);
+            return Ok(Some(Transaction { tx_hash, content }));
         }
     }
     Ok(None)
@@ -93,16 +119,46 @@ fn handle_kernel_upgrade<Host: Runtime>(
     }
 }
 
+fn handle_deposit<Host: Runtime>(
+    host: &mut Host,
+    deposit: Deposit,
+) -> Result<Transaction, Error> {
+    let deposit_nonce = get_and_increment_deposit_nonce(host)?;
+
+    let mut buffer_amount = [0; 32];
+    deposit.amount.to_little_endian(&mut buffer_amount);
+    let mut buffer_gas_price = [0; 32];
+    deposit.gas_price.to_little_endian(&mut buffer_gas_price);
+
+    let mut to_hash = vec![];
+    to_hash.extend_from_slice(&buffer_amount);
+    to_hash.extend_from_slice(&buffer_gas_price);
+    to_hash.extend_from_slice(&deposit.receiver.to_fixed_bytes());
+    to_hash.extend_from_slice(&deposit_nonce.to_le_bytes());
+
+    let kec = Keccak256::digest(to_hash);
+    let tx_hash = kec
+        .as_slice()
+        .try_into()
+        .map_err(|_| Error::InvalidConversion)?;
+
+    Ok(Transaction {
+        tx_hash,
+        content: TransactionContent::Deposit(deposit),
+    })
+}
+
 pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
+    ticketer: Option<ContractKt1Hash>,
 ) -> Result<InboxContent, Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
     };
     loop {
-        match read_input(host, smart_rollup_address)? {
+        match read_input(host, smart_rollup_address, &ticketer)? {
             InputResult::NoInput => {
                 return Ok(res);
             }
@@ -142,6 +198,9 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::Input(Input::Info(info)) => {
                 store_last_info_per_level_timestamp(host, info.predecessor_timestamp)?;
             }
+            InputResult::Input(Input::Deposit(deposit)) => {
+                res.transactions.push(handle_deposit(host, deposit)?)
+            }
         }
     }
 }
@@ -149,6 +208,7 @@ pub fn read_inbox<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inbox::TransactionContent::Ethereum;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_mock::MockHost;
@@ -166,7 +226,13 @@ mod tests {
                 // Simple transaction tag
                 buffer.push(0);
                 buffer.extend_from_slice(&tx.tx_hash);
-                let mut tx_bytes = tx.tx.into();
+                let mut tx_bytes = match tx.content {
+                    Ethereum(tx) => tx.into(),
+                    _ => panic!(
+                        "Simple transaction can contain only ethereum transactions"
+                    ),
+                };
+
                 buffer.append(&mut tx_bytes)
             }
             Input::NewChunkedTransaction {
@@ -232,7 +298,7 @@ mod tests {
             EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
         let input = Input::SimpleTransaction(Box::new(Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx: tx.clone(),
+            content: Ethereum(tx.clone()),
         }));
 
         host.add_external(Bytes::from(input_to_bytes(
@@ -240,10 +306,11 @@ mod tests {
             input,
         )));
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx,
+            content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
@@ -264,10 +331,11 @@ mod tests {
             )))
         }
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
-            tx,
+            content: Ethereum(tx),
         }];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
@@ -298,7 +366,8 @@ mod tests {
             input,
         )));
 
-        let inbox_content = read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }

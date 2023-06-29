@@ -4,10 +4,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::ApplicableTransaction;
-use crate::inbox::{read_inbox, KernelUpgrade, Transaction};
+use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
 use crate::Error;
 use primitive_types::U256;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 /// The blueprint of a block is a list of transactions.
@@ -43,7 +43,12 @@ fn filter_invalid_chain_id(
 ) -> Vec<Transaction> {
     transactions
         .into_iter()
-        .filter(|transaction| U256::eq(&transaction.tx.chain_id(), &chain_id))
+        .filter(|transaction| match &transaction.content {
+            TransactionContent::Deposit(_) => true,
+            TransactionContent::Ethereum(transaction) => {
+                U256::eq(&transaction.chain_id, &chain_id)
+            }
+        })
         .collect()
 }
 
@@ -51,8 +56,9 @@ pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_id: U256,
+    ticketer: Option<ContractKt1Hash>,
 ) -> Result<Queue, Error> {
-    let inbox_content = read_inbox(host, smart_rollup_address)?;
+    let inbox_content = read_inbox(host, smart_rollup_address, ticketer)?;
     let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
     let blueprint = Blueprint { transactions };
     Ok(Queue {
@@ -64,6 +70,7 @@ pub fn fetch<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, H256, U256};
     use tezos_ethereum::{
         signatures::EthereumTransactionCommon, transaction::TRANSACTION_HASH_SIZE,
@@ -93,14 +100,14 @@ mod tests {
 
         let valid_transaction = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
-            tx: tx.clone(),
+            content: Ethereum(tx.clone()),
         };
         let invalid_transaction = Transaction {
             tx_hash: [1; TRANSACTION_HASH_SIZE],
-            tx: EthereumTransactionCommon {
+            content: Ethereum(EthereumTransactionCommon {
                 chain_id: U256::from(1312321),
                 ..tx
-            },
+            }),
         };
 
         let filtered_transactions = filter_invalid_chain_id(

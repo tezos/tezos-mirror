@@ -1,0 +1,5 @@
+instructions:
+  - set:
+      # KT1DXADSWXucAJ6PujZeUSK9brpToFtC9fz6
+      value: 4b5431445841445357587563414a3650756a5a6555534b39627270546f46744339667a36
+      to: /evm/ticketer

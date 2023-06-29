@@ -5,14 +5,19 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inbox::{KernelUpgrade, Transaction};
+use crate::inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent};
+use primitive_types::{H160, U256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
+    wei::eth_from_mutez,
 };
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_debug::{debug_msg, Runtime};
 use tezos_smart_rollup_encoding::{
-    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage},
-    michelson::MichelsonUnit,
+    contract::Contract,
+    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer},
+    michelson::{ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonPair},
 };
 use tezos_smart_rollup_host::input::Message;
 
@@ -64,6 +69,7 @@ pub const UPGRADE_NONCE_SIZE: usize = 2;
 #[derive(Debug, PartialEq)]
 pub enum Input {
     SimpleTransaction(Box<Transaction>),
+    Deposit(Deposit),
     Upgrade(KernelUpgrade),
     NewChunkedTransaction {
         tx_hash: TransactionHash,
@@ -89,6 +95,8 @@ pub enum InputResult {
     Unparsable,
 }
 
+type RollupType = MichelsonPair<MichelsonPair<MichelsonBytes, UnitTicket>, MichelsonInt>;
+
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
@@ -97,7 +105,7 @@ impl InputResult {
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
         InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
             tx_hash,
-            tx,
+            content: TransactionContent::Ethereum(tx),
         })))
     }
 
@@ -186,20 +194,99 @@ impl InputResult {
         }
     }
 
-    pub fn parse(input: Message, smart_rollup_address: [u8; 20]) -> Self {
+    fn parse_deposit<Host: Runtime>(
+        host: &mut Host,
+        transfer: Transfer<RollupType>,
+        smart_rollup_address: &[u8],
+        ticketer: &ContractKt1Hash,
+    ) -> Self {
+        if transfer.destination.hash().0 != smart_rollup_address {
+            debug_msg!(
+                host,
+                "Deposit ignored because of different smart rollup address\n"
+            );
+            return InputResult::Unparsable;
+        }
+
+        let ticket = transfer.payload.0 .1;
+
+        match &ticket.creator().0 {
+            Contract::Originated(kt1) if kt1 == ticketer => (),
+            _ => {
+                debug_msg!(host, "Deposit ignored because of different ticketer\n");
+                return InputResult::Unparsable;
+            }
+        };
+
+        // Amount
+        let (_sign, amount_bytes) = ticket.amount().to_bytes_le();
+        // We use the `U256::from_little_endian` as it takes arbitrary long
+        // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
+        // obviously safe as we deposit CTEZ and the amount is limited by
+        // the XTZ quantity.
+        let amount: u64 = U256::from_little_endian(&amount_bytes).as_u64();
+        let amount: U256 = eth_from_mutez(amount);
+
+        // Amount for gas
+        let gas_price: MichelsonInt = transfer.payload.1;
+        let (_sign, gas_price_bytes) = gas_price.0 .0.to_bytes_le();
+        let gas_price: U256 = U256::from_little_endian(&gas_price_bytes);
+
+        // EVM address
+        let receiver_bytes: Vec<u8> = transfer.payload.0 .0 .0;
+        if receiver_bytes.len() != std::mem::size_of::<H160>() {
+            debug_msg!(
+                host,
+                "Deposit ignored because of invalid receiver address\n"
+            );
+            return InputResult::Unparsable;
+        }
+        let receiver = H160::from_slice(&receiver_bytes);
+
+        let content = Deposit {
+            amount,
+            gas_price,
+            receiver,
+        };
+        debug_msg!(
+            host,
+            "Deposit of {} to {} with gas price {}\n",
+            amount,
+            receiver,
+            gas_price
+        );
+        Self::Input(Input::Deposit(content))
+    }
+
+    pub fn parse<Host: Runtime>(
+        host: &mut Host,
+        input: Message,
+        smart_rollup_address: [u8; 20],
+        l1_bridge: &Option<ContractKt1Hash>,
+    ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
         if *input_tag == SIMULATION_TAG {
             return Self::parse_simulation(remaining);
         };
 
-        match InboxMessage::<MichelsonUnit>::parse(bytes) {
+        match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
                     Self::parse_external(message, &smart_rollup_address)
                 }
                 InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(info)) => {
                     InputResult::Input(Input::Info(info))
+                }
+                InboxMessage::Internal(InternalInboxMessage::Transfer(transfer))
+                    if l1_bridge.is_some() =>
+                {
+                    Self::parse_deposit(
+                        host,
+                        transfer,
+                        &smart_rollup_address,
+                        l1_bridge.as_ref().unwrap(),
+                    )
                 }
                 InboxMessage::Internal(_) => InputResult::Unparsable,
             },
@@ -212,14 +299,17 @@ impl InputResult {
 mod tests {
     use super::*;
     use tezos_smart_rollup_host::input::Message;
+    use tezos_smart_rollup_mock::MockHost;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn parse_unparsable_transaction() {
+        let mut host = MockHost::default();
+
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
-            InputResult::parse(message, ZERO_SMART_ROLLUP_ADDRESS),
+            InputResult::parse(&mut host, message, ZERO_SMART_ROLLUP_ADDRESS, &None),
             InputResult::Unparsable
         )
     }

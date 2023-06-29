@@ -6,6 +6,7 @@
 use crate::indexable_storage::IndexableStorage;
 use evm_execution::account_storage::EthereumAccount;
 use hex::ToHex;
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -26,6 +27,10 @@ use primitive_types::{H160, H256, U256};
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
+
+const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
+// Size of the ticketer contract, it is encoded in base58.
+const TICKETER_SIZE: usize = 36;
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
@@ -55,6 +60,7 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
 
 pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce");
+pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where Ethereum accounts are stored
 const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/evm/indexes/accounts");
@@ -666,6 +672,32 @@ pub fn index_account(
         index.push_value(host, address.as_bytes())?;
         account.set_indexed(host).map_err(Error::from)
     }
+}
+
+/// Reads the ticketer address set by the installer, if any, encoded in b58.
+pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    let mut buffer = [0; 36];
+    store_read_slice(host, &TICKETER, &mut buffer, 36).ok()?;
+    let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
+    ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+pub fn get_and_increment_deposit_nonce<Host: Runtime>(
+    host: &mut Host,
+) -> Result<u32, Error> {
+    let current_nonce = || -> Option<u32> {
+        let bytes = host.store_read_all(&DEPOSIT_NONCE).ok()?;
+        let slice_of_bytes: [u8; 4] = bytes[..]
+            .try_into()
+            .map_err(|_| Error::InvalidConversion)
+            .ok()?;
+        Some(u32::from_le_bytes(slice_of_bytes))
+    };
+
+    let nonce = current_nonce().unwrap_or(0u32);
+    let new_nonce = nonce + 1;
+    host.store_write_all(&DEPOSIT_NONCE, &new_nonce.to_le_bytes())?;
+    Ok(nonce)
 }
 
 pub(crate) mod internal_for_tests {

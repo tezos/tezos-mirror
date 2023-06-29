@@ -7,8 +7,10 @@
 use primitive_types::U256;
 use storage::{
     read_chain_id, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, store_chain_id, store_kernel_upgrade_nonce,
+    read_last_info_per_level_timestamp_stats, read_ticketer, store_chain_id,
+    store_kernel_upgrade_nonce,
 };
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -59,8 +61,17 @@ pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_id: U256,
+    ticketer: Option<ContractKt1Hash>,
 ) -> Result<Queue, Error> {
-    let queue = fetch(host, smart_rollup_address, chain_id)?;
+    match &ticketer {
+        Some(ref ticketer) => debug_msg!(host, "Ticketer is {}\n", ticketer),
+        None => debug_msg!(
+            host,
+            "Ticketer not specified, the kernel ignores internal transfers"
+        ),
+    }
+
+    let queue = fetch(host, smart_rollup_address, chain_id, ticketer)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
         debug_msg!(
@@ -146,9 +157,11 @@ fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
     let chain_id = retrieve_chain_id(host)?;
+    let ticketer = read_ticketer(host);
+
     genesis_initialisation(host)?;
 
-    let queue = stage_one(host, smart_rollup_address, chain_id)?;
+    let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)?;
 
     stage_two(host, queue)
 }
