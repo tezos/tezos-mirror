@@ -985,7 +985,7 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-let get_headers_succeeds expected_status response =
+let get_headers_succeeds ~__LOC__ expected_status response =
   let headers =
     JSON.(
       parse ~origin:"get_headers_succeeds" response.RPC_core.body
@@ -994,10 +994,11 @@ let get_headers_succeeds expected_status response =
   List.iter
     (fun header ->
       Check.(header.Rollup.Dal.RPC.status = expected_status)
+        ~__LOC__
         Check.string
         ~error_msg:
-          "The value of the fetched status should match the expected \
-           one(current = %L, expected = %R)")
+          "The value of the fetched status should match the expected one \
+           (current = %L, expected = %R)")
     headers
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
@@ -1025,6 +1026,14 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     (* The slot headers are not yet in a block. *)
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
+
+  (* slot2_a and slot3 will not be included as successful, because slot2_b has
+     better fees for slot 4, while slot3's fee is too low. slot4 is not injected
+     into L1 or DAL nodes.
+
+     We decide to have two failed slots instead of just one to better test some
+     internal aspects of failed slots headers recording (i.e. having a collection
+     of data instead of just one). *)
   let* slot2_a = publish Constant.bootstrap3 ~index:4 ~fee:1_200 "test4_a" in
   let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:1_350 "test4_b" in
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
@@ -1035,33 +1044,51 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
     return (6, commit)
   in
-  (* Just after injecting slots and before baking, all slots have status
-     "Unseen". *)
+
+  Log.info
+    "Just after injecting slots and before baking, there are 6 headers, all \
+     with status Unseen" ;
   let* () =
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds "unseen")
+      (get_headers_succeeds ~__LOC__ "unseen")
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
   let* () =
     (* The slot headers are still not yet in a block. *)
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  (* slot2_a and slot3 will not be included as successfull, slot2_b has better
-     fees for slot 4. While slot3's fee is too low. slot4 is not injected
-     into L1 or Dal nodes.
 
-     We decide to have two failed slots instead of just one to better test some
-     internal aspects of failed slots headers recoding (i.e. having a collection
-     of data instead of just one). *)
-  let wait_block_processing =
+  let wait_block_processing1 =
     wait_for_layer1_block_processing dal_node pub_level
   in
   let* () = Client.bake_for_and_wait client in
-  let* _pub_level = Node.wait_for_level node pub_level in
-  let* () = wait_block_processing in
+  let* () = wait_block_processing1 in
 
+  Log.info
+    "After baking one block, the status is still Unseen, because the block is \
+     not final" ;
+  let* () =
+    check_get_commitment_headers
+      dal_node
+      ~slot_level:level
+      (get_headers_succeeds ~__LOC__ "unseen")
+      [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
+  in
+
+  let final_pub_level = pub_level + 1 in
+  let wait_block_processing2 =
+    wait_for_layer1_block_processing dal_node final_pub_level
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = wait_block_processing2 in
+
+  Log.info
+    "After baking one more block, the slots' status is as expected (eg for \
+     published slots it's Waiting_attestation)" ;
+  let ok = [slot0; slot1; slot2_b] in
+  let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
     (* There are 4 published slots: slot0, slot1, slot2_a, and slot2_b *)
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
@@ -1079,7 +1106,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       slot_headers
     |> List.fast_sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
   in
-  Check.(slot_headers = [slot0; slot1; slot2_b])
+  Check.(slot_headers = ok)
     Check.(list (tuple2 int string))
     ~error_msg:
       "Published header is different from stored header (current = %L, \
@@ -1090,57 +1117,72 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let check_get_commitment =
     check_get_commitment dal_node ~slot_level:pub_level
   in
-  let ok = [slot0; slot1; slot2_b] in
-  let attested = [slot0; slot2_b] in
-  let unattested = [slot1] in
-  let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
 
   (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "waiting_attestation") ok
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "waiting_attestation")
+      ok
   in
   (* slot_2_a is not selected. *)
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "not_selected") [slot2_a]
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "not_selected")
+      [slot2_a]
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
 
-  (* Attest slots slot0 = (2, 0) and slot2_b = (2,4), bake and wait
-     two seconds so that the DAL node updates its state. *)
-  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let lag = parameters.attestation_lag in
-  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
+  Log.info
+    "Attest slots slot0 and slot2_b, and wait for the attestations to be final" ;
+  let attested = [slot0; slot2_b] in
+  let unattested = [slot1] in
+  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let* () = repeat (lag - 2) (fun () -> Client.bake_for_and_wait client) in
   let* _op_hash = dal_attestations ~nb_slots (List.map fst attested) client in
-  let* () = Client.bake_for_and_wait client in
-  let* () = Lwt_unix.sleep 2.0 in
+  let wait_block_processing3 =
+    let final_attested_level = final_pub_level + lag in
+    wait_for_layer1_block_processing dal_node final_attested_level
+  in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
+  let* () = wait_block_processing3 in
 
   let* () =
     (* The number of published slots has not changed *)
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
   in
 
-  (* Slot confirmed. *)
+  Log.info "Check that the store is as expected" ;
+  (* Slots confirmed. *)
   let* () = check_get_commitment get_commitment_succeeds ok in
   (* Slot that were waiting for attestation and now attested. *)
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "attested") attested
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "attested")
+      attested
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
   (* Slot that were waiting for attestation and now unattested. *)
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "unattested") unattested
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "unattested")
+      unattested
   in
   (* slot_2_a is still not selected. *)
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "not_selected") [slot2_a]
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "not_selected")
+      [slot2_a]
   in
   (* slot_3 never finished in an L1 block, so the DAL node only saw it as
      Unseen. *)
   let* () =
-    check_get_commitment_headers (get_headers_succeeds "unseen") [slot3]
+    check_get_commitment_headers
+      (get_headers_succeeds ~__LOC__ "unseen")
+      [slot3]
   in
   (* slot_4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
