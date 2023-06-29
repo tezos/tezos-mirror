@@ -2195,7 +2195,7 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
 
    The parameter [beforehand_slot_injection] (whose value should be at least
    one) allows, for a published level, to inject the slots an amount of blocks
-   ahead, In other terms, we have:
+   ahead. In other terms, we have:
 
    [published level = injection level + beforehand_slot_injection]
 
@@ -2399,6 +2399,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   in
   let end_dal_slots_level = start_dal_slots_level + number_of_dal_slots - 1 in
 
+  (* start_dal = 4, end_dal = 5 *)
   Log.info
     "[e2e.start_slot_producer] from level %d to level %d@."
     start_dal_slots_level
@@ -2417,16 +2418,16 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
       l1_client
   in
 
-  (* Wait until the last published slot is included and attested. *)
+  (* Wait until the last published slot is included and attested in a final block. *)
   let* _lvl =
     Node.wait_for_level
       l1_node
-      (end_dal_slots_level + attestation_lag + beforehand_slot_injection)
+      (end_dal_slots_level + attestation_lag + beforehand_slot_injection + 1)
   in
 
   Log.info
     "[e2e.sum_and_store] send an inbox messsage to the PVM to sum the received \
-     payloads are store the result in a 'value' variable@." ;
+     payloads, and store the result in a 'value' variable@." ;
   let* () =
     let level = Node.get_level l1_node in
     (* We send instructions "+...+ value" to the PVM of [number_of_dal_slots -
@@ -2474,7 +2475,7 @@ let e2e_tests =
   let test1 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 1;
+      attestation_lag = 2;
       block_delay = 6;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
@@ -2494,7 +2495,7 @@ let e2e_tests =
   let mainnet1 =
     {
       constants = Protocol.Constants_mainnet;
-      attestation_lag = 1;
+      attestation_lag = 2;
       block_delay = 15;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
