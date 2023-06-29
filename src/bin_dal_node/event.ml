@@ -173,3 +173,13 @@ let message_validation_error =
     ~pp1:Gossipsub.Worker.GS.Message_id.pp
     ("message_id", Gossipsub.message_id_encoding)
     ("validation_error", Data_encoding.string)
+
+let starting_metrics_server =
+  let open Internal_event.Simple in
+  declare_2
+    ~section
+    ~name:"starting_metrics_server"
+    ~msg:"starting metrics server on {host}:{port}"
+    ~level:Notice
+    ("host", Data_encoding.string)
+    ("port", Data_encoding.uint16)

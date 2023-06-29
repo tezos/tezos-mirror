@@ -72,3 +72,6 @@ val loading_shard_data_failed : string t
 
 (** Validating a message received via Gossipsub/P2P failed. *)
 val message_validation_error : (Gossipsub.message_id * string) t
+
+(** Emitted when the metrics server starts *)
+val starting_metrics_server : (string * int) t

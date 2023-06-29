@@ -34,6 +34,7 @@ type t = {
   expected_pow : float;
   network_name : string;
   endpoint : Uri.t;
+  metrics_addr : P2p_point.Id.t;
   profile : Services.Types.profile option;
 }
 
@@ -61,6 +62,12 @@ let default_network_name = "dal-sandbox"
 
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
+let default_metrics_port =
+  Gossipsub.Transport_layer.Default_parameters.P2p_config.listening_port + 1
+
+let default_metrics_addr =
+  P2p_point.Id.of_string_exn ~default_port:default_metrics_port "127.0.0.1"
+
 let default =
   {
     data_dir = default_data_dir;
@@ -71,6 +78,7 @@ let default =
     expected_pow = default_expected_pow;
     network_name = default_network_name;
     endpoint = default_endpoint;
+    metrics_addr = default_metrics_addr;
     profile = None;
   }
 
@@ -107,6 +115,7 @@ let encoding : t Data_encoding.t =
            expected_pow;
            network_name;
            endpoint;
+           metrics_addr;
            profile;
          } ->
       ( data_dir,
@@ -117,6 +126,7 @@ let encoding : t Data_encoding.t =
         expected_pow,
         network_name,
         endpoint,
+        metrics_addr,
         profile ))
     (fun ( data_dir,
            rpc_addr,
@@ -126,6 +136,7 @@ let encoding : t Data_encoding.t =
            expected_pow,
            network_name,
            endpoint,
+           metrics_addr,
            profile ) ->
       {
         data_dir;
@@ -136,9 +147,10 @@ let encoding : t Data_encoding.t =
         expected_pow;
         network_name;
         endpoint;
+        metrics_addr;
         profile;
       })
-    (obj9
+    (obj10
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -179,6 +191,11 @@ let encoding : t Data_encoding.t =
           ~description:"The Tezos node endpoint"
           endpoint_encoding
           default_endpoint)
+       (dft
+          "metrics-addr"
+          ~description:"The point for the DAL node metrics server"
+          P2p_point.Id.encoding
+          default_metrics_addr)
        (dft
           "profile"
           ~description:"The Octez DAL node profile"

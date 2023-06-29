@@ -7302,6 +7302,7 @@ let _octez_dal_node =
          irmin_pack;
          irmin_pack_unix;
          irmin;
+         prometheus_app;
        ]
       @ protocol_deps)
     ~conflicts:[Conflicts.checkseum]

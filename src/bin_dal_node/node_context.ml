@@ -45,9 +45,10 @@ type t = {
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
+  metrics_server : Metrics.t;
 }
 
-let init config store gs_worker transport_layer cctxt =
+let init config store gs_worker transport_layer cctxt metrics_server =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -68,6 +69,7 @@ let init config store gs_worker transport_layer cctxt =
     gs_worker;
     transport_layer;
     profile_ctxt = Profile_manager.empty;
+    metrics_server;
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters activation_level =

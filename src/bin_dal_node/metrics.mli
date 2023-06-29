@@ -23,41 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type neighbor = {addr : string; port : int}
+(** Abstract representation of the metrics server. *)
+type t
 
-type t = {
-  data_dir : string;  (** The path to the DAL node data directory *)
-  rpc_addr : P2p_point.Id.t;  (** The address the DAL node listens to *)
-  neighbors : neighbor list;  (** List of neighbors to reach within the DAL *)
-  listen_addr : P2p_point.Id.t;
-      (** The TCP address and port at which this instance can be reached. *)
-  peers : string list;  (** A list of P2P peers to connect to at startup. *)
-  expected_pow : float;  (** Expected P2P identity's PoW. *)
-  network_name : string;
-      (** A string that identifies the network's name. E.g. dal-sandbox. *)
-  endpoint : Uri.t;  (** Endpoint of a Tezos node *)
-  metrics_addr : P2p_point.Id.t;
-      (** The metrics server used to export metrics *)
-  profile : Services.Types.profile option;
-      (** Profile allowing to know the topics of interest. *)
-}
-
-(** [default] is the default configuration. *)
-val default : t
-
-(** [store_path config] returns a path for the store *)
-val store_path : t -> string
-
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
-
-val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t
-
-(** [identity_file t] returns the absolute path to the "identity.json"
-    file of the DAL node, based on the configuration [t]. *)
-val identity_file : t -> string
-
-(** [peers_file data_dir] returns the absolute path to the
-    "peers.json" file of the DAL node, based on the configuration
-    [t]. *)
-val peers_file : t -> string
+(** [launch point] runs the metrics server on point [point] and
+    returns the handle. The server is automatically shutdown at
+    exit. *)
+val launch : P2p_point.Id.t -> t Lwt.t
