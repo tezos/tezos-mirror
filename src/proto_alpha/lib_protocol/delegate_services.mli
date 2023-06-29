@@ -131,6 +131,9 @@ val grace_period :
   Signature.Public_key_hash.t ->
   Cycle.t shell_tzresult Lwt.t
 
+val current_voting_power :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
 

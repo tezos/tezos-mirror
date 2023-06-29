@@ -371,6 +371,15 @@ module S = struct
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
 
+  let current_voting_power =
+    RPC_service.get_service
+      ~description:
+        "The voting power of a given delegate, as computed from its current \
+         stake."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int64
+      RPC_path.(path / "current_voting_power")
+
   let voting_power =
     RPC_service.get_service
       ~description:"The voting power in the vote listings for a given delegate."
@@ -528,6 +537,9 @@ let register () =
   register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.last_cycle_before_deactivation ctxt pkh) ;
+  register1 ~chunked:false S.current_voting_power (fun ctxt pkh () () ->
+      check_delegate_registered ctxt pkh >>=? fun () ->
+      Vote.get_current_voting_power_free ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Vote.get_voting_power_free ctxt pkh) ;
@@ -593,6 +605,9 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
+
+let current_voting_power ctxt block pkh =
+  RPC_context.make_call1 S.current_voting_power ctxt block pkh () ()
 
 let voting_info ctxt block pkh =
   RPC_context.make_call1 S.voting_info ctxt block pkh () ()
