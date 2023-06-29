@@ -36,6 +36,15 @@ type dal = {
 
 val dal_encoding : dal Data_encoding.t
 
+type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
+
+(** Associates reveal kinds to their activation level. *)
+type sc_rollup_reveal_activation_level = {
+  raw_data : sc_rollup_reveal_hashing_schemes;
+  metadata : Raw_level_repr.t;
+  dal_page : Raw_level_repr.t;
+}
+
 type sc_rollup = {
   enable : bool;
   arith_pvm_enable : bool;
@@ -75,6 +84,8 @@ type sc_rollup = {
   max_number_of_stored_cemented_commitments : int;
   (* The maximum number of parallel games played by a given staker. *)
   max_number_of_parallel_games : int;
+  (* Activation's block level of reveal kinds. *)
+  reveal_activation_level : sc_rollup_reveal_activation_level;
 }
 
 type zk_rollup = {

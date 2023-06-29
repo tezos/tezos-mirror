@@ -226,6 +226,12 @@ let constants_mainnet =
             mempool. *)
         max_number_of_stored_cemented_commitments = 5;
         max_number_of_parallel_games = 32;
+        reveal_activation_level =
+          {
+            raw_data = {blake2B = Raw_level.root};
+            metadata = Raw_level.root;
+            dal_page = Raw_level.root;
+          };
       };
     zk_rollup =
       {

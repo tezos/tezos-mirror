@@ -2143,7 +2143,7 @@ let dumb_proof ~choice =
   let* pvm_step =
     Arith_pvm.produce_proof
       context_arith_pvm
-      ~is_reveal_enabled:(fun _ _ -> true)
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
       (Some input)
       arith_state
     >|= Environment.wrap_tzresult
@@ -2429,14 +2429,18 @@ let make_arith_state ?(boot_sector = "") metadata =
 
   (* 1. We evaluate the boot sector. *)
   let* input_required =
-    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    Arith_pvm.is_input_state
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+      state
   in
   assert (input_required = Sc_rollup.No_input_required) ;
   let* state = Arith_pvm.eval state in
   let* state_hash2 = Arith_pvm.state_hash state in
   (* 2. The state now needs the metadata. *)
   let* input_required =
-    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    Arith_pvm.is_input_state
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+      state
   in
   assert (input_required = Sc_rollup.Needs_reveal Reveal_metadata) ;
   (* 3. We feed the state with the metadata. *)
@@ -2444,7 +2448,9 @@ let make_arith_state ?(boot_sector = "") metadata =
   let* state = Arith_pvm.set_input input state in
   let* state_hash3 = Arith_pvm.state_hash state in
   let* input_required =
-    Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    Arith_pvm.is_input_state
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+      state
   in
   assert (input_required = Sc_rollup.Initial) ;
 
@@ -2455,7 +2461,7 @@ let make_set_input_refutation context state input input_proof =
   let* proof =
     Arith_pvm.produce_proof
       context
-      ~is_reveal_enabled:(fun _ _ -> true)
+      ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
       (Some input)
       state
   in
@@ -2639,7 +2645,9 @@ let arith_state_before_reveal metadata hash =
   let*! state = Arith_pvm.set_input input state in
   let rec eval_until_needs_reveal state =
     let*! input_request =
-      Arith_pvm.is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+      Arith_pvm.is_input_state
+        ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
+        state
     in
     match input_request with
     | Needs_reveal _ -> return state

@@ -233,7 +233,21 @@ let reveal_encoding =
 
 (** [is_reveal_enabled] is the type of a predicate that tells if a kind of
      reveal is activated at a certain block level. *)
-type is_reveal_enabled = Raw_level_repr.t -> reveal -> bool
+type is_reveal_enabled = current_block_level:Raw_level_repr.t -> reveal -> bool
+
+let is_reveal_enabled_predicate
+    (t : Constants_parametric_repr.sc_rollup_reveal_activation_level) :
+    is_reveal_enabled =
+ fun ~current_block_level reveal ->
+  let activation_level =
+    match reveal with
+    | Reveal_raw_data h -> (
+        match Sc_rollup_reveal_hash.scheme_of_hash h with
+        | Blake2B -> t.raw_data.blake2B)
+    | Reveal_metadata -> t.metadata
+    | Request_dal_page _ -> t.dal_page
+  in
+  Raw_level_repr.(current_block_level >= activation_level)
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
