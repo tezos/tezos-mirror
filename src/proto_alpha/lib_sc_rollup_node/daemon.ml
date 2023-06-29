@@ -122,6 +122,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
          this head. *)
       let* ctxt, _num_messages, num_ticks, initial_tick =
         Interpreter.process_head
+          (module Rollup_node_plugin.Plugin)
           node_ctxt
           ctxt
           ~predecessor
@@ -440,7 +441,13 @@ module Internal_for_tests = struct
     in
     let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
     let* ctxt, _num_messages, num_ticks, initial_tick =
-      Interpreter.process_head node_ctxt ctxt ~predecessor head (inbox, messages)
+      Interpreter.process_head
+        (module Rollup_node_plugin.Plugin)
+        node_ctxt
+        ctxt
+        ~predecessor
+        head
+        (inbox, messages)
     in
     let*! context_hash = Context.commit ctxt in
     let* commitment_hash =

@@ -83,7 +83,16 @@ let get_previous_delayed_inbox_size node_ctxt (head : Layer1.head) =
       return (Context.empty node_ctxt.context)
     else Node_context.checkout_context node_ctxt previous_head.hash
   in
-  let* _ctxt, state = Interpreter.state_of_head node_ctxt ctxt previous_head in
+  let* _ctxt, state =
+    Interpreter.state_of_head
+      (module Rollup_node_plugin.Plugin)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5989
+         We use the alpha rollup node plugin here but this should depend on the
+         current protocol. *)
+      node_ctxt
+      ctxt
+      previous_head
+  in
   let open Kernel_durable in
   let*! pointer_bytes = Durable_state.lookup state Delayed_inbox_pointer.path in
   match pointer_bytes with

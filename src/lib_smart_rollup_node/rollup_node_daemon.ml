@@ -125,7 +125,8 @@ let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   (* Avoid triggering the pvm execution if this has been done before for
      this head. *)
   let* ctxt, _num_messages, num_ticks, initial_tick =
-    Plugin.Interpreter.process_head
+    Interpreter.process_head
+      (module Plugin)
       node_ctxt
       rollup_ctxt
       ~predecessor
@@ -435,7 +436,8 @@ module Internal_for_tests = struct
         messages
     in
     let* ctxt, _num_messages, num_ticks, initial_tick =
-      Plugin.Interpreter.process_head
+      Interpreter.process_head
+        (module Plugin)
         node_ctxt
         ctxt
         ~predecessor

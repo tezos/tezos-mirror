@@ -53,7 +53,6 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
   let inbox_level = Int32.succ level in
   let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt inbox_level in
-  let module Plugin = (val plugin) in
   let*? () =
     error_unless
       (level >= node_ctxt.Node_context.genesis_info.level)
@@ -67,7 +66,9 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
       return (Context.empty node_ctxt.context)
     else Node_context.checkout_context node_ctxt hash
   in
-  let* ctxt, state = Plugin.Interpreter.state_of_head node_ctxt ctxt head in
+  let* ctxt, state =
+    Interpreter.state_of_head (module (val plugin)) node_ctxt ctxt head
+  in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
   {
     ctxt;

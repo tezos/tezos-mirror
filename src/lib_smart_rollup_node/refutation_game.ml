@@ -93,6 +93,7 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
   let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
   let* dissection =
     Plugin.Refutation_game_helpers.make_dissection
+      (module Plugin)
       node_ctxt
       ~start_state
       ~start_chunk
@@ -133,7 +134,8 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
           | Evaluated ok_state, _ -> Some ok_state
         in
         let* our =
-          Plugin.Refutation_game_helpers.state_of_tick
+          Interpreter.state_of_tick
+            (module Plugin)
             node_ctxt
             ?start_state
             ~tick
@@ -181,7 +183,8 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt ~opponent
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
-      Plugin.Refutation_game_helpers.state_of_tick
+      Interpreter.state_of_tick
+        (module Plugin)
         node_ctxt
         ~tick:start_tick
         game.inbox_level
