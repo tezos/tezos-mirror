@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -76,6 +77,19 @@ val prepare_installer_kernel :
   ?config:Installer_kernel_config.t ->
   string ->
   string Lwt.t
+
+(** [prepare_installer_kernel ?runner ?base_installee ~preimages_dir 
+    ?display_root_hash ?config installee] will behave just as
+    {!Sc_rollup_helpers.prepare_installer_kernel} but will also output
+    the preimage root hash if [display_root_hash] is set to [true]. *)
+val prepare_installer_kernel_gen :
+  ?runner:Runner.t ->
+  ?base_installee:string ->
+  preimages_dir:string ->
+  ?display_root_hash:bool ->
+  ?config:Installer_kernel_config.t ->
+  string ->
+  (string * string option) Lwt.t
 
 (** [setup_l1 protocol] initializes a protocol with the given parameters, and
     returns the L1 node and client. *)
