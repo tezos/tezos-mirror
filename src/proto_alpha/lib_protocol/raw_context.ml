@@ -940,7 +940,7 @@ let prepare_first_block ~level ~timestamp ctxt =
           {
             feature_enable = c.dal.feature_enable;
             number_of_slots = c.dal.number_of_slots;
-            attestation_lag = c.dal.attestation_lag;
+            attestation_lag = 4;
             attestation_threshold = c.dal.attestation_threshold;
             blocks_per_epoch = c.dal.blocks_per_epoch;
             cryptobox_parameters;

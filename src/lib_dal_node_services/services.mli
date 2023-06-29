@@ -158,8 +158,8 @@ val get_commitment_proof :
   service
 
 (** Compute and save the shards of the slot associated to the given
-    commitment. If the input's flag is true, the proofs associated with each
-    given shards are also computed. *)
+    commitment. If the input's flag is true, the proofs associated with the
+    computed shards are also computed and stored in memory. *)
 val put_commitment_shards :
   < meth : [`PUT]
   ; input : Types.with_proof
