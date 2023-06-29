@@ -3070,7 +3070,9 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
     else unit
   in
 
-  (* We bake a block that includes [slot_header] operation. *)
+  (* We bake a block that includes a [slot_header] operation. And then another
+     block so that this operation is final. *)
+  let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
   let* () = Lwt.join waiter_publish_list
   and* () = waiter_receive_shards
