@@ -529,7 +529,6 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Refutation_coordinator.process stripped_head in
-  let* () = Components.Batcher.batch () in
   let* () = Components.Batcher.new_head stripped_head in
   let*! () = Injector.inject ~header:head.header () in
   let* () = exit_after_proto_migration node_ctxt head in

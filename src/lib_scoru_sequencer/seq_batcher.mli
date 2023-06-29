@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,4 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Octez_smart_rollup_node_alpha.Daemon_components.RPC_server_sig
+include Octez_smart_rollup_node_alpha.Daemon_components.Batcher_sig
+
+(** [register_messages messages] registers new L2 [messages] in the queue of the
+    batcher for future injection on L1. The messages are evaluated the batcher's incremental
+    simulation context. *)
+val register_messages : string list -> L2_message.hash list tzresult Lwt.t
+
+(** [get_simulated_state_value key] returns simulated value of durable storage *)
+val get_simulated_state_value : string -> bytes option tzresult Lwt.t
+
+(** [get_optimistic_state_subkeys key] returns simulated subkeys of durable storage *)
+val get_simulated_state_subkeys : string -> string list tzresult Lwt.t

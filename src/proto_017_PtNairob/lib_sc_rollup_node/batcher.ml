@@ -28,6 +28,10 @@ open Alpha_context
 open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
+module Batcher_events = Batcher_events.Declare (struct
+  let worker_name = "batcher"
+end)
+
 module L2_batched_message = struct
   type t = {content : string; l1_hash : Injector.Inj_operation.hash}
 end
@@ -146,8 +150,6 @@ let produce_batches state ~only_full =
         to_remove ;
       return_unit
 
-let on_batch state = produce_batches state ~only_full:false
-
 let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
   let*? ext_messages =
@@ -203,6 +205,8 @@ let on_register state (messages : string list) =
 
 let on_new_head state head =
   let open Lwt_result_syntax in
+  (* Produce batches first *)
+  let* () = produce_batches state ~only_full:false in
   let* simulation_ctxt =
     Simulation.start_simulation ~reveal_map:None state.node_ctxt head
   in
@@ -288,7 +292,6 @@ module Handlers = struct
     match request with
     | Request.Register messages ->
         protect @@ fun () -> on_register state messages
-    | Request.Batch -> protect @@ fun () -> on_batch state
     | Request.New_head head -> protect @@ fun () -> on_new_head state head
 
   type launch_error = error trace
@@ -310,16 +313,12 @@ module Handlers = struct
     in
     match r with
     | Request.Register _ -> emit_and_return_errors errs
-    | Request.Batch -> emit_and_return_errors errs
     | Request.New_head _ -> emit_and_return_errors errs
 
   let on_completion _w r _ st =
     match Request.view r with
     | Request.View (Register _ | New_head _) ->
         Batcher_events.(emit Worker.request_completed_debug) (Request.view r, st)
-    | View Batch ->
-        Batcher_events.(emit Worker.request_completed_notice)
-          (Request.view r, st)
 
   let on_no_request _ = Lwt.return_unit
 
@@ -378,15 +377,6 @@ let register_messages messages =
   Worker.Queue.push_request_and_wait w (Request.Register messages)
   |> handle_request_error
 
-let batch () =
-  let w = Lazy.force worker in
-  match w with
-  | Error _ ->
-      (* There is no batcher, nothing to do *)
-      return_unit
-  | Ok w ->
-      Worker.Queue.push_request_and_wait w Request.Batch |> handle_request_error
-
 let new_head b =
   let open Lwt_result_syntax in
   let w = Lazy.force worker in
@@ -395,10 +385,8 @@ let new_head b =
       (* There is no batcher, nothing to do *)
       return_unit
   | Ok w ->
-      let*! (_pushed : bool) =
-        Worker.Queue.push_request w (Request.New_head b)
-      in
-      return_unit
+      Worker.Queue.push_request_and_wait w (Request.New_head b)
+      |> handle_request_error
 
 let shutdown () =
   let w = Lazy.force worker in

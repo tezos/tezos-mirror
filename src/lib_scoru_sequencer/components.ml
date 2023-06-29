@@ -26,7 +26,7 @@
 
 module Sc_rollup_node = Octez_smart_rollup_node_alpha
 
-module Daemon_components = struct
-  module Batcher = Sc_rollup_node.Batcher
-  module RPC_server = Sc_rollup_node.RPC_server
+module Daemon_components : Sc_rollup_node.Daemon_components.S = struct
+  module Batcher = Seq_batcher
+  module RPC_server = Rpc_server
 end

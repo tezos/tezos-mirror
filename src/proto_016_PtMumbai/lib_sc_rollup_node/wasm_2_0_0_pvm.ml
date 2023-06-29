@@ -123,13 +123,10 @@ module Make_durable_state
     Tezos_scoru_wasm.Durable.list durable key
 end
 
-module type S = sig
-  module Durable_state : Durable_state with type state = Context.tree
+module Durable_state =
+  Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
-  include Pvm.S
-end
-
-module Impl : S = struct
+module Impl : Pvm.S = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
@@ -139,8 +136,6 @@ module Impl : S = struct
   let new_dissection = Game_helpers.Wasm.new_dissection
 
   module State = Context.PVMState
-  module Durable_state =
-    Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
   module Inspect_durable_state = struct
     let lookup state keys =
