@@ -250,7 +250,11 @@ let test_invalid_serialized_inbox_proof () =
      [First_after]. *)
   let*! state = Arith_pvm.eval state in
   let*! pvm_step =
-    Arith_pvm.produce_proof ctxt ~is_reveal_enabled:(fun _ _ -> true) None state
+    Arith_pvm.produce_proof
+      ctxt
+      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+      None
+      state
   in
   let pvm_step = WithExceptions.Result.get_ok ~loc:__LOC__ pvm_step in
 
@@ -278,7 +282,7 @@ let test_invalid_serialized_inbox_proof () =
          dal_snapshot
          dal_parameters.cryptobox_parameters
          ~dal_attestation_lag:dal_parameters.attestation_lag
-         ~is_reveal_enabled:(fun _ _ -> true)
+         ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
          proof
   in
   Assert.proto_error

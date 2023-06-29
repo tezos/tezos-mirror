@@ -98,7 +98,7 @@ let check_proof_size ~current_tick ~proof_size_limit context input_opt s =
   let* proof =
     Prover.produce_proof
       context
-      ~is_reveal_enabled:(fun _ _ -> true)
+      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
       input_opt
       s
   in

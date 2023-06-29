@@ -302,8 +302,8 @@ module V2_0_0 = struct
          to upgrade the kernel to fix the off-by-one. *)
       let try_return_reveal candidate =
         match last_read with
-        | Some (current_level, _) ->
-            let is_enabled = is_reveal_enabled current_level candidate in
+        | Some (current_block_level, _) ->
+            let is_enabled = is_reveal_enabled ~current_block_level candidate in
             if is_enabled then Waiting_for_reveal candidate
             else Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash)
         | None -> Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash)

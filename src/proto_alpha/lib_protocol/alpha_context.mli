@@ -2890,7 +2890,7 @@ module Sc_rollup : sig
     | Reveal_metadata
     | Request_dal_page of Dal.Page.t
 
-  type is_reveal_enabled = Raw_level.t -> reveal -> bool
+  type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
 
   val is_reveal_enabled_predicate :
     Constants.Parametric.sc_rollup_reveal_activation_level -> is_reveal_enabled

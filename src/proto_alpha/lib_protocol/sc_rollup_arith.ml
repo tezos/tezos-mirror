@@ -992,16 +992,16 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
   let get_status ~is_reveal_enabled : status Monad.t =
     let open Monad.Syntax in
     let* status = Status.get in
-    let* level = Current_level.get in
+    let* current_block_level = Current_level.get in
     (* We do not put the machine in a stuck condition if a kind of reveal
        happens to not be supported. This is a sensible thing to do, as if
        there is an off-by-one error in the WASM kernel one can do an
        incorrect reveal, which can put the PVM in a stuck state with no way
        to upgrade the kernel to fix the off-by-one. *)
     let try_return_reveal candidate : status =
-      match (level, candidate) with
+      match (current_block_level, candidate) with
       | _, Waiting_for_reveal candidate ->
-          let is_enabled = is_reveal_enabled level candidate in
+          let is_enabled = is_reveal_enabled ~current_block_level candidate in
           if is_enabled then Waiting_for_reveal candidate
           else
             Waiting_for_reveal

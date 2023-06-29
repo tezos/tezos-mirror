@@ -130,7 +130,8 @@ let boot boot_sector f =
 let test_boot () =
   let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
-  is_input_state ~is_reveal_enabled:(fun _ _ -> true) state >>= function
+  is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
+  >>= function
   | Needs_reveal Reveal_metadata -> return ()
   | Initial | Needs_reveal _ | First_after _ ->
       failwith "After booting, the machine should be waiting for the metadata."
@@ -151,7 +152,9 @@ let test_metadata () =
   let input = Reveal (Metadata metadata) in
   let*! state = set_input input state in
   let*! input_request =
-    is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+    is_input_state
+      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+      state
   in
   match input_request with
   | Initial -> return ()
@@ -166,13 +169,15 @@ let test_input_message () =
   let input = Sc_rollup_helpers.make_external_input_repr "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  is_input_state ~is_reveal_enabled:(fun _ _ -> true) state >>= function
+  is_input_state ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true) state
+  >>= function
   | Initial | Needs_reveal _ | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
   | No_input_required -> return ()
 
-let go ?(is_reveal_enabled = fun _ _ -> true) ~max_steps target_status state =
+let go ?(is_reveal_enabled = fun ~current_block_level:_ _ -> true) ~max_steps
+    target_status state =
   let rec aux i state =
     pp state >>= fun pp ->
     Format.eprintf "%a" pp () ;
@@ -591,7 +596,9 @@ let test_filter_internal_message () =
     in
     let*! state = set_input input state in
     let*! input_state =
-      is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+      is_input_state
+        ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+        state
     in
     match input_state with
     | No_input_required -> return ()
@@ -616,7 +623,9 @@ let test_filter_internal_message () =
     in
     let*! state = set_input input state in
     let*! input_state =
-      is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+      is_input_state
+        ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+        state
     in
     match input_state with
     | No_input_required ->

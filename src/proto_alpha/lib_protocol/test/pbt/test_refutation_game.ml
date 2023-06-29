@@ -868,7 +868,9 @@ module Arith_test_pvm = struct
     let open Lwt_syntax in
     let rec go ~our_states fuel (tick : int) state =
       let* input_request =
-        is_input_state ~is_reveal_enabled:(fun _ _ -> true) state
+        is_input_state
+          ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
+          state
       in
       match fuel with
       | Some 0 -> return (state, fuel, tick, our_states)
@@ -1339,7 +1341,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
       ~metadata
       (module P)
       game.inbox_level
-      ~is_reveal_enabled:(fun _ _ -> true)
+      ~is_reveal_enabled:(fun ~current_block_level:_ _ -> true)
   in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 
