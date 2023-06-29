@@ -1150,6 +1150,9 @@ module type WORKER = sig
       application layer. *)
   val app_output_stream : t -> app_output Stream.t
 
+  (** [is_subscribed t topic] checks whether [topic] is in the mesh of [t]. *)
+  val is_subscribed : t -> GS.Topic.t -> bool
+
   (** Pretty-printer for values of type {!p2p_output}. *)
   val pp_p2p_output : Format.formatter -> p2p_output -> unit
 
