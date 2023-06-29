@@ -181,7 +181,7 @@ economic protocol, as a form of static sandboxing. It also generates a
 functorized version of the protocol, to make the execution of the
 protocol in an alternative environment possible.
 
-  - :package:`tezos-protocol-environment` contains the protocol
+  - :package-api:`tezos-protocol-environment <octez-libs/Tezos_protocol_environment/index.html>` contains the protocol
     generic environment, that is the API of the modules that are available to
     the economic protocol and the exported protocol API. A review of this
     sandbox is available :doc:`here <../shell/protocol_environment>`.
@@ -202,7 +202,7 @@ protocol in an alternative environment possible.
     standard library as a parameter. This parameter can be filled with
     any of the implementations described in the two points below.
 
-  - :package:`tezos-shell-context` implements a context representation
+  - :package-api:`tezos-shell-context <octez-libs/Tezos_shell_context/index.html>` implements a context representation
     that is accepted by the protocol environment. The node uses this
     instance to read and write data on disk.
 
@@ -284,7 +284,7 @@ run them.
    (in directory :src:`src/lib_p2p/test/`):
    tests of the peer-to-peer layer, independently of the Tezos gossip
    protocol (establishing connections, propagating peers, etc.)
- - :package:`tezos-protocol-environment`
+ - :package-api:`tezos-protocol-environment <octez-libs/Tezos_protocol_environment/index.html>`
    (in directory :src:`src/lib_protocol_environment/test/`):
    tests for the in-memory context implementation.
  - :package:`tezos-shell`
