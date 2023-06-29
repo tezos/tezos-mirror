@@ -31,9 +31,9 @@ module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
 (** A profile context stores profile-specific data used by the daemon.  *)
-type t = {producers : Slot_set.t; seen_committee_members : Pkh_set.t}
+type t = {producers : Slot_set.t}
 
-let empty = {producers = Slot_set.empty; seen_committee_members = Pkh_set.empty}
+let empty = {producers = Slot_set.empty}
 
 let init_attestor number_of_slots gs_worker pkh =
   List.iter
@@ -42,7 +42,7 @@ let init_attestor number_of_slots gs_worker pkh =
     Utils.Infix.(0 -- (number_of_slots - 1))
 
 let init_producer ctxt slot_index =
-  {ctxt with producers = Slot_set.add slot_index ctxt.producers}
+  {producers = Slot_set.add slot_index ctxt.producers}
 
 let add_profile ctxt proto_parameters node_store gs_worker profile =
   let open Lwt_result_syntax in
@@ -59,27 +59,19 @@ let add_profile ctxt proto_parameters node_store gs_worker profile =
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
-let resolve_pending_for_producer gs_worker committee ctxt =
-  let seen_committee_members = ctxt.seen_committee_members in
-  let seen_committee_members =
-    Slot_set.fold
-      (fun slot_index seen_committee_members ->
-        Signature.Public_key_hash.Map.fold
-          (fun pkh _shards seen_committee_members ->
-            if not (Pkh_set.mem pkh seen_committee_members) then (
-              (Join Gossipsub.{slot_index; pkh}
-              |> Gossipsub.Worker.(app_input gs_worker)) ;
-              Pkh_set.add pkh seen_committee_members)
-            else seen_committee_members)
-          committee
-          seen_committee_members)
-      ctxt.producers
-      seen_committee_members
-  in
-  {ctxt with seen_committee_members}
+let join_topics_for_producer gs_worker committee ctxt =
+  Slot_set.iter
+    (fun slot_index ->
+      Signature.Public_key_hash.Map.iter
+        (fun pkh _shards ->
+          let topic = Gossipsub.{slot_index; pkh} in
+          if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
+            Join topic |> Gossipsub.Worker.(app_input gs_worker))
+        committee)
+    ctxt.producers
 
 let on_new_head ctxt gs_worker committee =
-  resolve_pending_for_producer gs_worker committee ctxt
+  join_topics_for_producer gs_worker committee ctxt
 
 let get_profiles node_store = Store.Legacy.get_profiles node_store
 

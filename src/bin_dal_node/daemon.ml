@@ -307,7 +307,6 @@ module Handler = struct
                 (Node_context.get_profile_ctxt ctxt)
                 (Node_context.get_gs_worker ctxt)
                 committee
-              |> Node_context.set_profile_ctxt ctxt
             in
             let*! () =
               Event.(emit layer1_node_new_head (block_hash, block_level))

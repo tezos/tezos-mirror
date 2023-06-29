@@ -43,7 +43,7 @@ val add_profile :
 
 (** [on_new_head c gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
-val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> t
+val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles :
