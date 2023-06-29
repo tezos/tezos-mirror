@@ -878,11 +878,12 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
 (* This function builds a slot with the given content, and makes the given DAL
    node to compute and store the corresponding commitment and shards by calling
    relevant RPCs. It returns the commitment and its proof. *)
-let store_slot dal_node ~slot_size content =
+let store_slot dal_node ~slot_size ?with_proof content =
   let slot = Rollup.Dal.make_slot ~slot_size content in
   let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
   let* () =
-    RPC.call dal_node @@ Rollup.Dal.RPC.put_commitment_shards commitment
+    RPC.call dal_node
+    @@ Rollup.Dal.RPC.put_commitment_shards ?with_proof commitment
   in
   let* proof =
     RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof commitment
@@ -919,41 +920,43 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?with_proof ?counter ?force ?level ?(fee = 1_200)
-    node client dal_node source ~index content ~slot_size =
+let store_slot_and_patch_commitment l1_node dal_node ~slot_size ?with_proof
+    ?level ~index content =
+  let* commitment, proof = store_slot dal_node ~slot_size ?with_proof content in
   let slot_level =
-    match level with Some level -> level | None -> 1 + Node.get_level node
+    match level with Some level -> level | None -> 1 + Node.get_level l1_node
   in
-  let* slot_commitment =
-    let slot = Rollup.Dal.make_slot ~slot_size content in
-    let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
-    let* () =
-      RPC.call dal_node
-      @@ Rollup.Dal.RPC.put_commitment_shards ?with_proof commit
-    in
-    let* () =
-      RPC.call
-        dal_node
-        (Rollup.Dal.RPC.patch_commitment commit ~slot_level ~slot_index:index)
-    in
-    return commit
+  let* () =
+    RPC.call
+      dal_node
+      (Rollup.Dal.RPC.patch_commitment commitment ~slot_level ~slot_index:index)
   in
-  let commitment =
-    Cryptobox.Commitment.of_b58check_opt slot_commitment
-    |> mandatory "The b58check-encoded slot commitment is not valid"
-  in
-  let* proof =
-    RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof slot_commitment
-  in
-  let proof =
-    Data_encoding.Json.destruct
-      Cryptobox.Commitment_proof.encoding
-      (`String proof)
+  return (commitment, proof)
+
+let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) l1_node
+    client dal_node source ?level ~index content ~slot_size =
+  let* commitment, proof =
+    store_slot_and_patch_commitment
+      l1_node
+      dal_node
+      ~slot_size
+      ?with_proof
+      ?level
+      ~index
+      content
   in
   let* _ =
-    publish_slot ?counter ?force ~source ~fee ~index ~commitment ~proof client
+    publish_slot_header
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      client
   in
-  return slot_commitment
+  return commitment
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
