@@ -21,17 +21,23 @@ fn main() -> Result<(), ClientError> {
             output,
             preimages_dir,
             setup_file,
+            display_root_hash,
         } => {
             let upgrade_to = Path::new(&upgrade_to);
             let output = Path::new(&output);
             let preimages_dir = Path::new(&preimages_dir);
 
             let root_hash = preimages::content_to_preimages(upgrade_to, preimages_dir)?;
+            let root_hash_hex = hex::encode(root_hash.as_ref());
 
             let config = create_installer_config(root_hash, setup_file)?;
             let kernel = installer::with_config_program(config);
 
             output::save_kernel(output, &kernel).map_err(ClientError::SaveInstaller)?;
+
+            if display_root_hash {
+                println!("ROOT_HASH: {}", root_hash_hex);
+            };
         }
     }
 

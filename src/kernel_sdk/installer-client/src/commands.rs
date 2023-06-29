@@ -26,5 +26,8 @@ pub enum Commands {
 
         #[arg(short = 'S', long, value_name = "INSTALLER_SETUP_CONFIG")]
         setup_file: Option<OsString>,
+
+        #[arg(short, long, value_name = "DISPLAY_ROOT_HASH")]
+        display_root_hash: bool,
     },
 }

@@ -96,10 +96,10 @@ end
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel ?runner
+let prepare_installer_kernel_gen ?runner
     ?(base_installee =
       "src/proto_alpha/lib_protocol/test/integration/wasm_kernel")
-    ~preimages_dir ?config installee =
+    ~preimages_dir ?(display_root_hash = false) ?config installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
   let installer = installee ^ "-installer.hex" in
@@ -115,6 +115,9 @@ let prepare_installer_kernel ?runner
         ["--setup-file"; setup_file]
     | None -> []
   in
+  let display_root_hash_arg =
+    if display_root_hash then ["--display-root-hash"] else []
+  in
   let process =
     Process.spawn
       ?runner
@@ -129,10 +132,30 @@ let prepare_installer_kernel ?runner
          "--preimages-dir";
          preimages_dir;
        ]
-      @ setup_file_args)
+      @ display_root_hash_arg @ setup_file_args)
   in
-  let+ _ = Runnable.run @@ Runnable.{value = process; run = Process.check} in
-  read_file output
+  let+ installer_output =
+    Runnable.run
+    @@ Runnable.{value = process; run = Process.check_and_read_stdout}
+  in
+  let root_hash =
+    if display_root_hash then installer_output =~* rex "ROOT_HASH: ?(\\w*)"
+    else None
+  in
+  (read_file output, root_hash)
+
+let prepare_installer_kernel ?runner ?base_installee ~preimages_dir ?config
+    installee =
+  let open Lwt.Syntax in
+  let+ output, _ =
+    prepare_installer_kernel_gen
+      ?runner
+      ?base_installee
+      ~preimages_dir
+      ?config
+      installee
+  in
+  output
 
 let default_boot_sector_of ~kind =
   match kind with
