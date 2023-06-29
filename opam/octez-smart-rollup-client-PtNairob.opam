@@ -16,6 +16,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-client-017-PtNairob"
+  "octez-smart-rollup"
   "tezos-smart-rollup-017-PtNairob"
   "tezos-smart-rollup-layer2-017-PtNairob"
   "tezos-clic"

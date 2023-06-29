@@ -85,7 +85,10 @@ val payloads_history_of_messages :
 (** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
     node agrees with the L1 node that inbox for [block] is [node_inbox]. *)
 val same_as_layer_1 :
-  _ Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.t -> unit tzresult Lwt.t
+  _ Node_context.t ->
+  Block_hash.t ->
+  Octez_smart_rollup.Inbox.t ->
+  unit tzresult Lwt.t
 
 (**/**)
 

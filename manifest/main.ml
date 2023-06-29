@@ -6175,6 +6175,7 @@ let hash = Protocol.hash
             octez_client_base |> open_;
             octez_client_base_unix |> open_;
             client |> if_some |> open_;
+            octez_smart_rollup_lib |> open_;
             octez_sc_rollup |> if_some |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
           ]

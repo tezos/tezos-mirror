@@ -160,8 +160,11 @@ let genesis_commitment (node_ctxt : _ Node_context.t) ctxt =
         commitment_hash = node_ctxt.genesis_info.commitment_hash)
       (Sc_rollup_node_errors.Invalid_genesis_state
          {
-           expected = node_ctxt.genesis_info.commitment_hash;
-           actual = commitment_hash;
+           expected =
+             Sc_rollup_proto_types.Commitment_hash.to_octez
+               node_ctxt.genesis_info.commitment_hash;
+           actual =
+             Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash;
          })
   in
   commitment

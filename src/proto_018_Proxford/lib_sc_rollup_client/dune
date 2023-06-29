@@ -12,6 +12,7 @@
   tezos-client-base
   tezos-client-base-unix
   tezos-client-018-Proxford
+  octez-smart-rollup
   tezos-smart-rollup-018-Proxford
   tezos-smart-rollup-layer2-018-Proxford)
  (flags
@@ -24,5 +25,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_018_Proxford
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_018_Proxford
   -open Tezos_smart_rollup_layer2_018_Proxford))

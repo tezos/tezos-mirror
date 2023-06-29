@@ -16,6 +16,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-client-alpha"
+  "octez-smart-rollup"
   "tezos-smart-rollup-alpha"
   "tezos-smart-rollup-layer2-alpha"
   "tezos-clic"

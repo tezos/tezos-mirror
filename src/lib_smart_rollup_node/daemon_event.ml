@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +28,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "daemon"]
+  let section = ["sc_rollup_node"; "daemon"]
 
   let head_processing =
     declare_2
@@ -97,12 +99,12 @@ module Simple = struct
               ("backtracked", `Backtracked);
               ("skipped", `Skipped);
             ]) )
-      ("error", Data_encoding.option Environment.Error_monad.trace_encoding)
+      ("error", Data_encoding.option Error_monad.trace_encoding)
       ~pp1:L1_operation.pp
       ~pp3:
         (fun ppf -> function
           | None -> Format.pp_print_string ppf "none"
-          | Some e -> Environment.Error_monad.pp_trace ppf e)
+          | Some e -> Error_monad.pp_print_trace ppf e)
 
   let error =
     declare_1
@@ -146,23 +148,11 @@ let processing_heads_iteration =
 
 let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
-let included_operation (type kind)
-    (operation : kind Protocol.Alpha_context.manager_operation)
-    (result : kind Protocol.Apply_results.manager_operation_result) =
-  match Sc_rollup_injector.injector_operation_of_manager operation with
-  | None -> Lwt.return_unit
-  | Some operation -> (
-      match result with
-      | Applied _ -> Simple.(emit included_successful_operation) operation
-      | result ->
-          let status, errors =
-            match result with
-            | Applied _ -> assert false
-            | Failed (_, e) -> (`Failed, Some e)
-            | Backtracked (_, e) -> (`Backtracked, e)
-            | Skipped _ -> (`Skipped, None)
-          in
-          Simple.(emit included_failed_operation) (operation, status, errors))
+let included_operation ?errors status operation =
+  match status with
+  | `Applied -> Simple.(emit included_successful_operation) operation
+  | `Failed | `Backtracked | `Skipped ->
+      Simple.(emit included_failed_operation) (operation, status, errors)
 
 let error e = Simple.(emit error) e
 

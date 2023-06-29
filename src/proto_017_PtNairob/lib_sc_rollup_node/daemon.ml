@@ -155,21 +155,21 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
   | ( Sc_rollup_cement _,
       Sc_rollup_cement_result {inbox_level; commitment_hash; _} ) ->
       (* Cemented commitment ---------------------------------------------- *)
+      let proto_inbox_level = inbox_level in
+      let proto_commitment_hash = commitment_hash in
+      let inbox_level = Raw_level.to_int32 inbox_level in
+      let commitment_hash =
+        Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
+      in
       let* inbox_block =
-        Node_context.get_l2_block_by_level
-          node_ctxt
-          (Raw_level.to_int32 inbox_level)
+        Node_context.get_l2_block_by_level node_ctxt inbox_level
       in
       let*? () =
         (* We stop the node if we disagree with a cemented commitment *)
-        let our_commitment_hash =
-          Option.map
-            Sc_rollup_proto_types.Commitment_hash.of_octez
-            inbox_block.header.commitment_hash
-        in
+        let our_commitment_hash = inbox_block.header.commitment_hash in
         error_unless
           (Option.equal
-             Sc_rollup.Commitment.Hash.( = )
+             Octez_smart_rollup.Commitment.Hash.( = )
              our_commitment_hash
              (Some commitment_hash))
           (Sc_rollup_node_errors.Disagree_with_cemented
@@ -177,13 +177,13 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       in
       let lcc = Reference.get node_ctxt.lcc in
       let*! () =
-        if Raw_level.(inbox_level > lcc.level) then (
+        if inbox_level > Raw_level.to_int32 lcc.level then (
           Reference.set
             node_ctxt.lcc
-            {commitment = commitment_hash; level = inbox_level} ;
+            {commitment = proto_commitment_hash; level = proto_inbox_level} ;
           Commitment_event.last_cemented_commitment_updated
-            commitment_hash
-            inbox_level)
+            proto_commitment_hash
+            proto_inbox_level)
         else Lwt.return_unit
       in
       return_unit
@@ -192,8 +192,13 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
   | ( Sc_rollup_timeout _,
       Sc_rollup_timeout_result {game_status = Ended end_status; _} ) -> (
       match end_status with
-      | Loser {loser; _} when Node_context.is_operator node_ctxt loser ->
-          tzfail (Sc_rollup_node_errors.Lost_game end_status)
+      | Loser {loser; reason} when Node_context.is_operator node_ctxt loser ->
+          let result =
+            match reason with
+            | Conflict_resolved -> Sc_rollup_node_errors.Conflict_resolved
+            | Timeout -> Timeout
+          in
+          tzfail (Sc_rollup_node_errors.Lost_game result)
       | Loser _ ->
           (* Other player lost *)
           return_unit
@@ -206,7 +211,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           in
           fail_when
             (List.exists (Node_context.is_operator node_ctxt) stakers)
-            (Sc_rollup_node_errors.Lost_game end_status))
+            (Sc_rollup_node_errors.Lost_game Draw))
   | Dal_publish_slot_header _, Dal_publish_slot_header_result {slot_header; _}
     when Node_context.dal_supported node_ctxt ->
       let* () =
@@ -243,7 +248,20 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
   if not (is_for_my_rollup operation) then return_unit
   else
     (* Only look at operations that are for the node's rollup *)
-    let*! () = Daemon_event.included_operation operation result in
+    let*! () =
+      match Sc_rollup_injector.injector_operation_of_manager operation with
+      | None -> Lwt.return_unit
+      | Some op ->
+          let status, errors =
+            match result with
+            | Applied _ -> (`Applied, None)
+            | Backtracked (_, e) ->
+                (`Backtracked, Option.map Environment.wrap_tztrace e)
+            | Failed (_, e) -> (`Failed, Some (Environment.wrap_tztrace e))
+            | Skipped _ -> (`Skipped, None)
+          in
+          Daemon_event.included_operation ?errors status op
+    in
     match result with
     | Applied success_result ->
         process_included_l1_operation
@@ -390,7 +408,10 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       in
       let* () =
         unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-        Inbox.same_as_layer_1 node_ctxt head.hash inbox
+        Inbox.same_as_layer_1
+          node_ctxt
+          head.hash
+          (Sc_rollup_proto_types.Inbox.to_octez inbox)
       in
       let level = Raw_level.of_int32_exn head.level in
       let* previous_commitment_hash =
@@ -563,8 +584,14 @@ let check_initial_state_hash {Node_context.cctxt; rollup_address; pvm; _} =
   let module PVM = (val pvm) in
   let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! l2_initial_state_hash = PVM.state_hash s in
+  let l1_reference_initial_state_hash =
+    Sc_rollup_proto_types.State_hash.to_octez l1_reference_initial_state_hash
+  in
+  let l2_initial_state_hash =
+    Sc_rollup_proto_types.State_hash.to_octez l2_initial_state_hash
+  in
   fail_unless
-    Sc_rollup.State_hash.(
+    Octez_smart_rollup.State_hash.(
       l1_reference_initial_state_hash = l2_initial_state_hash)
     (Sc_rollup_node_errors.Wrong_initial_pvm_state
        {
@@ -757,7 +784,7 @@ let run
         ())
       configuration.sc_rollup_node_operators
   in
-  let*! () = Event.waiting_first_block () in
+  let*! () = Event.waiting_first_block Protocol.hash in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -771,7 +798,7 @@ let run
   let* predecessor =
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
-  let*! () = Event.received_first_block head.hash in
+  let*! () = Event.received_first_block head.hash Protocol.hash in
   let* node_ctxt =
     Node_context.init
       cctxt

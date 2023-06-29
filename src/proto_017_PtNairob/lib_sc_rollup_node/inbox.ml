@@ -87,8 +87,9 @@ let same_as_layer_1 node_ctxt head_hash inbox =
   let* layer1_inbox =
     Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block)
   in
+  let layer1_inbox = Sc_rollup_proto_types.Inbox.to_octez layer1_inbox in
   fail_unless
-    (Sc_rollup.Inbox.equal layer1_inbox inbox)
+    (Octez_smart_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
 let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox

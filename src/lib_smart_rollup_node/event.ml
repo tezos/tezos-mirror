@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +27,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "smart_rollup_node"]
+  let section = ["smart_rollup_node"]
 
   let starting_node =
     declare_0
@@ -60,7 +61,7 @@ module Simple = struct
       ~msg:
         "The smart rollup node is interacting with rollup {addr} of kind {kind}"
       ~level:Notice
-      ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
+      ("addr", Octez_smart_rollup.Address.encoding)
       ("kind", Data_encoding.string)
 
   let connection_lost =
@@ -126,28 +127,21 @@ module Simple = struct
       ()
 
   let waiting_first_block =
-    declare_0
+    declare_1
       ~section
       ~name:"waiting_first_block"
       ~level:Notice
-      ~msg:
-        (Format.asprintf
-           "Waiting for first block of protocol %a to appear."
-           Protocol_hash.pp
-           Protocol.hash)
-      ()
+      ~msg:"Waiting for first block of protocol {protocol} to appear."
+      ("protocol", Protocol_hash.encoding)
 
   let received_first_block =
-    declare_1
+    declare_2
       ~section
       ~name:"received_first_block"
       ~level:Notice
-      ~msg:
-        (Format.asprintf
-           "First block of protocol %a received: {block}."
-           Protocol_hash.pp
-           Protocol.hash)
+      ~msg:"First block of protocol {protocol} received: {block}."
       ("block", Block_hash.encoding)
+      ("protocol", Protocol_hash.encoding)
 
   let detected_protocol_migration =
     declare_0
@@ -174,7 +168,7 @@ let node_is_ready ~rpc_addr ~rpc_port =
   Simple.(emit node_is_ready (rpc_addr, rpc_port))
 
 let rollup_exists ~addr ~kind =
-  let kind = Protocol.Alpha_context.Sc_rollup.Kind.to_string kind in
+  let kind = Octez_smart_rollup.Kind.to_string kind in
   Simple.(emit rollup_exists (addr, kind))
 
 let connection_lost () = Simple.(emit connection_lost) ()
@@ -198,9 +192,9 @@ let kernel_debug_dont_wait msg =
 
 let warn_dal_enabled_no_node () = Simple.(emit warn_dal_enabled_no_node) ()
 
-let waiting_first_block () = Simple.(emit waiting_first_block) ()
+let waiting_first_block p = Simple.(emit waiting_first_block) p
 
-let received_first_block b = Simple.(emit received_first_block) b
+let received_first_block b p = Simple.(emit received_first_block) (b, p)
 
 let detected_protocol_migration () =
   Simple.(emit detected_protocol_migration) ()

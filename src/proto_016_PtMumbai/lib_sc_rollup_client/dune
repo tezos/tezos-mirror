@@ -12,6 +12,7 @@
   tezos-client-base
   tezos-client-base-unix
   tezos-client-016-PtMumbai
+  octez-smart-rollup
   tezos-smart-rollup-016-PtMumbai
   tezos-smart-rollup-layer2-016-PtMumbai)
  (flags
@@ -24,5 +25,6 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_016_PtMumbai
+  -open Octez_smart_rollup
   -open Tezos_smart_rollup_016_PtMumbai
   -open Tezos_smart_rollup_layer2_016_PtMumbai))
