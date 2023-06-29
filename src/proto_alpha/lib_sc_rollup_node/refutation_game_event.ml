@@ -64,11 +64,11 @@ module Simple = struct
          at level {level} with staker {other} that hash issued commitment \
          {their_commitment_hash} both based on {parent_commitment_hash}."
       ~level:Notice
-      ("our_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("level", Raw_level.encoding)
-      ("other", Sc_rollup.Staker.encoding)
-      ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("parent_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
+      ("our_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("level", Data_encoding.int32)
+      ("other", Signature.Public_key_hash.encoding)
+      ("their_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
+      ("parent_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
 
   let potential_conflict_detected =
     declare_4
@@ -112,9 +112,10 @@ module Simple = struct
          {end_tick}: {dissection}."
       ~level:Debug
       ("opponent", Signature.Public_key_hash.encoding)
-      ("start_tick", Sc_rollup.Tick.encoding)
-      ("end_tick", Sc_rollup.Tick.encoding)
-      ("dissection", Data_encoding.list dissection_chunk_encoding)
+      ("start_tick", Data_encoding.z)
+      ("end_tick", Data_encoding.z)
+      ( "dissection",
+        Data_encoding.list Octez_smart_rollup.Game.dissection_chunk_encoding )
 
   module Worker (ARG : sig
     val section : string list
@@ -166,8 +167,8 @@ module Simple = struct
         ~level:Notice
         ("opponent", Signature.Public_key_hash.encoding)
         ~pp1:Signature.Public_key_hash.pp
-        ("commitment", Sc_rollup.Commitment.encoding)
-        ~pp2:Sc_rollup.Commitment.pp
+        ("commitment", Octez_smart_rollup.Commitment.encoding)
+        ~pp2:Octez_smart_rollup.Commitment.pp
 
     let stopped =
       declare_1
@@ -201,12 +202,12 @@ let timeout address = Simple.(emit timeout address)
 
 let invalid_move () = Simple.(emit invalid_move ())
 
-let conflict_detected (conflict : Sc_rollup.Refutation_storage.conflict) =
+let conflict_detected (conflict : Octez_smart_rollup.Game.conflict) =
   let our_commitment_hash =
-    Sc_rollup.Commitment.hash_uncarbonated conflict.our_commitment
+    Octez_smart_rollup.Commitment.hash conflict.our_commitment
   in
   let their_commitment_hash =
-    Sc_rollup.Commitment.hash_uncarbonated conflict.their_commitment
+    Octez_smart_rollup.Commitment.hash conflict.their_commitment
   in
   let parent_commitment_hash = conflict.parent_commitment in
   let other = conflict.other in
