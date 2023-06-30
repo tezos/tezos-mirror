@@ -1978,7 +1978,7 @@ let find_in_slot_map consensus_content slot_map =
       | Some (consensus_key, power) -> ok (consensus_key, power))
 
 let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
-    (context * Kind.preendorsement contents_result_list) tzresult Lwt.t =
+    (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let ctxt =
     match mode with

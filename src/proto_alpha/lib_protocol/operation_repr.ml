@@ -35,7 +35,7 @@ module Kind = struct
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Endorsement_kind : endorsement_consensus_kind consensus
 
-  type preendorsement = preattestation_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
   type endorsement = endorsement_consensus_kind consensus
 
@@ -136,7 +136,7 @@ end
 
 type 'a consensus_operation_type =
   | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
+  | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -234,7 +234,7 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Preendorsement : consensus_content -> Kind.preattestation contents
   | Endorsement : consensus_content -> Kind.endorsement contents
   | Dal_attestation :
       Dal_attestation_repr.operation
@@ -249,8 +249,8 @@ and _ contents =
     }
       -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
       -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
@@ -1019,10 +1019,10 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preendorsement"
@@ -1045,10 +1045,10 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preattestation"

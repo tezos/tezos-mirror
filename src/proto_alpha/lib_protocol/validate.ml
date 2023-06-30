@@ -578,7 +578,7 @@ module Consensus = struct
      mempool's context. *)
 
   let check_preendorsement vi ~check_signature
-      (operation : Kind.preendorsement operation) =
+      (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
       Option.value_e
@@ -619,7 +619,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_preendorsement_conflict vs oph (op : Kind.preendorsement operation)
+  let check_preendorsement_conflict vs oph (op : Kind.preattestation operation)
       =
     let (Single (Preendorsement {slot; level; round; _})) =
       op.protocol_data.contents
@@ -640,7 +640,7 @@ module Consensus = struct
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Preattestation; conflict})
 
-  let add_preendorsement vs oph (op : Kind.preendorsement operation) =
+  let add_preendorsement vs oph (op : Kind.preattestation operation) =
     let (Single (Preendorsement {slot; level; round; _})) =
       op.protocol_data.contents
     in
@@ -672,7 +672,7 @@ module Consensus = struct
     {block_state with locked_round_evidence}
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_preendorsement vs (operation : Kind.preendorsement operation) =
+  let remove_preendorsement vs (operation : Kind.preattestation operation) =
     (* As we are in mempool mode, we do not update
        [locked_round_evidence]. *)
     let (Single (Preendorsement {slot; level; round; _})) =
@@ -896,7 +896,7 @@ module Consensus = struct
     | Application _ | Partial_validation _ | Mempool -> return_unit
 
   let validate_preendorsement ~check_signature info operation_state block_state
-      oph (operation : Kind.preendorsement operation) =
+      oph (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents

@@ -27,7 +27,7 @@
 (** Tezos Protocol Implementation - Low level Repr. of Operations
 
     Defines kinds of operations that can be performed on chain:
-    - preendorsement
+    - preattestation
     - endorsement
     - double baking evidence
     - double preendorsing evidence
@@ -69,7 +69,7 @@ module Kind : sig
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Endorsement_kind : endorsement_consensus_kind consensus
 
-  type preendorsement = preattestation_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
   type endorsement = endorsement_consensus_kind consensus
 
@@ -170,7 +170,7 @@ end
 
 type 'a consensus_operation_type =
   | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
+  | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -230,7 +230,7 @@ and _ contents_list =
 and _ contents =
   (* Preendorsement: About consensus, preendorsement of a block held by a
      validator (specific to Tenderbake). *)
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Preendorsement : consensus_content -> Kind.preattestation contents
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
   | Endorsement : consensus_content -> Kind.endorsement contents
@@ -262,8 +262,8 @@ and _ contents =
      twice. This behavior may be reported and the byzantine will have
      its security deposit forfeited. *)
   | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
       -> Kind.double_preendorsement_evidence contents
   (* Double_endorsement_evidence: Similar to double-preendorsement but
@@ -669,9 +669,9 @@ module Encoding : sig
       }
         -> 'b case
 
-  val preendorsement_case : Kind.preendorsement case
+  val preendorsement_case : Kind.preattestation case
 
-  val preattestation_case : Kind.preendorsement case
+  val preattestation_case : Kind.preattestation case
 
   val endorsement_case : Kind.endorsement case
 

@@ -30,7 +30,7 @@ open Validate_helpers
 type dbl_endorsement_state = {
   temporary : (Block.t * Block.t) option;
   slashable_preend :
-    (Kind.preendorsement operation * Kind.preendorsement operation) list;
+    (Kind.preattestation operation * Kind.preattestation operation) list;
   slashable_end : (Kind.endorsement operation * Kind.endorsement operation) list;
 }
 

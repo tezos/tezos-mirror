@@ -64,7 +64,7 @@ let extract_prequorum preendorsements =
   | h :: _ ->
       let ({protocol_data = {contents = Single (Preendorsement content); _}; _})
           =
-        (h : Kind.preendorsement Operation.t)
+        (h : Kind.preattestation Operation.t)
       in
       Some
         {

@@ -97,7 +97,7 @@ type prequorum = {
   level : int32;
   round : Round.t;
   block_payload_hash : Block_payload_hash.t;
-  preendorsements : Kind.preendorsement operation list;
+  preendorsements : Kind.preattestation operation list;
 }
 
 type block_info = {
@@ -347,7 +347,7 @@ type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_prequorum :
-    (Operation_worker.candidate * Kind.preendorsement operation list) option;
+    (Operation_worker.candidate * Kind.preattestation operation list) option;
 }
 
 type state = {
@@ -394,7 +394,7 @@ type event =
   | New_valid_proposal of proposal
   | New_head_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate * Kind.preendorsement operation list
+      Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.endorsement operation list
   | Timeout of timeout_kind

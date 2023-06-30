@@ -145,7 +145,7 @@ let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
   | None -> None
   | Some pqc ->
-      let add_voting_power acc (op : Kind.preendorsement Operation.t) =
+      let add_voting_power acc (op : Kind.preattestation Operation.t) =
         let open Protocol.Alpha_context.Operation in
         let {
           shell = _;
