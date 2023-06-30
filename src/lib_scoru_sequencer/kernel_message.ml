@@ -144,15 +144,25 @@ module Framed_message = Framed (struct
         && List.equal String.equal x.l2_messages y.l2_messages
 end)
 
-include Signed (Framed_message)
+type unsigned = Framed_message.t
 
-(* Signature consisting of zeroes *)
-let dummy_signature =
-  Signature.V0.of_bytes_exn @@ Bytes.make Signature.V0.size @@ Char.chr 0
+let unsigned_encoding = Framed_message.encoding
+
+module Signed_raw = Signed (struct
+  type t = string
+
+  let encoding = Data_encoding.Variable.string
+
+  let equal = String.equal
+end)
+
+type signed_raw = Signed_raw.t
+
+let signed_raw_encoding = Signed_raw.encoding
 
 let encode_sequence_message rollup_address ~prefix ~suffix
-    (l2_messages : Sc_rollup.Inbox_message.serialized list) : string =
-  (* Fix: actually sign a message *)
+    (l2_messages : Sc_rollup.Inbox_message.serialized list) :
+    [`Unsigned_encoded of string] =
   let unsigned_payload =
     Framed_message.
       {
@@ -168,18 +178,45 @@ let encode_sequence_message rollup_address ~prefix ~suffix
             };
       }
   in
-  let signed_framed_sequence =
-    {unsigned_payload; signature = dummy_signature}
+  `Unsigned_encoded
+    (Data_encoding.Binary.to_string_exn
+       Framed_message.encoding
+       unsigned_payload)
+
+let sign_sequence cctxt signer (`Unsigned_encoded unsigned_sequence) =
+  let open Lwt_result_syntax in
+  let+ signature =
+    Client_keys.V0.sign cctxt signer (String.to_bytes unsigned_sequence)
   in
-  Data_encoding.Binary.to_string_exn encoding signed_framed_sequence
+  Data_encoding.Binary.to_string_exn
+    signed_raw_encoding
+    {unsigned_payload = unsigned_sequence; signature}
+
+let encode_and_sign_sequence (cctx, signer) rollup_address ~prefix ~suffix
+    serialized_msgs =
+  let encoded_sequence =
+    encode_sequence_message rollup_address ~prefix ~suffix serialized_msgs
+  in
+  sign_sequence cctx signer encoded_sequence
 
 let single_l2_message_overhead =
   let dummy_address =
     Sc_rollup.Address.of_b58check_exn "sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb"
   in
-  String.length
-  @@ encode_sequence_message
-       dummy_address
-       ~prefix:1000l
-       ~suffix:1000l
-       [Sc_rollup.Inbox_message.unsafe_of_string ""]
+  (* Signature consisting of zeroes *)
+  let dummy_signature =
+    Signature.V0.of_bytes_exn @@ Bytes.make Signature.V0.size @@ Char.chr 0
+  in
+  let (`Unsigned_encoded encoded) =
+    encode_sequence_message
+      dummy_address
+      ~prefix:1000l
+      ~suffix:1000l
+      [Sc_rollup.Inbox_message.unsafe_of_string ""]
+  in
+  let dummy_signed =
+    Data_encoding.Binary.to_string_exn
+      signed_raw_encoding
+      {unsigned_payload = encoded; signature = dummy_signature}
+  in
+  String.length dummy_signed

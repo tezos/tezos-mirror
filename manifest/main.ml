@@ -7885,6 +7885,7 @@ let octez_scoru_sequencer =
         octez_workers |> open_;
         octez_smart_rollup_node_lib |> open_;
         octez_smart_rollup_lib |> open_;
+        octez_client_base |> open_;
         octez_rpc;
         octez_rpc_http;
         octez_rpc_http_server;

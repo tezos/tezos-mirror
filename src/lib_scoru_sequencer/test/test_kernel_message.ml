@@ -35,9 +35,18 @@ open Alpha_context
 open Tztest
 module KM = Octez_smart_rollup_sequencer.Kernel_message
 
-let test_signed ?loc expected_hex encoded_msg =
+(* TODO fix it: actually sign it *)
+let test_encoding ?loc expected_hex (`Unsigned_encoded encoded_msg) =
   let open Lwt_result_syntax in
-  let result_hex = Hex.show @@ Hex.of_string encoded_msg in
+  let dummy_signature =
+    Signature.V0.of_bytes_exn @@ Bytes.make Signature.V0.size @@ Char.chr 0
+  in
+  let dummy_signed =
+    Data_encoding.Binary.to_string_exn
+      KM.signed_raw_encoding
+      {unsigned_payload = encoded_msg; signature = dummy_signature}
+  in
+  let result_hex = Hex.show @@ Hex.of_string dummy_signed in
   Assert.equal ?loc ~msg:"Encoded hex don't match" expected_hex result_hex ;
   return_unit
 
@@ -52,7 +61,7 @@ let test_empty_suffix_n_prefix () =
     "006227a8721213bd7ddb9b56227e3acb01161b1e67000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
   in
   let* () =
-    test_signed
+    test_encoding
       ~loc:__LOC__
       empty_l2_messages_hex
       (KM.encode_sequence_message rollup_address ~prefix:0l ~suffix:0l [])
@@ -62,7 +71,7 @@ let test_empty_suffix_n_prefix () =
     "006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
   in
   let* () =
-    test_signed
+    test_encoding
       ~loc:__LOC__
       single_empty_l2_message_hex
       (KM.encode_sequence_message
@@ -76,7 +85,7 @@ let test_empty_suffix_n_prefix () =
     "006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000090000000568656c6c6f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
   in
   let* () =
-    test_signed
+    test_encoding
       ~loc:__LOC__
       hello_l2_message_hex
       (KM.encode_sequence_message
@@ -89,7 +98,7 @@ let test_empty_suffix_n_prefix () =
   let hello_world_l2_message_hex =
     "006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000120000000568656c6c6f00000005776f726c6400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
   in
-  test_signed
+  test_encoding
     ~loc:__LOC__
     hello_world_l2_message_hex
     (KM.encode_sequence_message

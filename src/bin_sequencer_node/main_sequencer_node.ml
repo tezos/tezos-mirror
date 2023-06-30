@@ -44,9 +44,9 @@ let sc_operator_pkh next =
     ~desc:"Public key hash, or alias, of a sequencer node operator."
     ( Tezos_clic.parameter @@ fun cctxt s ->
       let parse_pkh s =
-        let from_alias s = Client_keys.Public_key_hash.find cctxt s in
+        let from_alias s = Client_keys.V0.Public_key_hash.find cctxt s in
         let from_key s =
-          match Signature.Public_key_hash.of_b58check_opt s with
+          match Signature.V0.Public_key_hash.of_b58check_opt s with
           | None ->
               failwith "Could not read public key hash for sequencer operator"
           | Some pkh -> return pkh
@@ -58,7 +58,7 @@ let sc_operator_pkh next =
       match String.split ~limit:1 ':' s with
       | [_] ->
           let+ pkh = parse_pkh s in
-          `Default pkh
+          `Default (Signature.Of_V0.public_key_hash pkh)
       | [_purpose; _operator_s] ->
           failwith "Purposes are not supported for a sequencer operator"
       | _ ->
