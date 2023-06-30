@@ -22,9 +22,6 @@ pub const WORD_SIZE: usize = 32_usize;
 /// interface.
 #[derive(Error, Eq, PartialEq, Clone, Debug)]
 pub enum AccountStorageError {
-    /// The account does not hold enough Ether for a transaction
-    #[error("Insufficient Ether")]
-    NotEnoughEther,
     /// Some error happened while using durable storage, either from an invalid
     /// path or a runtime error.
     #[error("Durable storage error: {0:?}")]
@@ -194,6 +191,7 @@ pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
     let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
     OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
 }
+
 impl EthereumAccount {
     pub fn from_address(address: &H160) -> Result<Self, DurableStorageError> {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
