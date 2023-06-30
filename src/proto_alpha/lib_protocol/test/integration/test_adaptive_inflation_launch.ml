@@ -92,8 +92,14 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
         (Int64.div expected_liquid staking_over_delegation_edge)
     else Int64.add expected_frozen expected_liquid
   in
-  let* actual = Context.get_current_voting_power (B block) delegate in
-  Assert.equal_int64 ~loc actual expected_power
+  let* actual_voting_power =
+    Context.get_current_voting_power (B block) delegate
+  in
+  let* () = Assert.equal_int64 ~loc actual_voting_power expected_power in
+  let* actual_baking_power =
+    Context.get_current_baking_power (B block) delegate
+  in
+  Assert.equal_int64 ~loc actual_baking_power expected_power
 
 (* Test that:
    - the EMA of the adaptive inflation vote reaches the threshold after the
