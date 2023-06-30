@@ -7469,6 +7469,24 @@ let octez_scoru_sequencer =
         octez_rpc_http_server;
       ]
 
+let _octez_scoru_sequencer_tests =
+  tezt
+    ["test_kernel_message"]
+    ~path:"src/lib_scoru_sequencer/test"
+    ~opam:"scoru-sequencer-test"
+    ~synopsis:"Tests for the scoru sequencer library"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        Protocol.(main alpha) |> open_;
+        octez_scoru_sequencer;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+      ]
+
 let _sc_sequencer_node =
   public_exe
     "octez-smart-rollup-sequencer-node"

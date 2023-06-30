@@ -1,0 +1,47 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_scoru_sequencer_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezos-base
+  tezos-protocol-alpha
+  octez_smart_rollup_sequencer
+  tezos-base-test-helpers
+  tezos-test-helpers
+  qcheck-alcotest
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha
+  -open Tezos_base_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt)
+ (modules test_kernel_message))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_scoru_sequencer_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package scoru-sequencer-test)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

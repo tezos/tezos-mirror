@@ -59,6 +59,7 @@
 (package (name octez-srs-extraction))
 (package (name octez-testnet-scenarios))
 (package (name octez-wasmer-test)(allow_empty))
+(package (name scoru-sequencer-test)(allow_empty))
 (package (name tezos-016-PtMumbai-test-helpers))
 (package (name tezos-017-PtNairob-test-helpers))
 (package (name tezos-018-Proxford-test-helpers))
