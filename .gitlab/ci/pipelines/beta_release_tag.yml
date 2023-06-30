@@ -9,7 +9,7 @@ include:
   - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_release.yml
 
   # Stage: publish_release_gitlab
-  - .gitlab/ci/jobs/publish/gitlab.yml
+  - .gitlab/ci/jobs/publish/gitlab:release.yml
 
   # Stage: publish_release
   - .gitlab/ci/jobs/publish/deb_packages_stable_amd64.yml
