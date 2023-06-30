@@ -290,6 +290,10 @@ Smart Rollup WASM Debugger
 - Changed the syntax for the ``octez-smart-rollup-wasm-debugger`` to have the ``--kernel``
   argument before the kernel file. (MR :gl:`!9318`)
 
+- ``profile`` commands now profiles the time spent in each steps of a PVM
+  execution. It can be disabled with the option ``--without-time`` (MR
+  :gl:`!9335`).
+
 Data Availability Committee (DAC)
 ----------------------------------
 - Released Data Availability Committee executables which include ``octez-dac-node``
