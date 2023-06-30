@@ -12,7 +12,6 @@ use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use debug::debug_msg;
 use evm::executor::stack::PrecompileFailure;
-use evm::Config;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -24,6 +23,8 @@ pub mod handler;
 pub mod precompiles;
 pub mod storage;
 pub mod transaction;
+
+pub use evm::Config;
 
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
@@ -124,6 +125,7 @@ pub fn run_transaction<'a, Host>(
     block: &'a BlockConstants,
     evm_account_storage: &'a mut EthereumAccountStorage,
     precompiles: &'a precompiles::PrecompileBTreeMap<Host>,
+    config: Config,
     address: Option<H160>,
     caller: H160,
     call_data: Vec<u8>,
@@ -137,7 +139,6 @@ where
     debug_msg!(host, " - from address: {}", caller);
     debug_msg!(host, " - to address: {:?}", address);
 
-    let config = Config::london();
     let mut handler = handler::EvmHandler::<'_, Host>::new(
         host,
         evm_account_storage,
@@ -189,6 +190,8 @@ mod test {
     // call: set(42)
     const STORAGE_CONTRACT_CALL_SET42: &str =
         "60fe47b1000000000000000000000000000000000000000000000000000000000000002a";
+
+    const CONFIG: Config = Config::london();
 
     // The compiled initialization code for the Ethereum demo contract given
     // as an example in kernel_evm/solidity_examples/erc20tok.sol
@@ -279,6 +282,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(callee),
             caller,
             call_data,
@@ -336,6 +340,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(callee),
             caller,
             call_data,
@@ -387,6 +392,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             callee,
             caller,
             call_data,
@@ -433,6 +439,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             callee,
             caller,
             call_data,
@@ -458,6 +465,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             new_address,
             caller,
             call_data2,
@@ -477,6 +485,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             new_address,
             caller,
             call_data_set,
@@ -495,6 +504,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             new_address,
             caller,
             hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
@@ -533,6 +543,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             callee,
             caller,
             call_data,
@@ -577,6 +588,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             callee,
             caller,
             call_data,
@@ -616,6 +628,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -749,6 +762,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -794,6 +808,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -840,6 +855,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -890,6 +906,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(address),
             caller,
             input,
@@ -933,6 +950,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1035,6 +1053,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1102,6 +1121,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1176,6 +1196,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1271,6 +1292,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1366,6 +1388,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1450,6 +1473,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),
@@ -1549,6 +1573,7 @@ mod test {
             &block,
             &mut evm_account_storage,
             &precompiles,
+            CONFIG,
             Some(target),
             caller,
             data.to_vec(),

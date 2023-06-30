@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use evm_execution::Config;
 use primitive_types::U256;
 use storage::{
     read_chain_id, read_last_info_per_level_timestamp,
@@ -42,6 +43,9 @@ mod upgrade;
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;
+
+/// The configuration for the EVM execution.
+pub const CONFIG: Config = Config::london();
 
 /// Returns the current timestamp for the execution. Based on the last
 /// info per level read (or default timestamp if it was not set), plus the

@@ -19,6 +19,7 @@ use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::index_account;
+use crate::CONFIG;
 
 // This implementation of `Transaction` is used to share the logic of
 // transaction receipt and transaction object making. The functions
@@ -222,6 +223,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         block_constants,
         evm_account_storage,
         precompiles,
+        CONFIG,
         to,
         caller,
         call_data,
@@ -268,11 +270,9 @@ fn apply_deposit<Host: Runtime>(
     };
 
     let is_success = do_deposit(()).is_some();
-    let gas_used =
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5936
-        // This is the same as the EvmHandler London configuration, but it
-        // should be explicit.
-        21_000u64;
+
+    let gas_used = CONFIG.gas_transaction_call;
+
     let execution_outcome = ExecutionOutcome {
         gas_used,
         is_success,
