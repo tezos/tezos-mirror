@@ -2722,6 +2722,7 @@ let test_reveals_fails_on_wrong_hash =
 let test_reveals_fails_on_unknown_hash =
   let kind = "arith" in
   test_full_scenario
+    ~supports:(Protocol.From_protocol 17)
     ~timeout:120
     ~kind
     {
