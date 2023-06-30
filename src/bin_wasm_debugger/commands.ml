@@ -524,14 +524,35 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   let profile ~collapse ~with_time level inboxes config extra tree =
     let open Lwt_result_syntax in
+    let*! pvm_state =
+      Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
+    in
     let*! status = check_input_request tree in
+    let is_profilable =
+      match pvm_state.tick_state with
+      | Collect | Snapshot
+      | Decode Tezos_webassembly_interpreter.Decode.{module_kont = MKStart; _}
+        ->
+          true
+      | _ -> false
+    in
+
     match status with
-    | Ok () ->
+    | Ok () when is_profilable ->
         let* tree, inboxes, level = load_inputs inboxes level tree in
         let* tree = eval_and_profile ~collapse ~with_time config extra tree in
         return (tree, inboxes, level)
-    | Error _ ->
+    | Error _ when is_profilable ->
         let* tree = eval_and_profile ~collapse ~with_time config extra tree in
+        return (tree, inboxes, level)
+    | _ ->
+        let*! () =
+          Lwt_io.printf
+            "Profiling can only be done from a snapshotable state or when \
+             waiting for input. You can use `step kernel_run` to go to the \
+             next snapshotable state.\n\
+             %!"
+        in
         return (tree, inboxes, level)
 
   let pp_input_request ppf = function
