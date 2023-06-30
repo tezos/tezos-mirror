@@ -76,7 +76,11 @@ impl BlockInProgress {
         host: &mut Host,
     ) -> Result<L2Block, Error> {
         let timestamp = current_timestamp(host);
-        let new_block = L2Block::new(self.number, self.valid_txs, timestamp);
+        let new_block = L2Block {
+            timestamp,
+            gas_used: self.cumulative_gas,
+            ..L2Block::new(self.number, self.valid_txs, timestamp)
+        };
         storage::store_current_block(host, &new_block)?;
         Ok(new_block)
     }
