@@ -991,12 +991,12 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
+      let elab_conf = Script_ir_translator_config.make ~legacy:false () in
       (match Entrypoint.to_string entrypoint with
       | "default" ->
-          (match Micheline.root parameters with
-          | Prim (_, D_Unit, [], _) -> return_unit
-          | _ ->
-              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
           >>=? fun () ->
           apply_transaction_to_implicit
             ~ctxt
@@ -1005,10 +1005,9 @@ let apply_manager_operation :
             ~pkh
             ~before_operation:ctxt_before_op
       | "stake" ->
-          (match Micheline.root parameters with
-          | Prim (_, D_Unit, [], _) -> return_unit
-          | _ ->
-              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
           >>=? fun () ->
           apply_stake
             ~ctxt
@@ -1017,23 +1016,24 @@ let apply_manager_operation :
             ~destination:pkh
             ~before_operation:ctxt_before_op
       | "unstake" ->
-          (match Micheline.root parameters with
-          | Int (_, requested_amount) -> return requested_amount
-          | _ ->
-              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
-          >>=? fun requested_amount ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            Script_typed_ir.int_t
+            (Micheline.root parameters)
+          >>=? fun (requested_amount, ctxt) ->
           apply_unstake
             ~ctxt
             ~sender:source
             ~amount
-            ~requested_amount
+            ~requested_amount:(Script_int.to_zint requested_amount)
             ~destination:pkh
             ~before_operation:ctxt_before_op
       | "finalize_unstake" ->
-          (match Micheline.root parameters with
-          | Prim (_, D_Unit, [], _) -> return_unit
-          | _ ->
-              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
           >>=? fun () ->
           apply_finalize_unstake
             ~ctxt
@@ -1042,35 +1042,27 @@ let apply_manager_operation :
             ~destination:pkh
             ~before_operation:ctxt_before_op
       | "set_delegate_parameters" ->
-          (match Micheline.root parameters with
-          | Prim
-              ( _,
-                D_Pair,
-                [
-                  Int (_, staking_over_baking_limit_millionth);
-                  Prim
-                    ( _,
-                      D_Pair,
-                      [
-                        Int (_, baking_over_staking_edge_billionth);
-                        Prim (_, D_Unit, [], []);
-                      ],
-                      [] );
-                ],
-                [] ) ->
-              return
-                ( staking_over_baking_limit_millionth,
-                  baking_over_staking_edge_billionth )
-          | _ ->
-              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
-          >>=? fun ( staking_over_baking_limit_millionth,
-                     baking_over_staking_edge_billionth ) ->
+          Script_typed_ir.(pair_t Micheline.dummy_location int_t unit_t)
+          >>?= fun (Ty_ex_c ty) ->
+          Script_typed_ir.(pair_t Micheline.dummy_location int_t ty)
+          >>?= fun (Ty_ex_c ty) ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            ty
+            (Micheline.root parameters)
+          >>=? fun ( ( staking_over_baking_limit_millionth,
+                       (baking_over_staking_edge_billionth, ()) ),
+                     ctxt ) ->
           apply_set_delegate_parameters
             ~ctxt
             ~sender:source
             ~destination:pkh
-            ~staking_over_baking_limit_millionth
-            ~baking_over_staking_edge_billionth
+            ~staking_over_baking_limit_millionth:
+              (Script_int.to_zint staking_over_baking_limit_millionth)
+            ~baking_over_staking_edge_billionth:
+              (Script_int.to_zint baking_over_staking_edge_billionth)
             ~before_operation:ctxt_before_op
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
