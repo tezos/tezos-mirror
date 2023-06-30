@@ -63,27 +63,3 @@ module Committee_member : sig
     #Client_context.wallet ->
     t tzresult Lwt.t
 end
-
-(** Module containing the definition of account wallet and functions operating
-    on accunt wallets exclusive to [Legacy] nodes. *)
-module Legacy : sig
-  (** The type of a wallet of a [Legacy] node. It contains both the public key
-      hash, optional public key, and optional secret key URI, of a committee
-      member, as [Legacy] nodes are responsible both for signing and verifying
-      signatures on behalf of the whole data availability committee. A [Legacy]
-      node can keep operating even if the public key or secret key URI of a
-      committee member are not defined. *)
-  type t = {
-    public_key_hash : Tezos_crypto.Aggregate_signature.public_key_hash;
-    public_key_opt : Tezos_crypto.Aggregate_signature.public_key option;
-    secret_key_uri_opt : Client_keys.aggregate_sk_uri option;
-  }
-
-  (** [of_committee_member_address pkh wallet_cctxt] constructs a value of
-      type [Legacy.t] from the public key hash [pkh], by using the
-      wallet context [wallet_cctxt] . *)
-  val of_committee_member_address :
-    Tezos_crypto.Aggregate_signature.public_key_hash ->
-    #Client_context.wallet ->
-    t tzresult Lwt.t
-end

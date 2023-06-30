@@ -38,18 +38,6 @@ type error +=
   | Public_key_for_committee_member_not_available of
       Tezos_crypto.Aggregate_signature.public_key_hash
 
-(** [verify dac_plugin public_keys_opt root_hash aggregate_signature witnesses] verifies
-    the [aggregate_signature] signed by the witnessed dac members. The witnessed
-    dac members is given by applying the [witnesses] bitmap against [public_keys_opt]
- *)
-val verify :
-  Dac_plugin.t ->
-  public_keys_opt:Tezos_crypto.Aggregate_signature.public_key option trace ->
-  Dac_plugin.raw_hash ->
-  Tezos_crypto.Aggregate_signature.signature ->
-  Z.t ->
-  (bool, tztrace) result Lwt.t
-
 (** Module that exposes signature operations necsesary when running in
     [Configuration.Coordinator] mode.*)
 module Coordinator : sig
@@ -66,37 +54,6 @@ module Coordinator : sig
   *)
   val handle_put_dac_member_signature :
     Node_context.Coordinator.t ->
-    Dac_plugin.t ->
-    Store_sigs.rw Store.Irmin_store.t ->
-    Page_store.Filesystem.t ->
-    Signature_repr.t ->
-    unit tzresult Lwt.t
-end
-
-module Legacy : sig
-  (* [sign_root_hash dac_pliugin cctx dac_sk_uris_opt root_hash] is legacy function that
-     returns an aggregate signature over [root_hash] and a bitmap of witnesses where
-     empty elements of [dac_sk_uris_opt] are 0 and non-empty elements are 1. *)
-  val sign_root_hash :
-    Dac_plugin.t ->
-    #Client_context.wallet ->
-    Client_keys.aggregate_sk_uri option trace ->
-    Dac_plugin.hash ->
-    (Tezos_crypto.Aggregate_signature.signature * Z.t, tztrace) result Lwt.t
-
-  (** [handle_put_dac_member_signature ctx dac_plugin ro_store rw_store page_store
-      dac_member_signature] does the following procedure:
-      1. Checks that the [root_hash] provided inside [Signature_repr.t] is known. Fails if unknown
-      2. Checks that the [dac_member_signature.signer_pkh] is currently a Dac member.
-      3. Checks that the dac member has not yet signed. If already signed, then noop
-         and return.
-      4. Otherwise:
-        1. Verify the signature against the root hash and signer's public key.
-        2. Add signature to [Signature_store]
-        3. Update the aggregate signature in [Aggregate_signature_store]
-  *)
-  val handle_put_dac_member_signature :
-    Node_context.Legacy.t ->
     Dac_plugin.t ->
     Store_sigs.rw Store.Irmin_store.t ->
     Page_store.Filesystem.t ->

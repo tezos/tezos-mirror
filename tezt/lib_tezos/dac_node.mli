@@ -29,25 +29,6 @@
 (** DAC Node state. *)
 type t
 
-(** Creates a DAC node to run in legacy mode, using the specified threshold
-    and list of dac members. *)
-val create_legacy :
-  ?path:string ->
-  ?name:string ->
-  ?color:Log.Color.t ->
-  ?data_dir:string ->
-  ?event_pipe:string ->
-  ?rpc_host:string ->
-  ?rpc_port:int ->
-  ?reveal_data_dir:string ->
-  threshold:int ->
-  committee_members:string list ->
-  ?committee_member_address:string ->
-  node:Node.t ->
-  client:Client.t ->
-  unit ->
-  t
-
 (** Creates a DAC node to run in coordinator mode registered with
     the specified committee members. *)
 val create_coordinator :
@@ -170,7 +151,7 @@ val create_observer_with_endpoint :
 val name : t -> string
 
 (** Get the mode in which a dac node is configured to run. Returned values can
-    be either "Legacy", "Coordinator", "Commitee_member" or "Observer". *)
+    be either "Coordinator", "Commitee_member" or "Observer". *)
 val mode : t -> string
 
 (** Get the RPC host given as [--rpc-addr] to an dac node. *)

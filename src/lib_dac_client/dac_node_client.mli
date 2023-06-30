@@ -58,13 +58,6 @@ module V0 : sig
   val post_store_preimage :
     #cctxt -> payload:bytes -> (Dac_plugin.raw_hash * bytes) tzresult Lwt.t
 
-  (** [get_verify_signature cctxt ~external_message] requests the DAC node to
-      verify the signature of the external message [external_message] via
-      the v0/verify_signature endpoint. The DAC committee of the DAC node must
-      be the same that was used to produce the [external_message]. *)
-  val get_verify_signature :
-    #cctxt -> external_message:string option -> bool tzresult Lwt.t
-
   (** [put_dac_member_signature cctxt ~signature:Signature_repr.t]
       stores the [signature] generated from signing [hex_root_hash] by
       [dac_member_pkh]. *)

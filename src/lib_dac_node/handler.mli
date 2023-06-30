@@ -49,13 +49,6 @@ val resolve_plugin_and_set_ready : Node_context.t -> t tzresult Lwt.t
           one handler for monitoring root hashes streamed by a [Coordinator].
           Upon detecting a new root hash, the associated pages are downloaded
           from the [Coordinator]. Differently from the case of
-          [Committee_member _], root hashes are not signed, }
-      {li If [ctxt.mode] is [Legacy _], then a handler to monitor root hashes
-          from a coordinator is present only if the RPC address of a
-          [Coordindator] node is specified in the DAC node configuration.
-          Additionally, if the configuration also contains a [committee_member]
-          address field specified, then this handler behave as in the case for
-          [Committee_member _]. Otherwise, it behaves as in the case for
-          [Observer _].}
+          [Committee_member _], root hashes are not signed. }
     } *)
 val handlers : Node_context.t -> t tzresult Lwt.t list tzresult Lwt.t

@@ -52,23 +52,6 @@ end
 
 (** [V0] encapsulates handlers specific to [V0] API. *)
 module V0 : sig
-  (** [handle_post_store_preimage] is a handler for "POST v0/store_preimage". *)
-  val handle_post_store_preimage :
-    Dac_plugin.t ->
-    #Client_context.wallet ->
-    Client_keys.aggregate_sk_uri option trace ->
-    Page_store.Filesystem.t ->
-    Dac_plugin.raw_hash Data_streamer.t ->
-    bytes ->
-    (Dac_plugin.raw_hash * bytes, tztrace) result Lwt.t
-
-  (** [handle_get_verify_signature] is a handler for "GET v0/verify_signature". *)
-  val handle_get_verify_signature :
-    Dac_plugin.t ->
-    Tezos_crypto.Aggregate_signature.public_key option trace ->
-    string option ->
-    (bool, error trace) result Lwt.t
-
   (** [handle_monitor_root_hashes] is a handler for  subscribing to the
       streaming of root hashes via "GET v0/monitor/root_hashes" RPC call. *)
   val handle_monitor_root_hashes :

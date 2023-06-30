@@ -58,14 +58,6 @@ module V0 = struct
       ( json |-> "root_hash" |> as_string,
         json |-> "external_message" |> get_bytes_from_json_string_node )
 
-  let get_verify_signature external_msg =
-    let query_string =
-      [
-        ("external_message", match Hex.of_string external_msg with `Hex s -> s);
-      ]
-    in
-    make ~query_string GET [api_prefix; "verify_signature"] JSON.as_bool
-
   let make_put_dac_member_signature_request_body ~dac_member_pkh ~root_hash
       signature =
     let (`Hex root_hash) = root_hash in

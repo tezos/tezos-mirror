@@ -33,9 +33,6 @@ module Coordinator = struct
   type t = {
     committee_members : Wallet_account.Coordinator.t list;
     hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
-           This could be problematic in case coordinator and member/observer
-           use two different plugins that bind different underlying hashes. *)
     certificate_streamers : Certificate_streamers.t;
   }
 
@@ -109,102 +106,10 @@ module Observer = struct
     return {coordinator_cctxt; committee_cctxts; timeout}
 end
 
-module Legacy = struct
-  type t = {
-    committee_members : Wallet_account.Legacy.t list;
-    coordinator_cctxt : Dac_node_client.cctxt option;
-    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
-    committee_member_opt : Wallet_account.Legacy.t option;
-  }
-
-  let get_all_committee_members_keys committee_members_addresses ~threshold
-      cctxt =
-    let open Lwt_result_syntax in
-    let* wallet_accounts =
-      List.map_es
-        (fun public_key_hash ->
-          Wallet_account.Legacy.of_committee_member_address
-            public_key_hash
-            cctxt)
-        committee_members_addresses
-    in
-    let*! valid_wallets =
-      List.filter_s
-        (fun Wallet_account.Legacy.{public_key_hash; secret_key_uri_opt; _} ->
-          if Option.is_some secret_key_uri_opt then Lwt.return true
-          else
-            let*! () =
-              Event.(emit committee_member_cannot_sign public_key_hash)
-            in
-            Lwt.return false)
-        wallet_accounts
-    in
-    let recovered_keys = List.length valid_wallets in
-    let*! () =
-      (* We emit a warning if the threshold of dac accounts needed to sign a
-         root page hash is not reached. We also emit a warning for each DAC
-         account whose secret key URI was not recovered.
-         We do not stop the dac node at this stage.
-      *)
-      if recovered_keys < threshold then
-        Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
-      else Event.(emit committee_keys_imported) ()
-    in
-    return wallet_accounts
-
-  let init legacy_config cctxt =
-    let open Lwt_result_syntax in
-    let Configuration.Legacy.
-          {
-            threshold;
-            committee_members_addresses;
-            dac_cctxt_config;
-            committee_member_address_opt;
-          } =
-      legacy_config
-    in
-    let* committee_members =
-      get_all_committee_members_keys
-        committee_members_addresses
-        ~threshold
-        cctxt
-    in
-    let+ committee_member_opt =
-      Option.map_es
-        (fun address ->
-          Wallet_account.Legacy.of_committee_member_address address cctxt)
-        committee_member_address_opt
-    in
-    let coordinator_cctxt =
-      Option.map
-        (fun Configuration.{host; port} ->
-          Dac_node_client.make_unix_cctxt ~scheme:"http" ~host ~port)
-        dac_cctxt_config
-    in
-    let hash_streamer = Data_streamer.init () in
-    {committee_members; coordinator_cctxt; hash_streamer; committee_member_opt}
-
-  let public_keys_opt t =
-    List.map
-      (fun Wallet_account.Legacy.{public_key_opt; _} -> public_key_opt)
-      t.committee_members
-
-  let secret_key_uris_opt t =
-    List.map
-      (fun Wallet_account.Legacy.{secret_key_uri_opt; _} -> secret_key_uri_opt)
-      t.committee_members
-
-  let committee_members t =
-    List.map
-      (fun Wallet_account.Legacy.{public_key_hash; _} -> public_key_hash)
-      t.committee_members
-end
-
 type mode =
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
 type ready_ctxt = {dac_plugin : dac_plugin_module}
 
@@ -231,9 +136,6 @@ let init_mode Configuration.{mode; _} cctxt =
   | Observer config ->
       let+ mode_node_ctxt = Observer.init config in
       Observer mode_node_ctxt
-  | Legacy config ->
-      let+ mode_node_ctxt = Legacy.init config cctxt in
-      Legacy mode_node_ctxt
 
 let init config cctxt =
   let open Lwt_result_syntax in

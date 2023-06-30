@@ -38,12 +38,6 @@ module V0 = struct
         (req "root_hash" Dac_plugin.raw_hash_encoding)
         (req "external_message" (bytes' Hex)))
 
-  let external_message_query =
-    let open Tezos_rpc.Query in
-    query (fun hex_string -> hex_string)
-    |+ opt_field "external_message" Tezos_rpc.Arg.string (fun s -> s)
-    |> seal
-
   let post_store_preimage =
     Tezos_rpc.Service.post_service
       ~description:"Split DAC reveal data"
@@ -51,15 +45,6 @@ module V0 = struct
       ~input:store_preimage_request_encoding
       ~output:store_preimage_response_encoding
       Tezos_rpc.Path.(v0_prefix / "store_preimage")
-
-  (* DAC/FIXME: https://gitlab.com/tezos/tezos/-/issues/4263
-     remove this endpoint once end-to-end tests are in place. *)
-  let get_verify_signature =
-    Tezos_rpc.Service.get_service
-      ~description:"Verify signature of an external message to inject in L1"
-      ~query:external_message_query
-      ~output:Data_encoding.bool
-      Tezos_rpc.Path.(v0_prefix / "verify_signature")
 
   let get_preimage =
     Tezos_rpc.Service.get_service

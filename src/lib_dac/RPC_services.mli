@@ -39,13 +39,6 @@ module V0 : sig
       Dac_plugin.raw_hash * Bytes.t )
     Tezos_rpc.Service.service
 
-  (** "GET v0/verify_signature" endpoint requests the DAL node to verify
-    the signature of the external message [external_message]. The DAC committee
-    of the DAL node must be the same that was used to produce the
-    [external_message]. *)
-  val get_verify_signature :
-    ([`GET], unit, unit, string option, unit, bool) Tezos_rpc.Service.service
-
   (** "GET v0/preimage" requests the preimage of hash, consisting of a
     single page, from cctxt. When the request succeeds, the raw page will be
     returned as a sequence of bytes. *)

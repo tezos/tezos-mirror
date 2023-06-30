@@ -113,47 +113,6 @@ let with_layer1 ?additional_bootstrap_accounts ?commitment_period
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f node client bootstrap1_key
 
-let with_legacy_dac_node ?name ?sc_rollup_node ?(pvm_name = "arith")
-    ?(wait_ready = true) ?committee_member_address ~threshold ~committee_size
-    tezos_node tezos_client f =
-  let range i = List.init i Fun.id in
-  let reveal_data_dir =
-    Option.map
-      (fun sc_rollup_node ->
-        Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
-      sc_rollup_node
-  in
-  let* committee_members =
-    List.fold_left
-      (fun keys i ->
-        let* keys in
-        let* key =
-          Client.bls_gen_and_show_keys
-            ~alias:(Format.sprintf "dac-member-%d" i)
-            tezos_client
-        in
-        return (key :: keys))
-      (return [])
-      (range committee_size)
-  in
-  let dac_node =
-    Dac_node.create_legacy
-      ?name
-      ~node:tezos_node
-      ~client:tezos_client
-      ?reveal_data_dir
-      ~threshold
-      ?committee_member_address
-      ~committee_members:
-        (List.map
-           (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-           committee_members)
-      ()
-  in
-  let* _dir = Dac_node.init_config dac_node in
-  let* () = Dac_node.run dac_node ~wait_ready in
-  f dac_node committee_members
-
 let with_coordinator_node ?name ?sc_rollup_node ?(pvm_name = "arith")
     ?(wait_ready = true) ?(allow_v1_api = false) ~committee_members tezos_node
     tezos_client f =
@@ -398,60 +357,6 @@ let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
         ~protocol
       @@ fun node client key -> scenario protocol node client key)
 
-let scenario_with_layer1_and_legacy_dac_nodes
-    ?(tags = ["dac"; "layer1"; "legacy"]) ?commitment_period ?challenge_window
-    ~__FILE__ ~threshold ~committee_size variant scenario =
-  let description = "Testing DAC node" in
-  test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1 ?commitment_period ?challenge_window ~protocol
-      @@ fun node client _key ->
-      with_legacy_dac_node ~threshold ~committee_size node client
-      @@ fun dac_node committee_members ->
-      scenario protocol node client dac_node threshold committee_members)
-
-let scenario_with_layer1_legacy_and_rollup_nodes
-    ?(tags = ["dac"; "dac_node"; "legacy"]) ?(pvm_name = "arith")
-    ?commitment_period ?challenge_window ?committee_member_address ?hooks
-    ~__FILE__ ~threshold ~committee_size variant scenario =
-  let description = "Testing DAC rollup and node with L1" in
-  regression_test
-    ~__FILE__
-    ~tags
-    (Printf.sprintf "%s (%s)" description variant)
-    (fun protocol ->
-      with_layer1 ?commitment_period ?challenge_window ~protocol
-      @@ fun node client key ->
-      with_fresh_rollup
-        ?hooks
-        node
-        client
-        key
-        ~pvm_name
-        (fun sc_rollup_address sc_rollup_node ->
-          with_legacy_dac_node
-            node
-            ~sc_rollup_node
-            ~pvm_name
-            ~threshold
-            ~committee_size
-            ?committee_member_address
-            client
-          @@ fun dac_node committee_members ->
-          scenario
-            protocol
-            dac_node
-            sc_rollup_node
-            sc_rollup_address
-            node
-            client
-            pvm_name
-            threshold
-            committee_members))
-
 module Call_endpoint = struct
   module V0 = struct
     let get_preimage dac_node page_hash =
@@ -459,9 +364,6 @@ module Call_endpoint = struct
 
     let post_store_preimage dac_node ~payload =
       RPC.call dac_node (Dac_rpc.V0.post_store_preimage ~payload)
-
-    let get_verify_signature dac_node external_message =
-      RPC.call dac_node (Dac_rpc.V0.get_verify_signature external_message)
 
     let put_dac_member_signature dac_node ~hex_root_hash ~dac_member_pkh
         ~signature =
