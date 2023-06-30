@@ -398,6 +398,18 @@ module S = struct
       ~output:Data_encoding.int64
       RPC_path.(path / "baking_power")
 
+  let current_baking_power =
+    RPC_service.get_service
+      ~description:
+        "The baking power of a delegate, as computed from its current stake. \
+         Contrary to the value returned by the baking_power endpoint, this \
+         value is not used for computing baking rights but only reflects the \
+         baking power that the delegate would have if a snapshot was taken at \
+         the current block."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int64
+      RPC_path.(path / "current_baking_power")
+
   let voting_info =
     RPC_service.get_service
       ~description:
@@ -558,6 +570,9 @@ let register () =
       check_delegate_registered ctxt pkh >>=? fun () ->
       let cycle = (Level.current ctxt).cycle in
       Stake_distribution.For_RPC.delegate_baking_power_for_cycle ctxt cycle pkh) ;
+  register1 ~chunked:false S.current_baking_power (fun ctxt pkh () () ->
+      check_delegate_registered ctxt pkh >>=? fun () ->
+      Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh) ;
   register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Vote.get_delegate_info ctxt pkh) ;
@@ -626,6 +641,9 @@ let current_voting_power ctxt block pkh =
 
 let baking_power ctxt block pkh =
   RPC_context.make_call1 S.baking_power ctxt block pkh () ()
+
+let current_baking_power ctxt block pkh =
+  RPC_context.make_call1 S.current_baking_power ctxt block pkh () ()
 
 let voting_info ctxt block pkh =
   RPC_context.make_call1 S.voting_info ctxt block pkh () ()
