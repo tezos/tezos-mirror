@@ -293,6 +293,9 @@ Smart Rollup WASM Debugger
 - ``profile`` commands now profiles the time spent in each steps of a PVM
   execution. It can be disabled with the option ``--without-time`` (MR
   :gl:`!9335`).
+- Added option ``--no-reboot`` to the ``profile`` command to profile a single
+  ``kernel_run``.
+- Improved profiling output for consecutive kernel runs.
 
 Data Availability Committee (DAC)
 ----------------------------------
