@@ -323,7 +323,6 @@ impl Encodable for EthereumTransactionCommon {
         stream.append(&self.v);
         append_h256(stream, self.r);
         append_h256(stream, self.s);
-        assert!(stream.is_finished());
     }
 }
 

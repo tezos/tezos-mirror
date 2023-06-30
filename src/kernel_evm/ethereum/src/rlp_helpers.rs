@@ -5,7 +5,9 @@
 
 //! Module containing helper functions for RLP encoding/decoding.
 
-use crate::transaction::{TransactionHash, TransactionStatus, TransactionType};
+use crate::transaction::{
+    TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
+};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 
@@ -87,6 +89,16 @@ pub fn append_h256(s: &mut rlp::RlpStream, h256: H256) -> &mut RlpStream {
         // which is not such a big deal as H256 is used for hashed values
         s.append_empty_data()
     }
+}
+
+pub fn decode_tx_hash(item: rlp::Rlp<'_>) -> Result<TransactionHash, DecoderError> {
+    let list = item.data()?;
+    if list.len() != TRANSACTION_HASH_SIZE {
+        return Err(DecoderError::RlpIncorrectListLen);
+    }
+    let mut tx = [0u8; TRANSACTION_HASH_SIZE];
+    tx.copy_from_slice(list);
+    Ok(tx)
 }
 
 pub fn decode_field_u256_le(
