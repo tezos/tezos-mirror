@@ -33,6 +33,10 @@ Breaking Changes
 RPC Changes
 -----------
 
+- The new ``current_voting_power`` RPC computes the voting power of a
+  delegate based on its current stake (as opposed to reading it from
+  the vote listings as the ``voting_power`` does) (MR :gl:`!9329`)
+
 Operation receipts
 ------------------
 

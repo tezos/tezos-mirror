@@ -2373,6 +2373,9 @@ module Vote : sig
   val get_voting_power :
     context -> public_key_hash -> (context * int64) tzresult Lwt.t
 
+  val get_current_voting_power_free :
+    context -> public_key_hash -> int64 tzresult Lwt.t
+
   val get_total_voting_power_free : context -> int64 tzresult Lwt.t
 
   val get_total_voting_power : context -> (context * int64) tzresult Lwt.t

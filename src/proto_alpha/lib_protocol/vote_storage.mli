@@ -130,13 +130,22 @@ val delegate_info_encoding : delegate_info Data_encoding.t
 val get_delegate_info :
   Raw_context.t -> Signature.public_key_hash -> delegate_info tzresult Lwt.t
 
+(** Returns the voting power of a delegate from the voting power
+    listings.  This function does not account for gas cost. *)
 val get_voting_power_free :
   Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
 
+(** Same as [get_voting_power_free] but consumes gas. *)
 val get_voting_power :
   Raw_context.t ->
   Signature.public_key_hash ->
   (Raw_context.t * int64) tzresult Lwt.t
+
+(** Same as [get_voting_power_free] but computes the voting power
+    based on the current stake of the delegate instead of reading it
+    from the vote listings. *)
+val get_current_voting_power_free :
+  Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
 
 (** Returns the sum of all voting power in the listings,
     without accounting for gas cost. *)

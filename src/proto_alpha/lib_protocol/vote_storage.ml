@@ -104,6 +104,20 @@ let listings_encoding =
          (req "pkh" Signature.Public_key_hash.encoding)
          (req "voting_power" int64)))
 
+let get_current_voting_power_free ctxt delegate =
+  let open Lwt_result_syntax in
+  let* stake = Stake_storage.get_staking_balance ctxt delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
+  let frozen = deposits.current_amount in
+  let frozen = Tez_repr.min stake frozen in
+  (* Cannot fail:
+     frozen = min stake _ ⇒ frozen <= stake ⇒ stake - frozen >= 0. *)
+  let*? delegated = Tez_repr.(stake -? frozen) in
+  let stake = Stake_repr.make ~frozen ~delegated in
+  let weight = Stake_context.staking_weight ctxt stake in
+  return weight
+
 let update_listings ctxt =
   let open Lwt_result_syntax in
   let*! ctxt = Storage.Vote.Listings.clear ctxt in
@@ -112,18 +126,10 @@ let update_listings ctxt =
       ctxt
       (ctxt, 0L)
       ~order:`Sorted
-      ~f:(fun (delegate, stake) (ctxt, total) ->
-        let delegate_contract = Contract_repr.Implicit delegate in
-        let* deposits = Frozen_deposits_storage.get ctxt delegate_contract in
-        let frozen = deposits.current_amount in
-        let frozen = Tez_repr.min stake frozen in
-        (* Cannot fail:
-           frozen = min stake _ ⇒ frozen <= stake ⇒ stake - frozen >= 0. *)
-        let*? delegated = Tez_repr.(stake -? frozen) in
-        let stake = Stake_repr.make ~frozen ~delegated in
-        let weight = Stake_context.staking_weight ctxt stake in
-        Storage.Vote.Listings.init ctxt delegate weight >>=? fun ctxt ->
-        return (ctxt, Int64.add total weight))
+      ~f:(fun delegate (ctxt, total) ->
+        let* weight = get_current_voting_power_free ctxt delegate in
+        let+ ctxt = Storage.Vote.Listings.init ctxt delegate weight in
+        (ctxt, Int64.add total weight))
   in
   let*! ctxt = Storage.Vote.Voting_power_in_listings.add ctxt total in
   return ctxt
