@@ -343,6 +343,19 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     (* The call context is built as a side effect of the evaluation. *)
     let call_stack = ref (Toplevel [], []) in
 
+    (* Successive kernel runs are pushed on the stack. If one the unresolved
+       function calls stack is not empty at the end of a kernel, this implies
+       its result might be inconsistent and the profiling has failed. *)
+    let kernel_runs = ref [] in
+    let push_kernel_run () =
+      match !call_stack with
+      | (Toplevel _ as run), [] ->
+          kernel_runs := Some run :: !kernel_runs ;
+          call_stack := (Toplevel [], [])
+      | _ ->
+          kernel_runs := None :: !kernel_runs ;
+          call_stack := (Toplevel [], [])
+    in
     (* [current_time] is defined as a closure instead as a direct call to avoid
        calling it at each tick and avoid a non necessary system call. *)
     let current_time () =
@@ -364,9 +377,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         updated_stack ;
 
       let* input_request_val = Wasm_vm.get_info pvm_state in
-      match (input_request_val.input_request, pvm_state.tick_state) with
-      | Reveal_required _, _ when reveal_builtins <> None -> return_true
-      | Input_required, _ | Reveal_required _, _ -> return_false
+      if pvm_state.tick_state = Snapshot || pvm_state.tick_state = Collect then
+        push_kernel_run () ;
+      match input_request_val.input_request with
+      | Reveal_required _ when reveal_builtins <> None -> return_true
+      | Input_required | Reveal_required _ -> return_false
       | _ -> return_true
     in
     let rec eval_until_input_requested accumulated_ticks tree =
@@ -393,12 +408,16 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
     in
     let+ tree, ticks = eval_until_input_requested Z.zero tree in
-    let call_stack =
-      match !call_stack with
-      | Toplevel l, stack -> (Toplevel (List.rev l), stack)
-      | n -> n
+    let kernel_runs =
+      (List.fold_left
+         (fun runs graph ->
+           match graph with
+           | Some (Toplevel l) -> Some (Toplevel (List.rev l)) :: runs
+           | n -> n :: runs)
+         [])
+        !kernel_runs
     in
-    (tree, ticks, call_stack)
+    (tree, ticks, kernel_runs)
 end
 
 (** Flamegraph building

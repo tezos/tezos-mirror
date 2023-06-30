@@ -388,24 +388,53 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   type extra = {functions : string Custom_section.FuncMap.t}
 
-  let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
+  let produce_flamegraph ~collapse ~max_depth kernel_runs =
     let filename =
       Time.System.(
         Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
     in
     let path = Filename.(concat (get_temp_dir_name ()) filename) in
     let file = open_out path in
-    if remaining_nodes <> [] then
-      Format.printf
-        "The resulting call graph is inconsistent, please open an issue.\n%!" ;
-    Profiling.pp_flamegraph
-      ~collapse
-      ~max_depth
-      Profiling.pp_call
+    let pp_kernel_run ppf = function
+      | Some run ->
+          Profiling.pp_flamegraph ~collapse ~max_depth Profiling.pp_call ppf run
+      | None -> ()
+    in
+    let pp_kernel_runs ppf runs =
+      Format.pp_print_list ~pp_sep:(fun _ _ -> ()) pp_kernel_run ppf runs
+    in
+    Format.fprintf
       (Format.formatter_of_out_channel file)
-      current_node ;
+      "%a"
+      pp_kernel_runs
+      kernel_runs ;
     close_out file ;
     Format.printf "Profiling result can be found in %s\n%!" path
+
+  let profiling_results = function
+    | Some run ->
+        let pvm_steps = Profiling.aggregate_toplevel_time_and_ticks run in
+        let full_ticks, full_time = Profiling.full_ticks_and_time pvm_steps in
+        Format.printf
+          "----------------------\n\
+           Detailed results for a `kernel_run`:\n\
+           %a\n\n\
+           Full execution: %a ticks%a\n\
+           %!"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+             Profiling.pp_ticks_and_time)
+          pvm_steps
+          Z.pp_print
+          full_ticks
+          Profiling.pp_time_opt
+          full_time
+    | None ->
+        Format.printf
+          "----------------------\n\
+           The resulting call graph is inconsistent for this specific \
+           `kernel_run`, please open an issue.\n\
+           %!"
 
   let eval_and_profile ~collapse ~with_time config extra tree =
     let open Lwt_syntax in
@@ -424,26 +453,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             tree
         in
         produce_flamegraph ~collapse ~max_depth:100 graph ;
-        let pvm_steps =
-          Profiling.aggregate_toplevel_time_and_ticks (fst graph)
-        in
-        let full_ticks, full_time = Profiling.full_ticks_and_time pvm_steps in
+        List.iter profiling_results graph ;
         Format.printf
-          "----------------------\n\
-           Detailed results:\n\
-           %a\n\n\
-           Full execution: %a ticks%a\n\
-           Full execution with padding: %a ticks\n\
-           ----------------------\n\
-           %!"
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
-             Profiling.pp_ticks_and_time)
-          pvm_steps
-          Z.pp_print
-          full_ticks
-          Profiling.pp_time_opt
-          full_time
+          "----------------------\nFull execution with padding: %a ticks\n%!"
           Z.pp_print
           ticks ;
         tree)
