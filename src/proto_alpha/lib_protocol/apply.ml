@@ -991,22 +991,37 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      (match (Entrypoint.to_string entrypoint, Micheline.root parameters) with
-      | "default", Prim (_, D_Unit, [], _) ->
+      (match Entrypoint.to_string entrypoint with
+      | "default" ->
+          (match Micheline.root parameters with
+          | Prim (_, D_Unit, [], _) -> return_unit
+          | _ ->
+              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          >>=? fun () ->
           apply_transaction_to_implicit
             ~ctxt
             ~sender:source_contract
             ~amount
             ~pkh
             ~before_operation:ctxt_before_op
-      | "stake", Prim (_, D_Unit, [], _) ->
+      | "stake" ->
+          (match Micheline.root parameters with
+          | Prim (_, D_Unit, [], _) -> return_unit
+          | _ ->
+              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          >>=? fun () ->
           apply_stake
             ~ctxt
             ~sender:source
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | "unstake", Int (_, requested_amount) ->
+      | "unstake" ->
+          (match Micheline.root parameters with
+          | Int (_, requested_amount) -> return requested_amount
+          | _ ->
+              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          >>=? fun requested_amount ->
           apply_unstake
             ~ctxt
             ~sender:source
@@ -1014,29 +1029,42 @@ let apply_manager_operation :
             ~requested_amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | "finalize_unstake", Prim (_, D_Unit, [], _) ->
+      | "finalize_unstake" ->
+          (match Micheline.root parameters with
+          | Prim (_, D_Unit, [], _) -> return_unit
+          | _ ->
+              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          >>=? fun () ->
           apply_finalize_unstake
             ~ctxt
             ~sender:source
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ( "set_delegate_parameters",
-          Prim
-            ( _,
-              D_Pair,
-              [
-                Int (_, staking_over_baking_limit_millionth);
-                Prim
-                  ( _,
-                    D_Pair,
-                    [
-                      Int (_, baking_over_staking_edge_billionth);
-                      Prim (_, D_Unit, [], []);
-                    ],
-                    [] );
-              ],
-              [] ) ) ->
+      | "set_delegate_parameters" ->
+          (match Micheline.root parameters with
+          | Prim
+              ( _,
+                D_Pair,
+                [
+                  Int (_, staking_over_baking_limit_millionth);
+                  Prim
+                    ( _,
+                      D_Pair,
+                      [
+                        Int (_, baking_over_staking_edge_billionth);
+                        Prim (_, D_Unit, [], []);
+                      ],
+                      [] );
+                ],
+                [] ) ->
+              return
+                ( staking_over_baking_limit_millionth,
+                  baking_over_staking_edge_billionth )
+          | _ ->
+              tzfail (Script_interpreter.Bad_contract_parameter source_contract))
+          >>=? fun ( staking_over_baking_limit_millionth,
+                     baking_over_staking_edge_billionth ) ->
           apply_set_delegate_parameters
             ~ctxt
             ~sender:source
@@ -1044,16 +1072,6 @@ let apply_manager_operation :
             ~staking_over_baking_limit_millionth
             ~baking_over_staking_edge_billionth
             ~before_operation:ctxt_before_op
-      | ( ( "default" | "stake" | "unstake" | "finalize_unstake"
-          | "set_delegate_parameters" ),
-          _ ) ->
-          (* Only allow:
-             - [unit] parameter to implicit accounts' default, stake,
-               and finalize_unstake entrypoints;
-             - [nat] parameter to implicit accounts' unstake entrypoint;
-             - [pair nat nat unit] parameter to implicit accounts'
-               set_delegate_parameters entrypoint.*)
-          tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
