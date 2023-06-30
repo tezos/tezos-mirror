@@ -527,6 +527,8 @@ module Stake_distribution = struct
     let open Lwt_result_syntax in
     let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
     return (Stake_repr.get_frozen total_stake)
+
+  module For_RPC = Delegate_sampler.For_RPC
 end
 
 module Nonce = Nonce_storage

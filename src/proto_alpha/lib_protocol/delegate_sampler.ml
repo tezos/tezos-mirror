@@ -275,6 +275,30 @@ let select_distribution_for_cycle ctxt cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
+let delegate_baking_power_from_staking_balance ctxt delegate staking_balance =
+  let open Lwt_result_syntax in
+  let delegation_over_baking_limit =
+    Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
+  in
+  let staking_over_baking_global_limit_millionth =
+    Int64.(
+      mul
+        1_000_000L
+        (of_int
+           (Constants_storage
+            .adaptive_inflation_staking_over_baking_global_limit
+              ctxt)))
+  in
+  let+ stake =
+    get_delegate_stake_from_staking_balance
+      ctxt
+      ~staking_over_baking_global_limit_millionth
+      ~delegation_over_baking_limit
+      delegate
+      staking_balance
+  in
+  Stake_context.staking_weight ctxt stake
+
 let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
@@ -287,3 +311,17 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | Some outdated_cycle ->
       Delegate_sampler_state.remove_existing ctxt outdated_cycle
       >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
+
+module For_RPC = struct
+  let delegate_baking_power_for_cycle ctxt cycle delegate =
+    let open Lwt_result_syntax in
+    let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
+    let* seed = Seed_storage.raw_for_cycle ctxt cycle in
+    let* selected_index =
+      compute_snapshot_index_for_seed ~max_snapshot_index seed
+    in
+    let* staking_balance =
+      Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
+    in
+    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+end
