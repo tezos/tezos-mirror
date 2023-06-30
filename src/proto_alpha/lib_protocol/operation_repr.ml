@@ -33,7 +33,7 @@ module Kind = struct
 
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
-    | Endorsement_kind : attestation_consensus_kind consensus
+    | Attestation_kind : attestation_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
