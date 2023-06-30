@@ -33,7 +33,7 @@ type eval_step =
   | Kernel_run  (** Up to the end of the current `kernel_run` *)
   | Inbox  (** Until input requested *)
 
-type profile_options = {collapse : bool; with_time : bool}
+type profile_options = {collapse : bool; with_time : bool; no_reboot : bool}
 
 (* Possible commands for the REPL. *)
 type commands =
@@ -88,9 +88,13 @@ let parse_profile_options =
         Option.map (fun opts -> {opts with collapse = true}) profile_options
     | "--without-time" ->
         Option.map (fun opts -> {opts with with_time = false}) profile_options
+    | "--no-reboot" ->
+        Option.map (fun opts -> {opts with no_reboot = true}) profile_options
     | _ -> None
   in
-  List.fold_left set_option (Some {collapse = false; with_time = true})
+  List.fold_left
+    set_option
+    (Some {collapse = false; with_time = true; no_reboot = false})
 
 (* Documentation for commands type *)
 type command_description = {
@@ -238,7 +242,8 @@ let rec commands_docs =
          the identical stacks, at the cost of not being able to track the call \
          stack on a time basis.\n\
         \ - `--without-time`: does not profile the time (can have an impact on \
-         performance if the kernel does too many function calls).";
+         performance if the kernel does too many function calls).\n\
+        \ - `--no-reboot`: profile a single `kernel_run`, not a full inbox.";
     };
     {
       parse =
@@ -436,7 +441,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            `kernel_run`, please open an issue.\n\
            %!"
 
-  let eval_and_profile ~collapse ~with_time config extra tree =
+  let eval_and_profile ~collapse ~with_time ~no_reboot config extra tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         Format.printf
@@ -448,7 +453,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Prof.eval_and_profile
             ~write_debug
             ~reveal_builtins:(reveals config)
-            with_time
+            ~with_time
+            ~no_reboot
             extra.functions
             tree
         in
@@ -534,7 +540,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return (tree, ticks, inboxes, level)
         | Error _ -> return' (eval_until_input_requested config tree))
 
-  let profile ~collapse ~with_time level inboxes config extra tree =
+  let profile ~collapse ~with_time ~no_reboot level inboxes config extra tree =
     let open Lwt_result_syntax in
     let*! pvm_state =
       Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
@@ -552,10 +558,14 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     match status with
     | Ok () when is_profilable ->
         let* tree, inboxes, level = load_inputs inboxes level tree in
-        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
+        let* tree =
+          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+        in
         return (tree, inboxes, level)
     | Error _ when is_profilable ->
-        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
+        let* tree =
+          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+        in
         return (tree, inboxes, level)
     | _ ->
         let*! () =
@@ -939,9 +949,17 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Reveal_metadata ->
           let*! tree = reveal_metadata config tree in
           return ~tree ()
-      | Profile {collapse; with_time} ->
+      | Profile {collapse; with_time; no_reboot} ->
           let* tree, inboxes, level =
-            profile ~collapse ~with_time level inboxes config extra tree
+            profile
+              ~collapse
+              ~with_time
+              ~no_reboot
+              level
+              inboxes
+              config
+              extra
+              tree
           in
           Lwt.return_ok (tree, inboxes, level)
       | Unknown s ->

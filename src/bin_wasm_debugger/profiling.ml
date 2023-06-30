@@ -338,7 +338,8 @@ let update_call_stack current_tick current_time (current_node, call_stack)
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
     kernel up to the next result, and returns the call stack. *)
-  let eval_and_profile ?write_debug ?reveal_builtins with_time symbols tree =
+  let eval_and_profile ?write_debug ?reveal_builtins ~with_time ~no_reboot
+      symbols tree =
     let open Lwt_syntax in
     (* The call context is built as a side effect of the evaluation. *)
     let call_stack = ref (Toplevel [], []) in
@@ -398,9 +399,15 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             compute_and_snapshot
             tree
         in
-        eval_until_input_requested
-          (Z.add accumulated_ticks @@ Z.of_int64 ticks)
-          tree
+        let* pvm_state =
+          Wasm_utils.Tree_encoding_runner.decode
+            Wasm_pvm.pvm_state_encoding
+            tree
+        in
+        let accumulated_ticks = Z.add accumulated_ticks @@ Z.of_int64 ticks in
+        if no_reboot && pvm_state.tick_state = Snapshot then
+          return (tree, accumulated_ticks)
+        else eval_until_input_requested accumulated_ticks tree
       in
       match info.Wasm_pvm_state.input_request with
       | No_input_required -> run ()
