@@ -58,6 +58,7 @@
   test_dal_slot_proof
   test_compare_operations
   test_operation_encoding
+  test_balance_updates_encoding
   test_bytes_conversion))
 
 (executable
