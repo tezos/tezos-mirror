@@ -4590,6 +4590,9 @@ module Stake_distribution : sig
   module For_RPC : sig
     val delegate_baking_power_for_cycle :
       context -> Cycle.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
+
+    val delegate_current_baking_power :
+      context -> Signature.public_key_hash -> int64 tzresult Lwt.t
   end
 end
 

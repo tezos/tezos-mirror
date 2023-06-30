@@ -324,4 +324,9 @@ module For_RPC = struct
       Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
     in
     delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+
+  let delegate_current_baking_power ctxt delegate =
+    let open Lwt_result_syntax in
+    let* staking_balance = Stake_storage.get_staking_balance ctxt delegate in
+    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
 end
