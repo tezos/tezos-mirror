@@ -148,14 +148,6 @@ let rpc_directory_without_validator dir =
         (Tezos_rpc.Service.subst1 s)
         (fun (chain, a) p q -> f chain a p q)
   in
-  let register_dynamic_directory2 ?descr s f =
-    dir :=
-      Tezos_rpc.Directory.register_dynamic_directory
-        !dir
-        ?descr
-        (Tezos_rpc.Path.subst1 s)
-        (fun (chain, a) -> f chain a)
-  in
   register0 dir S.chain_id (fun chain_store () () ->
       return (Store.Chain.chain_id chain_store)) ;
   register0 dir S.checkpoint (fun chain_store () () ->
@@ -178,9 +170,6 @@ let rpc_directory_without_validator dir =
   (* blocks *)
   register0 dir S.Blocks.list (fun chain q () ->
       list_blocks chain ?length:q#length ?min_date:q#min_date q#heads) ;
-  register_dynamic_directory2
-    Block_services.path
-    Block_directory.build_rpc_directory ;
   (* invalid_blocks *)
   register0 dir S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
@@ -201,6 +190,18 @@ let rpc_directory validator =
   in
   rpc_directory_without_validator dir ;
   rpc_directory_with_validator dir validator ;
+  let register_dynamic_directory2 ?descr s f =
+    dir :=
+      Tezos_rpc.Directory.register_dynamic_directory
+        !dir
+        ?descr
+        (Tezos_rpc.Path.subst1 s)
+        (fun (chain, a) -> f chain a)
+  in
+  (* blocks *)
+  register_dynamic_directory2
+    Block_services.path
+    Block_directory.build_rpc_directory_with_validator ;
   !dir
 
 let rpc_directory_without_validator () =
@@ -208,6 +209,18 @@ let rpc_directory_without_validator () =
     ref Tezos_rpc.Directory.empty
   in
   rpc_directory_without_validator dir ;
+  let register_dynamic_directory2 ?descr s f =
+    dir :=
+      Tezos_rpc.Directory.register_dynamic_directory
+        !dir
+        ?descr
+        (Tezos_rpc.Path.subst1 s)
+        (fun (chain, a) -> f chain a)
+  in
+  (* blocks *)
+  register_dynamic_directory2
+    Block_services.path
+    Block_directory.build_rpc_directory_without_validator ;
   !dir
 
 let build_rpc_directory validator =
