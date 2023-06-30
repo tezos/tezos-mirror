@@ -44,7 +44,6 @@ WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk evm_kernel
 COPY --chown=tezos:nogroup src evm_kernel/src
-COPY --chown=tezos:nogroup scripts/evm_installer.sh evm_kernel/scripts/evm_installer.sh
 RUN make -C evm_kernel -f kernels.mk build-deps \
   && make -C evm_kernel -f kernels.mk evm_installer.wasm
 
