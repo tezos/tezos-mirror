@@ -29,15 +29,15 @@
 module Kind = struct
   type preattestation_consensus_kind = Preattestation_consensus_kind
 
-  type endorsement_consensus_kind = Endorsement_consensus_kind
+  type attestation_consensus_kind = Attestation_consensus_kind
 
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
-    | Endorsement_kind : endorsement_consensus_kind consensus
+    | Endorsement_kind : attestation_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = endorsement_consensus_kind consensus
+  type endorsement = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -49,7 +49,7 @@ module Kind = struct
     | Double_consensus_operation_evidence
 
   type double_endorsement_evidence =
-    endorsement_consensus_kind double_consensus_operation_evidence
+    attestation_consensus_kind double_consensus_operation_evidence
 
   type double_preendorsement_evidence =
     preattestation_consensus_kind double_consensus_operation_evidence
