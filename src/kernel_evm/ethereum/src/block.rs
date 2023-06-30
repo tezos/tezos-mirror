@@ -37,12 +37,12 @@ impl BlockConstants {
     /// Return the first block of the chain (genisis).
     /// TODO find suitable values for gas_limit et.c.
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
-    pub fn first_block() -> Self {
+    pub fn first_block(timestamp: U256) -> Self {
         Self {
             gas_price: U256::one(),
             number: U256::zero(),
             coinbase: H160::zero(),
-            timestamp: U256::zero(),
+            timestamp,
             difficulty: U256::zero(),
             gas_limit: 1u64,
             base_fee_per_gas: U256::one(),

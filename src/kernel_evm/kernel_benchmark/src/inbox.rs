@@ -56,7 +56,7 @@ pub fn process_inbox_message<'a, Host: Runtime>(
         }
         InboxMessage::External(message) => {
             debug_msg!(host, "Got an external message");
-            let current_block = BlockConstants::first_block();
+            let current_block = BlockConstants::first_block(U256::zero());
             // decoding
             let decoder = Rlp::new(message);
             let ethereum_transaction = EthereumTransactionCommon::decode(&decoder)

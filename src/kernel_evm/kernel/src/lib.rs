@@ -12,7 +12,6 @@ use storage::{
     store_kernel_upgrade_nonce,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::block::L2Block;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
@@ -31,7 +30,6 @@ mod apply;
 mod block;
 mod blueprint;
 mod error;
-mod genesis;
 mod inbox;
 mod indexable_storage;
 mod parsing;
@@ -147,23 +145,10 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn genesis_initialisation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let block_path = storage::block_path(U256::zero())?;
-    match Runtime::store_has(host, &block_path) {
-        Ok(Some(_)) => Ok(()),
-        _ => {
-            store_kernel_upgrade_nonce(host, 1)?;
-            genesis::init_block(host)
-        }
-    }
-}
-
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let smart_rollup_address = retrieve_smart_rollup_address(host)?;
     let chain_id = retrieve_chain_id(host)?;
     let ticketer = read_ticketer(host);
-
-    genesis_initialisation(host)?;
 
     let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)?;
 

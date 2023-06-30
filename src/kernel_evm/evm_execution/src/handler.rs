@@ -1307,7 +1307,7 @@ mod test {
     #[test]
     fn legacy_create_to_correct_address() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1344,7 +1344,7 @@ mod test {
     #[test]
     fn create2_to_correct_address() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1380,7 +1380,7 @@ mod test {
     #[test]
     fn create2_to_correct_address_nonzero_salt() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1419,7 +1419,7 @@ mod test {
     #[test]
     fn origin_instruction_returns_origin_address() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1485,7 +1485,7 @@ mod test {
     #[test]
     fn contract_call_produces_correct_output() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1586,7 +1586,7 @@ mod test {
     #[test]
     fn contract_call_fails_beyond_max_stack_depth() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1692,7 +1692,7 @@ mod test {
     #[test]
     fn contract_call_succeeds_at_maximum_stack_depth() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1785,7 +1785,7 @@ mod test {
     #[test]
     fn contract_can_use_durable_storage() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1858,7 +1858,7 @@ mod test {
     #[test]
     fn contract_create_can_use_durable_storage() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1905,7 +1905,7 @@ mod test {
     #[test]
     fn contract_call_does_transfer() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -1969,7 +1969,7 @@ mod test {
     #[test]
     fn contract_call_fails_when_insufficient_funds_for_transfer() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
@@ -2035,7 +2035,7 @@ mod test {
     #[test]
     fn revert_can_return_a_value() {
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block();
+        let block = BlockConstants::first_block(U256::zero());
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
