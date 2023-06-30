@@ -3,5 +3,5 @@
  (package teztale)
  (public_name teztale-server)
  (promote (until-clean))
- (libraries caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt
-   cohttp-lwt-unix ezgzip safepass teztale.lib aches))
+ (libraries aches caqti-driver-postgresql caqti-driver-sqlite3 caqti-lwt
+   cohttp-lwt-unix ezgzip safepass prometheus-app teztale.lib))

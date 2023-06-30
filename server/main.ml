@@ -1043,6 +1043,19 @@ let routes :
     ( Re.str "/head.json",
       fun _g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_head ~logger db_pool );
+    ( Re.str "/metrics",
+      fun _g ~logger:_ ~conf:_ ~admins:_ ~users:_ _db_pool _header _meth _body ->
+        Lwt.bind
+          Prometheus.CollectorRegistry.(collect default)
+          (fun data ->
+            let body =
+              Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data
+            in
+            let headers =
+              Cohttp.Header.init_with "Content-Type" "text/plain; version=0.0.4"
+            in
+            Cohttp_lwt_unix.Server.respond_string ~status:`OK ~headers ~body ())
+    );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
