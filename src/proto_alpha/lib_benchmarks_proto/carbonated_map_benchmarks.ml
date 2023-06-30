@@ -303,7 +303,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let group = group
 
-    let model = Model.make ~conv:(fun () -> ()) ~model:Model.unknown_const1
+    let model =
+      Model.make
+        ~conv:(fun () -> ())
+        ~model:(Model.unknown_const1 ~const:Find.fv_intercept)
 
     let create_benchmark ~rng_state (_config : config) =
       let ctxt = make_context ~rng_state in
