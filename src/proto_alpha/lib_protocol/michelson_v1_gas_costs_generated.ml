@@ -114,11 +114,11 @@ let cost_N_ICheck_signature_ed25519 size =
   S.safe_int 65_800 + (v0 + (v0 lsr 3))
 
 (* model N_ICheck_signature_p256 *)
-(* Approximating 1.111539 x term *)
+(* Approximating 340591.308259 + 1.111539 x term *)
 let cost_N_ICheck_signature_p256 size =
   let open S_syntax in
   let v0 = S.safe_int size in
-  S.safe_int 990_000 + (v0 + (v0 lsr 3))
+  S.safe_int 341_000 + (v0 + (v0 lsr 3))
 
 (* model N_ICheck_signature_secp256k1 *)
 (* Approximating 1.125404 x term *)
@@ -588,7 +588,7 @@ let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 3_600
 let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4_200
 
 (* model B58CHECK_DECODING_PUBLIC_KEY_p256 *)
-let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = S.safe_int 325_000
+let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = S.safe_int 13_450
 
 (* model B58CHECK_DECODING_PUBLIC_KEY_secp256k1 *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 9_000
@@ -675,7 +675,7 @@ let cost_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 60
 let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
 
 (* model DECODING_PUBLIC_KEY_p256 *)
-let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 18_800
+let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 9_550
 
 (* model DECODING_PUBLIC_KEY_secp256k1 *)
 let cost_DECODING_PUBLIC_KEY_secp256k1 = S.safe_int 4_900
