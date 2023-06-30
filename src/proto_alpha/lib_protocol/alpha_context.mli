@@ -4004,7 +4004,7 @@ module Kind : sig
   type endorsement_consensus_kind = Endorsement_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preattestation_consensus_kind consensus
+    | Preattestation_kind : preattestation_consensus_kind consensus
     | Endorsement_kind : endorsement_consensus_kind consensus
 
   type preendorsement = preattestation_consensus_kind consensus
