@@ -217,6 +217,9 @@ Baker
 Accuser
 -------
 
+- Rename ``endorsement`` into ``attestation`` for accuser errors and events.
+  (MR :gl:`!9196`)
+
 Signer
 ------
 

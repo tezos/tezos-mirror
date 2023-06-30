@@ -27,15 +27,25 @@
    -------
    Component:    Accuser
    Invocation:   dune exec tezt/tests/main.exe -- --file double_consensus.ml
-   Subject:      Detect double (pre)endorsement through the accuser.
+   Subject:      Detect double (pre)attestation through the accuser.
 *)
 
-let double_endorsement_waiter accuser =
-  Accuser.wait_for accuser "double_endorsement_denounced.v0" (fun _ -> Some ())
+let use_legacy_attestation_name protocol = Protocol.number protocol < 18
 
-let double_preendorsement_waiter accuser =
-  Accuser.wait_for accuser "double_preendorsement_denounced.v0" (fun _ ->
-      Some ())
+let get_consensus_operation_name protocol =
+  if use_legacy_attestation_name protocol then "endorsement" else "attestation"
+
+let double_attestation_waiter ~protocol accuser =
+  Accuser.wait_for
+    accuser
+    (sf "double_%s_denounced.v0" (get_consensus_operation_name protocol))
+    (fun _ -> Some ())
+
+let double_preattestation_waiter ~protocol accuser =
+  Accuser.wait_for
+    accuser
+    (sf "double_pre%s_denounced.v0" (get_consensus_operation_name protocol))
+    (fun _ -> Some ())
 
 let double_consensus_already_denounced_waiter accuser oph =
   Accuser.wait_for accuser "double_consensus_already_denounced.v0" (fun json ->
@@ -43,9 +53,10 @@ let double_consensus_already_denounced_waiter accuser oph =
 
 let get_double_consensus_denounciation_hash consensus_name client =
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
-  let ops = JSON.(mempool |-> "applied" |> as_list) in
+  let ops = JSON.(mempool |-> "validated" |> as_list) in
   let op =
     List.find_map
       (fun op ->
@@ -61,7 +72,7 @@ let get_double_consensus_denounciation_hash consensus_name client =
   | None -> failwith "Denunciation not found in the mempool"
   | Some op -> return op
 
-let double_endorsement_init
+let double_attestation_init
     (consensus_for :
       ?endpoint:Client.endpoint ->
       ?protocol:Protocol.t ->
@@ -92,9 +103,10 @@ let double_endorsement_init
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
-  let op = List.hd JSON.(mempool |-> "applied" |> as_list) in
+  let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
   let branch = JSON.(op |-> "branch" |> as_string) in
   let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
   let level = JSON.(content |-> "level" |> as_int) in
@@ -106,14 +118,15 @@ let double_endorsement_init
 
 let double_consensus_wrong_slot
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
+  let consensus_name = consensus_name protocol in
   let* (client, accuser), (branch, level, round, slots, block_payload_hash) =
-    double_endorsement_init consensus_for consensus_name protocol ()
+    double_attestation_init consensus_for consensus_name protocol ()
   in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
   let op =
     mk_consensus ~slot:(List.nth slots 1) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter accuser in
+  let waiter = consensus_waiter ~protocol accuser in
   let* _ =
     Operation.Consensus.inject ~branch ~signer:Constant.bootstrap1 op client
   in
@@ -134,38 +147,39 @@ let double_consensus_wrong_slot
   let* () = waiter_already_denounced in
   unit
 
-let endorse_utils =
+let attest_utils =
   ( Client.endorse_for,
     Operation.Consensus.attestation ~use_legacy_name:true,
-    double_endorsement_waiter,
-    "endorsement" )
+    double_attestation_waiter,
+    get_consensus_operation_name )
 
-let preendorse_utils =
+let preattest_utils =
   ( Client.preendorse_for,
     Operation.Consensus.preattestation ~use_legacy_name:true,
-    double_preendorsement_waiter,
-    "preendorsement" )
+    double_preattestation_waiter,
+    fun protocol -> sf "pre%s" (get_consensus_operation_name protocol) )
 
-let double_endorsement_wrong_slot =
+let double_attestation_wrong_slot =
   Protocol.register_test
     ~__FILE__
-    ~title:"double endorsement using wrong slot"
+    ~title:"double attestation using wrong slot"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "endorsement"; "accuser"; "slot"; "node"]
-  @@ fun protocol -> double_consensus_wrong_slot endorse_utils protocol
+    ~tags:["double"; "attestation"; "accuser"; "slot"; "node"]
+  @@ fun protocol -> double_consensus_wrong_slot attest_utils protocol
 
-let double_preendorsement_wrong_slot =
+let double_preattestation_wrong_slot =
   Protocol.register_test
     ~__FILE__
-    ~title:"double preendorsement using wrong slot"
+    ~title:"double preattestation using wrong slot"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preendorsement"; "accuser"; "slot"; "node"]
-  @@ fun protocol -> double_consensus_wrong_slot preendorse_utils protocol
+    ~tags:["double"; "preattestation"; "accuser"; "slot"; "node"]
+  @@ fun protocol -> double_consensus_wrong_slot preattest_utils protocol
 
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
+  let consensus_name = consensus_name protocol in
   let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
-    double_endorsement_init consensus_for consensus_name protocol ()
+    double_attestation_init consensus_for consensus_name protocol ()
   in
   let* header =
     RPC.Client.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
@@ -175,7 +189,7 @@ let double_consensus_wrong_block_payload_hash
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter accuser in
+  let waiter = consensus_waiter ~protocol accuser in
   let* _ =
     Operation.Consensus.inject
       ~force:true
@@ -210,35 +224,36 @@ let double_consensus_wrong_block_payload_hash
   let* () = waiter_already_denounced in
   unit
 
-let double_endorsement_wrong_block_payload_hash =
+let double_attestation_wrong_block_payload_hash =
   Protocol.register_test
     ~__FILE__
-    ~title:"double endorsement using wrong block_payload_hash"
+    ~title:"double attestation using wrong block_payload_hash"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "endorsement"; "accuser"; "block_payload_hash"; "node"]
+    ~tags:["double"; "attestation"; "accuser"; "block_payload_hash"; "node"]
   @@ fun protocol ->
-  double_consensus_wrong_block_payload_hash endorse_utils protocol
+  double_consensus_wrong_block_payload_hash attest_utils protocol
 
-let double_preendorsement_wrong_block_payload_hash =
+let double_preattestation_wrong_block_payload_hash =
   Protocol.register_test
     ~__FILE__
-    ~title:"double preendorsement using wrong block_payload_hash"
+    ~title:"double preattestation using wrong block_payload_hash"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preendorsement"; "accuser"; "block_payload_hash"; "node"]
+    ~tags:["double"; "preattestation"; "accuser"; "block_payload_hash"; "node"]
   @@ fun protocol ->
-  double_consensus_wrong_block_payload_hash preendorse_utils protocol
+  double_consensus_wrong_block_payload_hash preattest_utils protocol
 
 let double_consensus_wrong_branch
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
+  let consensus_name = consensus_name protocol in
   let* (client, accuser), (_branch, level, round, slots, block_payload_hash) =
-    double_endorsement_init consensus_for consensus_name protocol ()
+    double_attestation_init consensus_for consensus_name protocol ()
   in
   let* branch = Operation.Manager.get_branch ~offset:4 client in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
   let op =
     mk_consensus ~slot:(List.nth slots 0) ~level ~round ~block_payload_hash
   in
-  let waiter = consensus_waiter accuser in
+  let waiter = consensus_waiter ~protocol accuser in
   let* _ =
     Operation.Consensus.inject
       ~force:true
@@ -270,21 +285,21 @@ let double_consensus_wrong_branch
   let* () = waiter_already_denounced in
   unit
 
-let double_endorsement_wrong_branch =
+let double_attestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
-    ~title:"double endorsement using wrong branch"
+    ~title:"double attestation using wrong branch"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "endorsement"; "accuser"; "branch"; "node"]
-  @@ fun protocol -> double_consensus_wrong_branch endorse_utils protocol
+    ~tags:["double"; "attestation"; "accuser"; "branch"; "node"]
+  @@ fun protocol -> double_consensus_wrong_branch attest_utils protocol
 
-let double_preendorsement_wrong_branch =
+let double_preattestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
-    ~title:"double preendorsement using wrong branch"
+    ~title:"double preattestation using wrong branch"
     ~supports:Protocol.(From_protocol (number Nairobi))
-    ~tags:["double"; "preendorsement"; "accuser"; "branch"; "node"]
-  @@ fun protocol -> double_consensus_wrong_branch preendorse_utils protocol
+    ~tags:["double"; "preattestation"; "accuser"; "branch"; "node"]
+  @@ fun protocol -> double_consensus_wrong_branch preattest_utils protocol
 
 let consensus_operation_too_old_waiter accuser =
   Accuser.wait_for accuser "consensus_operation_too_old.v0" (fun _ -> Some ())
@@ -304,7 +319,7 @@ let operation_too_old =
     Accuser.init ~preserved_levels:0 ~event_level:`Debug ~protocol node
   in
   let* () = repeat 2 (fun () -> Client.bake_for client) in
-  Log.info "Inject valid endorsement." ;
+  Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
     Client.endorse_for
@@ -316,9 +331,10 @@ let operation_too_old =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
-  let op = List.hd JSON.(mempool |-> "applied" |> as_list) in
+  let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
   let branch = JSON.(op |-> "branch" |> as_string) in
   let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
   let level = JSON.(content |-> "level" |> as_int) in
@@ -329,11 +345,11 @@ let operation_too_old =
   Log.info "Bake 1 block." ;
   let* () = Client.bake_for client in
   Log.info
-    "Craft and inject an endorsement 1 level in the past and wait for \
+    "Craft and inject an attestation 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
   let op =
     Operation.Consensus.attestation
-      ~use_legacy_name:true
+      ~use_legacy_name:(use_legacy_attestation_name protocol)
       ~slot
       ~level
       ~round:3
@@ -367,7 +383,7 @@ let operation_too_far_in_future =
     Accuser.init ~preserved_levels:2 ~event_level:`Debug ~protocol node
   in
   let* () = repeat 2 (fun () -> Client.bake_for client) in
-  Log.info "Inject valid endorsement." ;
+  Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
     Client.endorse_for
@@ -379,9 +395,10 @@ let operation_too_far_in_future =
   let* () = waiter in
   Log.info "Get mempool and recover consensus information." ;
   let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
   in
-  let op = List.hd JSON.(mempool |-> "applied" |> as_list) in
+  let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
   let branch = JSON.(op |-> "branch" |> as_string) in
   let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
   let block_payload_hash =
@@ -405,11 +422,11 @@ let operation_too_far_in_future =
       JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
   in
   Log.info
-    "Craft and inject an endorsement 3 levels in the future and wait for \
+    "Craft and inject an attestation 3 levels in the future and wait for \
      [consensus_operation_too_far_in_future.v0] event from the accuser." ;
   let op =
     Operation.Consensus.attestation
-      ~use_legacy_name:true
+      ~use_legacy_name:(use_legacy_attestation_name protocol)
       ~slot:(List.hd slots)
       ~level
       ~round:0
@@ -428,11 +445,11 @@ let operation_too_far_in_future =
   unit
 
 let register ~protocols =
-  double_endorsement_wrong_slot protocols ;
-  double_preendorsement_wrong_slot protocols ;
-  double_endorsement_wrong_block_payload_hash protocols ;
-  double_preendorsement_wrong_block_payload_hash protocols ;
-  double_endorsement_wrong_branch protocols ;
-  double_preendorsement_wrong_branch protocols ;
+  double_attestation_wrong_slot protocols ;
+  double_preattestation_wrong_slot protocols ;
+  double_attestation_wrong_block_payload_hash protocols ;
+  double_preattestation_wrong_block_payload_hash protocols ;
+  double_attestation_wrong_branch protocols ;
+  double_preattestation_wrong_branch protocols ;
   operation_too_old protocols ;
   operation_too_far_in_future protocols
