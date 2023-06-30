@@ -200,6 +200,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let info = Printf.sprintf "Carbonated find model"
 
+    let ns s = Free_variable.of_namespace (Namespace.cons name s)
+
+    let fv_intercept = ns "intercept"
+
     (**
        Given the cost of comparing keys, the model is used for deducing [intercept]
        and [traverse_overhead] from:
@@ -208,11 +212,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
      *)
     let find_model ?intercept ?traverse_overhead name =
       let open Tezos_benchmark in
-      let ns s = Free_variable.of_namespace (Namespace.cons name s) in
       let traverse_overhead =
         Option.value ~default:(ns "traverse_overhead") traverse_overhead
       in
-      let intercept = Option.value ~default:(ns "intercept") intercept in
+      let intercept = Option.value ~default:fv_intercept intercept in
       let module M = struct
         type arg_type = int * unit
 
