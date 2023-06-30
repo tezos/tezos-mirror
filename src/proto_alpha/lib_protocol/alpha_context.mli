@@ -3999,15 +3999,15 @@ end
 
 (** This module re-exports definitions from {!Operation_repr.Kind}. *)
 module Kind : sig
-  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+  type preattestation_consensus_kind = Preattestation_consensus_kind
 
   type endorsement_consensus_kind = Endorsement_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preendorsement_consensus_kind consensus
+    | Preendorsement_kind : preattestation_consensus_kind consensus
     | Endorsement_kind : endorsement_consensus_kind consensus
 
-  type preendorsement = preendorsement_consensus_kind consensus
+  type preendorsement = preattestation_consensus_kind consensus
 
   type endorsement = endorsement_consensus_kind consensus
 
@@ -4024,7 +4024,7 @@ module Kind : sig
     endorsement_consensus_kind double_consensus_operation_evidence
 
   type double_preendorsement_evidence =
-    preendorsement_consensus_kind double_consensus_operation_evidence
+    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
