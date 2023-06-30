@@ -55,10 +55,6 @@ type full_evm_setup = {
 
 let hex_256_of n = Printf.sprintf "%064x" n
 
-let no_0x s =
-  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
-  else s
-
 let evm_proxy_server_version proxy_server =
   let endpoint = Evm_proxy_server.endpoint proxy_server in
   let get_version_url = endpoint ^ "/version" in
@@ -88,11 +84,7 @@ let get_value_in_storage sc_rollup_client address nth =
     sc_rollup_client
     ~pvm_kind
     ~operation:Sc_rollup_client.Value
-    ~key:
-      (Printf.sprintf
-         "/evm/eth_accounts/%s/storage/%064x"
-         (String.lowercase_ascii @@ no_0x address)
-         nth)
+    ~key:(Durable_storage_path.storage address ~key:(hex_256_of nth) ())
 
 let check_str_in_storage ~evm_setup ~address ~nth ~expected =
   let*! value = get_value_in_storage evm_setup.sc_rollup_client address nth in
@@ -110,10 +102,7 @@ let get_storage_size sc_rollup_client ~address =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:
-        (Printf.sprintf
-           "/evm/eth_accounts/%s/storage"
-           (String.lowercase_ascii @@ no_0x address))
+      ~key:(Durable_storage_path.storage address ())
   in
   return (List.length storage)
 
@@ -265,7 +254,7 @@ let make_config ?bootstrap_accounts ?ticketer () =
     Option.fold
       ~some:(fun ticketer ->
         let value = Hex.(of_string ticketer |> show) in
-        let to_ = "/evm/ticketer" in
+        let to_ = Durable_storage_path.ticketer in
         [Set {value; to_}])
       ~none:[]
       ticketer
@@ -278,11 +267,7 @@ let make_config ?bootstrap_accounts ?ticketer () =
              let value =
                Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
              in
-             let to_ =
-               sf
-                 "/evm/eth_accounts/%s/balance"
-                 (no_0x address |> String.lowercase_ascii)
-             in
+             let to_ = Durable_storage_path.balance address in
              Set {value; to_} :: acc)
            [])
       ~none:[]
@@ -726,7 +711,7 @@ let test_l2_deploy_simple_storage =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:"/evm/eth_accounts"
+      ~key:Durable_storage_path.eth_accounts
   in
   (* check tx status*)
   let* () = check_tx_succeeded ~endpoint ~tx in
@@ -735,7 +720,7 @@ let test_l2_deploy_simple_storage =
   Check.(
     list_mem
       string
-      (String.lowercase_ascii @@ no_0x contract_address)
+      (Helpers.normalize contract_address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
   unit
@@ -842,12 +827,12 @@ let test_l2_deploy_erc20 =
       sc_rollup_client
       ~pvm_kind
       ~operation:Sc_rollup_client.Subkeys
-      ~key:"/evm/eth_accounts"
+      ~key:Durable_storage_path.eth_accounts
   in
   Check.(
     list_mem
       string
-      (no_0x @@ String.lowercase_ascii address)
+      (Helpers.normalize address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
 
@@ -1416,7 +1401,7 @@ let test_preinitialized_evm_kernel =
     ~tags:["evm"; "dictator"; "config"]
     ~title:"Creates a kernel with an initialized dictator key"
   @@ fun protocol ->
-  let dictator_key_path = "/dictator_key" in
+  let dictator_key_path = Durable_storage_path.dictator in
   let dictator_key = Eth_account.bootstrap_accounts.(0).address in
   let config =
     Sc_rollup_helpers.Installer_kernel_config.
