@@ -142,7 +142,7 @@ module Simple = struct
   let connect_all ~timeout connect_handler pool points =
     List.map_ep (connect ~timeout connect_handler pool) points
 
-  let write_all msg = P2p.Internal_for_tests.broadcast_conns peer_table msg
+  let write_all msg = P2p.Internal_for_tests.raw_broadcast peer_table msg
 
   let read conn ref_msg =
     let open Lwt_result_syntax in
