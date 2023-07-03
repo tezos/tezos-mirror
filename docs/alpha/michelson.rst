@@ -999,30 +999,10 @@ A detailed description of the following instructions can be found in the `intera
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
-Please see the :doc:`Sapling integration<sapling>` page for a more
-comprehensive description of the Sapling protocol.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
--  ``SAPLING_VERIFY_UPDATE``: verify and apply a transaction on a Sapling state.
-
-::
-
-    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair bytes (pair int (sapling_state ms))): 'S
-
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair bound_data (Pair balance s')) : S
-        iff the transaction t successfully applied on state s resulting
-        in the bound_data and the balance of the transaction and an updated state s'
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
-        iff the transaction t is invalid with respect to the state
-
--  ``SAPLING_EMPTY_STATE ms``: Pushes an empty state on the stack.
-
-   ::
-
-    ::  'S   ->   sapling_state ms: 'S
-
-    > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
-        with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
-        with memo_size `ms`
+-  ``SAPLING_VERIFY_UPDATE``: Verify and apply a transaction on a Sapling state (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_VERIFY_UPDATE>`__).
+-  ``SAPLING_EMPTY_STATE ms``: Push an empty state on the stack (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SAPLING_EMPTY_STATE>`__).
 
 .. _MichelsonTickets_alpha:
 
