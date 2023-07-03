@@ -59,6 +59,7 @@ end
 
 module Make (PC : Polynomial_commitment.S) = struct
   open Utils
+  module ISet = Set.Make (Int)
   module IMap = Map.Make (Int)
 
   exception Entry_not_in_table
@@ -69,7 +70,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     n : int;
     domain_k : Domain.t;
     domain_2k : Domain.t;
-    table : int Scalar_map.t;
+    table : ISet.t Scalar_map.t;
     q : G1.t array;
     cms_lagrange : G1.t array;
     cms_lagrange_0 : G1.t array;
@@ -141,11 +142,16 @@ module Make (PC : Polynomial_commitment.S) = struct
     let domain_2k = Domain.build (2 * k) in
 
     let table =
-      (* Map that binds scalar to its first index in the table ; if there is duplication in the table the first index is kept ; converting to a map allow more efficient research in the table to build m polynomial *)
+      (* Map that binds scalar to the set of its indices in the table ; converting to a map allow more efficient research in the table to build m polynomial *)
       fst
       @@ Array.fold_left
            (fun (acc, i) fi ->
-             ( Scalar_map.update fi (function None -> Some i | sk -> sk) acc,
+             ( Scalar_map.update
+                 fi
+                 (function
+                   | None -> Some (ISet.singleton i)
+                   | Some sk -> Some (ISet.add i sk))
+                 acc,
                i + 1 ))
            (Scalar_map.empty, 0)
            table_array
@@ -233,7 +239,8 @@ module Make (PC : Polynomial_commitment.S) = struct
           let idx =
             match Scalar_map.find_opt fi pp.table with
             | None -> raise Entry_not_in_table
-            | Some idx -> idx
+            (* Just take one random index *)
+            | Some idx -> ISet.choose idx
           in
           (idx, Scalar.of_int nb, fi) :: mt_acc)
         (map_of_occurences f)
