@@ -2222,7 +2222,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
   | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
-  | Weight_preendorsement : endorsement_infos -> consensus_pass_type weight
+  | Weight_preattestation : endorsement_infos -> consensus_pass_type weight
   | Weight_dal_attestation :
       (* attestor * num_attestations * level *)
       (Signature.Public_key_hash.t * int * int32)
@@ -2318,7 +2318,7 @@ let weight_of : packed_operation -> operation_weight =
   | Single (Preattestation consensus_content) ->
       W
         ( Consensus,
-          Weight_preendorsement
+          Weight_preattestation
             (endorsement_infos_from_consensus_content consensus_content) )
   | Single (Endorsement consensus_content) ->
       W
@@ -2488,19 +2488,19 @@ let compare_consensus_weight w1 w2 =
   match (w1, w2) with
   | Weight_endorsement infos1, Weight_endorsement infos2 ->
       compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_preendorsement infos1, Weight_preendorsement infos2 ->
+  | Weight_preattestation infos1, Weight_preattestation infos2 ->
       compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_endorsement infos1, Weight_preendorsement infos2 ->
+  | Weight_endorsement infos1, Weight_preattestation infos2 ->
       compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
-  | Weight_preendorsement infos1, Weight_endorsement infos2 ->
+  | Weight_preattestation infos1, Weight_endorsement infos2 ->
       compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
   | ( Weight_dal_attestation (attestor1, size1, lvl1),
       Weight_dal_attestation (attestor2, size2, lvl2) ) ->
       compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
-  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preendorsement _)
+  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preattestation _)
     ->
       -1
-  | (Weight_endorsement _ | Weight_preendorsement _), Weight_dal_attestation _
+  | (Weight_endorsement _ | Weight_preattestation _), Weight_dal_attestation _
     ->
       1
 
