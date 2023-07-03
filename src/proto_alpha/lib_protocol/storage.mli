@@ -498,6 +498,16 @@ module Stake : sig
        and type snapshot = int
        and type t := Raw_context.t
 
+  (** The map of all the stake of all delegates, including those with
+      less than {!Constants_parametric_repr.minimal_stake}. It might
+      be large. *)
+  module Staking_balance :
+    Indexed_data_snapshotable_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Stake_repr.Full.t
+       and type snapshot = int
+       and type t := Raw_context.t
+
   (** This is a set, encoded in a map with value unit. This should be
      fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
