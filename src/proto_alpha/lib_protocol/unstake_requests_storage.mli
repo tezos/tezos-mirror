@@ -73,3 +73,15 @@ val add :
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** Slow functions only used for RPCs *)
+module For_RPC : sig
+  (** Apply current slash history to unfinalizable unstake requests.
+      [prepare_finalize_unstake] does not compute this value because it is never
+      used internally. However, we need to apply slashes anyways when trying to
+      compute the accurate balance of a staker *)
+  val apply_slash_to_unstaked_unfinalizable :
+    Raw_context.t ->
+    stored_requests ->
+    (Cycle_repr.t * Tez_repr.t) list tzresult Lwt.t
+end
