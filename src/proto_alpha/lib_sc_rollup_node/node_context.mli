@@ -66,7 +66,7 @@ type 'a t = {
   pvm : (module Pvm.S);  (** The PVM used by the smart rollup.  *)
   fee_parameters : Configuration.fee_parameters;
       (** Fee parameters to use when injecting operations in layer 1. *)
-  protocol_constants : Constants.t;
+  protocol_constants : Rollup_constants.protocol_constants;
       (** Protocol constants retrieved from the Tezos node. *)
   proto_level : int;
       (** Protocol supported by this rollup node (represented as a protocol
@@ -125,9 +125,10 @@ val get_fee_parameter :
     protocol. *)
 val protocol_max_batch_size : int
 
-(** [init cctxt ~data_dir mode l1_ctxt ~proto_level configuration] initializes
-    the rollup representation. The rollup origination level and kind are fetched
-    via an RPC call to the layer1 node that [cctxt] uses for RPC requests.
+(** [init cctxt ~data_dir mode l1_ctxt constants ~proto_level configuration]
+    initializes the rollup representation. The rollup origination level and kind
+    are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC
+    requests.
 *)
 val init :
   Protocol_client_context.full ->
@@ -135,6 +136,7 @@ val init :
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
   Layer1.t ->
+  Rollup_constants.protocol_constants ->
   proto_level:int ->
   Configuration.t ->
   'a t tzresult Lwt.t
@@ -485,7 +487,7 @@ module Internal_for_tests : sig
       rollup node functions. *)
   val create_node_context :
     Protocol_client_context.full ->
-    ?constants:Constants.Parametric.t ->
+    Rollup_constants.protocol_constants ->
     data_dir:string ->
     Sc_rollup.Kind.t ->
     Store_sigs.rw t tzresult Lwt.t

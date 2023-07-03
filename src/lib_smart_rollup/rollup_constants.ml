@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -24,22 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Octez_smart_rollup_node.Layer1
+(** Protocol agnostic representation for protocol constants. *)
 
-(** [fetch_tezos_block cctxt hash] returns a block info given a block hash.
-    Looks for the block in the blocks cache first, and fetches it from the L1
-    node otherwise. *)
-val fetch_tezos_block :
-  t ->
-  Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+type dal_constants = {
+  feature_enable : bool;
+  attestation_lag : int;
+  number_of_slots : int;
+}
 
-(** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks
-    asynchronously. NOTE: the number of blocks to prefetch must not be greater
-    than the size of the blocks cache otherwise they will be lost. *)
-val prefetch_tezos_blocks : t -> head list -> unit
+type reveal_activation_level = {
+  blake2B : int32;
+  metadata : int32;
+  dal_page : int32;
+}
 
-(** Convert protocol constants to their protocol agnostic representation. *)
-val constants_of_parametric :
-  Protocol.Alpha_context.Constants.Parametric.t ->
-  Rollup_constants.protocol_constants
+type sc_rollup_constants = {
+  challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  reveal_activation_level : reveal_activation_level option;
+}
+
+type protocol_constants = {
+  minimal_block_delay : int64;
+  delay_increment_per_round : int64;
+  sc_rollup : sc_rollup_constants;
+  dal : dal_constants;
+}

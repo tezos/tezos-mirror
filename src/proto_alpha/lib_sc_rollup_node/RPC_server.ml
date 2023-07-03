@@ -399,8 +399,7 @@ let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
   let+ last_published_commitment = Reference.get node_ctxt.lpc in
   let commitment_period =
     Int32.of_int
-      node_ctxt.protocol_constants.parametric.sc_rollup
-        .commitment_period_in_blocks
+      node_ctxt.protocol_constants.sc_rollup.commitment_period_in_blocks
   in
   let last_published =
     Raw_level.to_int32 last_published_commitment.inbox_level

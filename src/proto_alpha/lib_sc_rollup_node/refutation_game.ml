@@ -121,9 +121,13 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
     (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val node_ctxt.pvm) in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
+     Use constants for correct protocol. *)
   let is_reveal_enabled =
-    Sc_rollup.is_reveal_enabled_predicate
-      node_ctxt.protocol_constants.parametric.sc_rollup.reveal_activation_level
+    node_ctxt.protocol_constants.sc_rollup.reveal_activation_level
+    |> WithExceptions.Option.get ~loc:__LOC__
+    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+    |> Sc_rollup.is_reveal_enabled_predicate
   in
   let*! input_request = PVM.is_input_state ~is_reveal_enabled start_state in
   match input_request with

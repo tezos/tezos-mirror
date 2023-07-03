@@ -39,7 +39,7 @@ open Alpha_context
     context need to use this function in order to avoid file descriptor
     leaks. *)
 val with_node_context :
-  ?constants:Constants.Parametric.t ->
+  ?constants:Rollup_constants.protocol_constants ->
   Sc_rollup.Kind.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->
@@ -108,7 +108,7 @@ end
 val alcotest :
   string ->
   Alcotest.speed_level ->
-  ?constants:Constants.Parametric.t ->
+  ?constants:Rollup_constants.protocol_constants ->
   Sc_rollup.Kind.t ->
   boot_sector:string ->
   ([`Read | `Write] Node_context.t ->

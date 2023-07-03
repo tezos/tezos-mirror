@@ -52,3 +52,35 @@ let fetch_tezos_block l1_ctxt hash =
         Protocol.name
 
 let prefetch_tezos_blocks = Layer1.prefetch_tezos_blocks fetch extract_header
+
+let constants_of_parametric
+    Protocol.Alpha_context.Constants.Parametric.
+      {
+        minimal_block_delay;
+        delay_increment_per_round;
+        sc_rollup =
+          {
+            challenge_window_in_blocks;
+            commitment_period_in_blocks;
+            reveal_activation_level;
+            _;
+          };
+        dal = {feature_enable; attestation_lag; number_of_slots; _};
+        _;
+      } =
+  let open Protocol.Alpha_context in
+  Rollup_constants.
+    {
+      minimal_block_delay = Period.to_seconds minimal_block_delay;
+      delay_increment_per_round = Period.to_seconds delay_increment_per_round;
+      sc_rollup =
+        {
+          challenge_window_in_blocks;
+          commitment_period_in_blocks;
+          reveal_activation_level =
+            Some
+              (Sc_rollup_proto_types.Constants.reveal_activation_level_to_octez
+                 reveal_activation_level);
+        };
+      dal = {feature_enable; attestation_lag; number_of_slots};
+    }

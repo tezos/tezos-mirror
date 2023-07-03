@@ -160,3 +160,16 @@ module Dal : sig
     val to_octez : t -> Octez_smart_rollup.Dal.Slot_history_cache.t
   end
 end
+
+module Constants : sig
+  type reveal_activation_level =
+    Constants.Parametric.sc_rollup_reveal_activation_level
+
+  val reveal_activation_level_of_octez :
+    Octez_smart_rollup.Rollup_constants.reveal_activation_level ->
+    reveal_activation_level
+
+  val reveal_activation_level_to_octez :
+    reveal_activation_level ->
+    Octez_smart_rollup.Rollup_constants.reveal_activation_level
+end

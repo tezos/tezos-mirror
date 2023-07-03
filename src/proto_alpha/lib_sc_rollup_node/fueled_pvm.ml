@@ -130,15 +130,18 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
+       Use constants for correct protocol. *)
     let is_reveal_enabled =
-      Sc_rollup.is_reveal_enabled_predicate
-        node_ctxt.protocol_constants.parametric.sc_rollup
-          .reveal_activation_level
+      node_ctxt.protocol_constants.sc_rollup.reveal_activation_level
+      |> WithExceptions.Option.get ~loc:__LOC__
+      |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+      |> Sc_rollup.is_reveal_enabled_predicate
     in
     let module PVM = (val node_ctxt.pvm) in
     let metadata = Node_context.metadata node_ctxt in
     let dal_attestation_lag =
-      node_ctxt.protocol_constants.parametric.dal.attestation_lag
+      node_ctxt.protocol_constants.dal.attestation_lag
     in
     let reveal_builtins =
       Tezos_scoru_wasm.Builtins.

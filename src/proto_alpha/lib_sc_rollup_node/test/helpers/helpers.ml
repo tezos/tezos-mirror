@@ -39,16 +39,18 @@ let block_hash_of_level level =
   Block_hash.of_string_exn s
 
 let default_constants =
-  let constants = Default_parameters.constants_test in
-  let sc_rollup =
-    {
-      constants.sc_rollup with
-      arith_pvm_enable = true;
-      challenge_window_in_blocks = 4032;
-      commitment_period_in_blocks = 3;
-    }
+  let test_constants =
+    Layer1_helpers.constants_of_parametric Default_parameters.constants_test
   in
-  {constants with sc_rollup}
+  {
+    test_constants with
+    sc_rollup =
+      {
+        test_constants.sc_rollup with
+        challenge_window_in_blocks = 4032;
+        commitment_period_in_blocks = 3;
+      };
+  }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let open Lwt_result_syntax in
@@ -136,7 +138,7 @@ let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
   let* ctxt =
     Node_context.Internal_for_tests.create_node_context
       cctxt
-      ~constants
+      constants
       ~data_dir
       kind
   in
