@@ -384,14 +384,31 @@ module Dune = struct
 
   let include_ name = [S "include"; S name]
 
-  let targets_rule ?(promote = false) ?deps targets ~action =
+  let target_or_targets_rule ~promote ?deps ?enabled_if s ~action =
     [
       S "rule";
-      [S "targets"; G (of_atom_list targets)];
+      s;
       (if promote then [S "mode"; S "promote"] else E);
       (match deps with None -> E | Some deps -> [S "deps"; G (of_list deps)]);
       [S "action"; action];
+      (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
     ]
+
+  let targets_rule ?(promote = false) ?deps ?enabled_if targets ~action =
+    target_or_targets_rule
+      ~promote
+      ?deps
+      ?enabled_if
+      [S "targets"; G (of_atom_list targets)]
+      ~action
+
+  let target_rule ?(promote = false) ?deps ?enabled_if target ~action =
+    target_or_targets_rule
+      ~promote
+      ?deps
+      ?enabled_if
+      [S "target"; S target]
+      ~action
 
   let install ?package files ~section =
     [

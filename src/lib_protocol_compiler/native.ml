@@ -66,7 +66,7 @@ let pack_objects output objects =
   Asmpackager.package_files
     ~backend
     ~ppf_dump:Format.err_formatter
-    Env.initial_safe_string
+    Protocol_compiler_env.env
     objects
     output ;
   Warnings.check_fatal () ;

@@ -2854,10 +2854,29 @@ let octez_protocol_compiler_lib =
         "Packer";
         "Compiler";
         "Defaults";
+        "Protocol_compiler_env";
       ]
     ~dune:
       Dune.
         [
+          target_rule
+            "protocol_compiler_env.ml"
+            ~action:
+              [
+                S "copy";
+                S "compat_files/protocol_compiler_env_ocaml4.ml";
+                S "%{target}";
+              ]
+            ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
+          target_rule
+            "protocol_compiler_env.ml"
+            ~action:
+              [
+                S "copy";
+                S "compat_files/protocol_compiler_env_ocaml5.ml";
+                S "%{target}";
+              ]
+            ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
           targets_rule
             ["embedded-interfaces-env"]
             ~deps:[Dune.(H [[S "package"; S "tezos-protocol-environment"]])]
