@@ -647,20 +647,20 @@ module Scripts = struct
           let log_control _ = ()
 
           let get_log () =
-            let* _ctxt, res =
+            let+ _ctxt, res =
               List.fold_left_es
                 (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
                   let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
-                  let* stack =
+                  let+ stack =
                     Environment.Error_monad.trace
                       Plugin_errors.Cannot_serialize_log
                       (unparse_stack ctxt (stack, stack_ty))
                   in
-                  return (ctxt, (loc, consumed_gas, stack) :: l))
+                  (ctxt, (loc, consumed_gas, stack) :: l))
                 (ctxt, [])
                 (List.rev !log)
             in
-            return_some (List.rev res)
+            Some (List.rev res)
         end)
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
@@ -836,8 +836,8 @@ module Scripts = struct
                 ty
                 data_node
             in
-            let* Ex_stack (sty, y, st), ctxt = parse_stack ctxt ~legacy l in
-            return (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
+            let+ Ex_stack (sty, y, st), ctxt = parse_stack ctxt ~legacy l in
+            (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
 
     let rec unparse_stack :
         type a s.
@@ -859,8 +859,8 @@ module Scripts = struct
             let* data_node, ctxt =
               Script_ir_translator.unparse_data ctxt unparsing_mode ty x
             in
-            let* l, ctxt = unparse_stack ctxt unparsing_mode sty y st in
-            return ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
+            let+ l, ctxt = unparse_stack ctxt unparsing_mode sty y st in
+            ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
   end
 
   let rec pp_instr_name :
@@ -1165,7 +1165,7 @@ module Scripts = struct
           dummy_contract_hash
           ~script:(script, None)
       in
-      let* ctxt, _ =
+      let+ ctxt, _ =
         Token.transfer
           ~origin:Simulation
           ctxt
@@ -1173,7 +1173,7 @@ module Scripts = struct
           (`Contract dummy_contract)
           balance
       in
-      return (ctxt, dummy_contract_hash)
+      (ctxt, dummy_contract_hash)
     in
     let sender_and_payer ~sender_opt ~payer_opt ~default_sender =
       match (sender_opt, payer_opt) with
@@ -1185,25 +1185,25 @@ module Scripts = struct
     in
     let configure_contracts ctxt script balance ~sender_opt ~payer_opt ~self_opt
         =
-      let* ctxt, self, balance =
+      let+ ctxt, self, balance =
         match self_opt with
         | None ->
             let balance = Option.value ~default:default_balance balance in
-            let* ctxt, addr = originate_dummy_contract ctxt script balance in
-            return (ctxt, addr, balance)
+            let+ ctxt, addr = originate_dummy_contract ctxt script balance in
+            (ctxt, addr, balance)
         | Some addr ->
-            let* bal =
+            let+ bal =
               default_from_context
                 ctxt
                 (fun c -> Contract.get_balance c @@ Contract.Originated addr)
                 balance
             in
-            return (ctxt, addr, bal)
+            (ctxt, addr, bal)
       in
       let sender, payer =
         sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
       in
-      return (ctxt, {balance; self; sender; payer})
+      (ctxt, {balance; self; sender; payer})
     in
     let script_entrypoint_type ctxt expr entrypoint =
       let ctxt = Gas.set_unlimited ctxt in
@@ -2074,7 +2074,7 @@ module Contract = struct
         | None -> return_none
         | Some script ->
             let ctxt = Gas.set_unlimited ctxt in
-            let* script, _ctxt =
+            let+ script, _ctxt =
               Script_ir_translator.parse_and_unparse_script_unaccounted
                 ctxt
                 ~legacy:true
@@ -2083,21 +2083,21 @@ module Contract = struct
                 ~normalize_types
                 script
             in
-            return_some script) ;
+            Some script) ;
     Registration.register1
       ~chunked:false
       S.get_used_storage_space
       (fun ctxt contract () () ->
         get_contract contract @@ fun _ ->
-        let* x = Contract.used_storage_space ctxt contract in
-        return_some x) ;
+        let+ x = Contract.used_storage_space ctxt contract in
+        Some x) ;
     Registration.register1
       ~chunked:false
       S.get_paid_storage_space
       (fun ctxt contract () () ->
         get_contract contract @@ fun _ ->
-        let* x = Contract.paid_storage_space ctxt contract in
-        return_some x) ;
+        let+ x = Contract.paid_storage_space ctxt contract in
+        Some x) ;
     Registration.register1
       ~chunked:false
       S.ticket_balance
@@ -2110,8 +2110,8 @@ module Contract = struct
             ~contents_type:(Micheline.root contents_type)
             ~contents:(Micheline.root contents)
         in
-        let* amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
-        return @@ Option.value amount ~default:Z.zero) ;
+        let+ amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
+        Option.value amount ~default:Z.zero) ;
     Registration.opt_register1
       ~chunked:false
       S.all_ticket_balances
@@ -2138,18 +2138,18 @@ module Contract = struct
                 has_tickets
                 storage
             in
-            let* ticket_balances, _ctxt =
+            let+ ticket_balances, _ctxt =
               Ticket_token_map.fold_es
                 ctxt
                 (fun ctxt acc ex_token amount ->
-                  let* unparsed_token, ctxt =
+                  let+ unparsed_token, ctxt =
                     Ticket_token_unparser.unparse ctxt ex_token
                   in
-                  return ((unparsed_token, amount) :: acc, ctxt))
+                  ((unparsed_token, amount) :: acc, ctxt))
                 []
                 ticket_token_map
             in
-            return_some ticket_balances)
+            Some ticket_balances)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -2499,8 +2499,8 @@ module Sc_rollup = struct
   let register_inbox () =
     let open Lwt_result_syntax in
     Registration.register0 ~chunked:true S.inbox (fun ctxt () () ->
-        let* inbox, _ctxt = Sc_rollup.Inbox.get_inbox ctxt in
-        return inbox)
+        let+ inbox, _ctxt = Sc_rollup.Inbox.get_inbox ctxt in
+        inbox)
 
   let register_whitelist () =
     Registration.register1 ~chunked:true S.whitelist (fun ctxt address () () ->
@@ -2573,13 +2573,13 @@ module Sc_rollup = struct
     match commitment_hash with
     | None -> return_none
     | Some commitment_hash ->
-        let* commitment, _ctxt =
+        let+ commitment, _ctxt =
           Alpha_context.Sc_rollup.Commitment.get_commitment
             ctxt
             address
             commitment_hash
         in
-        return_some (commitment_hash, commitment)
+        Some (commitment_hash, commitment)
 
   let register_commitment () =
     let open Lwt_result_syntax in
@@ -2605,11 +2605,8 @@ module Sc_rollup = struct
       (fun context rollup staker () () ->
         let open Sc_rollup.Game.Index in
         let open Sc_rollup.Refutation_storage in
-        let* game, _ = get_ongoing_games_for_staker context rollup staker in
-        let game =
-          List.map (fun (game, index) -> (game, index.alice, index.bob)) game
-        in
-        return game)
+        let+ game, _ = get_ongoing_games_for_staker context rollup staker in
+        List.map (fun (game, index) -> (game, index.alice, index.bob)) game)
 
   let register_commitments () =
     Registration.register2
