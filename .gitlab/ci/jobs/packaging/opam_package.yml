@@ -407,6 +407,13 @@
       start_in: 7 minutes
     - when: never # default
 
+opam:bls12-381:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: bls12-381
+
 # Ignoring unreleased package internal-devtools.
 
 opam:octez-accuser-PtMumbai:

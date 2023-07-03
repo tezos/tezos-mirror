@@ -19,7 +19,7 @@ depends: [
   "logs"
   "octez-distributed-lwt-internal"
   "qcheck-alcotest" { >= "0.20" }
-  "bls12-381" { >= "6.1.0" & < "6.2.0" }
+  "bls12-381"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

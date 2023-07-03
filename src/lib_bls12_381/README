@@ -1,0 +1,3 @@
+To update the library, run the script `update_blst.sh` after specifying a new commit hash.
+
+To rebuild the JavaScript file blst.js (and blst.wasm), remove them and build the library with `dune build src/lib_bls12_381`.
