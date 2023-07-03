@@ -87,7 +87,7 @@ and 'kind contents_result =
       -> Kind.double_attestation_evidence contents_result
   | Double_preendorsement_evidence_result :
       Receipt.balance_updates
-      -> Kind.double_preendorsement_evidence contents_result
+      -> Kind.double_preattestation_evidence contents_result
   | Double_baking_evidence_result :
       Receipt.balance_updates
       -> Kind.double_baking_evidence contents_result

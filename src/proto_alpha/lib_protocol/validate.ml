@@ -1405,7 +1405,7 @@ module Anonymous = struct
         return_unit
 
   let check_double_preendorsement_evidence vi
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
@@ -1436,7 +1436,7 @@ module Anonymous = struct
             Error (Operation_conflict {existing; new_operation = oph}))
 
   let check_double_preendorsement_evidence_conflict vs oph
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1477,7 +1477,7 @@ module Anonymous = struct
     add_double_endorsing_evidence vs oph op1
 
   let add_double_preendorsement_evidence vs oph
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1498,7 +1498,7 @@ module Anonymous = struct
         {vs with anonymous_state}
 
   let remove_double_preendorsement_evidence vs
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
