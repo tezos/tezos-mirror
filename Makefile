@@ -327,11 +327,11 @@ lint-opam-dune:
 	@dune build --profile=$(PROFILE) @runtest_dune_template
 
 # Ensure that all unit tests are restricted to their opam package
-# (change 'tezos-test-helpers' to one the most elementary packages of
-# the repo if you add "internal" dependencies to tezos-test-helpers)
+# (change 'octez-distributed-internal' to one the most elementary packages of
+# the repo if you add "internal" dependencies to octez-distributed-internal)
 .PHONY: lint-tests-pkg
 lint-tests-pkg:
-	@(dune build -p tezos-test-helpers @runtest @runtest_js) || \
+	@(dune build -p octez-distributed-internal @runtest @runtest_js) || \
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
 
