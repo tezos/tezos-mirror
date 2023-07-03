@@ -327,3 +327,17 @@ val simulate_spending :
   (Tez_repr.t * bool) tzresult Lwt.t
 
 val get_total_supply : Raw_context.t -> Tez_repr.t tzresult Lwt.t
+
+module For_RPC : sig
+  val get_staked_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+
+  val get_unstaked_frozen_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+
+  val get_unstaked_finalizable_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+
+  val get_full_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+end

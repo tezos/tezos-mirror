@@ -57,6 +57,27 @@ val frozen_bonds :
 val balance_and_frozen_bonds :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
+val staked_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Tez.t option shell_tzresult Lwt.t
+
+val unstaked_frozen_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Tez.t option shell_tzresult Lwt.t
+
+val unstaked_finalizable_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Tez.t option shell_tzresult Lwt.t
+
+val full_balance :
+  'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
+
 val manager_key :
   'a #RPC_context.simple ->
   'a ->

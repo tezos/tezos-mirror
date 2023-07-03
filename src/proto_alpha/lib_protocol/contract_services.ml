@@ -84,6 +84,47 @@ module S = struct
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance_and_frozen_bonds")
 
+  let staked_balance =
+    RPC_service.get_service
+      ~description:
+        "Access the staked balance of a contract. Returns None if the contract \
+         is originated, or neither delegated nor a delegate."
+      ~query:RPC_query.empty
+      ~output:(option Tez.encoding)
+      RPC_path.(custom_root /: Contract.rpc_arg / "staked_balance")
+
+  let unstaked_frozen_balance =
+    RPC_service.get_service
+      ~description:
+        "Access the balance of a contract that was requested for an unstake \
+         operation, but is still frozen for the duration of the slashing \
+         period. Returns None if the contract is originated."
+      ~query:RPC_query.empty
+      ~output:(option Tez.encoding)
+      RPC_path.(custom_root /: Contract.rpc_arg / "unstaked_frozen_balance")
+
+  let unstaked_finalizable_balance =
+    RPC_service.get_service
+      ~description:
+        "Access the balance of a contract that was requested for an unstake \
+         operation, and is no longer frozen, which means it will appear in the \
+         spendable balance of the contract after any \
+         stake/unstake/finalize_unstake operation. Returns None if the \
+         contract is originated."
+      ~query:RPC_query.empty
+      ~output:(option Tez.encoding)
+      RPC_path.(
+        custom_root /: Contract.rpc_arg / "unstaked_finalizable_balance")
+
+  let full_balance =
+    RPC_service.get_service
+      ~description:
+        "Access the full balance of a contract, incuding frozen bonds and \
+         stake."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "full_balance")
+
   let manager_key =
     RPC_service.get_service
       ~description:"Access the manager of an implicit contract."
@@ -392,6 +433,19 @@ let register () =
     ~chunked:false
     S.balance_and_frozen_bonds
     Contract.get_balance_and_frozen_bonds ;
+  register_field
+    ~chunked:false
+    S.staked_balance
+    Contract.For_RPC.get_staked_balance ;
+  register_field
+    ~chunked:false
+    S.unstaked_frozen_balance
+    Contract.For_RPC.get_unstaked_frozen_balance ;
+  register_field
+    ~chunked:false
+    S.unstaked_finalizable_balance
+    Contract.For_RPC.get_unstaked_finalizable_balance ;
+  register_field ~chunked:false S.full_balance Contract.For_RPC.get_full_balance ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
@@ -589,6 +643,24 @@ let frozen_bonds ctxt block contract =
 
 let balance_and_frozen_bonds ctxt block contract =
   RPC_context.make_call1 S.balance_and_frozen_bonds ctxt block contract () ()
+
+let staked_balance ctxt block contract =
+  RPC_context.make_call1 S.staked_balance ctxt block contract () ()
+
+let unstaked_frozen_balance ctxt block contract =
+  RPC_context.make_call1 S.unstaked_frozen_balance ctxt block contract () ()
+
+let unstaked_finalizable_balance ctxt block contract =
+  RPC_context.make_call1
+    S.unstaked_finalizable_balance
+    ctxt
+    block
+    contract
+    ()
+    ()
+
+let full_balance ctxt block contract =
+  RPC_context.make_call1 S.full_balance ctxt block contract () ()
 
 let manager_key ctxt block mgr =
   RPC_context.make_call1 S.manager_key ctxt block (Contract.Implicit mgr) () ()

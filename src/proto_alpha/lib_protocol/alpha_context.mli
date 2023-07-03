@@ -1788,6 +1788,19 @@ module Contract : sig
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
   end
+
+  (** Functions used exclusively for RPC calls *)
+  module For_RPC : sig
+    val get_staked_balance : context -> t -> Tez.t option tzresult Lwt.t
+
+    val get_unstaked_frozen_balance :
+      context -> t -> Tez.t option tzresult Lwt.t
+
+    val get_unstaked_finalizable_balance :
+      context -> t -> Tez.t option tzresult Lwt.t
+
+    val get_full_balance : context -> t -> Tez.t tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Bond_id_repr}. *)
