@@ -35,7 +35,7 @@ type t = {
   network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t;
-  profile : Services.Types.profile option;
+  profiles : Services.Types.profiles;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -79,7 +79,7 @@ let default =
     network_name = default_network_name;
     endpoint = default_endpoint;
     metrics_addr = default_metrics_addr;
-    profile = None;
+    profiles = [];
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -116,7 +116,7 @@ let encoding : t Data_encoding.t =
            network_name;
            endpoint;
            metrics_addr;
-           profile;
+           profiles;
          } ->
       ( data_dir,
         rpc_addr,
@@ -127,7 +127,7 @@ let encoding : t Data_encoding.t =
         network_name,
         endpoint,
         metrics_addr,
-        profile ))
+        profiles ))
     (fun ( data_dir,
            rpc_addr,
            listen_addr,
@@ -137,7 +137,7 @@ let encoding : t Data_encoding.t =
            network_name,
            endpoint,
            metrics_addr,
-           profile ) ->
+           profiles ) ->
       {
         data_dir;
         rpc_addr;
@@ -148,7 +148,7 @@ let encoding : t Data_encoding.t =
         network_name;
         endpoint;
         metrics_addr;
-        profile;
+        profiles;
       })
     (obj10
        (dft
@@ -197,10 +197,10 @@ let encoding : t Data_encoding.t =
           P2p_point.Id.encoding
           default_metrics_addr)
        (dft
-          "profile"
-          ~description:"The Octez DAL node profile"
-          (option Services.Types.profile_encoding)
-          None))
+          "profiles"
+          ~description:"The Octez DAL node profiles"
+          Services.Types.profiles_encoding
+          []))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

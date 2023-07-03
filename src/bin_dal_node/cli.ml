@@ -99,17 +99,19 @@ module Term = struct
       & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"[ADDR:PORT]" ["endpoint"])
 
+  let profile_printer fmt = function
+    | Services.Types.Attestor pkh ->
+        Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
+    | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
+
   let attestor_profile_arg =
     let open Cmdliner in
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> `Attestor pkh |> Result.ok
+      | Some pkh -> Services.Types.Attestor pkh |> Result.ok
     in
-    let printer fmt profile =
-      match profile with `Attestor pkh -> Signature.Public_key_hash.pp fmt pkh
-    in
-    Arg.conv (decoder, printer)
+    Arg.conv (decoder, profile_printer)
 
   let producer_profile_arg =
     let open Cmdliner in
@@ -124,13 +126,9 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Result.ok (`Producer slot_index)
+      | Some slot_index -> Services.Types.Producer {slot_index} |> Result.ok
     in
-    let printer fmt profile =
-      match profile with
-      | `Producer slot_index -> Format.fprintf fmt "%d" slot_index
-    in
-    Arg.conv (decoder, printer)
+    Arg.conv (decoder, profile_printer)
 
   let attestor_profile =
     let open Cmdliner in
@@ -139,7 +137,7 @@ module Term = struct
     in
     Arg.(
       value
-      & opt (some attestor_profile_arg) None
+      & opt (list attestor_profile_arg) []
       & info ~docs ~doc ~docv:"[PKH]" ["attestor-profile"])
 
   let producer_profile =
@@ -147,7 +145,7 @@ module Term = struct
     let doc = "The Octez DAL node producer profile for a given slot index." in
     Arg.(
       value
-      & opt (some producer_profile_arg) None
+      & opt (list producer_profile_arg) []
       & info ~docs ~doc ~docv:"[slot index]" ["producer-profile"])
 
   let peers =
@@ -239,7 +237,7 @@ type options = {
   expected_pow : float option;
   listen_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profile : Services.Types.profile option;
+  profiles : Services.Types.profiles;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
 }
@@ -248,22 +246,8 @@ type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr endpoint
-      metrics_addr attestor_opt producer_opt peers =
-    let profile =
-      match (attestor_opt, producer_opt) with
-      | None, None -> None
-      | None, Some (`Producer slot_index) ->
-          Some (Services.Types.Producer {slot_index})
-      | Some (`Attestor pkh), _ ->
-          (* If both attestor and producer are present on the commandline, we
-             prioritize the attestor argument.
-
-             TODO: https://gitlab.com/tezos/tezos/-/issues/5967
-             The DAL node is able to handle several profiles concurrently. The commandline
-             should allow that.
-          *)
-          Some (Services.Types.Attestor pkh)
-    in
+      metrics_addr attestors producers peers =
+    let profiles = attestors @ producers in
     run
       subcommand
       {
@@ -272,7 +256,7 @@ let make ~run =
         expected_pow;
         listen_addr;
         endpoint;
-        profile;
+        profiles;
         metrics_addr;
         peers;
       }

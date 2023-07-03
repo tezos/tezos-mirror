@@ -184,18 +184,19 @@ module Handler = struct
           in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
           let* () =
-            match config.Configuration_file.profile with
-            | None -> return_unit
-            | Some profile ->
-                let+ pctxt =
+            let+ pctxt =
+              List.fold_left_es
+                (fun profile_ctxt profile ->
                   Profile_manager.add_profile
-                    (Node_context.get_profile_ctxt ctxt)
+                    profile_ctxt
                     proto_parameters
                     (Node_context.get_store ctxt)
                     (Node_context.get_gs_worker ctxt)
-                    profile
-                in
-                Node_context.set_profile_ctxt ctxt pctxt
+                    profile)
+                (Node_context.get_profile_ctxt ctxt)
+                config.Configuration_file.profiles
+            in
+            Node_context.set_profile_ctxt ctxt pctxt
           in
           Node_context.set_ready
             ctxt
