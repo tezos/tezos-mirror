@@ -59,7 +59,7 @@ val round_proposer :
   (consensus_key_and_delegate * endorsing_slot) option
 
 val propose_fresh_block_action :
-  endorsements:Kind.endorsement Operation.t list ->
+  endorsements:Kind.attestation Operation.t list ->
   dal_attestations:Kind.dal_attestation Operation.t list ->
   ?last_proposal:block_info ->
   predecessor:block_info ->
@@ -91,7 +91,7 @@ val prequorum_reached_when_awaiting_preendorsements :
 val quorum_reached_when_waiting_endorsements :
   state ->
   Operation_worker.candidate ->
-  Kind.endorsement operation list ->
+  Kind.attestation operation list ->
   (state * action) Lwt.t
 
 val step : state -> event -> (state * action) Lwt.t

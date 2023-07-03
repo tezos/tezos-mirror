@@ -28,7 +28,7 @@
 
     Defines kinds of operations that can be performed on chain:
     - preattestation
-    - endorsement
+    - attestation
     - double baking evidence
     - double preendorsing evidence
     - double endorsing evidence
@@ -71,7 +71,7 @@ module Kind : sig
 
   type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = attestation_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -169,7 +169,7 @@ module Kind : sig
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
   | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
@@ -233,7 +233,7 @@ and _ contents =
   | Preendorsement : consensus_content -> Kind.preattestation contents
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying endorsement encoding. *)
@@ -269,8 +269,8 @@ and _ contents =
   (* Double_endorsement_evidence: Similar to double-preendorsement but
      for endorsements. *)
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
       -> Kind.double_endorsement_evidence contents
   (* Double_baking_evidence: Similarly to double-endorsement but the
@@ -673,9 +673,9 @@ module Encoding : sig
 
   val preattestation_case : Kind.preattestation case
 
-  val endorsement_case : Kind.endorsement case
+  val endorsement_case : Kind.attestation case
 
-  val attestation_case : Kind.endorsement case
+  val attestation_case : Kind.attestation case
 
   val dal_attestation_case : Kind.dal_attestation case
 

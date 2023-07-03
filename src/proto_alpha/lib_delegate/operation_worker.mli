@@ -43,7 +43,7 @@ val candidate_encoding : candidate Data_encoding.t
 
 type event =
   | Prequorum_reached of candidate * Kind.preattestation operation list
-  | Quorum_reached of candidate * Kind.endorsement operation list
+  | Quorum_reached of candidate * Kind.attestation operation list
 
 (** {1 Constructors}*)
 

@@ -2027,7 +2027,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
       return (ctxt, mk_preendorsement_result consensus_key 0 (* Fake power. *))
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
-    (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
+    (context * Kind.attestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =

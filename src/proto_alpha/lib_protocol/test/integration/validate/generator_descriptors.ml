@@ -31,7 +31,7 @@ type dbl_endorsement_state = {
   temporary : (Block.t * Block.t) option;
   slashable_preend :
     (Kind.preattestation operation * Kind.preattestation operation) list;
-  slashable_end : (Kind.endorsement operation * Kind.endorsement operation) list;
+  slashable_end : (Kind.attestation operation * Kind.attestation operation) list;
 }
 
 type state = {
@@ -314,7 +314,7 @@ let seed_nonce_descriptor =
         List.map_es gen state.seed_nonce_to_reveal);
   }
 
-(** The heads on which two slashable endorsements or preendorsement
+(** The heads on which two slashable attestations or preattestation
    should be made are from the previous level. Hence, the temporary
    field of a double_evidence_state is used to transmit them to the
    next level in order to make the slashable operations. *)
@@ -326,15 +326,15 @@ let register_temporary ba bb state : (Block.t * Block.t) option * state =
 
 (** During the slashable period, at each level, two different heads
    for the same round are baked by the same baker. At the next level,
-   a delegate that either preendorses or endorses both heads makes a
-   pair of slashable pre- or endorsements.
+   a delegate that either preattests or attests both heads makes a
+   pair of slashable pre- or attestations.
 
    The pair of heads is placed in the temporary of the
    double_evidence_state. If a pair of heads was already in this
    field, hence they were baked at the previous level.
 
-   Consequently, two pairs of slashable operations: two endorsements
-   and two preendorsement, can be made by two distinct endorsers. Each
+   Consequently, two pairs of slashable operations: two attestations
+   and two preattestation, can be made by two distinct attestations. Each
    pair is ordered in operation_hash order. Consequently, each pair
    can appear in a denunciation operation and will be valid. *)
 let dbl_endorsement_prelude state =

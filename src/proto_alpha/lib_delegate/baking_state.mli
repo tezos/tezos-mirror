@@ -61,7 +61,7 @@ type block_info = {
   payload_round : Round.t;
   round : Round.t;
   prequorum : prequorum option;
-  quorum : Kind.endorsement operation list;
+  quorum : Kind.attestation operation list;
   dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
@@ -123,7 +123,7 @@ val endorsable_payload_encoding : endorsable_payload Data_encoding.t
 
 type elected_block = {
   proposal : proposal;
-  endorsement_qc : Kind.endorsement operation list;
+  endorsement_qc : Kind.attestation operation list;
 }
 
 type level_state = {
@@ -175,7 +175,7 @@ type event =
   | Prequorum_reached of
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
-      Operation_worker.candidate * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.attestation operation list
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t

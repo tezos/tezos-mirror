@@ -202,7 +202,7 @@ let state_endorsing_power =
          protocol_data = {contents = Single (Endorsement consensus_content); _};
          _;
        } :
-        Kind.endorsement operation)
+        Kind.attestation operation)
     -> consensus_content)
 
 let do_action (state, action) =
@@ -425,7 +425,7 @@ let baking_minimal_timestamp state =
                 {contents = Single (Endorsement consensus_content); _};
               _;
             } :
-             Kind.endorsement operation)
+             Kind.attestation operation)
          ->
            if
              Round.(consensus_content.round = latest_proposal.block.round)

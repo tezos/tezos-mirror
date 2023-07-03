@@ -863,7 +863,7 @@ type 'kind contents_result =
       consensus_key : Signature.public_key_hash;
       consensus_power : int;
     }
-      -> Kind.endorsement contents_result
+      -> Kind.attestation contents_result
   | Dal_attestation_result : {
       delegate : Signature.Public_key_hash.t;
     }

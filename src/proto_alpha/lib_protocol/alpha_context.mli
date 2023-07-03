@@ -4009,7 +4009,7 @@ module Kind : sig
 
   type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = attestation_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -4109,7 +4109,7 @@ end
 (** All the definitions below are re-exported from {!Operation_repr}. *)
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
   | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
@@ -4144,7 +4144,7 @@ and _ contents_list =
 
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preattestation contents
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
@@ -4161,8 +4161,8 @@ and _ contents =
     }
       -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -4424,9 +4424,9 @@ module Operation : sig
 
     val preattestation_case : Kind.preattestation case
 
-    val endorsement_case : Kind.endorsement case
+    val endorsement_case : Kind.attestation case
 
-    val attestation_case : Kind.endorsement case
+    val attestation_case : Kind.attestation case
 
     val dal_attestation_case : Kind.dal_attestation case
 

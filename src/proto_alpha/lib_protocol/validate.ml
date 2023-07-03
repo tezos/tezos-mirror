@@ -716,7 +716,7 @@ module Consensus = struct
     return (consensus_key, voting_power)
 
   let check_endorsement vi ~check_signature
-      (operation : Kind.endorsement operation) =
+      (operation : Kind.attestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
       Option.value_e
@@ -747,7 +747,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_endorsement_conflict vs oph (operation : Kind.endorsement operation)
+  let check_endorsement_conflict vs oph (operation : Kind.attestation operation)
       =
     let (Single (Endorsement {slot; level; round; _})) =
       operation.protocol_data.contents
@@ -768,7 +768,7 @@ module Consensus = struct
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
-  let add_endorsement vs oph (op : Kind.endorsement operation) =
+  let add_endorsement vs oph (op : Kind.attestation operation) =
     let (Single (Endorsement {slot; level; round; _})) =
       op.protocol_data.contents
     in
@@ -790,7 +790,7 @@ module Consensus = struct
         }
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_endorsement vs (operation : Kind.endorsement operation) =
+  let remove_endorsement vs (operation : Kind.attestation operation) =
     (* We do not remove the endorsement power because it is not
        relevant for the mempool mode. *)
     let (Single (Endorsement {slot; level; round; _})) =

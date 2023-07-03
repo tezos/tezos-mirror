@@ -107,7 +107,7 @@ type block_info = {
   payload_round : Round.t;
   round : Round.t;
   prequorum : prequorum option;
-  quorum : Kind.endorsement operation list;
+  quorum : Kind.attestation operation list;
   dal_attestations : Kind.dal_attestation operation list;
   payload : Operation_pool.payload;
 }
@@ -283,7 +283,7 @@ let endorsable_payload_encoding =
 
 type elected_block = {
   proposal : proposal;
-  endorsement_qc : Kind.endorsement Operation.t list;
+  endorsement_qc : Kind.attestation Operation.t list;
 }
 
 (* Updated only when we receive a block at a different level.
@@ -396,7 +396,7 @@ type event =
   | Prequorum_reached of
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
-      Operation_worker.candidate * Kind.endorsement operation list
+      Operation_worker.candidate * Kind.attestation operation list
   | Timeout of timeout_kind
 
 let event_encoding =

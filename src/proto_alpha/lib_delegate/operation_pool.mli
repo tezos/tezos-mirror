@@ -95,7 +95,7 @@ val filter_with_relevant_consensus_ops :
 val unpack_preendorsement :
   packed_operation -> Kind.preattestation operation option
 
-val unpack_endorsement : packed_operation -> Kind.endorsement operation option
+val unpack_endorsement : packed_operation -> Kind.attestation operation option
 
 val unpack_dal_attestation :
   packed_operation -> Kind.dal_attestation operation option
@@ -104,7 +104,7 @@ val filter_preendorsements :
   packed_operation list -> Kind.preattestation operation list
 
 val filter_endorsements :
-  packed_operation list -> Kind.endorsement operation list
+  packed_operation list -> Kind.attestation operation list
 
 val ordered_to_list_list : ordered_pool -> packed_operation list list
 
@@ -114,7 +114,7 @@ val ordered_of_list_list : packed_operation list list -> ordered_pool option
 val extract_operations_of_list_list :
   packed_operation list list ->
   (Kind.preattestation operation list option
-  * Kind.endorsement operation list
+  * Kind.attestation operation list
   * Kind.dal_attestation operation list
   * payload)
   option

@@ -37,7 +37,7 @@ module Kind = struct
 
   type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = attestation_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -135,7 +135,7 @@ module Kind = struct
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
   | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
@@ -235,7 +235,7 @@ and _ contents_list =
 
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preattestation contents
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -254,8 +254,8 @@ and _ contents =
     }
       -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -1116,8 +1116,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -1138,8 +1138,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.attestation"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->

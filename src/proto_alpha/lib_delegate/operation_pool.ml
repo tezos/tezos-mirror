@@ -265,7 +265,7 @@ let unpack_endorsement packed_endorsement =
   let {shell; protocol_data = Operation_data data} = packed_endorsement in
   match data with
   | {contents = Single (Endorsement _); _} ->
-      Some ({shell; protocol_data = data} : Kind.endorsement Operation.t)
+      Some ({shell; protocol_data = data} : Kind.attestation Operation.t)
   | _ -> None
 
 let unpack_dal_attestation packed_dal_attestation =
@@ -302,7 +302,7 @@ let filter_endorsements ops =
         } ->
           Some
             ({shell = {branch}; protocol_data = content}
-              : Kind.endorsement operation)
+              : Kind.attestation operation)
       | _ -> None)
     ops
 
@@ -335,7 +335,7 @@ let extract_operations_of_list_list = function
       let preendorsements, endorsements, dal_attestations =
         List.fold_left
           (fun ( (preendorsements : Kind.preattestation Operation.t list),
-                 (endorsements : Kind.endorsement Operation.t list),
+                 (endorsements : Kind.attestation Operation.t list),
                  (dal_attestations : Kind.dal_attestation Operation.t list) )
                packed_op ->
             let {shell; protocol_data = Operation_data data} = packed_op in
