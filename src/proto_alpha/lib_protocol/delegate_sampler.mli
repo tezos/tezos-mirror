@@ -77,3 +77,18 @@ val clear_outdated_sampling_data :
 
 val select_distribution_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+module For_RPC : sig
+  (** The baking power for a given delegate from the selected stake
+    snapshot of the current cycle. *)
+  val delegate_baking_power_for_cycle :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Signature.public_key_hash ->
+    int64 tzresult Lwt.t
+
+  (** The baking power for a given delegate computed from its current
+    stake. *)
+  val delegate_current_baking_power :
+    Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
+end

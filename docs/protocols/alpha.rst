@@ -33,9 +33,20 @@ Breaking Changes
 RPC Changes
 -----------
 
-- The new ``current_voting_power`` RPC computes the voting power of a
-  delegate based on its current stake (as opposed to reading it from
-  the vote listings as the ``voting_power`` does) (MR :gl:`!9329`)
+- Three new variants of the ``voting_power`` RPC (which returns the
+  voting power of a delegate based on the stake it had when voting
+  snapshot was taken) have been added:
+
+  - ``current_voting_power`` the voting power of a delegate based on
+    its current stake (MR :gl:`!9329`)
+
+  - ``baking_power`` computes the baking power of a delegate based on
+     the stake snapshot selected for the current cycle (MR
+     :gl:`!9350`)
+
+  - ``current_baking_power`` computes the baking power of a delegate
+    based on its current stake (MR :gl:`!9350`)
+
 
 Operation receipts
 ------------------

@@ -151,6 +151,65 @@ let load_sampler_for_cycle ctxt cycle =
   in
   return ctxt
 
+let get_delegate_stake_from_staking_balance ctxt
+    ~staking_over_baking_global_limit_millionth ~delegation_over_baking_limit
+    delegate staking_balance =
+  let open Lwt_result_syntax in
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let* delegate_own_pseudotokens =
+    Staking_pseudotokens_storage.costaking_pseudotokens_balance
+      ctxt
+      delegate_contract
+  in
+  let* delegate_own_frozen_deposits =
+    Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+      ctxt
+      delegate
+      delegate_own_pseudotokens
+  in
+  let* {staking_over_baking_limit_millionth; _} =
+    Delegate_staking_parameters.of_delegate ctxt delegate
+  in
+  let staking_over_baking_limit_millionth =
+    let delegate_staking_over_baking_limit_millionth =
+      Int64.of_int32 staking_over_baking_limit_millionth
+    in
+    Compare.Int64.min
+      staking_over_baking_global_limit_millionth
+      delegate_staking_over_baking_limit_millionth
+  in
+  let staking_over_baking_limit_plus_1_millionth =
+    Int64.add 1_000_000L staking_over_baking_limit_millionth
+  in
+  let open Tez_repr in
+  let* {current_amount = all_frozen_deposits; initial_amount = _} =
+    Frozen_deposits_storage.get ctxt delegate_contract
+  in
+  let frozen =
+    match
+      mul_ratio
+        delegate_own_frozen_deposits
+        ~num:staking_over_baking_limit_plus_1_millionth
+        ~den:1_000_000L
+    with
+    | Ok max_allowed_frozen_deposits ->
+        min all_frozen_deposits max_allowed_frozen_deposits
+        (* Over-co-staked frozen deposits counts towards delegated stake. *)
+    | Error _max_allowed_frozen_deposits_overflows -> all_frozen_deposits
+  in
+  (* This subtraction may result in a negative value if tez were frozen
+     after the snapshot. This is fine, they are then taken into account as
+     frozen stake rather than delegated. *)
+  let available_delegated =
+    sub_opt staking_balance frozen |> Option.value ~default:zero
+  in
+  let delegated =
+    match delegate_own_frozen_deposits *? delegation_over_baking_limit with
+    | Ok max_allowed_delegated -> min max_allowed_delegated available_delegated
+    | Error _max_allowed_delegated_overflows -> available_delegated
+  in
+  return (Stake_repr.make ~frozen ~delegated)
+
 let get_stakes_for_selected_index ctxt index =
   let open Lwt_result_syntax in
   let delegation_over_baking_limit =
@@ -169,61 +228,14 @@ let get_stakes_for_selected_index ctxt index =
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
-      let delegate_contract = Contract_repr.Implicit delegate in
-      let* delegate_own_pseudotokens =
-        Staking_pseudotokens_storage.costaking_pseudotokens_balance
-          ctxt
-          delegate_contract
-      in
-      let* delegate_own_frozen_deposits =
-        Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+      let* stake_for_cycle =
+        get_delegate_stake_from_staking_balance
+          ~staking_over_baking_global_limit_millionth
+          ~delegation_over_baking_limit
           ctxt
           delegate
-          delegate_own_pseudotokens
+          staking_balance
       in
-      let* {staking_over_baking_limit_millionth; _} =
-        Delegate_staking_parameters.of_delegate ctxt delegate
-      in
-      let staking_over_baking_limit_millionth =
-        let delegate_staking_over_baking_limit_millionth =
-          Int64.of_int32 staking_over_baking_limit_millionth
-        in
-        Compare.Int64.min
-          staking_over_baking_global_limit_millionth
-          delegate_staking_over_baking_limit_millionth
-      in
-      let staking_over_baking_limit_plus_1_millionth =
-        Int64.add 1_000_000L staking_over_baking_limit_millionth
-      in
-      let open Tez_repr in
-      let* {current_amount = all_frozen_deposits; initial_amount = _} =
-        Frozen_deposits_storage.get ctxt delegate_contract
-      in
-      let frozen =
-        match
-          mul_ratio
-            delegate_own_frozen_deposits
-            ~num:staking_over_baking_limit_plus_1_millionth
-            ~den:1_000_000L
-        with
-        | Ok max_allowed_frozen_deposits ->
-            min all_frozen_deposits max_allowed_frozen_deposits
-            (* Over-co-staked frozen deposits counts towards delegated stake. *)
-        | Error _max_allowed_frozen_deposits_overflows -> all_frozen_deposits
-      in
-      (* This subtraction may result in a negative value if tez were frozen
-         after the snapshot. This is fine, they are then taken into account as
-         frozen stake rather than delegated. *)
-      let available_delegated =
-        sub_opt staking_balance frozen |> Option.value ~default:zero
-      in
-      let delegated =
-        match delegate_own_frozen_deposits *? delegation_over_baking_limit with
-        | Ok max_allowed_delegated ->
-            min max_allowed_delegated available_delegated
-        | Error _max_allowed_delegated_overflows -> available_delegated
-      in
-      let stake_for_cycle = Stake_repr.make ~frozen ~delegated in
       let*? total_stake = Stake_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
     ~init:([], Stake_repr.zero)
@@ -263,6 +275,30 @@ let select_distribution_for_cycle ctxt cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
+let delegate_baking_power_from_staking_balance ctxt delegate staking_balance =
+  let open Lwt_result_syntax in
+  let delegation_over_baking_limit =
+    Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
+  in
+  let staking_over_baking_global_limit_millionth =
+    Int64.(
+      mul
+        1_000_000L
+        (of_int
+           (Constants_storage
+            .adaptive_inflation_staking_over_baking_global_limit
+              ctxt)))
+  in
+  let+ stake =
+    get_delegate_stake_from_staking_balance
+      ctxt
+      ~staking_over_baking_global_limit_millionth
+      ~delegation_over_baking_limit
+      delegate
+      staking_balance
+  in
+  Stake_context.staking_weight ctxt stake
+
 let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
@@ -275,3 +311,22 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | Some outdated_cycle ->
       Delegate_sampler_state.remove_existing ctxt outdated_cycle
       >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
+
+module For_RPC = struct
+  let delegate_baking_power_for_cycle ctxt cycle delegate =
+    let open Lwt_result_syntax in
+    let* max_snapshot_index = Stake_storage.max_snapshot_index ctxt in
+    let* seed = Seed_storage.raw_for_cycle ctxt cycle in
+    let* selected_index =
+      compute_snapshot_index_for_seed ~max_snapshot_index seed
+    in
+    let* staking_balance =
+      Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
+    in
+    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+
+  let delegate_current_baking_power ctxt delegate =
+    let open Lwt_result_syntax in
+    let* staking_balance = Stake_storage.get_staking_balance ctxt delegate in
+    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+end

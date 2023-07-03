@@ -174,6 +174,10 @@ let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 
+let get_baking_power = Delegate_services.baking_power rpc_ctxt
+
+let get_current_baking_power = Delegate_services.current_baking_power rpc_ctxt
+
 let get_bakers ?filter ?cycle ctxt =
   Plugin.RPC.Baking_rights.get rpc_ctxt ?cycle ctxt >|=? fun bakers ->
   (match filter with None -> bakers | Some f -> List.filter f bakers)

@@ -137,6 +137,12 @@ val current_voting_power :
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
 
+val baking_power :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+
+val current_baking_power :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+
 val voting_info :
   'a #RPC_context.simple ->
   'a ->

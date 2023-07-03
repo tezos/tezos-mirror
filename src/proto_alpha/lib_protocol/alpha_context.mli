@@ -4586,6 +4586,14 @@ module Stake_distribution : sig
   val load_sampler_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
 
   val get_total_frozen_stake : context -> Cycle.t -> Tez.t tzresult Lwt.t
+
+  module For_RPC : sig
+    val delegate_baking_power_for_cycle :
+      context -> Cycle.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
+
+    val delegate_current_baking_power :
+      context -> Signature.public_key_hash -> int64 tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,
