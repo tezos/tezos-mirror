@@ -39,7 +39,7 @@ val already_slashed_for_double_baking :
   bool tzresult Lwt.t
 
 (** Returns true if the given delegate has already been slashed
-    for double preendorsing or double endorsing for the given level. *)
+    for double preattesting or double endorsing for the given level. *)
 val already_slashed_for_double_endorsing :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
