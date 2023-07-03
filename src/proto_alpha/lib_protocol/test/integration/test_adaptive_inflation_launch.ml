@@ -31,14 +31,11 @@
     Subject:      Test the launch vote feature of Adaptive Inflation.
 *)
 
+open Adaptive_inflation
+
 let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
   Assert.equal_int32 ~loc current_level expected
-
-let get_launch_cycle ~loc blk =
-  let open Lwt_result_syntax in
-  let* launch_cycle_opt = Context.get_adaptive_inflation_launch_cycle (B blk) in
-  Assert.get_some ~loc launch_cycle_opt
 
 let assert_is_not_yet_set_to_launch ~loc blk =
   let open Lwt_result_syntax in
@@ -65,35 +62,6 @@ let assert_cycle_eq ~loc c1 c2 =
 let assert_current_cycle ~loc (blk : Block.t) expected =
   let current_cycle = Block.current_cycle blk in
   assert_cycle_eq ~loc current_cycle expected
-
-let stake ctxt contract amount =
-  Op.transaction
-    ctxt
-    ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
-    ~fee:Protocol.Alpha_context.Tez.zero
-    contract
-    contract
-    amount
-
-let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
-    ~baking_over_staking_edge_billionth =
-  let entrypoint = Protocol.Alpha_context.Entrypoint.set_delegate_parameters in
-  let parameters =
-    Protocol.Alpha_context.Script.lazy_expr
-      (Expr.from_string
-         (Printf.sprintf
-            "Pair %d (Pair %d Unit)"
-            staking_over_baking_limit
-            baking_over_staking_edge_billionth))
-  in
-  Op.transaction
-    ctxt
-    ~entrypoint
-    ~parameters
-    ~fee:Protocol.Alpha_context.Tez.zero
-    delegate
-    delegate
-    Protocol.Alpha_context.Tez.zero
 
 (** Assert that the staking balance is the expected one. *)
 let assert_total_frozen_stake ~loc block expected =
