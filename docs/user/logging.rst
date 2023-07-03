@@ -78,21 +78,21 @@ Common options:
    sections. To exclude a specific section use the ``none`` filter, for
    example ``section-prefix=p2p:none``. To define a filter only for
    one specific section ``section-prefix=p2p:debug&section-prefix=:none``
-- ``format=<value>`` the output format used. Note that syslog output will ignore
+-  ``format=<value>`` the output format used. Note that syslog output will ignore
    this option and use the syslog formatting. Possible values are:
 
    -  ``one-per-line`` (the default): output JSON objects, one per line,
    -  ``netstring``: use the Netstring format
       (cf. `Wikipedia <https://en.wikipedia.org/wiki/Netstring>`__) to
       separate JSON records,
-   - ``pp`` or ``pp-rfc5424`` to output the events pretty-printed, one per line,
+   -  ``pp`` or ``pp-rfc5424`` to output the events pretty-printed, one per line,
       using a format compatible with `RFC-5424
       <https://www.rfc-editor.org/rfc/rfc5424#section-6>`__ (or Syslog).
-   - ``pp-short`` to output the events pretty-printed in a shorter and more
-     user-friendly fashion.
+   -  ``pp-short`` to output the events pretty-printed in a shorter and more
+      user-friendly fashion.
 
-- ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
-  ``format=pp-short``.
+-  ``color=true`` enables logs coloring. It only works on ttys, in conjunction with
+   ``format=pp-short``.
 
 Options available only for the ``file-descriptor-path://`` case:
 
@@ -104,15 +104,15 @@ Options available only for the ``file-descriptor-path://`` case:
 -  ``chmod=<int>`` sets the access-rights of the file at creation time
    (default is ``0o600``, provided
    `Umask <https://en.wikipedia.org/wiki/Umask>`__ allows it).
-- ``daily-logs=<int>`` sets up a rotation for log files, creating a file for
-  each day. The parameter is the number of days these logs should be kept, and
-  hence the number of files. The day of the year with format ["yyyymmdd"] is
-  added as a suffix to the filename, prefixed by a dash. We recomend not to put
-  your tezos logs in ``/var/log`` if you use this option, as you system would
-  use ``logrotate`` automatically.
-- ``create-dirs=<bool>`` when ``true`` allows to create the directory where
-  the log files are stored and all its parents recursively if they don't
-  exist.
+-  ``daily-logs=<int>`` sets up a rotation for log files, creating a file for
+   each day. The parameter is the number of days these logs should be kept, and
+   hence the number of files. The day of the year with format ["yyyymmdd"] is
+   added as a suffix to the filename, prefixed by a dash. We recomend not to put
+   your tezos logs in ``/var/log`` if you use this option, as you system would
+   use ``logrotate`` automatically.
+-  ``create-dirs=<bool>`` when ``true`` allows to create the directory where
+   the log files are stored and all its parents recursively if they don't
+   exist.
 
 Option available only for ``file-descriptor-syslog://`` case:
 
@@ -138,7 +138,7 @@ Option available only for ``file-descriptor-syslog://`` case:
 -  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
    → Write only sections validator and rpc at debug level but exclude all
    other sections from the stream.
-- ``"file-descriptor-path:///tmp/node-logs/node.log?daily-logs=5&create-dirs=true&section-prefix=:info"``
+-  ``"file-descriptor-path:///tmp/node-logs/node.log?daily-logs=5&create-dirs=true&section-prefix=:info"``
    sets up daily log files with a history of up to 5 days and verbosity level
    ``info`` for all logs. Files will be named ``node-19700101.log`` in an
    example of a file produced in 1970, January, the 1st. The log directory
@@ -254,7 +254,7 @@ called; this should include *all* the regular ``octez-*`` binaries.
       to configuration JSON files (format above) to load (which
       themselves activate sinks).
 
-- ``TEZOS_LOG`` and ``LWT_LOG`` (deprecated and has a lower priority) contain
+-  ``TEZOS_LOG`` and ``LWT_LOG`` (deprecated and has a lower priority) contain
    “rules” to configure the default ``file-descriptor-stdout`` sink. The rules
    are expressed with a DSL:
 
@@ -291,7 +291,7 @@ In particular the fields:
 
 -  ``"internal-events"`` contains a configuration of the sinks (format
    above).
-- ``"log"`` is an object which defines the configuration of the default
+-  ``"log"`` is an object which defines the configuration of the default
    ``file-descriptor-stdout`` sink; one can redirect the output to a file, set
    the rules, and change the formatting template. The goal of this configuration
    field is to be simpler to express that ``internal-events`` for simpler
@@ -308,7 +308,7 @@ configuration can be also be changed with the following options:
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
    respectively.
 -  ``--log-output``: set the output file.
-- ``--log-coloring=<bool>``: enable or disable colors in the default stdout
+-  ``--log-coloring=<bool>``: enable or disable colors in the default stdout
    logs. The default value is ``true``.
 
 RPC ``/config/logging``
