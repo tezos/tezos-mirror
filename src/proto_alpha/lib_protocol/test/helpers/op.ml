@@ -647,7 +647,7 @@ let double_endorsement ctxt op1 op2 =
   }
 
 let double_preendorsement ctxt op1 op2 =
-  let contents = Single (Double_preendorsement_evidence {op1; op2}) in
+  let contents = Single (Double_preattestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};

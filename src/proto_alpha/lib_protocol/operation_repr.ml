@@ -248,7 +248,7 @@ and _ contents =
       solution : Seed_repr.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  | Double_preendorsement_evidence : {
+  | Double_preattestation_evidence : {
       op1 : Kind.preattestation operation;
       op2 : Kind.preattestation operation;
     }
@@ -1219,10 +1219,10 @@ module Encoding = struct
             (req "op2" (dynamic_size preendorsement_encoding));
         select =
           (function
-          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | Contents (Double_preattestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+        proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
       }
 
   let double_preattestation_evidence_case :
@@ -1237,10 +1237,10 @@ module Encoding = struct
             (req "op2" (dynamic_size preattestation_encoding));
         select =
           (function
-          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | Contents (Double_preattestation_evidence _ as op) -> Some op
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
-        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
+        proj = (fun (Double_preattestation_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preattestation_evidence {op1; op2});
       }
 
   let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
@@ -1854,7 +1854,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Seed_nonce_revelation _) -> Some anonymous_pass
   | Single (Vdf_revelation _) -> Some anonymous_pass
   | Single (Double_endorsement_evidence _) -> Some anonymous_pass
-  | Single (Double_preendorsement_evidence _) -> Some anonymous_pass
+  | Single (Double_preattestation_evidence _) -> Some anonymous_pass
   | Single (Double_baking_evidence _) -> Some anonymous_pass
   | Single (Activate_account _) -> Some anonymous_pass
   | Single (Drain_delegate _) -> Some anonymous_pass
@@ -1942,7 +1942,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
         | Single
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
             | Vdf_revelation _ | Double_endorsement_evidence _
-            | Double_preendorsement_evidence _ | Double_baking_evidence _
+            | Double_preattestation_evidence _ | Double_baking_evidence _
             | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
             Generic_operation
         | Cons (Manager_operation _, _ops) -> Generic_operation
@@ -2029,9 +2029,9 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Vdf_revelation _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
   | Double_endorsement_evidence _, _ -> None
-  | Double_preendorsement_evidence _, Double_preendorsement_evidence _ ->
+  | Double_preattestation_evidence _, Double_preattestation_evidence _ ->
       Some Eq
-  | Double_preendorsement_evidence _, _ -> None
+  | Double_preattestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
   | Double_baking_evidence _, _ -> None
   | Activate_account _, Activate_account _ -> Some Eq
@@ -2203,7 +2203,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    The [weight] of a {!Seed_nonce_revelation} depends on its [level]
    converted in {!int32}.
 
-    The [weight] of a {!Double_preendorsement} or
+    The [weight] of a {!Double_preattestation} or
    {!Double_endorsement} depends on the [level] and [round] of their
    first denounciated operations. The [level] and [round] are wrapped
    in a {!round_infos}.
@@ -2348,7 +2348,7 @@ let weight_of : packed_operation -> operation_weight =
             ( Anonymous,
               Weight_double_endorsement
                 (round_infos_from_consensus_content consensus_content) ))
-  | Single (Double_preendorsement_evidence {op1; _}) -> (
+  | Single (Double_preattestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
       | Single (Preattestation consensus_content) ->
           W
@@ -2413,7 +2413,7 @@ let compare_round_infos infos1 infos2 =
     (infos2.level, infos2.round)
 
 (** When comparing {!Endorsement} to {!Preattestation} or
-   {!Double_endorsement_evidence} to {!Double_preendorsement}, in case
+   {!Double_endorsement_evidence} to {!Double_preattestation}, in case
    of {!round_infos} equality, the position is relevant to compute the
    order. *)
 type prioritized_position = Nopos | Fstpos | Sndpos
@@ -2528,7 +2528,7 @@ let compare_vote_weight w1 w2 =
 (** {5 Comparison of valid anonymous operations} *)
 
 (** Comparing two {!Double_endorsement_evidence}, or two
-   {!Double_preendorsement_evidence}, or comparing them to each other
+   {!Double_preattestation_evidence}, or comparing them to each other
    is comparing their {!round_infos}, see {!compare_round_infos} for
    more details.
 
@@ -2543,7 +2543,7 @@ let compare_vote_weight w1 w2 =
    Two {!Activate_account} are compared as their [id].
 
    When comparing different kind of anonymous operations, the order is
-   as follows: {!Double_preendorsement_evidence} >
+   as follows: {!Double_preattestation_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}.
    *)

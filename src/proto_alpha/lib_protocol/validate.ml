@@ -1406,7 +1406,7 @@ module Anonymous = struct
 
   let check_double_preendorsement_evidence vi
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preendorsement_evidence {op1; op2})) =
+    let (Single (Double_preattestation_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
     check_double_endorsing_evidence
@@ -1437,7 +1437,7 @@ module Anonymous = struct
 
   let check_double_preendorsement_evidence_conflict vs oph
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preendorsement_evidence {op1; _})) =
+    let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     check_double_endorsing_evidence_conflict vs oph op1
@@ -1478,7 +1478,7 @@ module Anonymous = struct
 
   let add_double_preendorsement_evidence vs oph
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preendorsement_evidence {op1; _})) =
+    let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     add_double_endorsing_evidence vs oph op1
@@ -1499,7 +1499,7 @@ module Anonymous = struct
 
   let remove_double_preendorsement_evidence vs
       (operation : Kind.double_preattestation_evidence operation) =
-    let (Single (Double_preendorsement_evidence {op1; _})) =
+    let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     remove_double_endorsing_evidence vs op1
@@ -2463,7 +2463,7 @@ let check_operation ?(check_signature = true) info (type kind)
   | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
   | Single (Activate_account _) ->
       Anonymous.check_activate_account info operation
-  | Single (Double_preendorsement_evidence _) ->
+  | Single (Double_preattestation_evidence _) ->
       Anonymous.check_double_preendorsement_evidence info operation
   | Single (Double_endorsement_evidence _) ->
       Anonymous.check_double_endorsement_evidence info operation
@@ -2527,7 +2527,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
-  | Single (Double_preendorsement_evidence _) ->
+  | Single (Double_preattestation_evidence _) ->
       Anonymous.check_double_preendorsement_evidence_conflict
         operation_conflict_state
         oph
@@ -2581,7 +2581,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
       Voting.add_ballot operation_conflict_state oph operation
   | Single (Activate_account _) ->
       Anonymous.add_activate_account operation_conflict_state oph operation
-  | Single (Double_preendorsement_evidence _) ->
+  | Single (Double_preattestation_evidence _) ->
       Anonymous.add_double_preendorsement_evidence
         operation_conflict_state
         oph
@@ -2625,7 +2625,7 @@ let remove_operation operation_conflict_state (type kind)
   | Single (Ballot _) -> Voting.remove_ballot operation_conflict_state operation
   | Single (Activate_account _) ->
       Anonymous.remove_activate_account operation_conflict_state operation
-  | Single (Double_preendorsement_evidence _) ->
+  | Single (Double_preattestation_evidence _) ->
       Anonymous.remove_double_preendorsement_evidence
         operation_conflict_state
         operation
@@ -2756,7 +2756,7 @@ let validate_operation ?(check_signature = true)
             add_activate_account operation_state oph operation
           in
           return {info; operation_state; block_state}
-      | Single (Double_preendorsement_evidence _) ->
+      | Single (Double_preattestation_evidence _) ->
           let open Anonymous in
           let* () = check_double_preendorsement_evidence info operation in
           let*? () =

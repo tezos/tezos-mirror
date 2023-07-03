@@ -1220,7 +1220,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Double_preendorsement_evidence _ as op), res)
+          | Contents_and_result ((Double_preattestation_evidence _ as op), res)
             ->
               Some (op, res)
           | _ -> None);
@@ -1241,7 +1241,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Double_preendorsement_evidence _ as op), res)
+          | Contents_and_result ((Double_preattestation_evidence _ as op), res)
             ->
               Some (op, res)
           | _ -> None);
@@ -1904,9 +1904,9 @@ let kind_equal :
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
   | Vdf_revelation _, _ -> None
-  | Double_preendorsement_evidence _, Double_preendorsement_evidence_result _ ->
+  | Double_preattestation_evidence _, Double_preendorsement_evidence_result _ ->
       Some Eq
-  | Double_preendorsement_evidence _, _ -> None
+  | Double_preattestation_evidence _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence_result _ ->
       Some Eq
   | Double_endorsement_evidence _, _ -> None

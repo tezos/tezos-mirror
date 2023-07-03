@@ -255,18 +255,18 @@ and _ contents =
       solution : Seed_repr.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  (* Double_preendorsement_evidence: Double-preendorsement is a
+  (* Double_preattestation_evidence: Double-preattestation is a
      kind of malicious attack where a byzantine attempts to fork
      the chain by preendorsing blocks with different
      contents (at the same level and same round)
      twice. This behavior may be reported and the byzantine will have
      its security deposit forfeited. *)
-  | Double_preendorsement_evidence : {
+  | Double_preattestation_evidence : {
       op1 : Kind.preattestation operation;
       op2 : Kind.preattestation operation;
     }
       -> Kind.double_preattestation_evidence contents
-  (* Double_endorsement_evidence: Similar to double-preendorsement but
+  (* Double_endorsement_evidence: Similar to double-preattestation but
      for endorsements. *)
   | Double_endorsement_evidence : {
       op1 : Kind.attestation operation;
@@ -595,7 +595,7 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    The global order is as follows:
 
    {!Endorsement} and {!Preattestation} > {!Dal_attestation} >
-   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
+   {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.

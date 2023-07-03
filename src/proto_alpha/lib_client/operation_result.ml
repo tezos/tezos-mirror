@@ -926,7 +926,7 @@ let pp_contents_and_result :
         (Operation.hash op2)
         pp_balance_updates
         bus
-  | ( Double_preendorsement_evidence {op1; op2},
+  | ( Double_preattestation_evidence {op1; op2},
       Double_preendorsement_evidence_result bus ) ->
       Format.fprintf
         ppf

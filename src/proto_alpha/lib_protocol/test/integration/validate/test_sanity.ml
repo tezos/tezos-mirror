@@ -131,9 +131,9 @@ let covalidation_sanity () =
           | Single (Double_endorsement_evidence _), KDbl_consensus ->
               return_unit
           | Single (Double_endorsement_evidence _), _ -> assert false
-          | Single (Double_preendorsement_evidence _), KDbl_consensus ->
+          | Single (Double_preattestation_evidence _), KDbl_consensus ->
               return_unit
-          | Single (Double_preendorsement_evidence _), _ -> assert false
+          | Single (Double_preattestation_evidence _), _ -> assert false
           | Single (Double_baking_evidence _), KDbl_baking -> return_unit
           | Single (Double_baking_evidence _), _ -> assert false
           | Single (Activate_account _), KActivate -> return_unit

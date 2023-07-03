@@ -409,7 +409,7 @@ let generate_double_preendorsement =
   let open QCheck2.Gen in
   let* op1 = generate_op generate_preendorsement in
   let+ op2 = generate_op generate_preendorsement in
-  Double_preendorsement_evidence {op1; op2}
+  Double_preattestation_evidence {op1; op2}
 
 let generate_double_endorsement =
   let open QCheck2.Gen in

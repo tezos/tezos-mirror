@@ -2954,7 +2954,7 @@ module Forge = struct
     operation ctxt block ~branch (Double_endorsement_evidence {op1; op2})
 
   let double_preendorsement_evidence ctxt block ~branch ~op1 ~op2 () =
-    operation ctxt block ~branch (Double_preendorsement_evidence {op1; op2})
+    operation ctxt block ~branch (Double_preattestation_evidence {op1; op2})
 
   let empty_proof_of_work_nonce =
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
