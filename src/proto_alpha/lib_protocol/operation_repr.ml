@@ -234,7 +234,7 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Preattestation : consensus_content -> Kind.preattestation contents
   | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
@@ -998,9 +998,9 @@ module Encoding = struct
         name = "preendorsement";
         encoding = consensus_content_encoding;
         select =
-          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
-        proj = (fun (Preendorsement preendorsement) -> preendorsement);
-        inj = (fun preendorsement -> Preendorsement preendorsement);
+          (function Contents (Preattestation _ as op) -> Some op | _ -> None);
+        proj = (fun (Preattestation preattestation) -> preattestation);
+        inj = (fun preattestation -> Preattestation preattestation);
       }
 
   let preattestation_case =
@@ -1010,9 +1010,9 @@ module Encoding = struct
         name = "preattestation";
         encoding = consensus_content_encoding;
         select =
-          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
-        proj = (fun (Preendorsement preendorsement) -> preendorsement);
-        inj = (fun preendorsement -> Preendorsement preendorsement);
+          (function Contents (Preattestation _ as op) -> Some op | _ -> None);
+        proj = (fun (Preattestation preattestation) -> preattestation);
+        inj = (fun preattestation -> Preattestation preattestation);
       }
 
   let preendorsement_encoding =
@@ -1846,7 +1846,7 @@ let acceptable_pass (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Failing_noop _) -> None
-  | Single (Preendorsement _) -> Some consensus_pass
+  | Single (Preattestation _) -> Some consensus_pass
   | Single (Endorsement _) -> Some consensus_pass
   | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
@@ -1936,7 +1936,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
   | Some signature ->
       let watermark =
         match op.protocol_data.contents with
-        | Single (Preendorsement _) -> to_watermark (Preendorsement chain_id)
+        | Single (Preattestation _) -> to_watermark (Preendorsement chain_id)
         | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single
@@ -2017,8 +2017,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
  fun op1 op2 ->
   match (op1, op2) with
-  | Preendorsement _, Preendorsement _ -> Some Eq
-  | Preendorsement _, _ -> None
+  | Preattestation _, Preattestation _ -> Some Eq
+  | Preattestation _, _ -> None
   | Endorsement _, Endorsement _ -> Some Eq
   | Endorsement _, _ -> None
   | Dal_attestation _, Dal_attestation _ -> Some Eq
@@ -2147,10 +2147,10 @@ let round_infos_from_consensus_content (c : consensus_content) =
   | Error _ -> {level; round = -1}
 
 (** Compute a {!endorsement_infos} from a {!consensus_content}. It is
-   used to compute the weight of {!Endorsement} and {!Preendorsement}.
+   used to compute the weight of {!Endorsement} and {!Preattestation}.
 
     Precondition: [c] comes from a valid operation. The {!Endorsement}
-   or {!Preendorsement} is valid, so its [round] must succeed to
+   or {!Preattestation} is valid, so its [round] must succeed to
    convert into an {!int}. Hence, for the unreachable path where the
    convertion fails, we put (-1) as [round] value (see
    {!round_infos_from_consensus_content}). *)
@@ -2188,7 +2188,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    is used to compare it to an operation of the same pass.
     Operation weight are defined by validation pass.
 
-    The [weight] of an {!Endorsement} or {!Preendorsement} depends on
+    The [weight] of an {!Endorsement} or {!Preattestation} depends on
    its {!endorsement_infos}.
 
     The [weight] of a {!Dal_attestation} depends on the pair of
@@ -2315,7 +2315,7 @@ let weight_of : packed_operation -> operation_weight =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Failing_noop _) -> W (Noop, Weight_noop)
-  | Single (Preendorsement consensus_content) ->
+  | Single (Preattestation consensus_content) ->
       W
         ( Consensus,
           Weight_preendorsement
@@ -2350,7 +2350,7 @@ let weight_of : packed_operation -> operation_weight =
                 (round_infos_from_consensus_content consensus_content) ))
   | Single (Double_preendorsement_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Preendorsement consensus_content) ->
+      | Single (Preattestation consensus_content) ->
           W
             ( Anonymous,
               Weight_double_preendorsement
@@ -2412,7 +2412,7 @@ let compare_round_infos infos1 infos2 =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** When comparing {!Endorsement} to {!Preendorsement} or
+(** When comparing {!Endorsement} to {!Preattestation} or
    {!Double_endorsement_evidence} to {!Double_preendorsement}, in case
    of {!round_infos} equality, the position is relevant to compute the
    order. *)
@@ -2479,7 +2479,7 @@ let compare_dal_attestation (attestor1, endorsements1, level1)
 
 (** Comparing consensus operations by their [weight] uses the
    comparison on {!endorsement_infos} for {!Endorsement} and
-   {!Preendorsement}: see {!endorsement_infos} for more details.
+   {!Preattestation}: see {!endorsement_infos} for more details.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are

@@ -118,8 +118,8 @@ let covalidation_sanity () =
           failwith "no candidates was generated for kind '%a'" pp_op_kind kind
       | Some {protocol_data = Operation_data {contents; _}; _} -> (
           match (contents, kind) with
-          | Single (Preendorsement _), KPreendorsement -> return_unit
-          | Single (Preendorsement _), _ -> assert false
+          | Single (Preattestation _), KPreendorsement -> return_unit
+          | Single (Preattestation _), _ -> assert false
           | Single (Endorsement _), KEndorsement -> return_unit
           | Single (Endorsement _), _ -> assert false
           | Single (Dal_attestation _), KDalattestation -> return_unit

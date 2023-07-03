@@ -836,7 +836,7 @@ type op_kind =
 let op_kind_of_packed_operation op =
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with
-  | Single (Preendorsement _) -> KPreendorsement
+  | Single (Preattestation _) -> KPreendorsement
   | Single (Endorsement _) -> KEndorsement
   | Single (Dal_attestation _) -> KDalattestation
   | Single (Seed_nonce_revelation _) -> KNonce

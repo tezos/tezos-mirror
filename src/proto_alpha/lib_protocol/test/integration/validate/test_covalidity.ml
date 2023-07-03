@@ -62,7 +62,7 @@ let op_of_seed_gen = function Nonce -> KNonce | Vdf -> KVdf
 let is_not_preendorsement op =
   let open Protocol.Alpha_context in
   let (Operation_data {contents; _}) = op.protocol_data in
-  match contents with Single (Preendorsement _) -> false | _ -> true
+  match contents with Single (Preattestation _) -> false | _ -> true
 
 module OpkindMap = Map.Make (struct
   type t = op_kind

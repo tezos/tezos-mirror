@@ -360,7 +360,7 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
         List.find_map
           (fun {protocol_data = Operation_data protocol_data; _} ->
             match protocol_data.contents with
-            | Single (Preendorsement {round; _}) -> Some round
+            | Single (Preattestation {round; _}) -> Some round
             | _ -> None)
           (Option.value (List.hd operations) ~default:[])
     in

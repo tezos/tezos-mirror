@@ -228,9 +228,9 @@ and _ contents_list =
 (** A value of type [contents] an operation related to whether
     consensus, governance or contract management. *)
 and _ contents =
-  (* Preendorsement: About consensus, preendorsement of a block held by a
+  (* Preattestation: About consensus, preattestation of a block held by a
      validator (specific to Tenderbake). *)
-  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Preattestation : consensus_content -> Kind.preattestation contents
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
   | Endorsement : consensus_content -> Kind.attestation contents
@@ -594,20 +594,20 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Endorsement} and {!Preendorsement} > {!Dal_attestation} >
+   {!Endorsement} and {!Preattestation} > {!Dal_attestation} >
    {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.
 
-   {!Endorsement} and {!Preendorsement} are compared by the pair of
+   {!Endorsement} and {!Preattestation} are compared by the pair of
    their [level] and [round] such as the farther to the current state
    [level] and [round] is greater; e.g. the greater pair in
    lexicographic order being the better. When equal and both
    operations being of the same kind, we compare their [slot]: the
    The smaller being the better, assuming that the more slots an endorser
    has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Endorsement] to a {!Preendorsement}, the
+   and comparing an {!Endorsement] to a {!Preattestation}, the
    {!Endorsement} is better.
 
    Two {!Dal_attestation} ops are compared in the lexicographic

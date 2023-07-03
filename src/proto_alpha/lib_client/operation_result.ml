@@ -871,7 +871,7 @@ let pp_contents_and_result :
         (Block_header.hash bh2)
         pp_balance_updates
         bus
-  | ( Preendorsement {level; _},
+  | ( Preattestation {level; _},
       Preendorsement_result
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf

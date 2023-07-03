@@ -138,14 +138,14 @@ let get_block_offset level =
 let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
-  | Preattestation, Single (Preendorsement consensus_content)
+  | Preattestation, Single (Preattestation consensus_content)
   | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.block_payload_hash
 
 let get_slot (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
-  | Preattestation, Single (Preendorsement consensus_content)
+  | Preattestation, Single (Preattestation consensus_content)
   | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.slot
 
@@ -330,7 +330,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       let {shell; protocol_data; _} = packed_op op in
       match protocol_data with
       | Operation_data
-          ({contents = Single (Preendorsement {round; slot; level; _}); _} as
+          ({contents = Single (Preattestation {round; slot; level; _}); _} as
           protocol_data) ->
           let new_preendorsement : Kind.preattestation Alpha_context.operation =
             {shell; protocol_data}

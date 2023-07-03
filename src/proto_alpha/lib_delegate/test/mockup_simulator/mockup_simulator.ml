@@ -1344,7 +1344,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
             (match op_contents with
             | Endorsement _ ->
                 Alpha_context.Operation.to_watermark (Endorsement chain_id)
-            | Preendorsement _ ->
+            | Preattestation _ ->
                 Alpha_context.Operation.to_watermark (Preendorsement chain_id)
             | _ -> Signature.Generic_operation)
       | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
@@ -1375,7 +1375,7 @@ let op_is_preendorsement ?level ?round (op_hash : Operation_hash.t)
       match d.contents with
       | Single op_contents -> (
           match op_contents with
-          | Preendorsement consensus_content ->
+          | Preattestation consensus_content ->
               let right_level =
                 match level with
                 | None -> true

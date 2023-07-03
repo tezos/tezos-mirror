@@ -1977,7 +1977,7 @@ type application_state = {
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
   match operation.protocol_data.contents with
-  | Single (Preendorsement _) -> ctxt
+  | Single (Preattestation _) -> ctxt
   | Single (Endorsement _) -> ctxt
   | Single (Dal_attestation _) -> ctxt
   | Single
@@ -2134,13 +2134,13 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt
   let mk_result (balance_updates : Receipt.balance_updates) :
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
-    | Single (Preendorsement _) ->
+    | Single (Preattestation _) ->
         Double_preendorsement_evidence_result balance_updates
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
-  | Single (Preendorsement e1) | Single (Endorsement e1) ->
+  | Single (Preattestation e1) | Single (Endorsement e1) ->
       let level = Level.from_raw ctxt e1.level in
       Stake_distribution.slot_owner ctxt level e1.slot
       >>=? fun (ctxt, consensus_pk1) ->
@@ -2178,7 +2178,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     | Full_construction _ | Application _ -> false
   in
   match contents_list with
-  | Single (Preendorsement consensus_content) ->
+  | Single (Preattestation consensus_content) ->
       record_preendorsement ctxt mode consensus_content
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content

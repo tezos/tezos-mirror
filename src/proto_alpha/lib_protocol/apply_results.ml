@@ -1029,7 +1029,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Preendorsement _ as op), res) -> Some (op, res)
+          | Contents_and_result ((Preattestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1053,7 +1053,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Preendorsement _ as op), res) -> Some (op, res)
+          | Contents_and_result ((Preattestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1896,8 +1896,8 @@ let kind_equal :
   match (op, res) with
   | Endorsement _, Endorsement_result _ -> Some Eq
   | Endorsement _, _ -> None
-  | Preendorsement _, Preendorsement_result _ -> Some Eq
-  | Preendorsement _, _ -> None
+  | Preattestation _, Preendorsement_result _ -> Some Eq
+  | Preattestation _, _ -> None
   | Dal_attestation _, Dal_attestation_result _ -> Some Eq
   | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation_result _ -> Some Eq

@@ -4153,7 +4153,7 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Preattestation : consensus_content -> Kind.preattestation contents
   | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {

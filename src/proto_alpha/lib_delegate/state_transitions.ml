@@ -149,7 +149,7 @@ let extract_pqc state (new_proposal : proposal) =
         let open Protocol.Alpha_context.Operation in
         let {
           shell = _;
-          protocol_data = {contents = Single (Preendorsement {slot; _}); _};
+          protocol_data = {contents = Single (Preattestation {slot; _}); _};
           _;
         } =
           op

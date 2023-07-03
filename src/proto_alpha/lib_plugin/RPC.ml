@@ -1036,7 +1036,7 @@ module Scripts = struct
     let {Services_registration.context; block_header; _} = rpc_ctxt in
     let*? () =
       match packed_operation.protocol_data with
-      | Operation_data {contents = Single (Preendorsement _); _}
+      | Operation_data {contents = Single (Preattestation _); _}
       | Operation_data {contents = Single (Endorsement _); _}
       | Operation_data {contents = Single (Dal_attestation _); _} ->
           error Run_operation_does_not_support_consensus_operations

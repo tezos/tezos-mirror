@@ -224,12 +224,12 @@ let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
     (fun {protocol_data; _} ->
       match (protocol_data, preendorsement_filter) with
       (* 1a. Remove preendorsements. *)
-      | Operation_data {contents = Single (Preendorsement _); _}, None -> false
+      | Operation_data {contents = Single (Preattestation _); _}, None -> false
       (* 1b. Filter preendorsements. *)
       | ( Operation_data
             {
               contents =
-                Single (Preendorsement {level; round; block_payload_hash; _});
+                Single (Preattestation {level; round; block_payload_hash; _});
               _;
             },
           Some
@@ -257,7 +257,7 @@ let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
 let unpack_preendorsement packed_preendorsement =
   let {shell; protocol_data = Operation_data data} = packed_preendorsement in
   match data with
-  | {contents = Single (Preendorsement _); _} ->
+  | {contents = Single (Preattestation _); _} ->
       Some ({shell; protocol_data = data} : Kind.preattestation Operation.t)
   | _ -> None
 
@@ -282,7 +282,7 @@ let filter_preendorsements ops =
           shell = {branch};
           protocol_data =
             Operation_data
-              ({contents = Single (Preendorsement _); _} as content);
+              ({contents = Single (Preattestation _); _} as content);
           _;
         } ->
           Some
@@ -340,7 +340,7 @@ let extract_operations_of_list_list = function
                packed_op ->
             let {shell; protocol_data = Operation_data data} = packed_op in
             match data with
-            | {contents = Single (Preendorsement _); _} ->
+            | {contents = Single (Preattestation _); _} ->
                 ( {shell; protocol_data = data} :: preendorsements,
                   endorsements,
                   dal_attestations )

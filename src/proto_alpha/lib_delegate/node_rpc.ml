@@ -62,7 +62,7 @@ let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
 let extract_prequorum preendorsements =
   match preendorsements with
   | h :: _ ->
-      let ({protocol_data = {contents = Single (Preendorsement content); _}; _})
+      let ({protocol_data = {contents = Single (Preattestation content); _}; _})
           =
         (h : Kind.preattestation Operation.t)
       in
