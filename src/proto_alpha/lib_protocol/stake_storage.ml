@@ -75,17 +75,20 @@ let get_initialized_stake ctxt delegate =
       Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
       return (balance, ctxt)
 
+let has_minimal_stake ctxt staking_balance =
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
+  Tez_repr.(staking_balance >= minimal_stake)
+
 let update_stake ~f ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   f staking_balance_before >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
-  let minimal_stake = Constants_storage.minimal_stake ctxt in
   if Tez_repr.(staking_balance < staking_balance_before) then
     if
       (* Removing stake. The delegate may become inactive. *)
-      Tez_repr.(staking_balance_before >= minimal_stake)
-      && Tez_repr.(staking_balance < minimal_stake)
+      has_minimal_stake ctxt staking_balance_before
+      && not (has_minimal_stake ctxt staking_balance)
     then
       Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
       if inactive then return ctxt
@@ -102,8 +105,8 @@ let update_stake ~f ctxt delegate =
       return ctxt
   else if
     (* Adding stake. The delegate may become active. *)
-    Tez_repr.(staking_balance_before < minimal_stake)
-    && Tez_repr.(staking_balance >= minimal_stake)
+    (not (has_minimal_stake ctxt staking_balance_before))
+    && has_minimal_stake ctxt staking_balance
   then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if inactive then return ctxt
@@ -147,8 +150,7 @@ let set_active ctxt delegate =
   if not inactive then return ctxt
   else
     get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
-    let minimal_stake = Constants_storage.minimal_stake ctxt in
-    if Tez_repr.(staking_balance >= minimal_stake) then
+    if has_minimal_stake ctxt staking_balance then
       Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
       >>= fun ctxt -> return ctxt
     else return ctxt
