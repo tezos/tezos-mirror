@@ -237,4 +237,7 @@ let adaptive_inflation_staking_over_delegation_edge c =
 let adaptive_inflation_launch_ema_threshold c =
   (adaptive_inflation c).launch_ema_threshold
 
+let adaptive_inflation_rewards_params c =
+  (adaptive_inflation c).adaptive_rewards_params
+
 let freeze_rewards = adaptive_inflation_enable

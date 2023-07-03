@@ -30,17 +30,11 @@ let default_reward = Q.one
 (* Default bonus value *)
 let default_bonus = 0L
 
-let reward_ratio_min = Q.(5 // 1000)
-
-let reward_ratio_max = Q.(1 // 10)
-
 (* Order of magnitude of the total supply in mutez
    Approximately 2^50 *)
 let bonus_unit = 1_000_000_000_000_000L
 
 let ratio_to_bonus q = Q.(q * of_int64 bonus_unit |> to_int64)
-
-let max_bonus = Int64.div bonus_unit 20L (* = 5% *)
 
 type error += Undetermined_inflation_coeff_for_cycle of Cycle_repr.t
 
@@ -111,7 +105,7 @@ let load_reward_coeff ctxt ~cycle =
 
 let compute_reward_coeff_ratio =
   let q_400 = Q.of_int 400 in
-  fun ~stake_ratio ~bonus ->
+  fun ~stake_ratio ~bonus ~reward_ratio_max ~reward_ratio_min ->
     let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_400) in
     let f = Q.inv inv_f (* f = 1/400 * (1/x)^2 = yearly inflation rate *) in
@@ -121,55 +115,69 @@ let compute_reward_coeff_ratio =
     let f = Q.(max f reward_ratio_min) in
     f
 
-let compute_bonus =
-  let growth_rate =
-    115_740_740L
-    (* = 0.01 * [bonus_unit] / second_per_day
-       For each % and each day, grows the bonus by 0.01% *)
+let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
+    ~previous_bonus ~reward_params =
+  let Constants_parametric_repr.
+        {
+          reward_ratio_min;
+          reward_ratio_max;
+          max_bonus;
+          growth_rate;
+          center_dz;
+          radius_dz;
+        } =
+    reward_params
   in
-  (* Parameters for the dead zone: the bonus should not change in the interval [48%,52%] *)
-  let center_dz = Q.(1 // 2) (* = 50 % *) in
-  let radius_dz = Q.(1 // 50) (* = 2% *) in
-  fun ~seconds_per_cycle ~total_supply ~total_frozen_stake ~previous_bonus ->
-    let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
-    let q_total_frozen_stake =
-      Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
-    in
-    let stake_ratio =
-      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
-    in
-    let base_reward_coeff_ratio =
-      compute_reward_coeff_ratio ~stake_ratio ~bonus:0L
-    in
-    let base_reward_coeff_dist_to_max =
-      ratio_to_bonus Q.(reward_ratio_max - base_reward_coeff_ratio)
-    in
-    (* The bonus reward is truncated between [0] and [max_bonus] *)
-    (* It is done in a way that the bonus does not increase if the coeff
-       would already be above the [reward_pct_max] *)
-    let max_bonus = Compare.Int64.min base_reward_coeff_dist_to_max max_bonus in
-    (* [dist] is the distance from [stake_ratio] to [48%,52%] *)
-    let unsigned_dist =
-      Q.(max zero (abs (stake_ratio - center_dz) - radius_dz))
-    in
-    let dist_q =
-      if Compare.Q.(stake_ratio >= center_dz) then Q.neg unsigned_dist
-      else unsigned_dist
-    in
-    let dist = ratio_to_bonus dist_q in
-    let new_bonus =
-      Int64.(add previous_bonus (mul dist (mul growth_rate seconds_per_cycle)))
-    in
-    let new_bonus = Compare.Int64.max new_bonus 0L in
-    let new_bonus = Compare.Int64.min new_bonus max_bonus in
-    new_bonus
+  let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
+  let q_total_frozen_stake =
+    Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
+  in
+  let stake_ratio =
+    Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+  in
+  let base_reward_coeff_ratio =
+    compute_reward_coeff_ratio
+      ~stake_ratio
+      ~bonus:0L
+      ~reward_ratio_max
+      ~reward_ratio_min
+  in
+  let base_reward_coeff_dist_to_max =
+    ratio_to_bonus Q.(reward_ratio_max - base_reward_coeff_ratio)
+  in
+  (* The bonus reward is truncated between [0] and [max_bonus] *)
+  (* It is done in a way that the bonus does not increase if the coeff
+     would already be above the [reward_pct_max] *)
+  let max_bonus = Compare.Int64.min base_reward_coeff_dist_to_max max_bonus in
+  (* [dist] is the distance from [stake_ratio] to [48%,52%] *)
+  let unsigned_dist =
+    Q.(max zero (abs (stake_ratio - center_dz) - radius_dz))
+  in
+  let dist_q =
+    if Compare.Q.(stake_ratio >= center_dz) then Q.neg unsigned_dist
+    else unsigned_dist
+  in
+  let dist = ratio_to_bonus dist_q in
+  let new_bonus =
+    Int64.(add previous_bonus (mul dist (mul growth_rate seconds_per_cycle)))
+  in
+  let new_bonus = Compare.Int64.max new_bonus 0L in
+  let new_bonus = Compare.Int64.min new_bonus max_bonus in
+  new_bonus
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_rewards_per_minute ~total_supply ~total_frozen_stake ~bonus ->
+  fun ~base_total_rewards_per_minute
+      ~total_supply
+      ~total_frozen_stake
+      ~bonus
+      ~reward_params ->
     if Compare.Int64.equal (Tez_repr.to_mutez base_total_rewards_per_minute) 0L
     then Q.one
     else
+      let Constants_parametric_repr.{reward_ratio_min; reward_ratio_max; _} =
+        reward_params
+      in
       let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
       let q_total_frozen_stake =
         Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
@@ -182,7 +190,13 @@ let compute_coeff =
       let q_base_total_rewards_per_minute =
         Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
       in
-      let f = compute_reward_coeff_ratio ~stake_ratio ~bonus in
+      let f =
+        compute_reward_coeff_ratio
+          ~stake_ratio
+          ~bonus
+          ~reward_ratio_max
+          ~reward_ratio_min
+      in
       let f = Q.div f q_min_per_year (* = inflation per minute *) in
       let f = Q.mul f q_total_supply (* = rewards per minute *) in
       Q.div f q_base_total_rewards_per_minute
@@ -192,6 +206,9 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
   if not ai_enable then return ctxt
   else
+    let reward_params =
+      Constants_storage.adaptive_inflation_rewards_params ctxt
+    in
     let preserved = Constants_storage.preserved_cycles ctxt in
     let for_cycle = Cycle_repr.add new_cycle preserved in
     let before_for_cycle = Cycle_repr.pred for_cycle in
@@ -215,6 +232,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
         ~total_supply
         ~total_frozen_stake
         ~previous_bonus
+        ~reward_params
     in
     let coeff =
       compute_coeff
@@ -222,6 +240,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
         ~total_supply
         ~total_frozen_stake
         ~bonus
+        ~reward_params
     in
     let*! ctxt = Storage.Reward_bonus.add ctxt for_cycle bonus in
     let*! ctxt = Storage.Reward_coeff.add ctxt for_cycle coeff in
