@@ -48,8 +48,8 @@ val forge :
   pred_live_blocks:Block_hash.Set.t ->
   timestamp:Time.Protocol.t ->
   round:Round.t ->
-  liquidity_baking_toggle_vote:Toggle_votes.toggle_vote ->
-  adaptive_inflation_vote:Toggle_votes.toggle_vote ->
+  liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
+  adaptive_inflation_vote:Per_block_votes.per_block_vote ->
   user_activated_upgrades:User_activated.upgrades ->
   Baking_configuration.fees_config ->
   force_apply:bool ->

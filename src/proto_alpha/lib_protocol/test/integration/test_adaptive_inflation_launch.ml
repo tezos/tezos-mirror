@@ -114,8 +114,9 @@ let test_launch threshold expected_vote_duration () =
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
     let ema =
-      Protocol.Alpha_context.Toggle_votes.Adaptive_inflation_launch_EMA.to_int32
-        metadata.adaptive_inflation_toggle_ema
+      Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
+      .to_int32
+        metadata.adaptive_inflation_vote_ema
     in
     Assert.lt_int32 ~loc threshold ema
   in
@@ -164,7 +165,7 @@ let test_launch threshold expected_vote_duration () =
         ~staking_over_baking_limit:1_000_000
         ~baking_over_staking_edge_billionth:1_000_000_000
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
 
   (* Initialization of a delegator account which will attempt to
@@ -188,7 +189,7 @@ let test_launch threshold expected_vote_duration () =
         wannabe_costaker
         (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
   let* block =
     let* operation =
@@ -197,7 +198,7 @@ let test_launch threshold expected_vote_duration () =
         (B block)
         wannabe_costaker_account.pk
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
   let* block =
     let* operation =
@@ -207,7 +208,7 @@ let test_launch threshold expected_vote_duration () =
         wannabe_costaker
         (Some delegate_pkh)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
   (* Self-staking most of the remaining balance. *)
   let* block =
@@ -217,7 +218,7 @@ let test_launch threshold expected_vote_duration () =
         delegate
         (Protocol.Alpha_context.Tez.of_mutez_exn 1_800_000_000_000L)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Toggle_vote_on block
+    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
 
   (* We are now ready to activate the feature through by baking many
@@ -227,12 +228,12 @@ let test_launch threshold expected_vote_duration () =
 
   let* block =
     Block.bake_while_with_metadata
-      ~adaptive_inflation_vote:Toggle_vote_on
+      ~adaptive_inflation_vote:Per_block_vote_on
       (fun _block metadata ->
         let ema =
-          Protocol.Alpha_context.Toggle_votes.Adaptive_inflation_launch_EMA
+          Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
           .to_int32
-            metadata.adaptive_inflation_toggle_ema
+            metadata.adaptive_inflation_vote_ema
         in
         let launch_cycle = metadata.adaptive_inflation_launch_cycle in
         let cond = Compare.Int32.(ema < threshold) in
@@ -249,7 +250,10 @@ let test_launch threshold expected_vote_duration () =
   let* () = assert_is_not_yet_set_to_launch ~loc:__LOC__ block in
   (* We bake one more block to end the vote and set the feature to launch. *)
   let* block, metadata =
-    Block.bake_n_with_metadata ~adaptive_inflation_vote:Toggle_vote_on 1 block
+    Block.bake_n_with_metadata
+      ~adaptive_inflation_vote:Per_block_vote_on
+      1
+      block
   in
   let* () = assert_ema_above_threshold ~loc:__LOC__ metadata in
   let* () = assert_level ~loc:__LOC__ block expected_vote_duration in

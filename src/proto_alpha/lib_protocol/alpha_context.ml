@@ -612,8 +612,8 @@ let internal_nonce_already_recorded =
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
-module Toggle_EMA = Toggle_EMA
-module Toggle_votes = Toggle_votes_repr
+module Votes_EMA = Votes_EMA_repr
+module Per_block_votes = Per_block_votes_repr
 
 module Liquidity_baking = struct
   include Liquidity_baking_storage

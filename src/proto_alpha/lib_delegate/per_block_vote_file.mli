@@ -67,18 +67,21 @@ val default_vote_json_filename : string
 (** Reads the content of [per_block_vote_file] and returns the votes. If
     any error occurs (e.g. Non-existing file, unparsable content,
     etc.), given default values will be used to fill the gaps. *)
-val read_toggle_votes_no_fail :
-  default:Toggle_votes.toggle_votes ->
+val read_per_block_votes_no_fail :
+  default:Per_block_votes.per_block_votes ->
   per_block_vote_file:string ->
-  Toggle_votes.toggle_votes Lwt.t
+  Per_block_votes.per_block_votes Lwt.t
 
-(** Load a liquidity baking configuration given two possible
-    arguments. If neither are provided, it fails. Otherwise, it tries,
-    in priority, to read the [per_block_vote_file_arg] file if it is
-    given and loads a config using its content. Otherwise, the
-    [toggle_vote_arg] is used. *)
-val load_toggle_votes_config :
-  default_liquidity_baking_vote:Toggle_votes.toggle_vote option ->
-  default_adaptive_inflation_vote:Toggle_votes.toggle_vote option ->
+(** Load a configuration of per-block votes. Liquidity baking toggle
+    vote is mandatory, it has to come from either the per-block vote
+    file [per_block_vote_file] or from
+    [default_liquidity_baking_vote]. If a vote cannot be determined
+    from those values, this function fails. Adaptive inflation feature
+    vote is optional. Priority is given to the values in the
+    [per_block_vote_file] file for all votes at the time of the block
+    (the file is freshly read each time). *)
+val load_per_block_votes_config :
+  default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
+  default_adaptive_inflation_vote:Per_block_votes.per_block_vote option ->
   per_block_vote_file:string option ->
-  Baking_configuration.toggle_votes_config tzresult Lwt.t
+  Baking_configuration.per_block_votes_config tzresult Lwt.t

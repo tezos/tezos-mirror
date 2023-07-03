@@ -169,8 +169,8 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
-      ?(liquidity_baking_toggle_vote = Toggle_votes.Toggle_vote_pass)
-      ?(adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass)
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash shell =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -181,7 +181,7 @@ module Forge = struct
           payload_round;
           proof_of_work_nonce = default_proof_of_work_nonce;
           seed_nonce_hash;
-          toggle_votes =
+          per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
               adaptive_inflation_vote;
@@ -305,16 +305,16 @@ module Forge = struct
       ?(proof_of_work_threshold =
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
-      ?(liquidity_baking_toggle_vote = Toggle_votes.Toggle_vote_pass)
-      ?(adaptive_inflation_vote = Toggle_votes.Toggle_vote_pass) ~payload_hash
-      ~payload_round shell_header =
+      ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
+      ~payload_hash ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
       shell_header
       {
         Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
         seed_nonce_hash;
-        toggle_votes =
+        per_block_votes =
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
             adaptive_inflation_vote;

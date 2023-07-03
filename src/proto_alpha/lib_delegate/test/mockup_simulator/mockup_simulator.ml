@@ -929,9 +929,9 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
       ~payload_round:Alpha_context.Round.zero
       []
   in
-  let toggle_votes =
+  let per_block_votes =
     {
-      Protocol.Toggle_votes_repr.liquidity_baking_vote =
+      Protocol.Per_block_votes_repr.liquidity_baking_vote =
         Baking_configuration.default_votes_config
           .Baking_configuration.liquidity_baking_vote;
       adaptive_inflation_vote =
@@ -946,7 +946,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
         payload_round = Alpha_context.Round.zero;
         proof_of_work_nonce;
         seed_nonce_hash = None;
-        toggle_votes;
+        per_block_votes;
       }
   in
   let unsigned_header =

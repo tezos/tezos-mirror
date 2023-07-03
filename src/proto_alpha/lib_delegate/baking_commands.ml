@@ -147,14 +147,14 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
-let toggle_vote_parameter =
+let per_block_vote_parameter =
   Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
-    (let open Protocol.Alpha_context.Toggle_votes in
+    (let open Protocol.Alpha_context.Per_block_votes in
     fun _ctxt -> function
-      | "on" -> return Toggle_vote_on
-      | "off" -> return Toggle_vote_off
-      | "pass" -> return Toggle_vote_pass
+      | "on" -> return Per_block_vote_on
+      | "off" -> return Per_block_vote_off
+      | "pass" -> return Per_block_vote_pass
       | s ->
           failwith
             "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
@@ -169,7 +169,7 @@ let liquidity_baking_toggle_vote_arg =
        abstain. Note that this \"option\" is mandatory!"
     ~long:"liquidity-baking-toggle-vote"
     ~placeholder:"vote"
-    toggle_vote_parameter
+    per_block_vote_parameter
 
 let adaptive_inflation_vote_arg =
   Tezos_clic.arg
@@ -180,7 +180,7 @@ let adaptive_inflation_vote_arg =
        vote, default value is \"pass\"."
     ~long:"adaptive-inflation-vote"
     ~placeholder:"vote"
-    toggle_vote_parameter
+    per_block_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -315,10 +315,10 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
                         payload_round = Round.zero;
                         seed_nonce_hash = None;
                         proof_of_work_nonce;
-                        toggle_votes =
+                        per_block_votes =
                           {
-                            liquidity_baking_vote = Toggle_vote_pass;
-                            adaptive_inflation_vote = Toggle_vote_pass;
+                            liquidity_baking_vote = Per_block_vote_pass;
+                            adaptive_inflation_vote = Per_block_vote_pass;
                           };
                       })
               in
@@ -527,8 +527,8 @@ let run_baker
   >>= fun per_block_vote_file ->
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
-     the toggle votes. *)
-  Per_block_vote_file.load_toggle_votes_config
+     the per-block votes. *)
+  Per_block_vote_file.load_per_block_votes_config
     ~default_liquidity_baking_vote:liquidity_baking_vote
     ~default_adaptive_inflation_vote:adaptive_inflation_vote
     ~per_block_vote_file

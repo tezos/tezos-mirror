@@ -3848,7 +3848,7 @@ module Block_header : sig
     payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
-    toggle_votes : Toggle_votes_repr.toggle_votes;
+    per_block_votes : Per_block_votes_repr.per_block_votes;
   }
 
   type protocol_data = {contents : contents; signature : signature}
@@ -4710,8 +4710,8 @@ module Parameters : sig
   val encoding : t Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Toggle_EMA} *)
-module Toggle_EMA : sig
+(** This module re-exports definitions from {!Votes_EMA_repr} *)
+module Votes_EMA : sig
   module type T = sig
     type t
 
@@ -4731,35 +4731,35 @@ module Toggle_EMA : sig
   end
 end
 
-(** This module re-exports definitions from {!Toggle_votes_repr}. *)
-module Toggle_votes : sig
-  type toggle_vote = Toggle_votes_repr.toggle_vote =
-    | Toggle_vote_on
-    | Toggle_vote_off
-    | Toggle_vote_pass
+(** This module re-exports definitions from {!Per_block_votes_repr}. *)
+module Per_block_votes : sig
+  type per_block_vote = Per_block_votes_repr.per_block_vote =
+    | Per_block_vote_on
+    | Per_block_vote_off
+    | Per_block_vote_pass
 
-  type toggle_votes = Toggle_votes_repr.toggle_votes = {
-    liquidity_baking_vote : toggle_vote;
-    adaptive_inflation_vote : toggle_vote;
+  type per_block_votes = Per_block_votes_repr.per_block_votes = {
+    liquidity_baking_vote : per_block_vote;
+    adaptive_inflation_vote : per_block_vote;
   }
 
-  val liquidity_baking_vote_encoding : toggle_vote Data_encoding.encoding
+  val liquidity_baking_vote_encoding : per_block_vote Data_encoding.encoding
 
-  val adaptive_inflation_vote_encoding : toggle_vote Data_encoding.encoding
+  val adaptive_inflation_vote_encoding : per_block_vote Data_encoding.encoding
 
-  val toggle_votes_encoding : toggle_votes Data_encoding.encoding
+  val per_block_votes_encoding : per_block_votes Data_encoding.encoding
 
-  module Liquidity_baking_toggle_EMA : Toggle_EMA.T
+  module Liquidity_baking_toggle_EMA : Votes_EMA.T
 
-  module Adaptive_inflation_launch_EMA : Toggle_EMA.T
+  module Adaptive_inflation_launch_EMA : Votes_EMA.T
 
   val compute_new_liquidity_baking_ema :
-    toggle_vote:toggle_vote ->
+    per_block_vote:per_block_vote ->
     Liquidity_baking_toggle_EMA.t ->
     Liquidity_baking_toggle_EMA.t
 
   val compute_new_adaptive_inflation_ema :
-    toggle_vote:toggle_vote ->
+    per_block_vote:per_block_vote ->
     Adaptive_inflation_launch_EMA.t ->
     Adaptive_inflation_launch_EMA.t
 end
@@ -4770,9 +4770,9 @@ module Liquidity_baking : sig
 
   val on_subsidy_allowed :
     context ->
-    toggle_vote:Toggle_votes.toggle_vote ->
+    per_block_vote:Per_block_votes.per_block_vote ->
     (context -> Contract_hash.t -> (context * 'a list) tzresult Lwt.t) ->
-    (context * 'a list * Toggle_votes.Liquidity_baking_toggle_EMA.t) tzresult
+    (context * 'a list * Per_block_votes.Liquidity_baking_toggle_EMA.t) tzresult
     Lwt.t
 end
 
@@ -4780,8 +4780,8 @@ end
 module Adaptive_inflation : sig
   val update_ema :
     context ->
-    vote:Toggle_votes.toggle_vote ->
-    (context * Cycle.t option * Toggle_votes.Adaptive_inflation_launch_EMA.t)
+    vote:Per_block_votes.per_block_vote ->
+    (context * Cycle.t option * Per_block_votes.Adaptive_inflation_launch_EMA.t)
     tzresult
     Lwt.t
 

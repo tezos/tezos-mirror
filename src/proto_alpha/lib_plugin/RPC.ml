@@ -1034,9 +1034,9 @@ module Scripts = struct
           op_count = 0;
           migration_balance_updates = [];
           liquidity_baking_toggle_ema =
-            Toggle_votes.Liquidity_baking_toggle_EMA.zero;
-          adaptive_inflation_toggle_ema =
-            Toggle_votes.Adaptive_inflation_launch_EMA.zero;
+            Per_block_votes.Liquidity_baking_toggle_EMA.zero;
+          adaptive_inflation_vote_ema =
+            Per_block_votes.Adaptive_inflation_launch_EMA.zero;
           adaptive_inflation_launch_cycle = None;
           implicit_operations_results = [];
         }
@@ -2756,13 +2756,13 @@ module Forge = struct
                    Hex
                    Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce)
-             Toggle_votes.(
+             Per_block_votes.(
                dft
-                 "toggle_votes"
-                 toggle_votes_encoding
+                 "per_block_votes"
+                 per_block_votes_encoding
                  {
-                   liquidity_baking_vote = Toggle_vote_pass;
-                   adaptive_inflation_vote = Toggle_vote_pass;
+                   liquidity_baking_vote = Per_block_vote_pass;
+                   adaptive_inflation_vote = Per_block_vote_pass;
                  }))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
@@ -2786,7 +2786,7 @@ module Forge = struct
           payload_round,
           seed_nonce_hash,
           proof_of_work_nonce,
-          toggle_votes )
+          per_block_votes )
       ->
         return
           (Data_encoding.Binary.to_bytes_exn
@@ -2796,7 +2796,7 @@ module Forge = struct
                payload_round;
                seed_nonce_hash;
                proof_of_work_nonce;
-               toggle_votes;
+               per_block_votes;
              }))
 
   module Manager = struct

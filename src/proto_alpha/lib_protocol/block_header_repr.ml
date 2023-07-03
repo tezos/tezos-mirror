@@ -30,7 +30,7 @@ type contents = {
   payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
-  toggle_votes : Toggle_votes_repr.toggle_votes;
+  per_block_votes : Per_block_votes_repr.per_block_votes;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -76,7 +76,7 @@ let contents_encoding =
              payload_round;
              seed_nonce_hash;
              proof_of_work_nonce;
-             toggle_votes = {liquidity_baking_vote; adaptive_inflation_vote};
+             per_block_votes = {liquidity_baking_vote; adaptive_inflation_vote};
            } ->
         ( payload_hash,
           payload_round,
@@ -95,7 +95,7 @@ let contents_encoding =
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce;
-          toggle_votes = {liquidity_baking_vote; adaptive_inflation_vote};
+          per_block_votes = {liquidity_baking_vote; adaptive_inflation_vote};
         })
       (obj6
          (req "payload_hash" Block_payload_hash.encoding)
@@ -106,10 +106,10 @@ let contents_encoding =
          (opt "seed_nonce_hash" Nonce_hash.encoding)
          (req
             "liquidity_baking_toggle_vote"
-            Toggle_votes_repr.liquidity_baking_vote_encoding)
+            Per_block_votes_repr.liquidity_baking_vote_encoding)
          (req
             "adaptive_inflation_vote"
-            Toggle_votes_repr.adaptive_inflation_vote_encoding))
+            Per_block_votes_repr.adaptive_inflation_vote_encoding))
   in
   let binary =
     conv
@@ -118,24 +118,24 @@ let contents_encoding =
              payload_round;
              seed_nonce_hash;
              proof_of_work_nonce;
-             toggle_votes;
+             per_block_votes;
            } ->
         ( payload_hash,
           payload_round,
           proof_of_work_nonce,
           seed_nonce_hash,
-          toggle_votes ))
+          per_block_votes ))
       (fun ( payload_hash,
              payload_round,
              proof_of_work_nonce,
              seed_nonce_hash,
-             toggle_votes ) ->
+             per_block_votes ) ->
         {
           payload_hash;
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce;
-          toggle_votes;
+          per_block_votes;
         })
       (obj5
          (req "payload_hash" Block_payload_hash.encoding)
@@ -144,7 +144,7 @@ let contents_encoding =
             "proof_of_work_nonce"
             (Fixed.bytes Hex Constants_repr.proof_of_work_nonce_size))
          (opt "seed_nonce_hash" Nonce_hash.encoding)
-         (req "toggle_votes" Toggle_votes_repr.toggle_votes_encoding))
+         (req "per_block_votes" Per_block_votes_repr.per_block_votes_encoding))
   in
   def "block_header.alpha.unsigned_contents" @@ splitted ~binary ~json
 
@@ -205,10 +205,10 @@ let max_header_length =
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
-      toggle_votes =
+      per_block_votes =
         {
-          liquidity_baking_vote = Toggle_vote_pass;
-          adaptive_inflation_vote = Toggle_vote_pass;
+          liquidity_baking_vote = Per_block_vote_pass;
+          adaptive_inflation_vote = Per_block_vote_pass;
         };
     }
   in

@@ -30,9 +30,9 @@ let default_vote_json_filename = "per_block_votes.json"
 
 type per_block_votes = {
   liquidity_baking_toggle_vote :
-    Protocol.Alpha_context.Toggle_votes.toggle_vote;
+    Protocol.Alpha_context.Per_block_votes.per_block_vote;
   adaptive_inflation_vote_opt :
-    Protocol.Alpha_context.Toggle_votes.toggle_vote option;
+    Protocol.Alpha_context.Per_block_votes.per_block_vote option;
 }
 
 let vote_file_content_encoding =
@@ -46,10 +46,11 @@ let vote_file_content_encoding =
        (obj2
           (req
              "liquidity_baking_toggle_vote"
-             Protocol.Alpha_context.Toggle_votes.liquidity_baking_vote_encoding)
+             Protocol.Alpha_context.Per_block_votes
+             .liquidity_baking_vote_encoding)
           (opt
              "adaptive_inflation_vote"
-             Protocol.Alpha_context.Toggle_votes
+             Protocol.Alpha_context.Per_block_votes
              .adaptive_inflation_vote_encoding))
 
 type error += Block_vote_file_not_found of string
@@ -177,7 +178,7 @@ let check_file_exists file =
   in
   if file_exists then return_unit else tzfail (Block_vote_file_not_found file)
 
-let read_toggle_votes ~per_block_vote_file : 'a tzresult Lwt.t =
+let read_per_block_votes ~per_block_vote_file : 'a tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*! () = Events.(emit reading_per_block_votes) per_block_vote_file in
   let* () = check_file_exists per_block_vote_file in
@@ -195,8 +196,8 @@ let read_toggle_votes ~per_block_vote_file : 'a tzresult Lwt.t =
   in
   return votes
 
-let read_toggle_votes_no_fail ~default ~per_block_vote_file =
-  read_toggle_votes ~per_block_vote_file >>= function
+let read_per_block_votes_no_fail ~default ~per_block_vote_file =
+  read_per_block_votes ~per_block_vote_file >>= function
   | Error errs ->
       Events.(emit per_block_vote_file_fail) errs >>= fun () ->
       Lwt.return default
@@ -206,7 +207,7 @@ let read_toggle_votes_no_fail ~default ~per_block_vote_file =
         adaptive_inflation_vote_opt = Some adaptive_inflation_vote;
       } ->
       Lwt.return
-        Protocol.Alpha_context.Toggle_votes.
+        Protocol.Alpha_context.Per_block_votes.
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
             adaptive_inflation_vote;
@@ -215,17 +216,17 @@ let read_toggle_votes_no_fail ~default ~per_block_vote_file =
       Lwt.return
         {default with liquidity_baking_vote = liquidity_baking_toggle_vote}
 
-let load_toggle_votes_config ~default_liquidity_baking_vote
+let load_per_block_votes_config ~default_liquidity_baking_vote
     ~default_adaptive_inflation_vote ~per_block_vote_file :
-    Baking_configuration.toggle_votes_config tzresult Lwt.t =
+    Baking_configuration.per_block_votes_config tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* If a vote file is given, it takes priority. Otherwise, we expect
-     a toggle vote argument to be passed. *)
+     per-block vote arguments to be passed. *)
   let default_adaptive_inflation_vote =
     (* Unlike the vote for liquidity baking, the vote for adaptive
        inflation is not mandatory. *)
     match default_adaptive_inflation_vote with
-    | None -> Protocol.Alpha_context.Toggle_votes.Toggle_vote_pass
+    | None -> Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
     | Some default_adaptive_inflation_vote -> default_adaptive_inflation_vote
   in
   let* config =
@@ -239,7 +240,7 @@ let load_toggle_votes_config ~default_liquidity_baking_vote
             adaptive_inflation_vote = default_adaptive_inflation_vote;
           }
     | Some per_block_vote_file, _ -> (
-        let*! (res : _ tzresult) = read_toggle_votes ~per_block_vote_file in
+        let*! (res : _ tzresult) = read_per_block_votes ~per_block_vote_file in
         match res with
         | Ok
             {

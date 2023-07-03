@@ -28,7 +28,7 @@
     Liquidity Baking subsidy *)
 val get_cpmm_address : Raw_context.t -> Contract_hash.t tzresult Lwt.t
 
-(** [on_subsidy_allowed ctxt ~toggle_vote f] updates the toggle EMA according to
+(** [on_subsidy_allowed ctxt ~per_block_vote f] updates the toggle EMA according to
     [toggle_vote]. Then the callback function [f] is called if the following
     conditions are met:
     - the updated EMA is below the threshold,
@@ -38,8 +38,8 @@ val get_cpmm_address : Raw_context.t -> Contract_hash.t tzresult Lwt.t
     see [apply_liquidity_baking_subsidy] in [apply.ml]. *)
 val on_subsidy_allowed :
   Raw_context.t ->
-  toggle_vote:Toggle_votes_repr.toggle_vote ->
+  per_block_vote:Per_block_votes_repr.per_block_vote ->
   (Raw_context.t -> Contract_hash.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  (Raw_context.t * 'a list * Toggle_votes_repr.Liquidity_baking_toggle_EMA.t)
+  (Raw_context.t * 'a list * Per_block_votes_repr.Liquidity_baking_toggle_EMA.t)
   tzresult
   Lwt.t

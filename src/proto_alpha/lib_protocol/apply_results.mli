@@ -339,8 +339,8 @@ type block_metadata = {
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Toggle_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_inflation_toggle_ema : Toggle_votes.Adaptive_inflation_launch_EMA.t;
+  liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
+  adaptive_inflation_vote_ema : Per_block_votes.Adaptive_inflation_launch_EMA.t;
   adaptive_inflation_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t option;
