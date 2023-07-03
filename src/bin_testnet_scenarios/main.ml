@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,5 +30,6 @@ let () =
 
   Sc_rollup.register ~testnet ;
   Evm_rollup.register ~testnet ;
+  Evm_rollup_upgrade.register ~testnet ;
 
   Test.run ()

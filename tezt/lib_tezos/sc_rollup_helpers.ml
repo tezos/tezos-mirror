@@ -236,3 +236,11 @@ let genesis_commitment ~sc_rollup tezos_client =
   match Sc_rollup_client.commitment_from_json json with
   | None -> failwith "genesis commitment have been removed"
   | Some commitment -> return commitment
+
+let call_rpc ~smart_rollup_node ~service =
+  let open Runnable.Syntax in
+  let url =
+    Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint smart_rollup_node) service
+  in
+  let*! response = RPC.Curl.get url in
+  return response
