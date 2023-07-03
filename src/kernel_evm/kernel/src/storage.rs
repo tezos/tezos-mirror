@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 use crate::indexable_storage::IndexableStorage;
+use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use libsecp256k1::PublicKey;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -14,6 +15,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 
+use crate::block_in_progress::BlockInProgress;
 use crate::error::{Error, StorageError};
 use crate::parsing::UPGRADE_NONCE_SIZE;
 use rlp::Encodable;
@@ -41,6 +43,9 @@ const TICKETER_SIZE: usize = 36;
 const DICTATOR_KEY: RefPath = RefPath::assert_from(b"/dictator_key");
 // Size of the dictator public key in full length.
 const DICTATOR_KEY_SIZE: usize = 65;
+
+// Path to the block in progress, used between reboots
+const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
@@ -781,6 +786,15 @@ pub fn store_kernel_version<Host: Runtime>(
     let kernel_version = kernel_version.as_bytes();
     host.store_write_all(&KERNEL_VERSION_PATH, kernel_version)
         .map_err(Error::from)
+}
+
+pub fn store_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+    block: &BlockInProgress,
+) -> Result<(), anyhow::Error> {
+    let bip_path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
+    host.store_write_all(&bip_path, &block.rlp_bytes())
+        .context("Failed to store BlockInProgress")
 }
 
 pub(crate) mod internal_for_tests {

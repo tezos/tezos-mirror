@@ -132,12 +132,13 @@ fn decode_queue(decoder: &rlp::Rlp<'_>) -> Result<VecDeque<Transaction>, Decoder
 }
 
 impl BlockInProgress {
-    pub fn new(
+    pub fn new_with_ticks(
         number: U256,
         gas_price: U256,
         transactions: VecDeque<Transaction>,
-    ) -> BlockInProgress {
-        BlockInProgress {
+        estimated_ticks: u64,
+    ) -> Self {
+        Self {
             number,
             tx_queue: transactions,
             valid_txs: Vec::new(),
@@ -148,8 +149,23 @@ impl BlockInProgress {
             // it should be computed at the end, and not included in the receipt
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
-            estimated_ticks: tick_model::block_overhead_ticks(),
+            estimated_ticks,
         }
+    }
+
+    // constructor of raw structure, used in tests
+    #[cfg(test)]
+    pub fn new(
+        number: U256,
+        gas_price: U256,
+        transactions: VecDeque<Transaction>,
+    ) -> BlockInProgress {
+        Self::new_with_ticks(
+            number,
+            gas_price,
+            transactions,
+            tick_model::block_overhead_ticks(),
+        )
     }
 
     pub fn register_valid_transaction<Host: Runtime>(

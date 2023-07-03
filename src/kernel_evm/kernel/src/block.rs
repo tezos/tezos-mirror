@@ -10,7 +10,9 @@ use crate::blueprint::Queue;
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::indexable_storage::IndexableStorage;
-use crate::storage::{self, init_account_index};
+use crate::storage;
+use crate::storage::init_account_index;
+use crate::tick_model;
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
@@ -21,6 +23,11 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use tezos_ethereum::block::BlockConstants;
 
+pub enum ComputationResult {
+    RebootNeeded,
+    Finished,
+}
+
 fn compute<Host: Runtime>(
     host: &mut Host,
     block_in_progress: &mut BlockInProgress,
@@ -28,16 +35,14 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
-) -> Result<(), anyhow::Error> {
+) -> Result<ComputationResult, anyhow::Error> {
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         // is reboot necessary ?
         if block_in_progress.would_overflow() {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
             // there should be an upper bound on gasLimit
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-            // store the block in progress
-            return Ok(());
+            return Ok(ComputationResult::RebootNeeded);
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
 
@@ -65,7 +70,7 @@ fn compute<Host: Runtime>(
             }
         };
     }
-    Ok(())
+    Ok(ComputationResult::Finished)
 }
 
 pub fn produce<Host: Runtime>(
@@ -85,35 +90,41 @@ pub fn produce<Host: Runtime>(
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
-
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-    // if there is no more gas for the transaction,
-    // reload current container in progress and rest of queue
+    let mut tick_counter = tick_model::block_overhead_ticks();
 
     for proposal in queue.proposals {
         // proposal is turn into a ring to allow poping from the front
         let ring = proposal.transactions.into();
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-        // add proposal to the container
-        let mut block_in_progress =
-            BlockInProgress::new(current_block_number, current_constants.gas_price, ring);
-        compute(
+        let mut block_in_progress = BlockInProgress::new_with_ticks(
+            current_block_number,
+            current_constants.gas_price,
+            ring,
+            tick_counter,
+        );
+        match compute(
             host,
             &mut block_in_progress,
             &current_constants,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
-        )?;
-
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
-        // if reboot initiated, store container in progress and exit
-        // else store block
-        let new_block = block_in_progress
-            .finalize_and_store(host)
-            .context("Failed to finalize the block in progress")?;
-        current_block_number = new_block.number + 1;
-        current_constants = new_block.constants();
+        )? {
+            ComputationResult::RebootNeeded => {
+                storage::store_block_in_progress(host, &block_in_progress)?;
+                host.mark_for_reboot()?;
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+                // store the queue
+                return Ok(());
+            }
+            ComputationResult::Finished => {
+                tick_counter = block_in_progress.estimated_ticks;
+                let new_block = block_in_progress
+                    .finalize_and_store(host)
+                    .context("Failed to finalize the block in progress")?;
+                current_block_number = new_block.number + 1;
+                current_constants = new_block.constants();
+            }
+        }
     }
     Ok(())
 }
