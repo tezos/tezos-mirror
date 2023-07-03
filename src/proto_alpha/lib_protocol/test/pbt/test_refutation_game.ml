@@ -945,7 +945,9 @@ module Player_client = struct
         List.map (fun {inputs; _} -> inputs) payloads_per_levels
       in
       let*! r =
-        Sc_rollup_helpers.Arith_pvm_eval.eval_inputs ~metadata inputs_per_levels
+        Sc_rollup_helpers.Arith_pvm_eval.eval_inputs_from_initial_state
+          ~metadata
+          inputs_per_levels
       in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
@@ -1141,18 +1143,6 @@ let operation_publish_commitment ctxt rollup predecessor inbox_level
     [start_tick]. *)
 let build_proof ~player_client start_tick (game : Game.t) =
   let open Lwt_result_syntax in
-  (* No messages are added between [game.start_level] and the current level
-     so we can take the existing inbox of players. Otherwise, we should find the
-     inbox of [start_level]. *)
-  let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
-    player_client.inbox
-  in
-  let get_payloads_history witness_hash =
-    Payloads_histories.find witness_hash payloads_histories
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Lwt.return
-  in
-  let history_proof = Inbox.old_levels_messages inbox in
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
   let fuel = tick_to_int_exn start_tick in
@@ -1160,47 +1150,29 @@ let build_proof ~player_client start_tick (game : Game.t) =
   let inputs_per_levels =
     List.map (fun {inputs; _} -> inputs) player_client.payloads_per_levels
   in
-  let*! r = Arith_pvm_eval.eval_inputs ~metadata ~fuel inputs_per_levels in
+  let*! r =
+    Arith_pvm_eval.eval_inputs_from_initial_state
+      ~metadata
+      ~fuel
+      inputs_per_levels
+  in
   let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
-  let module P = struct
-    include Arith_pvm_eval
-
-    let initial_state ~empty:_ = initial_state ()
-
-    let context : context = player_client.context
-
-    let state = state
-
-    let reveal _ = assert false
-
-    module Inbox_with_history = struct
-      let inbox = history_proof
-
-      let get_history inbox = Inbox.History.find inbox history |> Lwt.return
-
-      let get_payloads_history = get_payloads_history
-    end
-
-    (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
-       Extend refutation game to handle Dal refutation case. *)
-    module Dal_with_history = struct
-      let confirmed_slots_history = Dal.Slots_history.genesis
-
-      let get_history _hash = Lwt.return_none
-
-      let page_info = None
-
-      let dal_parameters =
-        Default_parameters.constants_test.dal.cryptobox_parameters
-
-      let dal_attestation_lag =
-        Default_parameters.constants_test.dal.attestation_lag
-    end
-  end in
+  let pvm_with_context_and_state =
+    Sc_rollup_helpers.make_pvm_with_context_and_state
+      (module Arith_pvm)
+      ~state
+      ~context:player_client.context
+      ~reveal:(fun _ -> assert false)
+      ~inbox:player_client.inbox
+        (* No messages are added between [game.start_level] and the current level
+           so we can take the existing inbox of players. Otherwise, we should find the
+           inbox of [start_level]. *)
+      ()
+  in
   let*! proof =
     Sc_rollup.Proof.produce
       ~metadata
-      (module P)
+      pvm_with_context_and_state
       game.inbox_level
       ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
   in

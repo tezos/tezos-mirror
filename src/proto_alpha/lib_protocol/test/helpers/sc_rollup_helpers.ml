@@ -787,19 +787,50 @@ let is_reveal_enabled_default =
 let tick_of_int_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Sc_rollup.Tick.of_int n)
 
-module Make_PVM_eval (PVM : Pvm_in_memory.S) = struct
+module type PVM_eval = sig
+  include Sc_rollup.PVM.S
+
+  val make_empty_context : unit -> context
+
+  val initial_hash : hash Lwt.t
+
+  val eval_until_input :
+    fuel:int option ->
+    our_states:(int * hash) trace ->
+    int ->
+    state ->
+    (state * int option * int * (int * hash) trace) Lwt.t
+
+  val eval_inputs_from_initial_state :
+    metadata:Sc_rollup.Metadata.t ->
+    ?fuel:int ->
+    ?bootsector:string ->
+    Sc_rollup.input trace trace ->
+    (state * Sc_rollup.Tick.t * (Sc_rollup.Tick.t * hash) trace, 'a) result
+    Lwt.t
+end
+
+module Make_PVM_eval (PVM : sig
+  include Sc_rollup.PVM.S
+
+  val make_empty_state : unit -> state
+
+  val make_empty_context : unit -> context
+end) : PVM_eval with type context = PVM.context and type state = PVM.state =
+struct
   include PVM
 
-  let initial_state () =
+  let bootsector_state ~bootsector =
     let open Lwt_syntax in
     let empty = make_empty_state () in
     let* state = initial_state ~empty in
-    let* state = install_boot_sector state "" in
+    let* state = install_boot_sector state bootsector in
     return state
 
   let initial_hash =
     let open Lwt_syntax in
-    let* state = initial_state () in
+    let empty = make_empty_state () in
+    let* state = initial_state ~empty in
     state_hash state
 
   let consume_fuel = Option.map pred
@@ -883,9 +914,21 @@ module Make_PVM_eval (PVM : Pvm_in_memory.S) = struct
       (state, fuel, tick, [])
       inputs
 
-  let eval_inputs ~metadata ?fuel inputs_per_levels =
+  let eval_inputs ~fuel ~tick ?(our_states = []) ~inputs_per_levels state =
     let open Lwt_result_syntax in
-    let*! state = initial_state () in
+    List.fold_left_es
+      (fun (state, fuel, tick, our_states) inputs ->
+        let* state, fuel, tick, our_states' =
+          eval_inbox ?fuel ~inputs ~tick state
+        in
+        return (state, fuel, tick, our_states @ our_states'))
+      (state, fuel, tick, our_states)
+      inputs_per_levels
+
+  let eval_inputs_from_initial_state ~metadata ?fuel ?(bootsector = "")
+      inputs_per_levels =
+    let open Lwt_result_syntax in
+    let*! state = bootsector_state ~bootsector in
     let*! state_hash = state_hash state in
     let tick = 0 in
     let our_states = [(tick, state_hash)] in
@@ -900,14 +943,7 @@ module Make_PVM_eval (PVM : Pvm_in_memory.S) = struct
     in
     (* 3. We evaluate the inbox. *)
     let* state, _fuel, tick, our_states =
-      List.fold_left_es
-        (fun (state, fuel, tick, our_states) inputs ->
-          let* state, fuel, tick, our_states' =
-            eval_inbox ?fuel ~inputs ~tick state
-          in
-          return (state, fuel, tick, our_states @ our_states'))
-        (state, fuel, tick, our_states)
-        inputs_per_levels
+      eval_inputs state ~fuel ~tick ~our_states ~inputs_per_levels
     in
     let our_states =
       List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
@@ -923,3 +959,47 @@ end
 
 module Arith_pvm_eval = Make_PVM_eval (Arith_pvm)
 module Wasm_pvm_eval = Make_PVM_eval (Wasm_pvm)
+
+let make_pvm_with_context_and_state (type context state)
+    (module PVM : Sc_rollup.PVM.S
+      with type context = context
+       and type state = state) ~state ~context ~reveal ~inbox () :
+    (module Sc_rollup.Proof.PVM_with_context_and_state) =
+  let Node_inbox.{payloads_histories; history; inbox} = inbox in
+  (module struct
+    include PVM
+
+    let context : context = context
+
+    let state = state
+
+    let reveal = reveal
+
+    module Inbox_with_history = struct
+      let inbox = Sc_rollup.Inbox.old_levels_messages inbox
+
+      let get_history inbox =
+        Sc_rollup.Inbox.History.find inbox history |> Lwt.return
+
+      let get_payloads_history witness_hash =
+        Payloads_histories.find witness_hash payloads_histories
+        |> WithExceptions.Option.get ~loc:__LOC__
+        |> Lwt.return
+    end
+
+    (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
+       Extend refutation game to handle Dal refutation case. *)
+    module Dal_with_history = struct
+      let confirmed_slots_history = Dal.Slots_history.genesis
+
+      let get_history _hash = Lwt.return_none
+
+      let page_info = None
+
+      let dal_parameters =
+        Default_parameters.constants_test.dal.cryptobox_parameters
+
+      let dal_attestation_lag =
+        Default_parameters.constants_test.dal.attestation_lag
+    end
+  end)

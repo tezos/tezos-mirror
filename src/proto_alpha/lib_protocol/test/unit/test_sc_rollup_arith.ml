@@ -666,37 +666,11 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
   let dal_snapshot = Dal.Slots_history.genesis in
   let dal_parameters = Default_parameters.constants_mainnet.dal in
   let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
-  let empty = Tezos_context_memory.Context_binary.Tree.empty ctxt in
-  let*! state = Arith_pvm.initial_state ~empty in
 
-  (* No messages are added between [game.start_level] and the current level
-     so we can take the existing inbox of players. Otherwise, we should find the
-     inbox of [start_level]. *)
-  let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
-    inbox
-  in
-
-  let get_payloads_history witness_hash =
-    Sc_rollup_helpers.Payloads_histories.find witness_hash payloads_histories
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Lwt.return
-  in
   let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
   let metadata =
     Sc_rollup.Metadata.{address = rollup; origination_level = level}
   in
-
-  let*! state_hash = Arith_pvm.state_hash state in
-  let tick = 0 in
-  let our_states = [(tick, state_hash)] in
-  let*! state, fuel, tick, our_states =
-    Sc_rollup_helpers.Arith_pvm_eval.eval_until_input
-      ~fuel:None
-      ~our_states
-      tick
-      state
-  in
-
   let reveal_hash =
     Sc_rollup_reveal_hash.(
       hash_string ~scheme:Blake2B [hashed_preimage] |> to_hex)
@@ -704,58 +678,27 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
 
   let source = "hash:" ^ reveal_hash in
   let input =
-    Sc_rollup_helpers.make_external_input ~inbox_level:inbox.level source
+    Sc_rollup_helpers.make_external_input ~inbox_level:inbox.inbox.level source
   in
-  let*! state = Arith_pvm.set_input input state in
-  let*! state, _, _, _ =
-    Sc_rollup_helpers.Arith_pvm_eval.eval_until_input
-      ~fuel
-      ~our_states
-      tick
-      state
+  let* state, _, _ =
+    Sc_rollup_helpers.Arith_pvm_eval.eval_inputs_from_initial_state
+      ~metadata
+      [[input]]
   in
-  let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
 
-  let module P = struct
-    include Arith_pvm
-
-    let initial_state ~empty:_ = Lwt.return state
-
-    let context = ctxt
-
-    let state = state
-
-    let reveal _ = Lwt.return (Some input_preimage)
-
-    module Inbox_with_history = struct
-      let inbox = history_proof
-
-      let get_history inbox =
-        Sc_rollup.Inbox.History.find inbox history |> Lwt.return
-
-      let get_payloads_history = get_payloads_history
-    end
-
-    (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
-       Extend refutation game to handle Dal refutation case. *)
-    module Dal_with_history = struct
-      let confirmed_slots_history = Dal.Slots_history.genesis
-
-      let get_history _hash = Lwt.return_none
-
-      let page_info = None
-
-      let dal_parameters =
-        Default_parameters.constants_test.dal.cryptobox_parameters
-
-      let dal_attestation_lag =
-        Default_parameters.constants_test.dal.attestation_lag
-    end
-  end in
+  let pvm_with_context_and_state =
+    Sc_rollup_helpers.make_pvm_with_context_and_state
+      (module Arith_pvm)
+      ~state
+      ~context:ctxt
+      ~reveal:(fun _ -> Lwt.return_some input_preimage)
+      ~inbox
+      ()
+  in
   let*@ proof =
     Sc_rollup.Proof.produce
       ~metadata
-      (module P)
+      pvm_with_context_and_state
       Raw_level.root
       ~is_reveal_enabled
   in
