@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,3 +29,8 @@ val no_0x : string -> string
 
 (** [normalize s] calls {!no_0x} and {!String.lowercase_ascii} on [s]. *)
 val normalize : string -> string
+
+(** [u16_to_bytes n] translate an int in a binary string of two bytes
+    (little endian). 
+    NB: Ints greater than 2 bytes are truncated. *)
+val u16_to_bytes : int -> string

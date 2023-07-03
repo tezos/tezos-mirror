@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,3 +29,8 @@ let no_0x s =
   else s
 
 let normalize s = String.lowercase_ascii @@ no_0x s
+
+let u16_to_bytes n =
+  let bytes = Bytes.make 2 'a' in
+  Bytes.set_uint16_le bytes 0 n ;
+  Bytes.to_string bytes
