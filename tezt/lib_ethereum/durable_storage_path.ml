@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,8 @@ type path = string
 
 let evm rst = sf "/evm%s" rst
 
+let kernel rst = sf "/kernel%s" rst
+
 let eth_accounts = evm "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
@@ -44,3 +47,5 @@ let storage addr ?key () =
 let dictator = evm "/dictator_key"
 
 let ticketer = evm "/ticketer"
+
+let kernel_boot_wasm = kernel "/boot.wasm"
