@@ -11,7 +11,7 @@ use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
-use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 
 use crate::error::{Error, StorageError};
 use crate::parsing::UPGRADE_NONCE_SIZE;
@@ -627,10 +627,15 @@ pub fn store_kernel_upgrade_nonce<Host: Runtime>(
 }
 
 pub fn read_kernel_upgrade_nonce<Host: Runtime>(host: &mut Host) -> Result<u16, Error> {
-    let bytes = host.store_read_all(&KERNEL_UPGRADE_NONCE)?;
-    let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
-        bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-    Ok(u16::from_le_bytes(slice_of_bytes))
+    match host.store_read_all(&KERNEL_UPGRADE_NONCE) {
+        Ok(bytes) => {
+            let slice_of_bytes: [u8; UPGRADE_NONCE_SIZE] =
+                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+            Ok(u16::from_le_bytes(slice_of_bytes))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(1_u16),
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Get the index of accounts.
