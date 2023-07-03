@@ -37,6 +37,9 @@ type block_header_metadata = unit
 
 let block_header_metadata_encoding = Data_encoding.unit
 
+let block_header_metadata_encoding_with_legacy_attestation_name =
+  Data_encoding.unit
+
 type operation_data = unit
 
 let operation_data_encoding = Data_encoding.unit
