@@ -2235,7 +2235,7 @@ type _ weight =
       -> voting_pass_type weight
   | Weight_seed_nonce_revelation : int32 -> anonymous_pass_type weight
   | Weight_vdf_revelation : Seed_repr.vdf_solution -> anonymous_pass_type weight
-  | Weight_double_preendorsement : round_infos -> anonymous_pass_type weight
+  | Weight_double_preattestation : round_infos -> anonymous_pass_type weight
   | Weight_double_endorsement : round_infos -> anonymous_pass_type weight
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
   | Weight_activate_account :
@@ -2353,7 +2353,7 @@ let weight_of : packed_operation -> operation_weight =
       | Single (Preattestation consensus_content) ->
           W
             ( Anonymous,
-              Weight_double_preendorsement
+              Weight_double_preattestation
                 (round_infos_from_consensus_content consensus_content) ))
   | Single (Double_baking_evidence {bh1; _}) ->
       let double_baking_infos =
@@ -2549,14 +2549,14 @@ let compare_vote_weight w1 w2 =
    *)
 let compare_anonymous_weight w1 w2 =
   match (w1, w2) with
-  | Weight_double_preendorsement infos1, Weight_double_preendorsement infos2 ->
+  | Weight_double_preattestation infos1, Weight_double_preattestation infos2 ->
       compare_round_infos infos1 infos2
-  | Weight_double_preendorsement infos1, Weight_double_endorsement infos2 ->
+  | Weight_double_preattestation infos1, Weight_double_endorsement infos2 ->
       compare_round_infos_with_prioritized_position
         ~prioritized_position:Fstpos
         infos1
         infos2
-  | Weight_double_endorsement infos1, Weight_double_preendorsement infos2 ->
+  | Weight_double_endorsement infos1, Weight_double_preattestation infos2 ->
       compare_round_infos_with_prioritized_position
         ~prioritized_position:Sndpos
         infos1
@@ -2566,9 +2566,9 @@ let compare_anonymous_weight w1 w2 =
   | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
       | Weight_vdf_revelation _ | Weight_activate_account _
       | Weight_drain_delegate _ ),
-      (Weight_double_preendorsement _ | Weight_double_endorsement _) ) ->
+      (Weight_double_preattestation _ | Weight_double_endorsement _) ) ->
       -1
-  | ( (Weight_double_preendorsement _ | Weight_double_endorsement _),
+  | ( (Weight_double_preattestation _ | Weight_double_endorsement _),
       ( Weight_double_baking _ | Weight_seed_nonce_revelation _
       | Weight_vdf_revelation _ | Weight_activate_account _
       | Weight_drain_delegate _ ) ) ->
