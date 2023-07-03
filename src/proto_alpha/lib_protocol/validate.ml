@@ -37,7 +37,7 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
   {
     predecessor_level;
     predecessor_round;
-    preendorsement_slot_map = Consensus.allowed_preendorsements ctxt;
+    preendorsement_slot_map = Consensus.allowed_preattestations ctxt;
     endorsement_slot_map = Consensus.allowed_endorsements ctxt;
   }
 

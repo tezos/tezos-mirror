@@ -2004,8 +2004,8 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   let ctxt =
     match mode with
     | Full_construction _ -> (
-        match Consensus.get_preendorsements_quorum_round ctxt with
-        | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
+        match Consensus.get_preattestations_quorum_round ctxt with
+        | None -> Consensus.set_preattestations_quorum_round ctxt content.round
         | Some _ -> ctxt)
     | Application _ | Partial_construction _ -> ctxt
   in
@@ -2023,10 +2023,10 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_preendorsement
+        Consensus.record_preattestation
           ctxt
           ~initial_slot:content.slot
           ~power

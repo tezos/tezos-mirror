@@ -144,7 +144,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
         in
         return (Option.is_some locked_round)
   in
-  let* ctxt, allowed_preendorsements =
+  let* ctxt, allowed_preattestations =
     if can_contain_preendorsements then
       let* ctxt, preendorsements_map =
         Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
@@ -156,7 +156,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:(Some endorsements_map)
-      ~allowed_preendorsements
+      ~allowed_preattestations
   in
   return ctxt
 
@@ -178,7 +178,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:None
-      ~allowed_preendorsements:None
+      ~allowed_preattestations:None
   in
   (* However, we want to ensure that the cycle rights are loaded in
      the context, so that {!Stake_distribution.slot_owner} doesn't
