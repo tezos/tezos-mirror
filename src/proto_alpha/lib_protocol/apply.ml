@@ -2012,7 +2012,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   let mk_preendorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
     Single_result
-      (Preendorsement_result
+      (Preattestation_result
          {
            balance_updates = [];
            delegate;

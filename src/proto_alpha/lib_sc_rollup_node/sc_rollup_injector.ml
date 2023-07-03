@@ -157,7 +157,7 @@ module Proto_client = struct
   let operation_result_status (type kind)
       (op_result : kind Apply_results.contents_result) : operation_status =
     match op_result with
-    | Preendorsement_result _ -> Successful
+    | Preattestation_result _ -> Successful
     | Endorsement_result _ -> Successful
     | Dal_attestation_result _ -> Successful
     | Seed_nonce_revelation_result _ -> Successful

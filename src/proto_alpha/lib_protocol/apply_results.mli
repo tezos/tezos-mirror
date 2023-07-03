@@ -58,7 +58,7 @@ and packed_contents_result_list =
 
 (** Result of applying an {!Operation.contents}. Follows the same structure. *)
 and 'kind contents_result =
-  | Preendorsement_result : {
+  | Preattestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;

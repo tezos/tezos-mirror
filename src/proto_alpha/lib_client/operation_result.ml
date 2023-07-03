@@ -872,11 +872,11 @@ let pp_contents_and_result :
         pp_balance_updates
         bus
   | ( Preattestation {level; _},
-      Preendorsement_result
+      Preattestation_result
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf
-        "@[<v 2>Preendorsement:@,\
+        "@[<v 2>Preattestation:@,\
          Level: %a@,\
          Balance updates:%a@,\
          Delegate: %a@,\
