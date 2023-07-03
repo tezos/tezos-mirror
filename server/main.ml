@@ -228,7 +228,8 @@ let get_head ~logger db_pool =
   with_caqti_error
     ~logger
     (Caqti_lwt.Pool.use
-       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
+       (fun (module Db : Caqti_lwt.CONNECTION) ->
+         Teztale_lib.Metrics.sql "get_head" @@ fun () -> Db.find_opt query ())
        db_pool)
     (fun head_level ->
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
@@ -242,7 +243,9 @@ let get_users ~logger db_pool =
   with_caqti_error
     ~logger
     (Caqti_lwt.Pool.use
-       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
+       (fun (module Db : Caqti_lwt.CONNECTION) ->
+         Teztale_lib.Metrics.sql "get_users" @@ fun () ->
+         Db.collect_list query ())
        db_pool)
     (fun users -> reply_public_json Data_encoding.(list string) users)
 
@@ -294,7 +297,9 @@ let refresh_users db_pool users =
       Lwt_result.map
         (fun users_from_db -> users := users_from_db)
         (Caqti_lwt.Pool.use
-           (fun (module Db : Caqti_lwt.CONNECTION) -> Db.collect_list query ())
+           (fun (module Db : Caqti_lwt.CONNECTION) ->
+             Teztale_lib.Metrics.sql "refresh_users" @@ fun () ->
+             Db.collect_list query ())
            db_pool))
 
 (** Insert a new user (i.e. a teztale archiver) into the database.
@@ -309,6 +314,7 @@ let upsert_user db_pool login password =
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Teztale_lib.Metrics.sql "upsert_user" @@ fun () ->
       Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
           Db.exec query (login, password)))
     db_pool
@@ -320,7 +326,8 @@ let delete_user db_pool login =
       "UPDATE nodes SET password = NULL WHERE name = $1"
   in
   Caqti_lwt.Pool.use
-    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.exec query login)
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Teztale_lib.Metrics.sql "delete_user" @@ fun () -> Db.exec query login)
     db_pool
 
 let maybe_create_tables db_pool =
@@ -337,26 +344,28 @@ let maybe_alter_tables db_pool =
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Lwt.map
         (fun () -> Ok ())
-        (Lwt_list.iter_s
-           (fun reqs ->
-             Lwt.bind
-               (Db.with_transaction (fun () ->
-                    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
-                      (fun req ->
-                        Db.exec
-                          (Caqti_request.Infix.(Caqti_type.(unit ->. unit)) req)
-                          ())
-                      reqs))
-               (function
-                 | Ok () -> Lwt.return_unit
-                 | Error e ->
-                     Lwt_io.eprintlf
-                       "\"ALTER TABLE ADD COLUMN IF NOT EXISTS\" expression is \
-                        not supported by sqlite, if the following error is \
-                        because the column already exists ignore it:\n\
-                        %s"
-                       (Caqti_error.show e)))
-           Sql_requests.alter_tables))
+        ( Teztale_lib.Metrics.sql "alter_tables" @@ fun () ->
+          Lwt_list.iter_s
+            (fun reqs ->
+              Lwt.bind
+                (Db.with_transaction (fun () ->
+                     Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                       (fun req ->
+                         Db.exec
+                           (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                              req)
+                           ())
+                       reqs))
+                (function
+                  | Ok () -> Lwt.return_unit
+                  | Error e ->
+                      Lwt_io.eprintlf
+                        "\"ALTER TABLE ADD COLUMN IF NOT EXISTS\" expression \
+                         is not supported by sqlite, if the following error is \
+                         because the column already exists ignore it:\n\
+                         %s"
+                        (Caqti_error.show e)))
+            Sql_requests.alter_tables ))
     db_pool
 
 let maybe_alter_and_create_tables db_pool =
@@ -511,6 +520,7 @@ let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
           (block_hash, level) ))
       operations
   in
+  Teztale_lib.Metrics.sql "insert_included_operations" @@ fun () ->
   without_cache
     Sql_requests.Mutex.operations_inclusion
     Sql_requests.insert_included_operation

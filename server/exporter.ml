@@ -137,6 +137,7 @@ let select_blocks db_pool boundaries =
   let* blocks =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Teztale_lib.Metrics.sql "select_blocks" @@ fun () ->
         Db.fold block_request parse_block_row boundaries Int32Map.empty)
       db_pool
   in
@@ -158,6 +159,7 @@ let select_blocks db_pool boundaries =
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Teztale_lib.Metrics.sql "select_blocks_reception" @@ fun () ->
       Db.fold reception_request parse_block_reception_row boundaries blocks)
     db_pool
 
@@ -314,17 +316,20 @@ let select_ops db_pool boundaries =
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Teztale_lib.Metrics.sql "select_operations_rights" @@ fun () ->
         Db.fold q_rights cb_rights boundaries Int32Map.empty)
       db_pool
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Teztale_lib.Metrics.sql "select_operations_inclusion" @@ fun () ->
         Db.fold q_included cb_included boundaries out)
       db_pool
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Teztale_lib.Metrics.sql "select_operations_reception" @@ fun () ->
       Db.fold q_received cb_received boundaries out)
     db_pool
 

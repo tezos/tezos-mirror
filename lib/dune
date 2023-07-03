@@ -12,7 +12,7 @@
 (library
  (name teztale_lib)
  (public_name teztale.lib)
- (libraries octez-libs.base lwt.unix)
+ (libraries prometheus-app octez-libs.base lwt.unix)
  (flags
   (:standard
    (:include macos-link-flags.sexp)
