@@ -1252,7 +1252,7 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas, now, level) )
+          (unparsing_mode, gas_opt, now_opt, level_opt) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
@@ -1267,16 +1267,16 @@ module Scripts = struct
             ~self_opt
         in
         let gas =
-          match gas with
+          match gas_opt with
           | Some gas -> gas
           | None -> Constants.hard_gas_limit_per_operation ctxt
         in
         let ctxt = Gas.set_limit ctxt gas in
         let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
         in
         let level =
-          match level with
+          match level_opt with
           | None ->
               (Level.current ctxt).level |> Raw_level.to_int32
               |> Script_int.of_int32 |> Script_int.abs
@@ -1326,7 +1326,7 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas, now, level) )
+          (unparsing_mode, gas_opt, now_opt, level_opt) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
@@ -1341,16 +1341,16 @@ module Scripts = struct
             ~self_opt
         in
         let gas =
-          match gas with
+          match gas_opt with
           | Some gas -> gas
           | None -> Constants.hard_gas_limit_per_operation ctxt
         in
         let ctxt = Gas.set_limit ctxt gas in
         let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
         in
         let level =
-          match level with
+          match level_opt with
           | None ->
               (Level.current ctxt).level |> Raw_level.to_int32
               |> Script_int.of_int32 |> Script_int.abs
@@ -1401,8 +1401,8 @@ module Scripts = struct
           payer_opt,
           gas,
           unparsing_mode,
-          now,
-          level )
+          now_opt,
+          level_opt )
       ->
         let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
         let*? script =
@@ -1435,10 +1435,10 @@ module Scripts = struct
         in
         let ctxt = Gas.set_limit ctxt gas in
         let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
         in
         let level =
-          match level with
+          match level_opt with
           | None ->
               (Level.current ctxt).level |> Raw_level.to_int32
               |> Script_int.of_int32 |> Script_int.abs
@@ -1503,8 +1503,8 @@ module Scripts = struct
             payer_opt,
             gas,
             unparsing_mode,
-            now ),
-          level )
+            now_opt ),
+          level_opt )
       ->
         let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
         let*? script =
@@ -1523,7 +1523,7 @@ module Scripts = struct
           sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
         in
         let now =
-          match now with None -> Script_timestamp.now ctxt | Some t -> t
+          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
         in
         (* Using [Gas.set_unlimited] won't work, since the interpreter doesn't
            use this mode (see !4034#note_774734253) and still consumes gas.
@@ -1542,7 +1542,7 @@ module Scripts = struct
         in
         let level =
           Option.value
-            level
+            level_opt
             ~default:
               ((Level.current ctxt).level |> Raw_level.to_int32
              |> Script_int.of_int32 |> Script_int.abs)
