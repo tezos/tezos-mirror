@@ -48,8 +48,8 @@ Zero Knowledge Rollups (ongoing)
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Adaptive Inflation (ongoing)
-----------------------------
+Adaptive Inflation
+------------------
 
 - This protocol asks the bakers to set their votes for the adoption of
   the adaptive inflation feature. They may use the per-block votes
