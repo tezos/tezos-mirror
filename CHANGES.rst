@@ -203,6 +203,11 @@ Node
   is classified as ``branch_delayed`` with the
   ``prevalidation.operation_conflict`` error. (MR :gl:`!9314`)
 
+- In RPC ``/protocol_data``, ``"per_block_votes"`` replaces ``"liquidity_baking_toggle_vote"``;
+  ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_inflation_vote"``.
+  A vote is one of ``"on"``, ``"off"``, ``"pass"``.
+
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
