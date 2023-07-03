@@ -591,12 +591,23 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
+  let failed_to_get_dal_attestations =
+    declare_2
+      ~section
+      ~name:"failed_to_get_attestations"
+      ~level:Error
+      ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
   let skipping_dal_attestation =
     declare_2
       ~section
       ~name:"skipping_dal_attestation"
       ~level:Error
-      ~msg:"unable to sign dal attestation for {delegate} -- {trace}"
+      ~msg:"unable to sign DAL attestation for {delegate} -- {trace}"
       ~pp1:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
@@ -675,7 +686,7 @@ module Actions = struct
       ~name:"dal_attestation_injected"
       ~level:Notice
       ~msg:
-        "injected dal attestation {ophash} with bitset {bitset} for {delegate}"
+        "injected DAL attestation {ophash} with bitset {bitset} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
