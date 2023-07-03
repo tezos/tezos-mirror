@@ -48,7 +48,7 @@ module Kind = struct
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
+  type double_attestation_evidence =
     attestation_consensus_kind double_consensus_operation_evidence
 
   type double_preendorsement_evidence =
@@ -257,7 +257,7 @@ and _ contents =
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header_repr.t;
       bh2 : Block_header_repr.t;
@@ -1243,7 +1243,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
-  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
+  let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;
@@ -1260,7 +1260,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
       }
 
-  let double_attestation_evidence_case : Kind.double_endorsement_evidence case =
+  let double_attestation_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;

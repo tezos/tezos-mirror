@@ -1416,7 +1416,7 @@ module Anonymous = struct
       op2
 
   let check_double_endorsement_evidence vi
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
@@ -1443,7 +1443,7 @@ module Anonymous = struct
     check_double_endorsing_evidence_conflict vs oph op1
 
   let check_double_endorsement_evidence_conflict vs oph
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1470,7 +1470,7 @@ module Anonymous = struct
         }
 
   let add_double_endorsement_evidence vs oph
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1505,7 +1505,7 @@ module Anonymous = struct
     remove_double_endorsing_evidence vs op1
 
   let remove_double_endorsement_evidence vs
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in

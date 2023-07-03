@@ -4020,7 +4020,7 @@ module Kind : sig
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
+  type double_attestation_evidence =
     attestation_consensus_kind double_consensus_operation_evidence
 
   type double_preendorsement_evidence =
@@ -4164,7 +4164,7 @@ and _ contents =
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header.t;
       bh2 : Block_header.t;
@@ -4440,9 +4440,9 @@ module Operation : sig
     val double_preattestation_evidence_case :
       Kind.double_preendorsement_evidence case
 
-    val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
+    val double_endorsement_evidence_case : Kind.double_attestation_evidence case
 
-    val double_attestation_evidence_case : Kind.double_endorsement_evidence case
+    val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
 
