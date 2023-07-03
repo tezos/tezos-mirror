@@ -814,6 +814,20 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
           retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
   | Error _ as err -> Lwt.return err
 
+let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
+  Option.iter_es
+    (fun dal_ctxt ->
+      retry
+        cctxt
+        ~max_delay:2.
+        ~delay:1.
+        ~factor:2.
+        ~tries:max_int
+        ~msg:"Failed to register profiles, DAL node is not reachable. "
+        (fun () -> Node_rpc.register_dal_profiles dal_ctxt delegates)
+        ())
+    dal_node_rpc_ctxt
+
 let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> return_unit) ~chain config delegates =
   let open Lwt_result_syntax in
@@ -841,10 +855,12 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ~current_proposal
     delegates
   >>=? fun initial_state ->
-  Option.iter_es
-    (fun dal_ctxt -> Node_rpc.register_dal_profiles dal_ctxt delegates)
-    initial_state.global_state.dal_node_rpc_ctxt
-  >>=? fun () ->
+  let _promise =
+    register_dal_profiles
+      cctxt
+      initial_state.global_state.dal_node_rpc_ctxt
+      delegates
+  in
   let cloned_block_stream = Lwt_stream.clone heads_stream in
   Baking_nonces.start_revelation_worker
     cctxt
