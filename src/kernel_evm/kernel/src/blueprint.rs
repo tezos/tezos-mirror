@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::block_in_progress::BlockInProgress;
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
 use crate::Error;
 use primitive_types::U256;
@@ -14,13 +15,16 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub struct Blueprint {
     pub transactions: Vec<Transaction>,
 }
-
+pub enum QueueElement {
+    Blueprint(Blueprint),
+    BlockInProgress(BlockInProgress),
+}
 #[derive(Default)]
 pub struct Queue {
     // In our case, to make it simple and straightforward it will be
     // an array of pendings transactions even though it'll be only a
     // singleton for our needs.
-    pub proposals: Vec<Blueprint>,
+    pub proposals: Vec<QueueElement>,
     pub kernel_upgrade: Option<KernelUpgrade>,
 }
 
@@ -33,7 +37,9 @@ impl Queue {
     }
 
     pub fn add(queue: &mut Queue, transactions: Vec<Transaction>) {
-        queue.proposals.push(Blueprint { transactions })
+        queue
+            .proposals
+            .push(QueueElement::Blueprint(Blueprint { transactions }))
     }
 }
 
@@ -60,7 +66,7 @@ pub fn fetch<Host: Runtime>(
 ) -> Result<Queue, Error> {
     let inbox_content = read_inbox(host, smart_rollup_address, ticketer)?;
     let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
-    let blueprint = Blueprint { transactions };
+    let blueprint = QueueElement::Blueprint(Blueprint { transactions });
     Ok(Queue {
         proposals: vec![blueprint],
         kernel_upgrade: inbox_content.kernel_upgrade,

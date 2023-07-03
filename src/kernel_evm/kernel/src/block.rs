@@ -19,6 +19,7 @@ use evm_execution::account_storage::{init_account_storage, EthereumAccountStorag
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use primitive_types::U256;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use tezos_ethereum::block::BlockConstants;
@@ -93,12 +94,10 @@ pub fn produce<Host: Runtime>(
     let mut tick_counter = tick_model::block_overhead_ticks();
 
     for proposal in queue.proposals {
-        // proposal is turn into a ring to allow poping from the front
-        let ring = proposal.transactions.into();
-        let mut block_in_progress = BlockInProgress::new_with_ticks(
+        let mut block_in_progress = bip_from_queue_element(
+            proposal,
             current_block_number,
-            current_constants.gas_price,
-            ring,
+            &current_constants,
             tick_counter,
         );
         match compute(
@@ -110,7 +109,9 @@ pub fn produce<Host: Runtime>(
             &mut accounts_index,
         )? {
             ComputationResult::RebootNeeded => {
+                log!(host, Info, "Ask for reboot");
                 storage::store_block_in_progress(host, &block_in_progress)?;
+                storage::add_reboot_flag(host)?;
                 host.mark_for_reboot()?;
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
                 // store the queue
@@ -129,10 +130,34 @@ pub fn produce<Host: Runtime>(
     Ok(())
 }
 
+fn bip_from_queue_element(
+    proposal: crate::blueprint::QueueElement,
+    current_block_number: U256,
+    constants: &BlockConstants,
+    tick_counter: u64,
+) -> BlockInProgress {
+    match proposal {
+        crate::blueprint::QueueElement::Blueprint(proposal) => {
+            // proposal is turn into a ring to allow poping from the front
+            let ring = proposal.transactions.into();
+            BlockInProgress::new_with_ticks(
+                current_block_number,
+                constants.gas_price,
+                ring,
+                tick_counter,
+            )
+        }
+        crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
+            bip.estimated_ticks = tick_counter;
+            bip
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blueprint::Blueprint;
+    use crate::blueprint::{Blueprint, QueueElement};
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
@@ -147,10 +172,17 @@ mod tests {
     };
     use primitive_types::{H160, H256, U256};
     use std::collections::VecDeque;
+    use std::ops::Rem;
     use std::str::FromStr;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
-    use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
+    use tezos_ethereum::transaction::{
+        TransactionHash, TransactionStatus, TRANSACTION_HASH_SIZE,
+    };
     use tezos_smart_rollup_mock::MockHost;
+
+    fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
+        QueueElement::Blueprint(Blueprint { transactions })
+    }
 
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
@@ -302,7 +334,7 @@ mod tests {
         ];
 
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -340,7 +372,7 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![invalid_tx];
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -365,7 +397,7 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![valid_tx];
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -403,7 +435,7 @@ mod tests {
 
         let transactions: Vec<Transaction> = vec![valid_tx];
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -466,14 +498,7 @@ mod tests {
         }];
 
         let queue = Queue {
-            proposals: vec![
-                Blueprint {
-                    transactions: transaction_0,
-                },
-                Blueprint {
-                    transactions: transaction_1,
-                },
-            ],
+            proposals: vec![blueprint(transaction_0), blueprint(transaction_1)],
             kernel_upgrade: None,
         };
 
@@ -517,7 +542,7 @@ mod tests {
         ];
 
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -568,12 +593,7 @@ mod tests {
         let transactions = vec![tx.clone(), tx];
 
         let queue = Queue {
-            proposals: vec![
-                Blueprint {
-                    transactions: transactions.clone(),
-                },
-                Blueprint { transactions },
-            ],
+            proposals: vec![blueprint(transactions.clone()), blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -612,7 +632,7 @@ mod tests {
         let transactions = vec![tx];
 
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -645,9 +665,7 @@ mod tests {
         let transactions = vec![tx];
 
         let queue = Queue {
-            proposals: vec![Blueprint {
-                transactions: transactions.clone(),
-            }],
+            proposals: vec![blueprint(transactions.clone())],
             kernel_upgrade: None,
         };
 
@@ -656,7 +674,7 @@ mod tests {
         let indexed_accounts = length(&host, &accounts_index).unwrap();
 
         let next_queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -688,7 +706,7 @@ mod tests {
         let transactions = vec![tx];
 
         let queue = Queue {
-            proposals: vec![Blueprint { transactions }],
+            proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
 
@@ -938,9 +956,7 @@ mod tests {
             content: Ethereum(dummy_eth_transaction_zero()),
         };
         let queue = Queue {
-            proposals: vec![Blueprint {
-                transactions: vec![transaction],
-            }],
+            proposals: vec![blueprint(vec![transaction])],
             kernel_upgrade: None,
         };
 
@@ -957,5 +973,191 @@ mod tests {
         // Nonce should have been bumped
         let nonce = caller_account.nonce(&host).unwrap();
         assert_eq!(nonce, default_nonce + 1, "nonce should have been bumped");
+    }
+
+    /// A queue that should produce 1 block with an invalid transaction
+    fn almost_empty_queue() -> Queue {
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+
+        // transaction should be invalid
+        let tx = Transaction {
+            tx_hash,
+            content: Ethereum(dummy_eth_transaction_one()),
+        };
+
+        let transactions = vec![tx];
+
+        Queue {
+            proposals: vec![blueprint(transactions)],
+            kernel_upgrade: None,
+        }
+    }
+
+    fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
+        let current_nb = storage::read_current_block_number(host)
+            .expect("Should have manage to check block number");
+        assert_eq!(current_nb, U256::from(nb), "Incorrect block number");
+    }
+
+    #[test]
+    fn test_first_blocks() {
+        let mut host = MockHost::default();
+
+        // first block should be 0
+        produce(&mut host, almost_empty_queue())
+            .expect("Empty block should have been produced");
+        check_current_block_number(&mut host, 0);
+
+        // second block
+        produce(&mut host, almost_empty_queue())
+            .expect("Empty block should have been produced");
+        check_current_block_number(&mut host, 1);
+
+        // third block
+        produce(&mut host, almost_empty_queue())
+            .expect("Empty block should have been produced");
+        check_current_block_number(&mut host, 2);
+    }
+
+    fn dummy_eth(nonce: u64) -> EthereumTransactionCommon {
+        let nonce = U256::from(nonce);
+        let gas_price = U256::from(40000000000u64);
+        let gas_limit = 21000;
+        let value = U256::from(1);
+        let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
+        let tx = EthereumTransactionCommon {
+            chain_id: U256::one(),
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
+            value,
+            data: vec![],
+            v: U256::one(),
+            r: H256::zero(),
+            s: H256::zero(),
+        };
+
+        // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
+        tx.sign_transaction(
+            "dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701"
+                .to_string(),
+        )
+        .unwrap()
+    }
+
+    fn hash_from_nonce(nonce: u64) -> TransactionHash {
+        let nonce = u64::to_le_bytes(nonce);
+        let mut hash = [0; 32];
+        hash[..8].copy_from_slice(&nonce);
+        hash
+    }
+
+    fn dummy_transaction(nonce: u64) -> Transaction {
+        Transaction {
+            tx_hash: hash_from_nonce(nonce),
+            content: TransactionContent::Ethereum(dummy_eth(nonce)),
+        }
+    }
+
+    const TOO_MANY_TRANSACTIONS: u64 = 500;
+
+    #[test]
+    fn test_reboot_many_tx_one_proposal() {
+        // init host
+        let mut host = MockHost::default();
+
+        // sanity check: no current block
+        assert!(
+            storage::read_current_block_number(&mut host).is_err(),
+            "Should not have found current block number"
+        );
+
+        //provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        let mut transactions = vec![];
+        for n in 0..TOO_MANY_TRANSACTIONS {
+            transactions.push(dummy_transaction(n));
+        }
+        let queue = Queue {
+            proposals: vec![blueprint(transactions)],
+            kernel_upgrade: None,
+        };
+
+        produce(&mut host, queue).expect("Should have produced");
+
+        // test no new block
+        assert!(
+            storage::read_current_block_number(&mut host).is_err(),
+            "Should not have found current block number"
+        );
+
+        // test reboot is set
+        assert!(
+            storage::was_rebooted(&mut host).expect("Should have found flag"),
+            "Flag should be set"
+        );
+    }
+
+    #[test]
+    fn test_reboot_many_tx_many_proposal() {
+        // init host
+        let mut host = MockHost::default();
+
+        // sanity check: no current block
+        assert!(
+            storage::read_current_block_number(&mut host).is_err(),
+            "Should not have found current block number"
+        );
+
+        //provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let sender_initial_balance = U256::from(10000000000000000000u64);
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            sender_initial_balance,
+        );
+
+        let mut transactions = vec![];
+        let mut proposals = vec![];
+        for n in 1..TOO_MANY_TRANSACTIONS {
+            transactions.push(dummy_transaction(n));
+            if n.rem(100) == 0 {
+                proposals.push(blueprint(transactions));
+                transactions = vec![];
+            }
+        }
+        let queue = Queue {
+            proposals,
+            kernel_upgrade: None,
+        };
+
+        produce(&mut host, queue).expect("Should have produced");
+
+        // test no new block
+        assert!(
+            storage::read_current_block_number(&mut host)
+                .expect("should have found a block number")
+                > U256::zero(),
+            "There should have been multiple blocks registered"
+        );
+
+        // test reboot is set
+        assert!(
+            storage::was_rebooted(&mut host).expect("Should have found flag"),
+            "Flag should be set"
+        );
     }
 }

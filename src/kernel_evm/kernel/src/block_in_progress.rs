@@ -23,7 +23,7 @@ use tezos_ethereum::transaction::{
 };
 use tezos_smart_rollup_host::runtime::Runtime;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
 pub struct BlockInProgress {
     /// block number
@@ -132,6 +132,10 @@ fn decode_queue(decoder: &rlp::Rlp<'_>) -> Result<VecDeque<Transaction>, Decoder
 }
 
 impl BlockInProgress {
+    pub fn queue_length(&self) -> usize {
+        self.tx_queue.len()
+    }
+
     pub fn new_with_ticks(
         number: U256,
         gas_price: U256,

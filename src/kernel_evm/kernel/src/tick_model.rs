@@ -38,7 +38,7 @@ const SAFETY_MARGIN: u64 = 2_000_000_000;
 /// estimate value using benchmarks
 const INITIALISATION_OVERHEAD: u64 = 1_000_000_000;
 /// see [maximum_reboots_per_input]
-const _MAXIMUM_REBOOTS: u64 = 1_000;
+pub const _MAXIMUM_NUMBER_OF_REBOOTS: u32 = 1_000;
 /// The minimum amount of gas for an ethereum transaction.
 const BASE_GAS: u64 = Config::london().gas_transaction_call;
 
