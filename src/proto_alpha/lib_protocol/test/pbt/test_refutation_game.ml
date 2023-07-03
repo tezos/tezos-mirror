@@ -54,9 +54,6 @@ let qcheck_make_lwt_res ?print ?count ~name ~gen f =
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
 
-let tick_of_int_exn ?(__LOC__ = __LOC__) n =
-  WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
-
 let number_of_ticks_of_int64_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_value n)
 
@@ -835,144 +832,6 @@ end
 
 (** {2. ArithPVM utils} *)
 
-module ArithPVM = Arith_pvm
-
-module Arith_test_pvm = struct
-  include ArithPVM
-
-  let initial_state () =
-    let open Lwt_syntax in
-    let empty = Sc_rollup_helpers.Arith_pvm.make_empty_state () in
-    let* state = initial_state ~empty in
-    let* state = install_boot_sector state "" in
-    return state
-
-  let initial_hash =
-    let open Lwt_syntax in
-    let* state = initial_state () in
-    state_hash state
-
-  let consume_fuel = Option.map pred
-
-  let continue_with_fuel ~our_states ~(tick : int) fuel state f =
-    let open Lwt_syntax in
-    match fuel with
-    | Some 0 -> return (state, fuel, tick, our_states)
-    | _ -> f tick our_states (consume_fuel fuel) state
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3498
-
-     the following is almost the same code as in the rollup node, expect that it
-     creates the association list (tick, state_hash). *)
-  let eval_until_input ~fuel ~our_states start_tick state =
-    let open Lwt_syntax in
-    let rec go ~our_states fuel (tick : int) state =
-      let* input_request =
-        is_input_state
-          ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
-          state
-      in
-      match fuel with
-      | Some 0 -> return (state, fuel, tick, our_states)
-      | None | Some _ -> (
-          match input_request with
-          | No_input_required ->
-              let* state = eval state in
-              let* state_hash = state_hash state in
-              let our_states = (tick, state_hash) :: our_states in
-              go ~our_states (consume_fuel fuel) (tick + 1) state
-          | Needs_reveal (Request_dal_page _pid) ->
-              (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4160
-                 We assume that there are no confirmed Dal slots.
-                 We'll reuse the infra to provide Dal pages in the future. *)
-              let input = Sc_rollup.(Reveal (Dal_page None)) in
-              let* state = set_input input state in
-              let* state_hash = state_hash state in
-              let our_states = (tick, state_hash) :: our_states in
-              go ~our_states (consume_fuel fuel) (tick + 1) state
-          | Needs_reveal (Reveal_raw_data _)
-          | Needs_reveal Reveal_metadata
-          | Initial | First_after _ ->
-              return (state, fuel, tick, our_states))
-    in
-    go ~our_states fuel start_tick state
-
-  let eval_metadata ~fuel ~our_states tick state ~metadata =
-    let open Lwt_syntax in
-    continue_with_fuel ~our_states ~tick fuel state
-    @@ fun tick our_states fuel state ->
-    let input = Sc_rollup.(Reveal (Metadata metadata)) in
-    let* state = set_input input state in
-    let* state_hash = state_hash state in
-    let our_states = (tick, state_hash) :: our_states in
-    let tick = succ tick in
-    return (state, fuel, tick, our_states)
-
-  let feed_input ~fuel ~our_states ~tick state input =
-    let open Lwt_syntax in
-    let* state, fuel, tick, our_states =
-      eval_until_input ~fuel ~our_states tick state
-    in
-    continue_with_fuel ~our_states ~tick fuel state
-    @@ fun tick our_states fuel state ->
-    let* state = set_input input state in
-    let* state_hash = state_hash state in
-    let our_states = (tick, state_hash) :: our_states in
-    let tick = tick + 1 in
-    let* state, fuel, tick, our_states =
-      eval_until_input ~fuel ~our_states tick state
-    in
-    return (state, fuel, tick, our_states)
-
-  let eval_inbox ?fuel ~inputs ~tick state =
-    let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun (state, fuel, tick, our_states) input ->
-        let*! state, fuel, tick, our_states =
-          feed_input ~fuel ~our_states ~tick state input
-        in
-        return (state, fuel, tick, our_states))
-      (state, fuel, tick, [])
-      inputs
-
-  let eval_inputs ~metadata ?fuel inputs_per_levels =
-    let open Lwt_result_syntax in
-    let*! state = initial_state () in
-    let*! state_hash = state_hash state in
-    let tick = 0 in
-    let our_states = [(tick, state_hash)] in
-    let tick = succ tick in
-    (* 1. We evaluate the boot sector. *)
-    let*! state, fuel, tick, our_states =
-      eval_until_input ~fuel ~our_states tick state
-    in
-    (* 2. We evaluate the metadata. *)
-    let*! state, fuel, tick, our_states =
-      eval_metadata ~fuel ~our_states tick state ~metadata
-    in
-    (* 3. We evaluate the inbox. *)
-    let* state, _fuel, tick, our_states =
-      List.fold_left_es
-        (fun (state, fuel, tick, our_states) inputs ->
-          let* state, fuel, tick, our_states' =
-            eval_inbox ?fuel ~inputs ~tick state
-          in
-          return (state, fuel, tick, our_states @ our_states'))
-        (state, fuel, tick, our_states)
-        inputs_per_levels
-    in
-    let our_states =
-      List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
-    in
-    let our_states =
-      List.map
-        (fun (tick_int, state) -> (tick_of_int_exn tick_int, state))
-        our_states
-    in
-    let tick = tick_of_int_exn tick in
-    return (state, tick, our_states)
-end
-
 let construct_inbox_proto block list_of_messages contract =
   Sc_rollup_helpers.Protocol_inbox_with_ctxt.fill_inbox
     block
@@ -1085,7 +944,9 @@ module Player_client = struct
       let inputs_per_levels =
         List.map (fun {inputs; _} -> inputs) payloads_per_levels
       in
-      let*! r = Arith_test_pvm.eval_inputs ~metadata inputs_per_levels in
+      let*! r =
+        Sc_rollup_helpers.Arith_pvm_eval.eval_inputs ~metadata inputs_per_levels
+      in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
     match strategy with
@@ -1216,7 +1077,7 @@ module Player_client = struct
       payloads_per_levels =
     let open QCheck2.Gen in
     let ctxt : Context_helpers.In_memory.Tree.t =
-      ArithPVM.make_empty_context ()
+      Arith_pvm_eval.make_empty_context ()
     in
     let metadata = Sc_rollup.Metadata.{address = rollup; origination_level} in
     let* tick, our_states, payloads_per_levels =
@@ -1249,7 +1110,7 @@ let create_commitment ~predecessor ~inbox_level ~our_states =
     match List.last_opt our_states with
     | None ->
         (* No tick evaluated. *)
-        Arith_test_pvm.initial_hash
+        Arith_pvm_eval.initial_hash
     | Some (_, state) -> return state
   in
 
@@ -1299,10 +1160,10 @@ let build_proof ~player_client start_tick (game : Game.t) =
   let inputs_per_levels =
     List.map (fun {inputs; _} -> inputs) player_client.payloads_per_levels
   in
-  let*! r = Arith_test_pvm.eval_inputs ~metadata ~fuel inputs_per_levels in
+  let*! r = Arith_pvm_eval.eval_inputs ~metadata ~fuel inputs_per_levels in
   let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
   let module P = struct
-    include Arith_test_pvm
+    include Arith_pvm_eval
 
     let initial_state ~empty:_ = initial_state ()
 
