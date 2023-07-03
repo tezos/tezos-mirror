@@ -36,6 +36,24 @@ val create_loop_state :
 
 val sleep_until : Time.Protocol.t -> unit Lwt.t option
 
+(** [retry ctxt ~delay ?max_delay ~factor ~tries ?msg f x] retries applying [f
+    x] [tries] until it succeeds or returns an error different from
+    [Connection_failed], at most [tries] number of times. After each try it
+    waits for a number of seconds, but not more than [max_delay], if given. The
+    wait time between tries is given by the initial [delay], multiplied by
+    [factor] at each subsequent try. At each failure, [msg] together with the
+    current delay is printed using [ctxt#message].*)
+val retry :
+  #Protocol_client_context.full ->
+  ?max_delay:float ->
+  delay:float ->
+  factor:float ->
+  tries:int ->
+  ?msg:string ->
+  ('a -> 'b tzresult Lwt.t) ->
+  'a ->
+  'b tzresult Lwt.t
+
 (** An event monitor using the streams in [loop_state] (to create
     promises) and a timeout promise [timeout]. The function reacts to a
     promise being fulfilled by firing an event [Baking_state.event]. *)
