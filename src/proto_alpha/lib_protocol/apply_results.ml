@@ -877,7 +877,7 @@ type 'kind contents_result =
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_attestation_evidence contents_result
-  | Double_preendorsement_evidence_result :
+  | Double_preattestation_evidence_result :
       Receipt.balance_updates
       -> Kind.double_preattestation_evidence contents_result
   | Double_baking_evidence_result :
@@ -1215,7 +1215,7 @@ module Encoding = struct
           obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
-          | Contents_result (Double_preendorsement_evidence_result _ as op) ->
+          | Contents_result (Double_preattestation_evidence_result _ as op) ->
               Some op
           | _ -> None);
         mselect =
@@ -1224,8 +1224,8 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preendorsement_evidence_result bus);
+        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
+        inj = (fun bus -> Double_preattestation_evidence_result bus);
       }
 
   let double_preattestation_evidence_case =
@@ -1236,7 +1236,7 @@ module Encoding = struct
           obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
-          | Contents_result (Double_preendorsement_evidence_result _ as op) ->
+          | Contents_result (Double_preattestation_evidence_result _ as op) ->
               Some op
           | _ -> None);
         mselect =
@@ -1245,8 +1245,8 @@ module Encoding = struct
             ->
               Some (op, res)
           | _ -> None);
-        proj = (fun (Double_preendorsement_evidence_result bus) -> bus);
-        inj = (fun bus -> Double_preendorsement_evidence_result bus);
+        proj = (fun (Double_preattestation_evidence_result bus) -> bus);
+        inj = (fun bus -> Double_preattestation_evidence_result bus);
       }
 
   let double_baking_evidence_case =
@@ -1407,7 +1407,7 @@ module Encoding = struct
           | Contents_result (Seed_nonce_revelation_result _) -> None
           | Contents_result (Vdf_revelation_result _) -> None
           | Contents_result (Double_endorsement_evidence_result _) -> None
-          | Contents_result (Double_preendorsement_evidence_result _) -> None
+          | Contents_result (Double_preattestation_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
           | Contents_result (Activate_account_result _) -> None
           | Contents_result (Drain_delegate_result _) -> None
@@ -1904,7 +1904,7 @@ let kind_equal :
   | Seed_nonce_revelation _, _ -> None
   | Vdf_revelation _, Vdf_revelation_result _ -> Some Eq
   | Vdf_revelation _, _ -> None
-  | Double_preattestation_evidence _, Double_preendorsement_evidence_result _ ->
+  | Double_preattestation_evidence _, Double_preattestation_evidence_result _ ->
       Some Eq
   | Double_preattestation_evidence _, _ -> None
   | Double_endorsement_evidence _, Double_endorsement_evidence_result _ ->

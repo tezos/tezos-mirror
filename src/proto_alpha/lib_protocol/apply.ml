@@ -2135,7 +2135,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
     | Single (Preattestation _) ->
-        Double_preendorsement_evidence_result balance_updates
+        Double_preattestation_evidence_result balance_updates
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
