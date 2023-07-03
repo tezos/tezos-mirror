@@ -136,7 +136,7 @@ end
 
 type 'a consensus_operation_type =
   | Endorsement : Kind.attestation consensus_operation_type
-  | Preendorsement : Kind.preattestation consensus_operation_type
+  | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;

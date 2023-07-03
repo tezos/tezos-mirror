@@ -138,14 +138,14 @@ let get_block_offset level =
 let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
-  | Preendorsement, Single (Preendorsement consensus_content)
+  | Preattestation, Single (Preendorsement consensus_content)
   | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.block_payload_hash
 
 let get_slot (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
-  | Preendorsement, Single (Preendorsement consensus_content)
+  | Preattestation, Single (Preendorsement consensus_content)
   | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.slot
 
@@ -159,7 +159,7 @@ let double_consensus_op_evidence (type kind) :
     unit ->
     bytes Environment.Error_monad.shell_tzresult Lwt.t = function
   | Endorsement -> Plugin.RPC.Forge.double_endorsement_evidence
-  | Preendorsement -> Plugin.RPC.Forge.double_preendorsement_evidence
+  | Preattestation -> Plugin.RPC.Forge.double_preendorsement_evidence
 
 let lookup_recorded_consensus (type kind) consensus_key
     (op_kind : kind consensus_operation_type) map : kind recorded_consensus =
@@ -168,7 +168,7 @@ let lookup_recorded_consensus (type kind) consensus_key
   | Some {endorsement; preendorsement} -> (
       match op_kind with
       | Endorsement -> endorsement
-      | Preendorsement -> preendorsement)
+      | Preattestation -> preendorsement)
 
 let add_consensus_operation (type kind) consensus_key
     (op_kind : kind consensus_operation_type)
@@ -187,7 +187,7 @@ let add_consensus_operation (type kind) consensus_key
       in
       match op_kind with
       | Endorsement -> Some {record with endorsement = recorded_operation}
-      | Preendorsement -> Some {record with preendorsement = recorded_operation})
+      | Preattestation -> Some {record with preendorsement = recorded_operation})
     map
 
 let get_validator_rights state cctxt level =
@@ -292,7 +292,7 @@ let process_consensus_op (type kind) state cctxt
                 match op_kind with
                 | Endorsement ->
                     (double_attestation_detected, double_attestation_denounced)
-                | Preendorsement ->
+                | Preattestation ->
                     ( double_preattestation_detected,
                       double_preattestation_denounced ))
             in
@@ -338,7 +338,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
           process_consensus_op
             state
             cctxt
-            Preendorsement
+            Preattestation
             new_preendorsement
             chain_id
             level
