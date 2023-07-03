@@ -393,6 +393,11 @@ val protocol_of_level : _ t -> int32 -> proto_info tzresult Lwt.t
 (** Returns the last protocol seen by the rollup node. *)
 val last_seen_protocol : _ t -> Protocol_hash.t option tzresult Lwt.t
 
+(** Returns the activation level of a protocol or fails if the protocol was
+    never seen by the rollup node. *)
+val protocol_activation_level :
+  _ t -> Protocol_hash.t -> Store.Protocols.level tzresult Lwt.t
+
 (** [save_protocol_info t block ~predecessor] saves to disk the protocol
     information associated to the [block], if there is a protocol change
     between [block] and [predecessor]. *)

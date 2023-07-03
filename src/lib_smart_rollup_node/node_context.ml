@@ -773,6 +773,23 @@ let last_seen_protocol node_ctxt =
   | None | Some [] -> None
   | Some (p :: _) -> Some p.protocol
 
+let protocol_activation_level node_ctxt protocol_hash =
+  let open Lwt_result_syntax in
+  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  match
+    Option.bind
+      protocols
+      (List.find_map (function Store.Protocols.{protocol; level; _} ->
+           if Protocol_hash.(protocol_hash = protocol) then Some level else None))
+  with
+  | None ->
+      failwith
+        "Could not determine the activation level of a previously unseen \
+         protocol %a"
+        Protocol_hash.pp
+        protocol_hash
+  | Some l -> return l
+
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
