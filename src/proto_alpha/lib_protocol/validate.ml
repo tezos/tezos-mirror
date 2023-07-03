@@ -29,7 +29,7 @@ open Alpha_context
 type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
-  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
+  preattestation_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
   endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
 }
 
@@ -37,17 +37,17 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
   {
     predecessor_level;
     predecessor_round;
-    preendorsement_slot_map = Consensus.allowed_preattestations ctxt;
+    preattestation_slot_map = Consensus.allowed_preattestations ctxt;
     endorsement_slot_map = Consensus.allowed_endorsements ctxt;
   }
 
 (** Map used to detect consensus operation conflicts. Each delegate
     may (pre)endorse at most once for each level and round, so two
-    endorsements (resp. two preendorsements) conflict when they have
+    endorsements (resp. two preattestations) conflict when they have
     the same slot, level, and round.
 
     Note that when validating a block, all endorsements (resp. all
-    preendorsements) must have the same level and round anyway, so only
+    preattestations) must have the same level and round anyway, so only
     the slot is relevant. Taking the level and round into account is
     useful in mempool mode, because we want to be able to accept and
     propagate consensus operations for multiple close
@@ -62,7 +62,7 @@ module Consensus_conflict_map = Map.Make (struct
 end)
 
 type consensus_state = {
-  preendorsements_seen : Operation_hash.t Consensus_conflict_map.t;
+  preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
   endorsements_seen : Operation_hash.t Consensus_conflict_map.t;
   dal_attestation_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
 }
@@ -83,10 +83,10 @@ let consensus_state_encoding =
   let open Data_encoding in
   def "consensus_state"
   @@ conv
-       (fun {preendorsements_seen; endorsements_seen; dal_attestation_seen} ->
-         (preendorsements_seen, endorsements_seen, dal_attestation_seen))
-       (fun (preendorsements_seen, endorsements_seen, dal_attestation_seen) ->
-         {preendorsements_seen; endorsements_seen; dal_attestation_seen})
+       (fun {preattestations_seen; endorsements_seen; dal_attestation_seen} ->
+         (preattestations_seen, endorsements_seen, dal_attestation_seen))
+       (fun (preattestations_seen, endorsements_seen, dal_attestation_seen) ->
+         {preattestations_seen; endorsements_seen; dal_attestation_seen})
        (obj3
           (req "preendorsements_seen" consensus_conflict_map_encoding)
           (req "endorsements_seen" consensus_conflict_map_encoding)
@@ -96,7 +96,7 @@ let consensus_state_encoding =
 
 let empty_consensus_state =
   {
-    preendorsements_seen = Consensus_conflict_map.empty;
+    preattestations_seen = Consensus_conflict_map.empty;
     endorsements_seen = Consensus_conflict_map.empty;
     dal_attestation_seen = Signature.Public_key_hash.Map.empty;
   }
@@ -424,7 +424,7 @@ let init_block_state vi =
 let get_initial_ctxt {info; _} = info.ctxt
 
 (** Validation of consensus operations (validation pass [0]):
-    preendorsement, endorsement, and dal_attestation. *)
+    preattestation, endorsement, and dal_attestation. *)
 module Consensus = struct
   open Validate_errors.Consensus
 
@@ -443,7 +443,7 @@ module Consensus = struct
 
   (** When validating a block (ie. in [Application],
       [Partial_validation], and [Construction] modes), any
-      preendorsements must point to a round that is strictly before the
+      preattestations must point to a round that is strictly before the
       block's round. *)
   let check_round_before_block ~block_round provided =
     error_unless
@@ -471,11 +471,11 @@ module Consensus = struct
       (Block_payload_hash.equal expected provided)
       (Wrong_payload_hash_for_consensus_operation {kind; expected; provided})
 
-  (** Preendorsement checks for both [Application] and
+  (** Preattestation checks for both [Application] and
       [Partial_validation] modes.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_preexisting_block_preendorsement vi consensus_info block_info
+  let check_preexisting_block_preattestation vi consensus_info block_info
       {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let*? locked_round =
@@ -483,7 +483,7 @@ module Consensus = struct
       | Some locked_round -> ok locked_round
       | None ->
           (* A preexisting block whose fitness has no locked round
-             should contain no preendorsements. *)
+             should contain no preattestations. *)
           error Unexpected_preattestation_in_block
     in
     let kind = Preattestation in
@@ -493,24 +493,24 @@ module Consensus = struct
     let expected_payload_hash = block_info.header_contents.payload_hash in
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
-      get_delegate_details consensus_info.preendorsement_slot_map kind slot
+      get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
     let* () =
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
     return (consensus_key, voting_power)
 
-  (** Preendorsement checks for Construction mode.
+  (** Preattestation checks for Construction mode.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_constructed_block_preendorsement vi consensus_info cons_info
+  let check_constructed_block_preattestation vi consensus_info cons_info
       {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let expected_payload_hash = cons_info.header_contents.payload_hash in
     let*? () =
       (* When the proposal is fresh, a fake [payload_hash] of [zero]
          has been provided. In this case, the block should not contain
-         any preendorsements. *)
+         any preattestations. *)
       error_when
         Block_payload_hash.(expected_payload_hash = zero)
         Unexpected_preattestation_in_block
@@ -521,17 +521,17 @@ module Consensus = struct
     (* We cannot check the exact round here in construction mode, because
        there is no preexisting fitness to provide the locked_round. We do
        however check that all preendorments have the same round in
-       [check_construction_preendorsement_round_consistency] further below. *)
+       [check_construction_preattestation_round_consistency] further below. *)
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
-      get_delegate_details consensus_info.preendorsement_slot_map kind slot
+      get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
     let* () =
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
     return (consensus_key, voting_power)
 
-  (** Preendorsement/endorsement checks for Mempool mode.
+  (** Preattestation/endorsement checks for Mempool mode.
 
       We want this mode to be very permissive, to allow the mempool to
       accept and propagate consensus operations even if they point to a
@@ -577,7 +577,7 @@ module Consensus = struct
      contains the operation, which may not be the same as the current
      mempool's context. *)
 
-  let check_preendorsement vi ~check_signature
+  let check_preattestation vi ~check_signature
       (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
@@ -591,13 +591,13 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application block_info | Partial_validation block_info ->
-          check_preexisting_block_preendorsement
+          check_preexisting_block_preattestation
             vi
             consensus_info
             block_info
             consensus_content
       | Construction construction_info ->
-          check_constructed_block_preendorsement
+          check_constructed_block_preattestation
             vi
             consensus_info
             construction_info
@@ -619,7 +619,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_preendorsement_conflict vs oph (op : Kind.preattestation operation)
+  let check_preattestation_conflict vs oph (op : Kind.preattestation operation)
       =
     let (Single (Preattestation {slot; level; round; _})) =
       op.protocol_data.contents
@@ -627,30 +627,30 @@ module Consensus = struct
     match
       Consensus_conflict_map.find_opt
         (slot, level, round)
-        vs.consensus_state.preendorsements_seen
+        vs.consensus_state.preattestations_seen
     with
     | Some existing ->
         Error (Operation_conflict {existing; new_operation = oph})
     | None -> ok_unit
 
-  let wrap_preendorsement_conflict = function
+  let wrap_preattestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
         error
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Preattestation; conflict})
 
-  let add_preendorsement vs oph (op : Kind.preattestation operation) =
+  let add_preattestation vs oph (op : Kind.preattestation operation) =
     let (Single (Preattestation {slot; level; round; _})) =
       op.protocol_data.contents
     in
-    let preendorsements_seen =
+    let preattestations_seen =
       Consensus_conflict_map.add
         (slot, level, round)
         oph
-        vs.consensus_state.preendorsements_seen
+        vs.consensus_state.preattestations_seen
     in
-    {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
+    {vs with consensus_state = {vs.consensus_state with preattestations_seen}}
 
   let may_update_locked_round_evidence block_state mode
       (consensus_content : consensus_content) voting_power =
@@ -663,27 +663,27 @@ module Consensus = struct
           | Some (_stored_round, evidences) ->
               (* [_stored_round] is always equal to [consensus_content.round].
                  Indeed, this is ensured by
-                 {!check_preendorsement_content_preexisting_block} in
+                 {!check_preattestation_content_preexisting_block} in
                  application and partial validation modes, and by
-                 {!check_construction_preendorsement_round_consistency} in
+                 {!check_construction_preattestation_round_consistency} in
                  construction mode. *)
               Some (consensus_content.round, evidences + voting_power))
     in
     {block_state with locked_round_evidence}
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_preendorsement vs (operation : Kind.preattestation operation) =
+  let remove_preattestation vs (operation : Kind.preattestation operation) =
     (* As we are in mempool mode, we do not update
        [locked_round_evidence]. *)
     let (Single (Preattestation {slot; level; round; _})) =
       operation.protocol_data.contents
     in
-    let preendorsements_seen =
+    let preattestations_seen =
       Consensus_conflict_map.remove
         (slot, level, round)
-        vs.consensus_state.preendorsements_seen
+        vs.consensus_state.preattestations_seen
     in
-    {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
+    {vs with consensus_state = {vs.consensus_state with preattestations_seen}}
 
   (** Endorsement checks for all modes that involve a block:
       Application, Partial_validation, and Construction.
@@ -870,47 +870,47 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with dal_attestation_seen}}
 
-  (** In Construction mode, check that the preendorsement has the same
-      round as any previously validated preendorsements.
+  (** In Construction mode, check that the preattestation has the same
+      round as any previously validated preattestations.
 
       This check is not needed in other modes because
-      {!check_preendorsement} already checks that all preendorsements
+      {!check_preattestation} already checks that all preattestations
       have the same expected round (the locked_round in Application and
       Partial_validation modes when there is one (otherwise all
-      preendorsements are rejected so the point is moot), or the
+      preattestations are rejected so the point is moot), or the
       predecessor_round in Mempool mode). *)
-  let check_construction_preendorsement_round_consistency vi block_state
+  let check_construction_preattestation_round_consistency vi block_state
       (consensus_content : consensus_content) =
     let open Result_syntax in
     match vi.mode with
     | Construction _ -> (
         match block_state.locked_round_evidence with
         | None ->
-            (* This is the first validated preendorsement:
+            (* This is the first validated preattestation:
                there is nothing to check. *)
             return_unit
         | Some (expected, _power) ->
-            (* Other preendorsements have already been validated: we check
+            (* Other preattestations have already been validated: we check
                that the current operation has the same round as them. *)
             check_round Preattestation expected consensus_content.round)
     | Application _ | Partial_validation _ | Mempool -> return_unit
 
-  let validate_preendorsement ~check_signature info operation_state block_state
+  let validate_preattestation ~check_signature info operation_state block_state
       oph (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let (Single (Preattestation consensus_content)) =
       operation.protocol_data.contents
     in
-    let* voting_power = check_preendorsement info ~check_signature operation in
+    let* voting_power = check_preattestation info ~check_signature operation in
     let*? () =
-      check_construction_preendorsement_round_consistency
+      check_construction_preattestation_round_consistency
         info
         block_state
         consensus_content
     in
     let*? () =
-      check_preendorsement_conflict operation_state oph operation
-      |> wrap_preendorsement_conflict
+      check_preattestation_conflict operation_state oph operation
+      |> wrap_preattestation_conflict
     in
     (* We need to update the block state *)
     let block_state =
@@ -920,7 +920,7 @@ module Consensus = struct
         consensus_content
         voting_power
     in
-    let operation_state = add_preendorsement operation_state oph operation in
+    let operation_state = add_preattestation operation_state oph operation in
     return {info; operation_state; block_state}
 
   let validate_endorsement ~check_signature info operation_state block_state oph
@@ -2449,7 +2449,7 @@ let check_operation ?(check_signature = true) info (type kind)
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
       let* (_voting_power : int) =
-        Consensus.check_preendorsement info ~check_signature operation
+        Consensus.check_preattestation info ~check_signature operation
       in
       return_unit
   | Single (Endorsement _) ->
@@ -2504,7 +2504,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
     (operation : kind operation) =
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
-      Consensus.check_preendorsement_conflict
+      Consensus.check_preattestation_conflict
         operation_conflict_state
         oph
         operation
@@ -2570,7 +2570,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
     (operation : kind operation) =
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
-      Consensus.add_preendorsement operation_conflict_state oph operation
+      Consensus.add_preattestation operation_conflict_state oph operation
   | Single (Endorsement _) ->
       Consensus.add_endorsement operation_conflict_state oph operation
   | Single (Dal_attestation _) ->
@@ -2615,7 +2615,7 @@ let remove_operation operation_conflict_state (type kind)
     (operation : kind operation) =
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
-      Consensus.remove_preendorsement operation_conflict_state operation
+      Consensus.remove_preattestation operation_conflict_state operation
   | Single (Endorsement _) ->
       Consensus.remove_endorsement operation_conflict_state operation
   | Single (Dal_attestation _) ->
@@ -2701,7 +2701,7 @@ let validate_operation ?(check_signature = true)
   | (Application _ | Partial_validation _ | Construction _ | Mempool), _ -> (
       match operation.protocol_data.contents with
       | Single (Preattestation _) ->
-          Consensus.validate_preendorsement
+          Consensus.validate_preattestation
             ~check_signature
             info
             operation_state
@@ -2871,50 +2871,50 @@ let check_endorsement_power vi bs =
   else return_unit
 
 (** Check that the locked round in the fitness and the locked round
-    observed in the preendorsements are the same.
+    observed in the preattestations are the same.
 
     This check is not called in construction mode because there is
     no provided fitness (meaning that we do not know whether the block
-    should contain any preendorsements).
+    should contain any preattestations).
 
     When the observed locked round is [Some _], we actually already
     know that it is identical to the fitness locked round, otherwise
-    {!Consensus.check_preexisting_block_preendorsement} would have
-    rejected the preendorsements. But this check is needed to reject
+    {!Consensus.check_preexisting_block_preattestation} would have
+    rejected the preattestations. But this check is needed to reject
     blocks where the fitness locked round has a value yet there are no
-    preendorsements (ie. the observed locked round is [None]). *)
+    preattestations (ie. the observed locked round is [None]). *)
 let check_fitness_locked_round bs fitness_locked_round =
   let observed_locked_round = Option.map fst bs.locked_round_evidence in
   error_unless
     (Option.equal Round.equal observed_locked_round fitness_locked_round)
     Fitness.Wrong_fitness
 
-(** When there are preendorsements, check that they point to a round
+(** When there are preattestations, check that they point to a round
     before the block's round, and that their total power is high enough.
 
     Note that this function does not check whether the block actually
     contains preendorments when they are mandatory. This is checked by
     {!check_fitness_locked_round} instead. *)
-let check_preendorsement_round_and_power vi vs round =
+let check_preattestation_round_and_power vi vs round =
   let open Result_syntax in
   match vs.locked_round_evidence with
   | None -> ok_unit
-  | Some (preendorsement_round, preendorsement_count) ->
+  | Some (preattestation_round, preattestation_count) ->
       let* () =
         (* Actually, this check should never fail, because we have
            already called {!Consensus.check_round_before_block} for
-           all preendorsements in a block. Nevertheless, it does not
+           all preattestations in a block. Nevertheless, it does not
            cost much to check again here. *)
         error_when
-          Round.(preendorsement_round >= round)
+          Round.(preattestation_round >= round)
           (Locked_round_after_block_round
-             {locked_round = preendorsement_round; round})
+             {locked_round = preattestation_round; round})
       in
       let consensus_threshold = Constants.consensus_threshold vi.ctxt in
       error_when
-        Compare.Int.(preendorsement_count < consensus_threshold)
+        Compare.Int.(preattestation_count < consensus_threshold)
         (Insufficient_locked_round_evidence
-           {voting_power = preendorsement_count; consensus_threshold})
+           {voting_power = preattestation_count; consensus_threshold})
 
 let check_payload_hash block_state ~predecessor_hash
     (block_header_contents : Block_header.contents) =
@@ -2935,7 +2935,7 @@ let finalize_block {info; block_state; _} =
   | Application {round; locked_round; predecessor_hash; header_contents} ->
       let* () = check_endorsement_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
-      let*? () = check_preendorsement_round_and_power info block_state round in
+      let*? () = check_preattestation_round_and_power info block_state round in
       let*? () =
         check_payload_hash block_state ~predecessor_hash header_contents
       in
@@ -2943,18 +2943,18 @@ let finalize_block {info; block_state; _} =
   | Partial_validation {round; locked_round; _} ->
       let* () = check_endorsement_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
-      let*? () = check_preendorsement_round_and_power info block_state round in
+      let*? () = check_preattestation_round_and_power info block_state round in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
       let* () = check_endorsement_power info block_state in
-      let*? () = check_preendorsement_round_and_power info block_state round in
+      let*? () = check_preattestation_round_and_power info block_state round in
       let*? () =
         match block_state.locked_round_evidence with
         | Some _ ->
             check_payload_hash block_state ~predecessor_hash header_contents
         | None ->
             (* In construction mode, when there is no locked round
-               evidence (ie. no preendorsements), the baker cannot know
+               evidence (ie. no preattestations), the baker cannot know
                the payload hash before selecting the operations.
                Therefore, we do not check the initially given payload
                hash. The baker will have to patch the resulting block

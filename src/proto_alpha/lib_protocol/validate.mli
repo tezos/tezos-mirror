@@ -243,7 +243,7 @@ val begin_partial_construction :
 
 (** Similar to [begin_partial_construction] but do not require
     predecessor information that is essential to the validation of
-    preendorsement and endorsement operations. As a consequence, the
+    preattestation and endorsement operations. As a consequence, the
     validation of these operations will always fail.
 
     This function is used by the plugin RPC [run_operation], which
