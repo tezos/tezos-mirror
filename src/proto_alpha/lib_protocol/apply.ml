@@ -1042,15 +1042,11 @@ let apply_manager_operation :
             ~destination:pkh
             ~before_operation:ctxt_before_op
       | "set_delegate_parameters" ->
-          Script_typed_ir.(pair_t Micheline.dummy_location int_t unit_t)
-          >>?= fun (Ty_ex_c ty) ->
-          Script_typed_ir.(pair_t Micheline.dummy_location int_t ty)
-          >>?= fun (Ty_ex_c ty) ->
           Script_ir_translator.parse_data
             ~elab_conf
             ctxt
             ~allow_forged:false
-            ty
+            Script_typed_ir.pair_int_int_unit_t
             (Micheline.root parameters)
           >>=? fun ( ( staking_over_baking_limit_millionth,
                        (baking_over_staking_edge_billionth, ()) ),

@@ -1949,6 +1949,12 @@ let comparable_pair_t loc l r =
 let comparable_pair_3_t loc l m r =
   comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
 
+let pair_int_int_unit_t =
+  let iu_metadata = assert_ok2 pair_metadata int_metadata unit_metadata in
+  let iiu_metadata = assert_ok2 pair_metadata int_metadata iu_metadata in
+  Pair_t
+    (int_t, Pair_t (int_t, unit_t, iu_metadata, YesYes), iiu_metadata, YesYes)
+
 let or_t :
     type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
