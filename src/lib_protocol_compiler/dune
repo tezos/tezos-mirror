@@ -29,12 +29,12 @@
 
 (rule
  (target protocol_compiler_env.ml)
- (action (copy compat_files/protocol_compiler_env_ocaml4 %{target}))
+ (action (copy compat_files/protocol_compiler_env_ocaml4.ml %{target}))
  (enabled_if (< %{ocaml_version} 5)))
 
 (rule
  (target protocol_compiler_env.ml)
- (action (copy compat_files/protocol_compiler_env_ocaml5 %{target}))
+ (action (copy compat_files/protocol_compiler_env_ocaml5.ml %{target}))
  (enabled_if (>= %{ocaml_version} 5)))
 
 (rule

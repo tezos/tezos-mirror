@@ -2864,7 +2864,7 @@ let octez_protocol_compiler_lib =
             ~action:
               [
                 S "copy";
-                S "compat_files/protocol_compiler_env_ocaml4";
+                S "compat_files/protocol_compiler_env_ocaml4.ml";
                 S "%{target}";
               ]
             ~enabled_if:[S "<"; S "%{ocaml_version}"; S "5"];
@@ -2873,7 +2873,7 @@ let octez_protocol_compiler_lib =
             ~action:
               [
                 S "copy";
-                S "compat_files/protocol_compiler_env_ocaml5";
+                S "compat_files/protocol_compiler_env_ocaml5.ml";
                 S "%{target}";
               ]
             ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
