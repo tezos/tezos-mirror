@@ -3615,8 +3615,8 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~salt:"_empty"
         ~name:Interpreter_workload.N_KMap_enter_body
+        ~salt:"_empty"
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
@@ -3638,8 +3638,8 @@ module Registration_section = struct
        *)
       continuation_benchmark
         ~amplification:100
-        ~salt:"_singleton"
         ~name:Interpreter_workload.N_KMap_enter_body
+        ~salt:"_singleton"
         ~cont_and_stack_sampler:(fun _cfg _rng_state () ->
           Ex_stack_and_cont
             {
