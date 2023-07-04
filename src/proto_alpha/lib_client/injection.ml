@@ -385,10 +385,12 @@ let estimated_gas_single (type kind)
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  consumed_gas operation_result >>? fun gas ->
+  let open Result_syntax in
+  let* gas = consumed_gas operation_result in
   List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      internal_consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
+      let* gas = internal_consumed_gas r in
+      Ok (Gas.Arith.add acc gas))
     gas
     internal_operation_results
 
@@ -461,24 +463,29 @@ let estimated_storage_single (type kind) ~origination_size
         Ok Z.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  storage_size_diff operation_result >>? fun storage ->
+  let open Result_syntax in
+  let* storage = storage_size_diff operation_result in
   List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      internal_storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
+      let* storage = internal_storage_size_diff r in
+      Ok (Z.add acc storage))
     storage
     internal_operation_results
 
 let estimated_storage ~origination_size res =
+  let open Result_syntax in
   let rec estimated_storage : type kind. kind contents_result_list -> _ =
     function
     | Single_result (Manager_operation_result _ as res) ->
         estimated_storage_single ~origination_size res
     | Single_result _ -> Ok Z.zero
     | Cons_result (res, rest) ->
-        estimated_storage_single ~origination_size res >>? fun storage1 ->
-        estimated_storage rest >>? fun storage2 -> Ok (Z.add storage1 storage2)
+        let* storage1 = estimated_storage_single ~origination_size res in
+        let* storage2 = estimated_storage rest in
+        Ok (Z.add storage1 storage2)
   in
-  estimated_storage res >>? fun diff -> Ok (Z.max Z.zero diff)
+  let* diff = estimated_storage res in
+  Ok (Z.max Z.zero diff)
 
 let originated_contracts_single (type kind)
     (Manager_operation_result {operation_result; internal_operation_results; _} :
@@ -528,11 +535,12 @@ let originated_contracts_single (type kind)
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
-  originated_contracts operation_result >>? fun contracts ->
+  let open Result_syntax in
+  let* contracts = originated_contracts operation_result in
   let contracts = List.rev contracts in
   List.fold_left_e
     (fun acc (Internal_operation_result (_, r)) ->
-      internal_originated_contracts r >>? fun contracts ->
+      let* contracts = internal_originated_contracts r in
       Ok (List.rev_append contracts acc))
     contracts
     internal_operation_results
@@ -545,8 +553,9 @@ let rec originated_contracts : type kind. kind contents_result_list -> _ =
       List.rev l
   | Single_result _ -> Ok []
   | Cons_result (res, rest) ->
-      originated_contracts_single res >>? fun contracts1 ->
-      originated_contracts rest >>? fun contracts2 ->
+      let open Result_syntax in
+      let* contracts1 = originated_contracts_single res in
+      let* contracts2 = originated_contracts rest in
       Ok (List.rev_append contracts1 contracts2)
 
 let estimated_storage_single ~force ~origination_size result =
@@ -566,6 +575,7 @@ let originated_contracts ~force results =
 
 let detect_script_failure : type kind. kind operation_metadata -> _ =
   let rec detect_script_failure : type kind. kind contents_result_list -> _ =
+    let open Result_syntax in
     let detect_script_failure_single (type kind)
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :
@@ -587,7 +597,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
               (error_of_fmt "The transfer simulation failed.")
               (Error (Environment.wrap_tztrace errs))
       in
-      detect_script_failure operation_result >>? fun () ->
+      let* () = detect_script_failure operation_result in
       List.iter_e
         (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
@@ -597,7 +607,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
         detect_script_failure_single res
     | Single_result _ -> Ok ()
     | Cons_result (res, rest) ->
-        detect_script_failure_single res >>? fun () ->
+        let* () = detect_script_failure_single res in
         detect_script_failure rest
   in
   fun {contents} -> detect_script_failure contents
@@ -1476,10 +1486,11 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Bls _ -> Bls
   in
   let apply_specified_options counter op =
-    Annotated_manager_operation.set_source source op >>? fun op ->
-    Annotated_manager_operation.set_counter counter op >>? fun op ->
-    Annotated_manager_operation.join_fee fee op >>? fun op ->
-    Annotated_manager_operation.join_gas_limit gas_limit op >>? fun op ->
+    let open Result_syntax in
+    let* op = Annotated_manager_operation.set_source source op in
+    let* op = Annotated_manager_operation.set_counter counter op in
+    let* op = Annotated_manager_operation.join_fee fee op in
+    let* op = Annotated_manager_operation.join_gas_limit gas_limit op in
     Annotated_manager_operation.join_storage_limit storage_limit op
   in
   let rec build_contents :
@@ -1494,7 +1505,8 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         let+ op = apply_specified_options counter op in
         Annotated_manager_operation.Single_manager op
     | Cons_manager (op, rest) ->
-        apply_specified_options counter op >>? fun op ->
+        let open Result_syntax in
+        let* op = apply_specified_options counter op in
         let+ rest = build_contents (Manager_counter.succ counter) rest in
         Annotated_manager_operation.Cons_manager (op, rest)
   in

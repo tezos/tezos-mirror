@@ -105,15 +105,17 @@ let manager_from_annotated operation =
     operation
   in
   let open Result_syntax in
-  Limit.get ~when_unknown:"unknown fee" fee >>? fun fee ->
-  Limit.get ~when_unknown:"unknown gas limit" gas_limit >>? fun gas_limit ->
-  Limit.get ~when_unknown:"unknown storage limit" storage_limit
-  >>? fun storage_limit ->
-  Option.fold
-    ~some:ok
-    ~none:(error_with "manager_from_annotated: source not set")
-    source
-  >>? fun source ->
+  let* fee = Limit.get ~when_unknown:"unknown fee" fee in
+  let* gas_limit = Limit.get ~when_unknown:"unknown gas limit" gas_limit in
+  let* storage_limit =
+    Limit.get ~when_unknown:"unknown storage limit" storage_limit
+  in
+  let* source =
+    Option.fold
+      ~some:ok
+      ~none:(error_with "manager_from_annotated: source not set")
+      source
+  in
   let+ counter =
     Option.fold
       ~some:ok
@@ -130,6 +132,6 @@ let rec manager_list_from_annotated :
       let+ op = manager_from_annotated operation in
       Single op
   | Cons_manager (operation, rest) ->
-      manager_list_from_annotated rest >>? fun rest ->
+      let* rest = manager_list_from_annotated rest in
       let+ op = manager_from_annotated operation in
       Cons (op, rest)

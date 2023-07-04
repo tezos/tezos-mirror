@@ -79,12 +79,13 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
   Lwt.return @@ Environment.wrap_tzresult
   @@ Option.map_e
        (fun {Script.code; storage = _} ->
-         Script_repr.force_decode code >>? fun code ->
+         let open Result_syntax in
+         let* code = Script_repr.force_decode code in
          let bytes =
            Data_encoding.Binary.to_bytes_exn Script.expr_encoding code
          in
          let hash = Script_expr_hash.hash_bytes [bytes] in
-         ok hash)
+         return hash)
        script_opt
 
 let get_contract_ticket_balance (rpc : #rpc_context) ~chain ~block contract key
@@ -570,13 +571,18 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
         (List.length contracts)
 
 let michelson_expression_of_string str =
-  Michelson_v1_parser.parse_expression str |> Micheline_parser.no_parsing_error
-  >>? fun {Michelson_v1_parser.expanded = v; _} -> ok @@ Script.lazy_expr v
+  let open Result_syntax in
+  let* {Michelson_v1_parser.expanded = v; _} =
+    Michelson_v1_parser.parse_expression str
+    |> Micheline_parser.no_parsing_error
+  in
+  return @@ Script.lazy_expr v
 
 let build_register_global_constant ?fee ?gas_limit ?storage_limit value =
-  michelson_expression_of_string value >>? fun value ->
+  let open Result_syntax in
+  let* value = michelson_expression_of_string value in
   let op = Register_global_constant {value} in
-  ok
+  return
     (Injection.prepare_manager_operation
        ~fee:(Limit.of_option fee)
        ~gas_limit:(Limit.of_option gas_limit)

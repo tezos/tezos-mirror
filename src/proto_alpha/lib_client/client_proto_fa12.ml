@@ -545,6 +545,7 @@ let action_of_expr ~entrypoint expr =
   let error () =
     error (Action_unwrapping_error (entrypoint, Micheline.strip_locations expr))
   in
+  let open Result_syntax in
   match (entrypoint, expr) with
   (* Transfer operation before comb pairs. *)
   | ( "transfer",
@@ -575,16 +576,17 @@ let action_of_expr ~entrypoint expr =
             Int (_, amount);
           ],
           _ ) ) ->
-      parse_address error source >>? fun source ->
-      parse_address error destination >>? fun destination ->
-      ok (Transfer (source, destination, amount))
+      let* source = parse_address error source in
+      let* destination = parse_address error destination in
+      return (Transfer (source, destination, amount))
   | ( "approve",
       Prim
         ( _,
           Script.D_Pair,
           [((Bytes (_, _) | String (_, _)) as addr); Int (_, amount)],
           _ ) ) ->
-      parse_address error addr >>? fun addr -> ok (Approve (addr, amount))
+      let* addr = parse_address error addr in
+      return (Approve (addr, amount))
   | ( "getBalance",
       Prim
         ( _,
@@ -594,9 +596,9 @@ let action_of_expr ~entrypoint expr =
             ((Bytes (_, _) | String (_, _)) as cb);
           ],
           _ ) ) ->
-      parse_address error addr >>? fun addr ->
-      parse_callback error cb >>? fun callback ->
-      ok (Get_balance (addr, callback))
+      let* addr = parse_address error addr in
+      let* callback = parse_callback error cb in
+      return (Get_balance (addr, callback))
   | ( "getAllowance",
       Prim
         ( _,
@@ -613,10 +615,10 @@ let action_of_expr ~entrypoint expr =
             ((Bytes (_, _) | String (_, _)) as contract);
           ],
           _ ) ) ->
-      parse_address error source >>? fun source ->
-      parse_address error destination >>? fun destination ->
-      parse_callback error contract >>? fun callback ->
-      ok (Get_allowance (source, destination, callback))
+      let* source = parse_address error source in
+      let* destination = parse_address error destination in
+      let* callback = parse_callback error contract in
+      return (Get_allowance (source, destination, callback))
   | ( "getTotalSupply",
       Prim
         ( _,
@@ -626,8 +628,8 @@ let action_of_expr ~entrypoint expr =
             ((Bytes (_, _) | String (_, _)) as contract);
           ],
           _ ) ) ->
-      parse_callback error contract >>? fun callback ->
-      ok (Get_total_supply callback)
+      let* callback = parse_callback error contract in
+      return (Get_total_supply callback)
   | _ -> error ()
 
 let find_entrypoint_in_annot error annots expr =

@@ -41,6 +41,7 @@ let rec check_letters str i j f =
   i > j || (f str.[i] && check_letters str (i + 1) j f)
 
 let expand_caddadr original =
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -52,10 +53,11 @@ let expand_caddadr original =
                | 'A' | 'D' -> true
                | _ -> false)
       then
-        (match args with
-        | [] -> ok ()
-        | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
-        >>? fun () ->
+        let* () =
+          match args with
+          | [] -> return ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        in
         let path_annot =
           List.filter (function "@%" | "@%%" -> true | _ -> false) annot
         in
@@ -68,14 +70,15 @@ let expand_caddadr original =
             | 'D' -> parse (i - 1) (Prim (loc, "CDR", [], annot) :: acc)
             | _ -> assert false
         in
-        ok (Some (parse (len - 2) []))
-      else ok None
-  | _ -> ok None
+        return (Some (parse (len - 2) []))
+      else return None
+  | _ -> return None
 
 let expand_carn original =
+  let open Result_syntax in
   match original with
   | Prim (loc, "CAR", [Int (loc2, n)], annot) ->
-      ok
+      return
         (Some
            (Seq
               ( loc,
@@ -86,15 +89,16 @@ let expand_carn original =
                       [Int (loc2, Z.(of_int 1 + (n * of_int 2)))],
                       annot );
                 ] )))
-  | _ -> ok None
+  | _ -> return None
 
 let expand_cdrn original =
+  let open Result_syntax in
   match original with
   | Prim (loc, "CDR", [Int (loc2, n)], annot) ->
-      ok
+      return
         (Some
            (Seq (loc, [Prim (loc, "GET", [Int (loc2, Z.(n * of_int 2))], annot)])))
-  | _ -> ok None
+  | _ -> return None
 
 let extract_field_annots annot =
   List.partition
@@ -106,6 +110,7 @@ let extract_field_annots annot =
     annot
 
 let expand_set_caddadr original =
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -117,15 +122,17 @@ let expand_set_caddadr original =
                | 'A' | 'D' -> true
                | _ -> false)
       then
-        (match args with
-        | [] -> ok ()
-        | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
-        >>? fun () ->
-        (match extract_field_annots annot with
-        | [], annot -> ok (None, annot)
-        | [f], annot -> ok (Some f, annot)
-        | _, _ -> error (Unexpected_macro_annotation str))
-        >>? fun (field_annot, annot) ->
+        let* () =
+          match args with
+          | [] -> return ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        in
+        let* field_annot, annot =
+          match extract_field_annots annot with
+          | [], annot -> return (None, annot)
+          | [f], annot -> return (Some f, annot)
+          | _, _ -> error (Unexpected_macro_annotation str)
+        in
         let rec parse i acc =
           if i = 4 then acc
           else
@@ -191,7 +198,7 @@ let expand_set_caddadr original =
               ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
-            ok (Some (parse (len - 3) init))
+            return (Some (parse (len - 3) init))
         | 'D' ->
             let access_check =
               match field_annot with
@@ -214,12 +221,13 @@ let expand_set_caddadr original =
               ]
             in
             let init = Seq (loc, access_check @ encoding @ pair) in
-            ok (Some (parse (len - 3) init))
+            return (Some (parse (len - 3) init))
         | _ -> assert false
-      else ok None
-  | _ -> ok None
+      else return None
+  | _ -> return None
 
 let expand_map_caddadr original =
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -231,16 +239,18 @@ let expand_map_caddadr original =
                | 'A' | 'D' -> true
                | _ -> false)
       then
-        (match args with
-        | [(Seq _ as code)] -> ok code
-        | [_] -> error (Sequence_expected str)
-        | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1)))
-        >>? fun code ->
-        (match extract_field_annots annot with
-        | [], annot -> ok (None, annot)
-        | [f], annot -> ok (Some f, annot)
-        | _, _ -> error (Unexpected_macro_annotation str))
-        >>? fun (field_annot, annot) ->
+        let* code =
+          match args with
+          | [(Seq _ as code)] -> return code
+          | [_] -> error (Sequence_expected str)
+          | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
+        in
+        let* field_annot, annot =
+          match extract_field_annots annot with
+          | [], annot -> return (None, annot)
+          | [f], annot -> return (Some f, annot)
+          | _, _ -> error (Unexpected_macro_annotation str)
+        in
         let rec parse i acc =
           if i = 4 then acc
           else
@@ -307,7 +317,7 @@ let expand_map_caddadr original =
                         [Option.value field_annot ~default:"%"; "%@"] );
                   ] )
             in
-            ok (Some (parse (len - 3) init))
+            return (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq
@@ -325,10 +335,10 @@ let expand_map_caddadr original =
                         ["%@"; Option.value field_annot ~default:"%"] );
                   ] )
             in
-            ok (Some (parse (len - 3) init))
+            return (Some (parse (len - 3) init))
         | _ -> assert false
-      else ok None
-  | _ -> ok None
+      else return None
+  | _ -> return None
 
 exception Not_a_roman
 
@@ -360,6 +370,7 @@ let dip ~loc ?(annot = []) depth instr =
   else Prim (loc, "DIP", [Int (loc, Z.of_int depth); instr], annot)
 
 let expand_deprecated_dxiiivp original =
+  let open Result_syntax in
   (* transparently expands deprecated macro [DI...IP] to instruction [DIP n] *)
   match original with
   | Prim (loc, str, args, annot) ->
@@ -368,12 +379,12 @@ let expand_deprecated_dxiiivp original =
         try
           let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
           match args with
-          | [(Seq (_, _) as arg)] -> ok @@ Some (dip ~loc ~annot depth arg)
+          | [(Seq (_, _) as arg)] -> return @@ Some (dip ~loc ~annot depth arg)
           | [_] -> error (Sequence_expected str)
           | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
-        with Not_a_roman -> ok None
-      else ok None
-  | _ -> ok None
+        with Not_a_roman -> return None
+      else return None
+  | _ -> return None
 
 exception Not_a_pair
 
@@ -427,6 +438,7 @@ let pappaiir_annots_pos ast annot =
   snd (find_annots_pos 0 ast annot IntMap.empty)
 
 let expand_pappaiir original =
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -465,15 +477,18 @@ let expand_pappaiir original =
             | A | I -> (depth + 1, acc)
           in
           let _, expanded = parse ast (0, []) in
-          (match args with
-          | [] -> ok ()
-          | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
-          >>? fun () -> ok (Some (Seq (loc, expanded)))
-        with Not_a_pair -> ok None
-      else ok None
-  | _ -> ok None
+          let* () =
+            match args with
+            | [] -> return ()
+            | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+          in
+          return (Some (Seq (loc, expanded)))
+        with Not_a_pair -> return None
+      else return None
+  | _ -> return None
 
 let expand_unpappaiir original =
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, _annot) ->
       let len = String.length str in
@@ -500,18 +515,21 @@ let expand_unpappaiir original =
           in
           let _, rev_expanded = parse ast (0, []) in
           let expanded = Seq (loc, List.rev rev_expanded) in
-          (match args with
-          | [] -> ok ()
-          | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
-          >>? fun () -> ok (Some expanded)
-        with Not_a_pair -> ok None
-      else ok None
-  | _ -> ok None
+          let* () =
+            match args with
+            | [] -> return ()
+            | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+          in
+          return (Some expanded)
+        with Not_a_pair -> return None
+      else return None
+  | _ -> return None
 
 exception Not_a_dup
 
 let expand_deprecated_duuuuup original =
   (* transparently expands deprecated macro [DU...UP] to [{ DUP n }] *)
+  let open Result_syntax in
   match original with
   | Prim (loc, str, args, annot) ->
       let len = String.length str in
@@ -521,10 +539,11 @@ let expand_deprecated_duuuuup original =
         && str.[len - 1] = 'P'
         && check_letters str 1 (len - 2) (( = ) 'U')
       then
-        (match args with
-        | [] -> ok ()
-        | _ :: _ -> error (Invalid_arity (str, List.length args, 0)))
-        >>? fun () ->
+        let* () =
+          match args with
+          | [] -> return ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        in
         try
           let rec parse i =
             if i = 1 then
@@ -532,26 +551,27 @@ let expand_deprecated_duuuuup original =
             else if str.[i] = 'U' then parse (i - 1)
             else raise_notrace Not_a_dup
           in
-          ok (Some (parse (len - 2)))
-        with Not_a_dup -> ok None
-      else ok None
-  | _ -> ok None
+          return (Some (parse (len - 2)))
+        with Not_a_dup -> return None
+      else return None
+  | _ -> return None
 
 let expand_compare original =
+  let open Result_syntax in
   let cmp loc is annot =
     let is =
       match List.rev_map (fun i -> Prim (loc, i, [], [])) is with
       | Prim (loc, i, args, _) :: r -> List.rev (Prim (loc, i, args, annot) :: r)
       | is -> List.rev is
     in
-    ok (Some (Seq (loc, is)))
+    return (Some (Seq (loc, is)))
   in
   let ifcmp loc is l r annot =
     let is =
       List.map (fun i -> Prim (loc, i, [], [])) is
       @ [Prim (loc, "IF", [l; r], annot)]
     in
-    ok (Some (Seq (loc, is)))
+    return (Some (Seq (loc, is)))
   in
   match original with
   | Prim (loc, "CMPEQ", [], annot) -> cmp loc ["COMPARE"; "EQ"] annot
@@ -600,7 +620,7 @@ let expand_compare original =
         [],
         _ :: _ ) ->
       error (Unexpected_macro_annotation str)
-  | _ -> ok None
+  | _ -> return None
 
 let expand_asserts original =
   let may_rename loc = function
@@ -613,17 +633,21 @@ let expand_asserts original =
   let fail_true ?(annot = []) loc =
     [Seq (loc, [Prim (loc, "FAIL", [], [])]); may_rename loc annot]
   in
+  let open Result_syntax in
   match original with
   | Prim (loc, "ASSERT", [], []) ->
-      ok @@ Some (Seq (loc, [Prim (loc, "IF", fail_false loc, [])]))
+      return @@ Some (Seq (loc, [Prim (loc, "IF", fail_false loc, [])]))
   | Prim (loc, "ASSERT_NONE", [], []) ->
-      ok @@ Some (Seq (loc, [Prim (loc, "IF_NONE", fail_false loc, [])]))
+      return @@ Some (Seq (loc, [Prim (loc, "IF_NONE", fail_false loc, [])]))
   | Prim (loc, "ASSERT_SOME", [], annot) ->
-      ok @@ Some (Seq (loc, [Prim (loc, "IF_NONE", fail_true ~annot loc, [])]))
+      return
+      @@ Some (Seq (loc, [Prim (loc, "IF_NONE", fail_true ~annot loc, [])]))
   | Prim (loc, "ASSERT_LEFT", [], annot) ->
-      ok @@ Some (Seq (loc, [Prim (loc, "IF_LEFT", fail_false ~annot loc, [])]))
+      return
+      @@ Some (Seq (loc, [Prim (loc, "IF_LEFT", fail_false ~annot loc, [])]))
   | Prim (loc, "ASSERT_RIGHT", [], annot) ->
-      ok @@ Some (Seq (loc, [Prim (loc, "IF_LEFT", fail_true ~annot loc, [])]))
+      return
+      @@ Some (Seq (loc, [Prim (loc, "IF_LEFT", fail_true ~annot loc, [])]))
   | Prim
       ( _,
         (( "ASSERT" | "ASSERT_NONE" | "ASSERT_SOME" | "ASSERT_LEFT"
@@ -635,19 +659,21 @@ let expand_asserts original =
       error (Unexpected_macro_annotation str)
   | Prim (loc, s, args, annot)
     when String.(length s > 7 && equal (sub s 0 7) "ASSERT_") -> (
-      (match args with
-      | [] -> ok ()
-      | _ :: _ -> error (Invalid_arity (s, List.length args, 0)))
-      >>? fun () ->
-      (match annot with
-      | _ :: _ -> error (Unexpected_macro_annotation s)
-      | [] -> ok ())
-      >>? fun () ->
+      let* () =
+        match args with
+        | [] -> return ()
+        | _ :: _ -> error (Invalid_arity (s, List.length args, 0))
+      in
+      let* () =
+        match annot with
+        | _ :: _ -> error (Unexpected_macro_annotation s)
+        | [] -> return ()
+      in
       let remaining = String.(sub s 7 (length s - 7)) in
       let remaining_prim = Prim (loc, remaining, [], []) in
       match remaining with
       | "EQ" | "NEQ" | "LT" | "LE" | "GE" | "GT" ->
-          ok
+          return
           @@ Some
                (Seq (loc, [remaining_prim; Prim (loc, "IF", fail_false loc, [])]))
       | _ -> (
@@ -657,7 +683,7 @@ let expand_asserts original =
           | None -> None
           | Some seq ->
               Some (Seq (loc, [seq; Prim (loc, "IF", fail_false loc, [])]))))
-  | _ -> ok None
+  | _ -> return None
 
 let expand_if_some = function
   | Prim (loc, "IF_SOME", [right; left], annot) ->
@@ -682,12 +708,14 @@ let expand_fail = function
   | _ -> ok @@ None
 
 let expand original =
+  let open Result_syntax in
   let rec try_expansions = function
-    | [] -> ok @@ original
+    | [] -> return @@ original
     | expander :: expanders -> (
-        expander original >>? function
+        let* rewritten_opt = expander original in
+        match rewritten_opt with
         | None -> try_expansions expanders
-        | Some rewritten -> ok rewritten)
+        | Some rewritten -> return rewritten)
   in
   try_expansions
     [
