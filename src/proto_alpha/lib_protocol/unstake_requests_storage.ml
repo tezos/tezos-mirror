@@ -43,10 +43,7 @@ let apply_slashes ~preserved_plus_slashing slashing_history ~from_cycle amount =
   let last_cycle_to_apply_slash =
     Cycle_repr.add from_cycle (preserved_plus_slashing - 1)
   in
-  (* TODO https://gitlab.com/tezos/tezos/-/issues/5768
-     All slashings are applied multiplicatively so the order should have
-     no impact. But it does a little because of rounding down. Let's make sure
-     slashings are always applied in the same order, from oldest to newest. *)
+  (* [slashing_history] is sorted so slashings always happen in the same order. *)
   let amount = Z.of_int64 (Tez_repr.to_mutez amount) in
   let amount =
     List.fold_left

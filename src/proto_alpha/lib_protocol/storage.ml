@@ -158,6 +158,7 @@ module Slashed_deposits_history = struct
 
   let slashed_percentage_encoding = Data_encoding.uint8
 
+  (* invariant: sorted list *)
   type t = (Cycle_repr.t * slashed_percentage) list
 
   let encoding =
@@ -169,14 +170,16 @@ module Slashed_deposits_history = struct
 
   let add cycle percentage history =
     let rec loop rev_prefix = function
-      | [] ->
-          (* cycle does not exist -> add at the head *)
-          (cycle, percentage) :: history
-      | (c, p) :: tl when Cycle_repr.(c = cycle) ->
+      | (c, p) :: tl when Cycle_repr.(cycle = c) ->
           let p = Compare.Int.min 100 (p + percentage) in
           (* cycle found, do not change the order *)
           List.rev_append rev_prefix ((c, p) :: tl)
-      | hd :: tl -> loop (hd :: rev_prefix) tl
+      | ((c, _) as hd) :: tl when Cycle_repr.(cycle > c) ->
+          (* [cycle] must be inserted later *)
+          loop (hd :: rev_prefix) tl
+      | suffix ->
+          (* [cycle] between [rev_prefix] and [suffix] *)
+          List.rev_append rev_prefix ((cycle, percentage) :: suffix)
     in
     loop [] history
 end
