@@ -241,8 +241,7 @@ let set_active ctxt delegate =
 let snapshot ctxt =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun index ->
   Storage.Stake.Last_snapshot.update ctxt (index + 1) >>=? fun ctxt ->
-  Storage.Stake.Staking_balance_up_to_Nairobi.snapshot ctxt index
-  >>=? fun ctxt ->
+  Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.snapshot ctxt index
 
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
@@ -254,8 +253,7 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
   Storage.Stake.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   (* cleanup snapshots *)
-  Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.clear ctxt
-  >>= fun ctxt ->
+  Storage.Stake.Staking_balance.Snapshot.clear ctxt >>= fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
   >>= fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
