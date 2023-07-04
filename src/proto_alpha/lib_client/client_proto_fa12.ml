@@ -977,10 +977,11 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
       | Some error -> tzfail error)
 
 let is_viewable_action action =
+  let open Lwt_result_syntax in
   match action with
   | Get_balance (_, _) | Get_allowance (_, _, _) | Get_total_supply _ ->
       return ()
-  | _ -> fail (Not_a_viewable_entrypoint (action_to_entrypoint action))
+  | _ -> tzfail (Not_a_viewable_entrypoint (action_to_entrypoint action))
 
 let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ?sender ~contract ~action ?payer ?gas ~unparsing_mode () =
