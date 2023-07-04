@@ -289,6 +289,33 @@ let fetched_missing_page =
     ~level:Notice
     ("hash", Data_encoding.(string' Hex))
 
+(** [connection_lost] is emitted when client looses connection to Coordinator's
+    stream of root hashes. *)
+let connection_lost =
+  declare_0
+    ~section
+    ~name:"new_root_hash_daemon_connection_lost"
+    ~msg:
+      "Daemon for monitoring new root hashes has lost connection to \
+       Coordinator node"
+    ~level:Warning
+    ()
+
+(** [cannot_connect] event is emited when client tries to subscribe to the
+    stream of root hashes, but fails. *)
+let cannot_connect =
+  declare_3
+    ~section
+    ~name:"new_root_hash_daemon_cannot_connect"
+    ~msg:
+      "Cannot connect to Coordinator node. Tried {count}-times already, will \
+       retry in {delay}s. Error: {error}"
+    ~level:Warning
+    ("count", Data_encoding.int31)
+    ("delay", Data_encoding.float)
+    ("error", trace_encoding)
+    ~pp3:pp_print_trace
+
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash
 
@@ -332,3 +359,11 @@ let emit_cannot_retrieve_keys_from_address address =
 let emit_fetched_missing_page root_hash =
   let (`Hex root_hash) = Dac_plugin.hash_to_hex root_hash in
   emit fetched_missing_page root_hash
+
+(** [emit_cannot_connect_to_coordinator ()] emits [connection_lost] event. *)
+let emit_coordinators_connection_lost () = emit connection_lost ()
+
+(** [emit_cannot_connect_to_coordinator ~count ~delay error] emits
+    [cannot_connect] event. *)
+let emit_cannot_connect_to_coordinator ~count ~delay error =
+  (emit cannot_connect) (count, delay, error)
