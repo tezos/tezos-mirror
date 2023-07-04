@@ -57,9 +57,29 @@ let register (plugin : proto_plugin) =
       Plugin.protocol ;
   Protocol_hash.Table.add proto_plugins Plugin.protocol plugin
 
+let registered_protocols () =
+  Protocol_hash.Table.to_seq_keys proto_plugins |> List.of_seq
+
 let proto_plugin_for_protocol protocol =
   Protocol_hash.Table.find proto_plugins protocol
   |> Option.to_result ~none:[Unsupported_protocol protocol]
 
-let registered_protocols () =
-  Protocol_hash.Table.to_seq_keys proto_plugins |> List.of_seq
+let proto_plugin_for_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let* {protocol; _} = Node_context.protocol_of_level node_ctxt level in
+  let*? plugin = proto_plugin_for_protocol protocol in
+  return plugin
+
+let proto_plugin_for_block node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let* level = Node_context.level_of_hash node_ctxt block_hash in
+  proto_plugin_for_level node_ctxt level
+
+let last_proto_plugin node_ctxt =
+  let open Lwt_result_syntax in
+  let* protocol = Node_context.last_seen_protocol node_ctxt in
+  match protocol with
+  | None -> failwith "No known last protocol, cannot get plugin"
+  | Some protocol ->
+      let*? plugin = proto_plugin_for_protocol protocol in
+      return plugin

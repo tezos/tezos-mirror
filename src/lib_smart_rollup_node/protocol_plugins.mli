@@ -29,9 +29,25 @@ type proto_plugin = (module Protocol_plugin_sig.S)
     rollup node. *)
 val register : proto_plugin -> unit
 
+(** Returns the list of registered protocols. *)
+val registered_protocols : unit -> Protocol_hash.t list
+
+(** {2 Using the correct protocol plugin} *)
+
 (** Return the protocol plugin for a given protocol (or an error if not
     supported). *)
 val proto_plugin_for_protocol : Protocol_hash.t -> proto_plugin tzresult
 
-(** Returns the list of registered protocols. *)
-val registered_protocols : unit -> Protocol_hash.t list
+(** Return the protocol plugin for a given level (or an error if not
+    supported). *)
+val proto_plugin_for_level :
+  _ Node_context.t -> int32 -> proto_plugin tzresult Lwt.t
+
+(** Return the protocol plugin for a given block (or an error if not
+    supported). *)
+val proto_plugin_for_block :
+  _ Node_context.t -> Block_hash.t -> proto_plugin tzresult Lwt.t
+
+(** Returns the plugin corresponding to the last protocol seen by the rollup
+    node. *)
+val last_proto_plugin : _ Node_context.t -> proto_plugin tzresult Lwt.t
