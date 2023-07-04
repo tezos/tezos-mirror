@@ -50,25 +50,32 @@ let install_boot_sector kind state boot_sector =
   let module PVM = (val Pvm.of_kind kind) in
   PVM.install_boot_sector state boot_sector
 
-let get_status (node_ctxt : _ Node_context.t) state =
-  let open Lwt_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
-  let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-    |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
-  in
-  let+ status = PVM.get_status ~is_reveal_enabled state in
-  PVM.string_of_status status
-
 let get_current_level kind state =
   let open Lwt_option_syntax in
   let module PVM = (val Pvm.of_kind kind) in
   let+ current_level = PVM.get_current_level state in
   Raw_level.to_int32 current_level
+
+let get_status (node_ctxt : _ Node_context.t) state =
+  let open Lwt_result_syntax in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
+  let*! current_level = PVM.get_current_level state in
+  let* constants =
+    match current_level with
+    | None -> return node_ctxt.current_protocol.constants
+    | Some level ->
+        Protocol_plugins.get_constants_of_level
+          node_ctxt
+          (Raw_level.to_int32 level)
+  in
+  let is_reveal_enabled =
+    constants.sc_rollup.reveal_activation_level
+    |> WithExceptions.Option.get ~loc:__LOC__
+    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+    |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
+  in
+  let*! status = PVM.get_status ~is_reveal_enabled state in
+  return (PVM.string_of_status status)
 
 module Fueled = Fueled_pvm
 

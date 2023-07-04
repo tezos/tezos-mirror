@@ -51,10 +51,10 @@ let install_boot_sector kind state boot_sector =
   PVM.install_boot_sector state boot_sector
 
 let get_status node_ctxt state =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
-  let+ status = PVM.get_status state in
-  PVM.string_of_status status
+  let*! status = PVM.get_status state in
+  return (PVM.string_of_status status)
 
 let get_current_level kind state =
   let open Lwt_option_syntax in
