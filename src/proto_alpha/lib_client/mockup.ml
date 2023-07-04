@@ -320,7 +320,9 @@ let initial_context chain_id (header : Block_header.shell_header)
   let* ctxt = Environment.Updater.activate ctxt Protocol.hash in
   let open Lwt_result_syntax in
   let* {context; _} =
-    Protocol.Main.init chain_id ctxt header >|= Environment.wrap_tzresult
+    let open Lwt_syntax in
+    let+ r = Protocol.Main.init chain_id ctxt header in
+    Environment.wrap_tzresult r
   in
   let ({
          timestamp = predecessor_timestamp;
@@ -343,15 +345,18 @@ let initial_context chain_id (header : Block_header.shell_header)
     Tezos_base.Block_header.hash {shell = header; protocol_data = Bytes.empty}
   in
   let* value_of_key =
-    Protocol.Main.value_of_key
-      ~chain_id
-      ~predecessor_context:context
-      ~predecessor_timestamp
-      ~predecessor_level
-      ~predecessor_fitness
-      ~predecessor
-      ~timestamp
-    >|= Environment.wrap_tzresult
+    let open Lwt_syntax in
+    let+ r =
+      Protocol.Main.value_of_key
+        ~chain_id
+        ~predecessor_context:context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+    in
+    Environment.wrap_tzresult r
   in
   (*
       In the mockup mode, reactivity is important and there are
@@ -364,7 +369,10 @@ let initial_context chain_id (header : Block_header.shell_header)
       predecessor
       context
       `Lazy
-      (fun key -> value_of_key key >|= Environment.wrap_tzresult)
+      (fun key ->
+        let open Lwt_syntax in
+        let+ r = value_of_key key in
+        Environment.wrap_tzresult r)
   in
   return context
 
@@ -600,7 +608,9 @@ let migrate :
   let* context = Environment.Updater.activate context Protocol.hash in
   let open Lwt_result_syntax in
   let* {context; _} =
-    Protocol.Main.init chain context block_header >|= Environment.wrap_tzresult
+    let open Lwt_syntax in
+    let+ r = Protocol.Main.init chain context block_header in
+    Environment.wrap_tzresult r
   in
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}

@@ -69,7 +69,8 @@ module Originated_contract_alias = struct
         match contract_hash_opt with
         | Ok _ as ok_v -> Lwt.return ok_v
         | Error k_errs -> (
-            find cctxt s >|= function
+            let+ contract_hash_opt = find cctxt s in
+            match contract_hash_opt with
             | Ok _ as ok_v -> ok_v
             | Error c_errs -> Error (c_errs @ k_errs)))
 

@@ -149,7 +149,9 @@ let enrich_runtime_errors cctxt ~chain ~block ~parsed =
           | Some parsed ->
               Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
           | None -> (
-              fetch_script cctxt ~chain ~block contract >|= function
+              let open Lwt_syntax in
+              let+ script_opt = fetch_script cctxt ~chain ~block contract in
+              match script_opt with
               | Ok script ->
                   let parsed = Michelson_v1_printer.unparse_toplevel script in
                   Rich_runtime_contract_error (contract, parsed)
