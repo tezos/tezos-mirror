@@ -200,19 +200,22 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let info = Printf.sprintf "Carbonated find model"
 
+    let ns s = Free_variable.of_namespace (Namespace.cons name s)
+
+    let fv_intercept = ns "intercept"
+
     (**
        Given the cost of comparing keys, the model is used for deducing [intercept]
-       and [traverse_overhead] from:
+       and [traversal_overhead] from:
 
        [intercept + (log2 size * compare_cost) + (log2 size * traversal_overhead)]
      *)
-    let find_model ?intercept ?traverse_overhead name =
+    let find_model ?intercept ?traversal_overhead name =
       let open Tezos_benchmark in
-      let ns s = Free_variable.of_namespace (Namespace.cons name s) in
-      let traverse_overhead =
-        Option.value ~default:(ns "traverse_overhead") traverse_overhead
+      let traversal_overhead =
+        Option.value ~default:(ns "traversal_overhead") traversal_overhead
       in
-      let intercept = Option.value ~default:(ns "intercept") intercept in
+      let intercept = Option.value ~default:fv_intercept intercept in
       let module M = struct
         type arg_type = int * unit
 
@@ -229,7 +232,9 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
             let compare_cost =
               log2 size * free ~name:(compare_var CS.type_name)
             in
-            let traversal_overhead = log2 size * free ~name:traverse_overhead in
+            let traversal_overhead =
+              log2 size * free ~name:traversal_overhead
+            in
             free ~name:intercept + compare_cost + traversal_overhead
         end
       end in
@@ -300,7 +305,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let group = group
 
-    let model = Model.make ~conv:(fun () -> ()) ~model:Model.unknown_const1
+    let model =
+      Model.make
+        ~conv:(fun () -> ())
+        ~model:(Model.unknown_const1 ~const:Find.fv_intercept)
 
     let create_benchmark ~rng_state (_config : config) =
       let ctxt = make_context ~rng_state in
