@@ -8,48 +8,73 @@ use evm_execution::{DurableStorageError, EthereumError};
 use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_ethereum::signatures::SigError;
-use tezos_smart_rollup_host::path::{OwnedPath, PathError};
+use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum TransferError {
+    #[error("Transaction error: couldn't reconstruct the caller address")]
     InvalidCallerAddress,
+    #[error("Transaction error: couldn't verify the signature")]
     InvalidSignature,
+    #[error("Transaction error: incorrect nonce, expected {expected} but got {actual}")]
     InvalidNonce { expected: U256, actual: U256 },
+    #[error("Transaction error: not enough funds to apply transaction")]
     NotEnoughBalance,
+    #[error("Transaction error: cumulative gas overflowed")]
     CumulativeGasUsedOverflow,
+    #[error("Transaction error: invalid address format {0}")]
     InvalidAddressFormat(Utf8Error),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq)]
 pub enum StorageError {
+    #[error(transparent)]
     Path(PathError),
+    #[error(transparent)]
     Runtime(RuntimeError),
+    #[error("Storage error: index out of bound")]
     IndexOutOfBounds,
+    #[error("Storage error: failed to initialize an account")]
     AccountInitialisation,
+    #[error("Storage error: failed to initialize a genesis account")]
     GenesisAccountInitialisation,
+    #[error("Storage error: error while reading a value (incorrect size). Expected {expected} but got {actual}")]
     InvalidLoadValue { expected: usize, actual: usize },
-    InvalidEncoding { path: OwnedPath, value: Vec<u8> },
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum UpgradeProcessError {
+    #[error("Upgrade error: invalid nonce")]
     InvalidUpgradeNonce,
+    #[error("Internal upgrade error: {0}")]
     InternalUpgrade(&'static str),
+    #[error("Missing dictator key")]
     NoDictator,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
+    #[error(transparent)]
     Transfer(TransferError),
+    #[error(transparent)]
     Storage(StorageError),
+    #[error("Invalid conversion")]
     InvalidConversion,
+    #[error("Invalid parsing")]
     InvalidParsing,
+    #[error(transparent)]
     InvalidRunTransaction(EthereumError),
+    #[error("Simulation failed: {0}")]
     Simulation(EthereumError),
+    #[error(transparent)]
     UpgradeError(UpgradeProcessError),
+    #[error(transparent)]
     InvalidSignature(SigError),
+    #[error("Invalid signature check")]
     InvalidSignatureCheck,
+    #[error("Issue during reboot")]
     Reboot,
 }
 
