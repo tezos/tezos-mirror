@@ -112,9 +112,6 @@ val frozen_deposits :
 val spendable_balance :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.tez tzresult Lwt.t
 
-val staking_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
 (** [is_forbidden_delegate ctxt delegate] returns [true] if the given
     [delegate] is forbidden to bake or attest. This means that its
     current frozen deposit is equal to zero. Returns [false]
@@ -162,5 +159,8 @@ module For_RPC : sig
 
   (** Only use this function for RPCs: this is expensive. *)
   val delegated_balance :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+
+  val staking_balance :
     Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 end

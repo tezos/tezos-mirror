@@ -229,11 +229,6 @@ let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
 
-let staking_balance ctxt delegate =
-  registered ctxt delegate >>= fun is_registered ->
-  if is_registered then Stake_storage.get_staking_balance ctxt delegate
-  else return Tez_repr.zero
-
 let is_forbidden_delegate ctxt delegate =
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
   Signature.Public_key_hash.Set.mem delegate forbidden_delegates
@@ -344,6 +339,11 @@ module For_RPC = struct
     Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
     >>=? fun balance_and_frozen_bonds ->
     Lwt.return Tez_repr.(all_frozen +? balance_and_frozen_bonds)
+
+  let staking_balance ctxt delegate =
+    registered ctxt delegate >>= fun is_registered ->
+    if is_registered then Stake_storage.get_staking_balance ctxt delegate
+    else return Tez_repr.zero
 
   let delegated_balance ctxt delegate =
     staking_balance ctxt delegate >>=? fun staking_balance ->

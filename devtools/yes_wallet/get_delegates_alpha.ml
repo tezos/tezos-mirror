@@ -52,7 +52,7 @@ module Get_delegates = struct
       |> Lwt.map Environment.wrap_tzresult
 
     let staking_balance ctxt pkh =
-      staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      For_RPC.staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult
 
     let deactivated ctxt pkh =
       deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult

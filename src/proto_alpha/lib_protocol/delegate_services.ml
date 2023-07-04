@@ -495,14 +495,14 @@ let register () =
       | {with_minimal_stake = true; without_minimal_stake = false; _} ->
           List.filter_es
             (fun pkh ->
-              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
-              Tez.(staking_balance >= minimal_stake))
+              Delegate.For_RPC.staking_balance ctxt pkh
+              >|=? fun staking_balance -> Tez.(staking_balance >= minimal_stake))
             delegates
       | {with_minimal_stake = false; without_minimal_stake = true; _} ->
           List.filter_es
             (fun pkh ->
-              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
-              Tez.(staking_balance < minimal_stake))
+              Delegate.For_RPC.staking_balance ctxt pkh
+              >|=? fun staking_balance -> Tez.(staking_balance < minimal_stake))
             delegates
       | {with_minimal_stake = true; without_minimal_stake = true; _}
       | {with_minimal_stake = false; without_minimal_stake = false; _} ->
@@ -511,7 +511,7 @@ let register () =
       let* () = check_delegate_registered ctxt pkh in
       let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
       let* frozen_deposits = Delegate.frozen_deposits ctxt pkh in
-      let* staking_balance = Delegate.staking_balance ctxt pkh in
+      let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
       let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
       let* delegated_balance = Delegate.For_RPC.delegated_balance ctxt pkh in
       let* deactivated = Delegate.deactivated ctxt pkh in
@@ -576,7 +576,7 @@ let register () =
         slashed_requests) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.staking_balance ctxt pkh) ;
+      Delegate.For_RPC.staking_balance ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.delegated_contracts ctxt pkh >|= ok) ;
