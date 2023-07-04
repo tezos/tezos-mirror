@@ -592,10 +592,11 @@ let build_register_global_constant ?fee ?gas_limit ?storage_limit value =
 let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
     ?counter ~source ~src_pk ~src_sk ~fee_parameter ~constant () =
-  build_register_global_constant ?fee ?storage_limit ?gas_limit constant
-  >>?= fun op ->
-  let op = Annotated_manager_operation.Single_manager op in
   let open Lwt_result_syntax in
+  let*? op =
+    build_register_global_constant ?fee ?storage_limit ?gas_limit constant
+  in
+  let op = Annotated_manager_operation.Single_manager op in
   let* oph, _, op, result =
     Injection.inject_manager_operation
       cctxt
@@ -776,11 +777,13 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   in
   let pk = Signature.Of_V1.public_key pk in
   let sk = Signature.Of_V1.secret_key sk in
-  Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
+  let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
   let* sk_uri =
     if encrypted then
       Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-    else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return
+    else
+      let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+      return sk_uri
   in
   let* () = Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name in
   inject_activate_operation

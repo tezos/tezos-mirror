@@ -365,11 +365,14 @@ let tez_param ~name ~desc next =
     next
 
 let non_negative_z_parameter =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try
         let v = Z.of_string s in
-        error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
-        >>?= fun () -> return v
+        let*? () =
+          error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
+        in
+        return v
       with _ -> cctxt#error "Invalid number, must be a non negative number.")
 
 let non_negative_z_param ~name ~desc next =

@@ -930,7 +930,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           let op =
             Annotated_manager_operation.set_fee (Limit.known Tez.zero) op
           in
-          Annotated_manager_operation.manager_from_annotated op >>?= fun cm ->
+          let*? cm = Annotated_manager_operation.manager_from_annotated op in
           return (patch_fee ~first cm)
         else Lwt.return (Annotated_manager_operation.manager_from_annotated op)
   in
@@ -1524,9 +1524,9 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
           ~storage_limit:Limit.unknown
           (Reveal src_pk)
       in
-      Annotated_manager_operation.set_source source reveal >>?= fun reveal ->
-      Annotated_manager_operation.set_counter counter reveal >>?= fun reveal ->
-      build_contents (Manager_counter.succ counter) operations >>?= fun rest ->
+      let*? reveal = Annotated_manager_operation.set_source source reveal in
+      let*? reveal = Annotated_manager_operation.set_counter counter reveal in
+      let*? rest = build_contents (Manager_counter.succ counter) operations in
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
       let* contents =
         let* contents =
@@ -1574,7 +1574,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   | Some _ when has_reveal operations ->
       failwith "The manager key was previously revealed."
   | _ ->
-      build_contents counter operations >>?= fun contents ->
+      let*? contents = build_contents counter operations in
       let* contents =
         let* contents =
           may_patch_limits

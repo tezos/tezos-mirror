@@ -909,9 +909,10 @@ let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
       cctxt
       transfer.destination
   in
-  tez_of_opt_string_exn index "tez_amount" transfer.tez_amount
-  >>?= fun tez_amount ->
-  tez_of_opt_string_exn index "fee" transfer.fee >>?= fun transfer_fee ->
+  let*? tez_amount =
+    tez_of_opt_string_exn index "tez_amount" transfer.tez_amount
+  in
+  let*? transfer_fee = tez_of_opt_string_exn index "fee" transfer.fee in
   let fee = Option.either transfer_fee default_fee in
   let gas_limit = Option.either transfer.gas_limit default_gas_limit in
   let storage_limit =
