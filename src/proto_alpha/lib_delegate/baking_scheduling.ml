@@ -295,15 +295,9 @@ let compute_next_round_time state =
     is meant to be multiplied back again to find the round value. *)
 let first_potential_round_at_next_level state ~earliest_round =
   let open Baking_state in
-  let slots = state.level_state.next_level_delegate_slots.own_delegate_slots in
   let rounds =
-    state.level_state.next_level_delegate_slots.all_slots_by_round
-    |> Array.to_seqi
-    |> Seq.fold_left
-         (fun acc (round, slot) ->
-           if SlotMap.mem slot slots then (round, slot) :: acc else acc)
-         []
-    |> List.rev
+    Delegate_slots.all_proposer_rounds
+      state.level_state.next_level_delegate_slots
   in
   match Round.to_int earliest_round with
   | Error _ -> None
@@ -317,8 +311,11 @@ let first_potential_round_at_next_level state ~earliest_round =
       match first_round with
       | None -> None
       | Some (round, slot) -> (
-          SlotMap.find slot slots |> function
-          | None -> None
+          Delegate_slots.own_slot_owner
+            state.level_state.next_level_delegate_slots
+            ~slot
+          |> function
+          | None -> None (* impossible *)
           | Some (delegate, _) -> (
               (* TODO? check with [Node_rpc.first_proposer_round] if we also need the q+1 *)
               match Round.of_int ((q * consensus_committee_size) + round) with
@@ -526,12 +523,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   in
   let delay_next_round_timeout next_round =
     (* we only delay if it's our turn to bake *)
-    match
-      State_transitions.round_proposer
-        state
-        state.level_state.delegate_slots.own_delegate_slots
-        (snd next_round)
-    with
+    match round_proposer state ~level:`Current (snd next_round) with
     | Some _ ->
         let delta =
           state.global_state.constants.parametric.minimal_block_delay

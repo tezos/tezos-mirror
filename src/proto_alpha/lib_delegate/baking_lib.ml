@@ -157,10 +157,10 @@ let first_automaton_event state =
 let endorsements_endorsing_power state endorsements =
   let get_endorsement_voting_power {slot; _} =
     match
-      SlotMap.find slot state.level_state.delegate_slots.all_delegate_slots
+      Delegate_slots.voting_power state.level_state.delegate_slots ~slot
     with
-    | None -> assert false
-    | Some {endorsing_power; _} -> endorsing_power
+    | None -> 0 (* cannot happen *)
+    | Some endorsing_power -> endorsing_power
   in
   List.sort_uniq compare endorsements
   |> List.fold_left
@@ -339,10 +339,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             is_acceptable_proposal_for_current_level state latest_proposal
             >>= function
             | Invalid | Outdated_proposal -> (
-                let slotmap =
-                  state.level_state.delegate_slots.own_delegate_slots
-                in
-                match State_transitions.round_proposer state slotmap round with
+                match round_proposer state ~level:`Current round with
                 | Some (delegate, _) ->
                     let*! action =
                       State_transitions.propose_block_action

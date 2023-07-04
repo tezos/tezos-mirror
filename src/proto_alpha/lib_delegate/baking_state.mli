@@ -94,11 +94,30 @@ module SlotMap : Map.S with type key = Slot.t
 
 type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
 
-type delegate_slots = {
-  own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
-  all_delegate_slots : endorsing_slot SlotMap.t;
-  all_slots_by_round : Slot.t array;
-}
+module Delegate_slots : sig
+  (** Information regarding the slot distribution at some level. *)
+  type t
+
+  (** Returns the list of our own delegates that have at least a slot. There are
+     no duplicates, the associated slot is the first one. *)
+  val own_delegates : t -> (consensus_key_and_delegate * endorsing_slot) list
+
+  (** Returns, among our *own* delegates, the delegate (together with its
+      first endorsing slot) that owns the given slot, if any (even if the
+      given slot is not the delegate's first slot). *)
+  val own_slot_owner :
+    t -> slot:Slot.t -> (consensus_key_and_delegate * endorsing_slot) option
+
+  (** Returns the voting power of the delegate whose first slot is the given
+      slot. Returns [None] if the slot is not the first slot of any delegate. *)
+  val voting_power : t -> slot:Slot.t -> int option
+
+  (** Returns the list of rounds up to [committee_size], in ascending order, for
+      which one of our *own* delegates is a proposer. *)
+  val all_proposer_rounds : t -> (int * Slot.t) list
+end
+
+type delegate_slots = Delegate_slots.t
 
 type proposal = {block : block_info; predecessor : block_info}
 
@@ -162,6 +181,15 @@ type state = {
 type t = state
 
 val update_current_phase : t -> phase -> t
+
+(** Returns, among our *own* delegates, the delegate (and its endorsing slot)
+    that has a proposer slot at the given round and the current or next level,
+    if any. *)
+val round_proposer :
+  state ->
+  level:[`Current | `Next] ->
+  Round.t ->
+  (consensus_key_and_delegate * endorsing_slot) option
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}

@@ -52,12 +52,6 @@ val extract_pqc :
 val handle_proposal :
   is_proposal_applied:bool -> state -> proposal -> (state * action) Lwt.t
 
-val round_proposer :
-  state ->
-  (consensus_key_and_delegate * endorsing_slot) SlotMap.t ->
-  Round.t ->
-  (consensus_key_and_delegate * endorsing_slot) option
-
 val propose_fresh_block_action :
   endorsements:Kind.attestation Operation.t list ->
   dal_attestations:Kind.dal_attestation Operation.t list ->

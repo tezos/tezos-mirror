@@ -69,8 +69,6 @@ let is_acceptable_proposal_for_current_level state
       Lwt.return Valid_proposal
 
 let make_consensus_list state proposal =
-  (* TODO efficiently iterate on the slot map instead of removing
-     duplicate endorsements *)
   let level =
     Raw_level.of_int32 state.level_state.current_level |> function
     | Ok l -> l
@@ -78,14 +76,11 @@ let make_consensus_list state proposal =
   in
   let round = proposal.block.round in
   let block_payload_hash = proposal.block.payload_hash in
-  SlotMap.fold
-    (fun _slot (consensus_key_and_delegate, slots) acc ->
+  List.map
+    (fun (consensus_key_and_delegate, endorsing_slot) ->
       ( consensus_key_and_delegate,
-        {slot = slots.first_slot; level; round; block_payload_hash} )
-      :: acc)
-    state.level_state.delegate_slots.own_delegate_slots
-    []
-  |> List.sort_uniq compare
+        {slot = endorsing_slot.first_slot; level; round; block_payload_hash} ))
+    (Delegate_slots.own_delegates state.level_state.delegate_slots)
 
 (* If we do not have any slots, we won't inject any operation but we
    will still participate to determine an elected block *)
@@ -155,12 +150,12 @@ let extract_pqc state (new_proposal : proposal) =
           op
         in
         match
-          SlotMap.find slot state.level_state.delegate_slots.all_delegate_slots
+          Delegate_slots.voting_power state.level_state.delegate_slots ~slot
         with
         | None ->
             (* cannot happen if the map is correctly populated *)
             acc
-        | Some {endorsing_power; _} -> acc + endorsing_power
+        | Some endorsing_power -> acc + endorsing_power
       in
       let voting_power =
         List.fold_left add_voting_power 0 pqc.preendorsements
@@ -413,22 +408,6 @@ let may_register_early_prequorum state ((candidate, _) as received_prequorum) =
     let new_state = {state with round_state = new_round_state} in
     do_nothing new_state
 
-(** In the association map [delegate_slots], the function returns an
-    optional pair ([delegate], [endorsing_slot]) if for the current
-    [round], the validator [delegate] has a endorsing slot. *)
-let round_proposer state delegate_slots round =
-  (* TODO: make sure that for each slots all rounds in the map are filled *)
-  (* !FIXME! Endorsers and proposer are differents sets *)
-  (* !FIXME! the slotmap may be inconsistent & may sure to document
-     the invariants *)
-  let round_mod =
-    Int32.to_int (Round.to_int32 round)
-    mod state.global_state.constants.parametric.consensus_committee_size
-  in
-  SlotMap.find
-    state.level_state.delegate_slots.all_slots_by_round.(round_mod)
-    delegate_slots
-
 (** Inject a fresh block proposal containing the current operations of the
     mempool in [state] and the additional [endorsements] and [dal_attestations]
     for [delegate] at round [round]. *)
@@ -606,10 +585,7 @@ let end_of_round state current_round =
   let new_state = {state with round_state = new_round_state} in
   (* we need to check if we need to bake for this round or not *)
   match
-    round_proposer
-      new_state
-      new_state.level_state.delegate_slots.own_delegate_slots
-      new_state.round_state.current_round
+    round_proposer new_state ~level:`Current new_state.round_state.current_round
   with
   | None ->
       Events.(
@@ -647,12 +623,7 @@ let time_to_bake_at_next_level state at_round =
   (* We need to keep track for which block we have 2f+1 *endorsements*, that is,
      which will become the new predecessor_block *)
   (* Invariant: endorsable_round >= round(elected block) >= locked_round *)
-  let round_proposer_opt =
-    round_proposer
-      state
-      state.level_state.next_level_delegate_slots.own_delegate_slots
-      at_round
-  in
+  let round_proposer_opt = round_proposer state ~level:`Next at_round in
   match (state.level_state.elected_block, round_proposer_opt) with
   | None, _ | _, None ->
       (* Unreachable: the [Time_to_bake_next_level] event can only be
