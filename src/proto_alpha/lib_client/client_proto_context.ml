@@ -491,14 +491,18 @@ let increase_paid_storage cctxt ~chain ~block ?force ?dry_run ?verbose_signing
 let save_contract ~force cctxt alias_name contract =
   let open Lwt_result_syntax in
   let* () = Raw_contract_alias.add ~force cctxt alias_name contract in
-  message_added_contract cctxt alias_name >>= fun () -> return_unit
+  let open Lwt_syntax in
+  let* () = message_added_contract cctxt alias_name in
+  Lwt_result_syntax.return_unit
 
 let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
     ~code ~delegate ~balance () =
   (* With the change of making implicit accounts delegatable, the following
      3 arguments are being defaulted before they can be safely removed. *)
-  Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
-  >>= fun result ->
+  let open Lwt_syntax in
+  let* result =
+    Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
+  in
   let open Lwt_result_syntax in
   let* {Michelson_v1_parser.expanded = storage; _} =
     Lwt.return (Micheline_parser.no_parsing_error result)
@@ -730,15 +734,18 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
             (chain, block)
             (Contract.Implicit (Ed25519 pkh))
         in
-        cctxt#message
-          "Account %s (%a) activated with %s%a."
-          alias
-          Signature.Ed25519.Public_key_hash.pp
-          pkh
-          Operation_result.tez_sym
-          Tez.pp
-          balance
-        >>= fun () -> return_unit
+        let open Lwt_syntax in
+        let* () =
+          cctxt#message
+            "Account %s (%a) activated with %s%a."
+            alias
+            Signature.Ed25519.Public_key_hash.pp
+            pkh
+            Operation_result.tez_sym
+            Tez.pp
+            balance
+        in
+        Lwt_result_syntax.return_unit
   in
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Activate_account _ as op), result) ->
@@ -915,13 +922,16 @@ let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
   match block_opt with
   | None -> return_none
   | Some (block, i, j) ->
-      cctxt#message
-        "Operation found in block: %a (pass: %d, offset: %d)"
-        Block_hash.pp
-        block
-        i
-        j
-      >>= fun () ->
+      let open Lwt_syntax in
+      let* () =
+        cctxt#message
+          "Operation found in block: %a (pass: %d, offset: %d)"
+          Block_hash.pp
+          block
+          i
+          j
+      in
+      let open Lwt_result_syntax in
       let* op' =
         Protocol_client_context.Alpha_block_services.Operations.operation
           cctxt
@@ -938,9 +948,12 @@ let display_receipt_for_operation (cctxt : #full) ~chain ?(predecessors = 10)
   let* operation_opt =
     get_operation_from_block cctxt ~chain predecessors operation_hash
   in
+  let open Lwt_syntax in
   match operation_opt with
   | None -> failwith "Couldn't find operation"
-  | Some op -> cctxt#message "%a" pp_operation op >>= fun () -> return_unit
+  | Some op ->
+      let* () = cctxt#message "%a" pp_operation op in
+      Lwt_result_syntax.return_unit
 
 let cached_contracts cctxt ~chain ~block =
   let cb = (chain, block) in

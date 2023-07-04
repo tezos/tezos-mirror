@@ -51,7 +51,10 @@ module Originated_contract_alias = struct
     | None -> failwith "no contract named %s" s
 
   let of_literal s =
-    Contract_entity.of_source s >>= function
+    let open Lwt_syntax in
+    let* contract_opt = Contract_entity.of_source s in
+    let open Lwt_result_syntax in
+    match contract_opt with
     | Ok (Contract.Originated v) -> return v
     | Ok (Implicit _) -> failwith "contract %s is an implicit account" s
     | Error _ as err -> Lwt.return err
@@ -61,7 +64,9 @@ module Originated_contract_alias = struct
     | ["alias"; alias] -> find cctxt alias
     | ["text"; text] -> of_literal text
     | _ -> (
-        of_literal s >>= function
+        let open Lwt_syntax in
+        let* contract_hash_opt = of_literal s in
+        match contract_hash_opt with
         | Ok _ as ok_v -> Lwt.return ok_v
         | Error k_errs -> (
             find cctxt s >|= function
@@ -153,11 +158,14 @@ module Contract_alias = struct
         return (Contract.Implicit v)
     | ["text"; text] -> Contract_entity.of_source text
     | _ -> (
-        Contract_entity.of_source s >>= function
-        | Ok v -> return v
+        let open Lwt_syntax in
+        let* contract_opt = Contract_entity.of_source s in
+        match contract_opt with
+        | Ok v -> Lwt_result_syntax.return v
         | Error c_errs -> (
-            find cctxt s >>= function
-            | Ok v -> return v
+            let* contract_opt = find cctxt s in
+            match contract_opt with
+            | Ok v -> Lwt_result_syntax.return v
             | Error k_errs -> Lwt.return_error (c_errs @ k_errs)))
 
   let destination_parameter () =

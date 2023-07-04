@@ -776,29 +776,32 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
   let open Lwt_result_syntax in
   let* () = contract_has_fa12_interface cctxt ~chain ~block ~contract () in
   let entrypoint, parameters = translate_action_to_argument action in
-  Client_proto_context.transfer_with_script
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?branch
-    ~source
-    ~src_pk
-    ~src_sk
-    ~destination:(Originated contract)
-    ~parameters
-    ~amount:tez_amount
-    ~entrypoint
-    ?fee
-    ?gas_limit
-    ?storage_limit
-    ?counter
-    ~fee_parameter
-    ?verbose_signing
-    ()
-  >>= function
-  | Ok res -> return res
+  let open Lwt_syntax in
+  let* result =
+    Client_proto_context.transfer_with_script
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ?dry_run
+      ?branch
+      ~source
+      ~src_pk
+      ~src_sk
+      ~destination:(Originated contract)
+      ~parameters
+      ~amount:tez_amount
+      ~entrypoint
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ?counter
+      ~fee_parameter
+      ?verbose_signing
+      ()
+  in
+  match result with
+  | Ok res -> Lwt_result_syntax.return res
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)
@@ -944,24 +947,27 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
   let (Manager_list contents) =
     Annotated_manager_operation.manager_of_list contents
   in
-  Injection.inject_manager_operation
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ?dry_run
-    ?verbose_signing
-    ~source
-    ~fee:(Limit.of_option default_fee)
-    ~gas_limit:(Limit.of_option default_gas_limit)
-    ~storage_limit:(Limit.of_option default_storage_limit)
-    ?counter
-    ~src_pk
-    ~src_sk
-    ~fee_parameter
-    contents
-  >>= function
-  | Ok _ -> return ()
+  let open Lwt_syntax in
+  let* result =
+    Injection.inject_manager_operation
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ?dry_run
+      ?verbose_signing
+      ~source
+      ~fee:(Limit.of_option default_fee)
+      ~gas_limit:(Limit.of_option default_gas_limit)
+      ~storage_limit:(Limit.of_option default_storage_limit)
+      ?counter
+      ~src_pk
+      ~src_sk
+      ~fee_parameter
+      contents
+  in
+  match result with
+  | Ok _ -> Lwt_result_syntax.return ()
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)

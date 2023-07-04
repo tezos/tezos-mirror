@@ -103,23 +103,26 @@ let check_fees :
     int ->
     unit Lwt.t =
  fun cctxt config op size ->
+  let open Lwt_syntax in
   match Contents_list op |> get_manager_operation_gas_and_fee with
   | Error _ -> assert false (* FIXME *)
   | Ok (fee, gas) ->
       if Tez.compare fee config.fee_cap > 0 then
-        cctxt#error
-          "The proposed fee (%s%a) are higher than the configured fee cap \
-           (%s%a).@\n\
-          \ Use `--fee-cap %a` to emit this operation anyway."
-          Operation_result.tez_sym
-          Tez.pp
-          fee
-          Operation_result.tez_sym
-          Tez.pp
-          config.fee_cap
-          Tez.pp
-          fee
-        >>= fun () -> exit 1
+        let* () =
+          cctxt#error
+            "The proposed fee (%s%a) are higher than the configured fee cap \
+             (%s%a).@\n\
+            \ Use `--fee-cap %a` to emit this operation anyway."
+            Operation_result.tez_sym
+            Tez.pp
+            fee
+            Operation_result.tez_sym
+            Tez.pp
+            config.fee_cap
+            Tez.pp
+            fee
+        in
+        exit 1
       else
         let fees_in_nanotez =
           Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
@@ -154,17 +157,19 @@ let check_fees :
           (not config.force_low_fee)
           && Q.compare fees_in_nanotez estimated_fees_in_nanotez < 0
         then
-          cctxt#error
-            "The proposed fee (%s%a) are lower than the fee that baker expect \
-             by default (%s%a).@\n\
-            \ Use `--force-low-fee` to emit this operation anyway."
-            Operation_result.tez_sym
-            Tez.pp
-            fee
-            Operation_result.tez_sym
-            Tez.pp
-            estimated_fees
-          >>= fun () -> exit 1
+          let* () =
+            cctxt#error
+              "The proposed fee (%s%a) are lower than the fee that baker \
+               expect by default (%s%a).@\n\
+              \ Use `--force-low-fee` to emit this operation anyway."
+              Operation_result.tez_sym
+              Tez.pp
+              fee
+              Operation_result.tez_sym
+              Tez.pp
+              estimated_fees
+          in
+          exit 1
         else Lwt.return_unit
 
 let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
@@ -246,12 +251,15 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
           (* TODO-TB sign endorsement? *)
           | _ -> Signature.Generic_operation
         in
-        (if verbose_signing then
-         cctxt#message
-           "Pre-signature information (verbose signing):@.%t%!"
-           (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
-        else Lwt.return_unit)
-        >>= fun () ->
+        let open Lwt_syntax in
+        let* () =
+          if verbose_signing then
+            cctxt#message
+              "Pre-signature information (verbose signing):@.%t%!"
+              (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
+          else Lwt.return_unit
+        in
+        let open Lwt_result_syntax in
         let* signature = Client_keys.sign cctxt ~watermark src_sk bytes in
         return_some signature
   in
@@ -267,10 +275,13 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
       Operation.encoding_with_legacy_attestation_name
       packed_op
   in
-  (match fee_parameter with
-  | Some fee_parameter -> check_fees cctxt fee_parameter contents size
-  | None -> Lwt.return_unit)
-  >>= fun () ->
+  let open Lwt_syntax in
+  let* () =
+    match fee_parameter with
+    | Some fee_parameter -> check_fees cctxt fee_parameter contents size
+    | None -> Lwt.return_unit
+  in
+  let open Lwt_result_syntax in
   let* operations_opt =
     Protocol_client_context.Alpha_block_services.Helpers.Preapply.operations
       cctxt
@@ -816,7 +827,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | (Manager_info c as op), (Manager_operation_result _ as result) ->
         let* op =
           if user_gas_limit_needs_patching c.gas_limit then
-            Lwt.return (estimated_gas_single result) >>= fun gas ->
+            let open Lwt_syntax in
+            let* gas = Lwt.return (estimated_gas_single result) in
             match gas with
             | Error _ when force ->
                 (* When doing a simulation, set gas to the maximum possible value
@@ -827,15 +839,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                   if simulation then gas_limit_per_patched_op
                   else Gas.Arith.zero
                 in
-                return
+                Lwt_result_syntax.return
                   (Annotated_manager_operation.set_gas_limit
                      (Limit.known gas)
                      op)
             | Error _ as res -> Lwt.return res
             | Ok gas ->
                 if Gas.Arith.(gas = zero) then
-                  cctxt#message "Estimated gas: none" >>= fun () ->
-                  return
+                  let open Lwt_syntax in
+                  let* () = cctxt#message "Estimated gas: none" in
+                  Lwt_result_syntax.return
                     (Annotated_manager_operation.set_gas_limit
                        (Limit.known Gas.Arith.zero)
                        op)
@@ -847,18 +860,20 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                         Gas.Arith.zero
                     | _ -> safety_guard
                   in
-                  cctxt#message
-                    "Estimated gas: %a units (will add %a for safety)"
-                    Gas.Arith.pp
-                    gas
-                    Gas.Arith.pp
-                    safety_guard
-                  >>= fun () ->
+                  let open Lwt_syntax in
+                  let* () =
+                    cctxt#message
+                      "Estimated gas: %a units (will add %a for safety)"
+                      Gas.Arith.pp
+                      gas
+                      Gas.Arith.pp
+                      safety_guard
+                  in
                   let safe_gas = Gas.Arith.(add (ceil gas) safety_guard) in
                   let patched_gas =
                     Gas.Arith.min safe_gas hard_gas_limit_per_operation
                   in
-                  return
+                  Lwt_result_syntax.return
                     (Annotated_manager_operation.set_gas_limit
                        (Limit.known patched_gas)
                        op)
@@ -874,22 +889,25 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                    result)
             in
             if Z.equal storage Z.zero then
-              cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-              return
+              let open Lwt_syntax in
+              let* () = cctxt#message "Estimated storage: no bytes added" in
+              Lwt_result_syntax.return
                 (Annotated_manager_operation.set_storage_limit
                    (Limit.known Z.zero)
                    op)
             else
-              cctxt#message
-                "Estimated storage: %s bytes added (will add 20 for safety)"
-                (Z.to_string storage)
-              >>= fun () ->
+              let open Lwt_syntax in
+              let* () =
+                cctxt#message
+                  "Estimated storage: %s bytes added (will add 20 for safety)"
+                  (Z.to_string storage)
+              in
               let storage_limit =
                 Z.min
                   (Z.add storage (Z.of_int 20))
                   hard_storage_limit_per_operation
               in
-              return
+              Lwt_result_syntax.return
                 (Annotated_manager_operation.set_storage_limit
                    (Limit.known storage_limit)
                    op)
@@ -941,11 +959,14 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         match detect_script_failure result with
         | Ok () -> return_unit
         | Error _ ->
-            cctxt#message
-              "@[<v 2>This simulation failed:@,%a@]"
-              Operation_result.pp_operation_result
-              (contents_for_simulation, result.contents)
-            >>= fun () -> return_unit
+            let open Lwt_syntax in
+            let* () =
+              cctxt#message
+                "@[<v 2>This simulation failed:@,%a@]"
+                Operation_result.pp_operation_result
+                (contents_for_simulation, result.contents)
+            in
+            Lwt_result_syntax.return_unit
       in
       let* () =
         let* storage =
@@ -961,19 +982,22 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                Tez.(cost_per_byte *? Z.to_int64 storage))
         in
         if Tez.(burn > fee_parameter.burn_cap) then
-          cctxt#error
-            "The operation will burn %s%a which is higher than the configured \
-             burn cap (%s%a).@\n\
-            \ Use `--burn-cap %a` to emit this operation."
-            Operation_result.tez_sym
-            Tez.pp
-            burn
-            Operation_result.tez_sym
-            Tez.pp
-            fee_parameter.burn_cap
-            Tez.pp
-            burn
-          >>= fun () -> exit 1
+          let open Lwt_syntax in
+          let* () =
+            cctxt#error
+              "The operation will burn %s%a which is higher than the \
+               configured burn cap (%s%a).@\n\
+              \ Use `--burn-cap %a` to emit this operation."
+              Operation_result.tez_sym
+              Tez.pp
+              burn
+              Operation_result.tez_sym
+              Tez.pp
+              fee_parameter.burn_cap
+              Tez.pp
+              burn
+          in
+          exit 1
         else return_unit
       in
       patch_list true annotated_contents result.contents
@@ -988,13 +1012,16 @@ let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
   | None -> Lwt.return_none
   | Some cli_confirmations ->
       if cli_confirmations > tenderbake_finality_confirmations then
-        cctxt#message
-          "Tenderbake needs at most %d confirmations for finality (%d given). \
-           Using %d confirmations."
-          tenderbake_finality_confirmations
-          cli_confirmations
-          tenderbake_finality_confirmations
-        >>= fun () -> Lwt.return_some tenderbake_finality_confirmations
+        let open Lwt_syntax in
+        let* () =
+          cctxt#message
+            "Tenderbake needs at most %d confirmations for finality (%d \
+             given). Using %d confirmations."
+            tenderbake_finality_confirmations
+            cli_confirmations
+            tenderbake_finality_confirmations
+        in
+        Lwt.return_some tenderbake_finality_confirmations
       else Lwt.return_some cli_confirmations
 
 (* For Tenderbake we restrain the interval of confirmations to be [0,
@@ -1026,12 +1053,15 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     match detect_script_failure result with
     | Ok () -> return_unit
     | Error _ as res ->
-        cctxt#message
-          "@[<v 2>This simulation failed (force = %b):@,%a@]"
-          force
-          Operation_result.pp_operation_result
-          (op.protocol_data.contents, result.contents)
-        >>= fun () -> if force then return_unit else Lwt.return res
+        let open Lwt_syntax in
+        let* () =
+          cctxt#message
+            "@[<v 2>This simulation failed (force = %b):@,%a@]"
+            force
+            Operation_result.pp_operation_result
+            (op.protocol_data.contents, result.contents)
+        in
+        if force then Lwt_result_syntax.return_unit else Lwt.return res
   in
   let bytes =
     Data_encoding.Binary.to_bytes_exn
@@ -1039,44 +1069,56 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       (Operation.pack op)
   in
   if dry_run || simulation then
+    let open Lwt_syntax in
     let oph = Operation_hash.hash_bytes [bytes] in
-    cctxt#message
-      "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
-      Hex.pp
-      (Hex.of_bytes bytes)
-      Operation_hash.pp
-      oph
-    >>= fun () ->
-    cctxt#message
-      "@[<v 2>Simulation result:@,%a@]"
-      Operation_result.pp_operation_result
-      (op.protocol_data.contents, result.contents)
-    >>= fun () -> return (oph, op, result.contents)
+    let* () =
+      cctxt#message
+        "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
+        Hex.pp
+        (Hex.of_bytes bytes)
+        Operation_hash.pp
+        oph
+    in
+    let* () =
+      cctxt#message
+        "@[<v 2>Simulation result:@,%a@]"
+        Operation_result.pp_operation_result
+        (op.protocol_data.contents, result.contents)
+    in
+    Lwt_result_syntax.return (oph, op, result.contents)
   else
     let* oph = Shell_services.Injection.operation cctxt ~chain bytes in
-    cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
+    let open Lwt_syntax in
+    let* () = cctxt#message "Operation successfully injected in the node." in
+    let* () = cctxt#message "Operation hash is '%a'" Operation_hash.pp oph in
     (* Adjust user-provided confirmations with respect to Alpha protocol finality properties *)
-    tenderbake_adjust_confirmations cctxt confirmations >>= fun confirmations ->
+    let* confirmations = tenderbake_adjust_confirmations cctxt confirmations in
+    let open Lwt_result_syntax in
     let* result =
       match confirmations with
       | None ->
-          cctxt#message
-            "@[<v 0>NOT waiting for the operation to be included.@,\
-             Use command@,\
-            \  octez-client wait for %a to be included --confirmations %d \
-             --branch %a@,\
-             and/or an external block explorer to make sure that it has been \
-             included.@]"
-            Operation_hash.pp
-            oph
-            tenderbake_finality_confirmations
-            Block_hash.pp
-            op.shell.branch
-          >>= fun () -> return result
+          let open Lwt_syntax in
+          let* () =
+            cctxt#message
+              "@[<v 0>NOT waiting for the operation to be included.@,\
+               Use command@,\
+              \  octez-client wait for %a to be included --confirmations %d \
+               --branch %a@,\
+               and/or an external block explorer to make sure that it has been \
+               included.@]"
+              Operation_hash.pp
+              oph
+              tenderbake_finality_confirmations
+              Block_hash.pp
+              op.shell.branch
+          in
+          Lwt_result_syntax.return result
       | Some confirmations -> (
-          cctxt#message "Waiting for the operation to be included..."
-          >>= fun () ->
+          let open Lwt_syntax in
+          let* () =
+            cctxt#message "Waiting for the operation to be included..."
+          in
+          let open Lwt_result_syntax in
           let* h, i, j =
             Client_confirmations.wait_for_operation_inclusion
               ~branch:op.shell.branch
@@ -1097,48 +1139,59 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
           | Empty -> failwith "Internal error: pruned metadata."
           | Too_large -> failwith "Internal error: too large metadata."
           | Receipt No_operation_metadata ->
-              cctxt#message
-                "The operation metadata was not stored because it was too big, \
-                 thus the failure to display the receipt."
-              >>= fun () -> failwith "Internal error: unexpected receipt."
+              let open Lwt_syntax in
+              let* () =
+                cctxt#message
+                  "The operation metadata was not stored because it was too \
+                   big, thus the failure to display the receipt."
+              in
+              failwith "Internal error: unexpected receipt."
           | Receipt (Operation_metadata receipt) -> (
               match Apply_results.kind_equal_list contents receipt.contents with
               | Some Apply_results.Eq ->
                   return (receipt : kind operation_metadata)
               | None -> failwith "Internal error: unexpected receipt."))
     in
-    cctxt#message
-      "@[<v 2>This sequence of operations was run:@,%a@]"
-      Operation_result.pp_operation_result
-      (op.protocol_data.contents, result.contents)
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      cctxt#message
+        "@[<v 2>This sequence of operations was run:@,%a@]"
+        Operation_result.pp_operation_result
+        (op.protocol_data.contents, result.contents)
+    in
+    let open Lwt_result_syntax in
     let* contracts = Lwt.return (originated_contracts result.contents ~force) in
-    List.iter_s
-      (fun c -> cctxt#message "New contract %a originated." Contract_hash.pp c)
-      contracts
-    >>= fun () ->
-    (match confirmations with
-    | None -> Lwt.return_unit
-    | Some number ->
-        if number >= tenderbake_finality_confirmations then
-          cctxt#message
-            "The operation was included in a block %d blocks ago."
-            number
-        else
-          cctxt#message
-            "@[<v 0>The operation has only been included %d blocks ago.@,\
-             We recommend to wait more.@,\
-             Use command@,\
-            \  octez-client wait for %a to be included --confirmations %d \
-             --branch %a@,\
-             and/or an external block explorer.@]"
-            number
-            Operation_hash.pp
-            oph
-            tenderbake_finality_confirmations
-            Block_hash.pp
-            op.shell.branch)
-    >>= fun () -> return (oph, op, result.contents)
+    let open Lwt_syntax in
+    let* () =
+      List.iter_s
+        (fun c ->
+          cctxt#message "New contract %a originated." Contract_hash.pp c)
+        contracts
+    in
+    let* () =
+      match confirmations with
+      | None -> Lwt.return_unit
+      | Some number ->
+          if number >= tenderbake_finality_confirmations then
+            cctxt#message
+              "The operation was included in a block %d blocks ago."
+              number
+          else
+            cctxt#message
+              "@[<v 0>The operation has only been included %d blocks ago.@,\
+               We recommend to wait more.@,\
+               Use command@,\
+              \  octez-client wait for %a to be included --confirmations %d \
+               --branch %a@,\
+               and/or an external block explorer.@]"
+              number
+              Operation_hash.pp
+              oph
+              tenderbake_finality_confirmations
+              Block_hash.pp
+              op.shell.branch
+    in
+    Lwt_result_syntax.return (oph, op, result.contents)
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
@@ -1184,13 +1237,19 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2273
      Be able to get pending/validated operation of an implicit account.
   *)
-  Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>= function
+  let open Lwt_syntax in
+  let* ops_opt =
+    Alpha_block_services.Mempool.pending_operations cctxt ~chain ()
+  in
+  match ops_opt with
   | Error e ->
-      cctxt#error
-        "Error while fetching pending operations: %a@."
-        Error_monad.pp_print_trace
-        e
-      >>= fun () -> exit 1
+      let* () =
+        cctxt#error
+          "Error while fetching pending operations: %a@."
+          Error_monad.pp_print_trace
+          e
+      in
+      exit 1
   | Ok ops ->
       Lwt.return
       @@ List.fold_left
@@ -1233,14 +1292,17 @@ let compute_replacement_fees =
        Get the factor 1.05% from the plugin via an RPC *)
     let repl_q_fee = Q.mul max_fee (Q.make (Z.of_int 105) (Z.of_int 100)) in
     let repl_z_fee = Z.cdiv (Q.num repl_q_fee) (Q.den repl_q_fee) in
+    let open Lwt_syntax in
     try
       match Z.to_int64 repl_z_fee |> Tez.of_mutez with
       | Some replacement_fee -> Lwt.return replacement_fee
       | None ->
-          cctxt#error "Tez underflow while computing replacement fee@."
-          >>= fun () -> exit 1
+          let* () =
+            cctxt#error "Tez underflow while computing replacement fee@."
+          in
+          exit 1
     with Z.Overflow ->
-      cctxt#error "Tez overflow while computing replacement fee@." >>= fun () ->
+      let* () = cctxt#error "Tez overflow while computing replacement fee@." in
       exit 1
 
 (* Given an operation to inject whose gas and fee are set, and the amount
@@ -1249,15 +1311,20 @@ let compute_replacement_fees =
    operation's fee" and adds it to the operation. *)
 let bump_manager_op_fee =
   (* Internal function to bump the fee of a manager operation by a delta *)
-  let bump_manager (cctxt : #full) delta = function
+  let bump_manager (cctxt : #full) delta =
+    let open Lwt_syntax in
+    function
     | Manager_operation
         {source; fee; counter; operation; gas_limit; storage_limit} ->
-        (match Tez.( +? ) fee delta with
-        | Error _ ->
-            cctxt#error "Tez overflow while computing replacement fee@."
-            >>= fun () -> exit 1
-        | Ok new_fee -> Lwt.return new_fee)
-        >>= fun fee ->
+        let* fee =
+          match Tez.( +? ) fee delta with
+          | Error _ ->
+              let* () =
+                cctxt#error "Tez overflow while computing replacement fee@."
+              in
+              exit 1
+          | Ok new_fee -> Lwt.return new_fee
+        in
         Lwt.return
         @@ Manager_operation
              {source; fee; counter; operation; gas_limit; storage_limit}
@@ -1280,25 +1347,29 @@ let bump_manager_op_fee =
              command-line that are equal to the replacement threshold *)
           Lwt.return_ok contents
         else if Limit.is_unknown user_fee then
+          let open Lwt_syntax in
           match contents with
           | Single (Manager_operation _ as op) ->
               (* We add the delta to the op in case it's a Single *)
-              bump_manager (cctxt : #full) delta op >>= fun op ->
+              let* op = bump_manager (cctxt : #full) delta op in
               Lwt.return_ok @@ Single op
           | Cons ((Manager_operation _ as op), rest) ->
               (* We add the delta to the first op in case it's a batch *)
-              bump_manager (cctxt : #full) delta op >>= fun op ->
+              let* op = bump_manager (cctxt : #full) delta op in
               Lwt.return_ok @@ Cons (op, rest)
         else
-          cctxt#error
-            "The fee provided by the user is lower than the expected \
-             replacement fee. Threshold is %a but got %a.@."
-            Tez.pp
-            replacement_fee
-            Tez.pp
-            new_fee
-          (* New fee in this case correspond to provided user fee *)
-          >>= fun () -> exit 1
+          let open Lwt_syntax in
+          let* () =
+            cctxt#error
+              "The fee provided by the user is lower than the expected \
+               replacement fee. Threshold is %a but got %a.@."
+              Tez.pp
+              replacement_fee
+              Tez.pp
+              new_fee
+            (* New fee in this case correspond to provided user fee *)
+          in
+          exit 1
 
 (* Bump the fee of the given operation whose fee have been computed by
    simulation, to be able to replace an existing applied operation in the
@@ -1306,40 +1377,52 @@ let bump_manager_op_fee =
 let replace_operation (type kind) (cctxt : #full) chain source
     (contents : kind Kind.manager contents_list) ~user_fee :
     kind Kind.manager contents_list tzresult Lwt.t =
+  let open Lwt_syntax in
   let exit_err ~is_new_op e =
-    cctxt#error
-      "Unexpected error while getting gas and fees of user's %s operation.@.\n\
-       Error: %a@."
-      (if is_new_op then "new" else "old")
-      Error_monad.pp_print_trace
-      (Environment.wrap_tztrace e)
-    >>= fun () -> exit 1
+    let* () =
+      cctxt#error
+        "Unexpected error while getting gas and fees of user's %s operation.@.\n\
+         Error: %a@."
+        (if is_new_op then "new" else "old")
+        Error_monad.pp_print_trace
+        (Environment.wrap_tztrace e)
+    in
+    exit 1
   in
   match Contents_list contents |> get_manager_operation_gas_and_fee with
   | Error e -> exit_err ~is_new_op:true e
   | Ok (new_op_fee, new_op_gas) -> (
-      pending_applied_operations_of_source cctxt chain source >>= function
+      let* contents_list =
+        pending_applied_operations_of_source cctxt chain source
+      in
+      match contents_list with
       | [] ->
-          cctxt#error
-            "Cannot replace! No validated manager operation found for %a in \
-             mempool@."
-            Signature.Public_key_hash.pp
-            source
-          >>= fun () -> exit 1
+          let* () =
+            cctxt#error
+              "Cannot replace! No validated manager operation found for %a in \
+               mempool@."
+              Signature.Public_key_hash.pp
+              source
+          in
+          exit 1
       | _ :: _ :: _ as l ->
-          cctxt#error
-            "More than one validated manager operation found for %a in \
-             mempool. Found %d operations.@."
-            Signature.Public_key_hash.pp
-            source
-            (List.length l)
-          >>= fun () -> exit 1
+          let* () =
+            cctxt#error
+              "More than one validated manager operation found for %a in \
+               mempool. Found %d operations.@."
+              Signature.Public_key_hash.pp
+              source
+              (List.length l)
+          in
+          exit 1
       | [old_contents] -> (
           get_manager_operation_gas_and_fee old_contents |> function
           | Error e -> exit_err ~is_new_op:false e
           | Ok (old_op_fee, old_op_gas) ->
-              compute_replacement_fees cctxt old_op_fee old_op_gas new_op_gas
-              >>= bump_manager_op_fee cctxt contents new_op_fee ~user_fee))
+              let* delta =
+                compute_replacement_fees cctxt old_op_fee old_op_gas new_op_gas
+              in
+              bump_manager_op_fee cctxt contents new_op_fee ~user_fee delta))
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2276
    https://gitlab.com/tezos/tezos/-/issues/2276 *)

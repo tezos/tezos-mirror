@@ -76,13 +76,15 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       (key : Tezos_protocol_environment.Proxy_context.M.key) =
     let chain = pgi.chain in
     let block = pgi.block in
+    let open Lwt_syntax in
+    let* () =
+      Tezos_proxy.Logger.emit
+        Tezos_proxy.Logger.proxy_block_rpc
+        ( Tezos_shell_services.Block_services.chain_to_string chain,
+          Tezos_shell_services.Block_services.to_string block,
+          key )
+    in
     let open Lwt_result_syntax in
-    Tezos_proxy.Logger.emit
-      Tezos_proxy.Logger.proxy_block_rpc
-      ( Tezos_shell_services.Block_services.chain_to_string chain,
-        Tezos_shell_services.Block_services.to_string block,
-        key )
-    >>= fun () ->
     let* (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context) =
       Protocol_client_context.Alpha_block_services.Context.read
         pgi.rpc_context
@@ -90,9 +92,12 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
         ~block
         key
     in
-    Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
-    @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
-    >>= fun () -> return raw_context
+    let open Lwt_syntax in
+    let* () =
+      Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
+      @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
+    in
+    Lwt_result_syntax.return raw_context
 end
 
 let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)

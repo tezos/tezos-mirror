@@ -122,33 +122,36 @@ module Parsed_account = struct
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
     let* all_keys = Client_keys.list_keys wallet in
-    List.iter_s
-      (function
-        | name, pkh, _pk_opt, Some sk_uri -> (
-            let contract = Contract.Implicit pkh in
-            Client_proto_context.get_balance
-              rpc_context
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              contract
-            >>= fun tz_balance ->
-            match tz_balance with
-            | Ok balance -> (
-                let tez_repr = Tez.of_mutez @@ Tez.to_mutez balance in
-                match tez_repr with
-                | None ->
-                    (* we're reading the wallet, it's content MUST be valid *)
-                    assert false
-                | Some amount ->
-                    parsed_account_reprs :=
-                      {name; sk_uri; amount} :: !parsed_account_reprs ;
-                    Lwt.return_unit)
-            | Error err ->
-                errors := err :: !errors ;
-                Lwt.return_unit)
-        | _ -> Lwt.return_unit)
-      all_keys
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      List.iter_s
+        (function
+          | name, pkh, _pk_opt, Some sk_uri -> (
+              let contract = Contract.Implicit pkh in
+              let* tz_balance =
+                Client_proto_context.get_balance
+                  rpc_context
+                  ~chain:cctxt#chain
+                  ~block:cctxt#block
+                  contract
+              in
+              match tz_balance with
+              | Ok balance -> (
+                  let tez_repr = Tez.of_mutez @@ Tez.to_mutez balance in
+                  match tez_repr with
+                  | None ->
+                      (* we're reading the wallet, it's content MUST be valid *)
+                      assert false
+                  | Some amount ->
+                      parsed_account_reprs :=
+                        {name; sk_uri; amount} :: !parsed_account_reprs ;
+                      Lwt.return_unit)
+              | Error err ->
+                  errors := err :: !errors ;
+                  Lwt.return_unit)
+          | _ -> Lwt.return_unit)
+        all_keys
+    in
     match !errors with
     | [] ->
         let json =
@@ -156,7 +159,7 @@ module Parsed_account = struct
             (Data_encoding.list encoding)
             !parsed_account_reprs
         in
-        return @@ Data_encoding.Json.to_string json
+        Lwt_result_syntax.return @@ Data_encoding.Json.to_string json
     | errs -> Lwt.return_error @@ List.concat errs
 end
 
@@ -296,7 +299,6 @@ let attestation_branch_data_encoding =
 let initial_context chain_id (header : Block_header.shell_header)
     ({bootstrap_accounts; bootstrap_contracts; constants; _} :
       Protocol_parameters.t) =
-  let open Lwt_result_syntax in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -308,12 +310,15 @@ let initial_context chain_id (header : Block_header.shell_header)
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  Tezos_protocol_environment.Context.(
-    let empty = Tezos_protocol_environment.Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
-    add ctxt ["protocol_parameters"] proto_params)
-  >>= fun ctxt ->
-  Environment.Updater.activate ctxt Protocol.hash >>= fun ctxt ->
+  let open Lwt_syntax in
+  let* ctxt =
+    Tezos_protocol_environment.Context.(
+      let empty = Tezos_protocol_environment.Memory_context.empty in
+      let* ctxt = add empty ["version"] (Bytes.of_string "genesis") in
+      add ctxt ["protocol_parameters"] proto_params)
+  in
+  let* ctxt = Environment.Updater.activate ctxt Protocol.hash in
+  let open Lwt_result_syntax in
   let* {context; _} =
     Protocol.Main.init chain_id ctxt header >|= Environment.wrap_tzresult
   in
@@ -431,13 +436,16 @@ let mem_init :
         let field_pp ppf (name, value) =
           Format.fprintf ppf "@[<h>%s: %a@]" name Data_encoding.Json.pp value
         in
-        (if fields_with_override <> [] then
-         cctxt#message
-           "@[<v>mockup client uses protocol overrides:@,%a@]@?"
-           (Format.pp_print_list field_pp)
-           fields_with_override
-        else Lwt.return_unit)
-        >>= fun () -> return protocol_overrides
+        let open Lwt_syntax in
+        let* () =
+          if fields_with_override <> [] then
+            cctxt#message
+              "@[<v>mockup client uses protocol overrides:@,%a@]@?"
+              (Format.pp_print_list field_pp)
+              fields_with_override
+          else Lwt.return_unit
+        in
+        Lwt_result_syntax.return protocol_overrides
     | None ->
         return
           Protocol_constants_overrides.
@@ -456,10 +464,15 @@ let mem_init :
   in
   let default = parameters.initial_timestamp in
   let timestamp = Option.value ~default protocol_overrides.timestamp in
-  (if not @@ Time.Protocol.equal default timestamp then
-   cctxt#message "@[<h>initial_timestamp: %a@]" Time.Protocol.pp_hum timestamp
-  else Lwt.return_unit)
-  >>= fun () ->
+  let open Lwt_syntax in
+  let* () =
+    if not @@ Time.Protocol.equal default timestamp then
+      cctxt#message
+        "@[<h>initial_timestamp: %a@]"
+        Time.Protocol.pp_hum
+        timestamp
+    else Lwt.return_unit
+  in
   let fitness =
     Protocol.Alpha_context.(
       Fitness.create_without_locked_round
@@ -476,6 +489,7 @@ let mem_init :
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
+  let open Lwt_result_syntax in
   let* bootstrap_accounts_custom =
     match bootstrap_accounts_json with
     | None -> return None
@@ -486,16 +500,21 @@ let mem_init :
             json
         with
         | accounts ->
-            cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
-            >>= fun () ->
+            let open Lwt_syntax in
+            let* () =
+              cctxt#message
+                "@[<h>mockup client uses custom bootstrap accounts:@]"
+            in
             let open Format in
-            cctxt#message
-              "@[%a@]"
-              (pp_print_list
-                 ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-                 Parsed_account.pp)
-              accounts
-            >>= fun () ->
+            let* () =
+              cctxt#message
+                "@[%a@]"
+                (pp_print_list
+                   ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+                   Parsed_account.pp)
+                accounts
+            in
+            let open Lwt_result_syntax in
             let* bootstrap_accounts =
               List.map_es Parsed_account.to_bootstrap_account accounts
             in
@@ -577,8 +596,9 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
+  let open Lwt_syntax in
+  let* context = Environment.Updater.activate context Protocol.hash in
   let open Lwt_result_syntax in
-  Environment.Updater.activate context Protocol.hash >>= fun context ->
   let* {context; _} =
     Protocol.Main.init chain context block_header >|= Environment.wrap_tzresult
   in
