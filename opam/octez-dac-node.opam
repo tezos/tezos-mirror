@@ -21,6 +21,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-stdlib-unix"
   "tezos-stdlib"
+  "tezos-dac-lib"
   "tezos-dac-node-lib"
   "tezos-layer2-store"
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
