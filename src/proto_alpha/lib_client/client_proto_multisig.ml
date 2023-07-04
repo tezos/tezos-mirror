@@ -622,29 +622,37 @@ type multisig_action =
   | Lambda of Script.expr
   | Change_keys of Z.t * public_key list
 
-let action_to_expr_generic ~loc = function
+let action_to_expr_generic ~loc =
+  let open Result_syntax in
+  function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} -> (
       match destination with
       | Implicit destination ->
-          lambda_from_string
-          @@ Managed_contract.build_lambda_for_transfer_to_implicit
-               ~destination
-               ~amount
-          >|? left ~loc
+          let+ a =
+            lambda_from_string
+            @@ Managed_contract.build_lambda_for_transfer_to_implicit
+                 ~destination
+                 ~amount
+          in
+          left ~loc a
       | Originated destination ->
-          lambda_from_string
-          @@ Managed_contract.build_lambda_for_transfer_to_originated
-               ~destination
-               ~entrypoint
-               ~parameter_type
-               ~parameter
-               ~amount
-          >|? left ~loc)
+          let+ a =
+            lambda_from_string
+            @@ Managed_contract.build_lambda_for_transfer_to_originated
+                 ~destination
+                 ~entrypoint
+                 ~parameter_type
+                 ~parameter
+                 ~amount
+          in
+          left ~loc a)
   | Lambda code -> ok Tezos_micheline.Micheline.(left ~loc (root code))
   | Change_delegate delegate ->
-      lambda_from_string
-      @@ Managed_contract.build_lambda_for_set_delegate ~delegate
-      >|? left ~loc
+      let+ a =
+        lambda_from_string
+        @@ Managed_contract.build_lambda_for_set_delegate ~delegate
+      in
+      left ~loc a
   | Change_keys (threshold, keys) ->
       let optimized_keys = seq ~loc (List.map (optimized_key ~loc) keys) in
       let expr = right ~loc (pair ~loc (int ~loc threshold) optimized_keys) in

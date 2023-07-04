@@ -651,7 +651,9 @@ let expand_asserts original =
           @@ Some
                (Seq (loc, [remaining_prim; Prim (loc, "IF", fail_false loc, [])]))
       | _ -> (
-          expand_compare remaining_prim >|? function
+          let open Result_syntax in
+          let+ seq_opt = expand_compare remaining_prim in
+          match seq_opt with
           | None -> None
           | Some seq ->
               Some (Seq (loc, [seq; Prim (loc, "IF", fail_false loc, [])]))))

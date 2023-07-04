@@ -540,7 +540,9 @@ let originated_contracts_single (type kind)
 let rec originated_contracts : type kind. kind contents_result_list -> _ =
   function
   | Single_result (Manager_operation_result _ as res) ->
-      originated_contracts_single res >|? List.rev
+      let open Result_syntax in
+      let+ l = originated_contracts_single res in
+      List.rev l
   | Single_result _ -> Ok []
   | Cons_result (res, rest) ->
       originated_contracts_single res >>? fun contracts1 ->
@@ -1485,13 +1487,15 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       Manager_counter.t ->
       kind Annotated_manager_operation.annotated_list ->
       kind Annotated_manager_operation.annotated_list tzresult =
-   fun counter -> function
+   fun counter ->
+    let open Result_syntax in
+    function
     | Single_manager op ->
-        apply_specified_options counter op >|? fun op ->
+        let+ op = apply_specified_options counter op in
         Annotated_manager_operation.Single_manager op
     | Cons_manager (op, rest) ->
         apply_specified_options counter op >>? fun op ->
-        build_contents (Manager_counter.succ counter) rest >|? fun rest ->
+        let+ rest = build_contents (Manager_counter.succ counter) rest in
         Annotated_manager_operation.Cons_manager (op, rest)
   in
   match key with

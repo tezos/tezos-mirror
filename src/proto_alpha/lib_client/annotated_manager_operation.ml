@@ -63,21 +63,28 @@ let rec manager_of_list = function
 
 let join_fee fee operation =
   let (Manager_info c) = operation in
-  Limit.join ~where:__LOC__ Tez.equal fee c.fee >|? fun fee ->
+  let open Result_syntax in
+  let+ fee = Limit.join ~where:__LOC__ Tez.equal fee c.fee in
   Manager_info {c with fee}
 
 let set_fee fee (Manager_info c) = Manager_info {c with fee}
 
 let join_gas_limit gas_limit operation =
   let (Manager_info c) = operation in
-  Limit.join ~where:__LOC__ Gas.Arith.equal gas_limit c.gas_limit
-  >|? fun gas_limit -> Manager_info {c with gas_limit}
+  let open Result_syntax in
+  let+ gas_limit =
+    Limit.join ~where:__LOC__ Gas.Arith.equal gas_limit c.gas_limit
+  in
+  Manager_info {c with gas_limit}
 
 let set_gas_limit gas_limit (Manager_info c) = Manager_info {c with gas_limit}
 
 let join_storage_limit storage_limit (Manager_info c) =
-  Limit.join ~where:__LOC__ Z.equal storage_limit c.storage_limit
-  >|? fun storage_limit -> Manager_info {c with storage_limit}
+  let open Result_syntax in
+  let+ storage_limit =
+    Limit.join ~where:__LOC__ Z.equal storage_limit c.storage_limit
+  in
+  Manager_info {c with storage_limit}
 
 let set_storage_limit storage_limit (Manager_info c) =
   Manager_info {c with storage_limit}
@@ -97,6 +104,7 @@ let manager_from_annotated operation =
       =
     operation
   in
+  let open Result_syntax in
   Limit.get ~when_unknown:"unknown fee" fee >>? fun fee ->
   Limit.get ~when_unknown:"unknown gas limit" gas_limit >>? fun gas_limit ->
   Limit.get ~when_unknown:"unknown storage limit" storage_limit
@@ -106,18 +114,22 @@ let manager_from_annotated operation =
     ~none:(error_with "manager_from_annotated: source not set")
     source
   >>? fun source ->
-  Option.fold
-    ~some:ok
-    ~none:(error_with "manager_from_annotated: counter not set")
-    counter
-  >|? fun counter ->
+  let+ counter =
+    Option.fold
+      ~some:ok
+      ~none:(error_with "manager_from_annotated: counter not set")
+      counter
+  in
   Manager_operation {source; fee; counter; gas_limit; storage_limit; operation}
 
 let rec manager_list_from_annotated :
     type kind. kind annotated_list -> kind Kind.manager contents_list tzresult =
+  let open Result_syntax in
   function
   | Single_manager operation ->
-      manager_from_annotated operation >|? fun op -> Single op
+      let+ op = manager_from_annotated operation in
+      Single op
   | Cons_manager (operation, rest) ->
       manager_list_from_annotated rest >>? fun rest ->
-      manager_from_annotated operation >|? fun op -> Cons (op, rest)
+      let+ op = manager_from_annotated operation in
+      Cons (op, rest)
