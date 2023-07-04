@@ -110,6 +110,9 @@ let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"
 
+let create_blocks_level_idx =
+  "CREATE INDEX IF NOT EXISTS blocks_level_idx ON blocks(level)"
+
 let create_operations_level_idx =
   "CREATE INDEX IF NOT EXISTS operations_level_idx ON operations(level)"
 
@@ -136,6 +139,7 @@ let create_tables =
     create_operations_inclusion;
     create_endorsing_rights;
     create_endorsing_rights_level_idx;
+    create_blocks_level_idx;
     create_operations_level_idx;
     create_blocks_reception_block_idx;
     create_operations_reception_operation_idx;
