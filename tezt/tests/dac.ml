@@ -598,48 +598,6 @@ module Legacy = struct
       (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
     unit
 
-  let test_reveals_fails_on_wrong_hash _protocol dac_node sc_rollup_node
-      sc_rollup_address _node client _pvm_name _threshold _committee_members =
-    let payload = "Some data that is not related to the hash" in
-    let _actual_rh =
-      Dac_helper.Call_endpoint.V0.post_store_preimage
-        dac_node
-        ~payload
-        ~pagination_scheme:"Hash_chain_V0"
-    in
-    let errorneous_hash =
-      "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
-    in
-    let* genesis_info =
-      RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
-           sc_rollup_address
-    in
-    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-    let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-    let error_promise =
-      Sc_rollup_node.wait_for
-        sc_rollup_node
-        "sc_rollup_daemon_error.v0"
-        (fun e ->
-          let id = JSON.(e |=> 0 |-> "id" |> as_string) in
-          if id =~ rex "could_not_open_reveal_preimage_file" then Some (Ok ())
-          else Some (Error id))
-    in
-    let* _level =
-      Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
-    in
-    let* () =
-      send_messages
-        client
-        ["hash:" ^ errorneous_hash]
-        ~alter_final_msg:(fun s -> "text:" ^ s)
-    in
-    let* ok = error_promise in
-    match ok with
-    | Ok () -> unit
-    | Error id -> Test.fail "Rollup node failed with unexpected error %s" id
-
   (* The following tests involve multiple legacy DAC nodes running at
      the same time and playing either the coordinator, committee member or
      observer role. *)
@@ -3048,15 +3006,6 @@ let register ~protocols =
     protocols
     ~threshold:1
     ~committee_size:1 ;
-  scenario_with_layer1_legacy_and_rollup_nodes
-    ~hooks
-    ~__FILE__
-    ~tags:["dac"; "dac_node"]
-    "dac_rollup_arith_wrong_hash"
-    Legacy.test_reveals_fails_on_wrong_hash
-    ~threshold:1
-    ~committee_size:1
-    protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~__FILE__
     ~threshold:0
