@@ -1200,20 +1200,22 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
   let* () =
     Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   in
-  inject_operation_internal
-    cctxt
-    ~chain
-    ~block
-    ?confirmations
-    ~dry_run
-    ~simulation
-    ?successor_level
-    ?branch
-    ?src_sk
-    ?verbose_signing
-    ?fee_parameter
-    (contents : kind contents_list)
-  >|=? fun (oph, op, result) -> (oph, op.protocol_data.contents, result)
+  let+ oph, op, result =
+    inject_operation_internal
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ~dry_run
+      ~simulation
+      ?successor_level
+      ?branch
+      ?src_sk
+      ?verbose_signing
+      ?fee_parameter
+      (contents : kind contents_list)
+  in
+  (oph, op.protocol_data.contents, result)
 
 let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =
   Annotated_manager_operation.Manager_info

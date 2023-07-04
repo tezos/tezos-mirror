@@ -280,32 +280,34 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
 let list_contract_labels cctxt ~chain ~block =
   let open Lwt_result_syntax in
   let* contracts = Alpha_services.Contract.list cctxt (chain, block) in
-  List.rev_map_es
-    (fun h ->
-      let* nm =
-        match (h : Contract.t) with
-        | Implicit m -> (
-            let* nm_opt = Public_key_hash.rev_find cctxt m in
-            match nm_opt with
-            | None -> return ""
-            | Some nm -> (
-                let* contract_opt = Raw_contract_alias.find_opt cctxt nm in
-                match contract_opt with
-                | None -> return (" (known as " ^ nm ^ ")")
-                | Some _ -> return (" (known as key:" ^ nm ^ ")")))
-        | Originated _ -> (
-            let* nm_opt = Raw_contract_alias.rev_find cctxt h in
-            match nm_opt with
-            | None -> return ""
-            | Some nm -> return (" (known as " ^ nm ^ ")"))
-      in
-      let kind =
-        match h with Implicit _ -> " (implicit)" | Originated _ -> ""
-      in
-      let h_b58 = Contract.to_b58check h in
-      return (nm, h_b58, kind))
-    contracts
-  >|=? List.rev
+  let+ result =
+    List.rev_map_es
+      (fun h ->
+        let* nm =
+          match (h : Contract.t) with
+          | Implicit m -> (
+              let* nm_opt = Public_key_hash.rev_find cctxt m in
+              match nm_opt with
+              | None -> return ""
+              | Some nm -> (
+                  let* contract_opt = Raw_contract_alias.find_opt cctxt nm in
+                  match contract_opt with
+                  | None -> return (" (known as " ^ nm ^ ")")
+                  | Some _ -> return (" (known as key:" ^ nm ^ ")")))
+          | Originated _ -> (
+              let* nm_opt = Raw_contract_alias.rev_find cctxt h in
+              match nm_opt with
+              | None -> return ""
+              | Some nm -> return (" (known as " ^ nm ^ ")"))
+        in
+        let kind =
+          match h with Implicit _ -> " (implicit)" | Originated _ -> ""
+        in
+        let h_b58 = Contract.to_b58check h in
+        return (nm, h_b58, kind))
+      contracts
+  in
+  List.rev result
 
 let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
