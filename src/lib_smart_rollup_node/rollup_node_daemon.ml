@@ -32,17 +32,6 @@ type state = {
   node_ctxt : Node_context.rw;
 }
 
-let protocol_info cctxt protocol block_hash =
-  let open Result_syntax in
-  let+ plugin = Protocol_plugins.proto_plugin_for_protocol protocol in
-  let module Plugin = (val plugin) in
-  let constants =
-    Plugin.Layer1_helpers.retrieve_constants
-      ~block:(`Hash (block_hash, 0))
-      cctxt
-  in
-  (constants, plugin)
-
 let is_before_origination (node_ctxt : _ Node_context.t)
     (header : Layer1.header) =
   let origination_level = node_ctxt.genesis_info.level in
@@ -84,10 +73,10 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
         state.node_ctxt.current_protocol.proto_level )
       (new_protocol, head_proto.proto_level)
   in
-  let*? constants, new_plugin =
-    protocol_info state.node_ctxt.cctxt new_protocol head.hash
+  let*? new_plugin = Protocol_plugins.proto_plugin_for_protocol new_protocol in
+  let* constants =
+    Protocol_plugins.get_constants_of_protocol state.node_ctxt new_protocol
   in
-  let* constants in
   let new_protocol =
     {
       Node_context.hash = new_protocol;
@@ -517,8 +506,8 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
       ~block:(`Hash (block.hash, 0))
       ()
   in
-  let*? constants, plugin = protocol_info cctxt current_protocol block.hash in
-  return (constants, current_protocol, plugin)
+  let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
+  return (current_protocol, plugin)
 
 let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
@@ -552,9 +541,10 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       configuration.sc_rollup_node_operators
   in
 
-  let* constants, protocol, plugin = plugin_of_first_block cctxt head in
+  let* protocol, plugin = plugin_of_first_block cctxt head in
   let module Plugin = (val plugin) in
-  let* constants
+  let* constants =
+    Plugin.Layer1_helpers.retrieve_constants ~block:(`Hash (head.hash, 0)) cctxt
   and* genesis_info =
     Plugin.Layer1_helpers.retrieve_genesis_info
       cctxt
