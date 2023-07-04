@@ -358,12 +358,7 @@ module Make (PC : Polynomial_commitment.S) = struct
 
   let kzg_prove (pp : prover_public_parameters) transcript n
       ((cm_f, f_aux), (cm_f_agg, f_agg_aux)) (b0_map, f, f_agg, qb) =
-    let qb_map =
-      SMap.of_list
-        (List.mapi
-           (fun i qb -> (SMap.Aggregation.add_prefix ~n ~i "" qb_name, qb))
-           qb)
-    in
+    let qb_map = SMap.Aggregation.of_list ~n "" qb_name qb in
     let f_map = SMap.union_disjoint_list [f; f_agg; b0_map; qb_map] in
     let cm_b0, b0_aux = PC.Commitment.commit pp.pc b0_map in
     let cm_qb, qb_aux = PC.Commitment.commit pp.pc qb_map in
@@ -504,12 +499,8 @@ module Make (PC : Polynomial_commitment.S) = struct
           Evaluations.(interpolation_fft pp.domain_k (of_array (k - 1, f))))
         f_agg_arrays_list
     in
-    let f_agg_map =
-      SMap.of_list
-      @@ List.mapi
-           (fun i f -> (SMap.Aggregation.add_prefix ~n ~i "" f_agg_name, f))
-           f_agg_list
-    in
+    let f_agg_map = SMap.Aggregation.of_list ~n "" f_agg_name f_agg_list in
+
     let cm_f_agg, f_agg_aux = PC.Commitment.commit pp.pc f_agg_map in
     (* 1.1, 1.2 *)
     let m_and_t, cm_m =
