@@ -64,14 +64,14 @@ and 'kind contents_result =
       consensus_key : Signature.public_key_hash;
       consensus_power : int;
     }
-      -> Kind.preendorsement contents_result
+      -> Kind.preattestation contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
       consensus_power : int;
     }
-      -> Kind.endorsement contents_result
+      -> Kind.attestation contents_result
   | Dal_attestation_result : {
       delegate : Signature.Public_key_hash.t;
     }
@@ -84,10 +84,10 @@ and 'kind contents_result =
       -> Kind.vdf_revelation contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
-      -> Kind.double_endorsement_evidence contents_result
+      -> Kind.double_attestation_evidence contents_result
   | Double_preendorsement_evidence_result :
       Receipt.balance_updates
-      -> Kind.double_preendorsement_evidence contents_result
+      -> Kind.double_preattestation_evidence contents_result
   | Double_baking_evidence_result :
       Receipt.balance_updates
       -> Kind.double_baking_evidence contents_result

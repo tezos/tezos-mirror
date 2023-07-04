@@ -156,8 +156,8 @@ let candidate_encoding =
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
 type event =
-  | Prequorum_reached of candidate * Kind.preendorsement operation list
-  | Quorum_reached of candidate * Kind.endorsement operation list
+  | Prequorum_reached of candidate * Kind.preattestation operation list
+  | Quorum_reached of candidate * Kind.attestation operation list
 
 let compare_consensus_contents (op1 : consensus_content)
     (op2 : consensus_content) =
@@ -167,7 +167,7 @@ let compare_consensus_contents (op1 : consensus_content)
   Block_payload_hash.compare op1.block_payload_hash op2.block_payload_hash
 
 module Preendorsement_set = Set.Make (struct
-  type t = Kind.preendorsement operation
+  type t = Kind.preattestation operation
 
   let compare
       ({protocol_data = {contents = Single (Preendorsement op1); _}; shell = _} :
@@ -178,7 +178,7 @@ module Preendorsement_set = Set.Make (struct
 end)
 
 module Endorsement_set = Set.Make (struct
-  type t = Kind.endorsement operation
+  type t = Kind.attestation operation
 
   let compare
       ({protocol_data = {contents = Single (Endorsement op1); _}; shell = _} :
@@ -315,7 +315,7 @@ let update_monitoring ?(should_lock = true) state ops =
       in
       let preendorsements_count, voting_power =
         List.fold_left
-          (fun (count, power) (op : Kind.preendorsement Operation.t) ->
+          (fun (count, power) (op : Kind.preattestation Operation.t) ->
             let {
               shell = _;
               protocol_data =
@@ -387,7 +387,7 @@ let update_monitoring ?(should_lock = true) state ops =
       in
       let endorsements_count, voting_power =
         List.fold_left
-          (fun (count, power) (op : Kind.endorsement Operation.t) ->
+          (fun (count, power) (op : Kind.attestation Operation.t) ->
             let {
               shell = _;
               protocol_data =

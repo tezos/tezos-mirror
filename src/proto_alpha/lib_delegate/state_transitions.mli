@@ -47,7 +47,7 @@ val may_update_proposal :
 val preendorse : state -> proposal -> (state * action) Lwt.t
 
 val extract_pqc :
-  state -> proposal -> (Kind.preendorsement operation list * Round.t) option
+  state -> proposal -> (Kind.preattestation operation list * Round.t) option
 
 val handle_proposal :
   is_proposal_applied:bool -> state -> proposal -> (state * action) Lwt.t
@@ -59,7 +59,7 @@ val round_proposer :
   (consensus_key_and_delegate * endorsing_slot) option
 
 val propose_fresh_block_action :
-  endorsements:Kind.endorsement Operation.t list ->
+  endorsements:Kind.attestation Operation.t list ->
   dal_attestations:Kind.dal_attestation Operation.t list ->
   ?last_proposal:block_info ->
   predecessor:block_info ->
@@ -85,13 +85,13 @@ val make_endorse_action : state -> proposal -> action
 val prequorum_reached_when_awaiting_preendorsements :
   state ->
   Operation_worker.candidate ->
-  Kind.preendorsement operation list ->
+  Kind.preattestation operation list ->
   (state * action) Lwt.t
 
 val quorum_reached_when_waiting_endorsements :
   state ->
   Operation_worker.candidate ->
-  Kind.endorsement operation list ->
+  Kind.attestation operation list ->
   (state * action) Lwt.t
 
 val step : state -> event -> (state * action) Lwt.t

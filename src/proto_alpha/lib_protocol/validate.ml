@@ -578,7 +578,7 @@ module Consensus = struct
      mempool's context. *)
 
   let check_preendorsement vi ~check_signature
-      (operation : Kind.preendorsement operation) =
+      (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
       Option.value_e
@@ -619,7 +619,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_preendorsement_conflict vs oph (op : Kind.preendorsement operation)
+  let check_preendorsement_conflict vs oph (op : Kind.preattestation operation)
       =
     let (Single (Preendorsement {slot; level; round; _})) =
       op.protocol_data.contents
@@ -640,7 +640,7 @@ module Consensus = struct
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Preattestation; conflict})
 
-  let add_preendorsement vs oph (op : Kind.preendorsement operation) =
+  let add_preendorsement vs oph (op : Kind.preattestation operation) =
     let (Single (Preendorsement {slot; level; round; _})) =
       op.protocol_data.contents
     in
@@ -672,7 +672,7 @@ module Consensus = struct
     {block_state with locked_round_evidence}
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_preendorsement vs (operation : Kind.preendorsement operation) =
+  let remove_preendorsement vs (operation : Kind.preattestation operation) =
     (* As we are in mempool mode, we do not update
        [locked_round_evidence]. *)
     let (Single (Preendorsement {slot; level; round; _})) =
@@ -716,7 +716,7 @@ module Consensus = struct
     return (consensus_key, voting_power)
 
   let check_endorsement vi ~check_signature
-      (operation : Kind.endorsement operation) =
+      (operation : Kind.attestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
       Option.value_e
@@ -747,7 +747,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_endorsement_conflict vs oph (operation : Kind.endorsement operation)
+  let check_endorsement_conflict vs oph (operation : Kind.attestation operation)
       =
     let (Single (Endorsement {slot; level; round; _})) =
       operation.protocol_data.contents
@@ -768,7 +768,7 @@ module Consensus = struct
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
-  let add_endorsement vs oph (op : Kind.endorsement operation) =
+  let add_endorsement vs oph (op : Kind.attestation operation) =
     let (Single (Endorsement {slot; level; round; _})) =
       op.protocol_data.contents
     in
@@ -790,7 +790,7 @@ module Consensus = struct
         }
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_endorsement vs (operation : Kind.endorsement operation) =
+  let remove_endorsement vs (operation : Kind.attestation operation) =
     (* We do not remove the endorsement power because it is not
        relevant for the mempool mode. *)
     let (Single (Endorsement {slot; level; round; _})) =
@@ -896,7 +896,7 @@ module Consensus = struct
     | Application _ | Partial_validation _ | Mempool -> return_unit
 
   let validate_preendorsement ~check_signature info operation_state block_state
-      oph (operation : Kind.preendorsement operation) =
+      oph (operation : Kind.preattestation operation) =
     let open Lwt_result_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
@@ -1405,7 +1405,7 @@ module Anonymous = struct
         return_unit
 
   let check_double_preendorsement_evidence vi
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
@@ -1416,7 +1416,7 @@ module Anonymous = struct
       op2
 
   let check_double_endorsement_evidence vi
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
@@ -1436,14 +1436,14 @@ module Anonymous = struct
             Error (Operation_conflict {existing; new_operation = oph}))
 
   let check_double_preendorsement_evidence_conflict vs oph
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     check_double_endorsing_evidence_conflict vs oph op1
 
   let check_double_endorsement_evidence_conflict vs oph
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1470,14 +1470,14 @@ module Anonymous = struct
         }
 
   let add_double_endorsement_evidence vs oph
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     add_double_endorsing_evidence vs oph op1
 
   let add_double_preendorsement_evidence vs oph
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
@@ -1498,14 +1498,14 @@ module Anonymous = struct
         {vs with anonymous_state}
 
   let remove_double_preendorsement_evidence vs
-      (operation : Kind.double_preendorsement_evidence operation) =
+      (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preendorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in
     remove_double_endorsing_evidence vs op1
 
   let remove_double_endorsement_evidence vs
-      (operation : Kind.double_endorsement_evidence operation) =
+      (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_endorsement_evidence {op1; _})) =
       operation.protocol_data.contents
     in

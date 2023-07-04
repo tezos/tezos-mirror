@@ -64,8 +64,8 @@ type 'kind recorded_consensus =
     }
 
 type recorded_consensus_operations = {
-  endorsement : Kind.endorsement recorded_consensus;
-  preendorsement : Kind.preendorsement recorded_consensus;
+  endorsement : Kind.attestation recorded_consensus;
+  preendorsement : Kind.preattestation recorded_consensus;
 }
 
 type 'a state = {
@@ -332,7 +332,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       | Operation_data
           ({contents = Single (Preendorsement {round; slot; level; _}); _} as
           protocol_data) ->
-          let new_preendorsement : Kind.preendorsement Alpha_context.operation =
+          let new_preendorsement : Kind.preattestation Alpha_context.operation =
             {shell; protocol_data}
           in
           process_consensus_op
@@ -347,7 +347,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       | Operation_data
           ({contents = Single (Endorsement {round; slot; level; _}); _} as
           protocol_data) ->
-          let new_endorsement : Kind.endorsement Alpha_context.operation =
+          let new_endorsement : Kind.attestation Alpha_context.operation =
             {shell; protocol_data}
           in
           process_consensus_op

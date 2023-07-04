@@ -36,8 +36,8 @@ open Validate_helpers
 type dbl_endorsement_state = {
   temporary : (Block.t * Block.t) option;
   slashable_preend :
-    (Kind.preendorsement operation * Kind.preendorsement operation) list;
-  slashable_end : (Kind.endorsement operation * Kind.endorsement operation) list;
+    (Kind.preattestation operation * Kind.preattestation operation) list;
+  slashable_end : (Kind.attestation operation * Kind.attestation operation) list;
 }
 
 (** Generic generation state collecting

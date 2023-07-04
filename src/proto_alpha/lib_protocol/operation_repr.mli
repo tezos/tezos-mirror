@@ -27,11 +27,11 @@
 (** Tezos Protocol Implementation - Low level Repr. of Operations
 
     Defines kinds of operations that can be performed on chain:
-    - preendorsement
-    - endorsement
+    - preattestation
+    - attestation
     - double baking evidence
-    - double preendorsing evidence
-    - double endorsing evidence
+    - double preattestation evidence
+    - double attestation evidence
     - seed nonce revelation
     - account activation
     - proposal (see: [Voting_repr])
@@ -61,17 +61,17 @@
     list. *)
 
 module Kind : sig
-  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+  type preattestation_consensus_kind = Preattestation_consensus_kind
 
-  type endorsement_consensus_kind = Endorsement_consensus_kind
+  type attestation_consensus_kind = Attestation_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preendorsement_consensus_kind consensus
-    | Endorsement_kind : endorsement_consensus_kind consensus
+    | Preattestation_kind : preattestation_consensus_kind consensus
+    | Attestation_kind : attestation_consensus_kind consensus
 
-  type preendorsement = preendorsement_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = endorsement_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -82,11 +82,11 @@ module Kind : sig
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
-    endorsement_consensus_kind double_consensus_operation_evidence
+  type double_attestation_evidence =
+    attestation_consensus_kind double_consensus_operation_evidence
 
-  type double_preendorsement_evidence =
-    preendorsement_consensus_kind double_consensus_operation_evidence
+  type double_preattestation_evidence =
+    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -169,8 +169,8 @@ module Kind : sig
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
+  | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -230,10 +230,10 @@ and _ contents_list =
 and _ contents =
   (* Preendorsement: About consensus, preendorsement of a block held by a
      validator (specific to Tenderbake). *)
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Preendorsement : consensus_content -> Kind.preattestation contents
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
      Temporary operation to avoid modifying endorsement encoding. *)
@@ -262,17 +262,17 @@ and _ contents =
      twice. This behavior may be reported and the byzantine will have
      its security deposit forfeited. *)
   | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
-      -> Kind.double_preendorsement_evidence contents
+      -> Kind.double_preattestation_evidence contents
   (* Double_endorsement_evidence: Similar to double-preendorsement but
      for endorsements. *)
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   (* Double_baking_evidence: Similarly to double-endorsement but the
      byzantine attempts to fork by signing two different blocks at the
      same level. *)
@@ -669,13 +669,13 @@ module Encoding : sig
       }
         -> 'b case
 
-  val preendorsement_case : Kind.preendorsement case
+  val preendorsement_case : Kind.preattestation case
 
-  val preattestation_case : Kind.preendorsement case
+  val preattestation_case : Kind.preattestation case
 
-  val endorsement_case : Kind.endorsement case
+  val endorsement_case : Kind.attestation case
 
-  val attestation_case : Kind.endorsement case
+  val attestation_case : Kind.attestation case
 
   val dal_attestation_case : Kind.dal_attestation case
 
@@ -684,14 +684,14 @@ module Encoding : sig
   val vdf_revelation_case : Kind.vdf_revelation case
 
   val double_preendorsement_evidence_case :
-    Kind.double_preendorsement_evidence case
+    Kind.double_preattestation_evidence case
 
   val double_preattestation_evidence_case :
-    Kind.double_preendorsement_evidence case
+    Kind.double_preattestation_evidence case
 
-  val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
+  val double_endorsement_evidence_case : Kind.double_attestation_evidence case
 
-  val double_attestation_evidence_case : Kind.double_endorsement_evidence case
+  val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
   val double_baking_evidence_case : Kind.double_baking_evidence case
 

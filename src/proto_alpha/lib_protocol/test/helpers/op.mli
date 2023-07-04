@@ -51,16 +51,16 @@ val sign :
   packed_contents_list ->
   packed_operation
 
-(** Create an unpacked endorsement that is expected for given [Block.t].
+(** Create an unpacked attestation that is expected for given [Block.t].
 
-    Optional parameters allow to specify the endorsed values: [level],
+    Optional parameters allow to specify the attested values: [level],
     [round] and/or [block_payload_hash].
 
-    They also allow to specify the endorser ([delegate]), and/or the
+    They also allow to specify the attester ([delegate]), and/or the
     [slot]. These default to the first slot and its delegate.
 
     Finally, the operation [branch] can be specified. It defaults to the
-    predecessor of the endorsed block. *)
+    predecessor of the attested block. *)
 val raw_endorsement :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
@@ -69,9 +69,9 @@ val raw_endorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
-  Kind.endorsement Operation.t tzresult Lwt.t
+  Kind.attestation Operation.t tzresult Lwt.t
 
-(** Create an unpacked preendorsement that is expected for a given
+(** Create an unpacked preattestation that is expected for a given
     [Block.t].
 
     Optional parameters are the same than {!raw_endorsement}. *)
@@ -83,9 +83,9 @@ val raw_preendorsement :
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
-  Kind.preendorsement Operation.t tzresult Lwt.t
+  Kind.preattestation Operation.t tzresult Lwt.t
 
-(** Create a packed endorsement that is expected for a given
+(** Create a packed attestation that is expected for a given
     [Block.t] by packing the result of {!raw_endorsement}. *)
 val endorsement :
   ?delegate:public_key_hash ->
@@ -97,7 +97,7 @@ val endorsement :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed preendorsement that is expected for a given
+(** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preendorsement}. *)
 val preendorsement :
   ?delegate:public_key_hash ->
@@ -275,14 +275,14 @@ val register_global_constant :
 
 val double_endorsement :
   Context.t ->
-  Kind.endorsement Operation.t ->
-  Kind.endorsement Operation.t ->
+  Kind.attestation Operation.t ->
+  Kind.attestation Operation.t ->
   Operation.packed
 
 val double_preendorsement :
   Context.t ->
-  Kind.preendorsement Operation.t ->
-  Kind.preendorsement Operation.t ->
+  Kind.preattestation Operation.t ->
+  Kind.preattestation Operation.t ->
   Operation.packed
 
 val double_baking :

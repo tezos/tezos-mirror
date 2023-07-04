@@ -3999,17 +3999,17 @@ end
 
 (** This module re-exports definitions from {!Operation_repr.Kind}. *)
 module Kind : sig
-  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+  type preattestation_consensus_kind = Preattestation_consensus_kind
 
-  type endorsement_consensus_kind = Endorsement_consensus_kind
+  type attestation_consensus_kind = Attestation_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preendorsement_consensus_kind consensus
-    | Endorsement_kind : endorsement_consensus_kind consensus
+    | Preattestation_kind : preattestation_consensus_kind consensus
+    | Attestation_kind : attestation_consensus_kind consensus
 
-  type preendorsement = preendorsement_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = endorsement_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -4020,11 +4020,11 @@ module Kind : sig
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
-    endorsement_consensus_kind double_consensus_operation_evidence
+  type double_attestation_evidence =
+    attestation_consensus_kind double_consensus_operation_evidence
 
-  type double_preendorsement_evidence =
-    preendorsement_consensus_kind double_consensus_operation_evidence
+  type double_preattestation_evidence =
+    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -4109,8 +4109,8 @@ end
 (** All the definitions below are re-exported from {!Operation_repr}. *)
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
+  | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot.t;
@@ -4143,8 +4143,8 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
@@ -4156,15 +4156,15 @@ and _ contents =
     }
       -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
-      -> Kind.double_preendorsement_evidence contents
+      -> Kind.double_preattestation_evidence contents
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header.t;
       bh2 : Block_header.t;
@@ -4420,13 +4420,13 @@ module Operation : sig
         }
           -> 'b case
 
-    val preendorsement_case : Kind.preendorsement case
+    val preendorsement_case : Kind.preattestation case
 
-    val preattestation_case : Kind.preendorsement case
+    val preattestation_case : Kind.preattestation case
 
-    val endorsement_case : Kind.endorsement case
+    val endorsement_case : Kind.attestation case
 
-    val attestation_case : Kind.endorsement case
+    val attestation_case : Kind.attestation case
 
     val dal_attestation_case : Kind.dal_attestation case
 
@@ -4435,14 +4435,14 @@ module Operation : sig
     val vdf_revelation_case : Kind.vdf_revelation case
 
     val double_preendorsement_evidence_case :
-      Kind.double_preendorsement_evidence case
+      Kind.double_preattestation_evidence case
 
     val double_preattestation_evidence_case :
-      Kind.double_preendorsement_evidence case
+      Kind.double_preattestation_evidence case
 
-    val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
+    val double_endorsement_evidence_case : Kind.double_attestation_evidence case
 
-    val double_attestation_evidence_case : Kind.double_endorsement_evidence case
+    val double_attestation_evidence_case : Kind.double_attestation_evidence case
 
     val double_baking_evidence_case : Kind.double_baking_evidence case
 

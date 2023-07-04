@@ -27,17 +27,17 @@
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
 module Kind = struct
-  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+  type preattestation_consensus_kind = Preattestation_consensus_kind
 
-  type endorsement_consensus_kind = Endorsement_consensus_kind
+  type attestation_consensus_kind = Attestation_consensus_kind
 
   type 'a consensus =
-    | Preendorsement_kind : preendorsement_consensus_kind consensus
-    | Endorsement_kind : endorsement_consensus_kind consensus
+    | Preattestation_kind : preattestation_consensus_kind consensus
+    | Attestation_kind : attestation_consensus_kind consensus
 
-  type preendorsement = preendorsement_consensus_kind consensus
+  type preattestation = preattestation_consensus_kind consensus
 
-  type endorsement = endorsement_consensus_kind consensus
+  type attestation = attestation_consensus_kind consensus
 
   type dal_attestation = Dal_attestation_kind
 
@@ -48,11 +48,11 @@ module Kind = struct
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence =
-    endorsement_consensus_kind double_consensus_operation_evidence
+  type double_attestation_evidence =
+    attestation_consensus_kind double_consensus_operation_evidence
 
-  type double_preendorsement_evidence =
-    preendorsement_consensus_kind double_consensus_operation_evidence
+  type double_preattestation_evidence =
+    preattestation_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
@@ -135,8 +135,8 @@ module Kind = struct
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.endorsement consensus_operation_type
-  | Preendorsement : Kind.preendorsement consensus_operation_type
+  | Endorsement : Kind.attestation consensus_operation_type
+  | Preendorsement : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
@@ -234,8 +234,8 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preendorsement contents
-  | Endorsement : consensus_content -> Kind.endorsement contents
+  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -249,15 +249,15 @@ and _ contents =
     }
       -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
-      op1 : Kind.preendorsement operation;
-      op2 : Kind.preendorsement operation;
+      op1 : Kind.preattestation operation;
+      op2 : Kind.preattestation operation;
     }
-      -> Kind.double_preendorsement_evidence contents
+      -> Kind.double_preattestation_evidence contents
   | Double_endorsement_evidence : {
-      op1 : Kind.endorsement operation;
-      op2 : Kind.endorsement operation;
+      op1 : Kind.attestation operation;
+      op2 : Kind.attestation operation;
     }
-      -> Kind.double_endorsement_evidence contents
+      -> Kind.double_attestation_evidence contents
   | Double_baking_evidence : {
       bh1 : Block_header_repr.t;
       bh2 : Block_header_repr.t;
@@ -1019,10 +1019,10 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preendorsement"
@@ -1045,10 +1045,10 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.preendorsement contents_list -> _ = function
+    let to_list : Kind.preattestation contents_list -> _ = function
       | Single o -> o
     in
-    let of_list : Kind.preendorsement contents -> _ = function
+    let of_list : Kind.preattestation contents -> _ = function
       | o -> Single o
     in
     def "inlined.preattestation"
@@ -1116,8 +1116,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.endorsement"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -1138,8 +1138,8 @@ module Encoding = struct
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
-    let to_list : Kind.endorsement contents_list -> _ = fun (Single o) -> o in
-    let of_list : Kind.endorsement contents -> _ = fun o -> Single o in
+    let to_list : Kind.attestation contents_list -> _ = fun (Single o) -> o in
+    let of_list : Kind.attestation contents -> _ = fun o -> Single o in
     def "inlined.attestation"
     @@ conv
          (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
@@ -1208,7 +1208,7 @@ module Encoding = struct
       }
 
   let double_preendorsement_evidence_case :
-      Kind.double_preendorsement_evidence case =
+      Kind.double_preattestation_evidence case =
     Case
       {
         tag = 7;
@@ -1226,7 +1226,7 @@ module Encoding = struct
       }
 
   let double_preattestation_evidence_case :
-      Kind.double_preendorsement_evidence case =
+      Kind.double_preattestation_evidence case =
     Case
       {
         tag = 7;
@@ -1243,7 +1243,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
-  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
+  let double_endorsement_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;
@@ -1260,7 +1260,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
       }
 
-  let double_attestation_evidence_case : Kind.double_endorsement_evidence case =
+  let double_attestation_evidence_case : Kind.double_attestation_evidence case =
     Case
       {
         tag = 2;
