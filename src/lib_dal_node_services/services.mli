@@ -91,6 +91,8 @@ module Types : sig
     | Attestor of Tezos_crypto.Signature.public_key_hash
     | Producer of {slot_index : int}
 
+  type profiles = profile list
+
   (** Information associated to a slot header in the RPC services of the DAL
       node. *)
   type slot_header = {
@@ -108,6 +110,8 @@ module Types : sig
   val header_status_encoding : header_status Data_encoding.t
 
   val profile_encoding : profile Data_encoding.t
+
+  val profiles_encoding : profiles Data_encoding.t
 
   val with_proof_encoding : with_proof Data_encoding.t
 
@@ -203,7 +207,7 @@ val get_published_level_headers :
 (** Update the list of profiles tracked by the DAL node *)
 val patch_profiles :
   < meth : [`PATCH]
-  ; input : Types.profile list
+  ; input : Types.profiles
   ; output : unit
   ; prefix : unit
   ; params : unit
@@ -214,7 +218,7 @@ val patch_profiles :
 val get_profiles :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.profile list
+  ; output : Types.profiles
   ; prefix : unit
   ; params : unit
   ; query : unit >

@@ -67,6 +67,8 @@ module Types = struct
     | Attestor of Tezos_crypto.Signature.public_key_hash
     | Producer of {slot_index : int}
 
+  type profiles = profile list
+
   type with_proof = {with_proof : bool}
 
   (* Auxiliary functions.  *)
@@ -180,6 +182,10 @@ module Types = struct
             | Producer {slot_index} -> Some ((), slot_index) | _ -> None)
           (function (), slot_index -> Producer {slot_index});
       ]
+
+  let profiles_encoding =
+    let open Data_encoding in
+    list profile_encoding
 
   let with_proof_encoding =
     let open Data_encoding in
@@ -347,7 +353,7 @@ let get_published_level_headers :
 
 let patch_profiles :
     < meth : [`PATCH]
-    ; input : Types.profile list
+    ; input : Types.profiles
     ; output : unit
     ; prefix : unit
     ; params : unit
@@ -356,14 +362,14 @@ let patch_profiles :
   Tezos_rpc.Service.patch_service
     ~description:"Update the list of profiles tracked by the DAL node"
     ~query:Tezos_rpc.Query.empty
-    ~input:(Data_encoding.list Types.profile_encoding)
+    ~input:Types.profiles_encoding
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "profiles")
 
 let get_profiles :
     < meth : [`GET]
     ; input : unit
-    ; output : Types.profile list
+    ; output : Types.profiles
     ; prefix : unit
     ; params : unit
     ; query : unit >
@@ -371,7 +377,7 @@ let get_profiles :
   Tezos_rpc.Service.get_service
     ~description:"Return the list of current profiles tracked by the DAL node"
     ~query:Tezos_rpc.Query.empty
-    ~output:(Data_encoding.list Types.profile_encoding)
+    ~output:Types.profiles_encoding
     Tezos_rpc.Path.(open_root / "profiles")
 
 let get_assigned_shard_indices :
