@@ -263,9 +263,7 @@ let maybe_insert_operation =
       ->. unit))
     "INSERT INTO operations (level, hash, endorsement, endorser, round) SELECT \
      $1, $2, $3, delegates.id, $4 FROM delegates WHERE delegates.address = $5 \
-     AND NOT EXISTS ( SELECT 1 FROM operations WHERE endorsement = $3 AND \
-     endorser = delegates.id AND round = $4 AND level = $1) ON CONFLICT DO \
-     NOTHING"
+     ON CONFLICT DO NOTHING"
 
 let maybe_insert_block =
   Caqti_request.Infix.(
