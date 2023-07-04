@@ -143,8 +143,9 @@ let dispatch_input
     | Eth_call.Input (Some (call, _)) ->
         let* call_result = Rollup_node_rpc.simulate_call call in
         return (Eth_call.Output (Ok call_result))
-    | Get_estimate_gas.Input _ ->
-        return (Get_estimate_gas.Output (Ok Mockup.gas_price))
+    | Get_estimate_gas.Input (Some call) ->
+        let* gas = Rollup_node_rpc.estimate_gas call in
+        return (Get_estimate_gas.Output (Ok gas))
     | Txpool_content.Input _ ->
         let* txpool = Rollup_node_rpc.txpool () in
         return (Txpool_content.Output (Ok txpool))

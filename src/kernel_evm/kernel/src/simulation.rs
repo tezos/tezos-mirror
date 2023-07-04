@@ -241,6 +241,7 @@ pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error
     let outcome = simulation.run(host)?;
     debug_msg!(host, "outcome={:?} ", outcome);
     storage::store_simulation_status(host, outcome.is_success)?;
+    storage::store_simulation_gas(host, outcome.gas_used)?;
     storage::store_simulation_result(host, outcome.result)
 }
 
