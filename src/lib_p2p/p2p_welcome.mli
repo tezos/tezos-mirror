@@ -28,18 +28,6 @@
     Accept incoming connections and add them to the pool.
 *)
 
-(** Type discribing an opening failure for the
-   listening socket. *)
-type listening_socket_open_failure = {
-  reason : Unix.error;  (** The error we are re-raising *)
-  address : P2p_addr.t;  (** The interface we are trying to listen to *)
-  port : int;  (** The port we are trying to listen to *)
-}
-
-(** Type of an error in case where the listening
-    socket fails to open. *)
-type error += Failed_to_open_listening_socket of listening_socket_open_failure
-
 (** Type of a welcome worker. *)
 type t
 

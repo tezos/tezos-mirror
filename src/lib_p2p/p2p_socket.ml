@@ -884,7 +884,7 @@ module Internal_for_tests = struct
         }
     in
     let scheduled_conn =
-      let f2d_t = Lwt_main.run (P2p_fd.socket PF_INET6 SOCK_STREAM 0) in
+      let f2d_t = Lwt_main.run (P2p_fd.socket ()) in
       P2p_io_scheduler.register
         (P2p_io_scheduler.create ~read_buffer_size:0 ())
         f2d_t
