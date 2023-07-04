@@ -652,14 +652,8 @@ module DelegateSet = struct
     with Found d -> Some d
 end
 
-let cache_size_limit = 100
-
-let compute_delegate_slots (cctxt : Protocol_client_context.full)
-    ?(block = `Head 0) ~level ~chain delegates =
+let delegate_slots endorsing_rights delegates =
   let own_delegates = DelegateSet.of_list delegates in
-  Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
-  Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
-  >>=? fun endorsing_rights ->
   let own_delegate_slots, all_delegate_slots =
     List.fold_left
       (fun (own_map, all_map) slot ->
@@ -696,7 +690,16 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
   let all_slots_by_round =
     all_delegate_slots |> SlotMap.bindings |> List.split |> fst |> Array.of_list
   in
-  return {own_delegate_slots; all_delegate_slots; all_slots_by_round}
+  {own_delegate_slots; all_delegate_slots; all_slots_by_round}
+
+let compute_delegate_slots (cctxt : Protocol_client_context.full)
+    ?(block = `Head 0) ~level ~chain delegates =
+  Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
+  Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
+  >>=? fun endorsing_rights ->
+  delegate_slots endorsing_rights delegates |> return
+
+let cache_size_limit = 100
 
 let create_cache () =
   let open Baking_cache in
