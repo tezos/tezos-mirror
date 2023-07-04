@@ -491,7 +491,7 @@ module Stake : sig
   (** The map of all the staking balances of all delegates, including
      those with less than
      {!Constants_parametric_repr.minimal_stake}. It might be large *)
-  module Staking_balance :
+  module Staking_balance_up_to_Nairobi :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
        and type value = Tez_repr.t

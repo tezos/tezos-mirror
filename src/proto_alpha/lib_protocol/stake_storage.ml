@@ -65,15 +65,15 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
-let get_staking_balance = Storage.Stake.Staking_balance.get
+let get_staking_balance = Storage.Stake.Staking_balance_up_to_Nairobi.get
 
 let get_initialized_stake ctxt delegate =
-  Storage.Stake.Staking_balance.find ctxt delegate >>=? function
+  Storage.Stake.Staking_balance_up_to_Nairobi.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
   | None ->
       let balance = Tez_repr.zero in
-      Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
-      return (balance, ctxt)
+      Storage.Stake.Staking_balance_up_to_Nairobi.init ctxt delegate balance
+      >>=? fun ctxt -> return (balance, ctxt)
 
 let has_minimal_stake ctxt staking_balance =
   let minimal_stake = Constants_storage.minimal_stake ctxt in
@@ -82,7 +82,10 @@ let has_minimal_stake ctxt staking_balance =
 let update_stake ~f ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   f staking_balance_before >>?= fun staking_balance ->
-  Storage.Stake.Staking_balance.update ctxt delegate staking_balance
+  Storage.Stake.Staking_balance_up_to_Nairobi.update
+    ctxt
+    delegate
+    staking_balance
   >>=? fun ctxt ->
   (* Since the staking balance has changed, the delegate might have
      moved accross the minimal stake barrier. If so we may need to
@@ -151,7 +154,8 @@ let set_active ctxt delegate =
 let snapshot ctxt =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun index ->
   Storage.Stake.Last_snapshot.update ctxt (index + 1) >>=? fun ctxt ->
-  Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
+  Storage.Stake.Staking_balance_up_to_Nairobi.snapshot ctxt index
+  >>=? fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.snapshot ctxt index
 
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
@@ -163,7 +167,8 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
   Storage.Stake.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   (* cleanup snapshots *)
-  Storage.Stake.Staking_balance.Snapshot.clear ctxt >>= fun ctxt ->
+  Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.clear ctxt
+  >>= fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
   >>= fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
@@ -185,7 +190,9 @@ let fold_snapshot ctxt ~index ~f ~init =
     ~order:`Sorted
     ~init
     ~f:(fun delegate () acc ->
-      Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
+      Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.get
+        ctxt
+        (index, delegate)
       >>=? fun stake -> f (delegate, stake) acc)
 
 let clear_at_cycle_end ctxt ~new_cycle =

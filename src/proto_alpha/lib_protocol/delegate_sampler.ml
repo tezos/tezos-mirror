@@ -260,7 +260,9 @@ module For_RPC = struct
       compute_snapshot_index_for_seed ~max_snapshot_index seed
     in
     let* staking_balance =
-      Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
+      Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.get
+        ctxt
+        (selected_index, delegate)
     in
     delegate_baking_power_from_staking_balance ctxt delegate staking_balance
 
