@@ -50,6 +50,8 @@ Their OpenAPI specification can be found at:
 
 - `rpc-openapi.json (version 17.3) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
+- `rpc-openapi-rc.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+
 .. TODO tezos/tezos#2170: add/remove section(s)
 
 Nairobi RPCs
