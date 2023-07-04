@@ -73,19 +73,13 @@ module Committee_member = struct
 
   let init committee_member_config cctxt =
     let open Lwt_result_syntax in
-    let Configuration.Committee_member.
-          {address; coordinator_rpc_address; coordinator_rpc_port} =
+    let Configuration.Committee_member.{address; coordinator_rpc_address} =
       committee_member_config
     in
     let+ committee_member =
       Wallet_account.Committee_member.of_committee_member_address address cctxt
     in
-    let coordinator_cctxt =
-      Dac_node_client.make_unix_cctxt
-        ~scheme:"http"
-        ~host:coordinator_rpc_address
-        ~port:coordinator_rpc_port
-    in
+    let coordinator_cctxt = Dac_node_client.of_uri coordinator_rpc_address in
     {committee_member; coordinator_cctxt}
 
   let secret_key_uri t =

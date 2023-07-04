@@ -71,24 +71,23 @@ end
 
 module Committee_member = struct
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
+    coordinator_rpc_address : Uri.t;
     address : Tezos_crypto.Aggregate_signature.public_key_hash;
   }
 
-  let make coordinator_rpc_address coordinator_rpc_port address =
-    {coordinator_rpc_address; coordinator_rpc_port; address}
+  let make coordinator_rpc_address address = {coordinator_rpc_address; address}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {coordinator_rpc_address; coordinator_rpc_port; address} ->
-          (coordinator_rpc_address, coordinator_rpc_port, address))
-        (fun (coordinator_rpc_address, coordinator_rpc_port, address) ->
-          {coordinator_rpc_address; coordinator_rpc_port; address})
-        (obj3
+        (fun {coordinator_rpc_address; address} ->
+          let coordinator_rpc_address = Uri.to_string coordinator_rpc_address in
+          (coordinator_rpc_address, address))
+        (fun (coordinator_rpc_address, address) ->
+          let coordinator_rpc_address = Uri.of_string coordinator_rpc_address in
+          {coordinator_rpc_address; address})
+        (obj2
            (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" uint16)
            (req
               "address"
               Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
@@ -230,13 +229,9 @@ type mode =
 let make_coordinator committee_members =
   Coordinator (Coordinator.make committee_members)
 
-let make_committee_member coordinator_rpc_address coordinator_rpc_port
-    committee_member_address =
+let make_committee_member ~coordinator_rpc_address committee_member_address =
   Committee_member
-    (Committee_member.make
-       coordinator_rpc_address
-       coordinator_rpc_port
-       committee_member_address)
+    (Committee_member.make coordinator_rpc_address committee_member_address)
 
 let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address
     coordinator_rpc_port =

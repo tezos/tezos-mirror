@@ -44,6 +44,13 @@ let make_unix_cctxt ~scheme ~host ~port =
   in
   new unix_cctxt ~rpc_config
 
+let of_uri uri =
+  let endpoint = uri in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  new unix_cctxt ~rpc_config
+
 module V0 = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4895
      If the preimage was generated using a different plugin, the computation of

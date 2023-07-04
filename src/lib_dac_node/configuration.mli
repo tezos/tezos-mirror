@@ -46,8 +46,7 @@ end
 module Committee_member : sig
   (** The type of a Committee_member specific configuration mode. *)
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
+    coordinator_rpc_address : Uri.t;
     address : Tezos_crypto.Aggregate_signature.public_key_hash;
   }
 end
@@ -124,12 +123,13 @@ val mode_name : t -> string
 *)
 val make_coordinator : Tezos_crypto.Aggregate_signature.public_key list -> mode
 
-(** [make_committee_member coordinator_rpc_address coordinator_rpc_port
-    committee_member_address] creates a new committee-member configuration
-    mode using the given address and port for the coordinator, and the given
-    [committee_member_address]. *)
+(** [make_committee_member ~coordinator_rpc_address committee_member_address] 
+    creates a new committee member configuration with [committee_member_address]
+    as the signer and [coordinator_rpc_address] as the coordinator. *)
 val make_committee_member :
-  string -> int -> Tezos_crypto.Aggregate_signature.public_key_hash -> mode
+  coordinator_rpc_address:Uri.t ->
+  Tezos_crypto.Aggregate_signature.public_key_hash ->
+  mode
 
 (** [make_observer committee_endpoints coordinator_rpc_address coordinator_rpc_port]
     creates a new observer configuration that sets the Data Availabiity Committee 

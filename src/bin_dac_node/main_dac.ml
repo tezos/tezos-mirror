@@ -313,16 +313,20 @@ module Config_init = struct
            address
            cctxt ->
         experimental_disclaimer () ;
+        let coordinator_rpc_address =
+          Uri.make
+            ~scheme:coordinator_rpc_address.scheme
+            ~host:coordinator_rpc_address.host
+            ~port:coordinator_rpc_address.port
+            ()
+        in
         create_configuration
           ~data_dir
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
           ~allow_v1_api
-          (Configuration.make_committee_member
-             coordinator_rpc_address.host
-             coordinator_rpc_address.port
-             address)
+          (Configuration.make_committee_member ~coordinator_rpc_address address)
           cctxt)
 
   let observer_command =
