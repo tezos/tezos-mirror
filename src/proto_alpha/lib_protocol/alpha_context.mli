@@ -1014,8 +1014,6 @@ module Constants : sig
 
   val adaptive_inflation_enable : context -> bool
 
-  val freeze_rewards : context -> bool
-
   val zk_rollup_max_ticket_payload_size : context -> int
 
   (** All constants: fixed and parametric *)
