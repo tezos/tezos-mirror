@@ -184,7 +184,7 @@ let with_fresh_rollup ~protocol ?(pvm_name = "arith") ?dal_node f tezos_node
 
 let with_dal_node tezos_node tezos_client f key =
   let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
-  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.init_config dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
   f key dal_node
 
@@ -1227,9 +1227,9 @@ let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
   let dal_node2 = Dal_node.create ~node ~client () in
   let dal_node3 = Dal_node.create ~node ~client () in
   let dal_node4 = Dal_node.create ~node ~client () in
-  let* _ = Dal_node.init_config dal_node2 in
-  let* _ = Dal_node.init_config dal_node3 in
-  let* _ = Dal_node.init_config dal_node4 in
+  let* () = Dal_node.init_config dal_node2 in
+  let* () = Dal_node.init_config dal_node3 in
+  let* () = Dal_node.init_config dal_node4 in
   update_neighbors dal_node3 [dal_node1; dal_node2] ;
   update_neighbors dal_node4 [dal_node3] ;
   let* () = Dal_node.run dal_node2 in
@@ -1417,7 +1417,7 @@ let test_dal_node_startup =
       ()
   in
   let dal_node = Dal_node.create ~node ~client () in
-  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.init_config dal_node in
   let* () = run_dal dal_node in
   let* () =
     Dal_node.wait_for dal_node "dal_node_layer_1_start_tracking.v0" (fun _ ->
@@ -2170,7 +2170,7 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
     (fun index key_opt ->
       (* We create a new DAL node and initialize it. *)
       let fresh_dal_node = Dal_node.create ~node:l1_node ~client:l1_client () in
-      let* _config_file = Dal_node.init_config fresh_dal_node in
+      let* () = Dal_node.init_config fresh_dal_node in
 
       (* We connect the fresh DAL node to another node, start it and update the
          value of [connect_dal_node_to] to generate the topology above: *)
@@ -2706,7 +2706,7 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
 
     For this to work, [dal_node1] must already be running. *)
 let connect_nodes_via_p2p dal_node1 dal_node2 =
-  let* _config_file =
+  let* () =
     Dal_node.init_config ~peers:[Dal_node.listen_addr dal_node1] dal_node2
   in
   (* We ensure that [dal_node1] connects to [dal_node2]. *)
