@@ -53,6 +53,15 @@ val included_operation :
   L1_operation.t ->
   unit Lwt.t
 
+(** [migration ~catching_up (old_protocol, old_protocol_level) (new_protocol,
+    new_protocol_level)] emits and event for when the rollup node detects and
+    handles a protocol migration. *)
+val migration :
+  catching_up:bool ->
+  Protocol_hash.t * int ->
+  Protocol_hash.t * int ->
+  unit Lwt.t
+
 (** Emit a fatal error for the daemon. *)
 val error : tztrace -> unit Lwt.t
 

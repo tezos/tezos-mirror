@@ -106,6 +106,23 @@ module Simple = struct
           | None -> Format.pp_print_string ppf "none"
           | Some e -> Error_monad.pp_print_trace ppf e)
 
+  let migration =
+    declare_5
+      ~name:"sc_rollup_daemon_protocol_migration"
+      ~msg:
+        "{catching_up} from {old_protocol} ({old_protocol_level}) to \
+         {new_protocol} ({new_protocol_level}) "
+      ~level:Notice
+      ("catching_up", Data_encoding.bool)
+      ("old_protocol", Protocol_hash.encoding)
+      ("old_protocol_level", Data_encoding.int31)
+      ("new_protocol", Protocol_hash.encoding)
+      ("new_protocol_level", Data_encoding.int31)
+      ~pp1:(fun ppf catching_up ->
+        Format.pp_print_string
+          ppf
+          (if catching_up then "Catching up on migration" else "Migration"))
+
   let error =
     declare_1
       ~section
@@ -153,6 +170,15 @@ let included_operation ?errors status operation =
   | `Applied -> Simple.(emit included_successful_operation) operation
   | `Failed | `Backtracked | `Skipped ->
       Simple.(emit included_failed_operation) (operation, status, errors)
+
+let migration ~catching_up (old_protocol, old_protocol_level)
+    (new_protocol, new_protocol_level) =
+  Simple.(emit migration)
+    ( catching_up,
+      old_protocol,
+      old_protocol_level,
+      new_protocol,
+      new_protocol_level )
 
 let error e = Simple.(emit error) e
 
