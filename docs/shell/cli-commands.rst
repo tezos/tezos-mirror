@@ -59,7 +59,7 @@ The command line of the Octez node is documented in Unix ``man`` format, as show
 
 The manual briefly shows the available node commands.
 Each command accepts its own set of options and arguments, that you can discover by running ``octez-node <command> --help``.
-For more details on the node invocation and configuration, see see :doc:`../user/node-configuration`.
+For more details on the node invocation and configuration, see :doc:`../user/node-configuration`.
 
 .. include:: ../api/octez-node.txt
 
