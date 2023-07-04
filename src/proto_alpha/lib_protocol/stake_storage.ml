@@ -233,7 +233,7 @@ let remove_contract_stake ctxt contract amount =
   | None -> return ctxt
   | Some delegate -> remove_stake ctxt delegate amount
 
-let add_contract_stake ctxt contract amount =
+let add_contract_delegated_stake ctxt contract amount =
   Contract_delegate_storage.find ctxt contract >>=? function
   | None -> return ctxt
-  | Some delegate -> add_stake ctxt delegate amount
+  | Some delegate -> add_delegated_stake ctxt delegate amount

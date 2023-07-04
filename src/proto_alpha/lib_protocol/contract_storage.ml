@@ -637,7 +637,7 @@ let credit_only_call_from_token c contract amount =
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->
       Storage.Contract.Spendable_balance.update c contract balance >>=? fun c ->
-      Stake_storage.add_contract_stake c contract amount
+      Stake_storage.add_contract_delegated_stake c contract amount
 
 let init c =
   Storage.Contract.Global_counter.init c Manager_counter_repr.init >>=? fun c ->
@@ -705,7 +705,8 @@ let spend_bond_only_call_from_token ctxt contract bond_id amount =
 let credit_bond_only_call_from_token ctxt contract bond_id amount =
   fail_when Tez_repr.(amount = zero) (Failure "Expecting : [amount > 0]")
   >>=? fun () ->
-  Stake_storage.add_contract_stake ctxt contract amount >>=? fun ctxt ->
+  Stake_storage.add_contract_delegated_stake ctxt contract amount
+  >>=? fun ctxt ->
   ( Storage.Contract.Frozen_bonds.find (ctxt, contract) bond_id
   >>=? fun (ctxt, frozen_bonds_opt) ->
     match frozen_bonds_opt with
