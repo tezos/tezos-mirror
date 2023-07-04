@@ -41,19 +41,21 @@ let get_branch (rpc_config : #Protocol_client_context.full) ~chain
      because of potential reorgs (only the predecessor payload is
      finalized, not the whole block). *)
   let branch = Option.value ~default:0 branch in
-  (* TODO export parameter *)
-  (match block with
-  | `Head 0 ->
-      (* Default client's block value: we branch to head's grandfather *)
-      return (`Head (2 + branch))
-  | `Head n -> return (`Head (n + branch))
-  | `Hash (h, n) -> return (`Hash (h, n + branch))
-  | `Alias (a, n) -> return (`Alias (a, n))
-  | `Genesis -> return `Genesis
-  | `Level i -> return (`Level i))
-  >>=? fun block ->
-  Shell_services.Blocks.hash rpc_config ~chain ~block () >>=? fun hash ->
-  Shell_services.Chain.chain_id rpc_config ~chain () >>=? fun chain_id ->
+  let open Lwt_result_syntax in
+  let* block =
+    (* TODO export parameter *)
+    match block with
+    | `Head 0 ->
+        (* Default client's block value: we branch to head's grandfather *)
+        return (`Head (2 + branch))
+    | `Head n -> return (`Head (n + branch))
+    | `Hash (h, n) -> return (`Hash (h, n + branch))
+    | `Alias (a, n) -> return (`Alias (a, n))
+    | `Genesis -> return `Genesis
+    | `Level i -> return (`Level i)
+  in
+  let* hash = Shell_services.Blocks.hash rpc_config ~chain ~block () in
+  let* chain_id = Shell_services.Chain.chain_id rpc_config ~chain () in
   return (chain_id, hash)
 
 type 'kind preapply_result =
@@ -228,29 +230,31 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
 let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(verbose_signing = false) ?fee_parameter ?branch ?src_sk
     (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
+  let open Lwt_result_syntax in
+  let* _chain_id, branch = get_branch cctxt ~chain ~block branch in
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding_with_legacy_attestation_name
       ({branch}, Contents_list contents)
   in
-  (match src_sk with
-  | None -> return_none
-  | Some src_sk ->
-      let watermark =
-        match contents with
-        (* TODO-TB sign endorsement? *)
-        | _ -> Signature.Generic_operation
-      in
-      (if verbose_signing then
-       cctxt#message
-         "Pre-signature information (verbose signing):@.%t%!"
-         (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
-      else Lwt.return_unit)
-      >>= fun () ->
-      Client_keys.sign cctxt ~watermark src_sk bytes >>=? fun signature ->
-      return_some signature)
-  >>=? fun signature ->
+  let* signature =
+    match src_sk with
+    | None -> return_none
+    | Some src_sk ->
+        let watermark =
+          match contents with
+          (* TODO-TB sign endorsement? *)
+          | _ -> Signature.Generic_operation
+        in
+        (if verbose_signing then
+         cctxt#message
+           "Pre-signature information (verbose signing):@.%t%!"
+           (print_for_verbose_signing ~watermark ~bytes ~branch ~contents)
+        else Lwt.return_unit)
+        >>= fun () ->
+        let* signature = Client_keys.sign cctxt ~watermark src_sk bytes in
+        return_some signature
+  in
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature}}
   in
@@ -267,12 +271,14 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
   >>= fun () ->
-  Protocol_client_context.Alpha_block_services.Helpers.Preapply.operations
-    cctxt
-    ~chain
-    ~block
-    [Operation.pack op]
-  >>=? function
+  let* operations_opt =
+    Protocol_client_context.Alpha_block_services.Helpers.Preapply.operations
+      cctxt
+      ~chain
+      ~block
+      [Operation.pack op]
+  in
+  match operations_opt with
   | [(Operation_data op', Operation_metadata result)] -> (
       match
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
@@ -287,20 +293,23 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(successor_level = false) ?branch
     ?(latency = Plugin.RPC.default_operation_inclusion_latency)
     (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
+  let open Lwt_result_syntax in
+  let* _chain_id, branch = get_branch cctxt ~chain ~block branch in
   let op : _ Operation.t =
     {shell = {branch}; protocol_data = {contents; signature = None}}
   in
   let oph = Operation.hash op in
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Plugin.RPC.Scripts.simulate_operation
-    cctxt
-    (chain, block)
-    ~successor_level
-    ~op:(Operation.pack op)
-    ~chain_id
-    ~latency
-  >>=? function
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
+  let* operations_opt =
+    Plugin.RPC.Scripts.simulate_operation
+      cctxt
+      (chain, block)
+      ~successor_level
+      ~op:(Operation.pack op)
+      ~chain_id
+      ~latency
+  in
+  match operations_opt with
   | Operation_data op', Operation_metadata result -> (
       match
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
@@ -620,21 +629,24 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     ?(force = false) ?(simulation = false)
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
     kind Kind.manager contents_list tzresult Lwt.t =
-  Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
-  >>=? fun () ->
-  Alpha_services.Constants.all cctxt (chain, block)
-  >>=? fun {
-             parametric =
-               {
-                 hard_gas_limit_per_operation;
-                 hard_gas_limit_per_block;
-                 hard_storage_limit_per_operation;
-                 origination_size;
-                 cost_per_byte;
-                 _;
-               };
+  let open Lwt_result_syntax in
+  let* () =
+    Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
+  in
+  let* {
+         parametric =
+           {
+             hard_gas_limit_per_operation;
+             hard_gas_limit_per_block;
+             hard_storage_limit_per_operation;
+             origination_size;
+             cost_per_byte;
              _;
-           } ->
+           };
+         _;
+       } =
+    Alpha_services.Constants.all cctxt (chain, block)
+  in
   let user_gas_limit_needs_patching user_gas_limit =
     Limit.fold user_gas_limit ~unknown:true ~known:(fun user_gas_limit ->
         Gas.Arith.(
@@ -802,81 +814,87 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind Kind.manager contents tzresult Lwt.t =
    fun ~first -> function
     | (Manager_info c as op), (Manager_operation_result _ as result) ->
-        (if user_gas_limit_needs_patching c.gas_limit then
-         Lwt.return (estimated_gas_single result) >>= fun gas ->
-         match gas with
-         | Error _ when force ->
-             (* When doing a simulation, set gas to the maximum possible value
-                so as to not change the error. When force injecting a failing
-                operation, set gas to zero to not pay fees for this
-                operation. *)
-             let gas =
-               if simulation then gas_limit_per_patched_op else Gas.Arith.zero
-             in
-             return
-               (Annotated_manager_operation.set_gas_limit (Limit.known gas) op)
-         | Error _ as res -> Lwt.return res
-         | Ok gas ->
-             if Gas.Arith.(gas = zero) then
-               cctxt#message "Estimated gas: none" >>= fun () ->
-               return
-                 (Annotated_manager_operation.set_gas_limit
-                    (Limit.known Gas.Arith.zero)
-                    op)
-             else
-               let safety_guard =
-                 match c.operation with
-                 | Transaction {destination = Implicit _; _}
-                 | Reveal _ | Delegation _ | Increase_paid_storage _ ->
-                     Gas.Arith.zero
-                 | _ -> safety_guard
-               in
-               cctxt#message
-                 "Estimated gas: %a units (will add %a for safety)"
-                 Gas.Arith.pp
-                 gas
-                 Gas.Arith.pp
-                 safety_guard
-               >>= fun () ->
-               let safe_gas = Gas.Arith.(add (ceil gas) safety_guard) in
-               let patched_gas =
-                 Gas.Arith.min safe_gas hard_gas_limit_per_operation
-               in
-               return
-                 (Annotated_manager_operation.set_gas_limit
-                    (Limit.known patched_gas)
-                    op)
-        else return op)
-        >>=? fun op ->
-        (if user_storage_limit_needs_patching c.storage_limit then
-         Lwt.return
-           (estimated_storage_single
-              ~origination_size:(Z.of_int origination_size)
-              ~force
-              result)
-         >>=? fun storage ->
-         if Z.equal storage Z.zero then
-           cctxt#message "Estimated storage: no bytes added" >>= fun () ->
-           return
-             (Annotated_manager_operation.set_storage_limit
-                (Limit.known Z.zero)
-                op)
-         else
-           cctxt#message
-             "Estimated storage: %s bytes added (will add 20 for safety)"
-             (Z.to_string storage)
-           >>= fun () ->
-           let storage_limit =
-             Z.min
-               (Z.add storage (Z.of_int 20))
-               hard_storage_limit_per_operation
-           in
-           return
-             (Annotated_manager_operation.set_storage_limit
-                (Limit.known storage_limit)
-                op)
-        else return op)
-        >>=? fun op ->
+        let* op =
+          if user_gas_limit_needs_patching c.gas_limit then
+            Lwt.return (estimated_gas_single result) >>= fun gas ->
+            match gas with
+            | Error _ when force ->
+                (* When doing a simulation, set gas to the maximum possible value
+                   so as to not change the error. When force injecting a failing
+                   operation, set gas to zero to not pay fees for this
+                   operation. *)
+                let gas =
+                  if simulation then gas_limit_per_patched_op
+                  else Gas.Arith.zero
+                in
+                return
+                  (Annotated_manager_operation.set_gas_limit
+                     (Limit.known gas)
+                     op)
+            | Error _ as res -> Lwt.return res
+            | Ok gas ->
+                if Gas.Arith.(gas = zero) then
+                  cctxt#message "Estimated gas: none" >>= fun () ->
+                  return
+                    (Annotated_manager_operation.set_gas_limit
+                       (Limit.known Gas.Arith.zero)
+                       op)
+                else
+                  let safety_guard =
+                    match c.operation with
+                    | Transaction {destination = Implicit _; _}
+                    | Reveal _ | Delegation _ | Increase_paid_storage _ ->
+                        Gas.Arith.zero
+                    | _ -> safety_guard
+                  in
+                  cctxt#message
+                    "Estimated gas: %a units (will add %a for safety)"
+                    Gas.Arith.pp
+                    gas
+                    Gas.Arith.pp
+                    safety_guard
+                  >>= fun () ->
+                  let safe_gas = Gas.Arith.(add (ceil gas) safety_guard) in
+                  let patched_gas =
+                    Gas.Arith.min safe_gas hard_gas_limit_per_operation
+                  in
+                  return
+                    (Annotated_manager_operation.set_gas_limit
+                       (Limit.known patched_gas)
+                       op)
+          else return op
+        in
+        let* op =
+          if user_storage_limit_needs_patching c.storage_limit then
+            let* storage =
+              Lwt.return
+                (estimated_storage_single
+                   ~origination_size:(Z.of_int origination_size)
+                   ~force
+                   result)
+            in
+            if Z.equal storage Z.zero then
+              cctxt#message "Estimated storage: no bytes added" >>= fun () ->
+              return
+                (Annotated_manager_operation.set_storage_limit
+                   (Limit.known Z.zero)
+                   op)
+            else
+              cctxt#message
+                "Estimated storage: %s bytes added (will add 20 for safety)"
+                (Z.to_string storage)
+              >>= fun () ->
+              let storage_limit =
+                Z.min
+                  (Z.add storage (Z.of_int 20))
+                  hard_storage_limit_per_operation
+              in
+              return
+                (Annotated_manager_operation.set_storage_limit
+                   (Limit.known storage_limit)
+                   op)
+          else return op
+        in
         if Limit.is_unknown c.fee then
           (* Setting a dummy fee is required for converting to manager op *)
           let op =
@@ -895,45 +913,53 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
    fun first annotated_list result_list ->
     match (annotated_list, result_list) with
     | Single_manager annotated, Single_result res ->
-        patch ~first (annotated, res) >>=? fun op -> return (Single op)
+        let* op = patch ~first (annotated, res) in
+        return (Single op)
     | Cons_manager (annotated, annotated_rest), Cons_result (res, res_rest) ->
-        patch ~first (annotated, res) >>=? fun op ->
-        patch_list false annotated_rest res_rest >>=? fun rest ->
+        let* op = patch ~first (annotated, res) in
+        let* rest = patch_list false annotated_rest res_rest in
         return (Cons (op, rest))
     | _ -> assert false
   in
   match may_need_patching annotated_contents with
   | Some annotated_for_simulation ->
-      Lwt.return
-        (Annotated_manager_operation.manager_list_from_annotated
-           annotated_for_simulation)
-      >>=? fun contents_for_simulation ->
-      simulate
-        cctxt
-        ~chain
-        ~block
-        ?successor_level
-        ?branch
-        contents_for_simulation
-      >>=? fun (_, _, result) ->
-      (match detect_script_failure result with
-      | Ok () -> return_unit
-      | Error _ ->
-          cctxt#message
-            "@[<v 2>This simulation failed:@,%a@]"
-            Operation_result.pp_operation_result
-            (contents_for_simulation, result.contents)
-          >>= fun () -> return_unit)
-      >>=? fun () ->
-      ( Lwt.return
-          (estimated_storage
-             ~origination_size:(Z.of_int origination_size)
-             ~force
-             result.contents)
-      >>=? fun storage ->
+      let* contents_for_simulation =
         Lwt.return
-          (Environment.wrap_tzresult Tez.(cost_per_byte *? Z.to_int64 storage))
-        >>=? fun burn ->
+          (Annotated_manager_operation.manager_list_from_annotated
+             annotated_for_simulation)
+      in
+      let* _, _, result =
+        simulate
+          cctxt
+          ~chain
+          ~block
+          ?successor_level
+          ?branch
+          contents_for_simulation
+      in
+      let* () =
+        match detect_script_failure result with
+        | Ok () -> return_unit
+        | Error _ ->
+            cctxt#message
+              "@[<v 2>This simulation failed:@,%a@]"
+              Operation_result.pp_operation_result
+              (contents_for_simulation, result.contents)
+            >>= fun () -> return_unit
+      in
+      let* () =
+        let* storage =
+          Lwt.return
+            (estimated_storage
+               ~origination_size:(Z.of_int origination_size)
+               ~force
+               result.contents)
+        in
+        let* burn =
+          Lwt.return
+            (Environment.wrap_tzresult
+               Tez.(cost_per_byte *? Z.to_int64 storage))
+        in
         if Tez.(burn > fee_parameter.burn_cap) then
           cctxt#error
             "The operation will burn %s%a which is higher than the configured \
@@ -948,8 +974,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             Tez.pp
             burn
           >>= fun () -> exit 1
-        else return_unit )
-      >>=? fun () -> patch_list true annotated_contents result.contents
+        else return_unit
+      in
+      patch_list true annotated_contents result.contents
   | None ->
       Lwt.return
         (Annotated_manager_operation.manager_list_from_annotated
@@ -980,29 +1007,32 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?(force = false) ?successor_level
     ?branch ?src_sk ?verbose_signing ?fee_parameter
     (contents : kind contents_list) =
-  (if simulation then
-   simulate cctxt ~chain ~block ?successor_level ?branch contents
-  else
-    preapply
-      cctxt
-      ~chain
-      ~block
-      ?fee_parameter
-      ?verbose_signing
-      ?branch
-      ?src_sk
-      contents)
-  >>=? fun (_oph, op, result) ->
-  (match detect_script_failure result with
-  | Ok () -> return_unit
-  | Error _ as res ->
-      cctxt#message
-        "@[<v 2>This simulation failed (force = %b):@,%a@]"
-        force
-        Operation_result.pp_operation_result
-        (op.protocol_data.contents, result.contents)
-      >>= fun () -> if force then return_unit else Lwt.return res)
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* _oph, op, result =
+    if simulation then
+      simulate cctxt ~chain ~block ?successor_level ?branch contents
+    else
+      preapply
+        cctxt
+        ~chain
+        ~block
+        ?fee_parameter
+        ?verbose_signing
+        ?branch
+        ?src_sk
+        contents
+  in
+  let* () =
+    match detect_script_failure result with
+    | Ok () -> return_unit
+    | Error _ as res ->
+        cctxt#message
+          "@[<v 2>This simulation failed (force = %b):@,%a@]"
+          force
+          Operation_result.pp_operation_result
+          (op.protocol_data.contents, result.contents)
+        >>= fun () -> if force then return_unit else Lwt.return res
+  in
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.encoding_with_legacy_attestation_name
@@ -1023,64 +1053,66 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       (op.protocol_data.contents, result.contents)
     >>= fun () -> return (oph, op, result.contents)
   else
-    Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
+    let* oph = Shell_services.Injection.operation cctxt ~chain bytes in
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
     cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
     (* Adjust user-provided confirmations with respect to Alpha protocol finality properties *)
     tenderbake_adjust_confirmations cctxt confirmations >>= fun confirmations ->
-    (match confirmations with
-    | None ->
-        cctxt#message
-          "@[<v 0>NOT waiting for the operation to be included.@,\
-           Use command@,\
-          \  octez-client wait for %a to be included --confirmations %d \
-           --branch %a@,\
-           and/or an external block explorer to make sure that it has been \
-           included.@]"
-          Operation_hash.pp
-          oph
-          tenderbake_finality_confirmations
-          Block_hash.pp
-          op.shell.branch
-        >>= fun () -> return result
-    | Some confirmations -> (
-        cctxt#message "Waiting for the operation to be included..."
-        >>= fun () ->
-        Client_confirmations.wait_for_operation_inclusion
-          ~branch:op.shell.branch
-          ~confirmations
-          cctxt
-          ~chain
-          oph
-        >>=? fun (h, i, j) ->
-        Alpha_block_services.Operations.operation
-          cctxt
-          ~chain
-          ~block:(`Hash (h, 0))
-          i
-          j
-        >>=? fun op' ->
-        match op'.receipt with
-        | Empty -> failwith "Internal error: pruned metadata."
-        | Too_large -> failwith "Internal error: too large metadata."
-        | Receipt No_operation_metadata ->
-            cctxt#message
-              "The operation metadata was not stored because it was too big, \
-               thus the failure to display the receipt."
-            >>= fun () -> failwith "Internal error: unexpected receipt."
-        | Receipt (Operation_metadata receipt) -> (
-            match Apply_results.kind_equal_list contents receipt.contents with
-            | Some Apply_results.Eq ->
-                return (receipt : kind operation_metadata)
-            | None -> failwith "Internal error: unexpected receipt.")))
-    >>=? fun result ->
+    let* result =
+      match confirmations with
+      | None ->
+          cctxt#message
+            "@[<v 0>NOT waiting for the operation to be included.@,\
+             Use command@,\
+            \  octez-client wait for %a to be included --confirmations %d \
+             --branch %a@,\
+             and/or an external block explorer to make sure that it has been \
+             included.@]"
+            Operation_hash.pp
+            oph
+            tenderbake_finality_confirmations
+            Block_hash.pp
+            op.shell.branch
+          >>= fun () -> return result
+      | Some confirmations -> (
+          cctxt#message "Waiting for the operation to be included..."
+          >>= fun () ->
+          let* h, i, j =
+            Client_confirmations.wait_for_operation_inclusion
+              ~branch:op.shell.branch
+              ~confirmations
+              cctxt
+              ~chain
+              oph
+          in
+          let* op' =
+            Alpha_block_services.Operations.operation
+              cctxt
+              ~chain
+              ~block:(`Hash (h, 0))
+              i
+              j
+          in
+          match op'.receipt with
+          | Empty -> failwith "Internal error: pruned metadata."
+          | Too_large -> failwith "Internal error: too large metadata."
+          | Receipt No_operation_metadata ->
+              cctxt#message
+                "The operation metadata was not stored because it was too big, \
+                 thus the failure to display the receipt."
+              >>= fun () -> failwith "Internal error: unexpected receipt."
+          | Receipt (Operation_metadata receipt) -> (
+              match Apply_results.kind_equal_list contents receipt.contents with
+              | Some Apply_results.Eq ->
+                  return (receipt : kind operation_metadata)
+              | None -> failwith "Internal error: unexpected receipt."))
+    in
     cctxt#message
       "@[<v 2>This sequence of operations was run:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
     >>= fun () ->
-    Lwt.return (originated_contracts result.contents ~force)
-    >>=? fun contracts ->
+    let* contracts = Lwt.return (originated_contracts result.contents ~force) in
     List.iter_s
       (fun c -> cctxt#message "New contract %a originated." Contract_hash.pp c)
       contracts
@@ -1111,8 +1143,10 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
     ?verbose_signing ?fee_parameter (contents : kind contents_list) =
-  Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () =
+    Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
+  in
   inject_operation_internal
     cctxt
     ~chain
@@ -1327,16 +1361,18 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     * kind Kind.manager contents_result_list)
     tzresult
     Lwt.t =
-  (match counter with
-  | None ->
-      Alpha_services.Contract.counter cctxt (chain, block) source
-      >>=? fun pcounter ->
-      let counter = Manager_counter.succ pcounter in
-      return counter
-  | Some counter -> return counter)
-  >>=? fun counter ->
-  Alpha_services.Contract.manager_key cctxt (chain, block) source
-  >>=? fun key ->
+  let open Lwt_result_syntax in
+  let* counter =
+    match counter with
+    | None ->
+        let* pcounter =
+          Alpha_services.Contract.counter cctxt (chain, block) source
+        in
+        let counter = Manager_counter.succ pcounter in
+        return counter
+    | Some counter -> return counter
+  in
+  let* key = Alpha_services.Contract.manager_key cctxt (chain, block) source in
   (* [has_reveal] assumes that a Reveal operation only appears as the first of a batch *)
   let has_reveal :
       type kind. kind Annotated_manager_operation.annotated_list -> bool =
@@ -1375,10 +1411,11 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   in
   match key with
   | None when not (has_reveal operations) -> (
-      (if not (Limit.is_unknown fee && Limit.is_unknown storage_limit) then
-       reveal_error cctxt
-      else return_unit)
-      >>=? fun () ->
+      let* () =
+        if not (Limit.is_unknown fee && Limit.is_unknown storage_limit) then
+          reveal_error cctxt
+        else return_unit
+      in
       let reveal =
         prepare_manager_operation
           ~fee:Limit.unknown
@@ -1390,39 +1427,44 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       Annotated_manager_operation.set_counter counter reveal >>?= fun reveal ->
       build_contents (Manager_counter.succ counter) operations >>?= fun rest ->
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
-      may_patch_limits
-        cctxt
-        ~fee_parameter
-        ~signature_algo
-        ~chain
-        ~block
-        ?force
-        ?simulation
-        ?successor_level
-        ?branch
-        contents
-      >>=? may_replace_operation
-             cctxt
-             chain
-             source
-             ~replace_by_fees
-             ~user_fee:fee
-      >>=? fun contents ->
-      inject_operation_internal
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?simulation
-        ?force
-        ~fee_parameter
-        ?verbose_signing
-        ?successor_level
-        ?branch
-        ~src_sk
-        contents
-      >>=? fun (oph, op, result) ->
+      let* contents =
+        let* contents =
+          may_patch_limits
+            cctxt
+            ~fee_parameter
+            ~signature_algo
+            ~chain
+            ~block
+            ?force
+            ?simulation
+            ?successor_level
+            ?branch
+            contents
+        in
+        (may_replace_operation
+           cctxt
+           chain
+           source
+           ~replace_by_fees
+           ~user_fee:fee)
+          contents
+      in
+      let* oph, op, result =
+        inject_operation_internal
+          cctxt
+          ~chain
+          ~block
+          ?confirmations
+          ?dry_run
+          ?simulation
+          ?force
+          ~fee_parameter
+          ?verbose_signing
+          ?successor_level
+          ?branch
+          ~src_sk
+          contents
+      in
       match pack_contents_list op.protocol_data.contents result with
       | Cons_and_result (_, _, rest) ->
           let second_op, second_result = unpack_contents_list rest in
@@ -1432,37 +1474,42 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       failwith "The manager key was previously revealed."
   | _ ->
       build_contents counter operations >>?= fun contents ->
-      may_patch_limits
-        cctxt
-        ~fee_parameter
-        ~signature_algo
-        ~chain
-        ~block
-        ?force
-        ?simulation
-        ?successor_level
-        ?branch
-        contents
-      >>=? may_replace_operation
-             cctxt
-             chain
-             source
-             ~replace_by_fees
-             ~user_fee:fee
-      >>=? fun contents ->
-      inject_operation_internal
-        cctxt
-        ~chain
-        ~block
-        ?confirmations
-        ?dry_run
-        ?verbose_signing
-        ?simulation
-        ?force
-        ~fee_parameter
-        ?successor_level
-        ?branch
-        ~src_sk
-        contents
-      >>=? fun (oph, op, result) ->
+      let* contents =
+        let* contents =
+          may_patch_limits
+            cctxt
+            ~fee_parameter
+            ~signature_algo
+            ~chain
+            ~block
+            ?force
+            ?simulation
+            ?successor_level
+            ?branch
+            contents
+        in
+        (may_replace_operation
+           cctxt
+           chain
+           source
+           ~replace_by_fees
+           ~user_fee:fee)
+          contents
+      in
+      let* oph, op, result =
+        inject_operation_internal
+          cctxt
+          ~chain
+          ~block
+          ?confirmations
+          ?dry_run
+          ?verbose_signing
+          ?simulation
+          ?force
+          ~fee_parameter
+          ?successor_level
+          ?branch
+          ~src_sk
+          contents
+      in
       return (oph, Operation.pack op, op.protocol_data.contents, result)

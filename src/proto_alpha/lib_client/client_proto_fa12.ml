@@ -667,23 +667,27 @@ let extract_parameter contract = function
   | _ -> error (Contract_has_no_script contract)
 
 let get_contract_parameter cctxt ~chain ~block contract =
-  Client_proto_context.get_script
-    cctxt
-    ~chain
-    ~block
-    contract
-    ~unparsing_mode:Optimized
-    ~normalize_types:true
-  >>=? function
-  | None -> fail (Contract_has_no_script contract)
+  let open Lwt_result_syntax in
+  let* script_opt =
+    Client_proto_context.get_script
+      cctxt
+      ~chain
+      ~block
+      contract
+      ~unparsing_mode:Optimized
+      ~normalize_types:true
+  in
+  match script_opt with
+  | None -> tzfail (Contract_has_no_script contract)
   | Some {code; _} -> (
       match Script_repr.force_decode code with
-      | Error _ -> fail (Contract_has_no_script contract)
+      | Error _ -> tzfail (Contract_has_no_script contract)
       | Ok code -> Lwt.return (extract_parameter contract (Micheline.root code))
       )
 
 let convert_wrapped_parameter_into_action cctxt ~chain ~block contract param =
-  get_contract_parameter cctxt ~chain ~block contract >>=? fun parameter ->
+  let open Lwt_result_syntax in
+  let* parameter = get_contract_parameter cctxt ~chain ~block contract in
   Lwt.return (derive_action param parameter)
 
 let check_entrypoint entrypoints (name, (expected_ty, check)) =
@@ -716,15 +720,18 @@ let contract_has_fa12_interface :
     contract:Contract_hash.t ->
     unit ->
     unit tzresult Lwt.t =
- fun cctxt ~chain ~block ~contract () ->
-  Michelson_v1_entrypoints.list_contract_entrypoints
-    cctxt
-    ~chain
-    ~block
-    ~contract
-    ~normalize_types:true
-  >>=? fun entrypoints ->
-  List.iter_e (check_entrypoint entrypoints) standard_entrypoints |> Lwt.return
+  let open Lwt_result_syntax in
+  fun cctxt ~chain ~block ~contract () ->
+    let* entrypoints =
+      Michelson_v1_entrypoints.list_contract_entrypoints
+        cctxt
+        ~chain
+        ~block
+        ~contract
+        ~normalize_types:true
+    in
+    List.iter_e (check_entrypoint entrypoints) standard_entrypoints
+    |> Lwt.return
 
 let translate_action_to_argument action =
   let entrypoint = action_to_entrypoint action in
@@ -766,7 +773,8 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ?confirmations ?dry_run ?verbose_signing ?branch ~source ~src_pk ~src_sk
     ~contract ~action ~tez_amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter () =
-  contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = contract_has_fa12_interface cctxt ~chain ~block ~contract () in
   let entrypoint, parameters = translate_action_to_argument action in
   Client_proto_context.transfer_with_script
     cctxt
@@ -794,7 +802,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)
-      | Some error -> fail error)
+      | Some error -> tzfail error)
 
 type token_transfer = {
   token_contract : string;
@@ -882,16 +890,20 @@ let build_transaction_operation ?(tez_amount = Tez.zero) ?fee ?gas_limit
 
 let prepare_single_token_transfer cctxt ?default_fee ?default_gas_limit
     ?default_storage_limit ~chain ~block src index transfer =
-  Client_proto_contracts.Originated_contract_alias.find_destination
-    cctxt
-    transfer.token_contract
-  >>=? fun token ->
-  contract_has_fa12_interface cctxt ~chain ~block ~contract:token ()
-  >>=? fun () ->
-  Client_proto_contracts.Contract_alias.find_destination
-    cctxt
-    transfer.destination
-  >>=? fun dest ->
+  let open Lwt_result_syntax in
+  let* token =
+    Client_proto_contracts.Originated_contract_alias.find_destination
+      cctxt
+      transfer.token_contract
+  in
+  let* () =
+    contract_has_fa12_interface cctxt ~chain ~block ~contract:token ()
+  in
+  let* dest =
+    Client_proto_contracts.Contract_alias.find_destination
+      cctxt
+      transfer.destination
+  in
   tez_of_opt_string_exn index "tez_amount" transfer.tez_amount
   >>?= fun tez_amount ->
   tez_of_opt_string_exn index "fee" transfer.fee >>?= fun transfer_fee ->
@@ -916,17 +928,19 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
     ~block ?confirmations ?dry_run ?verbose_signing ~sender ~source ~src_pk
     ~src_sk ~token_transfers ~fee_parameter ?counter ?default_fee
     ?default_gas_limit ?default_storage_limit () =
-  List.mapi_ep
-    (prepare_single_token_transfer
-       cctxt
-       ?default_fee
-       ?default_gas_limit
-       ?default_storage_limit
-       ~chain
-       ~block
-       sender)
-    token_transfers
-  >>=? fun contents ->
+  let open Lwt_result_syntax in
+  let* contents =
+    List.mapi_ep
+      (prepare_single_token_transfer
+         cctxt
+         ?default_fee
+         ?default_gas_limit
+         ?default_storage_limit
+         ~chain
+         ~block
+         sender)
+      token_transfers
+  in
   let (Manager_list contents) =
     Annotated_manager_operation.manager_of_list contents
   in
@@ -951,7 +965,7 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)
-      | Some error -> fail error)
+      | Some error -> tzfail error)
 
 let is_viewable_action action =
   match action with
@@ -961,11 +975,12 @@ let is_viewable_action action =
 
 let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ?sender ~contract ~action ?payer ?gas ~unparsing_mode () =
-  is_viewable_action action >>=? fun () ->
-  contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = is_viewable_action action in
+  let* () = contract_has_fa12_interface cctxt ~chain ~block ~contract () in
   let entrypoint = action_to_entrypoint action in
   let input = Micheline.strip_locations (view_input ~loc:() action) in
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)

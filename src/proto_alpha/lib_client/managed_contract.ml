@@ -108,6 +108,7 @@ let entrypoint_remove_delegate = Entrypoint.remove_delegate
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
+  let open Lwt_result_syntax in
   let entrypoint = entrypoint_do in
   let open Lwt_result_syntax in
   let* expr_opt =

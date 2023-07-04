@@ -54,16 +54,19 @@ module Protocol_constants_overrides = struct
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
+    let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_full cctxt in
-    Protocol.Constants_services.all cpctxt (cpctxt#chain, cpctxt#block)
-    >>=? fun {parametric; _} ->
+    let* {parametric; _} =
+      Protocol.Constants_services.all cpctxt (cpctxt#chain, cpctxt#block)
+    in
     let to_chain_id_opt = function `Hash c -> Some c | _ -> None in
-    Shell_services.Blocks.Header.shell_header
-      cpctxt
-      ~chain:cpctxt#chain
-      ~block:cpctxt#block
-      ()
-    >>=? fun header ->
+    let* header =
+      Shell_services.Blocks.Header.shell_header
+        cpctxt
+        ~chain:cpctxt#chain
+        ~block:cpctxt#block
+        ()
+    in
     return
       {
         parametric;
@@ -97,8 +100,9 @@ module Parsed_account = struct
          (req "amount" Tez.encoding))
 
   let to_bootstrap_account repr =
-    Tezos_client_base.Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
-    Tezos_client_base.Client_keys.public_key pk_uri >>=? fun public_key ->
+    let open Lwt_result_syntax in
+    let* pk_uri = Tezos_client_base.Client_keys.neuterize repr.sk_uri in
+    let* public_key = Tezos_client_base.Client_keys.public_key pk_uri in
     let public_key_hash = Signature.Public_key.hash public_key in
     return
       Parameters.
@@ -112,11 +116,12 @@ module Parsed_account = struct
 
   let default_to_json (cctxt : Tezos_client_base.Client_context.full) :
       string tzresult Lwt.t =
+    let open Lwt_result_syntax in
     let rpc_context = new Protocol_client_context.wrap_full cctxt in
     let wallet = (cctxt :> Client_context.wallet) in
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
-    Client_keys.list_keys wallet >>=? fun all_keys ->
+    let* all_keys = Client_keys.list_keys wallet in
     List.iter_s
       (function
         | name, pkh, _pk_opt, Some sk_uri -> (
@@ -291,6 +296,7 @@ let attestation_branch_data_encoding =
 let initial_context chain_id (header : Block_header.shell_header)
     ({bootstrap_accounts; bootstrap_contracts; constants; _} :
       Protocol_parameters.t) =
+  let open Lwt_result_syntax in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -308,8 +314,9 @@ let initial_context chain_id (header : Block_header.shell_header)
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
   Environment.Updater.activate ctxt Protocol.hash >>= fun ctxt ->
-  Protocol.Main.init chain_id ctxt header >|= Environment.wrap_tzresult
-  >>=? fun {context; _} ->
+  let* {context; _} =
+    Protocol.Main.init chain_id ctxt header >|= Environment.wrap_tzresult
+  in
   let ({
          timestamp = predecessor_timestamp;
          level = predecessor_level;
@@ -330,28 +337,31 @@ let initial_context chain_id (header : Block_header.shell_header)
   let predecessor =
     Tezos_base.Block_header.hash {shell = header; protocol_data = Bytes.empty}
   in
-  Protocol.Main.value_of_key
-    ~chain_id
-    ~predecessor_context:context
-    ~predecessor_timestamp
-    ~predecessor_level
-    ~predecessor_fitness
-    ~predecessor
-    ~timestamp
-  >|= Environment.wrap_tzresult
-  >>=? fun value_of_key ->
+  let* value_of_key =
+    Protocol.Main.value_of_key
+      ~chain_id
+      ~predecessor_context:context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+    >|= Environment.wrap_tzresult
+  in
   (*
       In the mockup mode, reactivity is important and there are
       no constraints to be consistent with other nodes. For this
       reason, the mockup mode loads the cache lazily.
       See {!Environment_context.source_of_cache}.
   *)
-  Tezos_protocol_environment.Context.load_cache
-    predecessor
-    context
-    `Lazy
-    (fun key -> value_of_key key >|= Environment.wrap_tzresult)
-  >>=? fun context -> return context
+  let* context =
+    Tezos_protocol_environment.Context.load_cache
+      predecessor
+      context
+      `Lazy
+      (fun key -> value_of_key key >|= Environment.wrap_tzresult)
+  in
+  return context
 
 let mem_init :
     cctxt:Tezos_client_base.Client_context.printer ->
@@ -360,6 +370,7 @@ let mem_init :
     bootstrap_accounts_json:Data_encoding.json option ->
     Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
+  let open Lwt_result_syntax in
   let hash = genesis_block_hash in
   (* Need to read this Json file before since timestamp modification may be in
      there *)
@@ -403,18 +414,19 @@ let mem_init :
             parameters.constants
         in
         let parameters_overriden = merge_objects parameters_json json in
-        (match
-           Data_encoding.Json.destruct
-             lib_parameters_json_encoding
-             parameters_overriden
-         with
-        | _, x -> return x
-        | exception error ->
-            failwith
-              "cannot read protocol constants overrides: %a"
-              (Data_encoding.Json.print_error ?print_unknown:None)
-              error)
-        >>=? fun protocol_overrides ->
+        let* protocol_overrides =
+          match
+            Data_encoding.Json.destruct
+              lib_parameters_json_encoding
+              parameters_overriden
+          with
+          | _, x -> return x
+          | exception error ->
+              failwith
+                "cannot read protocol constants overrides: %a"
+                (Data_encoding.Json.print_error ?print_unknown:None)
+                error
+        in
         let fields_with_override = match json with `O fs -> fs | _ -> [] in
         let field_pp ppf (name, value) =
           Format.fprintf ppf "@[<h>%s: %a@]" name Data_encoding.Json.pp value
@@ -435,8 +447,9 @@ let mem_init :
               chain_id = None;
             }
   in
-  override_protocol_parameters constants_overrides_json parameters
-  >>=? fun (protocol_overrides : Protocol_constants_overrides.t) ->
+  let* (protocol_overrides : Protocol_constants_overrides.t) =
+    override_protocol_parameters constants_overrides_json parameters
+  in
   let chain_id =
     Tezos_mockup_registration.Mockup_args.Chain_id.choose
       ~from_config_file:protocol_overrides.chain_id
@@ -463,45 +476,49 @@ let mem_init :
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  (match bootstrap_accounts_json with
-  | None -> return None
-  | Some json -> (
-      match
-        Data_encoding.Json.destruct
-          (Data_encoding.list Parsed_account.encoding)
-          json
-      with
-      | accounts ->
-          cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
-          >>= fun () ->
-          let open Format in
-          cctxt#message
-            "@[%a@]"
-            (pp_print_list
-               ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-               Parsed_account.pp)
-            accounts
-          >>= fun () ->
-          List.map_es Parsed_account.to_bootstrap_account accounts
-          >>=? fun bootstrap_accounts -> return (Some bootstrap_accounts)
-      | exception error ->
-          failwith
-            "cannot read definitions of bootstrap accounts: %a"
-            (Data_encoding.Json.print_error ?print_unknown:None)
-            error))
-  >>=? fun bootstrap_accounts_custom ->
-  initial_context
-    chain_id
-    shell_header
-    {
-      parameters with
-      bootstrap_accounts =
-        Option.value
-          ~default:parameters.bootstrap_accounts
-          bootstrap_accounts_custom;
-      constants = protocol_overrides.parametric;
-    }
-  >>=? fun context ->
+  let* bootstrap_accounts_custom =
+    match bootstrap_accounts_json with
+    | None -> return None
+    | Some json -> (
+        match
+          Data_encoding.Json.destruct
+            (Data_encoding.list Parsed_account.encoding)
+            json
+        with
+        | accounts ->
+            cctxt#message "@[<h>mockup client uses custom bootstrap accounts:@]"
+            >>= fun () ->
+            let open Format in
+            cctxt#message
+              "@[%a@]"
+              (pp_print_list
+                 ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+                 Parsed_account.pp)
+              accounts
+            >>= fun () ->
+            let* bootstrap_accounts =
+              List.map_es Parsed_account.to_bootstrap_account accounts
+            in
+            return (Some bootstrap_accounts)
+        | exception error ->
+            failwith
+              "cannot read definitions of bootstrap accounts: %a"
+              (Data_encoding.Json.print_error ?print_unknown:None)
+              error)
+  in
+  let* context =
+    initial_context
+      chain_id
+      shell_header
+      {
+        parameters with
+        bootstrap_accounts =
+          Option.value
+            ~default:parameters.bootstrap_accounts
+            bootstrap_accounts_custom;
+        constants = protocol_overrides.parametric;
+      }
+  in
   let protocol_data =
     let payload_hash =
       Protocol.Block_payload_hash.hash_bytes
@@ -560,9 +577,11 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
+  let open Lwt_result_syntax in
   Environment.Updater.activate context Protocol.hash >>= fun context ->
-  Protocol.Main.init chain context block_header >|= Environment.wrap_tzresult
-  >>=? fun {context; _} ->
+  let* {context; _} =
+    Protocol.Main.init chain context block_header >|= Environment.wrap_tzresult
+  in
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}
   in

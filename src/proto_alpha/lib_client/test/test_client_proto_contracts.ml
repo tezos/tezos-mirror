@@ -72,20 +72,25 @@ let test_find_destination _ =
     Format.asprintf {| [{"name": "test_alias", "value": "%s" }] |} bootstrap1
   in
   let w = new mock_wallet wallet_json in
+  let open Lwt_result_syntax in
   let test msg key exp_source =
-    Client_proto_contracts.Contract_alias.find_destination w key
-    >>=? fun contract ->
-    Client_proto_contracts.Raw_contract_alias.to_source contract
-    >>=? fun source ->
+    let* contract =
+      Client_proto_contracts.Contract_alias.find_destination w key
+    in
+    let* source =
+      Client_proto_contracts.Raw_contract_alias.to_source contract
+    in
     (* Alcotest equality assertion *)
     Alcotest.(check string msg source exp_source) ;
     return_unit
   in
-  test "Expected alias:test_alias = bootstrap1" "alias:test_alias" bootstrap1
-  >>=? fun () ->
-  test "Expected key:test_alias = bootstrap1" "key:test_alias" bootstrap1
-  >>=? fun () ->
-  test "Expected bootstrap1 = bootstrap1" bootstrap1 bootstrap1 >>=? fun () ->
+  let* () =
+    test "Expected alias:test_alias = bootstrap1" "alias:test_alias" bootstrap1
+  in
+  let* () =
+    test "Expected key:test_alias = bootstrap1" "key:test_alias" bootstrap1
+  in
+  let* () = test "Expected bootstrap1 = bootstrap1" bootstrap1 bootstrap1 in
   test "Expected test_alias bootstrap1" "test_alias" bootstrap1
 
 let () =

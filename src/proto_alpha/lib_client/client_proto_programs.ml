@@ -155,6 +155,7 @@ type run_params = {
 
 let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_view_params) =
+  let open Lwt_result_syntax in
   let {
     shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     contract;
@@ -162,7 +163,7 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
   } =
     params
   in
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
@@ -179,6 +180,7 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
 
 let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
+  let open Lwt_result_syntax in
   let {
     shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     contract;
@@ -187,7 +189,7 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
   } =
     params
   in
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
   Plugin.RPC.Scripts.run_script_view
     cctxt
     (chain, block)
@@ -205,7 +207,8 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let open Lwt_result_syntax in
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
     shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     program;
@@ -238,7 +241,8 @@ let run (cctxt : #Protocol_client_context.rpc_context)
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
-  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  let open Lwt_result_syntax in
+  let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
     shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
     program;

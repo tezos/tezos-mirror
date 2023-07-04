@@ -124,14 +124,17 @@ type error += Fetch_script_meta_error of error trace
 
 let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
     contract =
-  Plugin.RPC.Contract.get_script_normalized
-    cctxt
-    (chain, block)
-    ~unparsing_mode:Readable
-    ~normalize_types:true
-    ~contract
-  >>=? function
-  | None -> fail (Fetch_script_not_found_meta_error contract)
+  let open Lwt_result_syntax in
+  let* script_opt =
+    Plugin.RPC.Contract.get_script_normalized
+      cctxt
+      (chain, block)
+      ~unparsing_mode:Readable
+      ~normalize_types:true
+      ~contract
+  in
+  match script_opt with
+  | None -> tzfail (Fetch_script_not_found_meta_error contract)
   | Some {code; storage = _} ->
       Lwt.return @@ Environment.wrap_tzresult @@ Script_repr.force_decode code
 

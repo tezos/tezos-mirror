@@ -119,22 +119,27 @@ let list_contract_unreachables cctxt ~chain ~block ~contract =
     (* no need to normalize types as typed entrypoints are ignored *)
     false
   in
-  list_contract_unreachables_and_entrypoints
-    cctxt
-    ~chain
-    ~block
-    ~contract
-    ~normalize_types
-  >>=? fun (unreachables, _typed_entrypoints) -> return unreachables
+  let open Lwt_result_syntax in
+  let* unreachables, _types_entrypoints =
+    list_contract_unreachables_and_entrypoints
+      cctxt
+      ~chain
+      ~block
+      ~contract
+      ~normalize_types
+  in
+  return unreachables
 
 let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
-  list_contract_unreachables_and_entrypoints
-    cctxt
-    ~chain
-    ~block
-    ~contract
-    ~normalize_types
-  >>=? fun (_, entrypoints) ->
+  let open Lwt_result_syntax in
+  let* _, entrypoints =
+    list_contract_unreachables_and_entrypoints
+      cctxt
+      ~chain
+      ~block
+      ~contract
+      ~normalize_types
+  in
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     contract_entrypoint_type
       cctxt
@@ -150,12 +155,17 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
   else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
-  Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
-  >>=? fun (unreachables, _) -> return unreachables
+  let open Lwt_result_syntax in
+  let* unreachables, _ =
+    Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
+  in
+  return unreachables
 
 let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
-  Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
-  >>=? fun (_, entrypoints) ->
+  let open Lwt_result_syntax in
+  let* _, entrypoints =
+    Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
+  in
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     script_entrypoint_type
       cctxt
