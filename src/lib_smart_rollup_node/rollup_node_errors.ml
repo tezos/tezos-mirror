@@ -63,6 +63,10 @@ type error +=
   | Could_not_acquire_lock of string
 
 type error +=
+  | Could_not_open_preimage_file of String.t
+  | Could_not_encode_raw_data
+
+type error +=
   | Lost_game of lost_result
   | Unparsable_boot_sector of {path : string}
   | Invalid_genesis_state of {
@@ -353,4 +357,33 @@ let () =
         f)
     Data_encoding.(obj1 (req "lock_file" string))
     (function Could_not_acquire_lock f -> Some f | _ -> None)
-    (fun f -> Could_not_acquire_lock f)
+    (fun f -> Could_not_acquire_lock f) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.could_not_open_reveal_preimage_file"
+    ~title:"Could not open reveal preimage file"
+    ~description:"Could not open reveal preimage file."
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "Could not open file containing preimage of reveal hash %s"
+        hash)
+    `Permanent
+    Data_encoding.(obj1 (req "hash" string))
+    (function
+      | Could_not_open_preimage_file filename -> Some filename | _ -> None)
+    (fun filename -> Could_not_open_preimage_file filename) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.could_not_encode_raw_data"
+    ~title:"Could not encode raw data to reveal"
+    ~description:"Could not encode raw data to reveal."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Could not encode raw data to reveal with the expected protocol \
+         encoding")
+    `Permanent
+    Data_encoding.unit
+    (function Could_not_encode_raw_data -> Some () | _ -> None)
+    (fun () -> Could_not_encode_raw_data)

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -5413,6 +5414,48 @@ let test_bootstrap_smart_rollup_originated =
       ~error_msg:"Expected %R bootstrapped smart rollups, got %L") ;
   unit
 
+let test_rollup_node_missing_preimage_exit_at_initialisation =
+  register_test
+    ~supports:(From_protocol 016)
+    ~__FILE__
+    ~tags:["node"; "preimage"; "boot_sector"]
+    ~title:
+      "Rollup node exit if at initialisation, there is one or multiple \
+       preimage(s) missing."
+  @@ fun protocol ->
+  let* node, client = setup_l1 protocol in
+  let rollup_node =
+    Sc_rollup_node.create
+      ~protocol
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:Constant.bootstrap1.alias
+      Operator
+      node
+  in
+  let* boot_sector =
+    (* The preimages will be saved in the rollup node's data directory
+       ROLLUP_NODE_DATA_DIR, whereas the rollup node will try to look
+       for the preimages in ROLLUP_NODE_DATA_DIR/wasm_2_0_0. *)
+    let preimages_dir = Sc_rollup_node.data_dir rollup_node in
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir "echo"
+  in
+  let* rollup_address =
+    originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~boot_sector
+      ~src:Constant.bootstrap1.alias
+      client
+  in
+  let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
+  let run_process = Sc_rollup_node.spawn_run rollup_node rollup_address [] in
+  let* () = Client.bake_for_and_wait client in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Could not open file containing preimage of reveal hash")
+      run_process
+  in
+  Lwt.return_unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5543,6 +5586,7 @@ let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific featued. *)
+  test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_wallet protocols ~kind:"wasm_2_0_0" ;
