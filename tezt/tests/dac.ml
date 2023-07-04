@@ -1620,6 +1620,52 @@ module Full_infrastructure = struct
     in
     check_preimage coordinator_page observer_preimage ;
     unit
+
+  (** [test_committe_member_disconnects_scenario] checks, that
+      committee member nodes automatically reconnect to the
+      streaming of root hashes in case they lose connection from Coordinator.
+      This may happen for example if Coordinator is rebooted. *)
+  let test_committe_member_disconnects_scenario
+      Scenarios.{coordinator_node; committee_members_nodes; _} =
+    let wait_for_node_subscribed_to_data_streamer () =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    (* We assert DAC network of only one committee member node. Unless this
+       is the case, this test as is may exhibit race conditions. *)
+    let () = assert (List.length committee_members_nodes = 1) in
+    let committee_member = List.hd committee_members_nodes in
+    (* Test start here. *)
+    (* 1. We set up a running and functional DAC network. *)
+    let* () =
+      init_run_and_subscribe_nodes coordinator_node committee_members_nodes
+    in
+    Log.info "Terminating Coordinator node" ;
+    (* 2. We restart the [coordinator_node]. We expect that all subscriptions to
+          the streaming of root hashes are lost. *)
+    let* () = Dac_node.terminate coordinator_node in
+    Log.info "Restarting Coordinator node" ;
+    (* 3. We restart [coordinator_node] and expect that clients will reconnect
+          automatically. *)
+    let* () = Dac_node.run coordinator_node in
+    (* 4. We assert [3.] by waiting for "handle_new_subscription_to_hash_streamer"
+          event. *)
+    let* () = wait_for_node_subscribed_to_data_streamer () in
+    let expected_rh =
+      "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+    in
+    let committee_member_receives_root_hash_promise =
+      wait_for_received_root_hash_processed committee_member expected_rh
+    in
+    (* 5. We serialize random payload. *)
+    let* _root_hash =
+      coordinator_serializes_payload
+        coordinator_node
+        ~payload:"test"
+        ~expected_rh
+    in
+    (* 6. We check that [committee_member} received a root hash that corresponds
+          to the serialized payload in [5].*)
+    committee_member_receives_root_hash_promise
 end
 
 let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
@@ -3107,6 +3153,14 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test serialized certificate"
     Full_infrastructure.test_serialized_certificate
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:0
+    ~committee_size:1
+    ~tags:["dac"; "dac_node"]
+    "test committee member disconnects from Coordinator"
+    Full_infrastructure.test_committe_member_disconnects_scenario
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;

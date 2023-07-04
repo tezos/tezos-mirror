@@ -71,6 +71,61 @@ let make_stream_daemon handle streamed_call =
   in
   return (go (), stopper)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/5930
+         Dac nodes operators should be able to configure
+         [infinite_daemon_init_delay] from the command line. *)
+
+(** [infinite_daemon_init_delay] represents a delay before trying to
+    re-establish connection in case of streamed daemon disconnection. *)
+let infinite_daemon_init_delay = 2.
+
+(** [infinite_daemon_max_delay] represents a max delay before trying to
+    re-establish connection in case of streamed daemon disconnection. *)
+let infinite_daemon_max_delay = 128.
+
+(** [make_infinite_stream_daemon ~on_disconnect ~on_failed_connection connect]
+    creates an ever lasting streamed daemon, by restarting a daemon,
+    every time connection is lost or connection fails to be established.
+
+    In case of a lost connection, we first wait [infinite_daemon_init_delay]
+    until trying to run the streamed daemon again. If connection is not
+    established we duplicate the waiting time. The waiting time is bounded by
+    [infinite_daemon_max_delay].
+
+    - [connect] is a streamed daemon constructor.
+    - [~on_disconnect] is used to emit event when the daemon disconnects.
+    - [~on_failed_connection] is used to emit event when unable to re-establish
+      connection. 
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5931
+            We would want an upper bound in [max_retries] for this function.
+            Both [max_retries] and [infinite_daemon_max_delay] would ideally
+            be configurable. *)
+let make_infinite_stream_daemon ~on_disconnect ~on_failed_connection connect =
+  let rec loop ~delay ~count =
+    let open Lwt_result_syntax in
+    let*! daemon = connect () in
+    match daemon with
+    | Ok (daemon, stopper) ->
+        (* [daemon] promise is resolved when underlying stream closes. E.g.
+           this happens when rebooting Coordinator's node. *)
+        let* () = daemon in
+        let () = stopper () in
+        let*! () = on_disconnect () in
+        (* Before reconnecting we wait. *)
+        let*! () = Lwt_unix.sleep delay in
+        loop ~count:0 ~delay:infinite_daemon_init_delay
+    | Error e ->
+        let*! () = on_failed_connection ~count ~delay e in
+        (* Before trying again we wait. *)
+        let*! () = Lwt_unix.sleep delay in
+        (* We duplicate the previous waiting time which is bounded by
+           [infinite_daemon_max_delay]. *)
+        let delay = Float.min (delay *. 2.0) infinite_daemon_max_delay in
+        loop ~count:(count + 1) ~delay
+  in
+  loop ~count:0 ~delay:infinite_daemon_init_delay
+
 let resolve_plugin_and_set_ready ctxt =
   (* Monitor heads and try resolve the DAC protocol plugin corresponding to
      the protocol of the targeted node. *)
@@ -206,9 +261,13 @@ module Committee_member = struct
       Page_store.(Remote.init {cctxt = coordinator_cctxt; page_store})
     in
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
-    make_stream_daemon
-      (handler dac_plugin remote_store)
-      (Monitor_services.V0.root_hashes coordinator_cctxt)
+    make_infinite_stream_daemon
+      ~on_disconnect:Event.emit_coordinators_connection_lost
+      ~on_failed_connection:Event.emit_cannot_connect_to_coordinator
+      (fun () ->
+        make_stream_daemon
+          (handler dac_plugin remote_store)
+          (Monitor_services.V0.root_hashes coordinator_cctxt))
 end
 
 (** Handlers specific to an [Observer]. An [Observer] is responsible for
@@ -249,9 +308,13 @@ module Observer = struct
       Page_store.(Remote.init {cctxt = coordinator_cctxt; page_store})
     in
     let*! () = Event.(emit subscribed_to_root_hashes_stream ()) in
-    make_stream_daemon
-      (handler dac_plugin remote_store)
-      (Monitor_services.V0.root_hashes coordinator_cctxt)
+    make_infinite_stream_daemon
+      ~on_disconnect:Event.emit_coordinators_connection_lost
+      ~on_failed_connection:Event.emit_cannot_connect_to_coordinator
+      (fun () ->
+        make_stream_daemon
+          (handler dac_plugin remote_store)
+          (Monitor_services.V0.root_hashes coordinator_cctxt))
 end
 
 (** Handlers specific to a [Legacy] DAC node. If no
