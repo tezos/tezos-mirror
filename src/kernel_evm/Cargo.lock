@@ -500,6 +500,7 @@ dependencies = [
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "evm-execution",
  "hex",
  "hex-literal",
