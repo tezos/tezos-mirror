@@ -1183,8 +1183,33 @@ module Scripts = struct
       | None, Some c -> (Contract.Implicit c, c)
       | Some sender, Some payer -> (sender, payer)
     in
-    let configure_contracts ctxt script balance ~sender_opt ~payer_opt ~self_opt
-        =
+    let compute_step_constants ctxt ~balance ~amount ~chain_id ~sender_opt
+        ~payer_opt ~self ~now_opt ~level_opt =
+      let sender, payer =
+        sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
+      in
+      let now =
+        match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
+      in
+      let level =
+        match level_opt with
+        | None ->
+            (Level.current ctxt).level |> Raw_level.to_int32
+            |> Script_int.of_int32 |> Script_int.abs
+        | Some z -> z
+      in
+      let open Script_interpreter in
+      let sender = Destination.Contract sender in
+      (ctxt, {sender; payer; self; amount; balance; chain_id; now; level})
+    in
+    let configure_gas_and_step_constants ctxt script ~gas_opt ~balance ~amount
+        ~chain_id ~sender_opt ~payer_opt ~self_opt ~now_opt ~level_opt =
+      let gas =
+        match gas_opt with
+        | Some gas -> gas
+        | None -> Constants.hard_gas_limit_per_operation ctxt
+      in
+      let ctxt = Gas.set_limit ctxt gas in
       let+ ctxt, self, balance =
         match self_opt with
         | None ->
@@ -1200,10 +1225,16 @@ module Scripts = struct
             in
             (ctxt, addr, bal)
       in
-      let sender, payer =
-        sender_and_payer ~sender_opt ~payer_opt ~default_sender:self
-      in
-      (ctxt, {balance; self; sender; payer})
+      compute_step_constants
+        ctxt
+        ~balance
+        ~amount
+        ~chain_id
+        ~sender_opt
+        ~payer_opt
+        ~self
+        ~now_opt
+        ~level_opt
     in
     let script_entrypoint_type ctxt expr entrypoint =
       let ctxt = Gas.set_unlimited ctxt in
@@ -1257,35 +1288,19 @@ module Scripts = struct
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        let* ctxt, {self; sender; payer; balance} =
-          configure_contracts
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
             ctxt
             {storage; code}
-            balance
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
             ~sender_opt
             ~payer_opt
             ~self_opt
-        in
-        let gas =
-          match gas_opt with
-          | Some gas -> gas
-          | None -> Constants.hard_gas_limit_per_operation ctxt
-        in
-        let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
-        in
-        let level =
-          match level_opt with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {sender; payer; self; amount; balance; chain_id; now; level}
+            ~now_opt
+            ~level_opt
         in
         let+ ( {
                  script = _;
@@ -1331,35 +1346,19 @@ module Scripts = struct
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
-        let* ctxt, {self; sender; payer; balance} =
-          configure_contracts
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
             ctxt
             {storage; code}
-            balance
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
             ~sender_opt
             ~payer_opt
             ~self_opt
-        in
-        let gas =
-          match gas_opt with
-          | Some gas -> gas
-          | None -> Constants.hard_gas_limit_per_operation ctxt
-        in
-        let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
-        in
-        let level =
-          match level_opt with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {sender; payer; self; amount; balance; chain_id; now; level}
+            ~now_opt
+            ~level_opt
         in
         let module Unparsing_mode = struct
           let unparsing_mode = unparsing_mode
@@ -1425,8 +1424,17 @@ module Scripts = struct
                (View_helpers.make_tzip4_viewer_script ty)
                Tez.zero
         in
-        let sender, payer =
-          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
+        let ctxt, step_constants =
+          compute_step_constants
+            ctxt
+            ~balance
+            ~amount:Tez.zero
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self:contract_hash
+            ~now_opt
+            ~level_opt
         in
         let gas =
           Option.value
@@ -1434,30 +1442,6 @@ module Scripts = struct
             gas
         in
         let ctxt = Gas.set_limit ctxt gas in
-        let now =
-          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
-        in
-        let level =
-          match level_opt with
-          | None ->
-              (Level.current ctxt).level |> Raw_level.to_int32
-              |> Script_int.of_int32 |> Script_int.abs
-          | Some z -> z
-        in
-        let step_constants =
-          let open Script_interpreter in
-          let sender = Destination.Contract sender in
-          {
-            sender;
-            payer;
-            self = contract_hash;
-            amount = Tez.zero;
-            balance;
-            chain_id;
-            now;
-            level;
-          }
-        in
         let parameter =
           View_helpers.make_view_parameter
             (Micheline.root input)
@@ -1519,11 +1503,17 @@ module Scripts = struct
           script_view_type ctxt contract_hash decoded_script view
         in
         let* balance = Contract.get_balance ctxt contract in
-        let sender, payer =
-          sender_and_payer ~sender_opt ~payer_opt ~default_sender:contract_hash
-        in
-        let now =
-          match now_opt with None -> Script_timestamp.now ctxt | Some t -> t
+        let ctxt, step_constants =
+          compute_step_constants
+            ctxt
+            ~balance
+            ~amount:Tez.zero
+            ~chain_id
+            ~sender_opt
+            ~payer_opt
+            ~self:contract_hash
+            ~now_opt
+            ~level_opt
         in
         (* Using [Gas.set_unlimited] won't work, since the interpreter doesn't
            use this mode (see !4034#note_774734253) and still consumes gas.
@@ -1539,26 +1529,6 @@ module Scripts = struct
         let ctxt =
           if unlimited_gas then Gas.set_limit ctxt max_gas
           else Gas.set_limit ctxt gas
-        in
-        let level =
-          Option.value
-            level_opt
-            ~default:
-              ((Level.current ctxt).level |> Raw_level.to_int32
-             |> Script_int.of_int32 |> Script_int.abs)
-        in
-        let step_constants =
-          let sender = Destination.Contract sender in
-          {
-            Script_interpreter.sender;
-            payer;
-            self = contract_hash;
-            amount = Tez.zero;
-            balance;
-            chain_id;
-            now;
-            level;
-          }
         in
         let viewer_script =
           View_helpers.make_michelson_viewer_script
