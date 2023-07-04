@@ -356,6 +356,7 @@ let block_callback db_pool g source
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         Db.with_transaction (fun () ->
             let* () = Db.exec Sql_requests.maybe_insert_source source in
+            let* () = Db.exec Sql_requests.maybe_insert_delegate delegate in
             let level = Int32.of_string (Re.Group.get g 1) in
             let* () =
               Db.exec
