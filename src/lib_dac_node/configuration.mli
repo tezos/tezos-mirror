@@ -55,9 +55,8 @@ end
 module Observer : sig
   (** The type of an Observer specific configuration mode. *)
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
-    committee_rpc_addresses : (string * int) list;
+    coordinator_rpc_address : Uri.t;
+    committee_rpc_addresses : Uri.t list;
     timeout : int;
   }
 
@@ -131,16 +130,12 @@ val make_committee_member :
   Tezos_crypto.Aggregate_signature.public_key_hash ->
   mode
 
-(** [make_observer committee_endpoints coordinator_rpc_address coordinator_rpc_port]
-    creates a new observer configuration that sets the Data Availabiity Committee 
-    endpoints to [committee_endpoints] and Coordinator endpoint to
-    [(coordinator_rpc_address * coordinator_rpc_port)] as the coordinator. *)
+(** [make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address]
+    creates a new observer configuration that sets the DAC Committee
+    rpc addresses to [committee_rpc_addresses] and Coordinator endpoint to
+    [coordinator_rpc_address]. *)
 val make_observer :
-  committee_rpc_addresses:(string * int) list ->
-  ?timeout:int ->
-  string ->
-  int ->
-  mode
+  committee_rpc_addresses:Uri.t list -> ?timeout:int -> Uri.t -> mode
 
 (** [make_legacy ?coordinator_host_and_port threshold
     committee_members_addresses]

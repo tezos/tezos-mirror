@@ -97,53 +97,35 @@ end
 
 module Observer = struct
   type t = {
-    coordinator_rpc_address : string;
-    coordinator_rpc_port : int;
-    committee_rpc_addresses : (string * int) list;
+    coordinator_rpc_address : Uri.t;
+    committee_rpc_addresses : Uri.t list;
     timeout : int;
   }
 
   let default_timeout = 6
 
   let make ~committee_rpc_addresses ?(timeout = default_timeout)
-      coordinator_rpc_address coordinator_rpc_port =
-    {
-      coordinator_rpc_address;
-      timeout;
-      coordinator_rpc_port;
-      committee_rpc_addresses;
-    }
+      coordinator_rpc_address =
+    {coordinator_rpc_address; timeout; committee_rpc_addresses}
 
   let encoding =
     Data_encoding.(
       conv
-        (fun {
-               coordinator_rpc_address;
-               coordinator_rpc_port;
-               committee_rpc_addresses;
-               timeout;
-             } ->
-          ( coordinator_rpc_address,
-            coordinator_rpc_port,
-            committee_rpc_addresses,
-            timeout ))
-        (fun ( coordinator_rpc_address,
-               coordinator_rpc_port,
-               committee_rpc_addresses,
-               timeout ) ->
-          {
-            coordinator_rpc_address;
-            coordinator_rpc_port;
-            committee_rpc_addresses;
-            timeout;
-          })
-        (obj4
+        (fun {coordinator_rpc_address; committee_rpc_addresses; timeout} ->
+          let coordinator_rpc_address = Uri.to_string coordinator_rpc_address in
+          let committee_rpc_addresses =
+            List.map Uri.to_string committee_rpc_addresses
+          in
+          (coordinator_rpc_address, committee_rpc_addresses, timeout))
+        (fun (coordinator_rpc_address, committee_rpc_addresses, timeout) ->
+          let coordinator_rpc_address = Uri.of_string coordinator_rpc_address in
+          let committee_rpc_addresses =
+            List.map Uri.of_string committee_rpc_addresses
+          in
+          {coordinator_rpc_address; committee_rpc_addresses; timeout})
+        (obj3
            (req "coordinator_rpc_address" string)
-           (req "coordinator_rpc_port" uint16)
-           (req
-              "committee_rpc_addresses"
-              (Data_encoding.list
-                 (obj2 (req "rpc_address" string) (req "rpc_port" uint16))))
+           (req "committee_rpc_addresses" (Data_encoding.list string))
            (req "timeout" Data_encoding.uint8)))
 
   let name = "Observer"
@@ -233,14 +215,9 @@ let make_committee_member ~coordinator_rpc_address committee_member_address =
   Committee_member
     (Committee_member.make coordinator_rpc_address committee_member_address)
 
-let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address
-    coordinator_rpc_port =
+let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address =
   Observer
-    (Observer.make
-       ~committee_rpc_addresses
-       ?timeout
-       coordinator_rpc_address
-       coordinator_rpc_port)
+    (Observer.make ~committee_rpc_addresses ?timeout coordinator_rpc_address)
 
 let make_legacy ?coordinator_host_and_port threshold committee_members_addresses
     committee_member_address_opt =

@@ -363,8 +363,16 @@ module Config_init = struct
         experimental_disclaimer () ;
         let committee_rpc_addresses =
           List.map
-            (fun Parsed_rpc.{scheme = _; host; port} -> (host, port))
+            (fun Parsed_rpc.{scheme; host; port} ->
+              Uri.make ~scheme ~host ~port ())
             committee_rpc_addresses
+        in
+        let coordinator_rpc_address =
+          Uri.make
+            ~scheme:coordinator_rpc_address.scheme
+            ~host:coordinator_rpc_address.host
+            ~port:coordinator_rpc_address.port
+            ()
         in
         create_configuration
           ~data_dir
@@ -375,8 +383,7 @@ module Config_init = struct
           (Configuration.make_observer
              ~committee_rpc_addresses
              ?timeout
-             coordinator_rpc_address.host
-             coordinator_rpc_address.port)
+             coordinator_rpc_address)
           cctxt)
 
   let commands =
