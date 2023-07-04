@@ -110,6 +110,83 @@ let handle_protocol_migration ?degraded ~catching_up state
   state.node_ctxt.current_protocol <- new_protocol ;
   return_unit
 
+(* Process a L1 that we have never seen and for which we have processed the
+   predecessor. *)
+let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
+    (head : Layer1.header) =
+  let open Lwt_result_syntax in
+  let* () =
+    Node_context.save_level
+      node_ctxt
+      {Layer1.hash = head.hash; level = head.level}
+  and* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
+  let* () = handle_protocol_migration ~catching_up state head in
+  let* rollup_ctxt = previous_context node_ctxt ~predecessor in
+  let module Plugin = (val state.plugin) in
+  let* inbox_hash, inbox, inbox_witness, messages =
+    Plugin.Inbox.process_head node_ctxt ~predecessor head
+  in
+  let* () =
+    when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
+    Plugin.Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
+  in
+  let* () = Plugin.L1_processing.process_l1_block_operations node_ctxt head in
+  (* Avoid storing and publishing commitments if the head is not final. *)
+  (* Avoid triggering the pvm execution if this has been done before for
+     this head. *)
+  let* ctxt, _num_messages, num_ticks, initial_tick =
+    Plugin.Interpreter.process_head
+      node_ctxt
+      rollup_ctxt
+      ~predecessor
+      head
+      (inbox, messages)
+  in
+  let*! context_hash = Context.commit ctxt in
+  let* commitment_hash =
+    Plugin.Publisher.process_head
+      node_ctxt
+      ~predecessor:predecessor.hash
+      head
+      ctxt
+  in
+  let* () =
+    unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
+    Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
+  in
+  let level = head.level in
+  let* previous_commitment_hash =
+    if level = node_ctxt.genesis_info.level then
+      (* Previous commitment for rollup genesis is itself. *)
+      return node_ctxt.genesis_info.commitment_hash
+    else
+      let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
+      Sc_rollup_block.most_recent_commitment pred.header
+  in
+  let header =
+    Sc_rollup_block.
+      {
+        block_hash = head.hash;
+        level;
+        predecessor = predecessor.hash;
+        commitment_hash;
+        previous_commitment_hash;
+        context = context_hash;
+        inbox_witness;
+        inbox_hash;
+      }
+  in
+  let l2_block =
+    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+  in
+  let* () =
+    Node_context.mark_finalized_level
+      node_ctxt
+      Int32.(sub head.level (of_int node_ctxt.block_finality_time))
+  in
+  let* () = Node_context.save_l2_head node_ctxt l2_block in
+  return_unit
+
 let rec process_head ({node_ctxt; _} as state) ~catching_up
     (head : Layer1.header) =
   let open Lwt_result_syntax in
@@ -126,80 +203,7 @@ let rec process_head ({node_ctxt; _} as state) ~catching_up
       return_unit
   | Some predecessor ->
       let* () = process_head state ~catching_up:true predecessor in
-      let* () =
-        Node_context.save_level
-          node_ctxt
-          {Layer1.hash = head.hash; level = head.level}
-      and* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
-      let* () = handle_protocol_migration ~catching_up state head in
-      let* rollup_ctxt = previous_context node_ctxt ~predecessor in
-      let module Plugin = (val state.plugin) in
-      let* inbox_hash, inbox, inbox_witness, messages =
-        Plugin.Inbox.process_head node_ctxt ~predecessor head
-      in
-      let* () =
-        when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
-        Plugin.Dal_slots_tracker.process_head
-          node_ctxt
-          (Layer1.head_of_header head)
-      in
-      let* () =
-        Plugin.L1_processing.process_l1_block_operations node_ctxt head
-      in
-      (* Avoid storing and publishing commitments if the head is not final. *)
-      (* Avoid triggering the pvm execution if this has been done before for
-         this head. *)
-      let* ctxt, _num_messages, num_ticks, initial_tick =
-        Plugin.Interpreter.process_head
-          node_ctxt
-          rollup_ctxt
-          ~predecessor
-          head
-          (inbox, messages)
-      in
-      let*! context_hash = Context.commit ctxt in
-      let* commitment_hash =
-        Plugin.Publisher.process_head
-          node_ctxt
-          ~predecessor:predecessor.hash
-          head
-          ctxt
-      in
-      let* () =
-        unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-        Plugin.Inbox.same_as_layer_1 node_ctxt head.hash inbox
-      in
-      let level = head.level in
-      let* previous_commitment_hash =
-        if level = node_ctxt.genesis_info.level then
-          (* Previous commitment for rollup genesis is itself. *)
-          return node_ctxt.genesis_info.commitment_hash
-        else
-          let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
-          Sc_rollup_block.most_recent_commitment pred.header
-      in
-      let header =
-        Sc_rollup_block.
-          {
-            block_hash = head.hash;
-            level;
-            predecessor = predecessor.hash;
-            commitment_hash;
-            previous_commitment_hash;
-            context = context_hash;
-            inbox_witness;
-            inbox_hash;
-          }
-      in
-      let l2_block =
-        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
-      in
-      let* () =
-        Node_context.mark_finalized_level
-          node_ctxt
-          Int32.(sub head.level (of_int node_ctxt.block_finality_time))
-      in
-      let* () = Node_context.save_l2_head node_ctxt l2_block in
+      let* () = process_new_head state ~catching_up ~predecessor head in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
       Metrics.Inbox.set_process_time process_time ;
