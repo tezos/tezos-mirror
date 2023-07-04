@@ -423,6 +423,14 @@ let send_external_message_and_wait ~sc_rollup_node ~node ~client ~sender
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   unit
 
+let check_block_progression ~sc_rollup_node ~node ~client ~endpoint
+    ~expected_block_level =
+  let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+  let* block_number = Eth_cli.block_number ~endpoint in
+  return
+  @@ Check.((block_number = expected_block_level) int)
+       ~error_msg:"Unexpected block number, should be %%R, but got %%L"
+
 let test_evm_proxy_server_connection =
   Protocol.register_test
     ~__FILE__
@@ -643,18 +651,23 @@ let test_l2_blocks_progression =
     setup_evm_kernel ~deposit_admin:None protocol
   in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
-  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
-  let check_block_progression ~expected_block_level =
-    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-    let* block_number =
-      Eth_cli.block_number ~endpoint:evm_proxy_server_endpoint
-    in
-    return
-    @@ Check.((block_number = expected_block_level) int)
-         ~error_msg:"Unexpected block number, should be %%R, but got %%L"
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* () =
+    check_block_progression
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~endpoint
+      ~expected_block_level:1
   in
-  let* () = check_block_progression ~expected_block_level:1 in
-  let* () = check_block_progression ~expected_block_level:2 in
+  let* () =
+    check_block_progression
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~endpoint
+      ~expected_block_level:2
+  in
   unit
 
 (** The info for the "storage.sol" contract.
@@ -1693,6 +1706,99 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
     ~error_msg:(sf "Unexpected `boot.wasm`.") ;
   return (sc_rollup_node, node, client, evm_proxy_server)
 
+let test_kernel_upgrade_to_debug =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["debug"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade integrity to a debug kernel"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "debug_kernel" in
+  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let* _ =
+    gen_test_kernel_upgrade ~base_installee ~installee ~private_key protocol
+  in
+  unit
+
+let test_kernel_upgrade_evm_to_evm =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade integrity to itself"
+  @@ fun protocol ->
+  let base_installee = "./" in
+  let installee = "evm_kernel" in
+  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let* sc_rollup_node, node, client, evm_proxy_server =
+    gen_test_kernel_upgrade ~base_installee ~installee ~private_key protocol
+  in
+  (* We ensure the upgrade went well by checking if the kernel still produces
+     blocks. *)
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  check_block_progression
+    ~sc_rollup_node
+    ~node
+    ~client
+    ~endpoint
+    ~expected_block_level:2
+
+let test_kernel_upgrade_wrong_key =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["dictator"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails with a wrong dictator key"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "debug_kernel" in
+  let private_key = Eth_account.bootstrap_accounts.(1).private_key in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~should_fail:true
+      ~base_installee
+      ~installee
+      ~private_key
+      protocol
+  in
+  unit
+
+let test_kernel_upgrade_wrong_nonce =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["nonce"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails with a wrong upgrade nonce"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "debug_kernel" in
+  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~nonce:3
+      ~should_fail:true
+      ~base_installee
+      ~installee
+      ~private_key
+      protocol
+  in
+  unit
+
+let test_kernel_upgrade_wrong_rollup_address =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["address"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails with a wrong rollup address"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "debug_kernel" in
+  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~rollup_address:"sr1T13qeVewVm3tudQb8dwn8qRjptNo7KVkj"
+      ~should_fail:true
+      ~base_installee
+      ~installee
+      ~private_key
+      protocol
+  in
   unit
 
 let register_evm_proxy_server ~protocols =
@@ -1723,6 +1829,11 @@ let register_evm_proxy_server ~protocols =
   test_preinitialized_evm_kernel protocols ;
   test_deposit_fa12 protocols ;
   test_estimate_gas protocols ;
-  test_estimate_gas_additionnal_field protocols
+  test_estimate_gas_additionnal_field protocols ;
+  test_kernel_upgrade_to_debug protocols ;
+  test_kernel_upgrade_evm_to_evm protocols ;
+  test_kernel_upgrade_wrong_key protocols ;
+  test_kernel_upgrade_wrong_nonce protocols ;
+  test_kernel_upgrade_wrong_rollup_address protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
