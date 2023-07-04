@@ -24,6 +24,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Smart Optimistic Rollups: EVM Kernel
+   Requirement:  * make -f kernels.mk build
+                 * provide a `kernel_upgrade_scenario.json` such as:
+                 ```
+                 {
+                   "smart-rollup": {
+                       "address": "<smart-rollup-address>",
+                       "current-preimages-dir": "<preimages-dir-used-for-address-above>"
+                   }, #OPTIONAL_FIELD
+                   "kernel-dir": "<new-kernel-dir>",
+                   "new-kernel": "<incoming-kernel-file-name>"
+                 }
+                 ```
+   Invocation:   dune exec src/bin_testnet_scenarios/main.exe -- --file evm_rollup_upgrade.ml --verbose
+                 NB: if your configuration files are not provided at the root of the project add
+                 additional `-a configuration=<PATH> -a upgrade_configuration=<PATH>` arguments.
+*)
+
 type upgrade_config = {
   (* Rollup where the previous kernel is deployed *)
   smart_rollup : Evm_rollup.existing_rollup option;
@@ -140,7 +160,12 @@ let replace_preimages ~smart_rollup_node ~kernel_dir ~new_kernel =
         "Couldn't obtain the root hash of the preimages of the chunked kernel."
 
 let upgrade_kernel ~testnet () =
-  let upgrade_config = get_upgrade_config "kernel_upgrade_scenario.json" in
+  let path =
+    Cli.get_string
+      ~default:"kernel_upgrade_scenario.json"
+      "upgrade_configuration"
+  in
+  let upgrade_config = get_upgrade_config path in
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
   let mode =
