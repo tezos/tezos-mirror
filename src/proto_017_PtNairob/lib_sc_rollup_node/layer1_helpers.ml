@@ -129,7 +129,14 @@ let constants_of_parametric
         minimal_block_delay;
         delay_increment_per_round;
         sc_rollup = {challenge_window_in_blocks; commitment_period_in_blocks; _};
-        dal = {feature_enable; attestation_lag; number_of_slots; _};
+        dal =
+          {
+            feature_enable;
+            attestation_lag;
+            number_of_slots;
+            cryptobox_parameters;
+            _;
+          };
         _;
       } =
   let open Protocol.Alpha_context in
@@ -143,7 +150,8 @@ let constants_of_parametric
           commitment_period_in_blocks;
           reveal_activation_level = None;
         };
-      dal = {feature_enable; attestation_lag; number_of_slots};
+      dal =
+        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901

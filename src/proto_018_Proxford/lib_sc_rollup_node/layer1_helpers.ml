@@ -135,7 +135,14 @@ let constants_of_parametric
             reveal_activation_level;
             _;
           };
-        dal = {feature_enable; attestation_lag; number_of_slots; _};
+        dal =
+          {
+            feature_enable;
+            attestation_lag;
+            number_of_slots;
+            cryptobox_parameters;
+            _;
+          };
         _;
       } =
   let open Protocol.Alpha_context in
@@ -152,7 +159,8 @@ let constants_of_parametric
               (Sc_rollup_proto_types.Constants.reveal_activation_level_to_octez
                  reveal_activation_level);
         };
-      dal = {feature_enable; attestation_lag; number_of_slots};
+      dal =
+        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
