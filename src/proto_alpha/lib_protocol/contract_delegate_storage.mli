@@ -47,6 +47,14 @@ val find :
 val is_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
+(** [find_is_delegate ctxt pkh] returns both the delegate associated to [pkh],
+    or [None] is [pkh] has no delegate, and whether [pkh] is a delegate (in this
+    case, [pkh] is his own delegate). *)
+val find_is_delegate :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  (Signature.Public_key_hash.t option * bool) tzresult Lwt.t
+
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
 
     This function assumes that [contract] does not have a delegate already. *)
