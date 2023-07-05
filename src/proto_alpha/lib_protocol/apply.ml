@@ -377,6 +377,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       Signature.Public_key_hash.(sender = destination)
       Invalid_self_transaction_destination
   in
+  let*? ctxt = Gas.consume ctxt Adaptive_inflation_costs.stake_cost in
   let* delegate_opt = Contract.Delegate.find ctxt contract in
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
@@ -441,6 +442,7 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
     | Some requested_amount -> Ok requested_amount
   in
   let sender_contract = Contract.Implicit sender in
+  let*? ctxt = Gas.consume ctxt Adaptive_inflation_costs.find_delegate_cost in
   let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
@@ -473,6 +475,7 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
     Invalid_self_transaction_destination
   >>?= fun () ->
   let contract = Contract.Implicit sender in
+  Gas.consume ctxt Adaptive_inflation_costs.find_delegate_cost >>?= fun ctxt ->
   Contract.allocated ctxt contract >>= fun already_allocated ->
   Staking.finalize_unstake ctxt contract >>=? fun (ctxt, balance_updates) ->
   let result =
@@ -495,6 +498,9 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
     ~staking_over_baking_limit_millionth ~baking_over_staking_edge_billionth
     ~before_operation =
   let open Lwt_result_syntax in
+  let*? ctxt =
+    Gas.consume ctxt Adaptive_inflation_costs.set_delegate_parameters_cost
+  in
   let*? () =
     error_unless
       Signature.Public_key_hash.(sender = destination)
