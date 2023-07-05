@@ -221,7 +221,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
       let open Lwt_syntax in
       let* res =
         Reveals.get
-          ?dac_client:node_ctxt.dac_client
+          ~dac_client:node_ctxt.dac_client
           ~data_dir:node_ctxt.data_dir
           ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
           hash

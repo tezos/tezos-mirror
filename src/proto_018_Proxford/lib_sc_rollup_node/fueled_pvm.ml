@@ -97,7 +97,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
 
   type eval_result = {state : eval_state; num_ticks : Z.t; num_messages : int}
 
-  let get_reveal ?dac_client ~data_dir ~pvm_kind reveal_map hash =
+  let get_reveal ~dac_client ~data_dir ~pvm_kind reveal_map hash =
     let found_in_map =
       match reveal_map with
       | None -> None
@@ -105,7 +105,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     in
     match found_in_map with
     | Some data -> return data
-    | None -> Reveals.get ?dac_client ~data_dir ~pvm_kind hash
+    | None -> Reveals.get ~dac_client ~data_dir ~pvm_kind hash
 
   type eval_completion =
     | Aborted of {state : pvm_state; fuel : fuel; current_tick : int64}
@@ -163,7 +163,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
                        Data_encoding.Binary.pp_read_error)
                 in
                 get_reveal
-                  ?dac_client:node_ctxt.dac_client
+                  ~dac_client:node_ctxt.dac_client
                   ~data_dir:node_ctxt.data_dir
                   ~pvm_kind:node_ctxt.kind
                   reveal_map
@@ -258,6 +258,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
       | Needs_reveal (Reveal_raw_data hash) -> (
           let* data =
             get_reveal
+              ~dac_client:node_ctxt.dac_client
               ~data_dir:node_ctxt.data_dir
               ~pvm_kind:node_ctxt.kind
               reveal_map
