@@ -92,3 +92,8 @@ let apply_limits ctxt staking_parameters
   in
   let+ frozen = Tez_repr.(own_frozen +? allowed_costaked_frozen) in
   Stake_repr.make ~frozen ~delegated
+
+let baking_weight ctxt staking_parameters f =
+  let open Result_syntax in
+  let+ s = apply_limits ctxt staking_parameters f in
+  staking_weight ctxt s
