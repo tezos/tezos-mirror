@@ -15,10 +15,6 @@ use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
-// TODO: https://gitlab.com/tezos/tezos/-/issues/5894, define the dictator key
-// via the config installer set function
-pub const DICTATOR_PUBLIC_KEY: &str = "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01";
-
 // The signature is a combination of the smart rollup address the upgrade nonce and
 // the preimage hash signed by the dictator.
 // This way we avoid potential replay attack by resending the same kernel upgrade
@@ -30,6 +26,7 @@ pub fn check_dictator_signature(
     smart_rollup_address: [u8; 20],
     upgrade_nonce: [u8; UPGRADE_NONCE_SIZE],
     preimage_hash: [u8; PREIMAGE_HASH_SIZE],
+    dictator: PublicKey,
 ) -> Result<(), Error> {
     let mut signed_msg = vec![];
     signed_msg.extend(smart_rollup_address);
@@ -37,12 +34,8 @@ pub fn check_dictator_signature(
     signed_msg.extend(preimage_hash);
     let hash_msg: [u8; 32] = Keccak256::digest(signed_msg).into();
     let msg = Message::parse(&hash_msg);
-    let dictator =
-        hex::decode(DICTATOR_PUBLIC_KEY).map_err(|_| Error::InvalidConversion)?;
-    let pk =
-        PublicKey::parse_slice(&dictator, None).map_err(|_| Error::InvalidParsing)?;
     let sig = Signature::parse_standard_slice(&sig).map_err(|_| Error::InvalidParsing)?;
-    if libsecp256k1::verify(&msg, &sig, &pk) {
+    if libsecp256k1::verify(&msg, &sig, &dictator) {
         Ok(())
     } else {
         Err(Error::InvalidSignatureCheck)
@@ -85,12 +78,18 @@ mod tests {
         .unwrap()
         .try_into()
         .unwrap();
+        let dictator_bytes = hex::decode(
+            "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01",
+        )
+        .unwrap();
+        let dictator = PublicKey::parse_slice(&dictator_bytes, None).unwrap();
         let signature: [u8; SIGNATURE_HASH_SIZE] = hex::decode("f6ab7d81a3d2791171b9cfdf41fca31d21dc56a5dd19e797e074ae4c3b2abecd2e450c97d30bbd44f8aa2aa36a348027ea9b8441907eabee3c86c87d0f42fef1").unwrap().try_into().unwrap();
         check_dictator_signature(
             signature,
             smart_rollup_address,
             upgrade_nonce,
             preimage_hash,
+            dictator,
         )
         .expect("The upgrade signature check from the dictator failed.");
     }

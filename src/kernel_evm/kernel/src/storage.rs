@@ -6,6 +6,7 @@
 use crate::indexable_storage::IndexableStorage;
 use evm_execution::account_storage::EthereumAccount;
 use hex::ToHex;
+use libsecp256k1::PublicKey;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
@@ -31,6 +32,10 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 // Size of the ticketer contract, it is encoded in base58.
 const TICKETER_SIZE: usize = 36;
+
+const DICTATOR_KEY: RefPath = RefPath::assert_from(b"/dictator_key");
+// Size of the dictator public key in full length.
+const DICTATOR_KEY_SIZE: usize = 65;
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
@@ -745,8 +750,22 @@ pub fn index_transaction_hash(
         .map_err(Error::from)
 }
 
+pub fn read_dictator_key<Host: Runtime>(host: &mut Host) -> Option<PublicKey> {
+    let mut buffer = [0; DICTATOR_KEY_SIZE];
+    store_read_slice(host, &DICTATOR_KEY, &mut buffer, DICTATOR_KEY_SIZE).ok()?;
+    PublicKey::parse_slice(&buffer, None).ok()
+}
+
 pub(crate) mod internal_for_tests {
     use super::*;
+
+    pub fn store_dictator_key<Host: Runtime>(
+        host: &mut Host,
+        dictator: PublicKey,
+    ) -> Result<(), Error> {
+        host.store_write(&DICTATOR_KEY, &dictator.serialize(), 0)
+            .map_err(Error::from)
+    }
 
     /// Reads status from the receipt in storage.
     pub fn read_transaction_receipt_status<Host: Runtime>(

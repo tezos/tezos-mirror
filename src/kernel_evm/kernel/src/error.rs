@@ -36,6 +36,7 @@ pub enum StorageError {
 pub enum UpgradeProcessError {
     InvalidUpgradeNonce,
     InternalUpgrade(&'static str),
+    NoDictator,
 }
 
 #[derive(Debug)]
