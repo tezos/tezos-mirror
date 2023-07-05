@@ -169,6 +169,7 @@ Platform developers are also provided reference materials for internal APIs of O
 
    shell/the_big_picture
    shell/shell
+   shell/data_availability_committees
    shell/p2p_api
    shell/cli-commands
    shell/rpc
