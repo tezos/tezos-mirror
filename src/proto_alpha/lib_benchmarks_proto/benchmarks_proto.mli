@@ -29,8 +29,6 @@ module Benchmark_base = Benchmark
 module Benchmark : sig
   type group = Benchmark_base.group = Standalone | Group of string | Generic
 
-  (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
-      [Registration.register] below. *)
   type purpose = Benchmark_base.purpose =
     | Other_purpose of string
     | Generate_code of string

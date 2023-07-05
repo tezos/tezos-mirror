@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines several signatures to create a benchmark.
+    * The most generic is [S]; it provides a rather complete control on
+      benchmark creation.
+    * [Simple] and [Simple_with_num] can be used to ease benchmark creation,
+      with simpler parameters. Registration functions in {!Registration} will
+      convert these simple interfaces back to [S].
+    * All the common parameters for these signatures are declared in
+      [Benchmark_base]. 
+      *)
+
 (** Some benchmarks depend on others, and some are for generic parameters that
     most benchmarks depend on. We need this information in order to correctly
     infer the values of parameters after a benchmark run; the user provides it
@@ -48,8 +58,8 @@ type purpose = Other_purpose of string | Generate_code of string
 (** Benchmark parameters. *)
 type 'config parameters = {bench_number : int; config : 'config}
 
-(** The module type of benchmarks *)
-module type S = sig
+(** Common declarations used by the different module types of benchmarks *)
+module type Benchmark_base = sig
   (** Name of the benchmark *)
   val name : Namespace.t
 
@@ -59,7 +69,10 @@ module type S = sig
   (** File where the benchmark module is defined *)
   val module_filename : string
 
-  (** Purpose of the benchmark *)
+  (** Described the purpose of the benchmark.
+      * [Generate_code of destination]: generates code at the given [destination] file.
+      * [Other_purpose of purpose]: any other purpose. The goal is to explain why the function is benchmarked since it does not produce a cost function.
+  *)
   val purpose : purpose
 
   (** Tags of the benchmark *)
@@ -82,6 +95,47 @@ module type S = sig
 
   (** Optional conversion to vector, for report generation purposes *)
   val workload_to_vector : workload -> Sparse_vec.String.t
+end
+
+(** A simplification of [S] below, when only one model is defined and no
+    particular process is needed to generate benchmarks. *)
+module type Simple = sig
+  include Benchmark_base
+
+  (** Inference group of the benchmark *)
+  val group : group
+
+  (** Model used for inference *)
+  val model : workload Model.t
+
+  (** Creates a  benchmark, ready to be run.
+      The benchmarks are thunked to prevent evaluating the workload until
+      needed. *)
+  val create_benchmark :
+    rng_state:Random.State.t -> config -> workload Generator.benchmark
+end
+
+(** A simplification of [S] below, when only one model is defined. *)
+module type Simple_with_num = sig
+  include Benchmark_base
+
+  (** Inference group of the benchmark *)
+  val group : group
+
+  (** Model used for inference *)
+  val model : workload Model.t
+
+  (** Benchmark generator *)
+  val create_benchmarks :
+    rng_state:Random.State.t ->
+    bench_num:int ->
+    config ->
+    (unit -> workload Generator.benchmark) trace
+end
+
+(** The module type of benchmarks *)
+module type S = sig
+  include Benchmark_base
 
   (** Cost models, with a given local name (string) for reference *)
   val models : (string * workload Model.t) list
@@ -95,6 +149,10 @@ module type S = sig
 end
 
 type t = (module S)
+
+type simple = (module Simple)
+
+type simple_with_num = (module Simple_with_num)
 
 val pp : Format.formatter -> t -> unit
 

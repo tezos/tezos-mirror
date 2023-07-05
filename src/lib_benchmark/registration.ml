@@ -181,6 +181,41 @@ let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
     Bench.models ;
   Name_table.add bench_table Bench.name (module Bench)
 
+let register_simple ?add_timer (bench : Benchmark.simple) =
+  register
+    ?add_timer
+    (module struct
+      include (val bench)
+
+      let models =
+        [
+          ( (match group with
+            | Generic -> "*"
+            | Group g -> g
+            | Standalone -> Namespace.(cons name "model" |> to_string)),
+            model );
+        ]
+
+      let create_benchmarks ~rng_state ~bench_num config =
+        List.repeat bench_num (fun () -> create_benchmark ~rng_state config)
+    end)
+
+let register_simple_with_num ?add_timer (bench : Benchmark.simple_with_num) =
+  register
+    ?add_timer
+    (module struct
+      include (val bench)
+
+      let models =
+        [
+          ( (match group with
+            | Generic -> "*"
+            | Group g -> g
+            | Standalone -> Namespace.(cons name "model" |> to_string)),
+            model );
+        ]
+    end)
+
 let add_command cmd = clic_table := cmd :: !clic_table
 
 (*---------------------------------------------------------------------------*)
