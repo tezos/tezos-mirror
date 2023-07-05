@@ -3186,6 +3186,88 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
   let* () = Lwt_unix.sleep 2.0 in
   check_profiles ~__LOC__ dal_node ~expected:profiles
 
+(* Adapted from sc_rollup.ml *)
+let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
+    ~migration_level ~scenario ~description () =
+  let tags =
+    Protocol.tag migrate_from :: Protocol.tag migrate_to :: "migration" :: tags
+  in
+  Test.register
+    ~__FILE__
+    ~tags
+    ~title:
+      (sf
+         "%s->%s: %s"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         description)
+  @@ fun () ->
+  let parameters = dal_enable_param (Some true) in
+  let* node, client, _dal_parameters =
+    setup_node ~parameters ~protocol:migrate_from ()
+  in
+
+  Log.info "Set user-activated-upgrade at level %d" migration_level ;
+  let* () = Node.terminate node in
+  let patch_config =
+    Node.Config_file.update_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let nodes_args = Node.[Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.run ~patch_config node nodes_args in
+  let* () = Node.wait_for_ready node in
+
+  let dal_node = Dal_node.create ~node ~client () in
+  let* () = Dal_node.init_config dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+
+  scenario ~migration_level client node dal_node
+
+let test_migration_plugin ~migrate_from ~migrate_to =
+  let tags = ["plugin"]
+  and description = "test plugin update"
+  and scenario ~migration_level client node dal_node =
+    let* current_level =
+      let* json = RPC.(call node @@ get_chain_block_header_shell ()) in
+      JSON.(json |-> "level" |> as_int |> return)
+    in
+
+    if migration_level <= current_level then
+      Test.fail ~__LOC__ "The migration level (%d) is too low" migration_level ;
+
+    let blocks_till_migration = migration_level - current_level in
+
+    let wait_for_plugin =
+      Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun json ->
+          let proto_hash = JSON.(json |> as_string) in
+          if String.equal proto_hash (Protocol.hash migrate_to) then Some ()
+          else None)
+    in
+
+    Log.info "Bake %d blocks" blocks_till_migration ;
+    let* () =
+      repeat blocks_till_migration (fun () -> Client.bake_for_and_wait client)
+    in
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6009
+       The daemon call to the following RPC fails with
+         "Failed to parse binary data: Not enough data."
+       This call can be removed, it's just a reminder of this problem. *)
+    let* _ =
+      RPC.(call node @@ get_chain_block ~version:"0" ~metadata:`Always ())
+    in
+
+    Log.info "Migrated to %s" (Protocol.name migrate_to) ;
+    wait_for_plugin
+  in
+  test_l1_migration_scenario
+    ~migrate_from
+    ~migrate_to
+    ~scenario
+    ~tags
+    ~description
+    ()
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -3325,3 +3407,6 @@ let register ~protocols =
 
   (* Register end-to-end tests *)
   register_end_to_end_tests ~protocols
+
+let register_migration ~migrate_from ~migrate_to =
+  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to
