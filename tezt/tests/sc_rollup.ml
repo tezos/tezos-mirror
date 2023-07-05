@@ -1490,6 +1490,51 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
+  let tags = ["catchup"] in
+  let description = "node can catch up on protocol migration" in
+  let commitment_period = 10 in
+  let challenge_window = 10 in
+  let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
+      tezos_client =
+    let* () = send_messages 1 tezos_client in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    Log.info "Stopping rollup node before protocol migration." ;
+    let* () = Sc_rollup_node.terminate rollup_node in
+    Log.info "Sending more messages on L1." ;
+    send_messages (commitment_period - 1) tezos_client
+  in
+  let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
+      tezos_client () =
+    let migration_level = Node.get_level tezos_node in
+    let* () = send_messages 1 tezos_client in
+    Log.info "Restarting rollup node after migration." ;
+    let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+    Log.info "Waiting for rollup node to catch up." ;
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:100. in
+    Log.info "Rollup node has caught up!" ;
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get
+        rollup_client
+        ["global"; "block"; string_of_int (migration_level - 1)]
+    in
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    in
+    unit
+  in
+  test_l2_migration_scenario
+    ~tags
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~description
+    ()
+
 (* Ensure the PVM is transitioning upon incoming messages.
       -------------------------------------------------------
 
@@ -5649,6 +5694,7 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_refute ~kind ~migrate_from ~migrate_to ;
   test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to ;
+  test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to ;
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =
