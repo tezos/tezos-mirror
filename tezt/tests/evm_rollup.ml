@@ -1824,6 +1824,24 @@ let test_kernel_upgrade_wrong_rollup_address =
   in
   unit
 
+let test_kernel_upgrade_no_dictator =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["dictator"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails if there is no dictator"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "debug_kernel" in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~should_fail:true
+      ~base_installee
+      ~installee
+      ~private_key:Eth_account.bootstrap_accounts.(0).private_key
+      protocol
+  in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1857,6 +1875,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_evm_to_evm protocols ;
   test_kernel_upgrade_wrong_key protocols ;
   test_kernel_upgrade_wrong_nonce protocols ;
-  test_kernel_upgrade_wrong_rollup_address protocols
+  test_kernel_upgrade_wrong_rollup_address protocols ;
+  test_kernel_upgrade_no_dictator protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
