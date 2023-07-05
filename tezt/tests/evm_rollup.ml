@@ -249,7 +249,7 @@ let setup_deposit_contracts ~admin client protocol =
 
   return {fa12 = fa12_address; bridge = bridge_address}
 
-let make_config ?bootstrap_accounts ?ticketer () =
+let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -274,13 +274,23 @@ let make_config ?bootstrap_accounts ?ticketer () =
       ~none:[]
       bootstrap_accounts
   in
-  match ticketer @ bootstrap_accounts with [] -> None | res -> Some res
+  let dictator =
+    Option.fold
+      ~some:(fun dictator ->
+        let to_ = Durable_storage_path.dictator in
+        [Set {value = dictator; to_}])
+      ~none:[]
+      dictator
+  in
+  match ticketer @ bootstrap_accounts @ dictator with
+  | [] -> None
+  | res -> Some res
 
 let setup_evm_kernel ?config
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
-    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ~deposit_admin
-    protocol =
+    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ?dictator
+    ~deposit_admin protocol =
   let* node, client = setup_l1 protocol in
   let* deposit_addresses =
     match deposit_admin with
@@ -297,7 +307,7 @@ let setup_evm_kernel ?config
         let ticketer =
           Option.map (fun {bridge; _} -> bridge) deposit_addresses
         in
-        make_config ~bootstrap_accounts ?ticketer ()
+        make_config ~bootstrap_accounts ?ticketer ?dictator ()
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -1607,7 +1617,7 @@ let test_deposit_fa12 =
   unit
 
 let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
-    ~base_installee ~installee ~private_key protocol =
+    ~base_installee ~installee ?dictator ~private_key protocol =
   let* {
          node;
          client;
@@ -1617,7 +1627,7 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
          evm_proxy_server;
          _;
        } =
-    setup_evm_kernel ~deposit_admin:None protocol
+    setup_evm_kernel ?dictator ~deposit_admin:None protocol
   in
   let sc_rollup_address =
     Option.value ~default:sc_rollup_address rollup_address
@@ -1714,9 +1724,14 @@ let test_kernel_upgrade_to_debug =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
-    gen_test_kernel_upgrade ~base_installee ~installee ~private_key protocol
+    gen_test_kernel_upgrade
+      ~base_installee
+      ~installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
   in
   unit
 
@@ -1728,9 +1743,14 @@ let test_kernel_upgrade_evm_to_evm =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* sc_rollup_node, node, client, evm_proxy_server =
-    gen_test_kernel_upgrade ~base_installee ~installee ~private_key protocol
+    gen_test_kernel_upgrade
+      ~base_installee
+      ~installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
      blocks. *)
@@ -1750,13 +1770,14 @@ let test_kernel_upgrade_wrong_key =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let private_key = Eth_account.bootstrap_accounts.(1).private_key in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
       ~should_fail:true
       ~base_installee
       ~installee
-      ~private_key
+      ~dictator:dictator.public_key
+      ~private_key:Eth_account.bootstrap_accounts.(1).private_key
       protocol
   in
   unit
@@ -1769,14 +1790,15 @@ let test_kernel_upgrade_wrong_nonce =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
       ~nonce:3
       ~should_fail:true
       ~base_installee
       ~installee
-      ~private_key
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
       protocol
   in
   unit
@@ -1789,14 +1811,15 @@ let test_kernel_upgrade_wrong_rollup_address =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let private_key = Eth_account.bootstrap_accounts.(0).private_key in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
       ~rollup_address:"sr1T13qeVewVm3tudQb8dwn8qRjptNo7KVkj"
       ~should_fail:true
       ~base_installee
       ~installee
-      ~private_key
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
       protocol
   in
   unit

@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {address : string; private_key : string}
+type t = {address : string; private_key : string; public_key : string}
 
 (** Bootstrap accounts in the EVM Kernel *)
 val bootstrap_accounts : t array
