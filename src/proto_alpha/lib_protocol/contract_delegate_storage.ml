@@ -59,10 +59,8 @@ let find_is_delegate ctxt pkh =
 
 let is_delegate ctxt pkh =
   let open Lwt_result_syntax in
-  let+ delegate = find ctxt (Contract_repr.Implicit pkh) in
-  match delegate with
-  | None -> false
-  | Some delegate -> Signature.Public_key_hash.(delegate = pkh)
+  let+ _delegate, is_delegate = find_is_delegate ctxt pkh in
+  is_delegate
 
 let init ctxt contract delegate =
   check_not_tz4 delegate >>?= fun () ->
