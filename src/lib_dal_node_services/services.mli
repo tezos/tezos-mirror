@@ -78,7 +78,7 @@ module Types : sig
     | `Not_selected
       (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
-    | `Unseen
+    | `Unseen_or_not_finalized
       (** The slot header was not seen in a *final* L1 block. For instance, this
           could happen if the RPC `PATCH /commitments/<commitment>` was called
           but the corresponding slot header was never included into a block; or

@@ -1047,12 +1047,12 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
 
   Log.info
     "Just after injecting slots and before baking, there are 6 headers, all \
-     with status Unseen" ;
+     with status Unseen_or_not_finalized" ;
   let* () =
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__ "unseen")
+      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
   let* () =
@@ -1067,13 +1067,13 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = wait_block_processing1 in
 
   Log.info
-    "After baking one block, the status is still Unseen, because the block is \
-     not final" ;
+    "After baking one block, the status is still Unseen_or_not_finalized, \
+     because the block is not final" ;
   let* () =
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__ "unseen")
+      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
 
@@ -1178,10 +1178,10 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       [slot2_a]
   in
   (* slot_3 never finished in an L1 block, so the DAL node only saw it as
-     Unseen. *)
+     Unseen_or_not_finalized. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ "unseen")
+      (get_headers_succeeds ~__LOC__ "unseen_or_not_finalized")
       [slot3]
   in
   (* slot_4 is never injected in any of the nodes. So, it's not

@@ -53,7 +53,11 @@ module Types = struct
   type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
   type header_status =
-    [`Waiting_attestation | `Attested | `Unattested | `Not_selected | `Unseen]
+    [ `Waiting_attestation
+    | `Attested
+    | `Unattested
+    | `Not_selected
+    | `Unseen_or_not_finalized ]
 
   type shard_index = int
 
@@ -135,11 +139,11 @@ module Types = struct
           (function `Not_selected -> Some () | _ -> None)
           (function () -> `Not_selected);
         case
-          ~title:"unseen"
+          ~title:"unseen_or_not_finalized"
           (Tag 4)
           (obj1 (req "status" (constant "unseen")))
-          (function `Unseen -> Some () | _ -> None)
-          (function () -> `Unseen);
+          (function `Unseen_or_not_finalized -> Some () | _ -> None)
+          (function () -> `Unseen_or_not_finalized);
       ]
 
   let slot_header_encoding =
