@@ -38,6 +38,8 @@ module type Commitment_sig = sig
 
   type secret = Poly.t SMap.t
 
+  val commit_single : prover_public_parameters -> Poly.t -> G1.t
+
   (* [all_keys] is an optional argument that should only be used for
      partial commitments. It contains all the polynomial names that
      make up the full commitment.
@@ -55,6 +57,12 @@ module type Commitment_sig = sig
   val cardinal : t -> int
 
   val rename : (string -> string) -> t -> t
+
+  val empty : t
+
+  val add : string -> G1.t -> t -> t
+
+  val get : string -> t -> G1.t
 end
 
 module type Public_parameters_sig = sig
@@ -169,6 +177,20 @@ module Kzg_impl = struct
 
     let rename f cmt =
       SMap.fold (fun key x acc -> SMap.add (f key) x acc) cmt SMap.empty
+
+    let empty = SMap.empty
+
+    let add = SMap.add_unique
+
+    let get name cmt =
+      match SMap.find_opt name cmt with
+      | Some c -> c
+      | None ->
+          raise
+            (Invalid_argument
+               (Printf.sprintf
+                  "Kzg.Commitment.get : commitement %s not found."
+                  name))
   end
 
   (* polynomials to be committed *)

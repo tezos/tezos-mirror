@@ -137,6 +137,11 @@ struct
     let cardinal = Pack.commitment_cardinal
 
     let rename _f cmt = cmt
+
+    let get _ _ = failwith "todo"
+    let commit_single _ _ = failwith "todo"
+    let empty  = Pack.{cmt_t = GT.zero; cmt_len = 0}
+    let add _ _ _ = failwith "todo"
   end
 
   type proof = {

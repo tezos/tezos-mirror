@@ -53,7 +53,7 @@ let test_not_in_table () =
   with Plonk.Cq.Entry_not_in_table -> ()
 
 let test_wrong_proof () =
-  let module Cq = Plonk.Cq.Internal in
+  let module Cq = Plonk.Cq.Make (Plonk.Polynomial_commitment) in
   let prv, vrf = Cq.setup ~srs ~wire_size ~table in
   let transcript = Bytes.empty in
   let proof_f, _ = Cq.prove prv transcript f in
@@ -65,7 +65,7 @@ let test_wrong_proof () =
             (Domain.build wire_size)
             (of_array (wire_size - 1, f_not_in_table))))
     in
-    Cq.{proof_f with cm_f = Plonk.Utils.commit1 prv.srs1 f}
+    Cq.{proof_f with cm_f = commit1 prv.pc f}
   in
   assert (not (fst @@ Cq.verify vrf transcript wrong_proof))
 

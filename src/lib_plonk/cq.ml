@@ -28,10 +28,9 @@
 (* here we call n the size of the table, & k the size of the wire poly to check *)
 
 open Bls
+open Identities
 
 module type Cq_sig = sig
-  open Bls
-
   exception Entry_not_in_table
 
   type transcript = bytes
@@ -55,7 +54,7 @@ module type Cq_sig = sig
     verifier_public_parameters -> transcript -> proof -> bool * transcript
 end
 
-module Internal = struct
+module Make (PC : Polynomial_commitment.S) = struct
   open Utils
 
   exception Entry_not_in_table
@@ -66,11 +65,11 @@ module Internal = struct
     n : int;
     domain_k : Domain.t;
     domain_2k : Domain.t;
-    srs1 : Srs_g1.t;
     table : int Scalar_map.t;
     q : G1.t array;
     cms_lagrange : G1.t array;
     cms_lagrange_0 : G1.t array;
+    pc : PC.Public_parameters.prover;
   }
 
   type verifier_public_parameters = {
@@ -81,22 +80,29 @@ module Internal = struct
     srs2_N_1_k_2 : G2.t;
     cm_table : G2.t;
     cm_zv : G2.t;
+    pc : PC.Public_parameters.verifier;
   }
 
   type proof = {
     cm_f : G1.t;
     cm_a : G1.t;
     cm_a0 : G1.t;
+    cm_b0 : G1.t;
     cm_qa : G1.t;
-    cm_qb : G1.t;
     cm_m : G1.t;
     cm_p : G1.t;
-    cm_b0 : G1.t;
     a0 : Scalar.t;
     b0y : Scalar.t;
     fy : Scalar.t;
-    piy : G1.t;
+    pc : PC.proof;
+    cm_b0_qb_f : PC.Commitment.t;
   }
+
+  (* We don’t need the generator because we don’t evaluate at gX *)
+  let get_pc_query gamma =
+    List.map (convert_eval_points ~generator:Scalar.zero ~x:gamma) [[X]]
+
+  let commit1 = PC.Commitment.commit_single
 
   let kzg_0 p =
     let q, r =
@@ -109,7 +115,7 @@ module Internal = struct
     let m, l = List.map f list |> Array.of_list |> Array.split in
     (m, pippenger1 l m)
 
-  let setup_prover (srs1, _srs2) (n, domain) k (table_array, table_poly) =
+  let setup_prover (n, domain) k (table_array, table_poly) pc =
     let domain_k = Domain.build k in
     let domain_2k = Domain.build (2 * k) in
 
@@ -130,10 +136,8 @@ module Internal = struct
               if j = i then Scalar.one else Scalar.zero)
           |> Evaluations.interpolation_fft domain)
     in
-    let cms_lagrange = Array.map (commit1 srs1) lagrange in
-    let cms_lagrange_0 =
-      Array.map (fun p -> commit1 srs1 @@ kzg_0 p) lagrange
-    in
+    let cms_lagrange = Array.map (commit1 pc) lagrange in
+    let cms_lagrange_0 = Array.map (fun p -> commit1 pc @@ kzg_0 p) lagrange in
 
     let q =
       Array.init n (fun i ->
@@ -146,12 +150,12 @@ module Internal = struct
           in
           if not (Poly.is_zero r) then
             failwith "Cq.setup_prover : division error." ;
-          commit1 srs1 q)
+          commit1 pc q)
     in
 
-    {n; domain_k; domain_2k; srs1; table; q; cms_lagrange; cms_lagrange_0}
+    {n; domain_k; domain_2k; table; q; cms_lagrange; cms_lagrange_0; pc}
 
-  let setup_verifier (_srs1, srs2) n k table_poly =
+  let setup_verifier (_srs1, srs2) n k table_poly pc =
     (* cm (X^n - 1) *)
     let cm_zv =
       try G2.(add (Srs_g2.get srs2 n) (negate one))
@@ -171,7 +175,7 @@ module Internal = struct
     let srs2_1 = Srs_g2.get srs2 1 in
     let srs2_N_1_k_2 = Srs_g2.get srs2 (n - 1 - (k - 2)) in
 
-    {n; k; srs2_0; srs2_1; srs2_N_1_k_2; cm_table; cm_zv}
+    {n; k; srs2_0; srs2_1; srs2_N_1_k_2; cm_table; cm_zv; pc}
 
   let setup ~srs ~wire_size ~table =
     let len_t = Array.length table in
@@ -183,8 +187,10 @@ module Internal = struct
     in
     let domain = Domain.build n in
     let table_poly = Evaluations.interpolation_fft2 domain table in
-    let prv = setup_prover srs (n, domain) wire_size (table, table_poly) in
-    let vrf = setup_verifier srs n wire_size table_poly in
+    (* TODO : changer ça si on utilise un autre pc *)
+    let pc = PC.Public_parameters.setup 0 (srs, srs) in
+    let prv = setup_prover (n, domain) wire_size (table, table_poly) (fst pc) in
+    let vrf = setup_verifier srs n wire_size table_poly (snd pc) in
     (prv, vrf)
 
   let map_of_occurences =
@@ -235,44 +241,70 @@ module Internal = struct
         Scalar.(inverse_exn (f.(i) + beta)))
     |> Evaluations.interpolation_fft domain
 
-  let compute_cm_qb pp beta k b f =
+  let compute_qb pp beta k b f =
     let f = Evaluations.evaluation_fft pp.domain_2k f in
     let b = Evaluations.evaluation_fft pp.domain_2k b in
-    let qb =
-      let f_beta =
-        Evaluations.linear_c ~evaluations:[f] ~add_constant:beta ()
-      in
-      let bf = Evaluations.mul_c ~evaluations:[b; f_beta] () in
-      let bf_1 =
-        Poly.(
-          Evaluations.interpolation_fft pp.domain_2k bf - constant Scalar.one)
-      in
-      let q, r = Poly.division_xn bf_1 k Scalar.(negate one) in
-      if Poly.is_zero r then q else raise Entry_not_in_table
+    let f_beta = Evaluations.linear_c ~evaluations:[f] ~add_constant:beta () in
+    let bf = Evaluations.mul_c ~evaluations:[b; f_beta] () in
+    let bf_1 =
+      Poly.(Evaluations.interpolation_fft pp.domain_2k bf - constant Scalar.one)
     in
-    (qb, commit1 pp.srs1 qb)
+    let q, r = Poly.division_xn bf_1 k Scalar.(negate one) in
+    if Poly.is_zero r then q else raise Entry_not_in_table
 
-  let compute_p pp k b0 =
-    Poly.mul_xn b0 (pp.n - 1 - (k - 2)) Scalar.zero |> commit1 pp.srs1
+  let compute_p (pp : prover_public_parameters) k b0 =
+    Poly.mul_xn b0 (pp.n - 1 - (k - 2)) Scalar.zero |> commit1 pp.pc
 
   (* as written p. 13, N × a₀ = ΣA_i for i < N ; since A is sparse, it’s fine *)
   let compute_a0 n a =
     Scalar.(List.fold_left (fun acc (_, a) -> acc + a) zero a / of_int n)
 
-  let compute_v k (beta, gamma, eta, eta2) b0y by fy =
-    let zhy = Scalar.((gamma ** Z.of_int k) + negate one) in
-    let qby = Scalar.(((by * (fy + beta)) + negate one) / zhy) in
-    Scalar.(b0y + (eta * fy) + (eta2 * qby))
-
-  let compute_piy pp k (beta, gamma, eta) (b0, f, qb) (b0y, by, fy) =
-    let eta2 = Scalar.(eta * eta) in
-    let v = compute_v k (beta, gamma, eta, eta2) b0y by fy in
-    let num =
-      Poly.(b0 + mul_by_scalar eta f + mul_by_scalar eta2 qb - constant v)
+  let kzg_prove (pp : prover_public_parameters) transcript cm_f (b0, f, qb) =
+    let f_map = SMap.of_list [("b0", b0); ("qb", qb)] in
+    let cm_map, f_aux = PC.Commitment.commit pp.pc f_map in
+    let f_map = SMap.add "f" f f_map in
+    let cm_map = PC.Commitment.add "f" cm_f cm_map in
+    let cm_b0 = PC.Commitment.get "b0" cm_map in
+    (* 3.1 *)
+    let transcript = Transcript.expand PC.Commitment.t cm_map transcript in
+    let gamma, transcript = Fr_generation.random_fr transcript in
+    (* 3.2 *)
+    let b0y = Poly.evaluate b0 gamma in
+    let qby = Poly.evaluate qb gamma in
+    let fy = Poly.evaluate f gamma in
+    let query = get_pc_query gamma in
+    let secret = [f_map] in
+    let cm_aux = [f_aux] in
+    let answers =
+      [SMap.singleton "x" (SMap.of_list [("b0", b0y); ("f", fy); ("qb", qby)])]
     in
-    let q, r = Poly.division_xn num 1 Scalar.(negate gamma) in
-    if not (Poly.is_zero r) then failwith "Cq.compute_piy : division error." ;
-    commit1 pp.srs1 q
+    let proof, transcript =
+      PC.prove pp.pc transcript secret cm_aux query answers
+    in
+    (b0y, fy, cm_map, cm_b0, proof, transcript)
+
+  let kzg_verify pp transcript proof k beta =
+    (* 3.1 *)
+    let transcript =
+      Transcript.expand PC.Commitment.t proof.cm_b0_qb_f transcript
+    in
+    let gamma, transcript = Fr_generation.random_fr transcript in
+    (* 3.4 *)
+    let b0 = Scalar.(of_int pp.n * proof.a0 / of_int pp.k) in
+    (* 3.5, 3.6.a *)
+    let zhy = Scalar.((gamma ** Z.of_int k) + negate one) in
+    let by = Scalar.((proof.b0y * gamma) + b0) in
+    let qby = Scalar.(((by * (proof.fy + beta)) + negate one) / zhy) in
+    let cm = [proof.cm_b0_qb_f] in
+    let query = get_pc_query gamma in
+    let answers =
+      [
+        SMap.singleton
+          "x"
+          (SMap.of_list [("b0", proof.b0y); ("f", proof.fy); ("qb", qby)]);
+      ]
+    in
+    PC.verify pp.pc transcript cm query answers proof.pc
 
   let compute_cm_a0 pp a =
     snd @@ compute_and_commit (fun (i, a) -> (a, pp.cms_lagrange_0.(i))) a
@@ -284,7 +316,7 @@ module Internal = struct
     let f =
       Evaluations.(interpolation_fft pp.domain_k (of_array (k - 1, f_array)))
     in
-    let cm_f = commit1 pp.srs1 f in
+    let cm_f = commit1 pp.pc f in
     (* 1.1, 1.2 *)
     let m_and_t, cm_m = compute_m_and_t_sparse pp f_array in
 
@@ -293,42 +325,32 @@ module Internal = struct
     let beta, transcript = Fr_generation.random_fr transcript in
     (* 2.2, 2.3 *)
     let a, cm_a = compute_a pp beta m_and_t in
+    (* 3.3 *)
+    let a0 = compute_a0 pp.n a in
+    (* 3.7.a *)
+    let cm_a0 = compute_cm_a0 pp a in
+    (* 3.6.a *)
+    let transcript = Transcript.expand Scalar.t a0 transcript in
     (* 2.4 *)
     let cm_qa = compute_cm_qa pp a in
     (* 2.5 *)
     let b = compute_b beta k pp.domain_k f_array in
     (* 2.6 *)
     let b0 = kzg_0 b in
-    (* 2.7 *)
-    let cm_b0 = commit1 pp.srs1 b0 in
     (* 2.8, 2.9 *)
-    let qb, cm_qb = compute_cm_qb pp beta k b f in
+    let qb = compute_qb pp beta k b f in
     (* 2.10 *)
     let cm_p = compute_p pp k b0 in
 
-    (* 3.1 *)
     let transcript =
-      Transcript.list_expand G1.t [cm_a; cm_qa; cm_qb; cm_b0; cm_p] transcript
+      Transcript.list_expand G1.t [cm_a; cm_qa; cm_p] transcript
     in
-    let gamma, transcript = Fr_generation.random_fr transcript in
-    (* 3.2 *)
-    let b0y = Poly.evaluate b0 gamma in
-    let by = Poly.evaluate b gamma in
-    let fy = Poly.evaluate f gamma in
-    (* 3.3 *)
-    let a0 = compute_a0 pp.n a in
-
-    (* 3.6.a *)
-    let transcript =
-      Transcript.list_expand Scalar.t [b0y; by; fy; a0] transcript
-    in
-    let eta, transcript = Fr_generation.random_fr transcript in
     (* 3.6.b *)
-    let piy = compute_piy pp k (beta, gamma, eta) (b0, f, qb) (b0y, by, fy) in
-    (* 3.7.a *)
-    let cm_a0 = compute_cm_a0 pp a in
+    let b0y, fy, cm_b0_qb_f, cm_b0, pc, transcript =
+      kzg_prove pp transcript cm_f (b0, f, qb)
+    in
 
-    ( {cm_f; cm_a; cm_a0; cm_qa; cm_qb; cm_m; cm_p; cm_b0; a0; b0y; fy; piy},
+    ( {cm_f; cm_a; cm_a0; cm_b0; cm_qa; cm_m; cm_p; a0; b0y; fy; pc; cm_b0_qb_f},
       transcript )
 
   let verify pp transcript proof =
@@ -337,25 +359,18 @@ module Internal = struct
       Transcript.list_expand G1.t [proof.cm_f; proof.cm_m] transcript
     in
     let beta, transcript = Fr_generation.random_fr transcript in
+    (* 3.6.a *)
+    let transcript = Transcript.expand Scalar.t proof.a0 transcript in
     (* 3.1 *)
     let transcript =
       Transcript.list_expand
         G1.t
-        [proof.cm_a; proof.cm_qa; proof.cm_qb; proof.cm_b0; proof.cm_p]
+        [proof.cm_a; proof.cm_qa; proof.cm_p]
         transcript
     in
-    let gamma, transcript = Fr_generation.random_fr transcript in
-    (* 3.4 *)
-    let b0 = Scalar.(of_int pp.n * proof.a0 / of_int pp.k) in
+
     (* 3.5, 3.6.a *)
-    let by = Scalar.((proof.b0y * gamma) + b0) in
-    let transcript =
-      Transcript.list_expand
-        Scalar.t
-        [proof.b0y; by; proof.fy; proof.a0]
-        transcript
-    in
-    let eta, transcript = Fr_generation.random_fr transcript in
+    let kzg_verif, transcript = kzg_verify pp transcript proof pp.k beta in
 
     (* 2.11 *)
     let check_a =
@@ -374,26 +389,6 @@ module Internal = struct
         G1.[(negate proof.cm_b0, pp.srs2_N_1_k_2); (proof.cm_p, pp.srs2_0)]
     in
 
-    (* 3.5, 3.6.a *)
-    let eta2 = Scalar.(eta * eta) in
-    let v =
-      let v = compute_v pp.k (beta, gamma, eta, eta2) proof.b0y by proof.fy in
-      G1.(mul one v)
-    in
-
-    (* 3.6.c *)
-    let c =
-      G1.(add (add proof.cm_b0 (mul proof.cm_f eta)) (mul proof.cm_qb eta2))
-    in
-    let check_piy =
-      Pairing.pairing_check
-        G1.
-          [
-            (add (add c (negate v)) (mul proof.piy gamma), pp.srs2_0);
-            (negate proof.piy, pp.srs2_1);
-          ]
-    in
-
     (* 3.6.b *)
     let check_a0 =
       Pairing.pairing_check
@@ -404,7 +399,7 @@ module Internal = struct
           ]
     in
 
-    (check_a && check_b0 && check_piy && check_a0, transcript)
+    (kzg_verif && check_a && check_b0 && check_a0, transcript)
 end
 
-include (Internal : Cq_sig)
+include (Make (Polynomial_commitment) : Cq_sig)
