@@ -39,25 +39,23 @@ let block_hash_of_level level =
   Block_hash.of_string_exn s
 
 let default_constants =
-  let constants = Default_parameters.constants_test in
-  let sc_rollup =
-    {
-      constants.sc_rollup with
-      arith_pvm_enable = true;
-      challenge_window_in_blocks = 4032;
-      commitment_period_in_blocks = 3;
-    }
+  let test_constants =
+    Layer1_helpers.constants_of_parametric Default_parameters.constants_test
   in
-  {constants with sc_rollup}
+  {
+    test_constants with
+    sc_rollup =
+      {
+        test_constants.sc_rollup with
+        challenge_window_in_blocks = 4032;
+        commitment_period_in_blocks = 3;
+      };
+  }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let open Lwt_result_syntax in
   let head =
-    Layer1.
-      {
-        hash = Block_hash.zero;
-        level = Raw_level.to_int32 node_ctxt.genesis_info.level;
-      }
+    Layer1.{hash = Block_hash.zero; level = node_ctxt.genesis_info.level}
   in
   let* () = Node_context.save_level node_ctxt head in
   let predecessor = head in
@@ -66,13 +64,20 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Sc_rollup.Inbox.genesis
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
-      node_ctxt.genesis_info.level
+      (Raw_level.of_int32_exn node_ctxt.genesis_info.level)
   in
-  let* inbox_hash = Node_context.save_inbox node_ctxt inbox in
-  let inbox_witness = Sc_rollup.Inbox.current_witness inbox in
+  let* inbox_hash =
+    Node_context.save_inbox
+      node_ctxt
+      (Sc_rollup_proto_types.Inbox.to_octez inbox)
+  in
+  let inbox_witness =
+    Sc_rollup.Inbox.current_witness inbox
+    |> Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
+  in
   let ctxt = Octez_smart_rollup_node.Context.empty node_ctxt.context in
   let num_ticks = 0L in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let initial_tick = Sc_rollup.Tick.initial in
   let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! state = PVM.install_boot_sector initial_state boot_sector in
@@ -81,16 +86,20 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
   let*! context_hash = Octez_smart_rollup_node.Context.commit ctxt in
   let commitment =
     Sc_rollup.Commitment.genesis_commitment
-      ~origination_level:node_ctxt.genesis_info.level
+      ~origination_level:(Raw_level.of_int32_exn node_ctxt.genesis_info.level)
       ~genesis_state_hash
   in
-  let* commitment_hash = Node_context.save_commitment node_ctxt commitment in
+  let* commitment_hash =
+    Node_context.save_commitment
+      node_ctxt
+      (Sc_rollup_proto_types.Commitment.to_octez commitment)
+  in
   let previous_commitment_hash = node_ctxt.genesis_info.commitment_hash in
   let header =
     Sc_rollup_block.
       {
         block_hash = head.hash;
-        level = Raw_level.to_int32 node_ctxt.genesis_info.level;
+        level = node_ctxt.genesis_info.level;
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
@@ -136,7 +145,7 @@ let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
   let* ctxt =
     Node_context.Internal_for_tests.create_node_context
       cctxt
-      ~constants
+      constants
       ~data_dir
       kind
   in
@@ -217,10 +226,7 @@ let append_dummy_l2_chain node_ctxt ~length =
   in
   let batches =
     Stdlib.List.init length (fun i ->
-        [
-          Sc_rollup.Inbox_message.External
-            (Z.to_bits (Z.of_int (i + head_level + 1)));
-        ])
+        ["\001" (* External tag *) ^ Z.to_bits (Z.of_int (i + head_level + 1))])
   in
   append_l2_blocks node_ctxt batches
 

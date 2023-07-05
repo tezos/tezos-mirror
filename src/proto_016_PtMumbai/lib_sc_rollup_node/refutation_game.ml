@@ -71,9 +71,7 @@ let inject_next_move node_ctxt source ~refutation ~opponent =
   let refute_operation =
     L1_operation.Refute
       {
-        rollup =
-          Sc_rollup_proto_types.Address.to_octez
-            node_ctxt.Node_context.rollup_address;
+        rollup = node_ctxt.Node_context.rollup_address;
         refutation = Sc_rollup_proto_types.Game.refutation_to_octez refutation;
         opponent;
       }
@@ -122,7 +120,7 @@ let page_membership_proof params page_index slot_data =
 let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
     (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! input_request = PVM.is_input_state start_state in
   match input_request with
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
@@ -130,7 +128,6 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
       let* pages =
         Dal_pages_request.slot_pages ~dal_attestation_lag node_ctxt slot_id
       in
-      let* pages = Delayed_write_monad.apply node_ctxt pages in
       match pages with
       | None -> return_none (* The slot is not confirmed. *)
       | Some pages -> (
@@ -155,9 +152,16 @@ let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
                 pages_per_slot))
   | _ -> return_none
 
+let metadata (node_ctxt : _ Node_context.t) =
+  let address =
+    Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
+  in
+  let origination_level = Raw_level.of_int32_exn node_ctxt.genesis_info.level in
+  Sc_rollup.Metadata.{address; origination_level}
+
 let generate_proof (node_ctxt : _ Node_context.t) game start_state =
   let open Lwt_result_syntax in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let snapshot = game.inbox_snapshot in
   (* NOTE: [snapshot_level_int32] below refers to the level of the snapshotted
      inbox (from the skip list) which also matches [game.start_level - 1]. *)
@@ -192,7 +196,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
   let* parametric_constants =
     let cctxt = node_ctxt.cctxt in
     Protocol.Constants_services.parametric
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Level snapshot_level_int32)
   in
   let dal_l1_parameters = parametric_constants.dal in
@@ -216,7 +220,10 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
     let reveal hash =
       let open Lwt_syntax in
       let* res =
-        Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_kind:PVM.kind ~hash
+        Reveals.get
+          ~data_dir:node_ctxt.data_dir
+          ~pvm_kind:(Sc_rollup_proto_types.Kind.to_octez PVM.kind)
+          ~hash
       in
       match res with Ok data -> return @@ Some data | Error _ -> return None
 
@@ -225,7 +232,11 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
 
       let get_history inbox_hash =
         let open Lwt_syntax in
-        let+ inbox = Node_context.find_inbox node_ctxt inbox_hash in
+        let+ inbox =
+          Node_context.find_inbox
+            node_ctxt
+            (Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash)
+        in
         match inbox with
         | Error err ->
             Format.kasprintf
@@ -235,7 +246,12 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
               inbox_hash
               pp_print_trace
               err
-        | Ok inbox -> Option.map Sc_rollup.Inbox.take_snapshot inbox
+        | Ok inbox ->
+            Option.map
+              (fun i ->
+                Sc_rollup.Inbox.take_snapshot
+                  (Sc_rollup_proto_types.Inbox.of_octez i))
+              inbox
 
       let get_payloads_history witness =
         Lwt.map
@@ -243,8 +259,11 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
              ~error:(Format.kasprintf Stdlib.failwith "%a" pp_print_trace))
         @@
         let open Lwt_result_syntax in
-        let* {predecessor; predecessor_timestamp; messages} =
-          Node_context.get_messages node_ctxt witness
+        let* {predecessor; predecessor_timestamp; messages; _} =
+          Node_context.get_messages
+            node_ctxt
+            (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
+               witness)
         in
         let*? hist =
           Inbox.payloads_history_of_messages
@@ -269,7 +288,7 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
       let page_info = page_info
     end
   end in
-  let metadata = Node_context.metadata node_ctxt in
+  let metadata = metadata node_ctxt in
   let*! start_tick = PVM.get_tick start_state in
   let* proof =
     trace
@@ -331,7 +350,7 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
   let our_stop_chunk =
     Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
   in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let* dissection =
     Game_helpers.make_dissection
       ~state_of_tick
@@ -458,7 +477,7 @@ let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let timeout_operation =
     L1_operation.Timeout
       {
-        rollup = Sc_rollup_proto_types.Address.to_octez node_ctxt.rollup_address;
+        rollup = node_ctxt.rollup_address;
         stakers = Sc_rollup_proto_types.Game.index_to_octez stakers;
       }
   in
@@ -474,9 +493,9 @@ let timeout_reached ~self head_block node_ctxt staker1 staker2 =
   let Node_context.{rollup_address; cctxt; _} = node_ctxt in
   let* game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, head_block)
-      rollup_address
+      (Sc_rollup_proto_types.Address.of_octez rollup_address)
       staker1
       staker2
   in

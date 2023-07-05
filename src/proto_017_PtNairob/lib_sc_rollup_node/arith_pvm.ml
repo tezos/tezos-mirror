@@ -44,7 +44,7 @@ module Arith_proof_format =
         .tree_proof_encoding
     end)
 
-module Impl : Pvm.S = struct
+module Impl : Pvm_sig.S = struct
   module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
   include PVM
 

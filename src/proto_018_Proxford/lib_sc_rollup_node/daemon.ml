@@ -32,24 +32,21 @@ open Apply_results
 (** Returns [Some c] if [their_commitment] is refutable where [c] is our
       commitment for the same inbox level. *)
 let is_refutable_commitment node_ctxt
-    (their_commitment : Sc_rollup.Commitment.t) their_commitment_hash =
+    (their_commitment : Octez_smart_rollup.Commitment.t) their_commitment_hash =
   let open Lwt_result_syntax in
   let* l2_block =
-    Node_context.get_l2_block_by_level
-      node_ctxt
-      (Raw_level.to_int32 their_commitment.inbox_level)
+    Node_context.get_l2_block_by_level node_ctxt their_commitment.inbox_level
   in
   let* our_commitment_and_hash =
     Option.filter_map_es
       (fun hash ->
-        let hash = Sc_rollup_proto_types.Commitment_hash.of_octez hash in
         let+ commitment = Node_context.find_commitment node_ctxt hash in
         Option.map (fun c -> (c, hash)) commitment)
       l2_block.header.commitment_hash
   in
   match our_commitment_and_hash with
   | Some (our_commitment, our_commitment_hash)
-    when Sc_rollup.Commitment.Hash.(
+    when Octez_smart_rollup.Commitment.Hash.(
            their_commitment_hash <> our_commitment_hash
            && their_commitment.predecessor = our_commitment.predecessor) ->
       return our_commitment_and_hash
@@ -76,7 +73,7 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
           ~level:their_commitment.inbox_level
           ~other
       in
-      assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
+      assert (Octez_smart_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
       Publisher.publish_single_commitment node_ctxt our_commitment
 
 (** Process an L1 SCORU operation (for the node's rollup) which is included
@@ -94,10 +91,12 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let save_lpc =
         match Reference.get node_ctxt.lpc with
         | None -> true
-        | Some lpc -> Raw_level.(commitment.inbox_level >= lpc.inbox_level)
+        | Some lpc ->
+            Raw_level.to_int32 commitment.inbox_level >= lpc.inbox_level
       in
+      let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
       if save_lpc then Reference.set node_ctxt.lpc (Some commitment) ;
-      let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
+      let commitment_hash = Octez_smart_rollup.Commitment.hash commitment in
       let* () =
         Node_context.set_commitment_published_at_level
           node_ctxt
@@ -110,7 +109,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       let*! () =
         Commitment_event.last_published_commitment_updated
           commitment_hash
-          (Raw_level.of_int32_exn head.Layer1.level)
+          head.Layer1.level
       in
       return_unit
   | ( Sc_rollup_publish {commitment = their_commitment; rollup},
@@ -118,6 +117,9 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
         {published_at_level; staked_hash = their_commitment_hash; _} ) ->
       (* Commitment published by someone else *)
       (* We first register the publication information *)
+      let their_commitment_hash =
+        Sc_rollup_proto_types.Commitment_hash.to_octez their_commitment_hash
+      in
       let* known_commitment =
         Node_context.commitment_exists node_ctxt their_commitment_hash
       in
@@ -146,6 +148,9 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       in
       (* An accuser node will publish its commitment if the other one is
          refutable. *)
+      let their_commitment =
+        Sc_rollup_proto_types.Commitment.to_octez their_commitment
+      in
       accuser_publish_commitment_when_refutable
         node_ctxt
         ~other:source
@@ -155,8 +160,6 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
   | ( Sc_rollup_cement _,
       Sc_rollup_cement_result {inbox_level; commitment_hash; _} ) ->
       (* Cemented commitment ---------------------------------------------- *)
-      let proto_inbox_level = inbox_level in
-      let proto_commitment_hash = commitment_hash in
       let inbox_level = Raw_level.to_int32 inbox_level in
       let commitment_hash =
         Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
@@ -177,13 +180,13 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
       in
       let lcc = Reference.get node_ctxt.lcc in
       let*! () =
-        if inbox_level > Raw_level.to_int32 lcc.level then (
+        if inbox_level > lcc.level then (
           Reference.set
             node_ctxt.lcc
-            {commitment = proto_commitment_hash; level = proto_inbox_level} ;
+            {commitment = commitment_hash; level = inbox_level} ;
           Commitment_event.last_cemented_commitment_updated
-            proto_commitment_hash
-            proto_inbox_level)
+            commitment_hash
+            inbox_level)
         else Lwt.return_unit
       in
       return_unit
@@ -218,7 +221,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
         Node_context.save_slot_header
           node_ctxt
           ~published_in_block_hash:head.Layer1.hash
-          slot_header
+          (Sc_rollup_proto_types.Dal.Slot_header.to_octez slot_header)
       in
       return_unit
   | _, _ ->
@@ -237,7 +240,9 @@ let process_l1_operation (type kind) node_ctxt (head : Layer1.header) ~source
     | Sc_rollup_timeout {rollup; _}
     | Sc_rollup_execute_outbox_message {rollup; _}
     | Sc_rollup_recover_bond {sc_rollup = rollup; staker = _} ->
-        Sc_rollup.Address.(rollup = node_ctxt.Node_context.rollup_address)
+        Octez_smart_rollup.Address.(
+          Sc_rollup_proto_types.Address.to_octez rollup
+          = node_ctxt.Node_context.rollup_address)
     | Dal_publish_slot_header _ -> true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Update_consensus_key _ | Register_global_constant _
@@ -299,13 +304,13 @@ let process_l1_block_operations node_ctxt (head : Layer1.header) =
   return_unit
 
 let before_origination (node_ctxt : _ Node_context.t) (header : Layer1.header) =
-  let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+  let origination_level = node_ctxt.genesis_info.level in
   header.level < origination_level
 
 let previous_context (node_ctxt : _ Node_context.t)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
-  if predecessor.level < Raw_level.to_int32 node_ctxt.genesis_info.level then
+  if predecessor.level < node_ctxt.genesis_info.level then
     (* This is before we have interpreted the boot sector, so we start
        with an empty context in genesis *)
     return (Context.empty node_ctxt.context)
@@ -376,11 +381,6 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       let* inbox_hash, inbox, inbox_witness, messages =
         Inbox.process_head node_ctxt ~predecessor head
       in
-      let inbox_witness =
-        Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
-          inbox_witness
-      in
-      let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
       let* () =
         when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
         Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
@@ -401,25 +401,15 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       let* commitment_hash =
         Publisher.process_head node_ctxt ~predecessor:predecessor.hash head ctxt
       in
-      let commitment_hash =
-        Option.map
-          Sc_rollup_proto_types.Commitment_hash.to_octez
-          commitment_hash
-      in
       let* () =
         unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-        Inbox.same_as_layer_1
-          node_ctxt
-          head.hash
-          (Sc_rollup_proto_types.Inbox.to_octez inbox)
+        Inbox.same_as_layer_1 node_ctxt head.hash inbox
       in
-      let level = Raw_level.of_int32_exn head.level in
+      let level = head.level in
       let* previous_commitment_hash =
-        if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+        if level = node_ctxt.genesis_info.level then
           (* Previous commitment for rollup genesis is itself. *)
-          return
-            (Sc_rollup_proto_types.Commitment_hash.to_octez
-               node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash)
+          return node_ctxt.genesis_info.commitment_hash
         else
           let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
           Sc_rollup_block.most_recent_commitment pred.header
@@ -428,7 +418,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
         Sc_rollup_block.
           {
             block_hash = head.hash;
-            level = head.level;
+            level;
             predecessor = predecessor.hash;
             commitment_hash;
             previous_commitment_hash;
@@ -474,9 +464,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
     | None ->
         (* if no head has been processed yet, we want to handle all blocks
            since, and including, the rollup origination. *)
-        let origination_level =
-          Raw_level.to_int32 node_ctxt.genesis_info.level
-        in
+        let origination_level = node_ctxt.genesis_info.level in
         `Level (Int32.pred origination_level)
   in
   let stripped_head = Layer1.head_of_header head in
@@ -573,14 +561,14 @@ let install_finalizer (daemon_components : (module Daemon_components.S))
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
-let check_initial_state_hash {Node_context.cctxt; rollup_address; pvm; _} =
+let check_initial_state_hash {Node_context.cctxt; rollup_address; kind; _} =
   let open Lwt_result_syntax in
-  let module PVM = (val pvm) in
+  let module PVM = (val Pvm.of_kind kind) in
   let* l1_reference_initial_state_hash =
     RPC.Sc_rollup.initial_pvm_state_hash
-      cctxt
+      (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, cctxt#block)
-      rollup_address
+      (Sc_rollup_proto_types.Address.of_octez rollup_address)
   in
   let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
   let*! l2_initial_state_hash = PVM.state_hash s in
@@ -639,12 +627,9 @@ let run node_ctxt configuration
         {
           cctxt = (node_ctxt.cctxt :> Client_context.full);
           fee_parameters = configuration.fee_parameters;
-          minimal_block_delay =
-            node_ctxt.protocol_constants.Constants.parametric
-              .minimal_block_delay |> Period.to_seconds;
+          minimal_block_delay = node_ctxt.protocol_constants.minimal_block_delay;
           delay_increment_per_round =
-            node_ctxt.protocol_constants.Constants.parametric
-              .delay_increment_per_round |> Period.to_seconds;
+            node_ctxt.protocol_constants.delay_increment_per_round;
         }
         ~data_dir:node_ctxt.data_dir
         ~signers
@@ -678,8 +663,8 @@ let run node_ctxt configuration
   Metrics.Info.init_rollup_node_info
     ~id:configuration.sc_rollup_address
     ~mode:configuration.mode
-    ~genesis_level:(Raw_level.to_int32 node_ctxt.genesis_info.level)
-    ~pvm_kind:(Sc_rollup.Kind.to_string node_ctxt.kind) ;
+    ~genesis_level:node_ctxt.genesis_info.level
+    ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind) ;
   let fatal_error_exit e =
     Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
     let*! _ = Lwt_exit.exit_and_wait 1 in
@@ -706,8 +691,9 @@ let run node_ctxt configuration
     match head with
     | Some head ->
         if
-          Sc_rollup_block.most_recent_commitment head.header
-          = node_ctxt.genesis_info.commitment_hash
+          Octez_smart_rollup.Commitment.Hash.(
+            Sc_rollup_block.most_recent_commitment head.header
+            = node_ctxt.genesis_info.commitment_hash)
         then fatal_error_exit e
         else error_to_degraded_mode e
     | None -> fatal_error_exit e
@@ -738,11 +724,6 @@ module Internal_for_tests = struct
         head
         messages
     in
-    let inbox_witness =
-      Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
-        inbox_witness
-    in
-    let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
     let* ctxt, _num_messages, num_ticks, initial_tick =
       Interpreter.process_head node_ctxt ctxt ~predecessor head (inbox, messages)
     in
@@ -754,16 +735,11 @@ module Internal_for_tests = struct
         head
         ctxt
     in
-    let commitment_hash =
-      Option.map Sc_rollup_proto_types.Commitment_hash.to_octez commitment_hash
-    in
-    let level = Raw_level.of_int32_exn head.level in
+    let level = head.level in
     let* previous_commitment_hash =
-      if level = node_ctxt.genesis_info.Sc_rollup.Commitment.level then
+      if level = node_ctxt.genesis_info.level then
         (* Previous commitment for rollup genesis is itself. *)
-        return
-          (Sc_rollup_proto_types.Commitment_hash.to_octez
-             node_ctxt.genesis_info.Sc_rollup.Commitment.commitment_hash)
+        return node_ctxt.genesis_info.commitment_hash
       else
         let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
         Sc_rollup_block.most_recent_commitment pred.header
@@ -772,7 +748,7 @@ module Internal_for_tests = struct
       Sc_rollup_block.
         {
           block_hash = head.hash;
-          level = head.level;
+          level;
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
@@ -830,6 +806,25 @@ let run
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
+  let publisher =
+    Configuration.Operator_purpose_map.find
+      Publish
+      configuration.sc_rollup_node_operators
+  in
+  let* constants = Layer1_helpers.retrieve_constants cctxt
+  and* genesis_info =
+    Layer1_helpers.retrieve_genesis_info cctxt configuration.sc_rollup_address
+  and* lcc =
+    Layer1_helpers.get_last_cemented_commitment
+      cctxt
+      configuration.sc_rollup_address
+  and* lpc =
+    Option.filter_map_es
+      (Layer1_helpers.get_last_published_commitment
+         cctxt
+         configuration.sc_rollup_address)
+      publisher
+  and* kind = Layer1_helpers.get_kind cctxt configuration.sc_rollup_address in
   let* node_ctxt =
     Node_context.init
       cctxt
@@ -837,6 +832,11 @@ let run
       ?log_kernel_debug_file
       Read_write
       l1_ctxt
+      constants
+      genesis_info
+      ~lcc
+      ~lpc
+      kind
       ~proto_level:predecessor.proto_level
       configuration
   in

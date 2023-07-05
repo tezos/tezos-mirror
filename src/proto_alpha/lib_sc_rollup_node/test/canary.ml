@@ -32,7 +32,7 @@
 *)
 
 open Octez_smart_rollup
-open Protocol.Alpha_context
+open Octez_smart_rollup_node
 
 let build_chain node_ctxt ~genesis ~length =
   let open Lwt_result_syntax in
@@ -85,15 +85,10 @@ let tests =
     Helpers.alcotest
       "canary arith"
       `Quick
-      Sc_rollup.Kind.Example_arith
+      Example_arith
       ~boot_sector:""
       canary_test;
-    Helpers.alcotest
-      "canary wasm"
-      `Quick
-      Sc_rollup.Kind.Wasm_2_0_0
-      ~boot_sector:""
-      canary_test;
+    Helpers.alcotest "canary wasm" `Quick Wasm_2_0_0 ~boot_sector:"" canary_test;
   ]
 
 let () =

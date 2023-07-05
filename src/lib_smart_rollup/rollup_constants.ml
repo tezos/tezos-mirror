@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,13 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides helper to interact with PVM outboxes. *)
+(** Protocol agnostic representation for protocol constants. *)
 
-open Protocol.Alpha_context
+type dal_constants = {
+  feature_enable : bool;
+  attestation_lag : int;
+  number_of_slots : int;
+}
 
-(** [proof_of_output node_ctxt output] returns the last cemented commitment hash
-    and the proof of the output in the LCC. *)
-val proof_of_output :
-  Node_context.rw ->
-  Sc_rollup.output ->
-  (Octez_smart_rollup.Commitment.Hash.t * string) tzresult Lwt.t
+type reveal_activation_level = {
+  blake2B : int32;
+  metadata : int32;
+  dal_page : int32;
+}
+
+type sc_rollup_constants = {
+  challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  reveal_activation_level : reveal_activation_level option;
+}
+
+type protocol_constants = {
+  minimal_block_delay : int64;
+  delay_increment_per_round : int64;
+  sc_rollup : sc_rollup_constants;
+  dal : dal_constants;
+}

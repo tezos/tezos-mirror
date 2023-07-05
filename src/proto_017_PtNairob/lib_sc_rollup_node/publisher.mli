@@ -50,16 +50,14 @@ val process_head :
   predecessor:Block_hash.t ->
   Layer1.header ->
   Context.rw ->
-  Protocol.Alpha_context.Sc_rollup.Commitment.Hash.t option tzresult Lwt.t
+  Octez_smart_rollup.Commitment.Hash.t option tzresult Lwt.t
 
 (** [publish_single_commitment node_ctxt commitment] publishes a single
     [commitment] if it is missing. This function is meant to be used by the {e
     accuser} mode to sparingly publish commitments when it detects a
     conflict. *)
 val publish_single_commitment :
-  _ Node_context.t ->
-  Protocol.Alpha_context.Sc_rollup.Commitment.t ->
-  unit tzresult Lwt.t
+  _ Node_context.t -> Octez_smart_rollup.Commitment.t -> unit tzresult Lwt.t
 
 (** Initialize worker for publishing and cementing commitments. *)
 val init : _ Node_context.t -> unit tzresult Lwt.t

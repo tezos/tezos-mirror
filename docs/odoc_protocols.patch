@@ -287,41 +287,6 @@ index 2a9a69a71b..f7247a51e3 100644
      supposed to be confirmed and [pages] correspond to the pages of the slot.
      Otherwise [None] is returned.
  
-diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli b/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
-index 411710c5b7..a62117b545 100644
---- a/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
-+++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/node_context.mli
-@@ -137,7 +137,7 @@ val close : _ t -> unit tzresult Lwt.t
-     [block_hash]. *)
- val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
- 
--(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
-+(** [metadata node_ctxt] creates a {!Sc_rollup.Metadata.t} using the information
-     stored in [node_ctxt]. *)
- val metadata : _ t -> Sc_rollup.Metadata.t
- 
-diff --git a/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml b/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
-index ca8e5769b9..90a3c81f2f 100644
---- a/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
-+++ b/src/proto_016_PtMumbai/lib_sc_rollup_node/pvm.ml
-@@ -34,7 +34,7 @@ module type S = sig
-       with type context = Context.rw_index
-        and type hash = Sc_rollup.State_hash.t
- 
--  (** Kind of the PVM (same as {!name}).  *)
-+  (** Kind of the PVM. *)
-   val kind : Sc_rollup.Kind.t
- 
-   (** [get_tick state] gets the total tick counter for the given PVM state. *)
-@@ -88,7 +88,7 @@ module type S = sig
- 
-     (** [set context state] saves the PVM state [state] in the context and
-         returns the updated context. Note: [set] does not perform any write on
--        disk, this information must be committed using {!Context.commit}. *)
-+        disk, this information must be committed using {!val:Context.commit}. *)
-     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
-   end
- end
 diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
 index 3be2cdb1f5..f27d737fbc 100644
 --- a/src/proto_017_PtNairob/lib_sc_rollup_node/dal_pages_request.mli
@@ -348,38 +313,3 @@ index a723ad47e5..29caafad18 100644
  val add_messages :
    is_migration_block:bool ->
    predecessor_timestamp:Timestamp.time ->
-diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli b/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
-index 713cf00c65..2e1b6d51d9 100644
---- a/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
-+++ b/src/proto_017_PtNairob/lib_sc_rollup_node/node_context.mli
-@@ -135,7 +135,7 @@ val close : _ t -> unit tzresult Lwt.t
-     [block_hash]. *)
- val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
- 
--(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
-+(** [metadata node_ctxt] creates a {!Sc_rollup.Metadata.t} using the information
-     stored in [node_ctxt]. *)
- val metadata : _ t -> Sc_rollup.Metadata.t
- 
-diff --git a/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml b/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
-index ca8e5769b9..90a3c81f2f 100644
---- a/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
-+++ b/src/proto_017_PtNairob/lib_sc_rollup_node/pvm.ml
-@@ -34,7 +34,7 @@ module type S = sig
-       with type context = Context.rw_index
-        and type hash = Sc_rollup.State_hash.t
- 
--  (** Kind of the PVM (same as {!name}).  *)
-+  (** Kind of the PVM. *)
-   val kind : Sc_rollup.Kind.t
- 
-   (** [get_tick state] gets the total tick counter for the given PVM state. *)
-@@ -88,7 +88,7 @@ module type S = sig
- 
-     (** [set context state] saves the PVM state [state] in the context and
-         returns the updated context. Note: [set] does not perform any write on
--        disk, this information must be committed using {!Context.commit}. *)
-+        disk, this information must be committed using {!val:Context.commit}. *)
-     val set : 'a Context.t -> state -> 'a Context.t Lwt.t
-   end
- end

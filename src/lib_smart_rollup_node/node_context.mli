@@ -26,10 +26,9 @@
 
 (** This module describes the execution context of the node. *)
 
-open Protocol
-open Alpha_context
+type lcc = {commitment : Commitment.Hash.t; level : int32}
 
-type lcc = {commitment : Sc_rollup.Commitment.Hash.t; level : Raw_level.t}
+type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
 
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
@@ -37,31 +36,34 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 type debug_logger = string -> unit Lwt.t
 
 type 'a t = {
-  cctxt : Protocol_client_context.full;
-      (** Client context used by the rollup node. *)
+  cctxt : Client_context.full;  (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
           the DAL. *)
+  dac_client : Dac_observer_client.t option;
+      (** DAC observer client to optionally pull in preimages *)
   data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
-  rollup_address : Sc_rollup.t;  (** Smart rollup tracked by the rollup node. *)
+  rollup_address : Address.t;  (** Smart rollup tracked by the rollup node. *)
+  boot_sector_file : string option;
+      (** Optional path to the boot sector file. Useful only if the smart
+          rollup was bootstrapped and not originated. *)
   mode : Configuration.mode;
-      (** Mode of the node, see {!Configuration.mode}. *)
+      (** Mode of the node, see {!type:Configuration.mode}. *)
   operators : Configuration.operators;
       (** Addresses of the rollup node operators by purposes. *)
-  genesis_info : Sc_rollup.Commitment.genesis_info;
+  genesis_info : genesis_info;
       (** Origination information of the smart rollup. *)
   injector_retention_period : int;
       (** Number of blocks the injector will keep information about included
           operations. *)
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
-  kind : Sc_rollup.Kind.t;  (** Kind of the smart rollup. *)
-  pvm : (module Pvm.S);  (** The PVM used by the smart rollup.  *)
+  kind : Kind.t;  (** Kind of the smart rollup. *)
   fee_parameters : Configuration.fee_parameters;
       (** Fee parameters to use when injecting operations in layer 1. *)
-  protocol_constants : Constants.t;
+  protocol_constants : Rollup_constants.protocol_constants;
       (** Protocol constants retrieved from the Tezos node. *)
   proto_level : int;
       (** Protocol supported by this rollup node (represented as a protocol
@@ -75,7 +77,7 @@ type 'a t = {
   context : 'a Context.index;
       (** The persistent context for the rollup node. *)
   lcc : ('a, lcc) Reference.t;  (** Last cemented commitment and its level. *)
-  lpc : ('a, Sc_rollup.Commitment.t option) Reference.t;
+  lpc : ('a, Commitment.t option) Reference.t;
       (** The last published commitment, i.e. commitment that the operator is
           staked on. *)
   kernel_debug_logger : debug_logger;
@@ -116,20 +118,22 @@ val is_loser : _ t -> bool
 val get_fee_parameter :
   _ t -> Configuration.purpose -> Injector_sigs.fee_parameter
 
-(** Maximum size of an L2 batch in bytes that can fit in an operation of the
-    protocol. *)
-val protocol_max_batch_size : int
-
-(** [init cctxt ~data_dir mode l1_ctxt ~proto_level configuration] initializes
-    the rollup representation. The rollup origination level and kind are fetched
-    via an RPC call to the layer1 node that [cctxt] uses for RPC requests.
+(** [init cctxt ~data_dir mode l1_ctxt constants genesis_info ~proto_level
+    configuration] initializes the rollup representation. The rollup origination
+    level and kind are fetched via an RPC call to the layer1 node that [cctxt]
+    uses for RPC requests.
 *)
 val init :
-  Protocol_client_context.full ->
+  #Client_context.full ->
   data_dir:string ->
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
   Layer1.t ->
+  Rollup_constants.protocol_constants ->
+  genesis_info ->
+  lcc:lcc ->
+  lpc:Commitment.t option ->
+  Kind.t ->
   proto_level:int ->
   Configuration.t ->
   'a t tzresult Lwt.t
@@ -140,10 +144,6 @@ val close : _ t -> unit tzresult Lwt.t
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context : 'a t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
-
-(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
-    stored in [node_ctxt]. *)
-val metadata : _ t -> Sc_rollup.Metadata.t
 
 (** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
     the current protocol. *)
@@ -251,34 +251,26 @@ val get_tezos_reorg_for_new_head :
     block exists (the tick happened after [max_level], or we are too late), the
     function returns [None]. *)
 val block_with_tick :
-  _ t ->
-  max_level:Raw_level.t ->
-  Sc_rollup.Tick.t ->
-  Sc_rollup_block.t option tzresult Lwt.t
+  _ t -> max_level:int32 -> Z.t -> Sc_rollup_block.t option tzresult Lwt.t
 
 (** {3 Commitments} *)
 
 (** [get_commitment t hash] returns the commitment with [hash] stored by the
     rollup node. *)
-val get_commitment :
-  _ t -> Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t tzresult Lwt.t
+val get_commitment : _ t -> Commitment.Hash.t -> Commitment.t tzresult Lwt.t
 
 (** Same as {!get_commitment} but returns [None] if this commitment hash is not
     known by the rollup node. *)
 val find_commitment :
-  _ t ->
-  Sc_rollup.Commitment.Hash.t ->
-  Sc_rollup.Commitment.t option tzresult Lwt.t
+  _ t -> Commitment.Hash.t -> Commitment.t option tzresult Lwt.t
 
 (** [commitment_exists t hash] returns [true] if the commitment with [hash] is
     known (i.e. stored) by the rollup node. *)
-val commitment_exists :
-  _ t -> Sc_rollup.Commitment.Hash.t -> bool tzresult Lwt.t
+val commitment_exists : _ t -> Commitment.Hash.t -> bool tzresult Lwt.t
 
 (** [save_commitment t commitment] saves a commitment in the store an returns is
     hash. *)
-val save_commitment :
-  rw -> Sc_rollup.Commitment.t -> Sc_rollup.Commitment.Hash.t tzresult Lwt.t
+val save_commitment : rw -> Commitment.t -> Commitment.Hash.t tzresult Lwt.t
 
 (** [commitment_published_at_level t hash] returns the levels at which the
     commitment was first published and the one at which it was included by in a
@@ -287,14 +279,14 @@ val save_commitment :
     L1). *)
 val commitment_published_at_level :
   _ t ->
-  Sc_rollup.Commitment.Hash.t ->
+  Commitment.Hash.t ->
   Store.Commitments_published_at_level.element option tzresult Lwt.t
 
 (** [save_commitment_published_at_level t hash levels] saves the
     publication/inclusion information for a commitment with [hash]. *)
 val set_commitment_published_at_level :
   rw ->
-  Sc_rollup.Commitment.Hash.t ->
+  Commitment.Hash.t ->
   Store.Commitments_published_at_level.element ->
   unit tzresult Lwt.t
 
@@ -305,73 +297,70 @@ type commitment_source = Anyone | Us
     the publication status for commitments we published ourselves [`Us] or that
     [`Anyone] published. *)
 val commitment_was_published :
-  _ t ->
-  source:commitment_source ->
-  Sc_rollup.Commitment.Hash.t ->
-  bool tzresult Lwt.t
+  _ t -> source:commitment_source -> Commitment.Hash.t -> bool tzresult Lwt.t
 
 (** {3 Inboxes} *)
 
 type messages_info = {
   is_first_block : bool;
   predecessor : Block_hash.t;
-  predecessor_timestamp : Timestamp.t;
-  messages : Sc_rollup.Inbox_message.t list;
+  predecessor_timestamp : Time.Protocol.t;
+  messages : string list;
 }
 
 (** [get_inbox t inbox_hash] retrieves the inbox whose hash is [inbox_hash] from
     the rollup node's storage. *)
 val get_inbox :
-  _ t -> Sc_rollup.Inbox.Hash.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+  _ t ->
+  Octez_smart_rollup.Inbox.Hash.t ->
+  Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
 (** Same as {!get_inbox} but returns [None] if this inbox is not known. *)
 val find_inbox :
-  _ t -> Sc_rollup.Inbox.Hash.t -> Sc_rollup.Inbox.t option tzresult Lwt.t
+  _ t ->
+  Octez_smart_rollup.Inbox.Hash.t ->
+  Octez_smart_rollup.Inbox.t option tzresult Lwt.t
 
 (** [save_inbox t inbox] remembers the [inbox] in the storage. It is associated
     to its hash which is returned. *)
 val save_inbox :
-  rw -> Sc_rollup.Inbox.t -> Sc_rollup.Inbox.Hash.t tzresult Lwt.t
+  rw ->
+  Octez_smart_rollup.Inbox.t ->
+  Octez_smart_rollup.Inbox.Hash.t tzresult Lwt.t
 
 (** [inbox_of_head node_ctxt block] returns the latest inbox at the given
     [block]. This function always returns [inbox] for all levels at and
     after the rollup genesis. NOTE: It requires the L2 block for [block.hash] to
     have been saved. *)
-val inbox_of_head : _ t -> Layer1.head -> Sc_rollup.Inbox.t tzresult Lwt.t
+val inbox_of_head :
+  _ t -> Layer1.head -> Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
 (** Same as {!get_inbox} but uses the Layer 1 block hash for this inbox instead. *)
 val get_inbox_by_block_hash :
-  _ t -> Block_hash.t -> Sc_rollup.Inbox.t tzresult Lwt.t
-
-(** [genesis_inbox t] is the genesis inbox for the rollup [t.sc_rollup_address]. *)
-val genesis_inbox : _ t -> Sc_rollup.Inbox.t tzresult Lwt.t
+  _ t -> Block_hash.t -> Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
 (** [get_messages t witness_hash] retrieves the messages for the merkelized
     payloads hash [witness_hash] stored by the rollup node. *)
 val get_messages :
-  _ t ->
-  Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  messages_info tzresult Lwt.t
+  _ t -> Merkelized_payload_hashes_hash.t -> messages_info tzresult Lwt.t
 
 (** Same as {!get_messages} but returns [None] if the payloads hash is not known. *)
 val find_messages :
-  _ t ->
-  Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
-  messages_info option tzresult Lwt.t
+  _ t -> Merkelized_payload_hashes_hash.t -> messages_info option tzresult Lwt.t
 
 (** [get_num_messages t witness_hash] retrieves the number of messages for the
     inbox witness [witness_hash] stored by the rollup node. *)
 val get_num_messages :
-  _ t -> Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t -> int tzresult Lwt.t
+  _ t -> Merkelized_payload_hashes_hash.t -> int tzresult Lwt.t
 
 (** [save_messages t payloads_hash ~block_hash messages] associates the list of
     [messages] to the [payloads_hash]. The payload hash must be computed by
     calling, e.g. {!Sc_rollup.Inbox.add_all_messages}. *)
 val save_messages :
   rw ->
-  Sc_rollup.Inbox_merkelized_payload_hashes.Hash.t ->
+  Merkelized_payload_hashes_hash.t ->
   block_hash:Block_hash.t ->
-  Sc_rollup.Inbox_message.t list ->
+  string list ->
   unit tzresult Lwt.t
 
 (** Return values for {!protocol_of_level}. *)
@@ -403,7 +392,7 @@ val get_slot_header :
   _ t ->
   published_in_block_hash:Block_hash.t ->
   Dal.Slot_index.t ->
-  Dal.Slot.Header.t tzresult Lwt.t
+  Dal.Slot_header.t tzresult Lwt.t
 
 (** [get_all_slot_headers t ~published_in_block_hash] returns the slot headers
     for all the slots that were published in the provided block hash on Layer
@@ -411,7 +400,7 @@ val get_slot_header :
 val get_all_slot_headers :
   _ t ->
   published_in_block_hash:Block_hash.t ->
-  Dal.Slot.Header.t list tzresult Lwt.t
+  Dal.Slot_header.t list tzresult Lwt.t
 
 (** [get_slot_indexes t ~published_in_block_hash] returns the slot indexes whose
     headers were published in the provided block hash on Layer 1. *)
@@ -425,7 +414,7 @@ val get_slot_indexes :
 val save_slot_header :
   rw ->
   published_in_block_hash:Block_hash.t ->
-  Dal.Slot.Header.t ->
+  Dal.Slot_header.t ->
   unit tzresult Lwt.t
 
 (** [find_slot_status t ~confirmed_in_block_hash index] returns [None] if the
@@ -461,16 +450,16 @@ val save_slot_status :
    Missing docstrings. *)
 
 val find_confirmed_slots_history :
-  _ t -> Block_hash.t -> Dal.Slots_history.t option tzresult Lwt.t
+  _ t -> Block_hash.t -> Dal.Slot_history.t option tzresult Lwt.t
 
 val save_confirmed_slots_history :
-  rw -> Block_hash.t -> Dal.Slots_history.t -> unit tzresult Lwt.t
+  rw -> Block_hash.t -> Dal.Slot_history.t -> unit tzresult Lwt.t
 
 val find_confirmed_slots_histories :
-  _ t -> Block_hash.t -> Dal.Slots_history.History_cache.t option tzresult Lwt.t
+  _ t -> Block_hash.t -> Dal.Slot_history_cache.t option tzresult Lwt.t
 
 val save_confirmed_slots_histories :
-  rw -> Block_hash.t -> Dal.Slots_history.History_cache.t -> unit tzresult Lwt.t
+  rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
 
 (**/**)
 
@@ -479,9 +468,9 @@ module Internal_for_tests : sig
       connect to any layer 1 node. It is meant to be used in unit tests for the
       rollup node functions. *)
   val create_node_context :
-    Protocol_client_context.full ->
-    ?constants:Constants.Parametric.t ->
+    #Client_context.full ->
+    Rollup_constants.protocol_constants ->
     data_dir:string ->
-    Sc_rollup.Kind.t ->
+    Kind.t ->
     Store_sigs.rw t tzresult Lwt.t
 end

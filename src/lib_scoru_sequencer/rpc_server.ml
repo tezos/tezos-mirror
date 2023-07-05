@@ -27,12 +27,11 @@
 open Tezos_rpc_http_server
 open RPC_directory_helpers
 open Octez_smart_rollup_node
-module Sc_rollup_node = Octez_smart_rollup_node_alpha
 
 module Local_directory = Make_directory (struct
   include Sc_rollup_services.Local
 
-  type context = Sc_rollup_node.Node_context.rw
+  type context = Node_context.rw
 
   type subcontext = unit
 
@@ -53,13 +52,13 @@ let () =
   Local_directory.register0 Sc_rollup_services.Local.injection
   @@ fun _node_ctxt () messages -> Seq_batcher.register_messages messages
 
-let register (node_ctxt : _ Sc_rollup_node.Node_context.t) =
+let register (node_ctxt : _ Node_context.t) =
   List.fold_left
     (fun dir f -> Tezos_rpc.Directory.merge dir (f node_ctxt))
     Tezos_rpc.Directory.empty
     [Local_directory.build_directory]
 
-let start (node_ctxt : _ Sc_rollup_node.Node_context.t) configuration =
+let start (node_ctxt : _ Node_context.t) configuration =
   let open Lwt_result_syntax in
   let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in

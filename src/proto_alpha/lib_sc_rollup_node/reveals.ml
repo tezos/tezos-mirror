@@ -73,7 +73,9 @@ let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
 let get ?dac_client ~data_dir ~pvm_kind hash =
   let open Lwt_result_syntax in
   let* contents =
-    let filename = path data_dir (Sc_rollup.Kind.to_string pvm_kind) hash in
+    let filename =
+      path data_dir (Octez_smart_rollup.Kind.to_string pvm_kind) hash
+    in
     let* file_contents = file_contents filename in
     match file_contents with
     | Some contents -> return contents

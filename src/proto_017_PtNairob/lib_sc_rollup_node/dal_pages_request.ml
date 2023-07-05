@@ -95,18 +95,17 @@ let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
   let* published_in_block_hash =
     Node_context.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
   in
-  let* {commitment; _} =
+  let* header =
     Node_context.get_slot_header node_ctxt ~published_in_block_hash index
   in
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
   (* DAL must be configured for this point to be reached *)
-  get_slot_pages dal_cctxt commitment
+  get_slot_pages dal_cctxt header.commitment
 
 let storage_invariant_broken published_level index =
   failwith
     "Internal error: [Node_context.find_slot_status] is supposed to have \
-     registered the status of the slot %a published at level %a in the store"
-    Dal.Slot_index.pp
+     registered the status of the slot %d published at level %a in the store"
     index
     Raw_level.pp
     published_level
@@ -120,6 +119,7 @@ let slot_pages ~dal_attestation_lag node_ctxt
       ~published_level
       node_ctxt
   in
+  let index = Dal.Slot_index.to_int index in
   let* processed =
     Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in
@@ -142,6 +142,7 @@ let page_content ~dal_attestation_lag node_ctxt page_id =
       ~published_level
       node_ctxt
   in
+  let index = Dal.Slot_index.to_int index in
   let* processed =
     Node_context.find_slot_status node_ctxt ~confirmed_in_block_hash index
   in

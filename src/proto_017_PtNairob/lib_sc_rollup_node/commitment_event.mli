@@ -51,13 +51,13 @@ val commitment_will_not_be_published :
     cemented commitment was updated to the given [hash] at the given inbox
     [level]. *)
 val last_cemented_commitment_updated :
-  Sc_rollup.Commitment.Hash.t -> Raw_level.t -> unit Lwt.t
+  Octez_smart_rollup.Commitment.Hash.t -> int32 -> unit Lwt.t
 
 (** [last_published_commitment_updated hash level] emits the event that the last
     published commitment was updated to the given [hash] at the given inbox
     [level]. *)
 val last_published_commitment_updated :
-  Sc_rollup.Commitment.Hash.t -> Raw_level.t -> unit Lwt.t
+  Octez_smart_rollup.Commitment.Hash.t -> int32 -> unit Lwt.t
 
 (** [commitment_parent_is_not_lcc predecessor_hash last_cemented_commitment_hash]
     emits the event that a commitment at the given inbox [level] is being
@@ -73,12 +73,12 @@ val commitment_parent_is_not_lcc :
 
 (** [compute_commitment level] emits the event that a new commitment is being
     computed and stored for the block at the given [level]. *)
-val compute_commitment : Raw_level.t -> unit Lwt.t
+val compute_commitment : int32 -> unit Lwt.t
 
 (** [publish_commitment hash level] emits the event that a new commitment is
     being published. *)
 val publish_commitment :
-  Sc_rollup.Commitment.Hash.t -> Raw_level.t -> unit Lwt.t
+  Octez_smart_rollup.Commitment.Hash.t -> int32 -> unit Lwt.t
 
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 (* Conveniences to construct RPC directory
    against a subcontext of the Node_context *)
 
@@ -43,9 +41,7 @@ let get_finalized node_ctxt =
 let get_last_cemented (node_ctxt : _ Node_context.t) =
   protect @@ fun () ->
   let lcc = Reference.get node_ctxt.lcc in
-  Node_context.hash_of_level
-    node_ctxt
-    (Alpha_context.Raw_level.to_int32 lcc.level)
+  Node_context.hash_of_level node_ctxt lcc.level
 
 let block_of_prefix node_ctxt block =
   match block with

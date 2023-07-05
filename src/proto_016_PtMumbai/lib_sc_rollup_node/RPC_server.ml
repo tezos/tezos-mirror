@@ -47,50 +47,8 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_confirmed_slot_pages node_ctxt block =
-  let open Lwt_result_syntax in
-  let* slot_pages =
-    Node_context.list_slot_pages node_ctxt ~confirmed_in_block_hash:block
-  in
-  (* Slot pages are sorted in lexicographic order of slot index and page
-     number.*)
-  let slot_rev_pages_map =
-    List.fold_left
-      (fun map ((index, _page), page) ->
-        Slot_pages_map.update
-          index
-          (function None -> Some [page] | Some pages -> Some (page :: pages))
-          map)
-      Slot_pages_map.empty
-      slot_pages
-  in
-  let slot_pages_map =
-    Slot_pages_map.map (fun pages -> List.rev pages) slot_rev_pages_map
-  in
-  return @@ Slot_pages_map.bindings slot_pages_map
-
-let get_dal_slot_page node_ctxt block slot_index slot_page =
-  let open Lwt_result_syntax in
-  let* processed =
-    Node_context.processed_slot
-      node_ctxt
-      ~confirmed_in_block_hash:block
-      slot_index
-  in
-  match processed with
-  | None -> return ("Slot page has not been downloaded", None)
-  | Some `Unconfirmed -> return ("Slot was not confirmed", None)
-  | Some `Confirmed -> (
-      let* contents_opt =
-        Node_context.find_slot_page
-          node_ctxt
-          ~confirmed_in_block_hash:block
-          ~slot_index
-          ~page_index:slot_page
-      in
-      match contents_opt with
-      | None -> assert false
-      | Some _contents -> return ("Slot page is available", contents_opt))
+let get_dal_processed_slots node_ctxt block =
+  Node_context.list_slots_statuses node_ctxt ~confirmed_in_block_hash:block
 
 module Global_directory = Make_directory (struct
   include Sc_rollup_services.Global
@@ -164,16 +122,14 @@ module Common = struct
     let open Lwt_result_syntax in
     let* l2_block = Node_context.get_l2_block node_ctxt block in
     let+ num_messages =
-      Node_context.get_num_messages
-        node_ctxt
-        (Sc_rollup_proto_types.Merkelized_payload_hashes_hash.of_octez
-           l2_block.header.inbox_witness)
+      Node_context.get_num_messages node_ctxt l2_block.header.inbox_witness
     in
     Z.of_int num_messages
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
-    @@ fun node_ctxt () () -> return @@ node_ctxt.rollup_address
+    @@ fun node_ctxt () () ->
+    return @@ Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address
 
   let () =
     Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
@@ -215,7 +171,7 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     ~insight_requests messages =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let reveal_map =
     match reveal_pages with
     | Some pages ->
@@ -251,11 +207,10 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       insight_requests
   in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
-  let*! outbox = PVM.get_outbox inbox_level state in
+  let level = Raw_level.of_int32_exn inbox_level in
+  let*! outbox = PVM.get_outbox level state in
   let output =
-    List.filter
-      (fun Sc_rollup.{outbox_level; _} -> outbox_level = inbox_level)
-      outbox
+    List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
   let*! state_hash = PVM.state_hash state in
   let*! status = PVM.get_status state in
@@ -269,7 +224,7 @@ let () =
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! tick = PVM.get_tick state in
   return tick
 
@@ -278,7 +233,7 @@ let () =
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! hash = PVM.state_hash state in
   return hash
 
@@ -287,7 +242,7 @@ let () =
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! current_level = PVM.get_current_level state in
   return current_level
 
@@ -314,7 +269,6 @@ let () =
   | Some head ->
       let commitment_hash =
         Sc_rollup_block.most_recent_commitment head.header
-        |> Sc_rollup_proto_types.Commitment_hash.of_octez
       in
       let+ commitment =
         Node_context.find_commitment node_ctxt commitment_hash
@@ -328,9 +282,7 @@ let () =
   match Reference.get node_ctxt.lpc with
   | None -> return_none
   | Some commitment ->
-      let hash =
-        Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment
-      in
+      let hash = Octez_smart_rollup.Commitment.hash commitment in
       (* The corresponding level in Store.Commitments.published_at_level is
          available only when the commitment has been published and included
          in a block. *)
@@ -350,7 +302,7 @@ let () =
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! status = PVM.get_status state in
   return (PVM.string_of_status status)
 
@@ -358,42 +310,35 @@ let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* slots =
+  let+ slots =
     Node_context.get_all_slot_headers node_ctxt ~published_in_block_hash:block
   in
-  return slots
+  List.rev_map Sc_rollup_proto_types.Dal.Slot_header.of_octez slots |> List.rev
 
 let () =
-  Block_directory.register0
-    Sc_rollup_services.Global.Block.dal_confirmed_slot_pages
-  @@ fun (node_ctxt, block) () () ->
-  get_dal_confirmed_slot_pages node_ctxt block
-
-let () =
-  Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page
-  @@ fun (node_ctxt, block) {index; page} () ->
-  get_dal_slot_page node_ctxt block index page
+  Block_directory.register0 Sc_rollup_services.Global.Block.dal_processed_slots
+  @@ fun (node_ctxt, block) () () -> get_dal_processed_slots node_ctxt block
 
 let () =
   Outbox_directory.register0 Sc_rollup_services.Global.Block.Outbox.messages
   @@ fun (node_ctxt, block, outbox_level) () () ->
   let open Lwt_result_syntax in
   let* state = get_state node_ctxt block in
-  let module PVM = (val node_ctxt.pvm) in
+  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let*! outbox = PVM.get_outbox outbox_level state in
   return outbox
 
 let () =
   Proof_helpers_directory.register0
     Sc_rollup_services.Global.Helpers.outbox_proof
-  @@ fun node_ctxt output () -> Outbox.proof_of_output node_ctxt output
+  @@ fun node_ctxt output () ->
+  let open Lwt_result_syntax in
+  let+ commitment, proof = Outbox.proof_of_output node_ctxt output in
+  (Sc_rollup_proto_types.Commitment_hash.of_octez commitment, proof)
 
 let () =
   Block_directory.register0 Sc_rollup_services.Global.Block.simulate
   @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
-  let messages =
-    List.map Alpha_context.Sc_rollup.Inbox_message.unsafe_of_string messages
-  in
   simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
 
 let () =
@@ -425,23 +370,19 @@ let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
   let+ last_published_commitment = Reference.get node_ctxt.lpc in
   let commitment_period =
     Int32.of_int
-      node_ctxt.protocol_constants.parametric.sc_rollup
-        .commitment_period_in_blocks
+      node_ctxt.protocol_constants.sc_rollup.commitment_period_in_blocks
   in
-  let last_published =
-    Raw_level.to_int32 last_published_commitment.inbox_level
-  in
+  let last_published = last_published_commitment.inbox_level in
   let open Int32 in
   div (sub last_published inbox_level) commitment_period
   |> mul commitment_period |> sub last_published |> Raw_level.of_int32_exn
 
 let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Alpha_context in
   let open Lwt_result_syntax in
   let+ finalized_level = Node_context.get_finalized_level node_ctxt in
   let finalized = Compare.Int32.(inbox_level <= finalized_level) in
   let lcc = Reference.get node_ctxt.lcc in
-  let cemented = Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc.level) in
+  let cemented = Compare.Int32.(inbox_level <= lcc.level) in
   (finalized, cemented)
 
 let () =
@@ -510,7 +451,6 @@ let () =
                           WithExceptions.Option.get
                             ~loc:__LOC__
                             block.header.commitment_hash
-                          |> Sc_rollup_proto_types.Commitment_hash.of_octez
                         in
                         (* Commitment computed *)
                         let* published_at =

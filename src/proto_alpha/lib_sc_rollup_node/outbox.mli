@@ -32,4 +32,4 @@ open Protocol.Alpha_context
 val proof_of_output :
   Node_context.rw ->
   Sc_rollup.output ->
-  (Sc_rollup.Commitment.Hash.t * string) tzresult Lwt.t
+  (Octez_smart_rollup.Commitment.Hash.t * string) tzresult Lwt.t
