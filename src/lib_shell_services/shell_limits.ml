@@ -220,7 +220,7 @@ let chain_validator_limits_encoding =
        [
          case
            ~title:"synchronisation_heuristic_encoding"
-           Json_only
+           (Tag 0)
            (synchronisation_heuristic_encoding
               default_chain_validator_limits.synchronisation.latency
               default_chain_validator_limits.synchronisation.threshold)
@@ -228,7 +228,7 @@ let chain_validator_limits_encoding =
            (fun x -> x);
          case
            ~title:"legacy_bootstrap_threshold_encoding"
-           Json_only
+           (Tag 1)
            (obj1
               (dft
                  "bootstrap_threshold"
