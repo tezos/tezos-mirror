@@ -204,14 +204,3 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
           tez_to_unstake
       in
       (ctxt, balance_updates @ finalize_balance_updates)
-
-let request_full_unstake ctxt ~sender_contract =
-  let open Lwt_result_syntax in
-  let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
-  match delegate_opt with
-  | None ->
-      (* No delegates, nothing to unstake but maybe some unstake request to finalize. *)
-      finalize_unstake ctxt sender_contract
-  | Some delegate ->
-      (* [request_unstake] bounds to the actual stake. *)
-      request_unstake ctxt ~sender_contract ~delegate Tez.max_mutez
