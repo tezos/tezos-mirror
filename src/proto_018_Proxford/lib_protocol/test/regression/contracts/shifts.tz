@@ -1,7 +1,0 @@
-{ parameter (or (pair nat nat) (pair nat nat)) ;
-  storage (option nat) ;
-  code { CAR ;
-         IF_LEFT { UNPAIR ; LSL } { UNPAIR ; LSR } ;
-         SOME ;
-         NIL operation ;
-         PAIR } }
