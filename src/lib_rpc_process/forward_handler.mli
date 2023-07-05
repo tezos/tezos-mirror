@@ -29,3 +29,7 @@
     satisfied. *)
 val callback :
   acl:RPC_server.Acl.t -> RPC_server.server -> string -> RPC_server.callback
+
+val socket_forwarding_uri : string
+
+val build_socket_redirection_ctx : string -> Cohttp_lwt_unix.Net.ctx
