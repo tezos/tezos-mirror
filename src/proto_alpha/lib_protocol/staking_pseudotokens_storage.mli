@@ -99,6 +99,18 @@ val debit_frozen_deposits_pseudotokens :
 val costaking_pseudotokens_balance :
   Raw_context.t -> Contract_repr.t -> Staking_pseudotoken_repr.t tzresult Lwt.t
 
+(** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
+    current costaking balance converted into tez using [delegate] frozen
+    deposits tez/pseudotokens rate.
+    
+    The given [delegate] should be [contract]'s delegate. Otherwise the given
+    [Tez.t] amount will not make sense. *)
+val costaking_balance_as_tez :
+  Raw_context.t ->
+  contract:Contract_repr.t ->
+  delegate:Signature.Public_key_hash.t ->
+  Tez_repr.t tzresult Lwt.t
+
 (** [credit_costaking_pseudotokens ctxt contract p_amount] increases
     [contract]'s costaking pseudotokens balance by [p_amount]. *)
 val credit_costaking_pseudotokens :

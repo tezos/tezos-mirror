@@ -302,14 +302,10 @@ let drain ctxt ~delegate ~destination =
 
 module For_RPC = struct
   let full_balance ctxt delegate =
-    Staking_pseudotokens_storage.costaking_pseudotokens_balance
+    Staking_pseudotokens_storage.costaking_balance_as_tez
       ctxt
-      (Contract_repr.Implicit delegate)
-    >>=? fun pseudotokens ->
-    Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
-      ctxt
-      delegate
-      pseudotokens
+      ~delegate
+      ~contract:(Contract_repr.Implicit delegate)
     >>=? fun own_frozen_deposits ->
     (Unstake_requests_storage.prepare_finalize_unstake
        ctxt

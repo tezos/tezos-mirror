@@ -789,14 +789,10 @@ module For_RPC = struct
         Storage.Contract.Delegate.find ctxt contract >>=? function
         | None -> return_none
         | Some delegate ->
-            Staking_pseudotokens_storage.costaking_pseudotokens_balance
+            Staking_pseudotokens_storage.costaking_balance_as_tez
               ctxt
-              contract
-            >>=? fun pseudotokens ->
-            Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
-              ctxt
-              delegate
-              pseudotokens
+              ~delegate
+              ~contract
             >>=? fun own_frozen_deposits -> return (Some own_frozen_deposits))
 
   let get_unstaked_balance ctxt = function

@@ -199,6 +199,11 @@ let costaking_pseudotokens_balance ctxt contract =
   in
   Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
 
+let costaking_balance_as_tez ctxt ~contract ~delegate =
+  let open Lwt_result_syntax in
+  let* pseudotokens = costaking_pseudotokens_balance ctxt contract in
+  tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotokens
+
 let update_costaking_pseudotokens ~f ctxt contract =
   let open Lwt_result_syntax in
   let* costaking_pseudotokens = costaking_pseudotokens_balance ctxt contract in
