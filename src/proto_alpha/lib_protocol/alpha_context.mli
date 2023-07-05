@@ -4921,6 +4921,14 @@ module Unstake_requests : sig
     Cycle.t ->
     Tez.t ->
     context tzresult Lwt.t
+
+  module For_RPC : sig
+    val apply_slash_to_unstaked_unfinalizable :
+      context ->
+      delegate:public_key_hash ->
+      requests:(Cycle.t * Tez.t) list ->
+      (Cycle.t * Tez.t) list tzresult Lwt.t
+  end
 end
 
 module Unstaked_frozen_deposits : sig
