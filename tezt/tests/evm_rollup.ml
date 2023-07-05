@@ -320,7 +320,7 @@ let setup_evm_kernel ?config
     originate_sc_rollup
       ~kind:pvm_kind
       ~boot_sector
-      ~parameters_ty:"pair (pair bytes (ticket unit)) nat"
+      ~parameters_ty:"pair (pair bytes (ticket unit)) (pair nat bytes)"
       ~src:originator_key
       client
   in

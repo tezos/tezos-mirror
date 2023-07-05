@@ -23,7 +23,7 @@
                  CDR ;
                  IF_NONE
                    { PUSH string "The EVM rollup was not set" ; FAILWITH }
-                   { CONTRACT (pair (pair bytes (ticket unit)) nat) ;
+                   { CONTRACT (pair (pair bytes (ticket unit)) nat bytes) ;
                      IF_NONE { PUSH string "option is None" ; FAILWITH } {} } ;
                  SWAP ;
                  PUSH mutez 0 ;
@@ -38,7 +38,9 @@
                  IF_NONE { PUSH string "Failed to create the ticket" ; FAILWITH } {} ;
                  DIG 2 ;
                  PUSH mutez 0 ;
-                 DIG 6 ;
+                 PUSH bytes 0x ;
+                 DIG 7 ;
+                 PAIR ;
                  DIG 3 ;
                  DIG 6 ;
                  PAIR ;

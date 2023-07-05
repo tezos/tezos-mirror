@@ -95,7 +95,10 @@ pub enum InputResult {
     Unparsable,
 }
 
-type RollupType = MichelsonPair<MichelsonPair<MichelsonBytes, UnitTicket>, MichelsonInt>;
+type RollupType = MichelsonPair<
+    MichelsonPair<MichelsonBytes, UnitTicket>,
+    MichelsonPair<MichelsonInt, MichelsonBytes>,
+>;
 
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
@@ -228,7 +231,7 @@ impl InputResult {
         let amount: U256 = eth_from_mutez(amount);
 
         // Amount for gas
-        let gas_price: MichelsonInt = transfer.payload.1;
+        let gas_price: MichelsonInt = transfer.payload.1 .0;
         let (_sign, gas_price_bytes) = gas_price.0 .0.to_bytes_le();
         let gas_price: U256 = U256::from_little_endian(&gas_price_bytes);
 

@@ -20,7 +20,7 @@ type parameter =
   | Set of address
 
 // EVM rollup expected type.
-type rollup_type = (bytes * unit ticket * nat)
+type rollup_type = (bytes * unit ticket * nat * bytes)
 
 // Entrypoint return type.
 type return = operation list * storage
@@ -32,7 +32,7 @@ type fa12_transfer_params = [@layout:comb] {
 }
 
 // Deposit transfers CTEZ from the contract to the L1 bridge. Transfer
-// the triplet (evm_address * nat * nat) to the EVM rollup.
+// the quadruplet (evm_address * nat * nat * 0x) to the EVM rollup.
 let deposit evm_address (amount : nat) (max_gas_price : nat) (store : storage)
   : operation list =
   // Sender
@@ -65,7 +65,10 @@ let deposit evm_address (amount : nat) (max_gas_price : nat) (store : storage)
   in
   // Create deposit transfer
   let deposit =
-    Tezos.transaction (evm_address, ticket, max_gas_price) 0mutez evm_rollup
+    Tezos.transaction
+      (evm_address, ticket, max_gas_price, ("" : bytes))
+      0mutez
+      evm_rollup
   in
   [transfer_ctez; deposit]
 
@@ -80,7 +83,7 @@ let set (evm_rollup : address) (store : storage) : storage =
    failwith "Unauthorized set entrypoint"
  else
    { store with rollup = Some evm_rollup }
-    
+
 
 let main (action : parameter) (store: storage) : return =
   match action with
