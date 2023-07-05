@@ -56,6 +56,10 @@ Operation receipts
 Bug Fixes
 ---------
 
+- Fix the JSON field ``kind`` of the smart rollup preveal
+  encoding. This constant field was wrongfully set for the
+  ``metadata`` and ``request_dal_page`` case. (MR :gl:`!9307`)
+
 Minor Changes
 -------------
 
