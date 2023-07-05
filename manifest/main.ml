@@ -4393,6 +4393,7 @@ let octez_rpc_process =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_shell |> open_;
         octez_base_unix |> open_;
         octez_node_config |> open_;
         octez_rpc_http |> open_;

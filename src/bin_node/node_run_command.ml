@@ -377,27 +377,12 @@ module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
 (* Launches an RPC server depending on the given [mode] (which is
    usually TCP, TLS or unix sockets). *)
-let launch_rpc_server ~mode (config : Config_file.t) node (addr, port) =
+let launch_rpc_server ~mode (config : Config_file.t) dir (addr, port) =
   let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let media_types = rpc_config.media_type in
   let*! acl_policy = RPC_server.Acl.resolve_domain_names rpc_config.acl in
   let host = Ipaddr.V6.to_string addr in
-  let version = Tezos_version_value.Current_git_info.version in
-  let commit_info =
-    ({
-       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-       commit_date = Tezos_version_value.Current_git_info.committer_date;
-     }
-      : Tezos_version.Node_version.commit_info)
-  in
-  let dir = Node.build_rpc_directory ~version ~commit_info node in
-  let dir = Node_directory.build_node_directory config dir in
-  let dir =
-    Tezos_rpc.Directory.register_describe_directory_service
-      dir
-      Tezos_rpc.Service.description_service
-  in
   let acl =
     let open RPC_server.Acl in
     find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
@@ -467,7 +452,7 @@ type rpc_server_kind =
   | No_server
 
 (* Initializes an RPC server handled by the node main process. *)
-let init_local_rpc_server (config : Config_file.t) node =
+let init_local_rpc_server (config : Config_file.t) dir =
   let open Lwt_result_syntax in
   let* servers =
     List.concat_map_es
@@ -489,7 +474,7 @@ let init_local_rpc_server (config : Config_file.t) node =
                           `No_password,
                           `Port port )
                 in
-                launch_rpc_server ~mode config node addr)
+                launch_rpc_server ~mode config dir addr)
               addrs)
       config.rpc.local_listen_addrs
   in
@@ -502,7 +487,7 @@ let rpc_socket_path ~socket_dir ~id ~pid =
 (* Initializes an RPC server handled by the node process. It will be
    used by an external RPC process, identified by [id], to forward
    RPCs to the node through a Unix socket. *)
-let init_local_rpc_server_for_external_process id (config : Config_file.t) node
+let init_local_rpc_server_for_external_process id (config : Config_file.t) dir
     addr =
   let open Lwt_result_syntax in
   let socket_dir = Tezos_base_unix.Socket.get_temporary_socket_dir () in
@@ -517,10 +502,10 @@ let init_local_rpc_server_for_external_process id (config : Config_file.t) node
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Lwt_unix.unlink comm_socket_path)
   in
-  let* rpc_server = launch_rpc_server ~mode config node addr in
+  let* rpc_server = launch_rpc_server ~mode config dir addr in
   return (rpc_server, comm_socket_path)
 
-let init_external_rpc_server config node internal_events =
+let init_external_rpc_server config node_version dir internal_events =
   let open Lwt_result_syntax in
   (* Start one rpc_process for each rpc endpoint. *)
   let id = ref 0 in
@@ -542,7 +527,7 @@ let init_external_rpc_server config node internal_events =
                   init_local_rpc_server_for_external_process
                     id
                     config
-                    node
+                    dir
                     p2p_point
                 in
                 let addr = P2p_point.Id.to_string p2p_point in
@@ -556,6 +541,7 @@ let init_external_rpc_server config node internal_events =
                   Octez_rpc_process.Rpc_process_worker.create
                     ~comm_socket_path
                     config
+                    node_version
                     internal_events
                 in
                 let* () =
@@ -604,13 +590,30 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
-let init_rpc (config : Config_file.t) node internal_events =
+let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
   let open Lwt_result_syntax in
   (* Start local RPC server (handled by the node main process) only
      when at least one local listen addr is given. *)
+  let commit_info =
+    ({
+       commit_hash = Tezos_version_value.Current_git_info.commit_hash;
+       commit_date = Tezos_version_value.Current_git_info.committer_date;
+     }
+      : Tezos_version.Node_version.commit_info)
+  in
+  let node_version = Node.get_version node in
+
+  let dir = Node.build_rpc_directory ~node_version ~commit_info node in
+  let dir = Node_directory.build_node_directory config dir in
+  let dir =
+    Tezos_rpc.Directory.register_describe_directory_service
+      dir
+      Tezos_rpc.Service.description_service
+  in
+
   let* local_rpc_server =
     if config.rpc.local_listen_addrs = [] then return No_server
-    else init_local_rpc_server config node
+    else init_local_rpc_server config dir
   in
   (* Start RPC process only when at least one listen addr is given. *)
   let* rpc_server =
@@ -619,7 +622,7 @@ let init_rpc (config : Config_file.t) node internal_events =
       (* Starts the node's local RPC server that aims to handle the
          RPCs forwarded by the rpc_process, if they cannot be
          processed by the rpc_process itself. *)
-      init_external_rpc_server config node internal_events
+      init_external_rpc_server config node_version dir internal_events
   in
   return (local_rpc_server :: [rpc_server])
 

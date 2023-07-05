@@ -26,6 +26,8 @@
 
 type t
 
+val get_version : t -> Tezos_version.Node_version.t
+
 type config = {
   genesis : Genesis.t;
   chain_name : Distributed_db_version.Name.t;
@@ -68,7 +70,7 @@ val create :
 val shutdown : t -> unit Lwt.t
 
 val build_rpc_directory :
-  version:Tezos_version_parser.t ->
+  node_version:Tezos_version.Node_version.t ->
   commit_info:Node_version.commit_info ->
   t ->
   unit Tezos_rpc.Directory.t

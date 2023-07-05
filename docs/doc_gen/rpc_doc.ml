@@ -353,7 +353,6 @@ let pp_document ppf _name intro prefix rpc_dir version =
 let make_index_shell ?introduction_path node =
   let open Lwt_syntax in
   let* shell_dir =
-    let version = Tezos_version_value.Current_git_info.version in
     let commit_info =
       ({
          commit_hash = Tezos_version_value.Current_git_info.commit_hash;
@@ -361,7 +360,8 @@ let make_index_shell ?introduction_path node =
        }
         : Tezos_version.Node_version.commit_info)
     in
-    let shell_dir = Node.build_rpc_directory ~version ~commit_info node in
+    let node_version = Node.get_version node in
+    let shell_dir = Node.build_rpc_directory ~node_version ~commit_info node in
     let shell_dir =
       Tezos_rpc.Directory.register0
         shell_dir

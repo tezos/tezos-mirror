@@ -32,14 +32,19 @@
 (** Type of the RPC process worker*)
 type t
 
-(** [create ~comm_socket_path config internal_event_config] creates the
-    worker initial state. [comm_socket_path] is a socket path that
-    will be used to communicate with the node (note that the socket is
-    created automatically, but the cleaning of it is not
-    handled). [config] contains all the RPC server configuration (such
-    as ACLs, cors_headers, …). *)
+(** [create ~comm_socket_path config node_version internal_event_config] creates
+    the worker initial state. [comm_socket_path] is a socket path that will be
+    used to communicate with the node (note that the socket is created
+    automatically, but the cleaning of it is not handled). [config] contains all
+    the RPC server configuration (such as ACLs, cors_headers, …). [node_version]
+    contains informations regarding version of the node to show when answering
+    related rpcs. *)
 val create :
-  comm_socket_path:string -> Config_file.t -> Internal_event_config.t -> t
+  comm_socket_path:string ->
+  Config_file.t ->
+  Tezos_version.Node_version.t ->
+  Internal_event_config.t ->
+  t
 
 (** Starts the external RPC process using fork+exec calls. It
     implements a watch dog that is responsible of restarting the

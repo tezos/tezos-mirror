@@ -96,7 +96,7 @@ let launch_rpc_server (config : Parameters.t) (addr, port) =
         allowed_headers = cors_headers;
       }
   in
-  let dir = Tezos_rpc.Directory.empty in
+  let dir = Directory.build_rpc_directory config.node_version in
   let server =
     RPC_server.init_server
       ~cors
