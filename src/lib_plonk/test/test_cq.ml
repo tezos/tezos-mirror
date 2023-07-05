@@ -23,36 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Plonk.Bls
 module PC = Plonk.Polynomial_commitment
 
 let ( !! ) = Plonk_test.Cases.( !! )
 
 let srs = fst Plonk_test.Helpers.srs
 
-let table1 = !![0; 2; 4; 6; 8; 10; 12; 14; 16; 18; 20; 22; 24; 26; 28; 28]
+let generate_table n = Array.init n (fun _ -> Scalar.random ())
 
-let table2 = !![1; 3; 5; 7; 9; 11; 13; 15; 17; 19; 21; 21; 23; 25; 27; 29]
+let table_size = 5 + (1 lsl Random.int 5)
 
-let table = [table1; table2]
+let wire_size = 1 lsl Random.int 5
 
-let f00 = !![0; 2; 2; 20]
+let nb_wires = 3 + Random.int 4
 
-let f01 = !![1; 3; 3; 21]
+let nb_proofs = 1 + Random.int 20
 
-let f10 = !![6; 8; 2; 26]
+let table = List.init nb_wires (fun _ -> generate_table table_size)
 
-let f11 = !![7; 9; 3; 25]
+let wires () =
+  (* indexes of the table lines that will be put in wires *)
+  let indexes = Array.init wire_size (fun _ -> Random.int table_size) in
+  List.init nb_wires (fun i ->
+      ( "w" ^ string_of_int i,
+        Array.init wire_size (fun j -> (List.nth table i).(indexes.(j))) ))
+  |> Plonk.SMap.of_list
 
-let f_map =
-  Plonk.SMap.
-    [of_list [("w0", f00); ("w1", f01)]; of_list [("w0", f10); ("w1", f11)]]
-
-let f_not_in_table = !![1; 3; 3; 1]
+let f_map = List.init nb_proofs (fun _ -> wires ())
 
 let f_map_not_in_table =
-  Plonk.SMap.[of_list [("w0", f00); ("w1", f_not_in_table)]]
-
-let wire_size = Array.length f00
+  Plonk.SMap.map
+    (fun _ -> Array.init wire_size (fun _ -> Scalar.random ()))
+    (List.hd f_map)
+  :: List.tl f_map
 
 let test_correctness () =
   let prv, vrf = Plonk.Cq.setup ~srs ~wire_size ~table in
@@ -71,34 +75,27 @@ let test_not_in_table () =
       "Test_cq.test_not_in_table : proof generation was supposed to fail."
   with Plonk.Cq.Entry_not_in_table -> ()
 
-(* Commented for now *)
-(* let test_wrong_proof () =
-   let module Cq = Plonk.Cq.Make (PC) in
-   let prv, vrf = Cq.setup ~srs ~wire_size ~table in
-   let transcript = Bytes.empty in
-   let proof_f, _ = Cq.prove prv transcript [f; f2] in
-   let wrong_proof =
-     let f =
-       Plonk.Bls.(
-         Evaluations.(
-           interpolation_fft
-             (Domain.build wire_size)
-             (of_array (wire_size - 1, f_not_in_table))))
-     in
-     let f2 =
-       Plonk.Bls.(
-         Evaluations.(
-           interpolation_fft
-             (Domain.build wire_size)
-             (of_array (wire_size - 1, f2))))
-     in
-     let cm_f, _ =
-       Plonk.SMap.of_list Cq.[("0~" ^ f_name, f); ("1~" ^ f_name, f2)]
-       |> PC.Commitment.commit prv.pc
-     in
-     Cq.{proof_f with cm_f}
-   in
-   assert (not (fst @@ Cq.verify vrf transcript wrong_proof)) *)
+let test_wrong_proof () =
+  let module Cq = Plonk.Cq.Make (PC) in
+  let prv, vrf = Cq.setup ~srs ~wire_size ~table in
+  let transcript = Bytes.empty in
+  let proof_f, _ = Cq.prove prv transcript [List.hd f_map] in
+  let wrong_proof =
+    let cm_f, _ =
+      PC.Commitment.commit
+        Cq.(prv.pc)
+        (Plonk.SMap.map
+           (fun f ->
+             Plonk.Bls.(
+               Evaluations.(
+                 interpolation_fft
+                   (Domain.build wire_size)
+                   (of_array (wire_size - 1, f)))))
+           (List.hd f_map_not_in_table))
+    in
+    Cq.{proof_f with cm_f}
+  in
+  assert (not (fst @@ Cq.verify vrf transcript wrong_proof))
 
 let tests =
   List.map
@@ -106,5 +103,5 @@ let tests =
     [
       ("Correctness", test_correctness);
       ("Not in table", test_not_in_table);
-      (* ("Fake proof", test_wrong_proof); *)
+      ("Fake proof", test_wrong_proof);
     ]
