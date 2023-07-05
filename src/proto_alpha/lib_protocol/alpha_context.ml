@@ -645,6 +645,16 @@ module Unstake_requests = struct
       Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
         ctxt
         {delegate; requests}
+
+    let apply_slash_to_unstaked_unfinalizable_stored_requests ctxt
+        {delegate; requests} =
+      let open Lwt_result_syntax in
+      let* requests =
+        Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
+          ctxt
+          {delegate; requests}
+      in
+      return {delegate; requests}
   end
 end
 

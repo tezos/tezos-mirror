@@ -4931,6 +4931,9 @@ module Unstake_requests : sig
       delegate:public_key_hash ->
       requests:(Cycle.t * Tez.t) list ->
       (Cycle.t * Tez.t) list tzresult Lwt.t
+
+    val apply_slash_to_unstaked_unfinalizable_stored_requests :
+      context -> stored_requests -> stored_requests tzresult Lwt.t
   end
 end
 
