@@ -23,9 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This file implements Cq, a lookup protocol described in https://eprint.iacr.org/2022/1763.pdf *)
+(* This file implements Cq, a lookup protocol described in
+   https://eprint.iacr.org/2022/1763.pdf, in which the prover work is
+   independant of the size of the table
 
-(* here we call n the size of the table, & k the size of the wire poly to check *)
+   In the code, we call n the size of the table (N), & k the size of the wire
+   to check (n).
+
+   TODO https://gitlab.com/tezos/tezos/-/issues/6070
+          - the setup is currently computed in O(N²) while it could be computed
+            in O(NlogN) with Kate amortized
+          - be able to select the wire’s value to lookup
+          - integrate to PlonK
+          - integrate to aPlonK
+*)
 
 open Bls
 open Identities
@@ -67,60 +78,90 @@ module Make (PC : Polynomial_commitment.S) = struct
   type transcript = bytes
 
   type prover_public_parameters = {
+    (* size of the table (= N in the paper) *)
     n : int;
+    (* precomputed domain for the wires of the size of the wires *)
     domain_k : Domain.t;
+    (* domain twice as large as the previous one (for poly multiplication) *)
     domain_2k : Domain.t;
+    (* the table as a list of scalar_maps to be more efficient for searching in
+       the prover *)
     table : ISet.t Scalar_map.t list;
-    q : G1.t array list;
+    (* N kzg commitments for lagrange polynomials L_i *)
     cms_lagrange : G1.t array;
+    (* N kzg commitments for (Li - Li(0))/X *)
     cms_lagrange_0 : G1.t array;
+    (* N kzg commitments for Qi = (Li × (T - ti)) / X^N - 1 *)
+    q : G1.t array list;
+    (* prover public parameters for commitment *)
     pc : PC.Public_parameters.prover;
   }
 
   type verifier_public_parameters = {
+    (* size of the table (= N in the paper) *)
     n : int;
+    (* size of the wires (= k in the paper) *)
     k : int;
+    (* first element of the SRS_2 *)
     srs2_0 : G2.t;
+    (* sencond element of the SRS_2 *)
     srs2_1 : G2.t;
+    (* (N-1-k+2) of the SRS_2 *)
     srs2_N_1_k_2 : G2.t;
+    (* commitment of the table *)
     cm_table : G2.t list;
+    (* commitment of the polynomial X^N - 1 *)
     cm_zv : G2.t;
+    (* verifier public parameters for commitment *)
     pc : PC.Public_parameters.verifier;
   }
 
   type proof = {
+    (* commitments *)
     cm_f : PC.Commitment.t;
     cm_f_agg : PC.Commitment.t;
     cm_a : PC.Commitment.t;
-    cm_a0 : G1.t;
     cm_b0 : PC.Commitment.t;
     cm_qa : PC.Commitment.t;
     cm_m : PC.Commitment.t;
     cm_p : PC.Commitment.t;
+    cm_b0_qb_f : PC.Commitment.t;
+    (* evaluations *)
     a0 : Scalar.t list;
     b0y : Scalar.t SMap.t;
     fy : Scalar.t SMap.t;
     fy_agg : Scalar.t SMap.t;
+    (* proofs *)
     pc : PC.proof;
-    cm_b0_qb_f : PC.Commitment.t;
+    cm_a0 : G1.t;
   }
 
+  (* Wires polynomial *)
   let f_name = "f"
 
+  (* m polynomial : i-th coefficient is the number of occurences of t_i in the
+     corresponding wire *)
   let m_name = "m"
 
+  (* A polynomial : i-th coefficient is m_i/(t_i + β) *)
   let a_name = "a"
 
+  (* Q_A polynomial : (A×(T+β) - m)/(X^N - 1) *)
   let qa_name = "qa"
 
-  let p_name = "p"
-
+  (* B₀ polynomial : (B(X) - B(0))/X, where B polynomial has i-th coefficient 1/(fi + β) *)
   let b0_name = "b0"
 
+  (* Q_B polynomial : (B×(f+β) - 1)/(X^k - 1) (with k = n in the paper) *)
   let qb_name = "qb"
 
+  (* P polynomial : B₀×X^(N-1-(k-2)) *)
+  let p_name = "p"
+
+  (* Wire aggregation polynomial : f₀ + αf₁ + α²f₂ + … *)
   let f_agg_name = "f_agg"
 
+  (* This function is used to aggregate commitments for different proofs *)
   let aggregate_cm cm etas =
     pippenger1 (PC.Commitment.to_map cm |> SMap.values |> Array.of_list) etas
 
@@ -128,8 +169,10 @@ module Make (PC : Polynomial_commitment.S) = struct
   let get_pc_query gamma =
     List.map (convert_eval_points ~generator:Scalar.zero ~x:gamma) [[X]]
 
+  (* We use PC’s function to commit our polynomials *)
   let commit1 = PC.Commitment.commit_single
 
+  (* [kzg_0 p] returns (p - p(0))/X *)
   let kzg_0 p =
     let q, r =
       Poly.(division_xn (p - constant (evaluate p Scalar.zero)) 1 Scalar.zero)
@@ -137,6 +180,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     if not (Poly.is_zero r) then failwith "Cq.kzg_0 : division error." ;
     q
 
+  (* This function avoid some lines of code duplication *)
   let compute_and_commit f list =
     let m, l = List.map f list |> Array.of_list |> Array.split in
     (m, pippenger1 l m)
@@ -145,8 +189,9 @@ module Make (PC : Polynomial_commitment.S) = struct
     let domain_k = Domain.build k in
     let domain_2k = Domain.build (2 * k) in
 
+    (* Map that binds scalar to the set of its indices in the table ;
+       converting it to a map allow more efficient research in the table *)
     let table =
-      (* Map that binds scalar to the set of its indices in the table ; converting to a map allow more efficient research in the table to build m polynomial *)
       List.map
         (fun t ->
           fst
@@ -228,7 +273,6 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     let domain = Domain.build n in
     let table_polys = List.map (Evaluations.interpolation_fft2 domain) table in
-    (* TODO : changer ça si on utilise un autre pc *)
     let pc = PC.Public_parameters.setup 0 (srs, srs) in
     let prv =
       setup_prover (n, domain) wire_size (table, table_polys) (fst pc)
@@ -236,27 +280,19 @@ module Make (PC : Polynomial_commitment.S) = struct
     let vrf = setup_verifier srs n wire_size table_polys (snd pc) in
     (prv, vrf)
 
-  let map_of_occurences =
-    (* by construction, f after convertion has no duplication *)
-    Array.fold_left
-      (fun acc fi ->
-        Scalar_map.update
-          fi
-          (function None -> Some 1 | Some k -> Some (k + 1))
-          acc)
-      Scalar_map.empty
-
   let compute_m_and_t_sparse pp f_arrays f_agg =
     let f_arrays = SMap.values f_arrays in
-    (* for all scalar in f, we fetch it in the table, get the index i, and then add nb_occ × cm(i-th lagrange poly) to the accumulator *)
-    (* Returning a list is ok because we just iterate on ms & it is sparse *)
-    (* For each element in fs, returns the set of corresponding index in the table *)
+    (* Returns [(i, mi, ti)], where mi is the number of occurences of ti (aggregated version) in f ;
+       returning lists is ok because we will just iterate on them & they are sparse *)
     let m_and_t_sparse =
       Array.fold_left
         (fun (m_map, i) f_agg ->
-          (* Index in the table of the f’s i-th line *)
+          (* Index in the table of the i-th line of f_arrays *)
           let idx, _ =
-            (* For each value of the i-th line, we search it in the table and return its indices in the corresponding column of the table ; the index of the line will be the intersection of the indices of for all the values of the line *)
+            (* For each value of the i-th line, we search it in the table and
+               return its indices in the corresponding column of the table
+               the index of the line will be the intersection of the indices
+               for all the values of the line *)
             List.fold_left2
               (fun (acc, first) f t ->
                 match Scalar_map.find_opt f.(i) t with
@@ -267,11 +303,15 @@ module Make (PC : Polynomial_commitment.S) = struct
               f_arrays
               pp.table
           in
-          (* If the set is empty it means that the line is not in the table ; if there is more than one index it means that there is duplication in the table, so we just keep one *)
+          (* If the set is empty it means that the line is not in the table ;
+             if there is more than one index it means that there is duplication
+             in the table, so we just keep one *)
           let idx =
             try ISet.choose idx with Not_found -> raise Entry_not_in_table
           in
-          (* Note that we add f_agg here to keep track of the aggregated value at each index ; we will need it later to compute a *)
+          (* Note that we add f_agg here to keep track of the aggregated value
+             at each index (what was called ti before) ; we will need it later
+             to compute a ; we use f_agg to avoid recomputation *)
           ( IMap.update
               idx
               (function
@@ -356,12 +396,14 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     snd @@ compute_and_commit (fun (i, a) -> (a, pp.cms_lagrange_0.(i))) a_agg
 
+  (* produces a kzg proof for steps 3.5 & 3.6 *)
   let kzg_prove (pp : prover_public_parameters) transcript n
       ((cm_f, f_aux), (cm_f_agg, f_agg_aux)) (b0_map, f, f_agg, qb) =
     let qb_map = SMap.Aggregation.of_list ~n "" qb_name qb in
     let f_map = SMap.union_disjoint_list [f; f_agg; b0_map; qb_map] in
     let cm_b0, b0_aux = PC.Commitment.commit pp.pc b0_map in
     let cm_qb, qb_aux = PC.Commitment.commit pp.pc qb_map in
+    (* Does this must be in lexicographic order ? *)
     let cm_map = PC.Commitment.(recombine [cm_b0; cm_f; cm_f_agg; cm_qb]) in
     let aux =
       PC.Commitment.(recombine_prover_aux [b0_aux; f_aux; f_agg_aux; qb_aux])
@@ -385,6 +427,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     (b0y, fy, fy_agg, cm_map, cm_b0, proof, transcript)
 
+  (* verify the values provided by kzg_prove *)
   let kzg_verify pp transcript proof k beta =
     (* 3.1 *)
     let transcript =
@@ -430,9 +473,10 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     PC.verify pp.pc transcript cm query answers proof.pc
 
+  (* Checks that f_agg(γ) = f₀(γ) + αf₁(γ) + α²f₂(γ) *)
   let verify_f_agg alphas proof =
     let nb_wires = Array.length alphas in
-    (* [[f₀, f₁, …] ; [f₀, f₁, …] ; …] *)
+    (* format proof.fy as [[f₀, f₁, …] ; [f₀, f₁, …] ; …] *)
     let formatted_fy =
       let (rev_formatted, last), _ =
         SMap.fold
@@ -446,6 +490,7 @@ module Make (PC : Polynomial_commitment.S) = struct
       in
       List.rev (List.rev last :: rev_formatted)
     in
+    (* Check equality for all proofs *)
     List.for_all2
       (fun fs f_agg ->
         let sum_fs, _ =
@@ -458,10 +503,10 @@ module Make (PC : Polynomial_commitment.S) = struct
       formatted_fy
       (SMap.values proof.fy_agg)
 
-  (* On suppose que f est de degré k < n *)
+  (* each f must be a power of two & of the same size *)
   let prove pp transcript f_map_list =
-    (* TODO padder f jusqu’à la prochaine puissance de 2 ? *)
     let k = Array.length (snd @@ SMap.choose (List.hd f_map_list)) in
+    (* n = nb_proofs *)
     let n = List.length f_map_list in
     (* The map of all wires polynomials *)
     let f_map =
@@ -500,19 +545,21 @@ module Make (PC : Polynomial_commitment.S) = struct
         f_agg_arrays_list
     in
     let f_agg_map = SMap.Aggregation.of_list ~n "" f_agg_name f_agg_list in
-
     let cm_f_agg, f_agg_aux = PC.Commitment.commit pp.pc f_agg_map in
+
     (* 1.1, 1.2 *)
     let m_and_t, cm_m =
       List.map2 (compute_m_and_t_sparse pp) f_map_list f_agg_arrays_list
       |> List.split
     in
     let cm_m, _ = PC.Commitment.of_list pp.pc ~name:m_name cm_m in
+
     (* 2.1 *)
     let transcript =
       Transcript.list_expand PC.Commitment.t [cm_f_agg; cm_m] transcript
     in
     let beta, transcript = Fr_generation.random_fr transcript in
+
     (* 2.2, 2.3 *)
     let a, cm_a = List.map (compute_a pp beta) m_and_t |> List.split in
     let cm_a, _ = PC.Commitment.of_list pp.pc ~name:a_name cm_a in
@@ -521,6 +568,7 @@ module Make (PC : Polynomial_commitment.S) = struct
       List.map (compute_cm_qa alphas pp) a
       |> PC.Commitment.of_list pp.pc ~name:qa_name
     in
+
     (* 2.5 *)
     let b = List.map (compute_b beta k pp.domain_k) f_agg_arrays_list in
     (* 2.6 *)
@@ -532,6 +580,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     (* 2.8, 2.9 *)
     let qb = List.map2 (compute_qb pp beta k) b (SMap.values f_agg_map) in
+
     (* 2.10 *)
     let cm_p, _ =
       SMap.map (compute_p pp k) b0
