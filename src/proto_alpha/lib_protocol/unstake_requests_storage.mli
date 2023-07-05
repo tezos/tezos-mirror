@@ -50,8 +50,7 @@ val prepared_finalize_unstake_encoding :
     the [finalizable_field] as well as the remaining unfinalizable requests
     that should be kept in the storage in [unfinalizable].
 
-    It returns [None] if there are no finalizable unstake requests (regardless
-    of whether there are unstake requests at all). *)
+    It returns [None] if there are no unstake requests. *)
 val prepare_finalize_unstake :
   Raw_context.t ->
   Contract_repr.t ->
