@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make_transform_callback ?ctx forwarding_endpoint callback conn req body =
+let make_transform_callback ?ctx ?on_forwarding forwarding_endpoint callback
+    conn req body =
   let open Lwt_syntax in
   let open Cohttp in
   (* Using a [Cohttp_lwt.Body.t] destructs it. As we may need it
@@ -37,6 +38,9 @@ let make_transform_callback ?ctx forwarding_endpoint callback conn req body =
         Response.status response = `Not_found
   in
   if answer_has_not_found_status answer then
+    let* () =
+      match on_forwarding with Some f -> f req | None -> Lwt.return_unit
+    in
     let uri = Request.uri req in
     let uri =
       Uri.make
@@ -105,5 +109,5 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
-let proxy_server_query_forwarder ?ctx forwarding_endpoint =
-  make_transform_callback ?ctx forwarding_endpoint
+let proxy_server_query_forwarder ?ctx ?on_forwarding forwarding_endpoint =
+  make_transform_callback ?ctx ?on_forwarding forwarding_endpoint

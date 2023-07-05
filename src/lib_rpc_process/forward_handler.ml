@@ -40,5 +40,12 @@ let callback server socket_path =
     Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
   in
   let forwarding_endpoint = Uri.of_string socket_forwarding_uri in
+  let on_forwarding req =
+    Rpc_process_event.(emit forwarding_rpc (Cohttp.Request.resource req))
+  in
   let ctx = build_socket_redirection_ctx socket_path in
-  RPC_middleware.proxy_server_query_forwarder ~ctx forwarding_endpoint callback
+  RPC_middleware.proxy_server_query_forwarder
+    ~ctx
+    ~on_forwarding
+    forwarding_endpoint
+    callback

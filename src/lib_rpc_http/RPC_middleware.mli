@@ -31,6 +31,7 @@
     handle and forwards them to the full node at the given [Uri.t]. *)
 val proxy_server_query_forwarder :
   ?ctx:Cohttp_lwt_unix.Net.ctx ->
+  ?on_forwarding:(Cohttp.Request.t -> unit Lwt.t) ->
   Uri.t ->
   RPC_server.callback ->
   RPC_server.callback

@@ -37,3 +37,11 @@ let starting_rpc_server =
     ("port", Data_encoding.uint16)
     ("tls", Data_encoding.bool)
     ("acl_policy", Data_encoding.string)
+
+let forwarding_rpc =
+  declare_1
+    ~section
+    ~name:"forwarding_rpc"
+    ~msg:"forwarding to the node : {uri}"
+    ~level:Debug
+    ("uri", Data_encoding.string)
