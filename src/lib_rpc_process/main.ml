@@ -59,23 +59,6 @@ let () =
     (function Missing_socket_dir -> Some () | _ -> None)
     (fun () -> Missing_socket_dir)
 
-module Event = struct
-  include Internal_event.Simple
-
-  let section = ["rpc-server"; "main"]
-
-  let starting_rpc_server =
-    declare_4
-      ~section
-      ~name:"starting_rpc_server"
-      ~msg:"starting RPC server on {host}:{port} (acl = {acl_policy})"
-      ~level:Notice
-      ("host", Data_encoding.string)
-      ("port", Data_encoding.uint16)
-      ("tls", Data_encoding.bool)
-      ("acl_policy", Data_encoding.string)
-end
-
 (* Add default accepted CORS headers *)
 let sanitize_cors_headers ~default headers =
   List.map String.lowercase_ascii headers
@@ -100,7 +83,7 @@ let launch_rpc_server (config : Parameters.t) (addr, port) =
     |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
-    Event.(emit starting_rpc_server)
+    Rpc_process_event.(emit starting_rpc_server)
       (host, port, config.rpc.tls <> None, RPC_server.Acl.policy_type acl)
   in
   let cors_headers =
