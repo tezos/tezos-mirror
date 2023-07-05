@@ -37,7 +37,9 @@
      This is ensured by:
        - checking that the result of
          {!Storage.Contract.Frozen_deposits_pseudotokens.find} is always matched
-         with [Some v when Staking_pseudotoken_repr.(v <> zero)].
+         with [Some v when Staking_pseudotoken_repr.(v <> zero)];
+       - and that there is no call to
+         {!Storage.Contract.Frozen_deposits_pseudotokens.get}.
 *)
 
 (** [init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract]
@@ -51,9 +53,7 @@ val init_delegate_pseudotokens_from_frozen_deposits_balance :
 
 (** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
     returns the amount of [delegate]'s stake pseudotokens the [tez_amount] is
-    currently worth.
-    
-    Returns an error if [delegate]'s pseudotokens haven't been initialized yet. *)
+    currently worth. *)
 val frozen_deposits_pseudotokens_for_tez_amount :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
