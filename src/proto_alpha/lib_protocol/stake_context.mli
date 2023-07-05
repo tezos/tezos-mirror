@@ -25,7 +25,20 @@
 
 (** Functions on stake and depending on the context. *)
 
-(** Weight for staking rights. *)
+(** Apply the delegation_over_baking and staking_over_baking limits of
+    a delegate. Overcostaked tez count as delegated, overdelegated tez
+    do not count at all.  *)
+val apply_limits :
+  Raw_context.t ->
+  Staking_parameters_repr.t ->
+  Stake_repr.Full.t ->
+  Stake_repr.t tzresult
+
+(** The weight of a staker or a set of stakers. When adaptive
+    inflation is active, the delegated tez weight
+    staking_over_delegation_edge less than frozen ones. Since this
+    function is applied on a [Stake_repr.t], the limits should already
+    have been applied using [apply_limits] if necessary. *)
 val staking_weight : Raw_context.t -> Stake_repr.t -> int64
 
 val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int
