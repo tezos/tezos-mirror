@@ -322,12 +322,9 @@ let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
     | Implicit sender_pkh ->
         let* sender_delegate_status = Contract.get_delegate_status ctxt sender_pkh in
         (match sender_delegate_status with
-         | Delegate ->
-          (* This is just a re-activation, do not unstake. *)
-          Staking.finalize_unstake ctxt sender
-         | Undelegated ->
-           (* No delegates, nothing to unstake but maybe some unstake request to finalize. *)
-           Staking.finalize_unstake ctxt sender
+         | Undelegated | Delegate ->
+           (* No delegate before or re-activation: no unstake request added. *)
+           return (ctxt, [])
          | Delegated delegate ->
         (* [request_unstake] bounds to the actual stake. *)
         Staking.request_unstake ctxt ~sender_contract:sender ~delegate Tez.max_mutez)
