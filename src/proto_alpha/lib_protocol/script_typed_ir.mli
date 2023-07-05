@@ -1743,6 +1743,8 @@ val comparable_pair_3_t :
   'c comparable_ty ->
   ('a, ('b, 'c) pair) pair comparable_ty tzresult
 
+val pair_int_int_unit_t : (z num, (z num, unit) pair) pair comparable_ty
+
 val or_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) or_ ty_ex_c tzresult
 

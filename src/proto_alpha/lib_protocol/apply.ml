@@ -991,69 +991,75 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      (match (Entrypoint.to_string entrypoint, Micheline.root parameters) with
-      | "default", Prim (_, D_Unit, [], _) ->
+      let elab_conf = Script_ir_translator_config.make ~legacy:false () in
+      (match Entrypoint.to_string entrypoint with
+      | "default" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
           apply_transaction_to_implicit
             ~ctxt
             ~sender:source_contract
             ~amount
             ~pkh
             ~before_operation:ctxt_before_op
-      | "stake", Prim (_, D_Unit, [], _) ->
+      | "stake" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
           apply_stake
             ~ctxt
             ~sender:source
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | "unstake", Int (_, requested_amount) ->
+      | "unstake" ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            Script_typed_ir.int_t
+            (Micheline.root parameters)
+          >>=? fun (requested_amount, ctxt) ->
           apply_unstake
             ~ctxt
             ~sender:source
             ~amount
-            ~requested_amount
+            ~requested_amount:(Script_int.to_zint requested_amount)
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | "finalize_unstake", Prim (_, D_Unit, [], _) ->
+      | "finalize_unstake" ->
+          fail_unless
+            (Script.is_unit parameters)
+            (Script_interpreter.Bad_contract_parameter source_contract)
+          >>=? fun () ->
           apply_finalize_unstake
             ~ctxt
             ~sender:source
             ~amount
             ~destination:pkh
             ~before_operation:ctxt_before_op
-      | ( "set_delegate_parameters",
-          Prim
-            ( _,
-              D_Pair,
-              [
-                Int (_, staking_over_baking_limit_millionth);
-                Prim
-                  ( _,
-                    D_Pair,
-                    [
-                      Int (_, baking_over_staking_edge_billionth);
-                      Prim (_, D_Unit, [], []);
-                    ],
-                    [] );
-              ],
-              [] ) ) ->
+      | "set_delegate_parameters" ->
+          Script_ir_translator.parse_data
+            ~elab_conf
+            ctxt
+            ~allow_forged:false
+            Script_typed_ir.pair_int_int_unit_t
+            (Micheline.root parameters)
+          >>=? fun ( ( staking_over_baking_limit_millionth,
+                       (baking_over_staking_edge_billionth, ()) ),
+                     ctxt ) ->
           apply_set_delegate_parameters
             ~ctxt
             ~sender:source
             ~destination:pkh
-            ~staking_over_baking_limit_millionth
-            ~baking_over_staking_edge_billionth
+            ~staking_over_baking_limit_millionth:
+              (Script_int.to_zint staking_over_baking_limit_millionth)
+            ~baking_over_staking_edge_billionth:
+              (Script_int.to_zint baking_over_staking_edge_billionth)
             ~before_operation:ctxt_before_op
-      | ( ( "default" | "stake" | "unstake" | "finalize_unstake"
-          | "set_delegate_parameters" ),
-          _ ) ->
-          (* Only allow:
-             - [unit] parameter to implicit accounts' default, stake,
-               and finalize_unstake entrypoints;
-             - [nat] parameter to implicit accounts' unstake entrypoint;
-             - [pair nat nat unit] parameter to implicit accounts'
-               set_delegate_parameters entrypoint.*)
-          tzfail (Script_interpreter.Bad_contract_parameter source_contract)
       | _ -> tzfail (Script_tc_errors.No_such_entrypoint entrypoint))
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction
