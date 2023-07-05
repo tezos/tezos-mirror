@@ -51,10 +51,10 @@ const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/info_per_level/timestamp");
 /// Path to the number of timestamps read, use to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/stats/numbers");
+    RefPath::assert_from(b"/info_per_level/stats/numbers");
 /// Path to the sum of distance between blocks, used to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/stats/total");
+    RefPath::assert_from(b"/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
 pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
@@ -64,7 +64,7 @@ pub const KERNEL_UPGRADE_NONCE: RefPath = RefPath::assert_from(b"/upgrade_nonce"
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where Ethereum accounts are stored
-const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/evm/indexes/accounts");
+const EVM_ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/indexes/accounts");
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
