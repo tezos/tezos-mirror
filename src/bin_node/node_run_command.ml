@@ -421,7 +421,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
       dir
   in
   let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
-    let path = Cohttp_lwt.Request.uri req |> Uri.path in
+    let path = Cohttp.Request.uri req |> Uri.path in
     if path = "/metrics" then
       let*! response = Metrics_server.callback conn req body in
       Lwt.return (`Response response)
