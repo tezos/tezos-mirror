@@ -320,11 +320,13 @@ let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
         (* Originated contracts have no costake (yet). *)
         return (ctxt, [])
     | Implicit sender_pkh ->
-        let* sender_is_delegate = Contract.is_delegate ctxt sender_pkh in
-        if sender_is_delegate then
+        let* sender_delegate_status = Contract.get_delegate_status ctxt sender_pkh in
+        (match sender_delegate_status with
+         | Delegate ->
           (* This is just a re-activation, do not unstake. *)
           Staking.finalize_unstake ctxt sender
-        else Staking.request_full_unstake ctxt ~sender_contract:sender
+         | Undelegated | Delegated _ ->
+        Staking.request_full_unstake ctxt ~sender_contract:sender)
   in
   let+ ctxt = Contract.Delegate.set ctxt sender delegate in
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])
