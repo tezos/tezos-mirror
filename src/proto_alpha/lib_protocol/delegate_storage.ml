@@ -317,11 +317,15 @@ module For_RPC = struct
      >>=? function
      | None -> return Tez_repr.zero
      | Some {finalizable; unfinalizable} ->
+         Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
+           ctxt
+           unfinalizable
+         >>=? fun unfinalizable_requests ->
          Lwt.return
            ( List.fold_left_e
                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
                Tez_repr.zero
-               unfinalizable.requests
+               unfinalizable_requests
            >>? fun sum_unfinalizable ->
              List.fold_left_e
                (fun acc (_, _cycle, tz) -> Tez_repr.(acc +? tz))

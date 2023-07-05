@@ -125,3 +125,28 @@ let add ctxt ~contract ~delegate cycle amount =
     Storage.Contract.Unstake_requests.add ctxt contract unstake_request
   in
   return ctxt
+
+module For_RPC = struct
+  let apply_slash_to_unstaked_unfinalizable ctxt {requests; delegate} =
+    let open Lwt_result_syntax in
+    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    let max_slashing_period = Constants_storage.max_slashing_period ctxt in
+    let preserved_plus_slashing = preserved_cycles + max_slashing_period in
+    let* slashing_history_opt =
+      Storage.Contract.Slashed_deposits.find
+        ctxt
+        (Contract_repr.Implicit delegate)
+    in
+    let slashing_history = Option.value slashing_history_opt ~default:[] in
+    List.map_es
+      (fun (request_cycle, request_amount) ->
+        let new_amount =
+          apply_slashes
+            ~preserved_plus_slashing
+            slashing_history
+            ~from_cycle:request_cycle
+            request_amount
+        in
+        return (request_cycle, new_amount))
+      requests
+end
