@@ -97,15 +97,13 @@ let prepare_finalize_unstake ctxt contract =
   let max_slashing_period = Constants_storage.max_slashing_period ctxt in
   let preserved_plus_slashing = preserved_cycles + max_slashing_period in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
-  match Cycle_repr.sub current_cycle preserved_plus_slashing with
-  | None (* no finalizable cycle *) -> return None
-  | Some greatest_finalizable_cycle -> (
-      let* requests_opt =
-        Storage.Contract.Unstake_requests.find ctxt contract
-      in
-      match requests_opt with
-      | None | Some {delegate = _; requests = []} -> return None
-      | Some {delegate; requests} ->
+  let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
+  match requests_opt with
+  | None | Some {delegate = _; requests = []} -> return None
+  | Some {delegate; requests} -> (
+      match Cycle_repr.sub current_cycle preserved_plus_slashing with
+      | None (* no finalizable cycle *) -> return None
+      | Some greatest_finalizable_cycle ->
           let* slashing_history_opt =
             Storage.Contract.Slashed_deposits.find
               ctxt
