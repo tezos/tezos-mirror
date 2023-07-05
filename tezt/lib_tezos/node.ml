@@ -372,27 +372,35 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
+  let put_user_activated_upgrades upgrade_points =
+    JSON.put
+      ( "user_activated_upgrades",
+        JSON.annotate ~origin:"user_activated_upgrades"
+        @@ `A
+             (List.map
+                (fun (level, protocol) ->
+                  `O
+                    [
+                      ("level", `Float (float level));
+                      ("replacement_protocol", `String (Protocol.hash protocol));
+                    ])
+                upgrade_points) )
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
       sandbox_network_config
       |> JSON.annotate
-           ~origin:"set_sandbox_network_with_user_activated_upgrades"
-      |> JSON.put
-           ( "user_activated_upgrades",
-             JSON.annotate ~origin:"user_activated_upgrades"
-             @@ `A
-                  (List.map
-                     (fun (level, protocol) ->
-                       `O
-                         [
-                           ("level", `Float (float level));
-                           ( "replacement_protocol",
-                             `String (Protocol.hash protocol) );
-                         ])
-                     upgrade_points) )
+           ~origin:"set_sandbox_network_config_with_user_activated_upgrades"
+      |> put_user_activated_upgrades upgrade_points
     in
     JSON.put ("network", network) old_config
+
+  let update_network_with_user_activated_upgrades upgrade_points old_config =
+    JSON.update
+      "network"
+      (fun config -> (put_user_activated_upgrades upgrade_points) config)
+      old_config
 
   let set_sandbox_network_with_user_activated_overrides overrides old_config =
     let network =
@@ -454,22 +462,8 @@ module Config_file = struct
     let may_patch_user_activated_upgrades =
       match user_activated_upgrades with
       | None -> Fun.id
-      | Some upgrade_points ->
-          JSON.put
-            ( "user_activated_upgrades",
-              JSON.annotate ~origin:"user_activated_upgrades"
-              @@ `A
-                   (List.map
-                      (fun (level, protocol) ->
-                        `O
-                          [
-                            ("level", `Float (float level));
-                            ( "replacement_protocol",
-                              `String (Protocol.hash protocol) );
-                          ])
-                      upgrade_points) )
+      | Some upgrade_points -> put_user_activated_upgrades upgrade_points
     in
-
     JSON.put
       ( "network",
         JSON.annotate
