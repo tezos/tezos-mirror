@@ -152,7 +152,7 @@ let stake ctxt ~sender ~delegate amount =
   in
   return (ctxt, stake_balance_updates @ finalize_balance_updates)
 
-let record_request_unstake ctxt ~sender_contract ~delegate requested_amount =
+let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   if Tez.(requested_amount = zero) then return (ctxt, [])
   else
@@ -204,13 +204,6 @@ let record_request_unstake ctxt ~sender_contract ~delegate requested_amount =
           tez_to_unstake
       in
       (ctxt, balance_updates @ finalize_balance_updates)
-
-let request_unstake ctxt ~sender_contract ~delegate requested_amount =
-  let open Lwt_result_syntax in
-  let+ ctxt, unstake_balance_updates =
-    record_request_unstake ctxt ~sender_contract ~delegate requested_amount
-  in
-  (ctxt, unstake_balance_updates)
 
 let request_full_unstake ctxt ~sender_contract =
   let open Lwt_result_syntax in
