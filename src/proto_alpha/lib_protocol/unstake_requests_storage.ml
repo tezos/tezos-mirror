@@ -99,7 +99,7 @@ let prepare_finalize_unstake ctxt contract =
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let* requests_opt = Storage.Contract.Unstake_requests.find ctxt contract in
   match requests_opt with
-  | None | Some {delegate = _; requests = []} -> return None
+  | None | Some {delegate = _; requests = []} -> return_none
   | Some {delegate; requests} -> (
       match Cycle_repr.sub current_cycle preserved_plus_slashing with
       | None (* no finalizable cycle *) ->
