@@ -67,12 +67,12 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
    [Client_proto_contracts.Contract_alias.find_destination].
 *)
 let test_find_destination _ =
+  let open Lwt_result_syntax in
   let bootstrap1 = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
   let wallet_json =
     Format.asprintf {| [{"name": "test_alias", "value": "%s" }] |} bootstrap1
   in
   let w = new mock_wallet wallet_json in
-  let open Lwt_result_syntax in
   let test msg key exp_source =
     let* contract =
       Client_proto_contracts.Contract_alias.find_destination w key

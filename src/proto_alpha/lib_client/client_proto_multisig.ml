@@ -628,15 +628,15 @@ let action_to_expr_generic ~loc =
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} -> (
       match destination with
       | Implicit destination ->
-          let+ a =
+          let* a =
             lambda_from_string
             @@ Managed_contract.build_lambda_for_transfer_to_implicit
                  ~destination
                  ~amount
           in
-          left ~loc a
+          return @@ left ~loc a
       | Originated destination ->
-          let+ a =
+          let* a =
             lambda_from_string
             @@ Managed_contract.build_lambda_for_transfer_to_originated
                  ~destination
@@ -645,47 +645,49 @@ let action_to_expr_generic ~loc =
                  ~parameter
                  ~amount
           in
-          left ~loc a)
-  | Lambda code -> ok Tezos_micheline.Micheline.(left ~loc (root code))
+          return @@ left ~loc a)
+  | Lambda code -> return Tezos_micheline.Micheline.(left ~loc (root code))
   | Change_delegate delegate ->
-      let+ a =
+      let* a =
         lambda_from_string
         @@ Managed_contract.build_lambda_for_set_delegate ~delegate
       in
-      left ~loc a
+      return @@ left ~loc a
   | Change_keys (threshold, keys) ->
       let optimized_keys = seq ~loc (List.map (optimized_key ~loc) keys) in
       let expr = right ~loc (pair ~loc (int ~loc threshold) optimized_keys) in
-      ok expr
+      return expr
 
-let action_to_expr_legacy ~loc = function
+let action_to_expr_legacy ~loc =
+  let open Result_syntax in
+  function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} ->
       if parameter <> Tezos_micheline.Micheline.strip_locations (unit ~loc:())
-      then error @@ Unsupported_feature_generic_call parameter
+      then tzfail @@ Unsupported_feature_generic_call parameter
       else if
         parameter_type
         <> Tezos_micheline.Micheline.strip_locations (unit_t ~loc:())
-      then error @@ Unsupported_feature_generic_call_ty parameter_type
+      then tzfail @@ Unsupported_feature_generic_call_ty parameter_type
       else
-        ok
+        return
         @@ left
              ~loc
              (pair
                 ~loc
                 (mutez ~loc amount)
                 (optimized_address ~loc ~address:destination ~entrypoint))
-  | Lambda _ -> error @@ Unsupported_feature_lambda ""
+  | Lambda _ -> tzfail @@ Unsupported_feature_lambda ""
   | Change_delegate delegate ->
       let delegate_opt =
         match delegate with
         | None -> none ~loc ()
         | Some delegate -> some ~loc (optimized_key_hash ~loc delegate)
       in
-      ok @@ right ~loc (left ~loc delegate_opt)
+      return @@ right ~loc (left ~loc delegate_opt)
   | Change_keys (threshold, keys) ->
       let optimized_keys = seq ~loc (List.map (optimized_key ~loc) keys) in
       let expr = right ~loc (pair ~loc (int ~loc threshold) optimized_keys) in
-      ok (right ~loc expr)
+      return (right ~loc expr)
 
 let action_to_expr ~loc ~generic action =
   if generic then action_to_expr_generic ~loc action
@@ -700,7 +702,7 @@ let action_of_expr_generic e =
   in
   match e with
   | Tezos_micheline.Micheline.Prim (_, Script.D_Left, [lam], []) ->
-      return @@ Lambda (Tezos_micheline.Micheline.strip_locations lam)
+      return (Lambda (Tezos_micheline.Micheline.strip_locations lam))
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
@@ -726,7 +728,7 @@ let action_of_expr_generic e =
             | _ -> fail ())
           key_bytes
       in
-      return @@ Change_keys (threshold, keys)
+      return (Change_keys (threshold, keys))
   | _ -> fail ()
 
 let action_of_expr_not_generic e =
@@ -777,7 +779,7 @@ let action_of_expr_not_generic e =
               [] );
         ],
         [] ) ->
-      return @@ Change_delegate None
+      return (Change_delegate None)
   | Tezos_micheline.Micheline.Prim
       ( _,
         Script.D_Right,
@@ -832,7 +834,7 @@ let action_of_expr_not_generic e =
             | _ -> fail ())
           key_bytes
       in
-      return @@ Change_keys (threshold, keys)
+      return (Change_keys (threshold, keys))
   | _ -> fail ()
 
 let action_of_expr ~generic =
@@ -877,9 +879,9 @@ let multisig_get_information (cctxt : #Protocol_client_context.full) ~chain
 
 let multisig_create_storage ~counter ~threshold ~keys () :
     Script.expr tzresult Lwt.t =
-  let loc = Tezos_micheline.Micheline_parser.location_zero in
   let open Tezos_micheline.Micheline in
   let open Lwt_result_syntax in
+  let loc = Tezos_micheline.Micheline_parser.location_zero in
   let* l =
     List.map_es
       (fun key ->
@@ -898,9 +900,9 @@ let multisig_storage_string ~counter ~threshold ~keys () =
 
 let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
     Script.expr tzresult Lwt.t =
-  let loc = 0 in
   let open Tezos_micheline.Micheline in
   let open Lwt_result_syntax in
+  let loc = 0 in
   let* l =
     List.map_es
       (fun sig_opt ->
@@ -910,7 +912,7 @@ let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
             return @@ some ~loc (String (loc, Signature.to_b58check signature)))
       optional_signatures
   in
-  let* expr = Lwt.return @@ action_to_expr ~loc ~generic action in
+  let*? expr = action_to_expr ~loc ~generic action in
   return @@ strip_locations
   @@ pair ~loc (pair ~loc (int ~loc counter) expr) (Seq (loc, l))
 
@@ -935,7 +937,7 @@ let get_contract_address_maybe_chain_id ~descr ~loc ~chain_id contract =
 let multisig_bytes ~counter ~action ~contract ~chain_id ~descr () =
   let open Lwt_result_syntax in
   let loc = 0 in
-  let* expr = Lwt.return @@ action_to_expr ~loc ~generic:descr.generic action in
+  let*? expr = action_to_expr ~loc ~generic:descr.generic action in
   let triple =
     pair
       ~loc
@@ -1083,6 +1085,7 @@ let prepare_multisig_transaction (cctxt : #Protocol_client_context.full) ~chain
     }
 
 let check_multisig_signatures ~bytes ~threshold ~keys signatures =
+  let open Lwt_result_syntax in
   let key_array = Array.of_list keys in
   let nkeys = Array.length key_array in
   let opt_sigs_arr = Array.make nkeys None in
@@ -1092,7 +1095,6 @@ let check_multisig_signatures ~bytes ~threshold ~keys signatures =
       matching_key_found := true ;
       opt_sigs_arr.(i) <- Some signature)
   in
-  let open Lwt_result_syntax in
   let* () =
     List.iter_ep
       (fun signature ->

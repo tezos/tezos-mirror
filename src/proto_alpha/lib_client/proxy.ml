@@ -74,17 +74,16 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
 
   let do_rpc (pgi : Tezos_proxy.Proxy.proxy_getter_input)
       (key : Tezos_protocol_environment.Proxy_context.M.key) =
+    let open Lwt_result_syntax in
     let chain = pgi.chain in
     let block = pgi.block in
-    let open Lwt_syntax in
-    let* () =
+    let*! () =
       Tezos_proxy.Logger.emit
         Tezos_proxy.Logger.proxy_block_rpc
         ( Tezos_shell_services.Block_services.chain_to_string chain,
           Tezos_shell_services.Block_services.to_string block,
           key )
     in
-    let open Lwt_result_syntax in
     let* (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context) =
       Protocol_client_context.Alpha_block_services.Context.read
         pgi.rpc_context
@@ -92,12 +91,11 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
         ~block
         key
     in
-    let open Lwt_syntax in
-    let* () =
+    let*! () =
       Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
       @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
     in
-    Lwt_result_syntax.return raw_context
+    return raw_context
 end
 
 let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
@@ -160,8 +158,10 @@ let round_durations (rpc_context : Tezos_rpc.Context.generic)
   let rpc_context = new Protocol_client_context.wrap_rpc_context rpc_context in
   let* constants = Constants_services.all rpc_context (chain, block) in
   (* Return the duration of block 0 *)
-  return_some
-    (Alpha_context.Period.to_seconds constants.parametric.minimal_block_delay)
+  return
+  @@ Some
+       (Alpha_context.Period.to_seconds
+          constants.parametric.minimal_block_delay)
 
 let () =
   let open Tezos_proxy.Registration in

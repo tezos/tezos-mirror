@@ -44,14 +44,14 @@ let () =
     (fun c -> Contract_without_code c)
 
 let print_errors (cctxt : #Client_context.printer) errs =
-  let open Lwt_syntax in
-  let* () = cctxt#error "%a" Error_monad.pp_print_trace errs in
-  Lwt_result_syntax.return_unit
+  let open Lwt_result_syntax in
+  let*! () = cctxt#error "%a" Error_monad.pp_print_trace errs in
+  return_unit
 
 let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Script.expr) ~entrypoint =
-  let open Lwt_syntax in
-  let* ty_opt =
+  let open Lwt_result_syntax in
+  let*! ty_opt =
     Plugin.RPC.Scripts.entrypoint_type
       cctxt
       (chain, block)
@@ -59,17 +59,17 @@ let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
       ~entrypoint
   in
   match ty_opt with
-  | Ok ty -> Lwt_result_syntax.return_some ty
+  | Ok ty -> return_some ty
   | Error
       (Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _) :: _)
     ->
-      Lwt_result_syntax.return None
+      return_none
   | Error _ as err -> Lwt.return err
 
 let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     ~contract ~entrypoint ~normalize_types =
-  let open Lwt_syntax in
-  let* ty_opt =
+  let open Lwt_result_syntax in
+  let*! ty_opt =
     Alpha_services.Contract.entrypoint_type
       cctxt
       (chain, block)
@@ -78,17 +78,17 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
       ~normalize_types
   in
   match ty_opt with
-  | Ok ty -> Lwt_result_syntax.return_some ty
-  | Error (Tezos_rpc.Context.Not_found _ :: _) -> Lwt_result_syntax.return None
+  | Ok ty -> return_some ty
+  | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_none
   | Error _ as err -> Lwt.return err
 
 let print_entrypoint_type (cctxt : #Client_context.printer)
     ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name ~entrypoint
     =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   function
   | Ok (Some ty) ->
-      let* () =
+      let*! () =
         if emacs then
           cctxt#message
             "@[<v 2>((entrypoint . %a) (type . %a))@]@."
@@ -104,9 +104,9 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
             Michelson_v1_printer.print_expr
             ty
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Ok None ->
-      let* () =
+      let*! () =
         cctxt#message
           "@[<v 2>No entrypoint named %a%a%a@]@."
           Entrypoint.pp
@@ -118,7 +118,7 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
                Format.fprintf ppf " for script %s"))
           script_name
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Error errs -> on_errors errs
 
 let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
@@ -130,11 +130,11 @@ let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
     ~normalize_types
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =
+  let open Lwt_result_syntax in
   let normalize_types =
     (* no need to normalize types as typed entrypoints are ignored *)
     false
   in
-  let open Lwt_result_syntax in
   let* unreachables, _types_entrypoints =
     list_contract_unreachables_and_entrypoints
       cctxt
@@ -155,9 +155,8 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
       ~contract
       ~normalize_types
   in
-  let open Lwt_syntax in
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
-    let* ty_opt =
+    let*! ty_opt =
       contract_entrypoint_type
         cctxt
         ~chain
@@ -167,10 +166,10 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
         ~normalize_types
     in
     match ty_opt with
-    | Ok (Some ty) -> Lwt_result_syntax.return (("default", ty) :: entrypoints)
-    | Ok None -> Lwt_result_syntax.return entrypoints
+    | Ok (Some ty) -> return (("default", ty) :: entrypoints)
+    | Ok None -> return entrypoints
     | Error _ as err -> Lwt.return err
-  else Lwt_result_syntax.return entrypoints
+  else return entrypoints
 
 let list_unreachables cctxt ~chain ~block (program : Script.expr) =
   let open Lwt_result_syntax in
@@ -184,9 +183,8 @@ let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
   let* _, entrypoints =
     Plugin.RPC.Scripts.list_entrypoints cctxt (chain, block) ~script:program
   in
-  let open Lwt_syntax in
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
-    let* ty_opt =
+    let*! ty_opt =
       script_entrypoint_type
         cctxt
         ~chain
@@ -195,16 +193,17 @@ let list_entrypoints cctxt ~chain ~block (program : Script.expr) =
         ~entrypoint:Entrypoint.default
     in
     match ty_opt with
-    | Ok (Some ty) -> Lwt_result_syntax.return (("default", ty) :: entrypoints)
-    | Ok None -> Lwt_result_syntax.return entrypoints
+    | Ok (Some ty) -> return (("default", ty) :: entrypoints)
+    | Ok None -> return entrypoints
     | Error _ as err -> Lwt.return err
-  else Lwt_result_syntax.return entrypoints
+  else return entrypoints
 
 let print_entrypoints_list (cctxt : #Client_context.printer)
-    ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
+    ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name =
+  let open Lwt_result_syntax in
+  function
   | Ok entrypoint_list ->
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         if emacs then
           cctxt#message
             "@[<v 2>(@[%a@])@."
@@ -238,14 +237,15 @@ let print_entrypoints_list (cctxt : #Client_context.printer)
                    ty))
             entrypoint_list
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Error errs -> on_errors errs
 
 let print_unreachables (cctxt : #Client_context.printer)
-    ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name = function
+    ?(on_errors = print_errors cctxt) ~emacs ?contract ?script_name =
+  let open Lwt_result_syntax in
+  function
   | Ok unreachable ->
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         if emacs then
           cctxt#message
             "@[<v 2>(@[%a@])@."
@@ -283,5 +283,5 @@ let print_unreachables (cctxt : #Client_context.printer)
                             @@ Michelson_v1_primitives.string_of_prim prim))))
                 unreachable
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Error errs -> on_errors errs

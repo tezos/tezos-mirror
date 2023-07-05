@@ -66,7 +66,7 @@ let%expect_test "join" =
 
 let get ~when_unknown = function
   | None -> error_with "Limit.get: %s" when_unknown
-  | Some x -> ok x
+  | Some x -> Ok x
 
 let%expect_test "get" =
   let pp_print_err fmt = function

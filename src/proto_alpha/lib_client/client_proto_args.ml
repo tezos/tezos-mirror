@@ -189,9 +189,8 @@ let json_parameter =
   Tezos_clic.map_parameter ~f:content_of_file_or_text json_with_origin_parameter
 
 let data_parameter =
-  let open Lwt_syntax in
   let from_text (_cctxt : #Client_context.full) input =
-    return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+    Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
   file_or_text_parameter ~from_text ()

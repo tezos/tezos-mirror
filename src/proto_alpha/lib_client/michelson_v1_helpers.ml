@@ -50,11 +50,11 @@ let unit ~loc = Prim (loc, D_Unit, [], [])
 
 let lambda_from_string code =
   let open Result_syntax in
-  let+ parsed =
+  let* parsed =
     Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression code
   in
-  root Michelson_v1_parser.(parsed.expanded)
+  return @@ root Michelson_v1_parser.(parsed.expanded)
 
 let lambda_t ~loc param res = Prim (loc, T_lambda, [param; res], [])
 

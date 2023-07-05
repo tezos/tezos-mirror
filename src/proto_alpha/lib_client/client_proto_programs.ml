@@ -53,8 +53,8 @@ end)
 
 let print_errors ?parsed (cctxt : #Protocol_client_context.full) errs
     ~show_source =
-  let open Lwt_syntax in
-  let* errs =
+  let open Lwt_result_syntax in
+  let*! errs =
     Michelson_v1_error_reporter.enrich_runtime_errors
       cctxt
       ~chain:cctxt#chain
@@ -62,7 +62,7 @@ let print_errors ?parsed (cctxt : #Protocol_client_context.full) errs
       ~parsed
       errs
   in
-  let* () =
+  let*! () =
     cctxt#warning
       "%a"
       (Michelson_v1_error_reporter.report_errors
@@ -71,21 +71,22 @@ let print_errors ?parsed (cctxt : #Protocol_client_context.full) errs
          ~show_source)
       errs
   in
-  let* () = cctxt#error "error running script" in
-  Lwt_result_syntax.return_unit
+  let*! () = cctxt#error "error running script" in
+  return_unit
 
-let print_view_result (cctxt : #Protocol_client_context.full) = function
+let print_view_result (cctxt : #Protocol_client_context.full) =
+  let open Lwt_result_syntax in
+  function
   | Ok expr ->
-      let open Lwt_syntax in
-      let* () = cctxt#message "%a" print_expr expr in
-      Lwt_result_syntax.return_unit
+      let*! () = cctxt#message "%a" print_expr expr in
+      return_unit
   | Error errs -> print_errors cctxt ~show_source:false errs
 
 let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
+  let open Lwt_result_syntax in
   function
   | Ok (storage, operations, maybe_lazy_storage_diff) ->
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         cctxt#message
           "@[<v 0>@[<v 2>storage@,\
            %a@]@,\
@@ -102,14 +103,14 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
             | Some diff -> print_big_map_diff ppf diff)
           maybe_lazy_storage_diff
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
 let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
+  let open Lwt_result_syntax in
   function
   | Ok (storage, operations, trace, maybe_lazy_storage_diff) ->
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         cctxt#message
           "@[<v 0>@[<v 2>storage@,\
            %a@]@,\
@@ -130,7 +131,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
           print_execution_trace
           trace
       in
-      Lwt_result_syntax.return_unit
+      return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
 
 type simulation_params = {
@@ -319,7 +320,7 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
 
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error
     ~display_names ~name program res (cctxt : #Client_context.printer) =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   if emacs then
     let type_map, errs, _gas =
       match res with
@@ -331,7 +332,7 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
           (type_map, errs, None)
       | Error errs -> ([], errs, None)
     in
-    let* () =
+    let*! () =
       cctxt#message
         "(@[<v 0>(types . %a)@ (errors . %a)@])"
         Michelson_v1_emacs.print_type_map
@@ -339,12 +340,12 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
         Michelson_v1_emacs.report_errors
         (program, errs)
     in
-    Lwt_result_syntax.return_unit
+    return_unit
   else
     match res with
     | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
-        let* () =
+        let*! () =
           cctxt#message
             "@[Well typed (Gas remaining: %a)\t%t@]"
             Gas.pp
@@ -352,11 +353,11 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
             (fun fmt -> if display_names then Format.pp_print_string fmt name)
         in
         if show_types then
-          let* () = cctxt#message "%a" Micheline_printer.print_expr program in
-          Lwt_result_syntax.return_unit
-        else Lwt_result_syntax.return_unit
+          let*! () = cctxt#message "%a" Micheline_printer.print_expr program in
+          return_unit
+        else return_unit
     | Error errs ->
-        let* () =
+        let*! () =
           cctxt#warning
             "%a"
             (Michelson_v1_error_reporter.report_errors

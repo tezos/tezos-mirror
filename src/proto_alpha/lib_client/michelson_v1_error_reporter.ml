@@ -142,15 +142,17 @@ type error +=
   | Rich_runtime_contract_error of Contract_hash.t * Michelson_v1_parser.parsed
 
 let enrich_runtime_errors cctxt ~chain ~block ~parsed =
+  let open Lwt_result_syntax in
   List.map_s (function
       | Environment.Ecoproto_error (Runtime_contract_error contract) -> (
           (* If we know the script already, we don't fetch it *)
           match parsed with
           | Some parsed ->
-              Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
+              Lwt.return (Rich_runtime_contract_error (contract, parsed))
           | None -> (
-              let open Lwt_syntax in
-              let+ script_opt = fetch_script cctxt ~chain ~block contract in
+              let*! script_opt = fetch_script cctxt ~chain ~block contract in
+              Lwt.return
+              @@
               match script_opt with
               | Ok script ->
                   let parsed = Michelson_v1_printer.unparse_toplevel script in

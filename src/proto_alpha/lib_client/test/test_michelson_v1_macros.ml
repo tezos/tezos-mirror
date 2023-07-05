@@ -57,7 +57,7 @@ let assert_expands
         ~pp
         (Michelson_v1_primitives.strings_of_prims expansion)
         (Micheline.strip_locations expanded) ;
-      ok ()
+      Ok ()
   | errors -> Error errors
 
 (****************************************************************************)
@@ -722,7 +722,7 @@ let assert_unexpansion original ex =
         ~pp
         unparse.Michelson_v1_parser.unexpanded
         (Micheline.strip_locations ex) ;
-      ok ()
+      Ok ()
   | _ :: _ -> Error errors
 
 (** Unexpanding "UNIT; FAILWITH"
@@ -931,9 +931,9 @@ let test_unexpand_duup () =
    Unexpanding "CDR; CAR" yields "CDAR"
 *)
 let test_unexpand_caddadr () =
+  let open Result_syntax in
   let car = Prim (zero_loc, "CAR", [], []) in
   let cdr = Prim (zero_loc, "CDR", [], []) in
-  let open Result_syntax in
   let* () = assert_unexpansion (Seq (zero_loc, [car])) car in
   let* () = assert_unexpansion (Seq (zero_loc, [cdr])) cdr in
   let* () =
@@ -1358,11 +1358,11 @@ let tests =
   ]
 
 let wrap (n, f) =
-  let open Lwt_syntax in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      let* result = f () in
-      match result with
-      | Ok () -> Lwt.return_unit
+      let open Lwt_syntax in
+      let* res = f () in
+      match res with
+      | Ok () -> return_unit
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 

@@ -86,8 +86,7 @@ let parse code =
   let open Lwt_result_syntax in
   let parsed_exp = Michelson_v1_parser.parse_expression code in
   let*? {expanded; _} = Micheline_parser.no_parsing_error parsed_exp in
-  let la = Script.lazy_expr expanded in
-  return la
+  return (Script.lazy_expr expanded)
 
 let build_lambda_for_set_delegate ~delegate =
   match delegate with
@@ -110,7 +109,6 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     (delegate : Signature.public_key_hash option) =
   let open Lwt_result_syntax in
   let entrypoint = entrypoint_do in
-  let open Lwt_result_syntax in
   let* expr_opt =
     Michelson_v1_entrypoints.contract_entrypoint_type
       cctxt

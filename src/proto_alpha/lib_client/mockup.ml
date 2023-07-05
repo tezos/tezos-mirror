@@ -122,13 +122,12 @@ module Parsed_account = struct
     let parsed_account_reprs = ref [] in
     let errors = ref [] in
     let* all_keys = Client_keys.list_keys wallet in
-    let open Lwt_syntax in
-    let* () =
+    let*! () =
       List.iter_s
         (function
           | name, pkh, _pk_opt, Some sk_uri -> (
               let contract = Contract.Implicit pkh in
-              let* tz_balance =
+              let*! tz_balance =
                 Client_proto_context.get_balance
                   rpc_context
                   ~chain:cctxt#chain
@@ -159,7 +158,7 @@ module Parsed_account = struct
             (Data_encoding.list encoding)
             !parsed_account_reprs
         in
-        Lwt_result_syntax.return @@ Data_encoding.Json.to_string json
+        return @@ Data_encoding.Json.to_string json
     | errs -> Lwt.return_error @@ List.concat errs
 end
 
@@ -299,6 +298,7 @@ let attestation_branch_data_encoding =
 let initial_context chain_id (header : Block_header.shell_header)
     ({bootstrap_accounts; bootstrap_contracts; constants; _} :
       Protocol_parameters.t) =
+  let open Lwt_result_syntax in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -310,19 +310,16 @@ let initial_context chain_id (header : Block_header.shell_header)
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  let open Lwt_syntax in
-  let* ctxt =
+  let*! ctxt =
     Tezos_protocol_environment.Context.(
       let empty = Tezos_protocol_environment.Memory_context.empty in
-      let* ctxt = add empty ["version"] (Bytes.of_string "genesis") in
+      let*! ctxt = add empty ["version"] (Bytes.of_string "genesis") in
       add ctxt ["protocol_parameters"] proto_params)
   in
-  let* ctxt = Environment.Updater.activate ctxt Protocol.hash in
-  let open Lwt_result_syntax in
+  let*! ctxt = Environment.Updater.activate ctxt Protocol.hash in
   let* {context; _} =
-    let open Lwt_syntax in
-    let+ r = Protocol.Main.init chain_id ctxt header in
-    Environment.wrap_tzresult r
+    let*! r = Protocol.Main.init chain_id ctxt header in
+    Lwt.return (Environment.wrap_tzresult r)
   in
   let ({
          timestamp = predecessor_timestamp;
@@ -345,8 +342,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     Tezos_base.Block_header.hash {shell = header; protocol_data = Bytes.empty}
   in
   let* value_of_key =
-    let open Lwt_syntax in
-    let+ r =
+    let*! r =
       Protocol.Main.value_of_key
         ~chain_id
         ~predecessor_context:context
@@ -356,7 +352,7 @@ let initial_context chain_id (header : Block_header.shell_header)
         ~predecessor
         ~timestamp
     in
-    Environment.wrap_tzresult r
+    Lwt.return (Environment.wrap_tzresult r)
   in
   (*
       In the mockup mode, reactivity is important and there are
@@ -370,9 +366,8 @@ let initial_context chain_id (header : Block_header.shell_header)
       context
       `Lazy
       (fun key ->
-        let open Lwt_syntax in
-        let+ r = value_of_key key in
-        Environment.wrap_tzresult r)
+        let*! r = value_of_key key in
+        Lwt.return (Environment.wrap_tzresult r))
   in
   return context
 
@@ -382,242 +377,238 @@ let mem_init :
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
     Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
- fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let open Lwt_result_syntax in
-  let hash = genesis_block_hash in
-  (* Need to read this Json file before since timestamp modification may be in
-     there *)
-  let override_protocol_parameters
-      (constants_overrides_json : Data_encoding.json option)
-      (parameters : Protocol_parameters.t) :
-      Protocol_constants_overrides.t tzresult Lwt.t =
-    (* [merge_objects v1 v2] recursively overrides [v1] with [v2], and
-       point-wise if [v1] and [v2] are objects.
+  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
+    let hash = genesis_block_hash in
+    (* Need to read this Json file before since timestamp modification may be in
+       there *)
+    let override_protocol_parameters
+        (constants_overrides_json : Data_encoding.json option)
+        (parameters : Protocol_parameters.t) :
+        Protocol_constants_overrides.t tzresult Lwt.t =
+      (* [merge_objects v1 v2] recursively overrides [v1] with [v2], and
+         point-wise if [v1] and [v2] are objects.
 
-       If [v1] and [v2] are objects, then the resulting value is an object where
-         - each field that is only present in either v1 and v2 is copied as is.
-           however, if the value in [v2] is explicitly [Some `Null], then the field is
-           absent in the result.
-         - if a field is present in both [v1] and [v2], then its value in the
-           result is merge recursively. *)
-    let rec merge_objects (v1 : Data_encoding.Json.t)
-        (v2 : Data_encoding.Json.t) : Data_encoding.Json.t =
-      match (v1, v2) with
-      | `O fs1, `O fs2 ->
-          let fields =
-            let tbl = String.Hashtbl.of_seq (List.to_seq fs1) in
-            List.iter
-              (fun (k2, v2) ->
-                match (String.Hashtbl.find_opt tbl k2, v2) with
-                | _, `Null -> String.Hashtbl.remove tbl k2
-                | Some v1, v2 ->
-                    String.Hashtbl.replace tbl k2 (merge_objects v1 v2)
-                | None, v2 -> String.Hashtbl.add tbl k2 v2)
-              fs2 ;
-            List.of_seq (String.Hashtbl.to_seq tbl)
+         If [v1] and [v2] are objects, then the resulting value is an object where
+           - each field that is only present in either v1 and v2 is copied as is.
+             however, if the value in [v2] is explicitly [Some `Null], then the field is
+             absent in the result.
+           - if a field is present in both [v1] and [v2], then its value in the
+             result is merge recursively. *)
+      let rec merge_objects (v1 : Data_encoding.Json.t)
+          (v2 : Data_encoding.Json.t) : Data_encoding.Json.t =
+        match (v1, v2) with
+        | `O fs1, `O fs2 ->
+            let fields =
+              let tbl = String.Hashtbl.of_seq (List.to_seq fs1) in
+              List.iter
+                (fun (k2, v2) ->
+                  match (String.Hashtbl.find_opt tbl k2, v2) with
+                  | _, `Null -> String.Hashtbl.remove tbl k2
+                  | Some v1, v2 ->
+                      String.Hashtbl.replace tbl k2 (merge_objects v1 v2)
+                  | None, v2 -> String.Hashtbl.add tbl k2 v2)
+                fs2 ;
+              List.of_seq (String.Hashtbl.to_seq tbl)
+            in
+            `O fields
+        | _, v2 -> v2
+      in
+      match constants_overrides_json with
+      | Some json ->
+          let parameters_json =
+            Data_encoding.Json.construct
+              Constants.Parametric.encoding
+              parameters.constants
           in
-          `O fields
-      | _, v2 -> v2
+          let parameters_overriden = merge_objects parameters_json json in
+          let* protocol_overrides =
+            match
+              Data_encoding.Json.destruct
+                lib_parameters_json_encoding
+                parameters_overriden
+            with
+            | _, x -> return x
+            | exception error ->
+                failwith
+                  "cannot read protocol constants overrides: %a"
+                  (Data_encoding.Json.print_error ?print_unknown:None)
+                  error
+          in
+          let fields_with_override = match json with `O fs -> fs | _ -> [] in
+          let field_pp ppf (name, value) =
+            Format.fprintf ppf "@[<h>%s: %a@]" name Data_encoding.Json.pp value
+          in
+          let*! () =
+            if fields_with_override <> [] then
+              cctxt#message
+                "@[<v>mockup client uses protocol overrides:@,%a@]@?"
+                (Format.pp_print_list field_pp)
+                fields_with_override
+            else Lwt.return_unit
+          in
+          return protocol_overrides
+      | None ->
+          return
+            Protocol_constants_overrides.
+              {
+                parametric = parameters.constants;
+                timestamp = None;
+                chain_id = None;
+              }
     in
-    match constants_overrides_json with
-    | Some json ->
-        let parameters_json =
-          Data_encoding.Json.construct
-            Constants.Parametric.encoding
-            parameters.constants
-        in
-        let parameters_overriden = merge_objects parameters_json json in
-        let* protocol_overrides =
+    let* (protocol_overrides : Protocol_constants_overrides.t) =
+      override_protocol_parameters constants_overrides_json parameters
+    in
+    let chain_id =
+      Tezos_mockup_registration.Mockup_args.Chain_id.choose
+        ~from_config_file:protocol_overrides.chain_id
+    in
+    let default = parameters.initial_timestamp in
+    let timestamp = Option.value ~default protocol_overrides.timestamp in
+    let*! () =
+      if not @@ Time.Protocol.equal default timestamp then
+        cctxt#message
+          "@[<h>initial_timestamp: %a@]"
+          Time.Protocol.pp_hum
+          timestamp
+      else Lwt.return_unit
+    in
+    let fitness =
+      Protocol.Alpha_context.(
+        Fitness.create_without_locked_round
+          ~level:Raw_level.root
+          ~predecessor_round:Round.zero
+          ~round:Round.zero
+        |> Fitness.to_raw)
+    in
+    let shell_header =
+      Forge.make_shell
+        ~level:0l
+        ~predecessor:hash
+        ~timestamp
+        ~fitness
+        ~operations_hash:Operation_list_list_hash.zero
+    in
+    let* bootstrap_accounts_custom =
+      match bootstrap_accounts_json with
+      | None -> return_none
+      | Some json -> (
           match
             Data_encoding.Json.destruct
-              lib_parameters_json_encoding
-              parameters_overriden
+              (Data_encoding.list Parsed_account.encoding)
+              json
           with
-          | _, x -> return x
+          | accounts ->
+              let*! () =
+                cctxt#message
+                  "@[<h>mockup client uses custom bootstrap accounts:@]"
+              in
+              let open Format in
+              let*! () =
+                cctxt#message
+                  "@[%a@]"
+                  (pp_print_list
+                     ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+                     Parsed_account.pp)
+                  accounts
+              in
+              let* bootstrap_accounts =
+                List.map_es Parsed_account.to_bootstrap_account accounts
+              in
+              return_some bootstrap_accounts
           | exception error ->
               failwith
-                "cannot read protocol constants overrides: %a"
+                "cannot read definitions of bootstrap accounts: %a"
                 (Data_encoding.Json.print_error ?print_unknown:None)
-                error
-        in
-        let fields_with_override = match json with `O fs -> fs | _ -> [] in
-        let field_pp ppf (name, value) =
-          Format.fprintf ppf "@[<h>%s: %a@]" name Data_encoding.Json.pp value
-        in
-        let open Lwt_syntax in
-        let* () =
-          if fields_with_override <> [] then
-            cctxt#message
-              "@[<v>mockup client uses protocol overrides:@,%a@]@?"
-              (Format.pp_print_list field_pp)
-              fields_with_override
-          else Lwt.return_unit
-        in
-        Lwt_result_syntax.return protocol_overrides
-    | None ->
-        return
-          Protocol_constants_overrides.
+                error)
+    in
+    let* context =
+      initial_context
+        chain_id
+        shell_header
+        {
+          parameters with
+          bootstrap_accounts =
+            Option.value
+              ~default:parameters.bootstrap_accounts
+              bootstrap_accounts_custom;
+          constants = protocol_overrides.parametric;
+        }
+    in
+    let protocol_data =
+      let payload_hash =
+        Protocol.Block_payload_hash.hash_bytes
+          [
+            Block_hash.to_bytes hash;
+            Operation_list_hash.(to_bytes @@ compute []);
+          ]
+      in
+      let open Protocol.Alpha_context.Block_header in
+      let _, _, sk = Signature.generate_key () in
+      let proof_of_work_nonce =
+        Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
+      in
+      let contents =
+        {
+          payload_round = Round.zero;
+          payload_hash;
+          seed_nonce_hash = None;
+          proof_of_work_nonce;
+          (* following Baking_configuration.per_block_votes in lib_delegate *)
+          per_block_votes =
             {
-              parametric = parameters.constants;
-              timestamp = None;
-              chain_id = None;
-            }
-  in
-  let* (protocol_overrides : Protocol_constants_overrides.t) =
-    override_protocol_parameters constants_overrides_json parameters
-  in
-  let chain_id =
-    Tezos_mockup_registration.Mockup_args.Chain_id.choose
-      ~from_config_file:protocol_overrides.chain_id
-  in
-  let default = parameters.initial_timestamp in
-  let timestamp = Option.value ~default protocol_overrides.timestamp in
-  let open Lwt_syntax in
-  let* () =
-    if not @@ Time.Protocol.equal default timestamp then
-      cctxt#message
-        "@[<h>initial_timestamp: %a@]"
-        Time.Protocol.pp_hum
-        timestamp
-    else Lwt.return_unit
-  in
-  let fitness =
-    Protocol.Alpha_context.(
-      Fitness.create_without_locked_round
-        ~level:Raw_level.root
-        ~predecessor_round:Round.zero
-        ~round:Round.zero
-      |> Fitness.to_raw)
-  in
-  let shell_header =
-    Forge.make_shell
-      ~level:0l
-      ~predecessor:hash
-      ~timestamp
-      ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
-  in
-  let open Lwt_result_syntax in
-  let* bootstrap_accounts_custom =
-    match bootstrap_accounts_json with
-    | None -> return None
-    | Some json -> (
-        match
-          Data_encoding.Json.destruct
-            (Data_encoding.list Parsed_account.encoding)
-            json
-        with
-        | accounts ->
-            let open Lwt_syntax in
-            let* () =
-              cctxt#message
-                "@[<h>mockup client uses custom bootstrap accounts:@]"
-            in
-            let open Format in
-            let* () =
-              cctxt#message
-                "@[%a@]"
-                (pp_print_list
-                   ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
-                   Parsed_account.pp)
-                accounts
-            in
-            let open Lwt_result_syntax in
-            let* bootstrap_accounts =
-              List.map_es Parsed_account.to_bootstrap_account accounts
-            in
-            return (Some bootstrap_accounts)
-        | exception error ->
-            failwith
-              "cannot read definitions of bootstrap accounts: %a"
-              (Data_encoding.Json.print_error ?print_unknown:None)
-              error)
-  in
-  let* context =
-    initial_context
-      chain_id
-      shell_header
-      {
-        parameters with
-        bootstrap_accounts =
-          Option.value
-            ~default:parameters.bootstrap_accounts
-            bootstrap_accounts_custom;
-        constants = protocol_overrides.parametric;
-      }
-  in
-  let protocol_data =
-    let payload_hash =
-      Protocol.Block_payload_hash.hash_bytes
-        [Block_hash.to_bytes hash; Operation_list_hash.(to_bytes @@ compute [])]
-    in
-    let open Protocol.Alpha_context.Block_header in
-    let _, _, sk = Signature.generate_key () in
-    let proof_of_work_nonce =
-      Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
-    in
-    let contents =
-      {
-        payload_round = Round.zero;
-        payload_hash;
-        seed_nonce_hash = None;
-        proof_of_work_nonce;
-        (* following Baking_configuration.per_block_votes in lib_delegate *)
-        per_block_votes =
-          {
-            liquidity_baking_vote = Per_block_votes.Per_block_vote_pass;
-            adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass;
-          };
-      }
-    in
-    let unsigned_bytes =
+              liquidity_baking_vote = Per_block_votes.Per_block_vote_pass;
+              adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass;
+            };
+        }
+      in
+      let unsigned_bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Block_header.unsigned_encoding
+          (shell_header, contents)
+      in
+      let signature =
+        Signature.sign
+          ~watermark:
+            Protocol.Alpha_context.Block_header.(
+              to_watermark (Block_header chain_id))
+          sk
+          unsigned_bytes
+      in
       Data_encoding.Binary.to_bytes_exn
-        Block_header.unsigned_encoding
-        (shell_header, contents)
+        Protocol.block_header_data_encoding
+        {contents; signature}
     in
-    let signature =
-      Signature.sign
-        ~watermark:
-          Protocol.Alpha_context.Block_header.(
-            to_watermark (Block_header chain_id))
-        sk
-        unsigned_bytes
-    in
-    Data_encoding.Binary.to_bytes_exn
-      Protocol.block_header_data_encoding
-      {contents; signature}
-  in
-  return
-    Tezos_mockup_registration.Registration_intf.
-      {
-        chain = chain_id;
-        rpc_context =
-          Tezos_protocol_environment.
-            {block_hash = hash; block_header = shell_header; context};
-        protocol_data;
-      }
+    return
+      Tezos_mockup_registration.Registration_intf.
+        {
+          chain = chain_id;
+          rpc_context =
+            Tezos_protocol_environment.
+              {block_hash = hash; block_header = shell_header; context};
+          protocol_data;
+        }
 
 let migrate :
     Tezos_mockup_registration.Registration.mockup_context ->
     Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
- fun {chain; rpc_context; protocol_data} ->
-  let Tezos_protocol_environment.{block_hash; context; block_header} =
-    rpc_context
-  in
-  let open Lwt_syntax in
-  let* context = Environment.Updater.activate context Protocol.hash in
   let open Lwt_result_syntax in
-  let* {context; _} =
-    let open Lwt_syntax in
-    let+ r = Protocol.Main.init chain context block_header in
-    Environment.wrap_tzresult r
-  in
-  let rpc_context =
-    Tezos_protocol_environment.{block_hash; block_header; context}
-  in
-  return
-    Tezos_mockup_registration.Registration_intf.
-      {chain; rpc_context; protocol_data}
+  fun {chain; rpc_context; protocol_data} ->
+    let Tezos_protocol_environment.{block_hash; context; block_header} =
+      rpc_context
+    in
+    let*! context = Environment.Updater.activate context Protocol.hash in
+    let* {context; _} =
+      let*! r = Protocol.Main.init chain context block_header in
+      Lwt.return (Environment.wrap_tzresult r)
+    in
+    let rpc_context =
+      Tezos_protocol_environment.{block_hash; block_header; context}
+    in
+    return
+      Tezos_mockup_registration.Registration_intf.
+        {chain; rpc_context; protocol_data}
 
 (* ------------------------------------------------------------------------- *)
 (* Register mockup *)

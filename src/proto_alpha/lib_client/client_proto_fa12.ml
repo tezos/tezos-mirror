@@ -511,23 +511,25 @@ let action_to_expr ~loc action =
       let input = view_input ~loc action in
       pair ~loc input (callback ~loc ?entrypoint cb)
 
-let parse_address error = function
+let parse_address error =
+  let open Result_syntax in
+  function
   | Micheline.Bytes (_, b) ->
-      ok @@ Data_encoding.Binary.of_bytes_exn Contract.encoding b
+      return @@ Data_encoding.Binary.of_bytes_exn Contract.encoding b
   | String (_, s) -> (
-      match Contract.of_b58check s with Ok c -> ok c | Error _ -> error ())
+      match Contract.of_b58check s with Ok c -> return c | Error _ -> error ())
   | _ -> error ()
 
 let parse_callback error expr =
   let of_b58_check (c, entrypoint) =
     match Contract.of_b58check c with
-    | Ok c -> ok (c, entrypoint)
+    | Ok c -> Ok (c, entrypoint)
     | Error _ -> error ()
   in
   match expr with
   | Micheline.Bytes (_, b) -> (
       match Data_encoding.Binary.of_bytes callback_encoding b with
-      | Ok (c, entrypoint) -> ok (c, entrypoint)
+      | Ok (c, entrypoint) -> Ok (c, entrypoint)
       | Error _ -> error ())
   | String (_, s) -> (
       match String.index_opt s '%' with
@@ -541,11 +543,12 @@ let parse_callback error expr =
   | _ -> error ()
 
 let action_of_expr ~entrypoint expr =
+  let open Result_syntax in
   let open Micheline in
   let error () =
-    error (Action_unwrapping_error (entrypoint, Micheline.strip_locations expr))
+    tzfail
+      (Action_unwrapping_error (entrypoint, Micheline.strip_locations expr))
   in
-  let open Result_syntax in
   match (entrypoint, expr) with
   (* Transfer operation before comb pairs. *)
   | ( "transfer",
@@ -641,7 +644,9 @@ let find_entrypoint_in_annot error annots expr =
   | None -> error ()
 
 let derive_action expr t_param =
-  let error () = error (Not_an_entrypoint (Micheline.strip_locations expr)) in
+  let error () =
+    Result_syntax.tzfail (Not_an_entrypoint (Micheline.strip_locations expr))
+  in
   let rec derive expr t_param =
     match (expr, t_param) with
     | ( Micheline.Prim (_, Script.D_Left, [left], _),
@@ -656,7 +661,9 @@ let derive_action expr t_param =
   in
   derive expr t_param
 
-let extract_parameter contract = function
+let extract_parameter contract =
+  let open Result_syntax in
+  function
   | Micheline.Seq (_, l) -> (
       List.filter_map
         (function
@@ -664,9 +671,9 @@ let extract_parameter contract = function
           | _ -> None)
         l
       |> function
-      | param :: _ -> ok param
-      | _ -> error (Contract_has_no_script contract))
-  | _ -> error (Contract_has_no_script contract)
+      | param :: _ -> return param
+      | _ -> tzfail (Contract_has_no_script contract))
+  | _ -> tzfail (Contract_has_no_script contract)
 
 let get_contract_parameter cctxt ~chain ~block contract =
   let open Lwt_result_syntax in
@@ -693,14 +700,15 @@ let convert_wrapped_parameter_into_action cctxt ~chain ~block contract param =
   Lwt.return (derive_action param parameter)
 
 let check_entrypoint entrypoints (name, (expected_ty, check)) =
+  let open Result_syntax in
   match List.assoc_opt ~equal:String.equal name entrypoints with
-  | None -> error (Entrypoint_mismatch (name, None))
+  | None -> tzfail (Entrypoint_mismatch (name, None))
   | Some ty ->
       if not (check (Micheline.root ty)) then
-        error
+        tzfail
           (Entrypoint_mismatch
              (name, Some (ty, Micheline.strip_locations expected_ty)))
-      else Ok ()
+      else return_unit
 
 let action_to_entrypoint =
   let transfer = Entrypoint.of_string_strict_exn "transfer" in
@@ -732,8 +740,10 @@ let contract_has_fa12_interface :
         ~contract
         ~normalize_types:true
     in
-    List.iter_e (check_entrypoint entrypoints) standard_entrypoints
-    |> Lwt.return
+    let*? () =
+      List.iter_e (check_entrypoint entrypoints) standard_entrypoints
+    in
+    return_unit
 
 let translate_action_to_argument action =
   let entrypoint = action_to_entrypoint action in
@@ -778,8 +788,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
   let open Lwt_result_syntax in
   let* () = contract_has_fa12_interface cctxt ~chain ~block ~contract () in
   let entrypoint, parameters = translate_action_to_argument action in
-  let open Lwt_syntax in
-  let* result =
+  let*! result =
     Client_proto_context.transfer_with_script
       cctxt
       ~chain
@@ -803,7 +812,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
       ()
   in
   match result with
-  | Ok res -> Lwt_result_syntax.return res
+  | Ok res -> return res
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)
@@ -865,7 +874,7 @@ let token_transfer_encoding =
 
 let tez_of_string_exn index field s =
   match Tez.of_string s with
-  | Some t -> ok t
+  | Some t -> Ok t
   | None ->
       error_with
         "Invalid %s notation at entry %i, field \"%s\": %s"
@@ -950,8 +959,7 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
   let (Manager_list contents) =
     Annotated_manager_operation.manager_of_list contents
   in
-  let open Lwt_syntax in
-  let* result =
+  let*! result =
     Injection.inject_manager_operation
       cctxt
       ~chain
@@ -970,7 +978,7 @@ let inject_token_transfer_batch (cctxt : #Protocol_client_context.full) ~chain
       contents
   in
   match result with
-  | Ok _ -> Lwt_result_syntax.return ()
+  | Ok _ -> return_unit
   | Error trace -> (
       match extract_error trace with
       | None -> Lwt.return (Error trace)
@@ -980,7 +988,7 @@ let is_viewable_action action =
   let open Lwt_result_syntax in
   match action with
   | Get_balance (_, _) | Get_allowance (_, _, _) | Get_total_supply _ ->
-      return ()
+      return_unit
   | _ -> tzfail (Not_a_viewable_entrypoint (action_to_entrypoint action))
 
 let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block

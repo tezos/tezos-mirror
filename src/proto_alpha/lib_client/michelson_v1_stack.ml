@@ -87,8 +87,8 @@ let parse_expression ~source (node : Micheline_parser.node) :
     Script.expr tzresult =
   let open Result_syntax in
   let parsing_result = Michelson_v1_parser.expand_all ~source ~original:node in
-  let+ parsed = Micheline_parser.no_parsing_error parsing_result in
-  parsed.expanded
+  let* parsed = Micheline_parser.no_parsing_error parsing_result in
+  return parsed.expanded
 
 let printable node =
   Micheline_printer.printable Fun.id (Micheline.strip_locations node)
@@ -98,12 +98,12 @@ let parse_stack_item ~source =
   function
   | Micheline.Prim (_loc, "Stack_elt", [ty; v], _annot) ->
       let* ty = parse_expression ~source ty in
-      let+ v = parse_expression ~source v in
-      (ty, v)
-  | e -> error (Wrong_stack_item (Micheline.location e, printable e))
+      let* v = parse_expression ~source v in
+      return (ty, v)
+  | e -> tzfail (Wrong_stack_item (Micheline.location e, printable e))
 
 let parse_stack ~source = function
   | Micheline.Seq (loc, l) as e ->
       record_trace (Wrong_stack (loc, printable e))
       @@ List.map_e (parse_stack_item ~source) l
-  | e -> error (Wrong_stack (Micheline.location e, printable e))
+  | e -> Result_syntax.tzfail (Wrong_stack (Micheline.location e, printable e))
