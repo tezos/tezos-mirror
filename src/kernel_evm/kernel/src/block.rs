@@ -209,9 +209,12 @@ mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
     use crate::inbox::{Transaction, TransactionContent::Ethereum};
-    use crate::indexable_storage::internal_for_tests::length;
+    use crate::indexable_storage::internal_for_tests::{get_value, length};
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
+    };
+    use crate::storage::{
+        init_account_index, init_blocks_index, init_transaction_hashes_index,
     };
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, H256};
@@ -732,5 +735,70 @@ mod tests {
             indexed_accounts, indexed_accounts_after_second_produce,
             "Accounts have been indexed twice"
         )
+    }
+
+    #[test]
+    fn test_blocks_and_transactions_are_indexed() {
+        let mut host = MockHost::default();
+        let blocks_index = init_blocks_index().unwrap();
+        let transaction_hashes_index = init_transaction_hashes_index().unwrap();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+
+        let tx = Transaction {
+            tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
+
+        let transactions = vec![tx];
+
+        let queue = Queue {
+            proposals: vec![Blueprint { transactions }],
+            kernel_upgrade: None,
+        };
+
+        let number_of_blocks_indexed = length(&host, &blocks_index).unwrap();
+        let number_of_transactions_indexed =
+            length(&host, &transaction_hashes_index).unwrap();
+
+        let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        produce(&mut host, queue).expect("The block production failed.");
+
+        let new_number_of_blocks_indexed = length(&host, &blocks_index).unwrap();
+        let new_number_of_transactions_indexed =
+            length(&host, &transaction_hashes_index).unwrap();
+
+        let current_block_hash = storage::read_current_block(&mut host)
+            .unwrap()
+            .hash
+            .as_bytes()
+            .to_vec();
+
+        assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
+        assert_eq!(
+            number_of_transactions_indexed + 1,
+            new_number_of_transactions_indexed
+        );
+
+        assert_eq!(
+            Ok(current_block_hash),
+            get_value(&host, &blocks_index, new_number_of_blocks_indexed - 1)
+        );
+
+        let last_indexed_transaction =
+            length(&host, &transaction_hashes_index).unwrap() - 1;
+
+        assert_eq!(
+            Ok(tx_hash.to_vec()),
+            get_value(&host, &transaction_hashes_index, last_indexed_transaction)
+        );
     }
 }
