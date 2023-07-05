@@ -277,9 +277,7 @@ let fold_snapshot ctxt ~index ~f ~init =
     ~order:`Sorted
     ~init
     ~f:(fun delegate () acc ->
-      Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.get
-        ctxt
-        (index, delegate)
+      Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
       >>=? fun stake -> f (delegate, stake) acc)
 
 let clear_at_cycle_end ctxt ~new_cycle =

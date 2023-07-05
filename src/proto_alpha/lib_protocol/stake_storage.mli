@@ -87,7 +87,7 @@ val fold :
 val fold_snapshot :
   Raw_context.t ->
   index:int ->
-  f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Signature.Public_key_hash.t * Stake_repr.Full.t -> 'a -> 'a tzresult Lwt.t) ->
   init:'a ->
   'a tzresult Lwt.t
 

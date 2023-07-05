@@ -153,35 +153,11 @@ let load_sampler_for_cycle ctxt cycle =
 
 let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   let open Lwt_result_syntax in
-  let delegate_contract = Contract_repr.Implicit delegate in
-  let* delegate_own_frozen_deposits =
-    Staking_pseudotokens_storage.costaking_balance_as_tez
-      ctxt
-      ~delegate
-      ~contract:delegate_contract
-  in
-  let open Tez_repr in
-  let* {current_amount = all_frozen_deposits; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt delegate_contract
-  in
-  let*? costaked_frozen = all_frozen_deposits -? delegate_own_frozen_deposits in
-  (* This subtraction may result in a negative value if tez were frozen
-     after the snapshot. This is fine, they are then taken into account as
-     frozen stake rather than delegated. *)
-  let delegated =
-    sub_opt staking_balance all_frozen_deposits |> Option.value ~default:zero
-  in
   let* staking_parameters =
     Delegate_staking_parameters.of_delegate ctxt delegate
   in
   Lwt.return
-    (Stake_context.apply_limits
-       ctxt
-       staking_parameters
-       (Stake_repr.Full.make
-          ~own_frozen:delegate_own_frozen_deposits
-          ~costaked_frozen
-          ~delegated))
+    (Stake_context.apply_limits ctxt staking_parameters staking_balance)
 
 let get_stakes_for_selected_index ctxt index =
   let open Lwt_result_syntax in
@@ -231,13 +207,6 @@ let select_distribution_for_cycle ctxt cycle =
   (* pre-allocate the sampler *)
   Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
 
-let delegate_baking_power_from_staking_balance ctxt delegate staking_balance =
-  let open Lwt_result_syntax in
-  let+ stake =
-    get_delegate_stake_from_staking_balance ctxt delegate staking_balance
-  in
-  Stake_context.staking_weight ctxt stake
-
 let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let for_cycle = Cycle_repr.add new_cycle preserved in
@@ -259,15 +228,19 @@ module For_RPC = struct
     let* selected_index =
       compute_snapshot_index_for_seed ~max_snapshot_index seed
     in
-    let* staking_balance =
-      Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.get
-        ctxt
-        (selected_index, delegate)
+    let* stake =
+      Storage.Stake.Staking_balance.Snapshot.get ctxt (selected_index, delegate)
     in
-    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+    let* staking_parameters =
+      Delegate_staking_parameters.of_delegate ctxt delegate
+    in
+    Lwt.return @@ Stake_context.baking_weight ctxt staking_parameters stake
 
   let delegate_current_baking_power ctxt delegate =
     let open Lwt_result_syntax in
-    let* staking_balance = Stake_storage.get_staking_balance ctxt delegate in
-    delegate_baking_power_from_staking_balance ctxt delegate staking_balance
+    let* stake = Storage.Stake.Staking_balance.get ctxt delegate in
+    let* staking_parameters =
+      Delegate_staking_parameters.of_delegate ctxt delegate
+    in
+    Lwt.return @@ Stake_context.baking_weight ctxt staking_parameters stake
 end
