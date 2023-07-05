@@ -6,9 +6,9 @@
 
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::{Path, RefPath};
-use tezos_smart_rollup_installer_config::binary::{read_size, RefConfigInstruction};
-
-use crate::preimage::reveal_root_hash;
+use tezos_smart_rollup_installer_config::binary::{
+    read_size, reveal_root_hash_to_store, RefConfigInstruction,
+};
 
 pub fn read_config_program_size(
     host: &impl Runtime,
@@ -48,7 +48,7 @@ pub fn handle_instruction(
     match instr {
         RefConfigInstruction::Reveal(instr) => {
             let to_path: RefPath = instr.to;
-            reveal_root_hash(host, &instr.hash.into(), to_path)
+            reveal_root_hash_to_store(host, &instr.hash.into(), &to_path)
         }
         RefConfigInstruction::Move(instr) => {
             let from_path: RefPath = instr.from;

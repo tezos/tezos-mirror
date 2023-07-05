@@ -19,7 +19,6 @@
 #![forbid(unsafe_code)]
 
 mod instr;
-mod preimage;
 
 use core::panic::PanicInfo;
 use instr::read_config_program_size;
@@ -38,9 +37,6 @@ const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
 // This is done in order avoid rewriting kernel during config execution.
 const AUXILIARY_CONFIG_INTERPRETATION_PATH: RefPath =
     RefPath::assert_from(b"/__installer_kernel/auxiliary/kernel/boot.wasm");
-
-// Support 3 levels of hashes pages, and then bottom layer of content.
-const MAX_DAC_LEVELS: usize = 4;
 
 #[cfg(all(feature = "entrypoint", target_arch = "wasm32"))]
 tezos_smart_rollup::kernel_entry!(installer);

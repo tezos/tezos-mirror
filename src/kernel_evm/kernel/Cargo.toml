@@ -32,12 +32,9 @@ path = "../../kernel_sdk/debug"
 [dependencies.tezos-smart-rollup-encoding]
 path = "../../kernel_sdk/encoding"
 
-[dependencies.installer-kernel]
-path = "../../kernel_sdk/installer-kernel"
-
 [dependencies.tezos-smart-rollup-installer-config]
 path = "../../kernel_sdk/installer-config"
-
+ 
 [dev-dependencies.tezos-smart-rollup-mock]
 path = "../../kernel_sdk/mock"
 features = ["proto-nairobi"]
