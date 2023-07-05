@@ -177,5 +177,5 @@ let parameters_type ctxt rollup =
 
 let must_exist ctxt rollup =
   let open Lwt_result_syntax in
-  let+ ctxt, _info = genesis_info ctxt rollup in
-  ctxt
+  let* ctxt, exists = Store.Genesis_info.mem ctxt rollup in
+  if exists then return ctxt else tzfail (Sc_rollup_does_not_exist rollup)

@@ -15,6 +15,8 @@ Environment Version
 Smart Rollups
 -------------
 
+- Reduce cost for internal transaction to smart rollup (MR :gl:`!9284`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
