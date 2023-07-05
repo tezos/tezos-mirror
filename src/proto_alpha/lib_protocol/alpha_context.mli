@@ -1755,6 +1755,16 @@ module Contract : sig
   (** See {!Contract_delegate_storage.is_delegate}. *)
   val is_delegate : context -> public_key_hash -> bool tzresult Lwt.t
 
+  (** See {!Contract_delegate_storage.delegate_status}. *)
+  type delegate_status =
+    | Delegate
+    | Delegated of Signature.Public_key_hash.t
+    | No_delegate
+
+  (** See {!Contract_delegate_storage.find_is_delegate}. *)
+  val find_is_delegate :
+    context -> public_key_hash -> delegate_status tzresult Lwt.t
+
   val get_total_supply : context -> Tez.t tzresult Lwt.t
 
   module Legacy_big_map_diff : sig
