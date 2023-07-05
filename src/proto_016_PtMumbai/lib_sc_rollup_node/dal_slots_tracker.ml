@@ -25,8 +25,6 @@
 
 open Protocol
 open Alpha_context
-module Lifted_protocol = Tezos_protocol_016_PtMumbai_lifted.Lifted_protocol
-module Block_services = Block_services.Make (Lifted_protocol) (Lifted_protocol)
 
 let ancestor_hash ~number_of_levels
     ({Node_context.genesis_info; _} as node_ctxt) head =
@@ -69,7 +67,9 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
      we reduce the lag to 1, then the slots header will never be confirmed.
   *)
   let open Lwt_result_syntax in
-  let lag = node_ctxt.Node_context.protocol_constants.dal.attestation_lag in
+  let lag =
+    node_ctxt.Node_context.current_protocol.constants.dal.attestation_lag
+  in
   (* we are downloading endorsemented for slots at level [level], so
      we need to download the data at level [level - lag].
   *)
@@ -127,22 +127,24 @@ let to_slot_index_list (constants : Rollup_constants.protocol_constants) bitset
    Use a shared storage between dal and rollup node to store slots data.
 *)
 
-let download_and_save_slots
-    ({Node_context.protocol_constants; _} as node_context) ~current_block_hash
-    {published_block_hash; confirmed_slots_indexes} =
+let download_and_save_slots (node_context : _ Node_context.t)
+    ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
-    Bitset.fill ~length:protocol_constants.dal.number_of_slots
+    Bitset.fill
+      ~length:node_context.current_protocol.constants.dal.number_of_slots
     |> Environment.wrap_tzresult
   in
   let*? not_confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list protocol_constants
+    @@ to_slot_index_list node_context.current_protocol.constants
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
   let*? confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list protocol_constants confirmed_slots_indexes
+    @@ to_slot_index_list
+         node_context.current_protocol.constants
+         confirmed_slots_indexes
   in
   (* The contents of each slot index are written to a different location on
      disk, therefore calls to store contents for different slot indexes can
@@ -185,7 +187,7 @@ module Confirmed_slots_history = struct
     let*? relevant_slots_indexes =
       Environment.wrap_tzresult
       @@ to_slot_index_list
-           node_ctxt.Node_context.protocol_constants
+           node_ctxt.Node_context.current_protocol.constants
            confirmed_slots_indexes
     in
     List.map_ep
@@ -217,7 +219,8 @@ module Confirmed_slots_history = struct
   let should_process_dal_slots node_ctxt block_level =
     let open Node_context in
     let lag =
-      Int32.of_int node_ctxt.Node_context.protocol_constants.dal.attestation_lag
+      Int32.of_int
+        node_ctxt.Node_context.current_protocol.constants.dal.attestation_lag
     in
     let block_level = Raw_level.to_int32 block_level in
     let genesis_level = node_ctxt.genesis_info.level in
@@ -280,7 +283,7 @@ module Confirmed_slots_history = struct
       ~find
       ~default:(fun node_ctxt _block ->
         let num_slots =
-          node_ctxt.Node_context.protocol_constants.dal.number_of_slots
+          node_ctxt.Node_context.current_protocol.constants.dal.number_of_slots
         in
         (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
            Put an accurate value for capacity. The value

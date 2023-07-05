@@ -333,7 +333,7 @@ let () =
   in
   List.rev_map
     (Sc_rollup_proto_types.Dal.Slot_header.of_octez
-       ~number_of_slots:node_ctxt.protocol_constants.dal.number_of_slots)
+       ~number_of_slots:node_ctxt.current_protocol.constants.dal.number_of_slots)
     slots
   |> List.rev
 
@@ -389,7 +389,7 @@ let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
   let+ last_published_commitment = Reference.get node_ctxt.lpc in
   let commitment_period =
     Int32.of_int
-      node_ctxt.protocol_constants.sc_rollup.commitment_period_in_blocks
+      node_ctxt.current_protocol.constants.sc_rollup.commitment_period_in_blocks
   in
   let last_published = last_published_commitment.inbox_level in
   let open Int32 in

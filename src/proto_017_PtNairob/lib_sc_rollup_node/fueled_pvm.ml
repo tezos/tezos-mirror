@@ -141,7 +141,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag =
-      node_ctxt.protocol_constants.dal.attestation_lag
+      node_ctxt.current_protocol.constants.dal.attestation_lag
     in
     let reveal_builtins =
       Tezos_scoru_wasm.Builtins.

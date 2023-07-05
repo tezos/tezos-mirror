@@ -141,7 +141,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
        Use constants for correct protocol. *)
     let is_reveal_enabled =
-      node_ctxt.protocol_constants.sc_rollup.reveal_activation_level
+      node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
       |> WithExceptions.Option.get ~loc:__LOC__
       |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
       |> Sc_rollup.is_reveal_enabled_predicate
@@ -149,7 +149,7 @@ module Make_fueled (F : Fuel.S) : S with type fuel = F.t = struct
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
     let dal_attestation_lag =
-      node_ctxt.protocol_constants.dal.attestation_lag
+      node_ctxt.current_protocol.constants.dal.attestation_lag
     in
     let reveal_builtins =
       Tezos_scoru_wasm.Builtins.
