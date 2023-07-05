@@ -25,7 +25,7 @@
 
 (** Type for the rpc process parameters received from the node *)
 type t = {
-  rpc : Config_file.rpc;
+  config : Config_file.t;
   rpc_comm_socket_path : string;
   internal_events : Tezos_base.Internal_event_config.t;
   node_version : Tezos_version.Node_version.t;
