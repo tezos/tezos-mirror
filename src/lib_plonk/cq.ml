@@ -48,7 +48,10 @@ module type Cq_sig = sig
     prover_public_parameters * verifier_public_parameters
 
   val prove :
-    prover_public_parameters -> transcript -> S.t array -> proof * transcript
+    prover_public_parameters ->
+    transcript ->
+    S.t array list ->
+    proof * transcript
 
   val verify :
     verifier_public_parameters -> transcript -> proof -> bool * transcript
@@ -56,6 +59,7 @@ end
 
 module Make (PC : Polynomial_commitment.S) = struct
   open Utils
+  module IMap = Map.Make (Int)
 
   exception Entry_not_in_table
 
@@ -84,19 +88,36 @@ module Make (PC : Polynomial_commitment.S) = struct
   }
 
   type proof = {
-    cm_f : G1.t;
-    cm_a : G1.t;
+    cm_f : PC.Commitment.t;
+    cm_a : PC.Commitment.t;
     cm_a0 : G1.t;
-    cm_b0 : G1.t;
-    cm_qa : G1.t;
-    cm_m : G1.t;
-    cm_p : G1.t;
-    a0 : Scalar.t;
-    b0y : Scalar.t;
-    fy : Scalar.t;
+    cm_b0 : PC.Commitment.t;
+    cm_qa : PC.Commitment.t;
+    cm_m : PC.Commitment.t;
+    cm_p : PC.Commitment.t;
+    a0 : Scalar.t list;
+    b0y : Scalar.t SMap.t;
+    fy : Scalar.t SMap.t;
     pc : PC.proof;
     cm_b0_qb_f : PC.Commitment.t;
   }
+
+  let f_name = "f"
+
+  let m_name = "m"
+
+  let a_name = "a"
+
+  let qa_name = "qa"
+
+  let p_name = "p"
+
+  let b0_name = "b0"
+
+  let qb_name = "qb"
+
+  let aggregate_cm cm etas =
+    pippenger1 (PC.Commitment.to_map cm |> SMap.values |> Array.of_list) etas
 
   (* We don’t need the generator because we don’t evaluate at gX *)
   let get_pc_query gamma =
@@ -259,24 +280,33 @@ module Make (PC : Polynomial_commitment.S) = struct
   let compute_a0 n a =
     Scalar.(List.fold_left (fun acc (_, a) -> acc + a) zero a / of_int n)
 
-  let kzg_prove (pp : prover_public_parameters) transcript cm_f (b0, f, qb) =
-    let f_map = SMap.of_list [("b0", b0); ("qb", qb)] in
-    let cm_map, f_aux = PC.Commitment.commit pp.pc f_map in
-    let f_map = SMap.add "f" f f_map in
-    let cm_map = PC.Commitment.add "f" cm_f cm_map in
-    let cm_b0 = PC.Commitment.get "b0" cm_map in
+  let kzg_prove (pp : prover_public_parameters) transcript (cm_f, f_aux)
+      (b0_map, f, qb) =
+    let n = SMap.cardinal f in
+    let qb_map =
+      SMap.of_list
+        (List.mapi
+           (fun i qb -> (SMap.Aggregation.add_prefix ~n ~i "" qb_name, qb))
+           qb)
+    in
+    let b0_qb_map = SMap.union_disjoint_list [b0_map; qb_map] in
+    let f_map = SMap.union_disjoint f b0_qb_map in
+    let cm_b0, b0_aux = PC.Commitment.commit pp.pc b0_map in
+    let cm_qb, qb_aux = PC.Commitment.commit pp.pc qb_map in
+    let cm_map = PC.Commitment.(recombine [cm_b0; cm_f; cm_qb]) in
+    let aux = PC.Commitment.(recombine_prover_aux [b0_aux; f_aux; qb_aux]) in
     (* 3.1 *)
     let transcript = Transcript.expand PC.Commitment.t cm_map transcript in
     let gamma, transcript = Fr_generation.random_fr transcript in
     (* 3.2 *)
-    let b0y = Poly.evaluate b0 gamma in
-    let qby = Poly.evaluate qb gamma in
-    let fy = Poly.evaluate f gamma in
+    let b0y = SMap.map (fun p -> Poly.evaluate p gamma) b0_map in
+    let qby = SMap.map (fun p -> Poly.evaluate p gamma) qb_map in
+    let fy = SMap.map (fun p -> Poly.evaluate p gamma) f in
     let query = get_pc_query gamma in
     let secret = [f_map] in
-    let cm_aux = [f_aux] in
+    let cm_aux = [aux] in
     let answers =
-      [SMap.singleton "x" (SMap.of_list [("b0", b0y); ("f", fy); ("qb", qby)])]
+      [SMap.singleton "x" (SMap.union_disjoint_list [b0y; fy; qby])]
     in
     let proof, transcript =
       PC.prove pp.pc transcript secret cm_aux query answers
@@ -290,65 +320,132 @@ module Make (PC : Polynomial_commitment.S) = struct
     in
     let gamma, transcript = Fr_generation.random_fr transcript in
     (* 3.4 *)
-    let b0 = Scalar.(of_int pp.n * proof.a0 / of_int pp.k) in
+    let n = List.length proof.a0 in
+    let b0 =
+      List.mapi
+        (fun i a0 ->
+          ( SMap.Aggregation.add_prefix ~n ~i "" b0_name,
+            Scalar.(of_int pp.n * a0 / of_int pp.k) ))
+        proof.a0
+    in
     (* 3.5, 3.6.a *)
     let zhy = Scalar.((gamma ** Z.of_int k) + negate one) in
-    let by = Scalar.((proof.b0y * gamma) + b0) in
-    let qby = Scalar.(((by * (proof.fy + beta)) + negate one) / zhy) in
+    let by =
+      List.map2
+        (fun b0y (_, b0) -> Scalar.((b0y * gamma) + b0))
+        (SMap.values proof.b0y)
+        b0
+    in
+    let qby =
+      let i = ref 0 in
+      SMap.of_list
+      @@ List.map2
+           (fun by fy ->
+             let res =
+               ( SMap.Aggregation.add_prefix ~n ~i:!i "" qb_name,
+                 Scalar.(((by * (fy + beta)) + negate one) / zhy) )
+             in
+             i := !i + 1 ;
+             res)
+           by
+           (SMap.values proof.fy)
+    in
     let cm = [proof.cm_b0_qb_f] in
     let query = get_pc_query gamma in
     let answers =
-      [
-        SMap.singleton
-          "x"
-          (SMap.of_list [("b0", proof.b0y); ("f", proof.fy); ("qb", qby)]);
-      ]
+      [SMap.singleton "x" (SMap.union_disjoint_list [proof.b0y; proof.fy; qby])]
     in
     PC.verify pp.pc transcript cm query answers proof.pc
 
-  let compute_cm_a0 pp a =
-    snd @@ compute_and_commit (fun (i, a) -> (a, pp.cms_lagrange_0.(i))) a
+  let compute_cm_a0 pp etas a =
+    (* since cm_a0 is a kzg proof, we can batch every a polynomials into one *)
+    let a_agg =
+      List.fold_left
+        (fun (global_acc, k) a ->
+          ( List.fold_left
+              (fun acc (i, ai) ->
+                IMap.update
+                  i
+                  (function
+                    | None -> Some Scalar.(etas.(k) * ai)
+                    | Some a -> Some Scalar.(a + (etas.(k) * ai)))
+                  acc)
+              global_acc
+              a,
+            k + 1 ))
+        (IMap.empty, 0)
+        a
+      |> fst |> IMap.to_seq |> List.of_seq
+    in
+    snd @@ compute_and_commit (fun (i, a) -> (a, pp.cms_lagrange_0.(i))) a_agg
 
   (* On suppose que f est de degré k < n *)
-  let prove pp transcript f_array =
+  let prove pp transcript f_arrays =
     (* TODO padder f jusqu’à la prochaine puissance de 2 ? *)
-    let k = Array.length f_array in
+    let k = Array.length (List.hd f_arrays) in
+    let n = List.length f_arrays in
     let f =
-      Evaluations.(interpolation_fft pp.domain_k (of_array (k - 1, f_array)))
+      SMap.of_list
+        (List.mapi
+           (fun i f ->
+             ( SMap.Aggregation.add_prefix ~n ~i "" f_name,
+               Evaluations.(interpolation_fft pp.domain_k (of_array (k - 1, f)))
+             ))
+           f_arrays)
     in
-    let cm_f = commit1 pp.pc f in
+    let cm_f, f_aux = PC.Commitment.commit pp.pc f in
     (* 1.1, 1.2 *)
-    let m_and_t, cm_m = compute_m_and_t_sparse pp f_array in
+    let m_and_t, cm_m =
+      List.map (compute_m_and_t_sparse pp) f_arrays |> List.split
+    in
+    let cm_m, _ = PC.Commitment.of_list pp.pc ~name:m_name cm_m in
 
     (* 2.1 *)
-    let transcript = Transcript.list_expand G1.t [cm_f; cm_m] transcript in
+    let transcript =
+      Transcript.list_expand PC.Commitment.t [cm_f; cm_m] transcript
+    in
     let beta, transcript = Fr_generation.random_fr transcript in
     (* 2.2, 2.3 *)
-    let a, cm_a = compute_a pp beta m_and_t in
-    (* 3.3 *)
-    let a0 = compute_a0 pp.n a in
-    (* 3.7.a *)
-    let cm_a0 = compute_cm_a0 pp a in
-    (* 3.6.a *)
-    let transcript = Transcript.expand Scalar.t a0 transcript in
+    let a, cm_a = List.map (compute_a pp beta) m_and_t |> List.split in
+    let cm_a, _ = PC.Commitment.of_list pp.pc ~name:a_name cm_a in
     (* 2.4 *)
-    let cm_qa = compute_cm_qa pp a in
+    let cm_qa, _ =
+      List.map (compute_cm_qa pp) a |> PC.Commitment.of_list pp.pc ~name:qa_name
+    in
     (* 2.5 *)
-    let b = compute_b beta k pp.domain_k f_array in
+    let b = List.map (compute_b beta k pp.domain_k) f_arrays in
     (* 2.6 *)
-    let b0 = kzg_0 b in
+    let b0 =
+      SMap.of_list
+      @@ List.mapi
+           (fun i b -> (SMap.Aggregation.add_prefix ~n ~i "" b0_name, kzg_0 b))
+           b
+    in
     (* 2.8, 2.9 *)
-    let qb = compute_qb pp beta k b f in
+    let qb = List.map2 (compute_qb pp beta k) b (SMap.values f) in
     (* 2.10 *)
-    let cm_p = compute_p pp k b0 in
+    let cm_p, _ =
+      SMap.map (compute_p pp k) b0
+      |> SMap.values
+      |> PC.Commitment.of_list pp.pc ~name:p_name
+    in
 
     let transcript =
-      Transcript.list_expand G1.t [cm_a; cm_qa; cm_p] transcript
+      Transcript.list_expand PC.Commitment.t [cm_a; cm_qa; cm_p] transcript
     in
     (* 3.6.b *)
     let b0y, fy, cm_b0_qb_f, cm_b0, pc, transcript =
-      kzg_prove pp transcript cm_f (b0, f, qb)
+      kzg_prove pp transcript (cm_f, f_aux) (b0, f, qb)
     in
+
+    (* 3.3 *)
+    let a0 = List.map (compute_a0 pp.n) a in
+
+    (* 3.6.a *)
+    let transcript = Transcript.list_expand Scalar.t a0 transcript in
+    let eta, transcript = Fr_generation.random_fr transcript in
+    (* 3.7.a *)
+    let cm_a0 = compute_cm_a0 pp (Fr_generation.powers n eta) a in
 
     ( {cm_f; cm_a; cm_a0; cm_b0; cm_qa; cm_m; cm_p; a0; b0y; fy; pc; cm_b0_qb_f},
       transcript )
@@ -356,15 +453,13 @@ module Make (PC : Polynomial_commitment.S) = struct
   let verify pp transcript proof =
     (* 2.1 *)
     let transcript =
-      Transcript.list_expand G1.t [proof.cm_f; proof.cm_m] transcript
+      Transcript.list_expand PC.Commitment.t [proof.cm_f; proof.cm_m] transcript
     in
     let beta, transcript = Fr_generation.random_fr transcript in
-    (* 3.6.a *)
-    let transcript = Transcript.expand Scalar.t proof.a0 transcript in
     (* 3.1 *)
     let transcript =
       Transcript.list_expand
-        G1.t
+        PC.Commitment.t
         [proof.cm_a; proof.cm_qa; proof.cm_p]
         transcript
     in
@@ -372,21 +467,44 @@ module Make (PC : Polynomial_commitment.S) = struct
     (* 3.5, 3.6.a *)
     let kzg_verif, transcript = kzg_verify pp transcript proof pp.k beta in
 
+    (* 3.6.a *)
+    let transcript = Transcript.list_expand Scalar.t proof.a0 transcript in
+    let eta, transcript = Fr_generation.random_fr transcript in
+    let etas =
+      Fr_generation.powers
+        (PC.Commitment.to_map proof.cm_a |> SMap.cardinal)
+        eta
+    in
+
+    let cm_a = aggregate_cm proof.cm_a etas in
+    let cm_qa = aggregate_cm proof.cm_qa etas in
+    let cm_m = aggregate_cm proof.cm_m etas in
+
+    let cm_b0 = aggregate_cm proof.cm_b0 etas in
+    let cm_p = aggregate_cm proof.cm_p etas in
+
+    let a0 =
+      List.fold_left
+        Scalar.(fun acc a -> (acc * eta) + a)
+        Scalar.zero
+        (List.rev proof.a0)
+    in
+
     (* 2.11 *)
     let check_a =
       Pairing.pairing_check
         G1.
           [
-            (negate proof.cm_a, pp.cm_table);
-            (proof.cm_qa, pp.cm_zv);
-            (add proof.cm_m (negate (mul proof.cm_a beta)), pp.srs2_0);
+            (negate cm_a, pp.cm_table);
+            (cm_qa, pp.cm_zv);
+            (add cm_m (negate (mul cm_a beta)), pp.srs2_0);
           ]
     in
 
     (* 2.12 *)
     let check_b0 =
       Pairing.pairing_check
-        G1.[(negate proof.cm_b0, pp.srs2_N_1_k_2); (proof.cm_p, pp.srs2_0)]
+        G1.[(negate cm_b0, pp.srs2_N_1_k_2); (cm_p, pp.srs2_0)]
     in
 
     (* 3.6.b *)
@@ -394,7 +512,7 @@ module Make (PC : Polynomial_commitment.S) = struct
       Pairing.pairing_check
         G1.
           [
-            (add proof.cm_a (negate (mul one proof.a0)), pp.srs2_0);
+            (add cm_a (negate (mul one a0)), pp.srs2_0);
             (negate proof.cm_a0, pp.srs2_1);
           ]
     in

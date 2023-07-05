@@ -30,27 +30,10 @@ module SMap = Plonk.SMap
 (** Extension of the PC signature with additional types and functions used
     in by Distributed_prover  *)
 
-module type Commitment_sig = sig
-  include Plonk.Polynomial_commitment.Commitment_sig
-
-  val recombine : t list -> t
-
-  val recombine_prover_aux : prover_aux list -> prover_aux
-
-  val empty : t
-
-  val empty_prover_aux : prover_aux
-end
-
 module type PC_for_distribution_sig = sig
   module BasePC : Plonk.Polynomial_commitment.S
 
-  module Commitment :
-    Commitment_sig
-      with type secret = BasePC.secret
-       and type prover_public_parameters = BasePC.Public_parameters.prover
-
-  include module type of BasePC with module Commitment := Commitment
+  include module type of BasePC
 
   val merge_answers : answer list -> answer
 
@@ -108,22 +91,6 @@ module Kzg_impl = struct
   let merge_answers : answer list -> answer =
     let open SMap in
     List.fold_left (union (fun _k m1 m2 -> Some (union_disjoint m1 m2))) empty
-
-  module Commitment = struct
-    include Commitment
-
-    let recombine cmt_list =
-      List.fold_left
-        (SMap.union (fun _k x _ -> Some x))
-        (List.hd cmt_list)
-        (List.tl cmt_list)
-
-    let recombine_prover_aux _ = ()
-
-    let empty = SMap.empty
-
-    let empty_prover_aux = ()
-  end
 
   let distributed_prove_worker f_map_list _prover_aux_list coeffs =
     let f_map = group_secrets f_map_list in

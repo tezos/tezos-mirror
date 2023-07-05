@@ -58,11 +58,18 @@ module type Commitment_sig = sig
 
   val rename : (string -> string) -> t -> t
 
+  val recombine : t list -> t
+
+  val recombine_prover_aux : prover_aux list -> prover_aux
+
   val empty : t
 
-  val add : string -> G1.t -> t -> t
+  val empty_prover_aux : prover_aux
 
-  val get : string -> t -> G1.t
+  val of_list :
+    prover_public_parameters -> name:string -> G1.t list -> t * prover_aux
+
+  val to_map : t -> G1.t SMap.t
 end
 
 module type Public_parameters_sig = sig
@@ -178,19 +185,26 @@ module Kzg_impl = struct
     let rename f cmt =
       SMap.fold (fun key x acc -> SMap.add (f key) x acc) cmt SMap.empty
 
+    let recombine cmt_list =
+      List.fold_left
+        (SMap.union (fun _k x _ -> Some x))
+        (List.hd cmt_list)
+        (List.tl cmt_list)
+
+    let recombine_prover_aux _ = ()
+
     let empty = SMap.empty
 
-    let add = SMap.add_unique
+    let empty_prover_aux = ()
 
-    let get name cmt =
-      match SMap.find_opt name cmt with
-      | Some c -> c
-      | None ->
-          raise
-            (Invalid_argument
-               (Printf.sprintf
-                  "Kzg.Commitment.get : commitement %s not found."
-                  name))
+    let of_list _ ~name l =
+      let n = List.length l in
+      ( SMap.(
+          of_list
+            (List.mapi (fun i c -> (Aggregation.add_prefix ~n ~i "" name, c)) l)),
+        () )
+
+    let to_map cm = cm
   end
 
   (* polynomials to be committed *)
