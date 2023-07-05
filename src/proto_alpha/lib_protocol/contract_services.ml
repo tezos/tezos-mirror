@@ -116,6 +116,18 @@ module S = struct
       RPC_path.(
         custom_root /: Contract.rpc_arg / "unstaked_finalizable_balance")
 
+  let unstake_requests =
+    RPC_service.get_service
+      ~description:
+        "Access the unstake requests of the contract. The requests that appear \
+         in the finalizable field can be finalized, which means that the \
+         contract can transfer these (no longer frozen) funds to their \
+         spendable balance with a [finalize_unstake] operation call. Returns \
+         None if there is no unstake request pending."
+      ~query:RPC_query.empty
+      ~output:(option Unstake_requests.prepared_finalize_unstake_encoding)
+      RPC_path.(custom_root /: Contract.rpc_arg / "unstake_requests")
+
   let full_balance =
     RPC_service.get_service
       ~description:
@@ -446,6 +458,16 @@ let register () =
     S.unstaked_finalizable_balance
     Contract.For_RPC.get_unstaked_finalizable_balance ;
   register_field ~chunked:false S.full_balance Contract.For_RPC.get_full_balance ;
+  register1 ~chunked:false S.unstake_requests (fun ctxt contract () () ->
+      Unstake_requests.prepare_finalize_unstake ctxt contract >>=? function
+      | None -> return_none
+      | Some {finalizable; unfinalizable} ->
+          Unstake_requests.For_RPC
+          .apply_slash_to_unstaked_unfinalizable_stored_requests
+            ctxt
+            unfinalizable
+          >>=? fun unfinalizable ->
+          return_some Unstake_requests.{finalizable; unfinalizable}) ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
@@ -658,6 +680,9 @@ let unstaked_finalizable_balance ctxt block contract =
     contract
     ()
     ()
+
+let unstake_requests ctxt block contract =
+  RPC_context.make_call1 S.unstake_requests ctxt block contract () ()
 
 let full_balance ctxt block contract =
   RPC_context.make_call1 S.full_balance ctxt block contract () ()
