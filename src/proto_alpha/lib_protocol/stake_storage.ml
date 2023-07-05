@@ -65,7 +65,14 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
-let get_staking_balance = Storage.Stake.Staking_balance_up_to_Nairobi.get
+let get_staking_balance ctxt delegate =
+  let open Lwt_result_syntax in
+  let* {own_frozen; costaked_frozen; delegated} =
+    Storage.Stake.Staking_balance.get ctxt delegate
+  in
+  let*? frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+  let*? staking_balance = Tez_repr.(frozen +? delegated) in
+  return staking_balance
 
 let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
