@@ -41,4 +41,7 @@ val apply_limits :
     have been applied using [apply_limits] if necessary. *)
 val staking_weight : Raw_context.t -> Stake_repr.t -> int64
 
+(** The weight of a delegate used for voting rights. *)
+val voting_weight : Raw_context.t -> Stake_repr.Full.t -> int64 tzresult
+
 val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int
