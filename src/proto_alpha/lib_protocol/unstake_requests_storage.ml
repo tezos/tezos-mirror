@@ -102,7 +102,8 @@ let prepare_finalize_unstake ctxt contract =
   | None | Some {delegate = _; requests = []} -> return None
   | Some {delegate; requests} -> (
       match Cycle_repr.sub current_cycle preserved_plus_slashing with
-      | None (* no finalizable cycle *) -> return None
+      | None (* no finalizable cycle *) ->
+          return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->
           let* slashing_history_opt =
             Storage.Contract.Slashed_deposits.find
