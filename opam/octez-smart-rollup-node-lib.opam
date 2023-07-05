@@ -11,18 +11,24 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-base"
-  "tezos-clic"
+  "tezos-stdlib-unix"
+  "tezos-crypto"
   "tezos-client-base"
   "tezos-client-base-unix"
-  "tezos-client-commands"
-  "octez-smart-rollup-node-lib"
-  "tezos-client-alpha"
-  "octez-smart-rollup-node-alpha"
-  "octez-smart-rollup-sequencer"
+  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
+  "octez-node-config"
+  "prometheus-app" { >= "1.2" }
+  "tezos-dal-node-lib"
+  "tezos-dac-client-lib"
+  "octez-injector"
+  "tezos-version"
+  "tezos-layer2-store"
+  "octez-crawler"
+  "octez-smart-rollup"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Smart rollup sequencer node (low-latency node)"
+synopsis: "Octez: library for Smart Rollup node"

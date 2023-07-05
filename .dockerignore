@@ -35,7 +35,7 @@ octez-endorser-*
 octez-accuser-*
 octez-proxy-server
 octez-signer
-octez-smart-rollup-node-*
+octez-smart-rollup-node*
 octez-smart-rollup-client-*
 
 scripts/opam-test-all.sh.DONE

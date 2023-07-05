@@ -4111,7 +4111,8 @@ let octez_smart_rollup_lib =
 
 let octez_smart_rollup_node_lib =
   public_lib
-    "octez-smart-rollup-node"
+    "octez-smart-rollup-node-lib"
+    ~internal_name:"octez_smart_rollup_node"
     ~path:"src/lib_smart_rollup_node"
     ~synopsis:"Octez: library for Smart Rollup node"
     ~deps:
@@ -7416,6 +7417,44 @@ let _octez_dac_client =
          octez_stdlib |> open_;
          octez_dac_lib |> open_;
          octez_dac_client_lib |> open_;
+       ]
+      @ protocol_deps)
+
+let _octez_smart_rollup_node =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | Active, V _ -> false
+        | (Frozen | Overridden | Not_mainnet), _ | Active, (Alpha | Other) ->
+            true
+      in
+      let targets =
+        List.filter_map Fun.id [Protocol.octez_sc_rollup_node protocol]
+      in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
+  public_exe
+    "octez-smart-rollup-node"
+    ~internal_name:"main_smart_rollup_node"
+    ~path:"src/bin_smart_rollup_node"
+    ~synopsis:"Octez: Smart rollup node"
+    ~release_status:Experimental
+    ~linkall:true
+    ~with_macos_security_framework:true
+    ~deps:
+      ([
+         octez_base |> open_ |> open_ ~m:"TzPervasives"
+         |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+         octez_clic;
+         octez_shell_services |> open_;
+         octez_client_base |> open_;
+         octez_client_base_unix |> open_;
+         octez_client_commands |> open_;
+         octez_smart_rollup_lib |> open_;
+         octez_smart_rollup_node_lib |> open_;
        ]
       @ protocol_deps)
 

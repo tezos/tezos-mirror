@@ -47,7 +47,7 @@ __pycache__
 /tezos-tps-evaluation-*
 /octez-tps-evaluation-*
 /tezos-smart-rollup-node-*
-/octez-smart-rollup-node-*
+/octez-smart-rollup-node*
 /octez-smart-rollup-sequencer-node
 /tezos-smart-rollup-client-*
 /octez-smart-rollup-client-*

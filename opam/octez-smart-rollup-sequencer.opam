@@ -15,7 +15,7 @@ depends: [
   "tezos-protocol-alpha"
   "octez-smart-rollup-node-alpha"
   "tezos-workers"
-  "octez-smart-rollup-node"
+  "octez-smart-rollup-node-lib"
   "octez-smart-rollup"
   "tezos-rpc"
   "tezos-rpc-http"

@@ -37,7 +37,7 @@
   aches
   aches-lwt
   octez-injector
-  octez-smart-rollup-node
+  octez-smart-rollup-node-lib
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
   tezos-crypto-dal
