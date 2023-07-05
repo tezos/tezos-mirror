@@ -49,6 +49,19 @@
        - or have no costakers, in which case their costaking balance and
          frozen deposits pseudotokens are assumed to be equal to their frozen
          deposits tez.
+
+
+   Invariant 3:
+     For a given delegate, their frozen deposits pseudotokens equal the sum of
+     all costaking pseudotokens of their delegators (including the delegate
+     itself).
+
+     It is ensured by:
+       - {credit_costaking_pseudotokens} always called with (the pseudotokens
+         result of) {credit_frozen_deposits_pseudotokens_for_tez_amount} in
+         {stake};
+       - {dedit_costaking_pseudotokens} always called with (the same value as)
+         {debit_frozen_deposits_pseudotokens} in {request_unstake}.
 *)
 
 (** [init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract]
