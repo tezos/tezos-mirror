@@ -994,6 +994,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_number_of_parallel_games =
               c.sc_rollup.max_number_of_parallel_games;
             reveal_activation_level;
+            private_enable = false;
           }
       in
       let zk_rollup =

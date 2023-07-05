@@ -829,6 +829,7 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
       max_number_of_parallel_games : int;
       reveal_activation_level : sc_rollup_reveal_activation_level;
+      private_enable : bool;
     }
 
     type zk_rollup = {
