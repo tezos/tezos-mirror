@@ -325,8 +325,12 @@ let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
          | Delegate ->
           (* This is just a re-activation, do not unstake. *)
           Staking.finalize_unstake ctxt sender
-         | Undelegated | Delegated _ ->
-        Staking.request_full_unstake ctxt ~sender_contract:sender)
+         | Undelegated ->
+           (* No delegates, nothing to unstake but maybe some unstake request to finalize. *)
+           Staking.finalize_unstake ctxt sender
+         | Delegated delegate ->
+        (* [request_unstake] bounds to the actual stake. *)
+        Staking.request_unstake ctxt ~sender_contract:sender ~delegate Tez.max_mutez)
   in
   let+ ctxt = Contract.Delegate.set ctxt sender delegate in
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, balance_updates, [])
