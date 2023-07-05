@@ -70,7 +70,7 @@ let proto_hash_to_dac_hash ((module Plugin) : Dac_plugin.t) proto_reveal_hash =
   |> Data_encoding.Binary.to_bytes_exn Protocol.Sc_rollup_reveal_hash.encoding
   |> Data_encoding.Binary.of_bytes_exn Plugin.encoding
 
-let get ?dac_client ~data_dir ~pvm_kind hash =
+let get ~dac_client ~data_dir ~pvm_kind hash =
   let open Lwt_result_syntax in
   let* contents =
     let filename =
