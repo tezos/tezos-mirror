@@ -478,12 +478,25 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let init node_ctxt =
+let start node_ctxt =
   let open Lwt_result_syntax in
   let*! () = Commitment_event.starting () in
   let node_ctxt = Node_context.readonly node_ctxt in
   let+ worker = Worker.launch table () {node_ctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
+
+let init node_ctxt =
+  let open Lwt_result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return _ ->
+      (* Worker already started, nothing to do. *)
+      return_unit
+  | Lwt.Fail exn ->
+      (* Worker crashed, not recoverable. *)
+      fail [Sc_rollup_node_errors.No_publisher; Exn exn]
+  | Lwt.Sleep ->
+      (* Never started, start it. *)
+      start node_ctxt
 
 (* This is a publisher worker for a single scoru *)
 let worker =

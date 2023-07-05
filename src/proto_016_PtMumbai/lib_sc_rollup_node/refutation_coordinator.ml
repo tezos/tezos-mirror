@@ -201,7 +201,7 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let init node_ctxt =
+let start node_ctxt =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.Coordinator.starting () in
   let cctxt =
@@ -209,6 +209,19 @@ let init node_ctxt =
   in
   let+ worker = Worker.launch table () {node_ctxt; cctxt} (module Handlers) in
   Lwt.wakeup worker_waker worker
+
+let init node_ctxt =
+  let open Lwt_result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return _ ->
+      (* Worker already started, nothing to do. *)
+      return_unit
+  | Lwt.Fail exn ->
+      (* Worker crashed, not recoverable. *)
+      fail [Sc_rollup_node_errors.No_refutation_coordinator; Exn exn]
+  | Lwt.Sleep ->
+      (* Never started, start it. *)
+      start node_ctxt
 
 (* This is a refutation coordinator for a single scoru *)
 let worker =

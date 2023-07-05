@@ -370,7 +370,7 @@ let check_batcher_config Configuration.{max_batch_size; _} =
         protocol_max_batch_size
   | _ -> Ok ()
 
-let init conf ~signer node_ctxt =
+let start conf ~signer node_ctxt =
   let open Lwt_result_syntax in
   let*? () = check_batcher_config conf in
   let node_ctxt = Node_context.readonly node_ctxt in
@@ -378,6 +378,19 @@ let init conf ~signer node_ctxt =
     Worker.launch table () {node_ctxt; signer; conf} (module Handlers)
   in
   Lwt.wakeup worker_waker worker
+
+let init conf ~signer node_ctxt =
+  let open Lwt_result_syntax in
+  match Lwt.state worker_promise with
+  | Lwt.Return _ ->
+      (* Worker already started, nothing to do. *)
+      return_unit
+  | Lwt.Fail exn ->
+      (* Worker crashed, not recoverable. *)
+      fail [Sc_rollup_node_errors.No_batcher; Exn exn]
+  | Lwt.Sleep ->
+      (* Never started, start it. *)
+      start conf ~signer node_ctxt
 
 (* This is a batcher worker for a single scoru *)
 let worker =
