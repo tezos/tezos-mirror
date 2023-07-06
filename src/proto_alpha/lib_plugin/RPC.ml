@@ -2990,26 +2990,16 @@ module Parse = struct
       |> seal
 
     let parse_operations_encoding =
-      union
-        [
-          case
-            ~title:"new_encoding_parse_operations"
-            (Tag 1)
-            (list (dynamic_size Operation.encoding))
-            (function
-              | Version_1, parse_operations -> Some parse_operations
-              | Version_0, _ -> None)
-            (fun parse_operations -> (Version_1, parse_operations));
-          case
-            ~title:"old_encoding_parse_operations"
-            Json_only
-            (list
-               (dynamic_size Operation.encoding_with_legacy_attestation_name))
-            (function
-              | Version_0, parse_operations -> Some parse_operations
-              | Version_1, _ -> None)
-            (fun parse_operations -> (Version_0, parse_operations));
-        ]
+      encoding_versioning
+        ~encoding_name:"parse_operations"
+        ~latest_encoding:(Version_1, list (dynamic_size Operation.encoding))
+        ~old_encodings:
+          [
+            ( Version_0,
+              list
+                (dynamic_size Operation.encoding_with_legacy_attestation_name)
+            );
+          ]
 
     let operations =
       RPC_service.post_service
