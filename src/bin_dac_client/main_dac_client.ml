@@ -76,18 +76,15 @@ let wait_for_threshold_arg =
     positive_int_parameter
 
 let coordinator_rpc_parameter =
-  Tezos_clic.parameter (fun _cctxt h ->
-      match String.split ':' h with
-      | [host; port] ->
-          Lwt.catch
-            (fun () ->
-              Lwt_result.return
-              @@ Dac_node_client.make_unix_cctxt
-                   ~scheme:"http"
-                   ~host
-                   ~port:(int_of_string port))
-            (fun _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
-      | _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
+  let open Dac_clic_helpers in
+  Tezos_clic.parameter (fun _cctxt rpc ->
+      let open Lwt_result_syntax in
+      let parsed_rpc_result = Parsed_rpc.of_string rpc in
+      match parsed_rpc_result with
+      | Ok {scheme; host; port} ->
+          return (Dac_node_client.make_unix_cctxt ~scheme ~host ~port)
+      | Error (`Parse_rpc_error msg) ->
+          failwith "Parse Coordinator rpc address failed: %s" msg)
 
 let hex_parameter =
   Tezos_clic.parameter (fun _cctxt h ->
@@ -99,7 +96,9 @@ let hex_parameter =
 let coordinator_rpc_param ?(name = "DAC coordinator rpc address parameter")
     ?(desc = "The address of the DAC coordinator") =
   let desc =
-    String.concat "\n" [desc; "An address of the form <rpc_address>:<rpc_port>"]
+    String.concat
+      "\n"
+      [desc; "A http/https url or an address in the form of <ip_addr>:<port>."]
   in
   Tezos_clic.param ~name ~desc coordinator_rpc_parameter
 
