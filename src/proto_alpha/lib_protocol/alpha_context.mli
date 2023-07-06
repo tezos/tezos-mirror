@@ -4963,20 +4963,6 @@ end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
-  type t
-
-  val zero : t
-
-  val min : t -> t -> t
-
-  val ( = ) : t -> t -> bool
-
-  val credit_frozen_deposits_pseudotokens_for_tez_amount :
-    context -> public_key_hash -> Tez.t -> (context * t) tzresult Lwt.t
-
-  val credit_costaking_pseudotokens :
-    context -> Contract.t -> t -> context tzresult Lwt.t
-
   val stake :
     context ->
     contract:Contract.t ->

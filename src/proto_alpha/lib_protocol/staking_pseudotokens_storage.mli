@@ -60,21 +60,6 @@
 val init_delegate_pseudotokens_from_frozen_deposits_balance :
   Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
-    increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
-    [tez_amount] multiplied by the current rate of the delegate's frozen
-    deposits pseudotokens per tez, as
-    [frozen_deposits_pseudotokens_for_tez_amount] would return.
-    The function also returns [pa].
-
-    This function must be called on "stake" before transferring tez to
-    [delegate]'s frozen deposits. *)
-val credit_frozen_deposits_pseudotokens_for_tez_amount :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
-  (Raw_context.t * Staking_pseudotoken_repr.t) tzresult Lwt.t
-
 (** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
     current costaking balance converted into tez using [delegate] frozen
     deposits tez/pseudotokens rate.
@@ -86,14 +71,6 @@ val costaking_balance_as_tez :
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->
   Tez_repr.t tzresult Lwt.t
-
-(** [credit_costaking_pseudotokens ctxt contract p_amount] increases
-    [contract]'s costaking pseudotokens balance by [p_amount]. *)
-val credit_costaking_pseudotokens :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Staking_pseudotoken_repr.t ->
-  Raw_context.t tzresult Lwt.t
 
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     costaking pseudotokens and the [delagte]'s frozen deposits pseudotokens by

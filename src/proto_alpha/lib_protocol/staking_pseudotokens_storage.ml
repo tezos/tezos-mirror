@@ -127,6 +127,15 @@ let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   in
   return (ctxt, x)
 
+(** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
+  increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
+  [tez_amount] multiplied by the current rate of the delegate's frozen
+  deposits pseudotokens per tez, as
+  [frozen_deposits_pseudotokens_for_tez_amount] would return.
+  The function also returns [pa].
+
+  This function must be called on "stake" before transferring tez to
+  [delegate]'s frozen deposits. *)
 let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     =
   if Tez_repr.(tez_amount = zero) then
@@ -219,6 +228,8 @@ let update_costaking_pseudotokens ~f ctxt contract =
   in
   return ctxt
 
+(** [credit_costaking_pseudotokens ctxt contract p_amount] increases
+    [contract]'s costaking pseudotokens balance by [p_amount]. *)
 let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
   let f current_pseudotokens_balance =
     Staking_pseudotoken_repr.(
