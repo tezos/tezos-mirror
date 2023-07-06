@@ -1070,30 +1070,22 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           |> seal
 
         let preapplied_operations_encoding =
-          union
-            [
-              case
-                ~title:"preapplied_operations_encoding"
-                (Tag 1)
-                (list
-                   (dynamic_size Next_proto.operation_data_and_receipt_encoding))
-                (function
-                  | Version_1, preapply_operations -> Some preapply_operations
-                  | (Version_0 | Version_2), _ -> None)
-                (fun preapply_operations -> (Version_1, preapply_operations));
-              case
-                ~title:
-                  "preapplied_operations_encoding_with_legacy_attestation_name"
-                (Tag 0)
-                (list
-                   (dynamic_size
-                      Next_proto
-                      .operation_data_and_receipt_encoding_with_legacy_attestation_name))
-                (function
-                  | Version_0, preapply_operations -> Some preapply_operations
-                  | (Version_1 | Version_2), _ -> None)
-                (fun preapply_operations -> (Version_0, preapply_operations));
-            ]
+          encoding_versioning
+            ~encoding_name:"preapplied_operations"
+            ~latest_encoding:
+              ( Version_1,
+                list
+                  (dynamic_size Next_proto.operation_data_and_receipt_encoding)
+              )
+            ~old_encodings:
+              [
+                ( Version_0,
+                  list
+                    (dynamic_size
+                       Next_proto
+                       .operation_data_and_receipt_encoding_with_legacy_attestation_name)
+                );
+              ]
 
         let operations =
           Tezos_rpc.Service.post_service
