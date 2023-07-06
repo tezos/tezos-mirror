@@ -155,7 +155,6 @@ end = struct
 end
 
 let table_or =
-  assert (nb_wires_arch >= 3) ;
   Table.of_list
   @@ Scalar.
        [
@@ -163,11 +162,42 @@ let table_or =
          [|zero; one; zero; one|];
          [|zero; one; one; one|];
        ]
-  @ List.init (nb_wires_arch - 3) (Fun.const Scalar.[|zero; zero; zero; zero|])
+
+let table_xor =
+  Table.of_list
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; one; one; zero|];
+       ]
+
+let table_band =
+  Table.of_list
+  @@ Scalar.
+       [
+         [|zero; zero; one; one|];
+         [|zero; one; zero; one|];
+         [|zero; zero; zero; one|];
+       ]
+
+(* There are three ways to define a lookup table for a unary operation
+   when nb_wires_arch = 3. Let z := f x, then:
+    1. x 0 z
+    2. x x z
+    3. x z 0
+   In this module, we choose option 1. *)
+let table_bnot =
+  Table.of_list @@ Scalar.[[|zero; one|]; [|zero; zero|]; [|one; zero|]]
 
 module Tables = Map.Make (String)
 
-let table_registry = Tables.add "or" table_or Tables.empty
+let table_registry =
+  let t = Tables.add "or" table_or Tables.empty in
+  let t = Tables.add "xor" table_xor t in
+  let t = Tables.add "band" table_band t in
+  let t = Tables.add "bnot" table_bnot t in
+  t
 
 module CS = struct
   let q_list ?q_table ~qc ~linear ~linear_g ~qm ~qx2b ~qx5a ~qx5c ~qecc_ws_add

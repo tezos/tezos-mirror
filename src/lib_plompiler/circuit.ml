@@ -799,11 +799,6 @@ module Bool = struct
       |]
     >* ret @@ Bool o
 
-  let bor_lookup (Bool l) (Bool r) =
-    let* (Bool o) = fresh Dummy.bool in
-    append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
-    >* ret @@ Bool o
-
   let swap : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
     let scalar_swap (Bool b) (Scalar x) (Scalar y) =
       let*& u = fresh Dummy.scalar in
@@ -858,6 +853,38 @@ module Bool = struct
           foldM Num.add (scalar_of_bool hd) (List.map scalar_of_bool tl)
         in
         is_eq_const sum (S.of_int @@ (List.length tl + 1))
+
+  module Internal = struct
+    let bor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
+      >* ret @@ Bool o
+
+    let xor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"xor"
+        "xor lookup"
+      >* ret @@ Bool o
+
+    let band_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"band"
+        "band lookup"
+      >* ret @@ Bool o
+
+    let bnot_lookup (Bool b) =
+      let* (Bool o) = fresh Dummy.bool in
+      let* (Scalar zero) = fresh Dummy.scalar in
+      append_lookup
+        ~wires:[Input b; Input zero; Output o]
+        ~table:"bnot"
+        "bnot lookup"
+      >* ret @@ Bool o
+  end
 end
 
 let hd (List l) = match l with [] -> assert false | x :: _ -> ret x

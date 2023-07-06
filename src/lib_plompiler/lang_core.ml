@@ -96,8 +96,6 @@ module type BOOL = sig
 
   val bor : bool repr -> bool repr -> bool repr t
 
-  val bor_lookup : bool repr -> bool repr -> bool repr t
-
   val bnot : bool repr -> bool repr t
 
   val ifthenelse : bool repr -> 'a repr -> 'a repr -> 'a repr t
@@ -111,6 +109,16 @@ module type BOOL = sig
   val constant : bool -> bool repr t
 
   val band_list : bool repr list -> bool repr t
+
+  module Internal : sig
+    val bor_lookup : bool repr -> bool repr -> bool repr t
+
+    val xor_lookup : bool repr -> bool repr -> bool repr t
+
+    val band_lookup : bool repr -> bool repr -> bool repr t
+
+    val bnot_lookup : bool repr -> bool repr t
+  end
 end
 
 module type COMMON = sig

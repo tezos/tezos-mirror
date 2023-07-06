@@ -297,8 +297,6 @@ module Bool = struct
 
   let bor (B l) (B r) = ret @@ B (l || r)
 
-  let bor_lookup (B l) (B r) = bor (B l) (B r)
-
   let bnot (B b) = ret @@ B (not b)
 
   let ifthenelse (B b) l r = if b then ret l else ret r
@@ -307,6 +305,16 @@ module Bool = struct
 
   let band_list l : bool repr t =
     ret @@ List.fold_left (fun (B a) (B b) -> B (a && b)) (B true) l
+
+  module Internal = struct
+    let bor_lookup (B l) (B r) = bor (B l) (B r)
+
+    let xor_lookup (B l) (B r) = xor (B l) (B r)
+
+    let band_lookup (B l) (B r) = band (B l) (B r)
+
+    let bnot_lookup (B b) = bnot (B b)
+  end
 end
 
 let point x y = P (S (X x), S (X y))

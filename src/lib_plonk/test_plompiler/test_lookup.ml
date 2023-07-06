@@ -45,7 +45,7 @@ functor
       let* x = input ~kind:`Public x in
       let* y = input y in
       let* z = input z in
-      let* z' = bor_lookup x y in
+      let* z' = Internal.bor_lookup x y in
       assert_equal z z'
 
     let tests_bor =
@@ -60,7 +60,7 @@ functor
           ]
 
     let bor_lookup a b =
-      let* l = map2M Bool.bor_lookup (of_list a) (of_list b) in
+      let* l = map2M Bool.Internal.bor_lookup (of_list a) (of_list b) in
       ret @@ to_list l
 
     let test_bor_bytes a b z () =
