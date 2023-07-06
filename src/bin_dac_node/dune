@@ -19,6 +19,7 @@
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
   tezos-stdlib
+  tezos-dac-lib
   tezos_dac_node_lib
   tezos_layer2_store
   irmin-pack
@@ -42,6 +43,7 @@
   -open Tezos_rpc_http
   -open Tezos_stdlib_unix
   -open Tezos_stdlib
+  -open Tezos_dac_lib
   -open Tezos_dac_node_lib
   -open Tezos_layer2_store))
 

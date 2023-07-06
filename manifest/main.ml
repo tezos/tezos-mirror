@@ -7371,6 +7371,7 @@ let _octez_dac_node =
          octez_rpc_http_client_unix;
          octez_stdlib_unix |> open_;
          octez_stdlib |> open_;
+         octez_dac_lib |> open_;
          octez_dac_node_lib |> open_;
          octez_layer2_store |> open_;
          irmin_pack;

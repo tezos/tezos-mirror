@@ -156,12 +156,13 @@ let allow_v1_api_arg : (bool, Client_context.full) Tezos_clic.arg =
     ()
 
 let raw_rpc_parameter =
-  Tezos_clic.parameter (fun _cctxt h ->
-      match String.split ':' h with
-      | [host_name; port] -> (
-          try Lwt.return_ok (host_name, int_of_string port)
-          with _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
-      | _ -> failwith "Address not in format <rpc_address>:<rpc_port>")
+  let open Lwt_result_syntax in
+  let open Dac_clic_helpers in
+  Tezos_clic.parameter (fun _cctxt raw_rpc ->
+      let parsed_rpc_result = Parsed_rpc.of_string raw_rpc in
+      match parsed_rpc_result with
+      | Ok parsed_rpc -> return parsed_rpc
+      | Error (`Parse_rpc_error msg) -> failwith "%s" msg)
 
 let coordinator_rpc_param ?(name = "coordinator-rpc-address")
     ?(desc =
@@ -308,24 +309,29 @@ module Config_init = struct
       @@ tz4_address_param ~desc:"BLS public key hash to use as the signer."
       @@ stop)
       (fun (data_dir, rpc_address, rpc_port, reveal_data_dir, allow_v1_api)
-           (coordinator_rpc_address, coordinator_rpc_port)
+           coordinator_rpc_address
            address
            cctxt ->
         experimental_disclaimer () ;
+        let coordinator_rpc_address =
+          Uri.make
+            ~scheme:coordinator_rpc_address.scheme
+            ~host:coordinator_rpc_address.host
+            ~port:coordinator_rpc_address.port
+            ()
+        in
         create_configuration
           ~data_dir
           ~reveal_data_dir
           ~rpc_address
           ~rpc_port
           ~allow_v1_api
-          (Configuration.make_committee_member
-             coordinator_rpc_address
-             coordinator_rpc_port
-             address)
+          (Configuration.make_committee_member ~coordinator_rpc_address address)
           cctxt)
 
   let observer_command =
     let open Tezos_clic in
+    let open Dac_clic_helpers in
     command
       ~group
       ~desc:"Configure DAC node in observer mode."
@@ -351,10 +357,23 @@ module Config_init = struct
              reveal_data_dir,
              timeout,
              allow_v1_api )
-           (coordinator_rpc_address, coordinator_rpc_port)
+           coordinator_rpc_address
            committee_rpc_addresses
            cctxt ->
         experimental_disclaimer () ;
+        let committee_rpc_addresses =
+          List.map
+            (fun Parsed_rpc.{scheme; host; port} ->
+              Uri.make ~scheme ~host ~port ())
+            committee_rpc_addresses
+        in
+        let coordinator_rpc_address =
+          Uri.make
+            ~scheme:coordinator_rpc_address.scheme
+            ~host:coordinator_rpc_address.host
+            ~port:coordinator_rpc_address.port
+            ()
+        in
         create_configuration
           ~data_dir
           ~reveal_data_dir
@@ -364,8 +383,7 @@ module Config_init = struct
           (Configuration.make_observer
              ~committee_rpc_addresses
              ?timeout
-             coordinator_rpc_address
-             coordinator_rpc_port)
+             coordinator_rpc_address)
           cctxt)
 
   let commands =

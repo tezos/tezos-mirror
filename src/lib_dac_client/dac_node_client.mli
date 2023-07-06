@@ -39,6 +39,9 @@ class unix_cctxt :
     the client configuration parameters. *)
 val make_unix_cctxt : scheme:string -> host:string -> port:int -> cctxt
 
+(** [of_uri uri] generates a cctxt from [uri]. *)
+val of_uri : Uri.t -> cctxt
+
 (** [V0] is a module that provides a client specification for interacting with
     experimental [Tezos_lib_dac.Rpc_services.Api.V0] API. Note that even though
     [V0] api is binding, it is already deprecated. Use it at your own risk! *)
