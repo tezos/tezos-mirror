@@ -64,15 +64,6 @@
          {debit_frozen_deposits_pseudotokens} in {request_unstake}.
 *)
 
-(** [init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract]
-    initializes [contract]'s frozen deposits pseudotokens and costaking
-    pseudotokens usings [contract]'s current frozen deposits tez.
-
-    This function must be called whenever a contract's frozen deposits tez are
-    initialized (see invariant above). *)
-val init_delegate_pseudotokens_from_frozen_deposits_balance :
-  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
-
 (** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
     current costaking balance converted into tez using [delegate] frozen
     deposits tez/pseudotokens rate.

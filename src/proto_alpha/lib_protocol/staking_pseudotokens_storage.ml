@@ -23,26 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract =
-  let open Lwt_result_syntax in
-  let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt contract
-  in
-  let initial_pseudotokens =
-    Staking_pseudotoken_repr.of_int64_exn
-      (Tez_repr.to_mutez frozen_deposits_tez)
-  in
-  let* ctxt =
-    Storage.Contract.Frozen_deposits_pseudotokens.init
-      ctxt
-      contract
-      initial_pseudotokens
-  in
-  Storage.Contract.Costaking_pseudotokens.init
-    ctxt
-    contract
-    initial_pseudotokens
-
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
   if Tez_repr.(frozen_deposits_tez = zero) then (
