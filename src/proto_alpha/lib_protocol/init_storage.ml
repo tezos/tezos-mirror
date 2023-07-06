@@ -128,6 +128,17 @@ let migrate_staking_balance_for_o ctxt =
       let* stake = convert ctxt delegate staking_balance in
       Storage.Stake.Staking_balance.update ctxt delegate stake)
 
+(** Clear staking balance snapshots to avoid storing legacy values.
+    This should do nothing if the migration happens at a cycle
+    boundary, which is usually the case.
+*)
+let clear_staking_balance_snapshots_for_o ctxt =
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.clear ctxt
+  in
+  Storage.Stake.Last_snapshot.update ctxt 0
+
 (** Converts {Storage.Stake.Total_active_stake} and
     {Storage.Stake.Selected_distribution_for_cycle} from {Tez_repr} to
     {Stake_repr}.
@@ -276,6 +287,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         Signature.Public_key_hash.Set.empty
       >>=? fun ctxt ->
       migrate_staking_balance_for_o ctxt >>=? fun ctxt ->
+      clear_staking_balance_snapshots_for_o ctxt >>=? fun ctxt ->
       migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
       initialize_total_supply_for_o chain_id ctxt >>= fun ctxt ->
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
