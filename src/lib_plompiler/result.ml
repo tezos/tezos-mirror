@@ -317,6 +317,39 @@ module Bool = struct
   end
 end
 
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits =
+    (* As we use the Int functions (logxor, logand, etc.) to compute
+       the lookup table, the nb_bits is limited to int_size / 2. *)
+    assert (N.nb_bits <= 8) ;
+    N.nb_bits
+
+  let xor_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logxor (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let band_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logand (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let bnot_lookup (S (X l)) =
+    let mask = (1 lsl nb_bits) - 1 in
+    ret @@ to_s @@ S.of_int @@ Int.(logand (lognot (Z.to_int (S.to_z l))) mask)
+
+  let rotate_right_lookup (S (X l)) (S (X r)) i =
+    assert (i < nb_bits) ;
+    ret @@ to_s
+    @@ S.of_int
+         (Csir.rotate_right
+            ~nb_bits
+            (Z.to_int (S.to_z l))
+            (Z.to_int (S.to_z r))
+            i)
+end
+
 let point x y = P (S (X x), S (X y))
 
 let of_point (P (S (X x), S (X y))) = (x, y)

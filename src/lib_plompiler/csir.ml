@@ -190,6 +190,56 @@ let table_band =
 let table_bnot =
   Table.of_list @@ Scalar.[[|zero; one|]; [|zero; zero|]; [|one; zero|]]
 
+let generate_lookup_table_op1 ~nb_bits (f : int -> int) =
+  let n = 1 lsl nb_bits in
+  let x = Array.init n (fun i -> i) in
+  let y = Array.init n (fun _i -> 0) in
+  let z = Array.map f x in
+  List.map (Array.map Scalar.of_int) [x; y; z]
+
+let generate_lookup_table_op2 ~nb_bits (f : int -> int -> int) =
+  let n = 1 lsl nb_bits in
+  let x = List.init n (fun i -> Array.init n (fun _j -> i)) |> Array.concat in
+  let y = List.init n (fun _i -> Array.init n (fun j -> j)) |> Array.concat in
+  let z = Array.map2 f x y in
+  List.map (Array.map Scalar.of_int) [x; y; z]
+
+let table_bnot4 =
+  let nb_bits = 4 in
+  let mask4 = (1 lsl nb_bits) - 1 in
+  Table.of_list
+  @@ generate_lookup_table_op1 ~nb_bits (fun x -> Int.(logand (lognot x) mask4))
+
+let table_xor4 =
+  Table.of_list @@ generate_lookup_table_op2 ~nb_bits:4 Int.logxor
+
+let table_band4 =
+  Table.of_list @@ generate_lookup_table_op2 ~nb_bits:4 Int.logand
+
+let rotate_right ~nb_bits x y b =
+  let a = x + (y lsl nb_bits) in
+  let r = Int.logor (a lsr b) (a lsl ((2 * nb_bits) - b)) in
+  let mask = (1 lsl nb_bits) - 1 in
+  Int.logand r mask
+
+let table_rotate_right4_1 =
+  (* x0x1x2x3 y0y1y2y3 -> x1x2x3y0 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 1)
+
+let table_rotate_right4_2 =
+  (* x0x1x2x3 y0y1y2y3 -> x2x3y0y1 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 2)
+
+let table_rotate_right4_3 =
+  (* x0x1x2x3 y0y1y2y3 -> x3y0y1y2 *)
+  let nb_bits = 4 in
+  Table.of_list
+  @@ generate_lookup_table_op2 ~nb_bits (fun x y -> rotate_right ~nb_bits x y 3)
+
 module Tables = Map.Make (String)
 
 let table_registry =
@@ -197,6 +247,12 @@ let table_registry =
   let t = Tables.add "xor" table_xor t in
   let t = Tables.add "band" table_band t in
   let t = Tables.add "bnot" table_bnot t in
+  let t = Tables.add "bnot4" table_bnot4 t in
+  let t = Tables.add "xor4" table_xor4 t in
+  let t = Tables.add "band4" table_band4 t in
+  let t = Tables.add "rotate_right4_1" table_rotate_right4_1 t in
+  let t = Tables.add "rotate_right4_2" table_rotate_right4_2 t in
+  let t = Tables.add "rotate_right4_3" table_rotate_right4_3 t in
   t
 
 module CS = struct

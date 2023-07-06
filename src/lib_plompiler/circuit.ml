@@ -887,6 +887,47 @@ module Bool = struct
   end
 end
 
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits = N.nb_bits
+
+  let xor_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("xor" ^ Int.to_string nb_bits)
+      ("xor lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let band_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("band" ^ Int.to_string nb_bits)
+      ("band lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let bnot_lookup (Scalar l) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let* (Scalar zero) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input zero; Output o]
+      ~table:("bnot" ^ Int.to_string nb_bits)
+      ("bnot lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let rotate_right_lookup (Scalar l) (Scalar r) i =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let nb_bits_i = Int.to_string nb_bits ^ "_" ^ Int.to_string i in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("rotate_right" ^ nb_bits_i)
+      ("rotate_right lookup" ^ nb_bits_i)
+    >* ret @@ Scalar o
+end
+
 let hd (List l) = match l with [] -> assert false | x :: _ -> ret x
 
 let assert_equal : type a. a repr -> a repr -> unit repr t =
