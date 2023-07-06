@@ -27,18 +27,18 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
-(* Invariant: all delegates with non-zero frozen deposits tez have their
-   frozen deposits pseudotokens initialized.
+(* Invariant 1:
+     For {!Storage.Contract.Frozen_deposits_pseudotokens}, a missing key is
+     equivalent to a value of [0], in which case it is also equivalent to having
+     the same amount of tokens in the balances
+     {!Storage.Contract.Frozen_deposits_pseudotokens} and
+     {!Storage.Contract.Frozen_deposits}.
 
-   It is ensured by:
-     - [init_delegate_pseudotokens_from_frozen_deposits_balance] called
-       for bootstrap accounts and at stitching to protocol O;
-     - stake correctly handles missing pseudotokens and offers a 1:1
-       tez/pseudotoken rate fallback;
-     - frozen deposits can be initialized only by:
-       - stake,
-       - rewards, but rewards can be paid only if a delegate has a non-zero
-         stake, hence has staked before. *)
+     This is ensured by:
+       - checking that the result of
+         {!Storage.Contract.Frozen_deposits_pseudotokens.find} is always matched
+         with [Some v when Staking_pseudotoken_repr.(v <> zero)].
+*)
 
 (** [init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract]
     initializes [contract]'s frozen deposits pseudotokens and costaking

@@ -49,10 +49,12 @@ let get_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez =
     Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
   in
   match frozen_deposits_pseudotokens_opt with
-  | None ->
+  | Some frozen_deposits_pseudotokens
+    when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+      frozen_deposits_pseudotokens
+  | _ ->
       Staking_pseudotoken_repr.of_int64_exn
         (Tez_repr.to_mutez frozen_deposits_tez)
-  | Some frozen_deposits_pseudotokens -> frozen_deposits_pseudotokens
 
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =

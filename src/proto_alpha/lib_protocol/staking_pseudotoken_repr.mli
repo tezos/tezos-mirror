@@ -37,6 +37,8 @@ val to_int64 : t -> int64
 
 val ( = ) : t -> t -> bool
 
+val ( <> ) : t -> t -> bool
+
 val ( +? ) : t -> t -> t tzresult
 
 val ( -? ) : t -> t -> t tzresult
