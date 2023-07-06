@@ -227,7 +227,7 @@ module MakeAbstract
         let trace =
           [Operation_replacement {old_hash = removed; new_hash = op.hash}]
         in
-        return_some (removed, `Outdated trace)
+        return_some (removed, classification_of_trace trace)
     | Unchanged ->
         (* There was an operation conflict and [op] lost to the
            pre-existing operation. The error should indicate the fee

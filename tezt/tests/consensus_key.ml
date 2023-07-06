@@ -409,14 +409,14 @@ let test_update_consensus_key =
     let* json =
       RPC.get_chain_mempool_pending_operations () |> RPC.Client.call client
     in
-    let replaced_op = JSON.(json |-> "outdated" |> geti 0) in
+    let replaced_op = JSON.(json |-> "branch_delayed" |> geti 0) in
     let replaced_op_kind =
       JSON.(replaced_op |-> "contents" |> geti 0 |-> "kind" |> as_string)
     in
     Check.((replaced_op_kind = "transaction") string)
       ~error_msg:
-        "Expected the replaced transaction to be in the outdated pool, but \
-         instead found %L." ;
+        "Expected the replaced transaction to be in the branch_delayed pool, \
+         but instead found %L." ;
     let replaced_op_err =
       JSON.(replaced_op |-> "error" |> geti 0 |-> "id" |> as_string)
     in

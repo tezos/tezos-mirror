@@ -193,6 +193,16 @@ Node
   ``double_attestation_evidence`` and ``double_preattestation_evidence`` kinds
   in the JSON result. (MR :gl:`!9008`)
 
+- When an operation in the mempool gets replaced with a better
+  conflicting operation (e.g. an operation from the same manager with
+  higher fees), the replaced operation is now reclassified as
+  ``branch_delayed`` instead of ``outdated``. The associated error
+  ``prevalidation.operation_replacement`` is otherwise unchanged. This
+  makes it consistent with the reverse situation: when the new
+  operation is worse than the old conflicting one, the new operation
+  is classified as ``branch_delayed`` with the
+  ``prevalidation.operation_conflict`` error. (MR :gl:`!9314`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
