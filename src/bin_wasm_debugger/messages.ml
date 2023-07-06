@@ -161,57 +161,10 @@ let compare_input_buffer_messages i1 i2 =
    also handles deserialization from raw bytes. If the message cannot be
    decoded, it prints its hexadecimal representation. *)
 let pp_output ppf bytes =
-  let pp_message_untyped ppf
-      ({unparsed_parameters; destination; entrypoint} :
-        Sc_rollup.Outbox.Message.transaction) =
-    let json =
-      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
-    in
-    Format.fprintf
-      ppf
-      "@[{ unparsed_parameters: %a@; destination: %a@; entrypoint: %a }@]"
-      Data_encoding.Json.pp
-      json
-      Contract_hash.pp
-      destination
-      Entrypoint.pp
-      entrypoint
-  in
-  let pp_message_typed ppf
-      ({unparsed_parameters; unparsed_ty; destination; entrypoint} :
-        Sc_rollup.Outbox.Message.typed_transaction) =
-    let parameters_json =
-      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
-    in
-    let ty_json =
-      Data_encoding.Json.construct Script_repr.expr_encoding unparsed_ty
-    in
-    Format.fprintf
-      ppf
-      "@[<v2>unparsed_parameters: %a@,\
-       unparsed_ty: %a@,\
-       destination: %a@,\
-       entrypoint: %a@]"
-      Data_encoding.Json.pp
-      parameters_json
-      Data_encoding.Json.pp
-      ty_json
-      Contract_hash.pp
-      destination
-      Entrypoint.pp
-      entrypoint
-  in
-  let pp_batch ppf = function
-    | Sc_rollup.Outbox.Message.(Atomic_transaction_batch {transactions}) ->
-        Format.pp_print_list pp_message_untyped ppf transactions
-    | Sc_rollup.Outbox.Message.(Atomic_transaction_batch_typed {transactions})
-      ->
-        Format.pp_print_list pp_message_typed ppf transactions
-  in
   match
     Sc_rollup.Outbox.Message.(
       deserialize (unsafe_of_string (Bytes.to_string bytes)))
   with
   | Error _ ->
       Format.fprintf ppf "Unknown encoding: %a" Hex.pp (Hex.of_bytes bytes)
-  | Ok msgs -> pp_batch ppf msgs
+  | Ok msgs -> Sc_rollup.Outbox.Message.pp ppf msgs

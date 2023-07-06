@@ -3141,6 +3141,8 @@ module Sc_rollup : sig
             transactions : typed_transaction list;
           }
 
+      val pp : Format.formatter -> t -> unit
+
       type serialized
 
       val unsafe_of_string : string -> serialized
