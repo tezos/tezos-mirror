@@ -37,6 +37,9 @@ type ready_ctxt = {
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
   activation_level : Int32.t;
       (** The level at which the DAL node will start tracking the Octez node. *)
+  proto_level : int;
+      (** Index of the protocol of the L1 head, called [proto_level] in the
+          block's shell header. *)
 }
 
 (** The status of the dal node *)
@@ -62,9 +65,9 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt dal_plugin cryptobox proto_parameters level] updates
-    in place the status value to [Ready], and initializes the inner
-    [ready_ctxt] value with the given parameters.
+(** [set_ready ctxt dal_plugin cryptobox proto_parameters activation_level
+    proto_index] updates in place the status value to [Ready], and initializes
+    the inner [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
@@ -73,7 +76,12 @@ val set_ready :
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
   Int32.t ->
+  int ->
   unit
+
+(** Updates the plugin and the protocol level. Should *)
+val update_plugin_in_ready :
+  t -> (module Tezos_dal_node_lib.Dal_plugin.T) -> int -> unit
 
 type error += Node_not_ready
 

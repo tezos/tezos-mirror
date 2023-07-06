@@ -70,6 +70,9 @@ type 'a t = (Node.t, 'a) RPC_core.t
 (** RPC: [GET /config] *)
 val get_config : JSON.t t
 
+(** RPC: [GET /config/network/dal] *)
+val get_config_network_dal : JSON.t t
+
 (** RPC: [GET /network/connections]
 
     Returns the list of [(address, port, peer_id)] tuple. *)
@@ -284,7 +287,13 @@ val get_chain_chain_id : ?chain:string -> unit -> string t
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block :
-  ?chain:string -> ?block:string -> ?version:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?version:string ->
+  ?force_metadata:bool ->
+  ?metadata:[`Always | `Never] ->
+  unit ->
+  JSON.t t
 
 type block_metadata = {
   protocol : string;
@@ -302,6 +311,13 @@ type block_metadata = {
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> unit -> block_metadata t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/protocols]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_protocols :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/hash]
 
     [chain] defaults to ["main"].
@@ -315,6 +331,13 @@ val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/header/shell]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_header_shell :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [PATCH /chains/<chain>] to set ["bootstrapped"]
 

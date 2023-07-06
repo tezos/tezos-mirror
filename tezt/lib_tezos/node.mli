@@ -311,6 +311,11 @@ module Config_file : sig
   val set_sandbox_network_with_dal_config :
     Tezos_crypto_dal.Cryptobox.Config.t -> JSON.t -> JSON.t
 
+  (** Update the network config with the given user
+      activated upgrades. *)
+  val update_network_with_user_activated_upgrades :
+    (int * Protocol.t) list -> JSON.t -> JSON.t
+
   (** Set the prevalidator configuration in the given configuration. *)
   val set_prevalidator :
     ?operations_request_timeout:float ->

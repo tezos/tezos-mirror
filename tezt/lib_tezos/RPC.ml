@@ -52,6 +52,8 @@ end
 
 let get_config = make GET ["config"] Fun.id
 
+let get_config_network_dal = make GET ["config"; "network"; "dal"] Fun.id
+
 let get_network_connections =
   make GET ["network"; "connections"] @@ fun json ->
   let decode_connection json =
@@ -277,8 +279,20 @@ let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 
-let get_chain_block ?(chain = "main") ?(block = "head") ?version () =
-  let query_string = Query_arg.opt "version" Fun.id version in
+let get_chain_block ?(chain = "main") ?(block = "head") ?version
+    ?(force_metadata = false) ?metadata () =
+  let query_string =
+    Query_arg.opt "version" Fun.id version
+    @
+    if force_metadata then [("force_metadata", "")]
+    else
+      []
+      @
+      match metadata with
+      | Some `Never -> [("metadata", "never")]
+      | Some `Always -> [("metadata", "always")]
+      | None -> []
+  in
   make ~query_string GET ["chains"; chain; "blocks"; block] Fun.id
 
 type block_metadata = {
@@ -313,11 +327,17 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
   let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
   {dal_attestation; protocol; next_protocol; proposer; max_operations_ttl}
 
+let get_chain_block_protocols ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "protocols"] Fun.id
+
 let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
 
 let get_chain_block_header ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
+
+let get_chain_block_header_shell ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"; "shell"] Fun.id
 
 let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
   make

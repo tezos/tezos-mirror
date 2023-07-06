@@ -49,6 +49,10 @@ val layer1_node_tracking_started : unit t
 
 val protocol_plugin_resolved : Protocol_hash.t t
 
+val no_protocol_plugin : unit t
+
+val unexpected_protocol_plugin : unit t
+
 val daemon_error : Error_monad.tztrace t
 
 (** An event emitted at startup when the configuration of the node is read from

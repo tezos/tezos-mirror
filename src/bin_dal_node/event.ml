@@ -112,6 +112,24 @@ let protocol_plugin_resolved =
     ~pp1:Protocol_hash.pp_short
     ("proto_hash", Protocol_hash.encoding)
 
+let no_protocol_plugin =
+  declare_0
+    ~section
+    ~name:"dal_node_no_plugin"
+    ~msg:"Could not resolve plugin"
+    ~level:Error
+    ()
+
+let unexpected_protocol_plugin =
+  declare_0
+    ~section
+    ~name:"dal_node_unexpected_plugin"
+    ~msg:
+      "Found plugin for the current protocol, expected one for the next \
+       protocol."
+    ~level:Error
+    ()
+
 let daemon_error =
   declare_1
     ~section
