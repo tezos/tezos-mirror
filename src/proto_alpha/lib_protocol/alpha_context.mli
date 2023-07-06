@@ -2270,6 +2270,11 @@ module Delegate : sig
       Signature.Public_key_hash.t ->
       Staking_parameters_repr.t tzresult Lwt.t
 
+    val pending_updates :
+      context ->
+      Signature.Public_key_hash.t ->
+      (Cycle.t * Staking_parameters_repr.t) list Lwt.t
+
     val pay_rewards :
       context ->
       ?active_stake:Stake_repr.t ->
