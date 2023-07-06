@@ -3380,14 +3380,6 @@ let test_migration_plugin ~migrate_from ~migrate_to =
       repeat blocks_till_migration (fun () -> Client.bake_for_and_wait client)
     in
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6009
-       The daemon call to the following RPC fails with
-         "Failed to parse binary data: Not enough data."
-       This call can be removed, it's just a reminder of this problem. *)
-    let* _ =
-      RPC.(call node @@ get_chain_block ~version:"0" ~metadata:`Always ())
-    in
-
     Log.info "Migrated to %s" (Protocol.name migrate_to) ;
     (* The plugin will change after the following block, as the migration block
        is not yet finalized. *)

@@ -35,7 +35,6 @@ type ready_ctxt = {
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
-  activation_level : Int32.t;
   plugin_proto : int; (* the [proto_level] of the plugin *)
   last_seen_head : head_info option;
 }
@@ -79,8 +78,7 @@ let init config store gs_worker transport_layer cctxt metrics_server =
     metrics_server;
   }
 
-let set_ready ctxt plugin cryptobox proto_parameters activation_level
-    plugin_proto =
+let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
   match ctxt.status with
   | Starting ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
@@ -97,7 +95,6 @@ let set_ready ctxt plugin cryptobox proto_parameters activation_level
             cryptobox;
             proto_parameters;
             shards_proofs_precomputation;
-            activation_level;
             plugin_proto;
             last_seen_head = None;
           }

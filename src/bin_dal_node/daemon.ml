@@ -23,37 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [resolve_plugin protocols] tries to load [Dal_plugin.T] for either
-    [protocols.current_protocol], if it is equal to [protocols.next_protocol],
-    or [protocols.next_protocol] otherwise.
-    It is an error to use the plugin of [next_protocol] to track a block in
-    [current_protocol] when these are distinct. To avoid this error,
-    the wrapping polymorphic variant allows to decide whether we should start
-    to track the current block or the wait until the next one.  *)
+(** [resolve_plugin protocols] tries to load [Dal_plugin.T] for
+    [protocols.next_protocol]. We use [next_protocol] because we use the
+    returned plugin to process the block at the next level, the block at the
+    previous level being processed by the previous plugin (if any). *)
 let resolve_plugin
-    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) :
-    [ `Current of (module Dal_plugin.T)
-    | `Next of (module Dal_plugin.T)
-    | `No_plugin ]
-    Lwt.t =
+    (protocols : Tezos_shell_services.Chain_services.Blocks.protocols) =
   let open Lwt_syntax in
-  let plugin_opt =
-    if Protocol_hash.equal protocols.current_protocol protocols.next_protocol
-    then
-      Dal_plugin.get protocols.current_protocol
-      |> Option.map (fun plugin -> `Current plugin)
-    else
-      Dal_plugin.get protocols.next_protocol
-      |> Option.map (fun plugin -> `Next plugin)
+  let plugin_opt = Dal_plugin.get protocols.next_protocol in
+  let* () =
+    Option.iter_s
+      (fun plugin ->
+        let (module Plugin : Dal_plugin.T) = plugin in
+        Event.(emit protocol_plugin_resolved Plugin.Proto.hash))
+      plugin_opt
   in
-  match plugin_opt with
-  | None ->
-      let* () = Event.(emit no_protocol_plugin ()) in
-      return `No_plugin
-  | Some ((`Current dal_plugin | `Next dal_plugin) as arg) ->
-      let (module Dal_plugin : Dal_plugin.T) = dal_plugin in
-      let* () = Event.(emit protocol_plugin_resolved) Dal_plugin.Proto.hash in
-      return arg
+  return plugin_opt
 
 type error +=
   | Cryptobox_initialisation_failed of string
@@ -163,8 +148,7 @@ module Handler = struct
     (* Monitor heads and try resolve the DAL protocol plugin corresponding to
        the protocol of the targeted node. *)
     let open Lwt_result_syntax in
-    let handler stopper (block_hash, (block_header : Tezos_base.Block_header.t))
-        =
+    let handler stopper (block_hash, block_header) =
       let block = `Hash (block_hash, 0) in
       let* protocols =
         Tezos_shell_services.Chain_services.Blocks.protocols
@@ -172,14 +156,9 @@ module Handler = struct
           ~block:(`Hash (block_hash, 0))
           ()
       in
-      let*! resolved_plugin = resolve_plugin protocols in
-      match resolved_plugin with
-      | (`Current plugin | `Next plugin) as resolved ->
-          let plugin_activation_level =
-            match resolved with
-            | `Current _ -> block_header.shell.level
-            | `Next _ -> Int32.succ block_header.shell.level
-          in
+      let*! plugin_opt = resolve_plugin protocols in
+      match plugin_opt with
+      | Some plugin ->
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
@@ -203,8 +182,7 @@ module Handler = struct
             plugin
             cryptobox
             proto_parameters
-            plugin_activation_level
-            block_header.shell.proto_level ;
+            block_header.Block_header.shell.proto_level ;
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
 
              The hook below should be called each time cryptobox parameters
@@ -214,7 +192,7 @@ module Handler = struct
           let*! () = Event.(emit node_is_ready ()) in
           stopper () ;
           return_unit
-      | `No_plugin ->
+      | None ->
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
              Handle situtation where plugin is not found *)
           return_unit
@@ -229,27 +207,22 @@ module Handler = struct
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  let update_plugin cctxt ctxt current_plugin ~block ~current_proto ~block_proto
-      =
+  let may_update_plugin cctxt ctxt current_plugin ~block ~current_proto
+      ~block_proto =
     let open Lwt_result_syntax in
     if current_proto <> block_proto then
       let* protocols =
         Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
       in
-      let*! resolved_plugin = resolve_plugin protocols in
-      match resolved_plugin with
-      | `Next plugin ->
+      let*! plugin_opt = resolve_plugin protocols in
+      match plugin_opt with
+      | Some plugin ->
           Node_context.update_plugin_in_ready ctxt plugin block_proto ;
-          return (Some plugin)
-      | `Current _ ->
-          (* We are expecting a protocol change. If we're in this case, there's no
-             protocol change. *)
-          let*! () = Event.(emit unexpected_protocol_plugin ()) in
-          return None
-      | `No_plugin ->
-          (* An event is emitted by [resolve_plugin]. *)
-          return None
-    else return (Some current_plugin)
+          return_unit
+      | None ->
+          let*! () = Event.(emit no_protocol_plugin ()) in
+          return_unit
+    else return_unit
 
   (* Monitor heads and store *finalized* published slot headers indexed by block
      hash. A slot header is considered finalized when it is in a block with at
@@ -268,11 +241,10 @@ module Handler = struct
           in
           let Node_context.
                 {
-                  plugin = current_plugin;
+                  plugin = (module Plugin);
                   proto_parameters;
                   cryptobox;
                   shards_proofs_precomputation = _;
-                  activation_level;
                   plugin_proto;
                   last_seen_head;
                 } =
@@ -280,99 +252,93 @@ module Handler = struct
           in
           let process_block block_proto block_level =
             let block = `Level block_level in
-            let* plugin_opt =
-              update_plugin
-                cctxt
-                ctxt
-                current_plugin
-                ~block
-                ~current_proto:plugin_proto
-                ~block_proto
+            let* block_info =
+              Plugin.block_info cctxt ~block ~metadata:`Always
             in
-            match plugin_opt with
-            | None -> return_unit
-            | Some plugin ->
-                let (module Plugin) = plugin in
-                let* block_info =
-                  Plugin.block_info cctxt ~block ~metadata:`Always
-                in
-                let* slot_headers =
-                  Plugin.get_published_slot_headers block_info
-                in
-                let* () =
-                  Slot_manager.store_slot_headers
-                    ~block_level
-                    slot_headers
-                    (Node_context.get_store ctxt)
-                in
-                let* () =
-                  (* If a slot header was posted to the L1 and we have the corresponding
-                         data, post it to gossipsub.
-
-                     FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
-                     Should we restrict published slot data to the slots for which
-                     we have the producer role?
-                  *)
-                  List.iter_es
-                    (fun (slot_header, status) ->
-                      match status with
-                      | Dal_plugin.Succeeded ->
-                          let Dal_plugin.
-                                {slot_index; commitment; published_level} =
-                            slot_header
-                          in
-                          Slot_manager.publish_slot_data
-                            ~level_committee:(Node_context.fetch_committee ctxt)
-                            (Node_context.get_store ctxt)
-                            (Node_context.get_gs_worker ctxt)
-                            cryptobox
-                            proto_parameters
-                            commitment
-                            published_level
-                            slot_index
-                      | Dal_plugin.Failed -> return_unit)
-                    slot_headers
-                in
-                let*? attested_slots =
-                  Plugin.attested_slot_headers
-                    block_info
-                    ~number_of_slots:proto_parameters.number_of_slots
-                in
-                let*! () =
-                  Slot_manager.update_selected_slot_headers_statuses
-                    ~block_level
-                    ~attestation_lag:proto_parameters.attestation_lag
-                    ~number_of_slots:proto_parameters.number_of_slots
-                    attested_slots
-                    (Node_context.get_store ctxt)
-                in
-                let* committee =
-                  Node_context.fetch_committee ctxt ~level:block_level
-                in
-                let () =
-                  Profile_manager.on_new_head
-                    (Node_context.get_profile_ctxt ctxt)
-                    (Node_context.get_gs_worker ctxt)
-                    committee
-                in
-                let*! () = Event.(emit layer1_node_final_block block_level) in
-                return_unit
-          in
-          if Compare.Int32.(head_level < activation_level) then return_unit
-          else
+            let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
-              match last_seen_head with
-              | Some {level = last_head_level; proto}
-                when Int32.(succ last_head_level = head_level) ->
-                  process_block proto last_head_level
-              | _ -> return_unit
+              Slot_manager.store_slot_headers
+                ~block_level
+                slot_headers
+                (Node_context.get_store ctxt)
             in
-            let head_info =
-              Node_context.
-                {proto = header.shell.proto_level; level = head_level}
+            let* () =
+              (* If a slot header was posted to the L1 and we have the corresponding
+                     data, post it to gossipsub.
+
+                 FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
+                 Should we restrict published slot data to the slots for which
+                 we have the producer role?
+              *)
+              List.iter_es
+                (fun (slot_header, status) ->
+                  match status with
+                  | Dal_plugin.Succeeded ->
+                      let Dal_plugin.{slot_index; commitment; published_level} =
+                        slot_header
+                      in
+                      Slot_manager.publish_slot_data
+                        ~level_committee:(Node_context.fetch_committee ctxt)
+                        (Node_context.get_store ctxt)
+                        (Node_context.get_gs_worker ctxt)
+                        cryptobox
+                        proto_parameters
+                        commitment
+                        published_level
+                        slot_index
+                  | Dal_plugin.Failed -> return_unit)
+                slot_headers
             in
-            let*? () = Node_context.update_last_seen_head ctxt head_info in
-            return_unit
+            let*? attested_slots =
+              Plugin.attested_slot_headers
+                block_info
+                ~number_of_slots:proto_parameters.number_of_slots
+            in
+            let*! () =
+              Slot_manager.update_selected_slot_headers_statuses
+                ~block_level
+                ~attestation_lag:proto_parameters.attestation_lag
+                ~number_of_slots:proto_parameters.number_of_slots
+                attested_slots
+                (Node_context.get_store ctxt)
+            in
+            let* committee =
+              Node_context.fetch_committee ctxt ~level:block_level
+            in
+            let () =
+              Profile_manager.on_new_head
+                (Node_context.get_profile_ctxt ctxt)
+                (Node_context.get_gs_worker ctxt)
+                committee
+            in
+            let*! () = Event.(emit layer1_node_final_block block_level) in
+            may_update_plugin
+              cctxt
+              ctxt
+              ~block
+              ~current_proto:plugin_proto
+              ~block_proto
+          in
+          let* () =
+            match last_seen_head with
+            | Some {level = last_head_level; proto}
+              when Int32.(succ last_head_level = head_level) ->
+                if last_head_level > 1l then process_block proto last_head_level
+                else
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
+                     [last_head_level = 1] is a special migration block: in
+                     contrast to the general case, as implemented by this
+                     function, the plugin was set before processing the block,
+                     by [resolve_plugin_and_set_ready], not after processing the
+                     block. We do not process the block at level 1. *)
+                  return_unit
+            | _ -> return_unit
+          in
+          let head_info =
+            Node_context.{proto = header.shell.proto_level; level = head_level}
+          in
+          let*? () = Node_context.update_last_seen_head ctxt head_info in
+          return_unit
     in
 
     let*! () = Event.(emit layer1_node_tracking_started ()) in
