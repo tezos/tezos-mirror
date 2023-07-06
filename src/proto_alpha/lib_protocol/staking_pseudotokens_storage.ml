@@ -89,30 +89,6 @@ let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     in
     Tez_repr.of_mutez_exn (Z.to_int64 res_z)
 
-let tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
-  let open Lwt_result_syntax in
-  if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
-    return Tez_repr.zero
-  else
-    let contract = Contract_repr.Implicit delegate in
-    let* frozen_deposits_pseudotokens_opt =
-      Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-    in
-    match frozen_deposits_pseudotokens_opt with
-    | Some frozen_deposits_pseudotokens
-      when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-        let+ {current_amount = frozen_deposits_tez; initial_amount = _} =
-          Frozen_deposits_storage.get ctxt contract
-        in
-        tez_of
-          ~frozen_deposits_pseudotokens
-          ~frozen_deposits_tez
-          ~pseudotoken_amount
-    | _ ->
-        return
-          (Tez_repr.of_mutez_exn
-             (Staking_pseudotoken_repr.to_int64 pseudotoken_amount))
-
 let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
@@ -207,8 +183,28 @@ let costaking_pseudotokens_balance ctxt contract =
 
 let costaking_balance_as_tez ctxt ~contract ~delegate =
   let open Lwt_result_syntax in
-  let* pseudotokens = costaking_pseudotokens_balance ctxt contract in
-  tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotokens
+  let* pseudotoken_amount = costaking_pseudotokens_balance ctxt contract in
+  if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
+    return Tez_repr.zero
+  else
+    let delegate_contract = Contract_repr.Implicit delegate in
+    let* frozen_deposits_pseudotokens_opt =
+      Storage.Contract.Frozen_deposits_pseudotokens.find ctxt delegate_contract
+    in
+    match frozen_deposits_pseudotokens_opt with
+    | Some frozen_deposits_pseudotokens
+      when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+        let+ {current_amount = frozen_deposits_tez; initial_amount = _} =
+          Frozen_deposits_storage.get ctxt delegate_contract
+        in
+        tez_of
+          ~frozen_deposits_pseudotokens
+          ~frozen_deposits_tez
+          ~pseudotoken_amount
+    | _ ->
+        return
+          (Tez_repr.of_mutez_exn
+             (Staking_pseudotoken_repr.to_int64 pseudotoken_amount))
 
 let update_costaking_pseudotokens ~f ctxt contract =
   let open Lwt_result_syntax in
