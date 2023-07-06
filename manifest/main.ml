@@ -4068,9 +4068,7 @@ let octez_crawler =
     ~synopsis:"Octez: library to crawl blocks of the L1 chain"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_rpc_http |> open_;
         octez_base_unix;
         octez_stdlib_unix |> open_;
