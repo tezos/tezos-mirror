@@ -12,7 +12,6 @@ use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
-use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
 // The signature is a combination of the smart rollup address the upgrade nonce and
@@ -48,8 +47,9 @@ pub fn upgrade_kernel<Host: Runtime>(
 ) -> Result<(), Error> {
     debug_msg!(host, "Kernel upgrade initialisation.\n");
 
-    let config_program = upgrade_reveal_flow(root_hash);
-    eval_config_program(host, &config_program)
+    let config = upgrade_reveal_flow(root_hash);
+    config
+        .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
     debug_msg!(host, "Kernel is ready to be upgraded.\n");
@@ -63,7 +63,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
     use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
-    use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
+    use tezos_smart_rollup_host::KERNEL_BOOT_PATH;
     use tezos_smart_rollup_mock::MockHost;
 
     #[test]
@@ -119,7 +119,7 @@ mod tests {
         upgrade_kernel(&mut host, root_hash.into())
             .expect("Kernel upgrade must succeed.");
 
-        let boot_kernel = host.store_read_all(&TMP_REVEAL_PATH).unwrap();
+        let boot_kernel = host.store_read_all(&KERNEL_BOOT_PATH).unwrap();
         assert_eq!(original_kernel, boot_kernel);
     }
 }
