@@ -4102,9 +4102,7 @@ let octez_smart_rollup_lib =
     ~synopsis:"Octez: library for Smart Rollups "
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix;
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
