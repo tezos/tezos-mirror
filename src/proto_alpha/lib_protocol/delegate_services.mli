@@ -161,4 +161,16 @@ val participation :
   public_key_hash ->
   Delegate.participation_info shell_tzresult Lwt.t
 
+val active_staking_parameters :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Staking_parameters_repr.t shell_tzresult Lwt.t
+
+val pending_staking_parameters :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  (Cycle.t * Staking_parameters_repr.t) list shell_tzresult Lwt.t
+
 val register : unit -> unit
