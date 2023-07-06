@@ -3,133 +3,32 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{apply_transaction, TransactionObjectInfo, TransactionReceiptInfo};
+use crate::apply::apply_transaction;
+use crate::block_in_progress;
 use crate::blueprint::{Blueprint, Queue};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
-use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{self, init_account_index};
-use evm_execution::account_storage::init_account_storage;
-use evm_execution::account_storage::EthereumAccountStorage;
+use block_in_progress::BlockInProgress;
+use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
-use tezos_ethereum::transaction::TransactionObject;
+use primitive_types::U256;
 use tezos_smart_rollup_host::runtime::Runtime;
 
-use primitive_types::{H256, U256};
-use tezos_ethereum::block::{BlockConstants, L2Block};
-use tezos_ethereum::transaction::{
-    TransactionReceipt, TransactionStatus, TransactionType,
-};
-
-fn make_receipt(
-    block: &L2Block,
-    receipt_info: TransactionReceiptInfo,
-    cumulative_gas_used: &mut U256,
-) -> Result<TransactionReceipt, Error> {
-    let hash = receipt_info.tx_hash;
-    let index = receipt_info.index;
-    let block_hash = block.hash;
-    let block_number = block.number;
-    let from = receipt_info.caller;
-    let to = receipt_info.to;
-    let effective_gas_price = block.constants().gas_price;
-
-    let tx_receipt = match receipt_info.execution_outcome {
-        Some(outcome) => {
-            *cumulative_gas_used = cumulative_gas_used
-                .checked_add(U256::from(outcome.gas_used))
-                .ok_or(Error::Transfer(CumulativeGasUsedOverflow))?;
-            TransactionReceipt {
-                hash,
-                index,
-                block_hash,
-                block_number,
-                from,
-                to,
-                cumulative_gas_used: *cumulative_gas_used,
-                effective_gas_price,
-                gas_used: U256::from(outcome.gas_used),
-                contract_address: outcome.new_address,
-                type_: TransactionType::Legacy,
-                status: if outcome.is_success {
-                    TransactionStatus::Success
-                } else {
-                    TransactionStatus::Failure
-                },
-            }
-        }
-        None => TransactionReceipt {
-            hash,
-            index,
-            block_hash,
-            block_number,
-            from,
-            to,
-            cumulative_gas_used: *cumulative_gas_used,
-            effective_gas_price,
-            gas_used: U256::zero(),
-            contract_address: None,
-            type_: TransactionType::Legacy,
-            status: TransactionStatus::Failure,
-        },
-    };
-
-    Ok(tx_receipt)
-}
-
-fn make_receipts(
-    block: &L2Block,
-    receipt_infos: Vec<TransactionReceiptInfo>,
-) -> Result<Vec<TransactionReceipt>, Error> {
-    let mut cumulative_gas_used = U256::zero();
-    receipt_infos
-        .into_iter()
-        .map(|receipt_info| make_receipt(block, receipt_info, &mut cumulative_gas_used))
-        .collect()
-}
-
-fn make_objects(
-    object_infos: Vec<TransactionObjectInfo>,
-    block_hash: &H256,
-    block_number: &U256,
-) -> Vec<TransactionObject> {
-    object_infos
-        .into_iter()
-        .map(|object_info| TransactionObject {
-            block_hash: *block_hash,
-            block_number: *block_number,
-            from: object_info.from,
-            gas_used: object_info.gas_used,
-            gas_price: object_info.gas_price,
-            hash: object_info.hash,
-            input: object_info.input,
-            nonce: object_info.nonce,
-            to: object_info.to,
-            index: object_info.index,
-            value: object_info.value,
-            v: object_info.v,
-            r: object_info.r,
-            s: object_info.s,
-        })
-        .collect()
-}
+use tezos_ethereum::block::BlockConstants;
 
 fn compute<Host: Runtime>(
     host: &mut Host,
     proposal: Blueprint,
+    block_in_progress: &mut BlockInProgress,
     block_constants: &BlockConstants,
-    next_level: U256,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
-) -> Result<L2Block, Error> {
-    let mut valid_txs = Vec::new();
-    let mut receipts_infos = Vec::new();
-    let mut object_infos = Vec::new();
-    let mut index = 0;
+) -> Result<(), Error> {
     let transactions = proposal.transactions;
 
     for transaction in transactions.into_iter() {
@@ -142,33 +41,18 @@ fn compute<Host: Runtime>(
             block_constants,
             precompiles,
             transaction,
-            index,
+            block_in_progress.index,
             evm_account_storage,
             accounts_index,
         )? {
-            valid_txs.push(tx_hash);
-            receipts_infos.push(receipt_info);
-            object_infos.push(object_info);
-            index += 1
+            block_in_progress.register_transaction(tx_hash, object_info.gas_used)?;
+            let receipt = block_in_progress.make_receipt(receipt_info)?;
+            storage::store_transaction_receipt(host, &receipt)?;
+            let object = block_in_progress.make_object(object_info);
+            storage::store_transaction_object(host, &object)?;
         }
     }
-
-    let timestamp = current_timestamp(host);
-    let new_block = L2Block::new(next_level, valid_txs, timestamp);
-    storage::store_current_block(host, &new_block)?;
-    storage::store_transaction_receipts(
-        host,
-        &make_receipts(&new_block, receipts_infos)?,
-    )?;
-    // Note that this is not efficient nor "properly" implemented. This
-    // is a temporary hack to answer to third-party tools that asks
-    // for transaction objects.
-    storage::store_transaction_objects(
-        host,
-        &make_objects(object_infos, &new_block.hash, &new_block.number),
-    )?;
-
-    Ok(new_block)
+    Ok(())
 }
 
 pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
@@ -187,19 +71,22 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     let precompiles = precompiles::precompile_set::<Host>();
 
     for proposal in queue.proposals {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+        // add proposal to the container
+        let mut block_in_progress =
+            BlockInProgress::new(current_block_number, current_constants.gas_price)?;
         compute(
             host,
             proposal,
+            &mut block_in_progress,
             &current_constants,
-            current_block_number,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
-        )
-        .map(|new_block| {
-            current_block_number = new_block.number + 1;
-            current_constants = new_block.constants()
-        })?;
+        )?;
+        let new_block = block_in_progress.finalize_and_store(host)?;
+        current_block_number = new_block.number + 1;
+        current_constants = new_block.constants();
     }
     Ok(())
 }
@@ -213,11 +100,11 @@ mod tests {
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
-    use crate::storage::{
-        init_account_index, init_blocks_index, init_transaction_hashes_index,
+    use crate::storage::{init_blocks_index, init_transaction_hashes_index};
+    use evm_execution::account_storage::{
+        account_path, init_account_storage, EthereumAccountStorage,
     };
-    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
-    use primitive_types::{H160, H256};
+    use primitive_types::{H160, H256, U256};
     use std::str::FromStr;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};

@@ -348,50 +348,26 @@ pub fn store_simulation_status<Host: Runtime>(
 }
 
 pub fn store_transaction_receipt<Host: Runtime>(
-    receipt_path: &OwnedPath,
     host: &mut Host,
     receipt: &TransactionReceipt,
 ) -> Result<(), Error> {
-    let bytes = receipt.rlp_bytes();
-    host.store_write_all(receipt_path, &bytes)?;
+    // For each transaction hash there exists a receipt and an object. As
+    // such the indexing must be done either with the objects or the
+    // receipts otherwise they would be indexed twice. We chose to index
+    // hashes using the receipts.
+    let mut transaction_hashes_index = init_transaction_hashes_index()?;
+    index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
+    let receipt_path = receipt_path(&receipt.hash)?;
+    host.store_write_all(&receipt_path, &receipt.rlp_bytes())?;
     Ok(())
 }
 
 pub fn store_transaction_object<Host: Runtime>(
-    object_path: &OwnedPath,
     host: &mut Host,
     object: &TransactionObject,
 ) -> Result<(), Error> {
-    let bytes = object.rlp_bytes();
-    host.store_write_all(object_path, &bytes)?;
-    Ok(())
-}
-
-pub fn store_transaction_objects<Host: Runtime>(
-    host: &mut Host,
-    objects: &[TransactionObject],
-) -> Result<(), Error> {
-    for object in objects {
-        let object_path = object_path(&object.hash)?;
-        store_transaction_object(&object_path, host, object)?;
-    }
-    Ok(())
-}
-
-pub fn store_transaction_receipts<Host: Runtime>(
-    host: &mut Host,
-    receipts: &[TransactionReceipt],
-) -> Result<(), Error> {
-    let mut transaction_hashes_index = init_transaction_hashes_index()?;
-    for receipt in receipts {
-        // For each transaction hash there exists a receipt and an object. As
-        // such the indexing must be done either with the objects or the
-        // receipts otherwise they would be indexed twice. We chose to index
-        // hashes using the receipts.
-        index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
-        let receipt_path = receipt_path(&receipt.hash)?;
-        store_transaction_receipt(&receipt_path, host, receipt)?
-    }
+    let object_path = object_path(&object.hash)?;
+    host.store_write_all(&object_path, &object.rlp_bytes())?;
     Ok(())
 }
 

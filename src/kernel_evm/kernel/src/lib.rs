@@ -28,6 +28,7 @@ use crate::upgrade::upgrade_kernel;
 
 mod apply;
 mod block;
+mod block_in_progress;
 mod blueprint;
 mod error;
 mod inbox;
