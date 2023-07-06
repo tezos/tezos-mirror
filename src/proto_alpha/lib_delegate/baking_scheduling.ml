@@ -787,6 +787,47 @@ let perform_sanity_check cctxt ~chain_id =
           (prefix_base_dir (Baking_files.filename state_location)))
   >>=? fun _ -> return_unit
 
+let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+    ~tries ?(msg = "Connection failed. ") f x =
+  f x >>= function
+  | Ok _ as r -> Lwt.return r
+  | Error
+      (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
+    as err
+    when tries > 0 -> (
+      cctxt#message "%sRetrying in %.2f seconds..." msg delay >>= fun () ->
+      Lwt.pick
+        [
+          (Lwt_unix.sleep delay >|= fun () -> `Continue);
+          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed);
+        ]
+      >>= function
+      | `Killed -> Lwt.return err
+      | `Continue ->
+          let next_delay = delay *. factor in
+          let delay =
+            Option.fold
+              ~none:next_delay
+              ~some:(fun max_delay -> Float.min next_delay max_delay)
+              max_delay
+          in
+          retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
+  | Error _ as err -> Lwt.return err
+
+let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
+  Option.iter_es
+    (fun dal_ctxt ->
+      retry
+        cctxt
+        ~max_delay:2.
+        ~delay:1.
+        ~factor:2.
+        ~tries:max_int
+        ~msg:"Failed to register profiles, DAL node is not reachable. "
+        (fun () -> Node_rpc.register_dal_profiles dal_ctxt delegates)
+        ())
+    dal_node_rpc_ctxt
+
 let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> return_unit) ~chain config delegates =
   let open Lwt_result_syntax in
@@ -814,10 +855,12 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     ~current_proposal
     delegates
   >>=? fun initial_state ->
-  Option.iter_es
-    (fun dal_ctxt -> Node_rpc.register_dal_profiles dal_ctxt delegates)
-    initial_state.global_state.dal_node_rpc_ctxt
-  >>=? fun () ->
+  let _promise =
+    register_dal_profiles
+      cctxt
+      initial_state.global_state.dal_node_rpc_ctxt
+      delegates
+  in
   let cloned_block_stream = Lwt_stream.clone heads_stream in
   Baking_nonces.start_revelation_worker
     cctxt

@@ -3148,6 +3148,10 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   let* () = iwant_events_waiter and* () = ihave_events_waiter in
   unit
 
+(* Checks that:
+   * the baker does not crash when there's a DAL node specified, but it is not
+   running
+   * the baker register profiles when the DAL node restarts. *)
 let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
     dal_node =
   let delegates =
@@ -3159,11 +3163,27 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
       delegates
   in
   let delegates = List.map (fun key -> key.Account.alias) delegates in
-  let* _baker = Baker.init ~dal_node ~protocol l1_node client ~delegates in
-  (* [Baker.init] ensures that the baker daemon "started", but this event is
-     emitted before the baker builds its initial stated and registers the
-     profiles. That's why we wait a bit more, namely for a block to be baked. *)
-  let* _lvl = Node.wait_for_level l1_node 2 in
+
+  Log.info
+    "Terminate the DAL node and then start the baker; the baker cannot attest \
+     but can advance" ;
+  let* () = Dal_node.terminate dal_node in
+  let baker = Baker.create ~dal_node ~protocol l1_node client ~delegates in
+  let wait_for_attestation_event =
+    Baker.wait_for baker "failed_to_get_attestations.v0" (fun _json -> Some ())
+  in
+  let* () = Baker.run baker in
+  let* () = wait_for_attestation_event in
+  let* _lvl = Node.wait_for_level l1_node 3 in
+
+  Log.info "Start (again) the DAL node" ;
+  let* () = Dal_node.run dal_node in
+  Log.info "Wait 2 seconds; by then, profiles should have been registered" ;
+  (* Note: this constant depends on how often the baker retries to register
+     profiles (see [max_delay] in [Baking_scheduling.register_dal_profiles]); if
+     the baker behavior changes in this respect, the constant may need
+     adjusting. *)
+  let* () = Lwt_unix.sleep 2.0 in
   check_profiles ~__LOC__ dal_node ~expected:profiles
 
 let register ~protocols =

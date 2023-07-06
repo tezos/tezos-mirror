@@ -625,6 +625,7 @@ let only_if_dal_feature_enabled state ~default_value f =
   else return default_value
 
 let get_dal_attestations state ~level =
+  let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
       let delegates =
         SlotMap.bindings state.level_state.delegate_slots.own_delegate_slots
@@ -637,21 +638,29 @@ let get_dal_attestations state ~level =
       let signing_key delegate = (fst delegate).public_key_hash in
       List.fold_left_es
         (fun acc delegate ->
-          Node_rpc.get_attestable_slots
-            dal_node_rpc_ctxt
-            (signing_key delegate)
-            ~level
-          >>=? fun res ->
-          match res with
-          | Tezos_dal_node_services.Services.Types.Not_in_committee ->
+          let*! tz_res =
+            Node_rpc.get_attestable_slots
+              dal_node_rpc_ctxt
+              (signing_key delegate)
+              ~level
+          in
+          match tz_res with
+          | Error errs ->
+              let*! () =
+                Events.(emit failed_to_get_dal_attestations (delegate, errs))
+              in
               return acc
-          | Attestable_slots attestation ->
-              if List.exists Fun.id attestation then
-                return ((delegate, attestation) :: acc)
-              else
-                (* No slot is attested, no need to send an attestation, at least
-                   for now. *)
-                return acc)
+          | Ok res -> (
+              match res with
+              | Tezos_dal_node_services.Services.Types.Not_in_committee ->
+                  return acc
+              | Attestable_slots attestation ->
+                  if List.exists Fun.id attestation then
+                    return ((delegate, attestation) :: acc)
+                  else
+                    (* No slot is attested, no need to send an attestation, at least
+                       for now. *)
+                    return acc))
         []
         delegates
       >>=? fun attestations ->

@@ -23,34 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
-    ~tries f x =
-  f x >>= function
-  | Ok _ as r -> Lwt.return r
-  | Error
-      (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
-    as err
-    when tries > 0 -> (
-      cctxt#message "Connection refused, retrying in %.2f seconds..." delay
-      >>= fun () ->
-      Lwt.pick
-        [
-          (Lwt_unix.sleep delay >|= fun () -> `Continue);
-          (Lwt_exit.clean_up_starts >|= fun _ -> `Killed);
-        ]
-      >>= function
-      | `Killed -> Lwt.return err
-      | `Continue ->
-          let next_delay = delay *. factor in
-          let delay =
-            Option.fold
-              ~none:next_delay
-              ~some:(fun max_delay -> Float.min next_delay max_delay)
-              max_delay
-          in
-          retry cctxt ?max_delay ~delay ~factor ~tries:(tries - 1) f x)
-  | Error _ as err -> Lwt.return err
-
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   f () >>= function
   | Ok () -> return_unit
@@ -60,7 +32,13 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       >>= fun () ->
       (* Wait forever when the node stops responding... *)
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5 ~tries:max_int)
+        ~retry:
+          (Baking_scheduling.retry
+             cctxt
+             ~max_delay:10.
+             ~delay:1.
+             ~factor:1.5
+             ~tries:max_int)
         cctxt
       >>=? fun () -> retry_on_disconnection cctxt f
   | Error err ->
@@ -108,7 +86,7 @@ module Baker = struct
       Baking_scheduling.run cctxt ~canceler ~chain config delegates
     in
     Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
     await_protocol_start cctxt ~chain >>=? fun () ->
@@ -146,7 +124,7 @@ module Accuser = struct
         valid_blocks_stream
     in
     Client_confirmations.wait_for_bootstrapped
-      ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+      ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
       cctxt
     >>=? fun () ->
     await_protocol_start cctxt ~chain >>=? fun () ->
@@ -181,7 +159,7 @@ module VDF = struct
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
         cctxt
     in
     let* () = await_protocol_start cctxt ~chain in
