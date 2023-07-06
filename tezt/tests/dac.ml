@@ -374,227 +374,6 @@ module Legacy = struct
      the same time and playing either the coordinator, committee member or
      observer role. *)
 
-  let test_streaming_of_root_hashes_as_observer _protocol node client
-      coordinator threshold committee_members =
-    (* 1. Create two new dac nodes; [observer_1] and [observer_2].
-       2. Initialize their default configuration.
-       3. Update their configuration so that their dac node client context
-          points to [coordinator]. *)
-    let committee_members =
-      List.map
-        (fun (a : Account.aggregate_key) -> a.aggregate_public_key_hash)
-        committee_members
-    in
-    let observer_1 =
-      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
-    in
-    let observer_2 =
-      Dac_node.create_legacy ~threshold ~committee_members ~node ~client ()
-    in
-    let* _ = Dac_node.init_config observer_1 in
-    let* _ = Dac_node.init_config observer_2 in
-    let () = set_coordinator observer_1 coordinator in
-    let () = set_coordinator observer_2 coordinator in
-    let payload_1 = "test_1" in
-    let expected_rh_1 =
-      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
-    in
-    let payload_2 = "test_2" in
-    let expected_rh_2 =
-      "00f2f47f480fec0e4180930790e52a54b2dbd7676b5fa2a25dd93bf22969f22e33"
-    in
-    let push_promise_1 =
-      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh_1
-    in
-    let push_promise_2 =
-      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh_2
-    in
-    let observer_1_promise_1 =
-      wait_for_received_root_hash observer_1 expected_rh_1
-    in
-    let observer_1_promise_2 =
-      wait_for_received_root_hash observer_1 expected_rh_2
-    in
-    let observer_2_promise_1 =
-      wait_for_received_root_hash observer_2 expected_rh_1
-    in
-    let observer_2_promise_2 =
-      wait_for_received_root_hash observer_2 expected_rh_2
-    in
-
-    (* Start running [observer_1]. From now on we expect [observer_1] to
-       monitor streamed root hashes produced by [coordinator]. [coordinator]
-       produces and pushes them as a side effect of serializing dac payload. *)
-    let observer_1_is_subscribed =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator
-    in
-    let* () = Dac_node.run observer_1 in
-    let* () = observer_1_is_subscribed in
-    (* [coordinator] serializes [payload_1]. We expect it would push
-       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
-    let* () =
-      coordinator_serializes_payload
-        coordinator
-        ~payload:payload_1
-        ~expected_rh:expected_rh_1
-    in
-    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
-       to the data_streamer. *)
-    let* () = push_promise_1 in
-    (* Assert [observer_1] emitted event of received [expected_rh_1]. *)
-    let* () = observer_1_promise_1 in
-    (* Start running [observer_2]. We expect that from now on [observer_2]
-       will also monitor streamed root hashes from [coordinator]. *)
-    let observer_2_is_subscribed =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator
-    in
-    let push_signature =
-      wait_for_signature_pushed_to_coordinator observer_1 ""
-    in
-    let* () = Dac_node.run observer_2 in
-    let* () = observer_2_is_subscribed in
-    (* [coordinator] serializes [payload_2]. We expect it would push
-       [expected_rh_2] to all attached subscribers,
-       i.e. to both [observer_1] and [observer_2] this time. *)
-    let* () =
-      coordinator_serializes_payload
-        coordinator
-        ~payload:payload_2
-        ~expected_rh:expected_rh_2
-    in
-    (* Assert [coordinator] emitted event. *)
-    let* () = push_promise_2 in
-    (* Assert both [observer_1] and [observer_2] received [expected_rh_2]. *)
-    let* () = observer_1_promise_2 in
-    let* () = observer_2_promise_2 in
-    (* Since [observer_2] was not running when [expected_rh_1] was generated
-       and streamed by [coordinator], we expect it never received it.
-       We assert this, by making sure that the promise of [observer_2] about
-       waiting for the emitted event with payload [expected_rh_1] is still not
-       resolved after the promise [observer_2_promise_2] has been resolved. *)
-    assert (
-      Lwt.is_sleeping observer_2_promise_1 && Lwt.is_sleeping push_signature) ;
-    unit
-
-  let test_streaming_of_root_hashes_as_member _protocol node client coordinator
-      threshold dac_members =
-    (* This test doesn't have any meaning if run without any committee member. *)
-    assert (List.length dac_members > 0) ;
-    let member_key : Account.aggregate_key = List.nth dac_members 0 in
-    let dac_member_pkh = member_key.aggregate_public_key_hash in
-
-    let member =
-      Dac_node.create_legacy
-        ~threshold
-        ~committee_members:[]
-        ~node
-        ~client
-        ?committee_member_address:(Some dac_member_pkh)
-        ()
-    in
-    let* _ = Dac_node.init_config member in
-    let () = set_coordinator member coordinator in
-    let payload = "test_1" in
-    let expected_rh =
-      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
-    in
-    let push_promise =
-      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
-    in
-    let member_promise = wait_for_received_root_hash member expected_rh in
-
-    (* Start running [member]. From now on we expect [member] to
-       monitor streamed root hashes produced by [coordinator]. [coordinator]
-       produces and pushes them as a side effect of serializing dac payload. *)
-    let member_is_subscribed =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator
-    in
-    let expected_signature = bls_sign_hex_hash member_key (`Hex expected_rh) in
-    let* () = Dac_node.run member in
-    let* () = member_is_subscribed in
-    (* [coordinator] serializes [payload_1]. We expect it would push
-       [expected_rh_1] to all attached subscribers, i.e. to [member]. *)
-    let* () =
-      coordinator_serializes_payload coordinator ~payload ~expected_rh
-    in
-    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
-       to the data_streamer. *)
-    let* () = push_promise in
-    (* Assert [member] emitted event of received [expected_rh_1]. *)
-    let* () = member_promise in
-
-    (* If the signature inside the emitted event is equal to the [expected_signature]
-       test is OK *)
-    let* () =
-      wait_for_signature_pushed_to_coordinator
-        member
-        (Tezos_crypto.Aggregate_signature.to_b58check expected_signature)
-    in
-    unit
-
-  let test_observer_downloads_pages _protocol node client coordinator threshold
-      committee_members =
-    (* 1. Create one new dac nodes; [observer_1],
-       2. Initialize the default configuration,
-       3. Specify a temporary directory within the test data for the observer
-          reveal data dir,
-       4. Update the configuration of the observer so that the dac node client
-          context points to [coordinator]. *)
-    let committee_members =
-      List.map
-        (fun (dc : Account.aggregate_key) -> dc.aggregate_public_key_hash)
-        committee_members
-    in
-    let observer =
-      Dac_node.create_legacy
-        ~threshold
-        ~committee_members
-        ~name:"observer"
-        ~node
-        ~client
-        ()
-    in
-    let* _ = Dac_node.init_config observer in
-    let () = set_coordinator observer coordinator in
-    (* Payload with more than 4091 bytes to check recursive calls of the
-       committee member to the coordinator.
-       The payload of this JSON file corresponds to the hex encoded version of
-       the Inferno, Canto I, by Dante Alighieri. The original text is also used
-       in the uit tests
-       (see src/proto_alpha/lib_dac/test/test_dac_pages_encoding.ml). Because
-       the unit test and the integration test use pages of different size,
-       the final root hash obtained is different from the one in the unit
-       tests. *)
-    let payload, expected_rh = sample_payload "preimage" in
-    let push_promise =
-      wait_for_root_hash_pushed_to_data_streamer coordinator expected_rh
-    in
-    let wait_for_observer_subscribed_to_data_streamer =
-      wait_for_handle_new_subscription_to_hash_streamer coordinator
-    in
-    let fetch_root_hash_promise =
-      wait_for_received_root_hash_processed observer expected_rh
-    in
-
-    (* Test starts here *)
-
-    (* Start running [observer_1]. From now on we expect [observer_1] to monitor
-       streamed root hashes produced by [coordinator]. [coordinator] produces
-       and pushes them as a side effect of serializing dac payload. *)
-    let* () = Dac_node.run observer in
-    let* () = wait_for_observer_subscribed_to_data_streamer in
-    (* [coordinator] serializes [payload_1]. We expect it would push
-       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
-    let* () =
-      coordinator_serializes_payload coordinator ~payload ~expected_rh
-    in
-    (* Assert [coordinator] emitted event that [expected_rh] was pushed
-       to the data_streamer. *)
-    let* () = push_promise in
-    (* Assert [observer] emitted event of received [expected_rh]. *)
-    let* () = fetch_root_hash_promise in
-    check_downloaded_preimage coordinator observer expected_rh
-
   module Signature_manager = struct
     let test_non_committee_signer_should_fail tz_client
         (coordinator_node, hex_root_hash, _dac_committee) =
@@ -883,6 +662,198 @@ module Full_infrastructure = struct
         expected_rh
     in
     return (`Hex actual_rh)
+
+  let test_streaming_of_root_hashes_as_observer scenario =
+    let Scenarios.{coordinator_node; observer_nodes; _} = scenario in
+
+    (* 1. Create two new dac nodes; [observer_1] and [observer_2].
+       2. Initialize their default configuration.
+       3. Update their configuration so that their dac node client context
+          points to [coordinator]. *)
+    assert (List.length observer_nodes = 2) ;
+    let observer_1 = List.nth observer_nodes 0 in
+    let observer_2 = List.nth observer_nodes 1 in
+    let* _ = Dac_node.init_config observer_1 in
+    let* _ = Dac_node.init_config observer_2 in
+    let payload_1 = "test_1" in
+    let expected_rh_1 =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let payload_2 = "test_2" in
+    let expected_rh_2 =
+      "00f2f47f480fec0e4180930790e52a54b2dbd7676b5fa2a25dd93bf22969f22e33"
+    in
+    let push_promise_1 =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh_1
+    in
+    let push_promise_2 =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh_2
+    in
+    let observer_1_promise_1 =
+      wait_for_received_root_hash observer_1 expected_rh_1
+    in
+    let observer_1_promise_2 =
+      wait_for_received_root_hash observer_1 expected_rh_2
+    in
+    let observer_2_promise_1 =
+      wait_for_received_root_hash observer_2 expected_rh_1
+    in
+    let observer_2_promise_2 =
+      wait_for_received_root_hash observer_2 expected_rh_2
+    in
+
+    (* Start running [observer_1]. From now on we expect [observer_1] to
+       monitor streamed root hashes produced by [coordinator]. [coordinator]
+       produces and pushes them as a side effect of serializing dac payload. *)
+    let observer_1_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    let* () = Dac_node.run observer_1 in
+    let* () = observer_1_is_subscribed in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
+    let* _root_hash_1 =
+      coordinator_serializes_payload
+        coordinator_node
+        ~payload:payload_1
+        ~expected_rh:expected_rh_1
+    in
+    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
+       to the data_streamer. *)
+    let* () = push_promise_1 in
+    (* Assert [observer_1] emitted event of received [expected_rh_1]. *)
+    let* () = observer_1_promise_1 in
+    (* Start running [observer_2]. We expect that from now on [observer_2]
+       will also monitor streamed root hashes from [coordinator]. *)
+    let observer_2_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    let push_signature =
+      wait_for_signature_pushed_to_coordinator observer_1 ""
+    in
+    let* () = Dac_node.run observer_2 in
+    let* () = observer_2_is_subscribed in
+    (* [coordinator] serializes [payload_2]. We expect it would push
+       [expected_rh_2] to all attached subscribers,
+       i.e. to both [observer_1] and [observer_2] this time. *)
+    let* _root_hash_2 =
+      coordinator_serializes_payload
+        coordinator_node
+        ~payload:payload_2
+        ~expected_rh:expected_rh_2
+    in
+    (* Assert [coordinator] emitted event. *)
+    let* () = push_promise_2 in
+    (* Assert both [observer_1] and [observer_2] received [expected_rh_2]. *)
+    let* () = observer_1_promise_2 in
+    let* () = observer_2_promise_2 in
+    (* Since [observer_2] was not running when [expected_rh_1] was generated
+       and streamed by [coordinator], we expect it never received it.
+       We assert this, by making sure that the promise of [observer_2] about
+       waiting for the emitted event with payload [expected_rh_1] is still not
+       resolved after the promise [observer_2_promise_2] has been resolved. *)
+    assert (
+      Lwt.is_sleeping observer_2_promise_1 && Lwt.is_sleeping push_signature) ;
+    unit
+
+  let test_streaming_of_root_hashes_as_member scenario =
+    let Scenarios.
+          {coordinator_node; committee_members_nodes; committee_members; _} =
+      scenario
+    in
+    (* This test doesn't have any meaning if run without any committee member. *)
+    assert (List.length committee_members > 0) ;
+    let member_key = List.nth committee_members 0 in
+    let member = List.nth committee_members_nodes 0 in
+    let* _ = Dac_node.init_config member in
+    let payload = "test_1" in
+    let expected_rh =
+      "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+    in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
+    in
+    let member_promise = wait_for_received_root_hash member expected_rh in
+
+    (* Start running [member]. From now on we expect [member] to
+       monitor streamed root hashes produced by [coordinator]. [coordinator]
+       produces and pushes them as a side effect of serializing dac payload. *)
+    let member_is_subscribed =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    let expected_signature = bls_sign_hex_hash member_key (`Hex expected_rh) in
+    let* () = Dac_node.run member in
+    let* () = member_is_subscribed in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [member]. *)
+    let* _root_hash =
+      coordinator_serializes_payload coordinator_node ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh_1] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* Assert [member] emitted event of received [expected_rh_1]. *)
+    let* () = member_promise in
+
+    (* If the signature inside the emitted event is equal to the [expected_signature]
+       test is OK *)
+    let* () =
+      wait_for_signature_pushed_to_coordinator
+        member
+        (Tezos_crypto.Aggregate_signature.to_b58check expected_signature)
+    in
+    unit
+
+  let test_observer_downloads_pages scenario =
+    let Scenarios.{coordinator_node; observer_nodes; _} = scenario in
+
+    (* 1. Create one new dac nodes; [observer_1],
+       2. Initialize the default configuration,
+       3. Specify a temporary directory within the test data for the observer
+          reveal data dir,
+       4. Update the configuration of the observer so that the dac node client
+          context points to [coordinator]. *)
+    assert (List.length observer_nodes = 1) ;
+    let observer = List.nth observer_nodes 0 in
+    let* _ = Dac_node.init_config observer in
+    (* Payload with more than 4091 bytes to check recursive calls of the
+       committee member to the coordinator.
+       The payload of this JSON file corresponds to the hex encoded version of
+       the Inferno, Canto I, by Dante Alighieri. The original text is also used
+       in the uit tests
+       (see src/proto_alpha/lib_dac/test/test_dac_pages_encoding.ml). Because
+       the unit test and the integration test use pages of different size,
+       the final root hash obtained is different from the one in the unit
+       tests. *)
+    let payload, expected_rh = sample_payload "preimage" in
+    let push_promise =
+      wait_for_root_hash_pushed_to_data_streamer coordinator_node expected_rh
+    in
+    let wait_for_observer_subscribed_to_data_streamer =
+      wait_for_handle_new_subscription_to_hash_streamer coordinator_node
+    in
+    let fetch_root_hash_promise =
+      wait_for_received_root_hash_processed observer expected_rh
+    in
+
+    (* Test starts here *)
+
+    (* Start running [observer_1]. From now on we expect [observer_1] to monitor
+       streamed root hashes produced by [coordinator]. [coordinator] produces
+       and pushes them as a side effect of serializing dac payload. *)
+    let* () = Dac_node.run observer in
+    let* () = wait_for_observer_subscribed_to_data_streamer in
+    (* [coordinator] serializes [payload_1]. We expect it would push
+       [expected_rh_1] to all attached subscribers, i.e. to [observer_1]. *)
+    let* _root_hash =
+      coordinator_serializes_payload coordinator_node ~payload ~expected_rh
+    in
+    (* Assert [coordinator] emitted event that [expected_rh] was pushed
+       to the data_streamer. *)
+    let* () = push_promise in
+    (* Assert [observer] emitted event of received [expected_rh]. *)
+    let* () = fetch_root_hash_promise in
+    check_downloaded_preimage coordinator_node observer expected_rh
 
   let test_coordinator_post_preimage_endpoint Scenarios.{coordinator_node; _} =
     (* 1. Send the [payload] to coordinator.
@@ -2785,29 +2756,29 @@ module Api_regression = struct
 end
 
 let register ~protocols =
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
     ~committee_size:0
+    ~observers:2
     ~tags:["dac"; "dac_node"]
-    "dac_streaming_of_root_hashes_in_legacy_mode"
-    Legacy.test_streaming_of_root_hashes_as_observer
+    "dac_streaming_of_root_hashes"
+    Full_infrastructure.test_streaming_of_root_hashes_as_observer
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
     ~committee_size:1
+    ~observers:0
     ~tags:["dac"; "dac_node"]
-    "dac_push_signature_in_legacy_mode_as_member"
-    Legacy.test_streaming_of_root_hashes_as_member
+    "dac_push_signature_as_member"
+    Full_infrastructure.test_streaming_of_root_hashes_as_member
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
+    ~observers:1
     ~committee_size:0
     ~tags:["dac"; "dac_node"]
     "committee member downloads pages from coordinator"
-    Legacy.test_observer_downloads_pages
+    Full_infrastructure.test_observer_downloads_pages
     protocols ;
   scenario_with_layer1_and_legacy_dac_nodes
     ~__FILE__
