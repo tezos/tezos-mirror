@@ -1616,32 +1616,16 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (obj1 (dft "error" Tezos_rpc.Error.opt_encoding None))
 
       let processed_operation_encoding =
-        union
-          [
-            case
-              ~title:"monitor_operations_encoding"
-              (Tag 1)
-              (list (monitor_operations_encoding ~use_legacy_name:false))
-              (function
-                | Version_1, monitor_operations -> Some monitor_operations
-                | ( ( Version_0
-                    | Version_2
-                      (* The same [version] type is used for versioning all the
-                         RPC. Even though this version is not supported for this
-                         RPC we need to handle it. We rely on the supported
-                         version list to fail at parsing for this version *) ),
-                    _ ) ->
-                    None)
-              (fun monitor_operations -> (Version_1, monitor_operations));
-            case
-              ~title:"monitor_operations_encoding_with_legacy_attestation_name"
-              (Tag 0)
-              (list (monitor_operations_encoding ~use_legacy_name:true))
-              (function
-                | Version_0, monitor_operations -> Some monitor_operations
-                | (Version_1 | Version_2), _ -> None)
-              (fun monitor_operations -> (Version_0, monitor_operations));
-          ]
+        encoding_versioning
+          ~encoding_name:"monitor_operations"
+          ~latest_encoding:
+            ( Version_1,
+              list (monitor_operations_encoding ~use_legacy_name:false) )
+          ~old_encodings:
+            [
+              ( Version_0,
+                list (monitor_operations_encoding ~use_legacy_name:true) );
+            ]
 
       let monitor_operations path =
         Tezos_rpc.Service.get_service
