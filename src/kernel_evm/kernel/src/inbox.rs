@@ -16,11 +16,11 @@ use crate::parsing::{
 };
 use crate::simulation;
 use crate::storage::{
-    get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
+    get_and_increment_deposit_nonce, read_dictator_key, read_kernel_upgrade_nonce,
     store_last_info_per_level_timestamp,
 };
 
-use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
+use crate::error::UpgradeProcessError::{InvalidUpgradeNonce, NoDictator};
 use crate::upgrade::check_dictator_signature;
 use crate::Error;
 
@@ -105,17 +105,23 @@ fn handle_kernel_upgrade<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     kernel_upgrade: &KernelUpgrade,
 ) -> Result<(), Error> {
-    let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
-    let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
-    if incoming_nonce == current_kernel_upgrade_nonce + 1 {
-        check_dictator_signature(
-            kernel_upgrade.signature,
-            smart_rollup_address,
-            kernel_upgrade.nonce,
-            kernel_upgrade.preimage_hash,
-        )
-    } else {
-        Err(Error::UpgradeError(InvalidUpgradeNonce))
+    match read_dictator_key(host) {
+        Some(dictator) => {
+            let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
+            let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
+            if incoming_nonce == current_kernel_upgrade_nonce + 1 {
+                check_dictator_signature(
+                    kernel_upgrade.signature,
+                    smart_rollup_address,
+                    kernel_upgrade.nonce,
+                    kernel_upgrade.preimage_hash,
+                    dictator,
+                )
+            } else {
+                Err(Error::UpgradeError(InvalidUpgradeNonce))
+            }
+        }
+        None => Err(Error::UpgradeError(NoDictator)),
     }
 }
 
@@ -209,6 +215,7 @@ pub fn read_inbox<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
+    use libsecp256k1::PublicKey;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_mock::MockHost;
@@ -344,6 +351,14 @@ mod tests {
     fn parse_valid_kernel_upgrade() {
         let mut host = MockHost::default();
         crate::storage::store_kernel_upgrade_nonce(&mut host, 1).unwrap();
+
+        let dictator_bytes = hex::decode(
+            "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01",
+        )
+        .unwrap();
+        let dictator = PublicKey::parse_slice(&dictator_bytes, None).unwrap();
+        crate::storage::internal_for_tests::store_dictator_key(&mut host, dictator)
+            .unwrap();
 
         let preimage_hash = hex::decode(
             "004b28109df802cb1885ab29461bc1b410057a9f3a848d122ac7a742351a3a1f4e",
