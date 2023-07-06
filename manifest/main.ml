@@ -7513,8 +7513,7 @@ let _sc_sequencer_node =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_base |> open_ |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
