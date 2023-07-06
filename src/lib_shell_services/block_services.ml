@@ -67,6 +67,36 @@ let version_arg supported =
     ~construct:string_of_version
     ()
 
+(* This function creates an encoding that use the [latest_encoding] in binary
+   and that can use [latest_encoding] and any [old_encodings] in JSON. The
+   version value is only used to decide which encoding to use in JSON. *)
+let encoding_versioning ~encoding_name ~latest_encoding ~old_encodings =
+  let make_case ~version ~encoding =
+    case
+      ~title:
+        (Format.sprintf
+           "%s_encoding_v%s"
+           encoding_name
+           (string_of_version version))
+      Json_only
+      encoding
+      (function v, value when v == version -> Some value | _v, _value -> None)
+      (fun value -> (version, value))
+  in
+  let latest_version, latest_encoding = latest_encoding in
+  splitted
+    ~binary:
+      (conv
+         (fun (_, value) -> value)
+         (fun value -> (latest_version, value))
+         latest_encoding)
+    ~json:
+      (union
+         (make_case ~version:latest_version ~encoding:latest_encoding
+         :: List.map
+              (fun (version, encoding) -> make_case ~version ~encoding)
+              old_encodings))
+
 (* TODO: V2.Tree32 has been chosen arbitrarily ; maybe it's not the best option *)
 module Merkle_proof_encoding =
   Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
@@ -637,44 +667,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     operations : operation list list;
   }
 
-  let encoding_versioning ~encoding_name ~old_encoding ~new_encoding =
-    union
-      [
-        case
-          ~title:(Format.sprintf "%s_encoding" encoding_name)
-          (Tag 1)
-          new_encoding
-          (function
-            | Version_1, operations -> Some operations
-            | ( ( Version_0
-                | Version_2
-                  (* The same [version] type is used for versioning all the
-                     RPC. Even though this version is not supported for this
-                     RPC we need to handle it. We rely on the supported
-                     version list to fail at parsing for this version *) ),
-                _ ) ->
-                None)
-          (fun operations -> (Version_1, operations));
-        case
-          ~title:
-            (Format.sprintf
-               "%s_encoding_with_legacy_attestation_name"
-               encoding_name)
-          (Tag 0)
-          old_encoding
-          (function
-            | Version_0, operations -> Some operations
-            | ( ( Version_1
-                | Version_2
-                  (* The same [version] type is used for versioning all the
-                     RPC. Even though this version is not supported for this
-                     RPC we need to handle it. We rely on the supported
-                     version list to fail at parsing for this version *) ),
-                _ ) ->
-                None)
-          (fun operations -> (Version_0, operations));
-      ]
-
   let block_info_encoding ~use_legacy_attestation_name =
     let operation_encoding =
       if use_legacy_attestation_name then
@@ -697,8 +689,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let block_info_encoding =
     encoding_versioning
       ~encoding_name:"block_info"
-      ~old_encoding:(block_info_encoding ~use_legacy_attestation_name:true)
-      ~new_encoding:(block_info_encoding ~use_legacy_attestation_name:false)
+      ~latest_encoding:
+        (Version_1, block_info_encoding ~use_legacy_attestation_name:false)
+      ~old_encodings:
+        [(Version_0, block_info_encoding ~use_legacy_attestation_name:true)]
 
   module S = struct
     let path : prefix Tezos_rpc.Path.context = Tezos_rpc.Path.open_root
@@ -830,11 +824,16 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         let output =
           encoding_versioning
             ~encoding_name:"operations"
-            ~old_encoding:
-              (list
-                 (dynamic_size
-                    (list operation_encoding_with_legacy_attestation_name)))
-            ~new_encoding:(list (dynamic_size (list operation_encoding)))
+            ~latest_encoding:
+              (Version_1, list (dynamic_size (list operation_encoding)))
+            ~old_encodings:
+              [
+                ( Version_0,
+                  list
+                    (dynamic_size
+                       (list operation_encoding_with_legacy_attestation_name))
+                );
+              ]
         in
         Tezos_rpc.Service.get_service
           ~description:"All the operations included in the block."
@@ -868,8 +867,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         let output =
           encoding_versioning
             ~encoding_name:"operations_in_pass"
-            ~old_encoding:(list operation_encoding_with_legacy_attestation_name)
-            ~new_encoding:(list operation_encoding)
+            ~latest_encoding:(Version_1, list operation_encoding)
+            ~old_encodings:
+              [
+                (Version_0, list operation_encoding_with_legacy_attestation_name);
+              ]
         in
         Tezos_rpc.Service.get_service
           ~description:
@@ -883,8 +885,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         let output =
           encoding_versioning
             ~encoding_name:"operation"
-            ~old_encoding:operation_encoding_with_legacy_attestation_name
-            ~new_encoding:operation_encoding
+            ~latest_encoding:(Version_1, operation_encoding)
+            ~old_encodings:
+              [(Version_0, operation_encoding_with_legacy_attestation_name)]
         in
         Tezos_rpc.Service.get_service
           ~description:
