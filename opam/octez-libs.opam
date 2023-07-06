@@ -87,4 +87,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez libs"
+synopsis: "A package that contains multiple base libraries used by the Octez suite"
