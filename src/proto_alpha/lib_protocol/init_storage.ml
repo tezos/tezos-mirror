@@ -140,16 +140,36 @@ let migrate_stake_distribution_for_o ctxt =
       let distr = List.map (fun (pkh, stake) -> (pkh, convert stake)) distr in
       Storage.Stake.Selected_distribution_for_cycle.update ctxt cycle distr)
 
-(** Initializes the total supply at the beginning of O
+(** Initializes the total supply when migrating from N to O
     Uses an estimation of the total supply at the activation of O.
     This value can be refined at the beginning of P to have a
-    perfectly accurate ammount.
+    perfectly accurate ammount on mainnet.
 
     Remove me in P. *)
-let initialize_total_supply_for_o ctxt =
-  Storage.Contract.Total_supply.add
-    ctxt
-    (Tez_repr.of_mutez_exn 940_000_000_000_000L)
+let initialize_total_supply_for_o chain_id ctxt =
+  let open Lwt_syntax in
+  if Chain_id.equal Constants_repr.mainnet_id chain_id then
+    (* We only estimate the total supply in mainnet *)
+    Storage.Contract.Total_supply.add
+      ctxt
+      (Tez_repr.of_mutez_exn 940_000_000_000_000L)
+  else
+    (* If not on mainnet, iterate over all accounts and get an accurate total supply *)
+    let* total_supply =
+      Storage.Contract.fold
+        ctxt
+        ~order:`Undefined
+        ~f:(fun contract acc ->
+          let* full_balance =
+            Contract_storage.For_RPC.get_full_balance ctxt contract
+          in
+          match full_balance with
+          | Ok full_balance ->
+              return @@ Result.value ~default:acc Tez_repr.(acc +? full_balance)
+          | _ -> return acc)
+        ~init:Tez_repr.zero
+    in
+    Storage.Contract.Total_supply.add ctxt total_supply
 
 (** Initializes frozen deposits pseudotokens and costaking pseudotokens for all
     existing delegates. *)
@@ -166,7 +186,7 @@ let init_delegates_pseudotokens_for_o ctxt =
         ctxt
         (Contract_repr.Implicit delegate))
 
-let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
+let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
@@ -242,7 +262,7 @@ let prepare_first_block _chain_id ctxt ~typecheck_smart_contract
         Signature.Public_key_hash.Set.empty
       >>=? fun ctxt ->
       migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
-      initialize_total_supply_for_o ctxt >>= fun ctxt ->
+      initialize_total_supply_for_o chain_id ctxt >>= fun ctxt ->
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
       >>= fun ctxt ->
       Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
