@@ -3389,6 +3389,9 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     in
 
     Log.info "Migrated to %s" (Protocol.name migrate_to) ;
+    (* The plugin will change after the following block, as the migration block
+       is not yet finalized. *)
+    let* () = Client.bake_for_and_wait client in
     wait_for_plugin
   in
   test_l1_migration_scenario
