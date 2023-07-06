@@ -453,10 +453,16 @@ let alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
-type sub_lib_documentation_link = Module of string | Page of string
+type sub_lib_documentation_entrypoint = Module | Page
+
+type sub_lib = {
+  name : string;
+  synopsis : string option;
+  documentation_type : sub_lib_documentation_entrypoint;
+}
 
 (* List of the registered sublibraries of octez-libs *)
-let registered_octez_libs : sub_lib_documentation_link list ref = ref []
+let registered_octez_libs : sub_lib list ref = ref []
 
 (* Registers [public_name] as a sublibrary of the [octez-libs] package.
 
@@ -467,7 +473,7 @@ let registered_octez_libs : sub_lib_documentation_link list ref = ref []
 let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
     ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
-    ?release_status ?ctypes ?opam_with_test ?c_library_flags ?synopsis:_ ~path
+    ?release_status ?ctypes ?c_library_flags ?opam_with_test ?synopsis ~path
     public_name =
   let name =
     let s = Option.value ~default:public_name internal_name in
@@ -481,12 +487,15 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
   in
   let registered =
     match documentation with
-    | None -> Module (String.capitalize_ascii name)
-    | Some (docs : Dune.s_expr) when docs = [Dune.[S "package"; S "octez-libs"]]
-      ->
-        (* In that specific case, we don't want the page to be used *)
-        Module (String.capitalize_ascii name)
-    | Some _docs -> Page name
+    | None | Some Dune.[[S "package"; S "octez-libs"]] ->
+        (* In the case that the documentation stanza is only a package declaration,
+           we don't want the page to be used *)
+        {
+          name = String.capitalize_ascii name;
+          synopsis;
+          documentation_type = Module;
+        }
+    | Some _docs -> {name; synopsis; documentation_type = Page}
   in
   registered_octez_libs := registered :: !registered_octez_libs ;
   public_lib
@@ -527,19 +536,24 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
 (* Prints all the registered octez libraries as a documentation index *)
 let pp_octez_libs_index fmt registered_octez_libs =
   let header =
-    "{0 Octez-libs: octez libraries}\n\n\
+    "{0 Octez-libs: Octez libraries}\n\n\
      This is a package containing some libraries used by the Octez project.\n\n\
      It contains the following libraries:\n\n"
   in
   let pp_registered pp = function
-    | Module registered ->
-        Format.fprintf pp "- {{!module-%s}%s}" registered registered
-    | Page registered ->
+    | {name; synopsis = None; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}" name name
+    | {name; synopsis = Some synopsis; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}: %s" name name synopsis
+    | {name; synopsis = None; documentation_type = Page} ->
+        Format.fprintf pp "- {{!page-%s}%s}" name (String.capitalize_ascii name)
+    | {name; synopsis = Some synopsis; documentation_type = Page} ->
         Format.fprintf
           pp
-          "- {{!page-%s}%s}"
-          registered
-          (String.capitalize_ascii registered)
+          "- {{!page-%s}%s}: %s"
+          name
+          (String.capitalize_ascii name)
+          synopsis
   in
   Format.fprintf
     fmt
@@ -549,15 +563,10 @@ let pp_octez_libs_index fmt registered_octez_libs =
        ~pp_sep:(fun pp () -> Format.fprintf pp "@.")
        pp_registered)
   @@ List.sort
-       (fun lib1 lib2 ->
-         match (lib1, lib2) with
-         | Page n1, Page n2
-         | Page n1, Module n2
-         | Module n1, Page n2
-         | Module n1, Module n2 ->
-             String.compare
-               (String.capitalize_ascii n1)
-               (String.capitalize_ascii n2))
+       (fun {name = name1; _} {name = name2; _} ->
+         String.compare
+           (String.capitalize_ascii name1)
+           (String.capitalize_ascii name2))
        registered_octez_libs
 
 let octez_test_helpers =
