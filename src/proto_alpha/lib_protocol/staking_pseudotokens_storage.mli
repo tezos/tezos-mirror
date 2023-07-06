@@ -126,3 +126,20 @@ val debit_costaking_pseudotokens :
   Contract_repr.t ->
   Staking_pseudotoken_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** [request_unstake ctxt ~contract ~delegate amount] debits the [contract]'s
+    costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
+    an amount of pseudotokens corresponding to [amount] using [delegate]'s
+    frozen deposits pseudotokens/tez rate capped by [contract]'s costaking
+    pseudotokens balance.
+
+    It returns the tez amount corresponding to the debited pseudotokens.
+
+    Resulting context do not make sense if [delegate] is not [contract]'s
+    delegate. *)
+val request_unstake :
+  Raw_context.t ->
+  contract:Contract_repr.t ->
+  delegate:Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  (Raw_context.t * Tez_repr.t) tzresult Lwt.t

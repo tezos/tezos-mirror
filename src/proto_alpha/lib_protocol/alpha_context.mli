@@ -4988,6 +4988,13 @@ module Staking_pseudotokens : sig
 
   val debit_costaking_pseudotokens :
     context -> Contract.t -> t -> context tzresult Lwt.t
+
+  val request_unstake :
+    context ->
+    contract:Contract.t ->
+    delegate:public_key_hash ->
+    Tez.t ->
+    (context * Tez.t) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Fees_storage}. *)

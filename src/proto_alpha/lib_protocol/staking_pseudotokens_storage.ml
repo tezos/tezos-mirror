@@ -249,3 +249,33 @@ let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
       current_pseudotokens_balance -? pseudotokens_to_subtract)
   in
   update_costaking_pseudotokens ~f ctxt contract
+
+let request_unstake ctxt ~contract ~delegate requested_amount =
+  let open Lwt_result_syntax in
+  if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)
+  else
+    let* available_pseudotokens =
+      costaking_pseudotokens_balance ctxt contract
+    in
+    if Staking_pseudotoken_repr.(available_pseudotokens = zero) then
+      return (ctxt, Tez_repr.zero)
+    else
+      let* requested_pseudotokens =
+        frozen_deposits_pseudotokens_for_tez_amount
+          ctxt
+          delegate
+          requested_amount
+      in
+      let pseudotokens_to_unstake =
+        Staking_pseudotoken_repr.min
+          requested_pseudotokens
+          available_pseudotokens
+      in
+      assert (not Staking_pseudotoken_repr.(pseudotokens_to_unstake = zero)) ;
+      let* ctxt, tez_to_unstake =
+        debit_frozen_deposits_pseudotokens ctxt delegate pseudotokens_to_unstake
+      in
+      let+ ctxt =
+        debit_costaking_pseudotokens ctxt contract pseudotokens_to_unstake
+      in
+      (ctxt, tez_to_unstake)
