@@ -53,7 +53,7 @@ full: odoc
 	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-smart-rollup-client.html:
 	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-
+	
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
@@ -65,11 +65,13 @@ manuals: \
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
 	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
 	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
+	@ ../octez-dac-node man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-node.html
+	@ ../octez-dac-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-dac-client.html
 	@../octez-node --help | grep -v '^Octez-node' | grep -v 'OCTEZ-NODE(1)' | \
 		./scripts/man2txt.py > api/octez-node.txt
 	@../octez-proxy-server --help | grep -v '^Octez-proxy-server' | grep -v 'OCTEZ-PROXY-SERVER(1)' | \
 		./scripts/man2txt.py > api/octez-proxy-server.txt
-
+	
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
 odoc: docexes
