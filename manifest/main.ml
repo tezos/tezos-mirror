@@ -493,7 +493,8 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ("octez-libs." ^ public_name)
     ~internal_name:name
     ~opam:"octez-libs"
-    ~synopsis:"Octez libs"
+    ~synopsis:
+      "A package that contains multiple base libraries used by the Octez suite"
     ?opam_with_test
     ?linkall
     ?js_compatible
