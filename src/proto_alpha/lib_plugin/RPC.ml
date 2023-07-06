@@ -49,6 +49,37 @@ let version_arg =
     ~construct:string_of_version
     ()
 
+(* This function creates an encoding that use the [latest_encoding] in binary
+   and that can use [latest_encoding] and any [old_encodings] in JSON. The
+   version value is only used to decide which encoding to use in JSON. *)
+let encoding_versioning ~encoding_name ~latest_encoding ~old_encodings =
+  let open Data_encoding in
+  let make_case ~version ~encoding =
+    case
+      ~title:
+        (Format.sprintf
+           "%s_encoding_v%s"
+           encoding_name
+           (string_of_version version))
+      Json_only
+      encoding
+      (function v, value when v == version -> Some value | _v, _value -> None)
+      (fun value -> (version, value))
+  in
+  let latest_version, latest_encoding = latest_encoding in
+  splitted
+    ~binary:
+      (conv
+         (fun (_, value) -> value)
+         (fun value -> (latest_version, value))
+         latest_encoding)
+    ~json:
+      (union
+         (make_case ~version:latest_version ~encoding:latest_encoding
+         :: List.map
+              (fun (version, encoding) -> make_case ~version ~encoding)
+              old_encodings))
+
 (** The assumed number of blocks between operation-creation time and
     the actual time when the operation is included in a block. *)
 let default_operation_inclusion_latency = 3
@@ -456,24 +487,17 @@ module Scripts = struct
         ]
 
     let run_operation_output_encoding =
-      union
-        [
-          case
-            ~title:"new_encoding_run_operation_output"
-            (Tag 1)
-            Apply_results.operation_data_and_metadata_encoding
-            (function
-              | Version_1, operation -> Some operation | Version_0, _ -> None)
-            (fun operation -> (Version_1, operation));
-          case
-            ~title:"old_encoding_run_operation_output"
-            (Tag 0)
-            Apply_results
-            .operation_data_and_metadata_encoding_with_legacy_attestation_name
-            (function
-              | Version_0, operation -> Some operation | Version_1, _ -> None)
-            (fun operation -> (Version_0, operation));
-        ]
+      encoding_versioning
+        ~encoding_name:"run_operation_output"
+        ~latest_encoding:
+          (Version_1, Apply_results.operation_data_and_metadata_encoding)
+        ~old_encodings:
+          [
+            ( Version_0,
+              Apply_results
+              .operation_data_and_metadata_encoding_with_legacy_attestation_name
+            );
+          ]
 
     let run_operation =
       RPC_service.post_service
@@ -2966,26 +2990,16 @@ module Parse = struct
       |> seal
 
     let parse_operations_encoding =
-      union
-        [
-          case
-            ~title:"new_encoding_parse_operations"
-            (Tag 1)
-            (list (dynamic_size Operation.encoding))
-            (function
-              | Version_1, parse_operations -> Some parse_operations
-              | Version_0, _ -> None)
-            (fun parse_operations -> (Version_1, parse_operations));
-          case
-            ~title:"old_encoding_parse_operations"
-            Json_only
-            (list
-               (dynamic_size Operation.encoding_with_legacy_attestation_name))
-            (function
-              | Version_0, parse_operations -> Some parse_operations
-              | Version_1, _ -> None)
-            (fun parse_operations -> (Version_0, parse_operations));
-        ]
+      encoding_versioning
+        ~encoding_name:"parse_operations"
+        ~latest_encoding:(Version_1, list (dynamic_size Operation.encoding))
+        ~old_encodings:
+          [
+            ( Version_0,
+              list
+                (dynamic_size Operation.encoding_with_legacy_attestation_name)
+            );
+          ]
 
     let operations =
       RPC_service.post_service
