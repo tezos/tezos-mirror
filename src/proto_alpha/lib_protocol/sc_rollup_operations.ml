@@ -497,6 +497,17 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     match decoded_outbox_msg with
     | Sc_rollup_management_protocol.Atomic_transaction_batch {transactions} ->
         execute_outbox_message_transaction ctxt ~transactions ~rollup
+    | Sc_rollup_management_protocol.Whitelist_update _whitelist_opt ->
+        let is_enabled = Constants.sc_rollup_private_enable ctxt in
+        if is_enabled then
+          return
+            ( {
+                paid_storage_size_diff = Z.zero;
+                ticket_receipt = [];
+                operations = [];
+              },
+              ctxt )
+        else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
   in
   (* Record that the message for the given level has been applied. This fails
      in case a message for the rollup, outbox-level and message index has

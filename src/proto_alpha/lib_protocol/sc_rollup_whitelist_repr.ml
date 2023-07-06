@@ -27,4 +27,7 @@ type t = Signature.Public_key_hash.t list
 
 let encoding = Data_encoding.(list Signature.Public_key_hash.encoding)
 
-let pp = Format.pp_print_list Signature.Public_key_hash.pp
+let pp =
+  Format.pp_print_list
+    ~pp_sep:Format.pp_print_space
+    Signature.Public_key_hash.pp_short

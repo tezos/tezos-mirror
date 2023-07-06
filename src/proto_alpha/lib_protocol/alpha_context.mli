@@ -3170,6 +3170,7 @@ module Sc_rollup : sig
         | Atomic_transaction_batch_typed of {
             transactions : typed_transaction list;
           }
+        | Whitelist_update of Whitelist.t option
 
       val pp : Format.formatter -> t -> unit
 

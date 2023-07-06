@@ -132,6 +132,7 @@ let pp_typed_transaction fmt
 type t =
   | Atomic_transaction_batch of {transactions : transaction list}
   | Atomic_transaction_batch_typed of {transactions : typed_transaction list}
+  | Whitelist_update of Sc_rollup_whitelist_repr.t option
 
 let encoding =
   let open Data_encoding in
@@ -166,6 +167,16 @@ let encoding =
              | _ -> None)
            (fun (transactions, ()) ->
              Atomic_transaction_batch_typed {transactions});
+         case
+           (Tag 2)
+           ~title:"Whitelist_update"
+           (obj2
+              (opt "whitelist" Sc_rollup_whitelist_repr.encoding)
+              (req "kind" (constant "whitelist_update")))
+           (function
+             | Whitelist_update whitelist_opt -> Some (whitelist_opt, ())
+             | _ -> None)
+           (fun (whitelist_opt, ()) -> Whitelist_update whitelist_opt);
        ])
 
 let pp fmt = function
@@ -181,6 +192,8 @@ let pp fmt = function
         pp_typed_transaction
         fmt
         transactions
+  | Whitelist_update whitelist_opt ->
+      Format.pp_print_option Sc_rollup_whitelist_repr.pp fmt whitelist_opt
 
 type serialized = string
 
