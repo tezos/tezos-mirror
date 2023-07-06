@@ -4083,9 +4083,7 @@ let octez_injector =
     ~synopsis:"Octez: library for building injectors"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         logs_lwt;
         octez_base_unix;
         octez_stdlib_unix |> open_;

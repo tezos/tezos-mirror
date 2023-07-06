@@ -692,11 +692,12 @@ module Make (Parameters : PARAMETERS) = struct
         state.signer.sk
         Unsigned_op.value
     in
-    Tezos_shell_services.Shell_services.Injection.operation
-      state.cctxt
-      ~chain:state.cctxt#chain
-      signed_op_bytes
-    >>=? fun oph ->
+    let* oph =
+      Tezos_shell_services.Shell_services.Injection.operation
+        state.cctxt
+        ~chain:state.cctxt#chain
+        signed_op_bytes
+    in
     let*! () = Event.(emit2 injected) state nb oph in
     return oph
 
@@ -797,10 +798,11 @@ module Make (Parameters : PARAMETERS) = struct
     List.rev rev_ops
 
   (* Ignore operations that are allowed to fail. *)
-  let ignore_ignorable_failing_operations state operations = function
+  let ignore_ignorable_failing_operations state operations =
+    let open Lwt_result_syntax in
+    function
     | Ok res -> return (`Injected res)
     | Error err ->
-        let open Lwt_result_syntax in
         let+ operations_to_drop =
           List.fold_left_es
             (fun to_drop op ->
@@ -1471,22 +1473,24 @@ module Make (Parameters : PARAMETERS) = struct
     return_unit
 
   let worker_of_signer signer_pkh =
+    let open Result_syntax in
     match Worker.find_opt table signer_pkh with
     | None ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2818
            maybe lazily start worker here *)
-        error (No_worker_for_source signer_pkh)
-    | Some worker -> ok worker
+        tzfail (No_worker_for_source signer_pkh)
+    | Some worker -> return worker
 
   let worker_of_tag tag =
+    let open Result_syntax in
     match Tags_table.find_opt tags_table tag with
     | None ->
         Format.kasprintf
-          (fun s -> error (No_worker_for_tag s))
+          (fun s -> tzfail (No_worker_for_tag s))
           "%a"
           Parameters.Tag.pp
           tag
-    | Some worker -> ok worker
+    | Some worker -> return worker
 
   let add_pending_operation ?source op =
     let open Lwt_result_syntax in
