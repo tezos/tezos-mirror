@@ -1473,33 +1473,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         |> seal
 
       let pending_operations_encoding =
-        union
-          [
-            case
-              ~title:"pending_operations_encoding"
-              (Tag 2)
-              version_2_encoding
-              (function
-                | Version_2, pending_operations -> Some pending_operations
-                | (Version_0 | Version_1), _ -> None)
-              (fun pending_operations -> (Version_2, pending_operations));
-            case
-              ~title:"pending_operations_encoding_with_legacy_attestation_name"
-              (Tag 1)
-              version_1_encoding
-              (function
-                | Version_1, pending_operations -> Some pending_operations
-                | (Version_0 | Version_2), _ -> None)
-              (fun pending_operations -> (Version_1, pending_operations));
-            case
-              ~title:"old_encoding_pending_operations"
-              Json_only
-              version_0_encoding
-              (function
-                | Version_0, pending_operations -> Some pending_operations
-                | (Version_1 | Version_2), _ -> None)
-              (fun pending_operations -> (Version_0, pending_operations));
-          ]
+        encoding_versioning
+          ~encoding_name:"pending_operations"
+          ~latest_encoding:(Version_2, version_2_encoding)
+          ~old_encodings:
+            [(Version_0, version_0_encoding); (Version_1, version_1_encoding)]
 
       let pending_operations path =
         Tezos_rpc.Service.get_service
