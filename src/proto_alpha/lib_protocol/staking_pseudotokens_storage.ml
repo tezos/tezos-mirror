@@ -235,6 +235,13 @@ let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
   in
   update_costaking_pseudotokens ~f ctxt contract
 
+let stake ctxt ~contract ~delegate amount =
+  let open Lwt_result_syntax in
+  let* ctxt, new_pseudotokens =
+    credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate amount
+  in
+  credit_costaking_pseudotokens ctxt contract new_pseudotokens
+
 let request_unstake ctxt ~contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)

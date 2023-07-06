@@ -95,6 +95,22 @@ val credit_costaking_pseudotokens :
   Staking_pseudotoken_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+(** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
+    costaking pseudotokens and the [delagte]'s frozen deposits pseudotokens by
+    an amount of pseudotokens corresponding to [amount] using [delegate]'s 
+    frozen deposits pseudotokens/tez rate. 
+    
+    This function must be called on "stake" **before** transferring tez to
+    [delegate]'s frozen deposits. 
+    
+    [delegate] must be [contract]'s delegate. *)
+val stake :
+  Raw_context.t ->
+  contract:Contract_repr.t ->
+  delegate:Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
 (** [request_unstake ctxt ~contract ~delegate amount] debits the [contract]'s
     costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s

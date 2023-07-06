@@ -4977,6 +4977,13 @@ module Staking_pseudotokens : sig
   val credit_costaking_pseudotokens :
     context -> Contract.t -> t -> context tzresult Lwt.t
 
+  val stake :
+    context ->
+    contract:Contract.t ->
+    delegate:public_key_hash ->
+    Tez.t ->
+    context tzresult Lwt.t
+
   val request_unstake :
     context ->
     contract:Contract.t ->
