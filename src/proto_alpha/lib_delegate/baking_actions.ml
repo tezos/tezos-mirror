@@ -426,7 +426,7 @@ let inject_preendorsements state ~preendorsements =
       >>=? fun may_sign ->
       (if may_sign then
        let unsigned_operation = (shell, Contents_list contents) in
-       let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
+       let watermark = Operation.(to_watermark (Preattestation chain_id)) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
            Operation.unsigned_encoding_with_legacy_attestation_name

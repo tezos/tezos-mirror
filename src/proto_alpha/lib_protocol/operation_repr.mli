@@ -189,7 +189,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
 type consensus_watermark =
   | Endorsement of Chain_id.t
-  | Preendorsement of Chain_id.t
+  | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark

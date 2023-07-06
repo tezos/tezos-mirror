@@ -179,11 +179,11 @@ let pp_consensus_content ppf content =
 
 type consensus_watermark =
   | Endorsement of Chain_id.t
-  | Preendorsement of Chain_id.t
+  | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
 let to_watermark = function
-  | Preendorsement chain_id ->
+  | Preattestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id))
   | Dal_attestation chain_id
@@ -203,7 +203,7 @@ let of_watermark = function
         match Bytes.get b 0 with
         | '\x12' ->
             Option.map
-              (fun chain_id -> Preendorsement chain_id)
+              (fun chain_id -> Preattestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x13' ->
             Option.map
@@ -1936,7 +1936,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
   | Some signature ->
       let watermark =
         match op.protocol_data.contents with
-        | Single (Preattestation _) -> to_watermark (Preendorsement chain_id)
+        | Single (Preattestation _) -> to_watermark (Preattestation chain_id)
         | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single

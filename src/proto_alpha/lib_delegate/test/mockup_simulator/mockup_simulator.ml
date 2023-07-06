@@ -1345,7 +1345,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
             | Endorsement _ ->
                 Alpha_context.Operation.to_watermark (Endorsement chain_id)
             | Preattestation _ ->
-                Alpha_context.Operation.to_watermark (Preendorsement chain_id)
+                Alpha_context.Operation.to_watermark (Preattestation chain_id)
             | _ -> Signature.Generic_operation)
       | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
       >>=? fun watermark ->
