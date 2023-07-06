@@ -43,19 +43,6 @@ let init_delegate_pseudotokens_from_frozen_deposits_balance ctxt contract =
     contract
     initial_pseudotokens
 
-let get_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_pseudotokens_opt =
-    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-  in
-  match frozen_deposits_pseudotokens_opt with
-  | Some frozen_deposits_pseudotokens
-    when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-      frozen_deposits_pseudotokens
-  | _ ->
-      Staking_pseudotoken_repr.of_int64_exn
-        (Tez_repr.to_mutez frozen_deposits_tez)
-
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
   if Tez_repr.(frozen_deposits_tez = zero) then (
@@ -108,8 +95,17 @@ let tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
   let* {current_amount = frozen_deposits_tez; initial_amount = _} =
     Frozen_deposits_storage.get ctxt contract
   in
-  let+ frozen_deposits_pseudotokens =
-    get_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
+  let+ frozen_deposits_pseudotokens_opt =
+    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
+  in
+  let frozen_deposits_pseudotokens =
+    match frozen_deposits_pseudotokens_opt with
+    | Some frozen_deposits_pseudotokens
+      when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+        frozen_deposits_pseudotokens
+    | _ ->
+        Staking_pseudotoken_repr.of_int64_exn
+          (Tez_repr.to_mutez frozen_deposits_tez)
   in
   tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez ~pseudotoken_amount
 
@@ -139,8 +135,17 @@ let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   let* {current_amount = frozen_deposits_tez; initial_amount = _} =
     Frozen_deposits_storage.get ctxt contract
   in
-  let* frozen_deposits_pseudotokens =
-    get_frozen_deposits_pseudotokens ctxt contract ~frozen_deposits_tez
+  let* frozen_deposits_pseudotokens_opt =
+    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
+  in
+  let frozen_deposits_pseudotokens =
+    match frozen_deposits_pseudotokens_opt with
+    | Some frozen_deposits_pseudotokens
+      when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+        frozen_deposits_pseudotokens
+    | _ ->
+        Staking_pseudotoken_repr.of_int64_exn
+          (Tez_repr.to_mutez frozen_deposits_tez)
   in
   let*? new_frozen_deposits_pseudotokens, x =
     f ~frozen_deposits_pseudotokens ~frozen_deposits_tez
