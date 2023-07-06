@@ -172,9 +172,14 @@ let select_commands _ctxt Client_config.{chain; _} =
       Tezos_clic.command
         ~group
         ~desc:"run the archiver to a teztale_server"
-        Tezos_clic.no_options
+        (Tezos_clic.args1
+           (Tezos_clic.arg
+              ~doc:"dump failed post data"
+              ~long:"backup-dir"
+              ~placeholder:"path"
+              (Tezos_clic.parameter (fun _ p -> return p))))
         (Tezos_clic.prefixes ["feed"] @@ Tezos_clic.seq_of_param endpoint_param)
-        (fun () endpoints cctxt ->
+        (fun _ endpoints cctxt ->
           let*! ctx =
             match X509.Authenticator.of_string "none" with
             | Error _ -> Conduit_lwt_unix.init ()
