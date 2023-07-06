@@ -27,7 +27,11 @@
     for all *)
 type endpoint = {auth : string * string; endpoint : Uri.t}
 
-type ctx = {cohttp_ctx : Cohttp_lwt_unix.Net.ctx; endpoints : endpoint list}
+type ctx = {
+  cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
+  endpoints : endpoint list;
+  backup_path : string option;
+}
 
 val extract_auth : Uri.t -> endpoint
 
