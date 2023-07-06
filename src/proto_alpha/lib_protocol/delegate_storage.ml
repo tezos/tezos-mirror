@@ -342,7 +342,8 @@ module For_RPC = struct
 
   let staking_balance ctxt delegate =
     registered ctxt delegate >>= fun is_registered ->
-    if is_registered then Stake_storage.get_staking_balance ctxt delegate
+    if is_registered then
+      Stake_storage.For_RPC.get_staking_balance ctxt delegate
     else return Tez_repr.zero
 
   let delegated_balance ctxt delegate =

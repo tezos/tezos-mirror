@@ -65,15 +65,6 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
-let get_staking_balance ctxt delegate =
-  let open Lwt_result_syntax in
-  let* {own_frozen; costaked_frozen; delegated} =
-    Storage.Stake.Staking_balance.get ctxt delegate
-  in
-  let*? frozen = Tez_repr.(own_frozen +? costaked_frozen) in
-  let*? staking_balance = Tez_repr.(frozen +? delegated) in
-  return staking_balance
-
 let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
@@ -317,10 +308,21 @@ let add_contract_delegated_stake ctxt contract amount =
   | None -> return ctxt
   | Some delegate -> add_delegated_stake ctxt delegate amount
 
+module For_RPC = struct
+  let get_staking_balance ctxt delegate =
+    let open Lwt_result_syntax in
+    let* {own_frozen; costaked_frozen; delegated} =
+      Storage.Stake.Staking_balance.get ctxt delegate
+    in
+    let*? frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+    let*? staking_balance = Tez_repr.(frozen +? delegated) in
+    return staking_balance
+end
+
 module Internal_for_tests = struct
   let get ctxt delegate =
     Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
     >>= function
-    | true -> get_staking_balance ctxt delegate
+    | true -> For_RPC.get_staking_balance ctxt delegate
     | false -> return Tez_repr.zero
 end

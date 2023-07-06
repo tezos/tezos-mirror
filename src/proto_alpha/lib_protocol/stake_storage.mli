@@ -64,9 +64,6 @@ val set_inactive :
 val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-val get_staking_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
 val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
@@ -148,6 +145,11 @@ val add_contract_delegated_stake :
     nothing. *)
 val remove_contract_delegated_stake :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+module For_RPC : sig
+  val get_staking_balance :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+end
 
 module Internal_for_tests : sig
   (** Same as [get_staking_balance] but returns zero if the argument
