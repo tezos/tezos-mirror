@@ -113,6 +113,9 @@ let tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
           (Tez_repr.of_mutez_exn
              (Staking_pseudotoken_repr.to_int64 pseudotoken_amount))
 
+(** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
+    returns the amount of [delegate]'s stake pseudotokens the [tez_amount] is
+    currently worth. *)
 let frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
@@ -192,6 +195,10 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     in
     update_frozen_deposits_pseudotokens ~f ctxt delegate
 
+(** [debit_frozen_deposits_pseudotokens ctxt delegate p_amount] decreases
+    [delegate]'s stake pseudotokens by [p_amount].
+    The function also returns the amount of tez [p_amount] current worth.
+*)
 let debit_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
   if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
     return (ctxt, Tez_repr.zero)
@@ -212,6 +219,8 @@ let debit_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
     in
     update_frozen_deposits_pseudotokens ~f ctxt delegate
 
+(** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
+    current costaking balance. *)
 let costaking_pseudotokens_balance ctxt contract =
   let open Lwt_result_syntax in
   let+ costaking_pseudotokens_opt =
@@ -243,6 +252,8 @@ let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
   in
   update_costaking_pseudotokens ~f ctxt contract
 
+(** [debit_costaking_pseudotokens ctxt contract p_amount] decreases
+    [contract]'s costaking pseudotokens balance by [p_amount]. *)
 let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
   let f current_pseudotokens_balance =
     Staking_pseudotoken_repr.(

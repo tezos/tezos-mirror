@@ -60,15 +60,6 @@
 val init_delegate_pseudotokens_from_frozen_deposits_balance :
   Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
-    returns the amount of [delegate]'s stake pseudotokens the [tez_amount] is
-    currently worth. *)
-val frozen_deposits_pseudotokens_for_tez_amount :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Tez_repr.t ->
-  Staking_pseudotoken_repr.t tzresult Lwt.t
-
 (** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
     increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
     [tez_amount] multiplied by the current rate of the delegate's frozen
@@ -83,21 +74,6 @@ val credit_frozen_deposits_pseudotokens_for_tez_amount :
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   (Raw_context.t * Staking_pseudotoken_repr.t) tzresult Lwt.t
-
-(** [debit_frozen_deposits_pseudotokens ctxt delegate p_amount] decreases
-    [delegate]'s stake pseudotokens by [p_amount].
-    The function also returns the amount of tez [p_amount] current worth.
-*)
-val debit_frozen_deposits_pseudotokens :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Staking_pseudotoken_repr.t ->
-  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
-
-(** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
-    current costaking balance. *)
-val costaking_pseudotokens_balance :
-  Raw_context.t -> Contract_repr.t -> Staking_pseudotoken_repr.t tzresult Lwt.t
 
 (** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
     current costaking balance converted into tez using [delegate] frozen
@@ -114,14 +90,6 @@ val costaking_balance_as_tez :
 (** [credit_costaking_pseudotokens ctxt contract p_amount] increases
     [contract]'s costaking pseudotokens balance by [p_amount]. *)
 val credit_costaking_pseudotokens :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Staking_pseudotoken_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
-(** [debit_costaking_pseudotokens ctxt contract p_amount] decreases
-    [contract]'s costaking pseudotokens balance by [p_amount]. *)
-val debit_costaking_pseudotokens :
   Raw_context.t ->
   Contract_repr.t ->
   Staking_pseudotoken_repr.t ->
