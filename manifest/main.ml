@@ -7472,8 +7472,7 @@ let octez_scoru_sequencer =
     ~synopsis:"Sequencer library for smart contract rollup"
     ~deps:
       [
-        octez_base |> open_ |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         Protocol.(octez_sc_rollup_layer2 alpha |> if_some |> open_);
         Protocol.(main alpha) |> open_;
         Protocol.(octez_sc_rollup_node alpha) |> if_some;

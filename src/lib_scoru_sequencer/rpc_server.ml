@@ -35,7 +35,7 @@ module Local_directory = Make_directory (struct
 
   type subcontext = unit
 
-  let context_of_prefix _ll_node_ctxt () = return ()
+  let context_of_prefix _ll_node_ctxt () = Lwt_result_syntax.return_unit
 end)
 
 (* Register server handlers *)
