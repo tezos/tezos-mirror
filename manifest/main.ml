@@ -4026,7 +4026,7 @@ let _octez_dac_node_lib_tests =
 
 let _octez_dac_lib_tests =
   tezt
-    ["test_certificate"; "test_dac_plugin"]
+    ["test_certificate"; "test_dac_plugin"; "test_dac_clic_helpers"]
     ~path:"src/lib_dac/test"
     ~opam:"tezos-dac-lib-test"
     ~synopsis:"Test for dac lib"
