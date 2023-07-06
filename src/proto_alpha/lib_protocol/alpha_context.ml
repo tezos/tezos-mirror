@@ -636,7 +636,18 @@ end
 
 module Token = Token
 module Cache = Cache_repr
-module Unstake_requests = Unstake_requests_storage
+
+module Unstake_requests = struct
+  include Unstake_requests_storage
+
+  module For_RPC = struct
+    let apply_slash_to_unstaked_unfinalizable ctxt ~delegate ~requests =
+      Unstake_requests_storage.For_RPC.apply_slash_to_unstaked_unfinalizable
+        ctxt
+        {delegate; requests}
+  end
+end
+
 module Unstaked_frozen_deposits = Unstaked_frozen_deposits_storage
 
 module Staking_pseudotokens = struct
