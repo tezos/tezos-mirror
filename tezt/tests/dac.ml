@@ -123,6 +123,9 @@ let wait_for_layer1_block_processing dac_node level =
   Dac_node.wait_for dac_node "dac_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
+let wait_for_layer1_new_head dac_node =
+  Dac_node.wait_for dac_node "dac_node_layer_1_new_head.v0" (fun _ -> Some ())
+
 let wait_for_root_hash_pushed_to_data_streamer dac_node root_hash =
   Dac_node.wait_for
     dac_node
@@ -150,6 +153,10 @@ let wait_for_handle_new_subscription_to_hash_streamer dac_node =
     dac_node
     "handle_new_subscription_to_hash_streamer.v0"
     (fun _ -> Some ())
+
+let wait_for_l1_tracking_ended dac_node =
+  Dac_node.wait_for dac_node "new_head_daemon_connection_lost.v0" (fun _ ->
+      Some ())
 
 let bls_sign_hex_hash (signer : Account.aggregate_key) hex_root_hash =
   let sk =
@@ -1409,6 +1416,80 @@ module Full_infrastructure = struct
     (* 6. We check that [committee_member} received a root hash that corresponds
           to the serialized payload in [5].*)
     committee_member_receives_root_hash_promise
+
+  (** [test_tezos_node_disconnects_scenario] checks that upon L1 disconnection,
+      DAC actors automatically restart L1 tracking. In addition, we also test
+      that upon reconnection, DAC network works as expected when serializing a
+      random payload.  *)
+  let test_tezos_node_disconnects_scenario
+      Scenarios.
+        {node; coordinator_node; committee_members_nodes; observer_nodes; _} =
+    (* We assert DAC network of only one committee member and one observer node.
+       Unless this is the case, this test as is may exhibit race conditions. *)
+    let () =
+      assert (
+        List.length committee_members_nodes = 1
+        && List.length observer_nodes = 1)
+    in
+    let committee_member = List.hd committee_members_nodes in
+    let observer = List.hd observer_nodes in
+    (* Test start here. *)
+    (* 1. We set up a running and functional DAC network. *)
+    let* () =
+      init_run_and_subscribe_nodes
+        coordinator_node
+        (committee_members_nodes @ observer_nodes)
+    in
+    (* 2. We terminate the Tezos [node], which cause a L1 disconnection of the
+          DAC network. *)
+    let wait_for_coordinator_stopped_tracking_l1 =
+      wait_for_l1_tracking_ended coordinator_node
+    in
+    let wait_for_committee_member_stopped_tracking_l1 =
+      wait_for_l1_tracking_ended committee_member
+    in
+    let wait_for_observer_stopped_tracking_l1 =
+      wait_for_l1_tracking_ended observer
+    in
+    Log.info "Terminating Tezos node" ;
+    let* () = Node.terminate node in
+    let* () = wait_for_coordinator_stopped_tracking_l1 in
+    let* () = wait_for_committee_member_stopped_tracking_l1 in
+    let* () = wait_for_observer_stopped_tracking_l1 in
+    (* 3. We restart Tezos [node] and expect the DAC network to restart tracking
+         L1 heads. *)
+    let wait_for_coordinator_connected_to_l1 =
+      wait_for_layer1_new_head coordinator_node
+    in
+    let wait_for_committee_member_connected_to_l1 =
+      wait_for_layer1_new_head committee_member
+    in
+    Log.info "Restarting Tezos node" ;
+    let* () = Node.run node [] in
+    (* 4. We assert [3.] by waiting for "dac_node_layer_1_new_head" event from
+       both [coordinator_node] and [committee_member] node. *)
+    let* () = wait_for_coordinator_connected_to_l1 in
+    let* () = wait_for_committee_member_connected_to_l1 in
+    let expected_rh =
+      "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6"
+    in
+    let committee_member_receives_root_hash_promise =
+      wait_for_received_root_hash_processed committee_member expected_rh
+    in
+    let observer_receives_root_hash_promise =
+      wait_for_received_root_hash_processed observer expected_rh
+    in
+    (* 5. We serialize random payload. *)
+    let* _root_hash =
+      coordinator_serializes_payload
+        coordinator_node
+        ~payload:"test"
+        ~expected_rh
+    in
+    (* 6. We check that [committee_member] and [observer] node both received
+          a root hash that corresponds to the serialized payload in [5].*)
+    let* () = committee_member_receives_root_hash_promise in
+    observer_receives_root_hash_promise
 end
 
 let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
@@ -2865,6 +2946,14 @@ let register ~protocols =
     ~tags:["dac"; "dac_node"]
     "test committee member disconnects from Coordinator"
     Full_infrastructure.test_committe_member_disconnects_scenario
+    protocols ;
+  scenario_with_full_dac_infrastructure
+    ~__FILE__
+    ~observers:1
+    ~committee_size:1
+    ~tags:["dac"; "dac_node"]
+    "test DAC disconnects from L1"
+    Full_infrastructure.test_tezos_node_disconnects_scenario
     protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_synced_with_dac protocols ;
   Tx_kernel_e2e.test_tx_kernel_e2e_with_dac_observer_missing_pages protocols ;

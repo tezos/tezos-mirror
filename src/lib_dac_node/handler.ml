@@ -173,11 +173,13 @@ let new_head ctxt =
         return_unit
   in
   let*! () = Event.(emit layer1_node_tracking_started ()) in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
-      If the layer1 node reboots, the rpc stream breaks.*)
-  make_stream_daemon
-    handler
-    (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+  make_infinite_stream_daemon
+    ~on_disconnect:Event.emit_l1_tracking_ended
+    ~on_failed_connection:Event.cannot_connect_to_tezos_node
+    (fun () ->
+      make_stream_daemon
+        handler
+        (Tezos_shell_services.Monitor_services.heads cctxt `Main))
 
 (** Handlers specific to a [Committee_member]. A [Committee_member] is
     responsible for
