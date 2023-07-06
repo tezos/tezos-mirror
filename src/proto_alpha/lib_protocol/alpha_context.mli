@@ -4908,6 +4908,9 @@ module Unstake_requests : sig
     unfinalizable : stored_requests;
   }
 
+  val prepared_finalize_unstake_encoding :
+    prepared_finalize_unstake Data_encoding.encoding
+
   val prepare_finalize_unstake :
     context -> Contract.t -> prepared_finalize_unstake option tzresult Lwt.t
 
@@ -4928,6 +4931,9 @@ module Unstake_requests : sig
       delegate:public_key_hash ->
       requests:(Cycle.t * Tez.t) list ->
       (Cycle.t * Tez.t) list tzresult Lwt.t
+
+    val apply_slash_to_unstaked_unfinalizable_stored_requests :
+      context -> stored_requests -> stored_requests tzresult Lwt.t
   end
 end
 
