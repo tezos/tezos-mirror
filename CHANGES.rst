@@ -203,6 +203,11 @@ Node
   is classified as ``branch_delayed`` with the
   ``prevalidation.operation_conflict`` error. (MR :gl:`!9314`)
 
+- In RPC ``/protocol_data``, ``"per_block_votes"`` replaces ``"liquidity_baking_toggle_vote"``;
+  ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_inflation_vote"``.
+  A vote is one of ``"on"``, ``"off"``, ``"pass"``.
+
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
@@ -217,9 +222,10 @@ Baker
   data directory when searching an existing file. The previous
   semantics, which looks for this file in the current working
   directory, takes predecence.
-- Bakers are now required to set their votes for the adoption of the
-  adaptive inflation feature. They may use the per block votes file,
-  or CLI option ``--adaptive-inflation-vote``.
+- Bakers are now asked (but not required) to set their votes for the adoption of the
+  adaptive inflation feature. They may use the CLI option ``--adaptive-inflation-vote``
+  or the per-block votes file (which is re-read at each block, and overrides the CLI option).
+  Absence of vote is equivalent to voting "pass".
 
 - Rename ``endorsement`` into ``attestation`` for baker errors and events.
   (MR :gl:`!9195`)

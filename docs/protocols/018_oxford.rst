@@ -48,16 +48,18 @@ Zero Knowledge Rollups (ongoing)
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Adaptive Inflation (ongoing)
-----------------------------
+Adaptive Inflation
+------------------
 
 - This protocol asks the bakers to set their votes for the adoption of
   the adaptive inflation feature. They may use the per-block votes
-  file, or CLI option ``--adaptive-inflation-vote``. If they do
-  not vote for the adaptive inflation feature, the vote defaults to
-  "pass" (unlike for the liquidity baking vote, which is mandatory).
-
-- Introduce feature flag for Adaptive Inflation. (MR :gl:`!8566`)
+  file, or CLI option ``--adaptive-inflation-vote``. If they do not
+  vote for the adaptive inflation feature, the vote defaults to
+  ``"pass"`` (unlike for the liquidity baking toggle vote, which is
+  mandatory). As for the liquidity baking toggle vote, the value in
+  the per-block votes file is read at each block (so the baker does
+  not have to restart in case the value has changed in the file), and
+  overrides the value of the CLI option if any.
 
 - Add parameter ``staking_over_baking_limit`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
 
