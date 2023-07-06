@@ -113,29 +113,6 @@ let tez_of_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
           (Tez_repr.of_mutez_exn
              (Staking_pseudotoken_repr.to_int64 pseudotoken_amount))
 
-(** [frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
-    returns the amount of [delegate]'s stake pseudotokens the [tez_amount] is
-    currently worth. *)
-let frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount =
-  let open Lwt_result_syntax in
-  let contract = Contract_repr.Implicit delegate in
-  let* frozen_deposits_pseudotokens_opt =
-    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-  in
-  match frozen_deposits_pseudotokens_opt with
-  | Some frozen_deposits_pseudotokens
-    when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-      let+ {current_amount = frozen_deposits_tez; initial_amount = _} =
-        Frozen_deposits_storage.get ctxt contract
-      in
-      pseudotokens_of
-        ~frozen_deposits_pseudotokens
-        ~frozen_deposits_tez
-        ~tez_amount
-  | _ ->
-      return
-        Staking_pseudotoken_repr.(of_int64_exn (Tez_repr.to_mutez tez_amount))
-
 let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit delegate in
@@ -265,28 +242,56 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
   let open Lwt_result_syntax in
   if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)
   else
-    let* available_pseudotokens =
-      costaking_pseudotokens_balance ctxt contract
+    let delegate_contract = Contract_repr.Implicit delegate in
+    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
+      Frozen_deposits_storage.get ctxt delegate_contract
     in
-    if Staking_pseudotoken_repr.(available_pseudotokens = zero) then
-      return (ctxt, Tez_repr.zero)
+    if Tez_repr.(frozen_deposits_tez = zero) then return (ctxt, Tez_repr.zero)
     else
-      let* requested_pseudotokens =
-        frozen_deposits_pseudotokens_for_tez_amount
+      let* frozen_deposits_pseudotokens_opt =
+        Storage.Contract.Frozen_deposits_pseudotokens.find
           ctxt
-          delegate
-          requested_amount
+          delegate_contract
       in
-      let pseudotokens_to_unstake =
-        Staking_pseudotoken_repr.min
-          requested_pseudotokens
-          available_pseudotokens
+      let* available_pseudotokens =
+        costaking_pseudotokens_balance ctxt contract
       in
-      assert (not Staking_pseudotoken_repr.(pseudotokens_to_unstake = zero)) ;
-      let* ctxt, tez_to_unstake =
-        debit_frozen_deposits_pseudotokens ctxt delegate pseudotokens_to_unstake
-      in
-      let+ ctxt =
-        debit_costaking_pseudotokens ctxt contract pseudotokens_to_unstake
-      in
-      (ctxt, tez_to_unstake)
+      match frozen_deposits_pseudotokens_opt with
+      | Some frozen_deposits_pseudotokens
+        when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+          if Staking_pseudotoken_repr.(available_pseudotokens = zero) then
+            return (ctxt, Tez_repr.zero)
+          else
+            let requested_pseudotokens =
+              pseudotokens_of
+                ~frozen_deposits_pseudotokens
+                ~frozen_deposits_tez
+                ~tez_amount:requested_amount
+            in
+            let pseudotokens_to_unstake =
+              Staking_pseudotoken_repr.min
+                requested_pseudotokens
+                available_pseudotokens
+            in
+            assert (
+              not Staking_pseudotoken_repr.(pseudotokens_to_unstake = zero)) ;
+            let* ctxt, tez_to_unstake =
+              debit_frozen_deposits_pseudotokens
+                ctxt
+                delegate
+                pseudotokens_to_unstake
+            in
+            let+ ctxt =
+              debit_costaking_pseudotokens ctxt contract pseudotokens_to_unstake
+            in
+            (ctxt, tez_to_unstake)
+      | _ ->
+          (* [delegate] must be non-costaked and have their pseudotokens
+             non-initialized.
+             Either the request is from a delegator with zero costake (hence
+             nothing to unstake) or from the delegate themself and there is no
+             need to initialize their pseudotokens. *)
+          assert (Staking_pseudotoken_repr.(available_pseudotokens = zero)) ;
+          if Contract_repr.(contract = delegate_contract) then
+            return (ctxt, Tez_repr.min frozen_deposits_tez requested_amount)
+          else return (ctxt, Tez_repr.zero)
