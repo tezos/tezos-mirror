@@ -239,6 +239,15 @@ let deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t =
     (fun (cycle, deposit) -> {cycle; deposit})
     (obj2 (req "cycle" Cycle.encoding) (req "deposit" Tez.encoding))
 
+type pending_staking_parameters = Cycle.t * Staking_parameters_repr.t
+
+let pending_staking_parameters_encoding :
+    pending_staking_parameters Data_encoding.t =
+  let open Data_encoding in
+  obj2
+    (req "cycle" Cycle.encoding)
+    (req "parameters" Staking_parameters_repr.encoding)
+
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
 
