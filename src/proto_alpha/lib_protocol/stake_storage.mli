@@ -108,9 +108,6 @@ val set_selected_distribution_for_cycle :
 val clear_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-val get :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
 val fold_on_active_delegates_with_minimal_stake :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
@@ -151,3 +148,10 @@ val add_contract_delegated_stake :
     nothing. *)
 val remove_contract_delegated_stake :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** Same as [get_staking_balance] but returns zero if the argument
+      is not an active delegate above minimal stake.  *)
+  val get :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+end

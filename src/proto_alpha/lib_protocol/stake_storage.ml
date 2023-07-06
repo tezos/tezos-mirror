@@ -284,12 +284,6 @@ let clear_at_cycle_end ctxt ~new_cycle =
   | None -> return ctxt
   | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear
 
-let get ctxt delegate =
-  Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
-  >>= function
-  | true -> get_staking_balance ctxt delegate
-  | false -> return Tez_repr.zero
-
 let fold_on_active_delegates_with_minimal_stake =
   Storage.Stake.Active_delegates_with_minimal_stake.fold
 
@@ -322,3 +316,11 @@ let add_contract_delegated_stake ctxt contract amount =
   Contract_delegate_storage.find ctxt contract >>=? function
   | None -> return ctxt
   | Some delegate -> add_delegated_stake ctxt delegate amount
+
+module Internal_for_tests = struct
+  let get ctxt delegate =
+    Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
+    >>= function
+    | true -> get_staking_balance ctxt delegate
+    | false -> return Tez_repr.zero
+end
