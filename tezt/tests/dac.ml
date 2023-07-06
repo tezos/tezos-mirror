@@ -47,10 +47,7 @@ let assert_lwt_failure ?__LOC__ msg lwt_under_inspection =
 let init_hex_root_hash ?payload coordinator_node =
   let payload = Option.value payload ~default:"hello test message" in
   let* root_hash, _l1_op =
-    Dac_helper.Call_endpoint.V0.post_store_preimage
-      coordinator_node
-      ~payload
-      ~pagination_scheme:"Merkle_tree_V0"
+    Dac_helper.Call_endpoint.V0.post_store_preimage coordinator_node ~payload
   in
   let hex_root_hash = `Hex root_hash in
   return hex_root_hash
@@ -175,15 +172,6 @@ let pp fmt = function
   | Failed {error_id} -> Format.fprintf fmt "failed: %s" error_id
 
 let status_typ = Check.equalable pp ( = )
-
-let send_messages ?(src = Constant.bootstrap2.alias) ?(alter_final_msg = Fun.id)
-    client msgs =
-  let msg =
-    alter_final_msg
-    @@ Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs)
-  in
-  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  Client.bake_for_and_wait client
 
 let bake_levels n client = repeat n (fun () -> Client.bake_for_and_wait client)
 
@@ -314,6 +302,15 @@ let sample_payload example_filename =
 
 let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
+let assert_state_changed ?block sc_rollup_client prev_state_hash =
+  let*! state_hash =
+    Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
+  in
+  Check.(state_hash <> prev_state_hash)
+    Check.string
+    ~error_msg:"State hash has not changed (%L <> %R)" ;
+  Lwt.return_unit
+
 (** This modules encapsulate tests for DAC nodes when running in legacy node.
     It includes tests where we have two dac nodes running in
     the legacy mode interacting with each other. As such one node normally tries
@@ -342,10 +339,7 @@ module Legacy = struct
 
   let coordinator_serializes_payload coordinator ~payload ~expected_rh =
     let* actual_rh, _l1_operation =
-      Dac_helper.Call_endpoint.V0.post_store_preimage
-        coordinator
-        ~payload
-        ~pagination_scheme:"Merkle_tree_V0"
+      Dac_helper.Call_endpoint.V0.post_store_preimage coordinator ~payload
     in
     return @@ check_valid_root_hash expected_rh actual_rh
 
@@ -1772,15 +1766,6 @@ module Tx_kernel_e2e = struct
       external_message_of_batch @@ transactions_batch_of
       @@ [multiaccount_tx_of accounts_ops]
   end
-
-  let assert_state_changed ?block sc_rollup_client prev_state_hash =
-    let*! state_hash =
-      Sc_rollup_client.state_hash ?block ~hooks sc_rollup_client
-    in
-    Check.(state_hash <> prev_state_hash)
-      Check.string
-      ~error_msg:"State hash has not changed (%L <> %R)" ;
-    Lwt.return_unit
 
   let assert_ticks_advanced ?block sc_rollup_client prev_ticks =
     let*! ticks = Sc_rollup_client.total_ticks ?block ~hooks sc_rollup_client in

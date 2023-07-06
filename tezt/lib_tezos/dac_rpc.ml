@@ -46,14 +46,11 @@ module V0 = struct
   let get_preimage page_hash =
     make GET [api_prefix; "preimage"; page_hash] JSON.as_string
 
-  let post_store_preimage ~payload ~pagination_scheme =
+  let post_store_preimage ~payload =
     let preimage =
       JSON.parse
         ~origin:"dal_node_dac_store_preimage_rpc"
-        (Format.sprintf
-           {|{"payload":%s,"pagination_scheme":"%s"}|}
-           (encode_bytes_to_hex_string payload)
-           pagination_scheme)
+        (Format.sprintf {|{"payload":%s}|} (encode_bytes_to_hex_string payload))
     in
     let data : RPC_core.data = Data (JSON.unannotate preimage) in
     make ~data POST [api_prefix; "store_preimage"] @@ fun json ->

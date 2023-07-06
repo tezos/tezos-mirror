@@ -33,15 +33,12 @@ module V0 : sig
       returned as a sequence of bytes. *)
   val get_preimage : string -> (Dac_node.t, string) RPC_core.t
 
-  (** [post_store_preimage cctxt ~payload ~pagination_scheme] posts a
-      [payload] to "v0/store_preimage" using a given [pagination_scheme].
-      It returns the hex encoded root page hash and the raw bytes that can be used
-      as contents of a rollup message to trigger the request of the payload in a
-      WASM rollup. *)
+  (** [post_store_preimage cctxt ~payload] posts a
+      [payload] to "v0/store_preimage". It returns the hex encoded root page hash
+      and the raw bytes that can be used as contents of a rollup message 
+      to trigger the request of the payload in a WASM rollup. *)
   val post_store_preimage :
-    payload:string ->
-    pagination_scheme:string ->
-    (Dac_node.t, string * string) RPC_core.t
+    payload:string -> (Dac_node.t, string * string) RPC_core.t
 
   (** [get_verify_signature cctxt external_message] requests the DAC
       node to verify the signature of the external message [external_message] via

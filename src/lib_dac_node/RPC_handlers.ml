@@ -83,38 +83,20 @@ end
 
 module V0 = struct
   let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
-      hash_streamer (data, pagination_scheme) =
+      hash_streamer data =
     let open Lwt_result_syntax in
     let open Pages_encoding in
     let* root_hash =
-      match pagination_scheme with
-      | Pagination_scheme.Merkle_tree_V0 ->
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4897
-             Once new "PUT /preimage" endpoint is implemented, pushing
-             a new root hash to the data streamer should be moved there.
-             Tezt for testing streaming of root hashes should also use
-             the new endpoint. *)
-          let* root_hash =
-            Merkle_tree.V0.Filesystem.serialize_payload
-              dac_plugin
-              ~page_store
-              data
-          in
-          let () =
-            Data_streamer.publish
-              hash_streamer
-              (Dac_plugin.hash_to_raw root_hash)
-          in
-          let*! () =
-            Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
-          in
-          return root_hash
-      | Pagination_scheme.Hash_chain_V0 ->
-          Hash_chain.V0.serialize_payload
-            dac_plugin
-            ~for_each_page:(fun (hash, content) ->
-              Page_store.Filesystem.save dac_plugin page_store ~hash ~content)
-            data
+      let* root_hash =
+        Merkle_tree.V0.Filesystem.serialize_payload dac_plugin ~page_store data
+      in
+      let () =
+        Data_streamer.publish hash_streamer (Dac_plugin.hash_to_raw root_hash)
+      in
+      let*! () =
+        Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
+      in
+      return root_hash
     in
     let* signature, witnesses =
       Signature_manager.Legacy.sign_root_hash

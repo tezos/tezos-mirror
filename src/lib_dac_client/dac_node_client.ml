@@ -54,12 +54,8 @@ module V0 = struct
   let get_preimage (cctxt : #cctxt) ~page_hash =
     cctxt#call_service RPC_services.V0.get_preimage ((), page_hash) () ()
 
-  let post_store_preimage (cctxt : #cctxt) ~payload ~pagination_scheme =
-    cctxt#call_service
-      RPC_services.V0.post_store_preimage
-      ()
-      ()
-      (payload, pagination_scheme)
+  let post_store_preimage (cctxt : #cctxt) ~payload =
+    cctxt#call_service RPC_services.V0.post_store_preimage () () payload
 
   let get_verify_signature (cctxt : #cctxt) ~external_message =
     cctxt#call_service

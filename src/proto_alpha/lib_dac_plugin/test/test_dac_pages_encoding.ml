@@ -589,112 +589,6 @@ module Merkle_tree = struct
   end
 end
 
-module Hash_chain = struct
-  (* Return substring of [str] after the first [n] char. Returns the original string
-     if n <= 0. Returns an empty string if n > String.length str *)
-  let take_after str n =
-    let n = max 0 n in
-    String.sub str (min (String.length str) n) (max 0 (String.length str - n))
-
-  module V0 = struct
-    module Pagination_scheme = Pages_encoding.Hash_chain.V0
-
-    let deserialize_page page :
-        [`Node of Dac_plugin.hash * string | `Leaf of string] =
-      if String.length page > 3996 then
-        let content = String.sub page 0 3996 in
-        let (module Plugin) = dac_plugin in
-        let hash =
-          Stdlib.Option.get
-          @@ Plugin.of_hex (take_after page (3996 + String.length " hash:"))
-        in
-        `Node (hash, content)
-      else `Leaf page
-
-    let rec retrieve_content ~get_page ?(result = "") hash =
-      let open Lwt_result_syntax in
-      let* page = get_page hash in
-      let* res = return @@ deserialize_page (Bytes.to_string page) in
-      match res with
-      | `Node (succ_hash, content) ->
-          (retrieve_content [@tailcall])
-            ~get_page
-            ~result:(String.cat result content)
-            succ_hash
-      | `Leaf content -> return @@ String.cat result content
-
-    let test_make_chain_hash_one_page () =
-      let open Lwt_result_syntax in
-      let payload = Bytes.of_string "simple payload" in
-      let*? pages = Pagination_scheme.make_hash_chain dac_plugin payload in
-      let* () = Assert.equal_int ~loc:__LOC__ 1 (List.length pages) in
-      let actual_hash, content = Stdlib.List.hd pages in
-      let* () =
-        assert_equal_bytes ~loc:__LOC__ "Contents not equal" payload content
-      in
-      let (module Plugin) = dac_plugin in
-      let expected_hash =
-        Plugin.to_hex @@ Plugin.hash_bytes ~scheme:Blake2B [content]
-      in
-      Assert.equal_string ~loc:__LOC__ expected_hash (Plugin.to_hex actual_hash)
-
-    let test_make_chain_hash_long () =
-      let open Lwt_result_syntax in
-      let payload = Bytes.of_string long_payload in
-      let*? pages = Pagination_scheme.make_hash_chain dac_plugin payload in
-      let* () = Assert.equal_int ~loc:__LOC__ 2 (List.length pages) in
-      let head_succ =
-        Stdlib.List.hd pages |> snd |> fun byt ->
-        take_after (String.of_bytes byt) (3996 + String.length " hash:")
-      in
-      let (module Plugin) = dac_plugin in
-      let next_hash, content = Stdlib.List.nth pages 1 in
-      let* () =
-        Assert.equal_string ~loc:__LOC__ (Plugin.to_hex next_hash) head_succ
-      in
-      Assert.equal_string
-        ~loc:__LOC__
-        (Plugin.to_hex next_hash)
-        (Plugin.to_hex @@ Plugin.hash_bytes ~scheme:Blake2B [content])
-
-    let test_serialize () =
-      let open Lwt_result_syntax in
-      let payload = Bytes.of_string long_payload in
-      let page_store = Hashes_map_backend.init () in
-      let* root_hash =
-        Pagination_scheme.serialize_payload
-          dac_plugin
-          ~for_each_page:(fun (hash, content) ->
-            Hashes_map_backend.save dac_plugin page_store ~hash ~content)
-          payload
-      in
-      let* () =
-        Assert.equal_int
-          ~loc:__LOC__
-          (Hashes_map_backend.number_of_pages page_store)
-          2
-      in
-      let get_page hash = Hashes_map_backend.load dac_plugin page_store hash in
-      let* content = retrieve_content ~get_page root_hash in
-      Assert.equal_string ~loc:__LOC__ long_payload content
-
-    let test_serialize_empty_payload_fails () =
-      let page_store = Hashes_map_backend.init () in
-      let payload = Bytes.of_string "" in
-      let result =
-        Pagination_scheme.serialize_payload
-          ~for_each_page:(fun (hash, content) ->
-            Hashes_map_backend.save dac_plugin page_store ~hash ~content)
-          dac_plugin
-          payload
-      in
-      assert_fails_with
-        ~loc:__LOC__
-        result
-        Pages_encoding.Payload_cannot_be_empty
-  end
-end
-
 let tests =
   [
     Tztest.tztest
@@ -729,23 +623,6 @@ let tests =
       "Hashes pages are not larger than expected"
       `Quick
       Merkle_tree.V0.multiple_pages_roundtrip_do_not_exceed_page_size;
-    Tztest.tztest
-      "Constructing hash chain (V0) for single page content is correct"
-      `Quick
-      Hash_chain.V0.test_make_chain_hash_one_page;
-    Tztest.tztest
-      "Constructing hash chain (V0) for multi page content is correct"
-      `Quick
-      Hash_chain.V0.test_make_chain_hash_long;
-    Tztest.tztest
-      "Serializing an empty payload returns an error (Hash chain)"
-      `Quick
-      Hash_chain.V0.test_serialize_empty_payload_fails;
-    Tztest.tztest
-      "Contents fitting in more pages can be retrieved after being saved - \
-       repeated pages (Hash chain, V0)"
-      `Quick
-      Hash_chain.V0.test_serialize;
     Tztest.tztest
       "Deserialization with integrity check fails if page contents are corrupt"
       `Quick
