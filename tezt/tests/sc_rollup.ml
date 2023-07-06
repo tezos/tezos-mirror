@@ -2741,6 +2741,14 @@ let test_reveals_fails_on_unknown_hash =
         if id =~ rex "could_not_open_reveal_preimage_file" then Some ()
         else None)
   in
+  (* We need to check that the rollup has entered the degraded mode,
+      so we wait for 60 blocks (commitment period) + 2. *)
+  let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
+  let* () =
+    repeat (commitment_period_in_blocks + 2) (fun () ->
+        Client.bake_for_and_wait client)
+  in
+  (* Then, we finally send the message with the unknown hash. *)
   let* () = send_text_messages client ["hash:" ^ unknown_hash] in
   let should_not_sync =
     let* _level =
