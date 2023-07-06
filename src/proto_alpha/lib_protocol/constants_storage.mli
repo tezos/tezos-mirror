@@ -145,5 +145,3 @@ val adaptive_inflation_launch_ema_threshold : Raw_context.t -> int32
 
 val adaptive_inflation_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params
-
-val freeze_rewards : Raw_context.t -> bool

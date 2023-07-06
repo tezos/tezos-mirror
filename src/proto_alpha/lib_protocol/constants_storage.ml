@@ -239,5 +239,3 @@ let adaptive_inflation_launch_ema_threshold c =
 
 let adaptive_inflation_rewards_params c =
   (adaptive_inflation c).adaptive_rewards_params
-
-let freeze_rewards = adaptive_inflation_enable
