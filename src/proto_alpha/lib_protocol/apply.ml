@@ -2137,7 +2137,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
     | Single (Preattestation _) ->
         Double_preattestation_evidence_result balance_updates
     | Single (Endorsement _) ->
-        Double_endorsement_evidence_result balance_updates
+        Double_attestation_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
   | Single (Preattestation e1) | Single (Endorsement e1) ->

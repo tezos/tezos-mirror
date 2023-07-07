@@ -912,7 +912,7 @@ let pp_contents_and_result :
         Signature.Public_key_hash.pp
         delegate
   | ( Double_attestation_evidence {op1; op2},
-      Double_endorsement_evidence_result bus ) ->
+      Double_attestation_evidence_result bus ) ->
       Format.fprintf
         ppf
         "@[<v 2>Double attestation evidence:@,\
