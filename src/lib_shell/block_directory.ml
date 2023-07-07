@@ -172,6 +172,11 @@ let build_raw_rpc_directory_with_validator (module Proto : Block_services.PROTO)
   in
   let module Block_services = Block_services.Make (Proto) (Next_proto) in
   let module S = Block_services.S in
+  register0 S.live_blocks (fun (chain_store, block) () () ->
+      let* live_blocks, _ =
+        Store.Chain.compute_live_blocks chain_store ~block
+      in
+      return live_blocks) ;
   (* helpers *)
   register0 S.Helpers.Preapply.block (fun (chain_store, block) q p ->
       let timestamp =
@@ -255,11 +260,6 @@ let build_raw_rpc_directory_without_validator
   in
   let module Block_services = Block_services.Make (Proto) (Next_proto) in
   let module S = Block_services.S in
-  register0 S.live_blocks (fun (chain_store, block) () () ->
-      let* live_blocks, _ =
-        Store.Chain.compute_live_blocks chain_store ~block
-      in
-      return live_blocks) ;
   (* block metadata *)
   let block_metadata chain_store block =
     let* metadata = Store.Block.get_block_metadata chain_store block in
