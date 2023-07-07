@@ -131,7 +131,7 @@ type mode =
 let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  let* ctxt, endorsements_map =
+  let* ctxt, attestations_map =
     Baking.endorsing_rights_by_first_slot ctxt predecessor_level
   in
   let*? can_contain_preattestations =
@@ -158,7 +158,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
-      ~allowed_endorsements:(Some endorsements_map)
+      ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
   in
   return ctxt
@@ -180,7 +180,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
-      ~allowed_endorsements:None
+      ~allowed_attestations:None
       ~allowed_preattestations:None
   in
   (* However, we want to ensure that the cycle rights are loaded in

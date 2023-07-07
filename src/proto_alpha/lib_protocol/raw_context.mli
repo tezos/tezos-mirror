@@ -321,44 +321,44 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  (** Returns a map where each endorser's pkh is associated to the
-     list of its endorsing slots (in decreasing order) for a given
+  (** Returns a map where each attester's pkh is associated to the
+     list of its attesting slots (in decreasing order) for a given
      level. *)
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
+  val allowed_attestations : t -> (consensus_pk * int) slot_map option
 
-  (** Returns a map where each endorser's pkh is associated to the
-     list of its endorsing slots (in decreasing order) for a given
+  (** Returns a map where each attester's pkh is associated to the
+     list of its attesting slots (in decreasing order) for a given
      level. *)
   val allowed_preattestations : t -> (consensus_pk * int) slot_map option
 
   (** Returns the set of delegates that are not allowed to bake or
-      endorse blocks; i.e., delegates which have zero frozen deposit
+      attest blocks; i.e., delegates which have zero frozen deposit
       due to a previous slashing. *)
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
 
-  (** [endorsement power ctx] returns the endorsement power of the
+  (** [attestation power ctx] returns the attestation power of the
      current block. *)
-  val current_endorsement_power : t -> int
+  val current_attestation_power : t -> int
 
-  (** Initializes the map of allowed endorsements and preattestations,
-     this function must be called only once and before applying
-     any consensus operation.  *)
+  (** Initializes the map of allowed attestations and preattestations, this
+      function must be called only once and before applying any consensus
+      operation. *)
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int) slot_map option ->
     t
 
-  (** [record_endorsement ctx ~initial_slot ~power] records an
-     endorsement for the current block.
+  (** [record_attestation ctx ~initial_slot ~power] records an
+     attestation for the current block.
 
-      The endorsement should be valid in the sense that
-      [Int_map.find_opt initial_slot allowed_endorsement ctx = Some
+      The attestation should be valid in the sense that
+      [Int_map.find_opt initial_slot allowed_attestation ctx = Some
       (pkh, power)].  *)
-  val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
 
   (** [record_preattestation ctx ~initial_slot ~power round
      payload_hash power] records a preattestation for a proposal at
@@ -372,14 +372,14 @@ module type CONSENSUS = sig
 
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
       forbidden delegates, which prevents this delegate from baking or
-      endorsing. *)
+      attesting. *)
   val forbid_delegate : t -> Signature.Public_key_hash.t -> t
 
   (** [set_forbidden_delegate ctx delegates] sets [delegates] as the
       current forbidden delegates. *)
   val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
 
-  val endorsements_seen : t -> slot_set
+  val attestations_seen : t -> slot_set
 
   (** [get_preattestations_quorum_round ctx] returns [None] if no
      preattestation are included in the current block. Otherwise,
@@ -398,9 +398,9 @@ module type CONSENSUS = sig
      preattestations as well as their power. *)
   val locked_round_evidence : t -> (round * int) option
 
-  val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+  val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
-  val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+  val attestation_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :

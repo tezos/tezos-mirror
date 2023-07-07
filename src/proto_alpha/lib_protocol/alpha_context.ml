@@ -566,12 +566,12 @@ module Consensus = struct
   let load_endorsement_branch ctxt =
     Storage.Tenderbake.Attestation_branch.find ctxt >>=? function
     | Some endorsement_branch ->
-        Raw_context.Consensus.set_endorsement_branch ctxt endorsement_branch
+        Raw_context.Consensus.set_attestation_branch ctxt endorsement_branch
         |> return
     | None -> return ctxt
 
   let store_endorsement_branch ctxt branch =
-    let ctxt = set_endorsement_branch ctxt branch in
+    let ctxt = set_attestation_branch ctxt branch in
     Storage.Tenderbake.Attestation_branch.add ctxt branch
 end
 

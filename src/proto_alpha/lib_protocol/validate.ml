@@ -38,7 +38,7 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
     predecessor_level;
     predecessor_round;
     preattestation_slot_map = Consensus.allowed_preattestations ctxt;
-    endorsement_slot_map = Consensus.allowed_endorsements ctxt;
+    endorsement_slot_map = Consensus.allowed_attestations ctxt;
   }
 
 (** Map used to detect consensus operation conflicts. Each delegate
@@ -693,7 +693,7 @@ module Consensus = struct
       {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
-      match Consensus.endorsement_branch vi.ctxt with
+      match Consensus.attestation_branch vi.ctxt with
       | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
       | None ->
           (* [Consensus.endorsement_branch] only returns [None] when the

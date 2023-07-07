@@ -2070,10 +2070,10 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_endorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
+        Consensus.record_attestation ctxt ~initial_slot:content.slot ~power
       in
       return (ctxt, mk_endorsement_result consensus_key power)
   | Partial_construction _ ->
@@ -2501,14 +2501,14 @@ let are_endorsements_required ctxt ~level =
 let record_endorsing_participation ctxt =
   let open Lwt_result_syntax in
   let*? validators =
-    match Consensus.allowed_endorsements ctxt with
+    match Consensus.allowed_attestations ctxt with
     | Some x -> ok x
     | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
   in
   Slot.Map.fold_es
     (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
       let participation =
-        if Slot.Set.mem initial_slot (Consensus.endorsements_seen ctxt) then
+        if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
           Delegate.Participated
         else Delegate.Didn't_participate
       in
@@ -2699,7 +2699,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let attestation_power = Consensus.current_endorsement_power ctxt in
+  let attestation_power = Consensus.current_attestation_power ctxt in
   let* required_endorsements =
     are_endorsements_required ctxt ~level:level.level
   in
