@@ -207,38 +207,64 @@ let fetch_tezos_shell_header {cctxt; headers_cache; _} hash =
   | None, Some errs -> Error errs
   | Some shell_header, _ -> Ok shell_header
 
+let fetch_block_no_cache (fetch : fetch_block_rpc) extract_header
+    ({cctxt; blocks_cache; _} as l1_ctxt) hash =
+  let open Lwt_result_syntax in
+  trace (Cannot_find_block hash)
+  @@ let* block =
+       fetch cctxt ~chain:`Main ~block:(`Hash (hash, 0)) ~metadata:`Always ()
+     in
+     Blocks_cache.put blocks_cache hash (Lwt.return_some block) ;
+     cache_shell_header l1_ctxt hash (extract_header block) ;
+     return block
+
 (** [fetch_tezos_block cctxt fetch extract_header hash] returns a block info
     given a block hash. Looks for the block in the blocks cache first, and
     fetches it from the L1 node otherwise. *)
-let fetch_tezos_block (fetch : fetch_block_rpc) extract_header
+let fetch_tezos_block (fetch_rpc : fetch_block_rpc) extract_header
     ({cctxt; blocks_cache; _} as l1_ctxt) hash =
-  let open Lwt_syntax in
   trace (Cannot_find_block hash)
   @@
   let errors = ref None in
   let fetch hash =
+    let open Lwt_syntax in
     let* block =
-      fetch cctxt ~chain:`Main ~block:(`Hash (hash, 0)) ~metadata:`Always ()
+      fetch_rpc cctxt ~chain:`Main ~block:(`Hash (hash, 0)) ~metadata:`Always ()
     in
     match block with
     | Error errs ->
         errors := Some errs ;
         return_none
-    | Ok block -> return_some block
+    | Ok block ->
+        cache_shell_header l1_ctxt hash (extract_header block) ;
+        return_some block
   in
-  let+ block = Blocks_cache.bind_or_put blocks_cache hash fetch Lwt.return in
+  let open Lwt_result_syntax in
+  let*! block = Blocks_cache.bind_or_put blocks_cache hash fetch Lwt.return in
   match (block, !errors) with
   | None, None ->
       (* This should not happen if {!find_in_cache} behaves correctly,
          i.e. calls {!fetch} for cache misses. *)
-      error_with
-        "Fetching Tezos block %a failed unexpectedly"
-        Block_hash.pp
-        hash
-  | None, Some errs -> Error errs
+      failwith "Fetching Tezos block %a failed unexpectedly" Block_hash.pp hash
+  | None, Some errs -> Lwt.return_error errs
   | Some block, _ ->
-      cache_shell_header l1_ctxt hash (extract_header block) ;
-      Ok block
+      let is_of_expected_protocol =
+        try
+          let (_ : Block_header.shell_header) = extract_header block in
+          true
+        with _ -> false
+      in
+      if is_of_expected_protocol then return block
+      else
+        (* It is possible for a value stored in the cache to have been parsed
+           with the wrong protocol code because:
+           1. There is no protocol information in binary blocs
+           2. We pre-fetch blocks eagerly.
+
+           If we realize a posteriori that the bloc we cached is for another
+           protocol then we overwrite it with the correctly parsed one.
+        *)
+        fetch_block_no_cache fetch_rpc extract_header l1_ctxt hash
 
 let make_prefetching_schedule {prefetch_blocks; _} blocks =
   let blocks_with_prefetching, _, first_prefetch =
