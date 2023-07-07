@@ -2135,7 +2135,7 @@ module Delegate : sig
     Cycle.t ->
     (context * Receipt.balance_updates * public_key_hash list) tzresult Lwt.t
 
-  val already_slashed_for_double_endorsing :
+  val already_slashed_for_double_attesting :
     context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
 
   val already_slashed_for_double_baking :
@@ -2148,7 +2148,7 @@ module Delegate : sig
     unstaked : (Cycle.t * reward_and_burn) list;
   }
 
-  val punish_double_endorsing :
+  val punish_double_attesting :
     context ->
     public_key_hash ->
     Level.t ->

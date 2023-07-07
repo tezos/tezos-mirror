@@ -92,7 +92,7 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
   let punish =
     match mistake with
     | `Double_baking -> Delegate.punish_double_baking
-    | `Double_endorsing -> Delegate.punish_double_endorsing
+    | `Double_endorsing -> Delegate.punish_double_attesting
   in
   let* ctxt, {staked; unstaked} = punish ctxt delegate level in
   let init_to_burn_to_reward =

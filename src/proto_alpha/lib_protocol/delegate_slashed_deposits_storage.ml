@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let already_slashed_for_double_endorsing ctxt delegate (level : Level_repr.t) =
+let already_slashed_for_double_attesting ctxt delegate (level : Level_repr.t) =
   Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
   >>=? function
   | None -> return_false
@@ -137,7 +137,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   in
   return (ctxt, {staked; unstaked})
 
-let punish_double_endorsing =
+let punish_double_attesting =
   let get Storage.{for_double_attesting; _} = for_double_attesting in
   let set slashed = Storage.{slashed with for_double_attesting = true} in
   let get_percentage =
