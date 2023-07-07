@@ -2717,7 +2717,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
-    Consensus.store_endorsement_branch
+    Consensus.store_attestation_branch
       ctxt
       (predecessor_hash, block_payload_hash)
   in

@@ -4856,10 +4856,10 @@ module Consensus : sig
        and type round := Round.t
        and type consensus_pk := Consensus_key.pk
 
-  (** [store_endorsement_branch context branch] sets the "endorsement branch"
-      (see {!Storage.Tenderbake.Endorsement_branch} to [branch] in both the disk
+  (** [store_attestation_branch context branch] sets the "attestation branch"
+      (see {!Storage.Tenderbake.Attestation_branch} to [branch] in both the disk
       storage and RAM. *)
-  val store_endorsement_branch :
+  val store_attestation_branch :
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 end
 
