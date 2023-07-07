@@ -311,7 +311,6 @@ let setup_evm_kernel ?config
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
@@ -457,7 +456,6 @@ let test_evm_proxy_server_connection =
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Observer
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)

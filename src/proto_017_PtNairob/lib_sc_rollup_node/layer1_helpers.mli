@@ -40,19 +40,18 @@ val fetch_tezos_block :
 val prefetch_tezos_blocks : t -> head list -> unit
 
 val get_last_cemented_commitment :
-  Protocol_client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
+  #Client_context.full -> Address.t -> Node_context.lcc tzresult Lwt.t
 
 val get_last_published_commitment :
-  Protocol_client_context.full ->
+  #Client_context.full ->
   Address.t ->
   Signature.public_key_hash ->
   Commitment.t option tzresult Lwt.t
 
-val get_kind :
-  Protocol_client_context.full -> Address.t -> Kind.t tzresult Lwt.t
+val get_kind : #Client_context.full -> Address.t -> Kind.t tzresult Lwt.t
 
 val genesis_inbox :
-  Protocol_client_context.full ->
+  #Client_context.full ->
   genesis_level:int32 ->
   Octez_smart_rollup.Inbox.t tzresult Lwt.t
 
@@ -64,10 +63,8 @@ val constants_of_parametric :
 (** Retrieve protocol agnotic constants for the head of the chain. *)
 val retrieve_constants :
   ?block:Block_services.block ->
-  Protocol_client_context.full ->
+  #Client_context.full ->
   Rollup_constants.protocol_constants tzresult Lwt.t
 
 val retrieve_genesis_info :
-  Protocol_client_context.full ->
-  Address.t ->
-  Node_context.genesis_info tzresult Lwt.t
+  #Client_context.full -> Address.t -> Node_context.genesis_info tzresult Lwt.t

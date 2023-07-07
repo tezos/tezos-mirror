@@ -142,10 +142,13 @@ let initialize_node_context ?(constants = default_constants) kind ~boot_sector =
     new Protocol_client_context.wrap_full
       (new Faked_client_context.unix_faked ~base_dir ~filesystem)
   in
+  let current_protocol =
+    {Node_context.hash = Protocol.hash; proto_level = 0; constants}
+  in
   let* ctxt =
     Node_context.Internal_for_tests.create_node_context
       cctxt
-      constants
+      current_protocol
       ~data_dir
       kind
   in

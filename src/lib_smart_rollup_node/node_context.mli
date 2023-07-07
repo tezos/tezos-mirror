@@ -35,6 +35,15 @@ type 'a store constraint 'a = [< `Read | `Write > `Read]
 
 type debug_logger = string -> unit Lwt.t
 
+type current_protocol = {
+  hash : Protocol_hash.t;  (** Hash of the current protocol. *)
+  proto_level : int;
+      (** Protocol supported by this rollup node (represented as a protocol
+          level). *)
+  constants : Rollup_constants.protocol_constants;
+      (** Protocol constants retrieved from the Tezos node. *)
+}
+
 type 'a t = {
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt option;
@@ -63,11 +72,6 @@ type 'a t = {
   kind : Kind.t;  (** Kind of the smart rollup. *)
   fee_parameters : Configuration.fee_parameters;
       (** Fee parameters to use when injecting operations in layer 1. *)
-  protocol_constants : Rollup_constants.protocol_constants;
-      (** Protocol constants retrieved from the Tezos node. *)
-  proto_level : int;
-      (** Protocol supported by this rollup node (represented as a protocol
-          level). *)
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
@@ -84,6 +88,9 @@ type 'a t = {
       (** Logger used for writing [kernel_debug] messages *)
   finaliser : unit -> unit Lwt.t;
       (** Aggregation of finalisers to run when the node context closes *)
+  mutable current_protocol : current_protocol;
+      (** Information about the current protocol. This value is changed in place
+          on protocol upgrades. *)
 }
 
 (** Read/write node context {!t}. *)
@@ -118,10 +125,10 @@ val is_loser : _ t -> bool
 val get_fee_parameter :
   _ t -> Configuration.purpose -> Injector_sigs.fee_parameter
 
-(** [init cctxt ~data_dir mode l1_ctxt constants genesis_info ~proto_level
-    configuration] initializes the rollup representation. The rollup origination
-    level and kind are fetched via an RPC call to the layer1 node that [cctxt]
-    uses for RPC requests.
+(** [init cctxt ~data_dir mode l1_ctxt genesis_info protocol configuration]
+    initializes the rollup representation. The rollup origination level and kind
+    are fetched via an RPC call to the layer1 node that [cctxt] uses for RPC
+    requests.
 *)
 val init :
   #Client_context.full ->
@@ -129,12 +136,11 @@ val init :
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
   Layer1.t ->
-  Rollup_constants.protocol_constants ->
   genesis_info ->
   lcc:lcc ->
   lpc:Commitment.t option ->
   Kind.t ->
-  proto_level:int ->
+  current_protocol ->
   Configuration.t ->
   'a t tzresult Lwt.t
 
@@ -469,7 +475,7 @@ module Internal_for_tests : sig
       rollup node functions. *)
   val create_node_context :
     #Client_context.full ->
-    Rollup_constants.protocol_constants ->
+    current_protocol ->
     data_dir:string ->
     Kind.t ->
     Store_sigs.rw t tzresult Lwt.t

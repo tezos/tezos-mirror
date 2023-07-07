@@ -257,7 +257,6 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       mode
       tezos_node
       ?data_dir
@@ -380,7 +379,7 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   let* tezos_node, tezos_client =
     setup_l1 ?commitment_period ?challenge_window ?timeout migrate_from
   in
-  let* rollup_node_from, rollup_client_from, sc_rollup =
+  let* rollup_node, rollup_client, sc_rollup =
     setup_rollup
       ~protocol:migrate_from
       ?parameters_ty
@@ -391,35 +390,16 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
       tezos_node
       tezos_client
   in
-  (* Rollup node and client for other protocol *)
-  let data_dir = Sc_rollup_node.data_dir rollup_node_from in
-  let rollup_node_to =
-    Sc_rollup_node.create
-      ~protocol:migrate_to
-      ~data_dir
-      ~base_dir:(Client.base_dir tezos_client)
-      ~default_operator:operator
-      mode
-      tezos_node
-  in
-  let rollup_client_to =
-    Sc_rollup_client.create ~protocol:migrate_to rollup_node_to
-  in
-
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* prior_res =
     scenario_prior
       ~sc_rollup
-      ~rollup_node_from
-      ~rollup_client_from
-      ~rollup_node_to
-      ~rollup_client_to
+      ~rollup_node
+      ~rollup_client
       tezos_node
       tezos_client
   in
   let migration_level = Node.get_level tezos_node + 1 in
-  let rollup_node_from_processed_migration_level =
-    Sc_rollup_node.wait_for_level ~timeout:10. rollup_node_from migration_level
-  in
   let patch_config =
     Node.Config_file.set_sandbox_network_with_user_activated_upgrades
       [(migration_level, migrate_to)]
@@ -435,13 +415,10 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
   let* () = Node.run ~patch_config tezos_node nodes_args in
   let* () = Node.wait_for_ready tezos_node in
   let* () = Client.bake_for_and_wait tezos_client in
-  let* _ = rollup_node_from_processed_migration_level in
   scenario_after
     ~sc_rollup
-    ~rollup_node_from
-    ~rollup_client_from
-    ~rollup_node_to
-    ~rollup_client_to
+    ~rollup_node
+    ~rollup_client
     tezos_node
     tezos_client
     prior_res
@@ -1480,28 +1457,69 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
   let description = "node can read data after store migration" in
   let commitment_period = 10 in
   let challenge_window = 10 in
-  let scenario_prior ~sc_rollup ~rollup_node_from ~rollup_client_from:_
-      ~rollup_node_to ~rollup_client_to:_ _tezos_node tezos_client =
-    let* () = Sc_rollup_node.run rollup_node_from sc_rollup []
-    and* () =
-      Sc_rollup_node.run ~wait_ready:false rollup_node_to sc_rollup []
-    in
+  let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
+      tezos_client =
     let* () = send_messages commitment_period tezos_client in
-    let* _ = Sc_rollup_node.wait_sync rollup_node_from ~timeout:10. in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     unit
   in
-  let scenario_after ~sc_rollup:_ ~rollup_node_from:_ ~rollup_client_from:_
-      ~rollup_node_to ~rollup_client_to tezos_node tezos_client () =
+  let scenario_after ~sc_rollup:_ ~rollup_node ~rollup_client tezos_node
+      tezos_client () =
     let migration_level = Node.get_level tezos_node in
     let* () = send_messages 1 tezos_client in
-    let* _ = Sc_rollup_node.wait_sync rollup_node_to ~timeout:10. in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let*! _l2_block =
       Sc_rollup_client.rpc_get
-        rollup_client_to
+        rollup_client
         ["global"; "block"; string_of_int (migration_level - 1)]
     in
     let*! _l2_block =
-      Sc_rollup_client.rpc_get rollup_client_to ["global"; "block"; "head"]
+      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    in
+    unit
+  in
+  test_l2_migration_scenario
+    ~tags
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~description
+    ()
+
+let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
+  let tags = ["catchup"] in
+  let description = "node can catch up on protocol migration" in
+  let commitment_period = 10 in
+  let challenge_window = 10 in
+  let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
+      tezos_client =
+    let* () = send_messages 1 tezos_client in
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    Log.info "Stopping rollup node before protocol migration." ;
+    let* () = Sc_rollup_node.terminate rollup_node in
+    Log.info "Sending more messages on L1." ;
+    send_messages (commitment_period - 1) tezos_client
+  in
+  let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
+      tezos_client () =
+    let migration_level = Node.get_level tezos_node in
+    let* () = send_messages 1 tezos_client in
+    Log.info "Restarting rollup node after migration." ;
+    let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+    Log.info "Waiting for rollup node to catch up." ;
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:100. in
+    Log.info "Rollup node has caught up!" ;
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get
+        rollup_client
+        ["global"; "block"; string_of_int (migration_level - 1)]
+    in
+    let*! _l2_block =
+      Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
     in
     unit
   in
@@ -1719,7 +1737,6 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let sc_rollup_other_node =
     (* Other rollup node *)
     Sc_rollup_node.create
-      ~protocol
       mode
       node'
       ~base_dir:(Client.base_dir client')
@@ -1936,7 +1953,6 @@ let commitment_stored_robust_to_failures protocol sc_rollup_node
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client')
@@ -2319,7 +2335,6 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client')
@@ -2449,7 +2464,6 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client')
@@ -2498,7 +2512,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
   unit
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373 *)
-let _test_reinject_failed_commitment ~protocol ~kind =
+let _test_reinject_failed_commitment ~protocol:_ ~kind =
   let commitment_period = 3 in
   test_full_scenario
     ~kind
@@ -2511,7 +2525,6 @@ let _test_reinject_failed_commitment ~protocol ~kind =
   @@ fun _protocol sc_rollup_node1 _sc_rollup_client1 sc_rollup node client ->
   let sc_rollup_node2 =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
@@ -2960,7 +2973,6 @@ let test_cement_ignore_commitment ~kind =
   @@ fun protocol _sc_rollup_node _sc_rollup_client sc_rollup node client ->
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Custom
       node
       ~base_dir:(Client.base_dir client)
@@ -3130,7 +3142,6 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     List.map2
       (fun default_operator _ ->
         Sc_rollup_node.create
-          ~protocol
           Operator
           node
           ~base_dir:(Client.base_dir client)
@@ -3878,7 +3889,8 @@ let test_late_rollup_node =
       variant = None;
       description = "a late rollup should catch up";
     }
-  @@ fun protocol sc_rollup_node _rollup_client sc_rollup_address node client ->
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
+    ->
   let* () = bake_levels 65 client in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let* () = bake_levels 30 client in
@@ -3886,7 +3898,6 @@ let test_late_rollup_node =
   Log.info "First rollup node synchronized." ;
   let sc_rollup_node2 =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
@@ -3929,7 +3940,8 @@ let test_late_rollup_node_2 =
       variant = None;
       description = "a late alternative rollup should catch up";
     }
-  @@ fun protocol sc_rollup_node _rollup_client sc_rollup_address node client ->
+  @@ fun _protocol sc_rollup_node _rollup_client sc_rollup_address node client
+    ->
   let* () = bake_levels 65 client in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let* () = bake_levels 30 client in
@@ -3937,7 +3949,6 @@ let test_late_rollup_node_2 =
   Log.info "First rollup node synchronized." ;
   let sc_rollup_node2 =
     Sc_rollup_node.create
-      ~protocol
       Operator
       node
       ~base_dir:(Client.base_dir client)
@@ -5326,7 +5337,6 @@ let test_injector_auto_discard =
   (* Change operator and only batch messages *)
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Batcher
       tezos_node
       ~base_dir:(Client.base_dir client)
@@ -5468,7 +5478,6 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
   let* node, client = setup_l1 protocol in
   let rollup_node =
     Sc_rollup_node.create
-      ~protocol
       ~base_dir:(Client.base_dir client)
       ~default_operator:Constant.bootstrap1.alias
       Operator
@@ -5685,6 +5694,7 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_refute ~kind ~migrate_from ~migrate_to ;
   test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to ;
+  test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to ;
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
 let register_migration ~migrate_from ~migrate_to =

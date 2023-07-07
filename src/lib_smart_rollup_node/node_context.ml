@@ -32,6 +32,12 @@ type 'a store = 'a Store.t
 
 type debug_logger = string -> unit Lwt.t
 
+type current_protocol = {
+  hash : Protocol_hash.t;
+  proto_level : int;
+  constants : Rollup_constants.protocol_constants;
+}
+
 type 'a t = {
   cctxt : Client_context.full;
   dal_cctxt : Dal_node_client.cctxt option;
@@ -47,8 +53,6 @@ type 'a t = {
   block_finality_time : int;
   kind : Kind.t;
   fee_parameters : Configuration.fee_parameters;
-  protocol_constants : Rollup_constants.protocol_constants;
-  proto_level : int;
   loser_mode : Loser_mode.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
@@ -57,6 +61,7 @@ type 'a t = {
   lpc : ('a, Commitment.t option) Reference.t;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
+  mutable current_protocol : current_protocol;
 }
 
 type rw = [`Read | `Write] t
@@ -124,8 +129,7 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
 
 let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
-    l1_ctxt (protocol_constants : Rollup_constants.protocol_constants)
-    genesis_info ~lcc ~lpc kind ~proto_level
+    l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -159,7 +163,7 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
   let*! () =
-    if dal_cctxt = None && protocol_constants.dal.feature_enable then
+    if dal_cctxt = None && current_protocol.constants.dal.feature_enable then
       Event.warn_dal_enabled_no_node ()
     else Lwt.return_unit
   in
@@ -206,14 +210,13 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
       injector_retention_period = 0;
       block_finality_time = 2;
       fee_parameters;
-      protocol_constants;
-      proto_level;
       loser_mode;
       lockfile;
       store;
       context;
       kernel_debug_logger;
       finaliser = kernel_debug_finaliser;
+      current_protocol;
     }
 
 let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
@@ -252,7 +255,8 @@ let checkout_context node_ctxt block_hash =
   | Some ctxt -> return ctxt
 
 let dal_supported node_ctxt =
-  node_ctxt.dal_cctxt <> None && node_ctxt.protocol_constants.dal.feature_enable
+  node_ctxt.dal_cctxt <> None
+  && node_ctxt.current_protocol.constants.dal.feature_enable
 
 let readonly (node_ctxt : _ t) =
   {
@@ -922,7 +926,7 @@ let save_confirmed_slots_histories {store; _} block hist =
   Store.Dal_confirmed_slots_histories.add store.irmin_store block hist
 
 module Internal_for_tests = struct
-  let create_node_context cctxt protocol_constants ~data_dir kind =
+  let create_node_context cctxt current_protocol ~data_dir kind =
     let open Lwt_result_syntax in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let* lockfile = lock ~data_dir in
@@ -957,8 +961,7 @@ module Internal_for_tests = struct
         injector_retention_period = 0;
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;
-        protocol_constants;
-        proto_level = 0;
+        current_protocol;
         loser_mode = Loser_mode.no_failures;
         lockfile;
         store;

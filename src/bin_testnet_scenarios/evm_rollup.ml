@@ -30,13 +30,12 @@ let preset_preimages ~rollup_preimages_dir ~preimages_dir =
   let* () = Process.run "mkdir" ["-p"; preimages_dir] in
   Process.run "cp" ["-rT"; rollup_preimages_dir; preimages_dir]
 
-let setup_evm_infra ~mode ~(testnet : Testnet.t) ~operator ?runner
-    ?preexisting_rollup ?rollup_node_name ?loser_mode node client =
+let setup_evm_infra ~mode ~operator ?runner ?preexisting_rollup
+    ?rollup_node_name ?loser_mode node client =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
       ?name:rollup_node_name
-      ~protocol:testnet.protocol
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator.Account.alias
       mode
@@ -112,7 +111,7 @@ let deploy_evm_rollup ~(testnet : Testnet.t) () =
   in
   let* () = check_operator_balance ~node ~client ~mode ~operator in
   let* _rollup_address, _rollup_node, _evm_proxy_server =
-    setup_evm_infra ~mode ~testnet ~operator node client
+    setup_evm_infra ~mode ~operator node client
   in
   stop_or_keep_going ~node
 

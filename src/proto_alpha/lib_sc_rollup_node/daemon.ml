@@ -315,16 +315,18 @@ let previous_context (node_ctxt : _ Node_context.t)
 let classify_head (node_ctxt : _ Node_context.t)
     ?(predecessor : Layer1.header option) (head : Layer1.header) =
   let open Lwt_result_syntax in
-  if head.header.proto_level = node_ctxt.proto_level then
+  if head.header.proto_level = node_ctxt.current_protocol.proto_level then
     (* Same protocol as supported one, ok *)
     return `Supported_proto
-  else if head.header.proto_level = node_ctxt.proto_level + 1 then
+  else if head.header.proto_level = node_ctxt.current_protocol.proto_level + 1
+  then
     let* predecessor =
       match predecessor with
       | Some p -> return p
       | None -> Node_context.get_predecessor_header node_ctxt head
     in
-    if predecessor.header.proto_level = node_ctxt.proto_level then
+    if predecessor.header.proto_level = node_ctxt.current_protocol.proto_level
+    then
       (* Migration block from supported protocol to the next one, ok *)
       return `Supported_migration
     else return `Unsupported_proto
@@ -434,13 +436,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
           }
       in
       let l2_block =
-        Sc_rollup_block.
-          {
-            header;
-            content = ();
-            num_ticks;
-            initial_tick = Sc_rollup.Tick.to_z initial_tick;
-          }
+        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
       in
       let* () =
         Node_context.mark_finalized_level
@@ -633,9 +629,10 @@ let run node_ctxt configuration
         {
           cctxt = (node_ctxt.cctxt :> Client_context.full);
           fee_parameters = configuration.fee_parameters;
-          minimal_block_delay = node_ctxt.protocol_constants.minimal_block_delay;
+          minimal_block_delay =
+            node_ctxt.current_protocol.constants.minimal_block_delay;
           delay_increment_per_round =
-            node_ctxt.protocol_constants.delay_increment_per_round;
+            node_ctxt.current_protocol.constants.delay_increment_per_round;
         }
         ~data_dir:node_ctxt.data_dir
         ~signers
@@ -772,13 +769,7 @@ module Internal_for_tests = struct
         }
     in
     let l2_block =
-      Sc_rollup_block.
-        {
-          header;
-          content = ();
-          num_ticks;
-          initial_tick = Sc_rollup.Tick.to_z initial_tick;
-        }
+      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
     in
     let* () = Node_context.save_l2_head node_ctxt l2_block in
     return l2_block
@@ -839,6 +830,13 @@ let run
          configuration.sc_rollup_address)
       publisher
   and* kind = Layer1_helpers.get_kind cctxt configuration.sc_rollup_address in
+  let current_protocol =
+    {
+      Node_context.hash = Protocol.hash;
+      proto_level = predecessor.proto_level;
+      constants;
+    }
+  in
   let* node_ctxt =
     Node_context.init
       cctxt
@@ -846,12 +844,11 @@ let run
       ?log_kernel_debug_file
       Read_write
       l1_ctxt
-      constants
       genesis_info
       ~lcc
       ~lpc
       kind
-      ~proto_level:predecessor.proto_level
+      current_protocol
       configuration
   in
   run node_ctxt configuration daemon_components

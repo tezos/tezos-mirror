@@ -11,7 +11,7 @@
   tezos-protocol-alpha
   octez_smart_rollup_node_alpha
   tezos-workers
-  octez-smart-rollup-node
+  octez-smart-rollup-node-lib
   octez-smart-rollup
   tezos-rpc
   tezos-rpc-http

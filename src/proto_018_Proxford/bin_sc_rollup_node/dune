@@ -15,7 +15,7 @@
   tezos-client-base-unix
   tezos-client-commands
   tezos-client-018-Proxford
-  octez-smart-rollup-node
+  octez-smart-rollup-node-lib
   octez_smart_rollup_node_Proxford)
  (link_flags
   (:standard)

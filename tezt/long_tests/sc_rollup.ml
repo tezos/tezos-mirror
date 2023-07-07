@@ -113,8 +113,8 @@ let send_message client msg =
   in
   Client.bake_for_and_wait client
 
-let with_fresh_rollup ~protocol ?(kind = "arith") ~boot_sector f tezos_node
-    tezos_client operator =
+let with_fresh_rollup ?(kind = "arith") ~boot_sector f tezos_node tezos_client
+    operator =
   let* sc_rollup =
     Sc_rollup_helpers.originate_sc_rollup
       ~kind
@@ -124,7 +124,6 @@ let with_fresh_rollup ~protocol ?(kind = "arith") ~boot_sector f tezos_node
   in
   let sc_rollup_node =
     Sc_rollup_node.create
-      ~protocol
       Operator
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
@@ -263,7 +262,6 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
-          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->
@@ -279,7 +277,6 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
-          ~protocol
           ~kind
           ~boot_sector
           (fun sc_rollup_address sc_rollup_node _filename ->

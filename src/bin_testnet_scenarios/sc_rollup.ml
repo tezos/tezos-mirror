@@ -40,15 +40,13 @@ let originate_new_rollup ?(alias = "rollup")
   Log.info "Rollup %s originated" rollup ;
   return rollup
 
-let setup_l2_node ~(testnet : Testnet.t) ?runner ?name ?loser_mode ~operator
-    client node rollup =
+let setup_l2_node ?runner ?name ?loser_mode ~operator client node rollup =
   let rollup_node =
     Sc_rollup_node.create
       ?runner
       ?name
       ~base_dir:(Client.base_dir client)
       ~default_operator:operator
-      ~protocol:testnet.protocol
       Operator
       node
   in
@@ -114,14 +112,12 @@ let rejection_with_proof ~(testnet : Testnet.t) () =
     Lwt.all
       [
         setup_l2_node
-          ~testnet
           ~name:"honest-node"
           ~operator:honest_operator.alias
           client
           node
           rollup_address;
         setup_l2_node
-          ~testnet
           ~name:"dishonest-node"
           ~loser_mode:Format.(sprintf "%d 0 0" fault_level)
           ~operator:dishonest_operator.alias

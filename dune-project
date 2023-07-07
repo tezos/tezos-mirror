@@ -50,6 +50,7 @@
 (package (name octez-smart-rollup-node-PtMumbai))
 (package (name octez-smart-rollup-node-PtNairob))
 (package (name octez-smart-rollup-node-alpha))
+(package (name octez-smart-rollup-node-lib))
 (package (name octez-smart-rollup-sequencer)(allow_empty))
 (package (name octez-smart-rollup-sequencer-node))
 (package (name octez-smart-rollup-wasm-benchmark)(allow_empty))

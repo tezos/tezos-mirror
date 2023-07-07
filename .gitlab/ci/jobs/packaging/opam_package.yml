@@ -648,12 +648,7 @@ opam:octez-smart-rollup-client-PtNairob:
 
 # Ignoring unreleased package octez-smart-rollup-client-alpha.
 
-opam:octez-smart-rollup-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
-  variables:
-    package: octez-smart-rollup-node
+# Ignoring unreleased package octez-smart-rollup-node.
 
 opam:octez-smart-rollup-node-Proxford:
   extends:
@@ -677,6 +672,13 @@ opam:octez-smart-rollup-node-PtNairob:
     package: octez-smart-rollup-node-PtNairob
 
 # Ignoring unreleased package octez-smart-rollup-node-alpha.
+
+opam:octez-smart-rollup-node-lib:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_1
+  variables:
+    package: octez-smart-rollup-node-lib
 
 # Ignoring unreleased package octez-smart-rollup-sequencer.
 

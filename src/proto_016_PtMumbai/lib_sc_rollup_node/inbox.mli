@@ -91,6 +91,7 @@ val same_as_layer_1 :
 module Internal_for_tests : sig
   val process_messages :
     Node_context.rw ->
+    is_first_block:bool ->
     predecessor:Layer1.header ->
     Layer1.header ->
     string list ->

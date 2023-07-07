@@ -80,10 +80,6 @@ val accuser : t -> string
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string
 
-(** Get the path of the smart rollup node of a protocol, such as
-    ["./octez-smart-rollup-node-alpha"]. *)
-val sc_rollup_node : t -> string
-
 (** Get the path of the smart rollup client of a protocol, such as
     ["./octez-smart-rollup-client-alpha"]. *)
 val sc_rollup_client : t -> string
