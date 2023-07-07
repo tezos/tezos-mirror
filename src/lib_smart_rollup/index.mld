@@ -1,0 +1,6 @@
+{0 Octez-l2-libs: octez layer2 libraries}
+
+This is a package containing some libraries used by the layer 2 of Octez.
+
+It contains the following libraries:
+
