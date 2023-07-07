@@ -230,7 +230,7 @@ module Elt_g2 = struct
     [@@noalloc]
 
   external pippenger : G.t -> Bigstringaf.t -> Polynomial.t -> int -> int -> int
-    = "caml_blst_g2_pippenger_contiguous_affine_array_stubs"
+    = "caml_bls12_381_polynomial_srs_g2_pippenger_stubs"
     [@@noalloc]
 end
 
