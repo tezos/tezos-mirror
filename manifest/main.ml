@@ -4315,7 +4315,7 @@ let octez_crawler =
         octez_shell;
       ]
 
-let octez_injector =
+let octez_injector_lib =
   public_lib
     "octez-injector"
     ~path:"src/lib_injector"
@@ -4369,7 +4369,7 @@ let octez_smart_rollup_node_lib =
         octez_dal_node_lib |> open_;
         octez_dac_lib |> open_;
         octez_dac_client_lib |> open_;
-        octez_injector |> open_;
+        octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
         octez_crawler |> open_;
@@ -6346,7 +6346,7 @@ let hash = Protocol.hash
           [
             octez_base |> open_ ~m:"TzPervasives";
             main |> open_;
-            octez_injector |> open_;
+            octez_injector_lib |> open_;
             octez_smart_rollup_lib |> open_;
           ]
         ~inline_tests:ppx_expect
@@ -6396,7 +6396,7 @@ let hash = Protocol.hash
             irmin;
             aches;
             aches_lwt;
-            octez_injector |> open_;
+            octez_injector_lib |> open_;
             octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
