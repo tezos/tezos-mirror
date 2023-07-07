@@ -2125,7 +2125,7 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
   >|=? fun (ctxt, balance_updates) ->
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preattestation (type kind) ctxt
+let punish_double_attestation_or_preattestation (type kind) ctxt
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
@@ -2220,9 +2220,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preattestation_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_attestation_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->
