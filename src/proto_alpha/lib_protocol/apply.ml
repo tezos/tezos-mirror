@@ -2053,7 +2053,7 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
   let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
     Single_result
-      (Endorsement_result
+      (Attestation_result
          {
            balance_updates = [];
            delegate;

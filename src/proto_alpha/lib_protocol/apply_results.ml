@@ -892,7 +892,7 @@ type 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.preattestation contents_result
-  | Endorsement_result : {
+  | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
@@ -1111,19 +1111,19 @@ module Encoding = struct
         encoding = consensus_result_encoding_legacy "endorsement";
         select =
           (function
-          | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
+          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
-          | Endorsement_result
+          | Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power} ->
               (balance_updates, delegate, consensus_power, consensus_key));
         inj =
           (fun (balance_updates, delegate, consensus_power, consensus_key) ->
-            Endorsement_result
+            Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power});
       }
 
@@ -1134,19 +1134,19 @@ module Encoding = struct
         encoding = consensus_result_encoding;
         select =
           (function
-          | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
+          | Contents_result (Attestation_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
           | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
-          | Endorsement_result
+          | Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power} ->
               (balance_updates, delegate, consensus_power, consensus_key));
         inj =
           (fun (balance_updates, delegate, consensus_power, consensus_key) ->
-            Endorsement_result
+            Attestation_result
               {balance_updates; delegate; consensus_key; consensus_power});
       }
 
@@ -1477,7 +1477,7 @@ module Encoding = struct
                     (Manager_operation_result
                        {op with operation_result = Failed (kind, errs)}))
           | Contents_result (Preattestation_result _) -> None
-          | Contents_result (Endorsement_result _) -> None
+          | Contents_result (Attestation_result _) -> None
           | Contents_result (Dal_attestation_result _) -> None
           | Contents_result Ballot_result -> None
           | Contents_result (Seed_nonce_revelation_result _) -> None
@@ -1970,7 +1970,7 @@ let kind_equal :
     kind contents -> kind2 contents_result -> (kind, kind2) eq option =
  fun op res ->
   match (op, res) with
-  | Attestation _, Endorsement_result _ -> Some Eq
+  | Attestation _, Attestation_result _ -> Some Eq
   | Attestation _, _ -> None
   | Preattestation _, Preattestation_result _ -> Some Eq
   | Preattestation _, _ -> None

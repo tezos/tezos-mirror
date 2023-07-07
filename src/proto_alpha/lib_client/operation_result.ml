@@ -889,7 +889,7 @@ let pp_contents_and_result :
         {delegate; consensus_pkh = consensus_key}
         consensus_power
   | ( Attestation {level; _},
-      Endorsement_result
+      Attestation_result
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf

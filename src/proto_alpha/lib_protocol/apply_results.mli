@@ -65,7 +65,7 @@ and 'kind contents_result =
       consensus_power : int;
     }
       -> Kind.preattestation contents_result
-  | Endorsement_result : {
+  | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
