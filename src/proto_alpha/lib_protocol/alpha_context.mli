@@ -4878,7 +4878,7 @@ module Token : sig
     | `Bootstrap
     | `Initial_commitments
     | `Revelation_rewards
-    | `Endorsing_rewards
+    | `Attesting_rewards
     | `Baking_rewards
     | `Baking_bonuses
     | `Minted
@@ -4889,7 +4889,7 @@ module Token : sig
   type receiver =
     [ `Storage_fees
     | `Double_signing_punishments
-    | `Lost_endorsing_rewards of public_key_hash * bool * bool
+    | `Lost_attesting_rewards of public_key_hash * bool * bool
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]
