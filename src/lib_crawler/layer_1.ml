@@ -177,7 +177,7 @@ let iter_heads l1_ctxt f =
   in
   Lwt.catch
     (fun () -> Lwt.no_cancel @@ loop l1_ctxt)
-    (function Iter_error e -> Lwt.return_error e | exn -> fail (Exn exn))
+    (function Iter_error e -> Lwt.return_error e | exn -> fail_with_exn exn)
 
 let wait_first l1_ctxt =
   let rec loop l1_ctxt =

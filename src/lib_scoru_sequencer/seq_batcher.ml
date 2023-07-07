@@ -304,10 +304,11 @@ let init _conf ~signer node_ctxt =
 
 (* This is a batcher worker for a single scoru *)
 let worker =
+  let open Result_syntax in
   lazy
     (match Lwt.state worker_promise with
-    | Lwt.Return worker -> ok worker
-    | Lwt.Fail _ | Lwt.Sleep -> error Sc_rollup_node_errors.No_batcher)
+    | Lwt.Return worker -> return worker
+    | Lwt.Fail _ | Lwt.Sleep -> tzfail Sc_rollup_node_errors.No_batcher)
 
 let handle_request_error rq =
   let open Lwt_syntax in

@@ -4068,9 +4068,7 @@ let octez_crawler =
     ~synopsis:"Octez: library to crawl blocks of the L1 chain"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_rpc_http |> open_;
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -4085,9 +4083,7 @@ let octez_injector =
     ~synopsis:"Octez: library for building injectors"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         logs_lwt;
         octez_base_unix;
         octez_stdlib_unix |> open_;
@@ -4106,9 +4102,7 @@ let octez_smart_rollup_lib =
     ~synopsis:"Octez: library for Smart Rollups "
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
-        |> open_;
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix;
         octez_stdlib_unix |> open_;
         octez_crypto |> open_;
@@ -7478,8 +7472,7 @@ let octez_scoru_sequencer =
     ~synopsis:"Sequencer library for smart contract rollup"
     ~deps:
       [
-        octez_base |> open_ |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         Protocol.(octez_sc_rollup_layer2 alpha |> if_some |> open_);
         Protocol.(main alpha) |> open_;
         Protocol.(octez_sc_rollup_node alpha) |> if_some;
@@ -7519,8 +7512,7 @@ let _sc_sequencer_node =
     ~with_macos_security_framework:true
     ~deps:
       [
-        octez_base |> open_ |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_clic;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
