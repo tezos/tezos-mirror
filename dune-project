@@ -94,6 +94,7 @@
 (package (name tezos-dac-node-lib-test)(allow_empty))
 (package (name tezos-dal-node-lib))
 (package (name tezos-dal-node-services))
+(package (name tezos-injector-alpha)(allow_empty))
 (package (name tezos-lazy-containers-tests)(allow_empty))
 (package (name tezos-micheline-rewriting))
 (package (name tezos-openapi))

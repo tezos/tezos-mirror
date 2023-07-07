@@ -4594,6 +4594,8 @@ module Protocol : sig
 
   val octez_sc_rollup_node : t -> target option
 
+  val octez_injector : t -> target option
+
   val baking_exn : t -> target
 
   val genesis : t
@@ -4712,13 +4714,14 @@ end = struct
     octez_sc_rollup : target option;
     octez_sc_rollup_layer2 : target option;
     octez_sc_rollup_node : target option;
+    octez_injector : target option;
   }
 
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal ?dac
       ?test_helpers ?parameters ?benchmarks_proto ?octez_sc_rollup
-      ?octez_sc_rollup_layer2 ?octez_sc_rollup_node ?baking ~status ~name ~main
-      ~embedded () =
+      ?octez_sc_rollup_layer2 ?octez_sc_rollup_node ?octez_injector ?baking
+      ~status ~name ~main ~embedded () =
     {
       status;
       name;
@@ -4739,6 +4742,7 @@ end = struct
       octez_sc_rollup;
       octez_sc_rollup_layer2;
       octez_sc_rollup_node;
+      octez_injector;
     }
 
   let all_rev : t list ref = ref []
@@ -4802,6 +4806,8 @@ end = struct
   let octez_sc_rollup_layer2 p = p.octez_sc_rollup_layer2
 
   let octez_sc_rollup_node p = p.octez_sc_rollup_node
+
+  let octez_injector p = p.octez_injector
 
   (* N as in "protocol number in the Alpha family". *)
   module N = struct
@@ -6335,6 +6341,25 @@ let hash = Protocol.hash
             alcotezt;
           ]
     in
+    let octez_injector =
+      only_if N.(number >= 019) @@ fun () ->
+      private_lib
+        (sf "octez_injector_%s" short_hash)
+        ~path:(path // "lib_injector")
+        ~synopsis:
+          "Tezos/Protocol: protocol-specific library for the injector binary"
+        ~opam:(sf "tezos-injector-%s" name_dash)
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            main |> open_;
+            octez_injector_lib |> open_;
+            client |> if_some |> open_;
+            octez_client_base |> open_;
+            plugin |> if_some |> open_;
+          ]
+        ~linkall:true
+    in
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
@@ -6781,6 +6806,7 @@ let hash = Protocol.hash
          ?octez_sc_rollup
          ?octez_sc_rollup_layer2
          ?octez_sc_rollup_node
+         ?octez_injector
          ()
 
   let active = register_alpha_family Active
