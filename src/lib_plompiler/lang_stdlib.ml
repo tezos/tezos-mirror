@@ -137,6 +137,14 @@ module type LIB = sig
     val shift_left : bl repr -> int -> bl repr t
 
     val shift_right : bl repr -> int -> bl repr t
+
+    module Internal : sig
+      val xor_lookup : bl repr -> bl repr -> bl repr t
+
+      val band_lookup : bl repr -> bl repr -> bl repr t
+
+      val not_lookup : bl repr -> bl repr t
+    end
   end
 
   val add2 :
@@ -724,6 +732,22 @@ module Lib (C : COMMON) = struct
         List.filteri (fun j _x -> j >= i) l @ List.init i (fun _ -> zero)
       in
       ret @@ to_list res
+
+    module Internal = struct
+      let xor_lookup a b =
+        check_args_length "Bytes.xor_lookup" a b ;
+        let* l = map2M Bool.Internal.xor_lookup (of_list a) (of_list b) in
+        ret @@ to_list l
+
+      let band_lookup a b =
+        check_args_length "Bytes.band_lookup" a b ;
+        let* l = map2M Bool.Internal.band_lookup (of_list a) (of_list b) in
+        ret @@ to_list l
+
+      let not_lookup b =
+        let* l = mapM Bool.Internal.bnot_lookup (of_list b) in
+        ret @@ to_list l
+    end
   end
 
   let add2 p1 p2 =
