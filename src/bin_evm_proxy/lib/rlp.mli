@@ -27,6 +27,8 @@
     https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp/
     for the specification. *)
 
+type error += Rlp_decoding_error of string
+
 (** An RLP value is either a bytes value, or a list of RLP values. *)
 type item = Value of bytes | List of item list
 
@@ -39,3 +41,17 @@ val encode_z : Z.t -> bytes
 
 (** [encode item] takes an RLP [item] and returns its encoded form. *)
 val encode : item -> bytes
+
+(** [decode_int bytes] decodes an integer encoded in big endian from the given
+    [bytes]. Returns an {!Rlp_decoding_error} if the bytes is not a valid RLP encoded
+    integer. *)
+val decode_int : bytes -> int tzresult
+
+(** [decode_z bytes] decodes a big integer encoded in big endian from the given
+    [bytes]. Returns an {!Rlp_decoding_error} if the bytes is not a valid RLP encoded
+    big integer. *)
+val decode_z : bytes -> Z.t tzresult
+
+(** [decode bytes] decodes an RLP value from the given [bytes]. Returns an
+    {!Rlp_decoding_error} if the bytes is not an RLP encoded value. *)
+val decode : bytes -> item tzresult
