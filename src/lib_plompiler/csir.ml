@@ -147,9 +147,7 @@ end = struct
     | Some _ -> true
     | None -> false
 
-  let to_list table =
-    Format.printf "\n%i %i\n" (Array.length table) (Array.length table.(0)) ;
-    Array.to_list table
+  let to_list table = Array.to_list table
 
   let of_list table = Array.of_list table
 end
