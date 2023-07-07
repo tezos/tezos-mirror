@@ -61,9 +61,9 @@ The value of the additional field ``category`` designates one of the following f
 
 * ``"nonce revelation rewards"`` is the source of tokens minted to reward delegates for revealing their nonces
 * ``"double signing evidence rewards"`` is the source of tokens minted to reward delegates for injecting a double signing evidence
-* ``"endorsing rewards"`` is the source of tokens minted to reward delegates for endorsing blocks
+* ``"attesting rewards"`` is the source of tokens minted to reward delegates for attesting blocks
 * ``"baking rewards"`` is the source of tokens minted to reward delegates for creating blocks
-* ``"baking bonuses"`` is the source of tokens minted to reward delegates for validating blocks and including extra endorsements
+* ``"baking bonuses"`` is the source of tokens minted to reward delegates for validating blocks and including extra attestations
 * ``"subsidy"`` is the source of tokens minted to subsidize the liquidity baking CPMM contract
 * ``"invoice"`` is the source of tokens minted to compensate some users who have contributed to the betterment of the chain
 * ``"commitment"`` is the source of tokens minted to match commitments made by some users to supply funds for the chain
@@ -113,8 +113,8 @@ The value of the additional field ``category`` allows to identify more specifica
 The field ``category`` of a sink account may have one of the following values:
 
 * ``"storage fees"`` is the destination of storage fees burned for consuming storage space on the chain
-* ``"punishments"`` is the destination of tokens burned as punishment for a delegate that has double baked or double endorsed
-* ``"lost endorsing rewards"`` is the destination of rewards that were not distributed to a delegate.
+* ``"punishments"`` is the destination of tokens burned as punishment for a delegate that has double baked or double attested
+* ``"lost attesting rewards"`` is the destination of rewards that were not distributed to a delegate.
   This category comes with the following additional fields:
 
   - the field ``delegate`` contains the public key hash of the delegate
@@ -176,28 +176,28 @@ For example, the balance updates generated for an amount of ``100`` mutez in bak
   [ {"kind": "minted", "category": "baking bonus", "change": "-100", ...},
     {"kind": "contract", "contract": "tz1b...", "change": "100", ...} ]
 
-Endorsing, double signing evidence, and nonce revelation rewards
+Attesting, double signing evidence, and nonce revelation rewards
 ----------------------------------------------------------------
 
-Endorsing rewards are reflected in balance updates as a transfer of tokens from the ``"endorsing rewards"`` source account to the account of the delegate that receives the reward.
+Attesting rewards are reflected in balance updates as a transfer of tokens from the ``"attesting rewards"`` source account to the account of the delegate that receives the reward.
 Hence, for a reward of ``100`` mutez, the following two balance updates are generated:
 
 ::
 
-  [ {"kind": "minted", "category": "endorsing rewards", "change": "-100", ...},
+  [ {"kind": "minted", "category": "attesting rewards", "change": "-100", ...},
     {"kind": "contract", "contract": "tz1...", "change": "100", ...} ]
 
-When endorsing rewards are not distributed to the delegate due to insufficient participation or for not revealing nonces, they are transferred instead to the sink account identified by the quadruple ``("lost endorsing rewards", delegate, participation, revelation)``.
+When attesting rewards are not distributed to the delegate due to insufficient participation or for not revealing nonces, they are transferred instead to the sink account identified by the quadruple ``("lost attesting rewards", delegate, participation, revelation)``.
 For example, for an amount of ``100`` mutez in rewards not distributed due to insufficient participation, the following balance updates are generated:
 
 ::
 
-  [ {"kind": "minted", "category": "endorsing rewards", "change": "-100", ...},
+  [ {"kind": "minted", "category": "attesting rewards", "change": "-100", ...},
     {"kind": "burned",
-     "category": "lost endorsing rewards",
+     "category": "lost attesting rewards",
      "delegate": "tz1...",
      "participation": "true",
      "revelation": "false",
      "change": "100", ...} ]
 
-Double signing evidence rewards and nonce revelation rewards are analogous to endorsing rewards, except that the source accounts used are ``"double signing evidence rewards"`` and ``"nonce revelation rewards"``.
+Double signing evidence rewards and nonce revelation rewards are analogous to attesting rewards, except that the source accounts used are ``"double signing evidence rewards"`` and ``"nonce revelation rewards"``.

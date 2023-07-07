@@ -89,10 +89,10 @@ Schematically, a round consists in the following steps:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
-before endorsing a block ``b``, a validator preendorses ``b``. Furthermore,
-to be able to endorse, a validator must have observed a preendorsement *quorum*, that is a
-set of preendorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. The
-endorsement quorum for a block ``b`` is included in a block ``b'`` on top of ``b``,
+before attesting a block ``b``, a validator preattests ``b``. Furthermore,
+to be able to attest, a validator must have observed a preattestation *quorum*, that is a
+set of preattestations from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. Similarly, to be able to decide, a validator must have observed an attestation quorum, that is, a set of attestations from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. The
+attestation quorum for a block ``b`` is included in a block ``b'`` on top of ``b``,
 serving as a certification that ``b`` has been agreed upon.
 We also say that block ``b'`` confirms block ``b``.
 
@@ -100,7 +100,7 @@ The validator's whose turn is to inject a candidate block at a given round is
 called the *proposer* at that round. Proposers in Tenderbake are selected
 similarly to bakers in Emmy*: the proposer at round ``r`` is the
 validator who has the validator slot ``r``. A proposer who has observed a
-preendorsement quorum for a candidate block in a previous round, is required to propose a block with
+preattestation quorum for a candidate block in a previous round, is required to propose a block with
 the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
@@ -111,8 +111,8 @@ Transaction and block finality
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A transaction is final as soon as the block including it has a confirmation (that is, a block on top of it).
-Indeed, as hinted above, a block contains the certification (that is, the endorsement quorum) for the previous
-payload. Thanks to the endorsement quorum, Tenderbake guarantees **transaction finality
+Indeed, as hinted above, a block contains the certification (that is, the attestation quorum) for the previous
+payload. Thanks to the attestation quorum, Tenderbake guarantees **transaction finality
 after 1 confirmation**.
 
 It may be possible that different validators decide at different rounds, though on the same payload. The blocks at these different rounds differ precisely because they contain, in the header, as part of the block fitness,
@@ -205,7 +205,7 @@ before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
    PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
    PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
    declared passive. Here "participation" means *having baked a final
-   block* or *having a preendorsement or endorsement included in a final
+   block* or *having a preattestation or attestation included in a final
    block*.
 
 Intuitively, the active stake is set to 10 times the delegate's chosen frozen
@@ -254,7 +254,7 @@ during the last 8 cycles).
 
 We note in passing that this new schema basically solves the main
 problem of over-delegation: a delegate will not fail anymore to bake
-and endorse because of an insufficient balance to pay the
+and attest because of an insufficient balance to pay the
 deposit. However, a delegate can still be over-delegated, and it will be
 rewarded based on its active stake, not on its staking balance.
 
@@ -268,18 +268,18 @@ behavior. Notable changes however are as follows:
   transactions to be included in the block (and was the first to propose a
   block with that payload). In case of re-proposal, the payload producer might
   be different from the block proposer, the baker who injects the block.
-* Including extra endorsements, that is, more than the minimal required to
+* Including extra attestations, that is, more than the minimal required to
   obtain a quorum, is rewarded with a bonus.
-* Endorsing rewards are shared equally among all validators. Participation above
+* Attesting rewards are shared equally among all validators. Participation above
   a minimal threshold per cycle is however required.
 * Deposits are no longer frozen and unfrozen, instead a percentage of the active
   stake is always locked. A delegate with an empty deposit cannot bake nor
-  (pre)endorse.
-* Validators are rewarded instantaneously for baking blocks and including extra endorsements, and not at the end of the cycle like in Emmy*.
+  (pre)attest.
+* Validators are rewarded instantaneously for baking blocks and including extra attestations, and not at the end of the cycle like in Emmy*.
 * At the end of a cycle ``c``, the following actions happen:
 
   - the selection of the consensus committee cycle ``c + PRESERVED_CYCLES``, based on the current active stake distribution,
-  - the distribution of endorsing rewards,
+  - the distribution of attesting rewards,
   - the adjustment of frozen deposits.
 
 
@@ -303,20 +303,20 @@ block.
 Rewards
 ^^^^^^^
 
-There are three kinds of rewards: baking rewards, endorsing rewards, and a bonus for including extra endorsements.
+There are three kinds of rewards: baking rewards, attesting rewards, and a bonus for including extra attestations.
 
 The baking rewards are treated in the same way as fees: they go to the *payload*
 producer and are distributed immediately.
 
 To encourage fairness and participation, the *block* proposer receives
-a bonus for the extra endorsements it includes in the block.
+a bonus for the extra attestations it includes in the block.
 The bonus is proportional to the number of
 validator slots above the threshold of ``CONSENSUS_COMMITTEE_SIZE * 2 / 3`` that
-the included endorsements represent. The bonus is also distributed
+the included attestations represent. The bonus is also distributed
 immediately.
 
-The endorsing rewards are distributed at the end of the cycle.
-The endorsing reward may be received even if not all of the validator's endorsements are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
+The attesting rewards are distributed at the end of the cycle.
+The attesting reward may be received even if not all of the validator's attestations are included in a block and is proportional to the validator's active stake (in other words, to its *expected* number of validator slots, and not its actual number of slots).
 However, two conditions must be met:
 
  - the validator has revealed its nonce, and
@@ -325,8 +325,8 @@ However, two conditions must be met:
 Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_alpha>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
-if the endorsing power (that is, the number of validator slots at the
-corresponding level) of all the endorsements included by the delegate during the
+if the attesting power (that is, the number of validator slots at the
+corresponding level) of all the attestations included by the delegate during the
 cycle represents at least ``MINIMAL_PARTICIPATION_RATIO`` of the delegate's expected number of
 validator slots for the current cycle (which is ``BLOCKS_PER_CYCLE *
 CONSENSUS_COMMITTEE_SIZE * active_stake / total_active_stake``).
@@ -338,7 +338,7 @@ We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
 - ``bonus := (1 - baking_reward_ratio) * bonus_ratio * total_rewards`` is the max bonus
-- ``endorsing_reward := (1 - baking_reward_ratio) * (1 - bonus_ratio) * total_rewards``
+- ``attesting_reward := (1 - baking_reward_ratio) * (1 - bonus_ratio) * total_rewards``
 
 where:
 
@@ -346,30 +346,30 @@ where:
 - ``bonus_ratio`` to ``1 / 3``.
 
 Thus, we obtain ``BAKING_REWARD_FIXED_PORTION = 5`` tez,
-(maximum) ``bonus = 5`` tez, and ``endorsing_rewards = 10`` tez.
-The bonus per additional endorsement slot is in turn ``bonus /
+(maximum) ``bonus = 5`` tez, and ``attesting_rewards = 10`` tez.
+The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
-additional endorsements included in a block). The rewards per
-endorsement slot are ``endorsing_rewards / CONSENSUS_COMMITTEE_SIZE``.
+additional attestations included in a block). The rewards per
+attestation slot are ``attesting_rewards / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``5 / (7000 / 3) = 0.002143`` tez and an endorsing
+``5 / (7000 / 3) = 0.002143`` tez and an attesting
 rewards per slot of ``10 / 7000 = 0.001428`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
-A. Also, B includes endorsements with endorsing power ``5251``. Then A receives
+A. Also, B includes attestations with attesting power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
 Therefore B receives the bonus ``(5251 - 4667) * 0.002143 = 1.251512`` tez. (Note
-that B only included endorsements corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
-maximum 2333 extra endorsements it could have theoretically included.) Finally, consider some
+that B only included attestations corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
+maximum 2333 extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
 his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
-2,867,200`` slots. Assume also that the endorsing power of C's endorsements
+2,867,200`` slots. Assume also that the attesting power of C's attestations
 included during that cycle has been ``2,123,456`` slots. Given that this number is
-bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
+bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an attesting
 reward of ``2,867,200 * 0.001428 = 4094.3616`` tez for that cycle.
 
 .. _slashing_alpha:
@@ -379,25 +379,26 @@ Slashing
 
 Like in Emmy*, not revealing nonces and double signing are punishable. If a
 validator does not reveal its nonce by the end of the cycle, it does not receive
-its endorsing rewards. If a validator double signs, that is, it double bakes
-(which means signing different blocks at the same level and same round) or
-it double (pre)endorses (which means voting on two different proposals at the
-same level and round), a part of the frozen deposit is slashed. The slashed amount for double baking
-is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double (pre)endorsing is
-a fixed percentage ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
-of the frozen deposit. The payload producer that includes the misbehavior
-evidence is rewarded half of the slashed amount.
+its attesting rewards. If a validator double signs, that is, it double bakes
+(which means signing different blocks at the same level and same round) or it
+double (pre)attests (which means voting on two different proposals at the same
+level and round), a part of the frozen deposit is slashed. The slashed amount
+for double baking is ``DOUBLE_BAKING_PUNISHMENT``. The slashed amount for double
+(pre)attesting is a fixed percentage
+``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION`` of the frozen
+deposit. The payload producer that includes the misbehavior evidence is rewarded
+half of the slashed amount.
 
 The evidence for double signing at a given level can be collected by any
 :ref:`accuser<def_accuser_alpha>` and included as an *accusation* operation in a block
 for a period of ``MAX_SLASHING_PERIOD``.
 
 If a delegates' deposit is smaller than the slashed amount, the deposit is
-simply emptied, which leads to the delegate losing its baking and endorsing
+simply emptied, which leads to the delegate losing its baking and attesting
 rights for the rest of the cycle.
 
 We note that selfish baking is not an issue in Tenderbake: say we are at round
-``r`` and the validator which is proposer at round ``r+1`` does not (pre)endorse
+``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
 at round ``r`` in the hope that the block at round ``r`` is not agreed upon and
 its turn comes to propose at round ``r+1``. Under the assumption that the
 correct validators have more than two thirds of the total stake, these correct
@@ -431,14 +432,14 @@ Consensus related protocol parameters
      - 2 cycles
    * - ``DOUBLE_BAKING_PUNISHMENT``
      - 640 tez
-   * - ``RATIO_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ENDORSEMENT``
-     - 1/2
+   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
+     - 50%
    * - ``BAKING_REWARD_FIXED_PORTION``
      - 5 tez
    * - ``BAKING_REWARD_BONUS_PER_SLOT``
      - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.002143 tez
-   * - ``ENDORSING_REWARD_PER_SLOT``
-     - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.001428 tez
+   * - ``ATTESTING_REWARD_PER_SLOT``
+     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.001428 tez
 
 These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
@@ -475,11 +476,11 @@ Furthermore, we also allow to change the predecessor block when it has a :ref:`s
 Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
 Finally, to (partially) enforce :ref:`the rule on
 re-proposals<quorum_alpha>`, the fitness also includes, as the third
-component, the round at which a preendorsement quorum was observed by
+component, the round at which a preattestation quorum was observed by
 the baker, if any (this component can therefore be empty). By the way,
-preendorsements are present in a block if and only if the locked round
+preattestations are present in a block if and only if the locked round
 component is non-empty and if so, the locked round has to match the
-round of the included preendorsements.
+round of the included preattestations.
 
 Next, we provide two examples of fitness values:
 ``02::00001000::::ffffffff::00000000`` and

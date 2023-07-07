@@ -104,7 +104,7 @@ commitment is simply the hash of the nonce.
 The committed nonce must be revealed by the original block proposer during the
 nonce revelation phase, that is during the first ``NONCE_REVELATION_THRESHOLD``
 blocks, of cycle ``n-1-PRESERVED_CYCLES`` under penalty of forfeiting all of
-its expected endorsing rewards for that cycle. The associated security deposit
+its expected attesting rewards for that cycle. The associated security deposit
 and baking rewards are not affected. The RANDAO output is then computed and
 stored on-chain as the temporary seed for cycle ``n``. The RANDAO output is the
 bitstring obtained by iterating through the nonces revealed in cycle ``n-1`` as

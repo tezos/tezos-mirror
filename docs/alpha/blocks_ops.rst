@@ -59,12 +59,12 @@ to implement the :doc:`consensus algorithm<consensus>`. There are two
 kinds of consensus operations, each belonging to the different voting
 phases required to agree on the next block.
 
-- A ``Preendorsement`` operation implements a first vote for a
+- A ``Preattestation`` operation implements a first vote for a
   :ref:`candidate block <candidate_block_alpha>` with the aim of
-  building a :ref:`preendorsement quorum <quorum_alpha>`.
+  building a :ref:`preattestation quorum <quorum_alpha>`.
 
-- An ``Endorsement`` operation implements a vote for a candidate block
-  for which a preendorsement quorum certificate (PQC) has been
+- An ``Attestation`` operation implements a vote for a candidate block
+  for which a preattestation quorum certificate (PQC) has been
   observed.
 
 .. _voting_operations_alpha:
@@ -122,16 +122,16 @@ which engage in Byzantine behaviour<slashing_alpha>` -- notably
 delegates which :ref:`"double sign" <def_double_signing_alpha>` blocks, or emit
 conflicting :ref:`consensus operations<consensus_operations_alpha>`:
 
-- The ``Double_preendorsement_evidence`` operation allows for accusing
-  a delegate of having *double-preendorsed* -- i.e., of having
-  preendorsed two different block candidates, at the same level and at
+- The ``Double_preattestation_evidence`` operation allows for accusing
+  a delegate of having *double-preattested* -- i.e., of having
+  preattested two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
-  provided, consists of the two offending preendorsements.
+  provided, consists of the two offending preattestations.
 
-- Similarly, the ``Double_endorsement_evidence`` operation allows for
-  accusing a delegate of having *double-endorsed* -- i.e., of having
-  endorsed two different block candidates at the same level and the
-  same round -- by providing the two offending endorsements.
+- Similarly, the ``Double_attestation_evidence`` operation allows for
+  accusing a delegate of having *double-attested* -- i.e., of having
+  attested two different block candidates at the same level and the
+  same round -- by providing the two offending attestations.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of
   having "double-baked" a block -- i.e., of having signed two

@@ -121,12 +121,12 @@ _`Baking`
     The act of creating a new block_ by a baker_.
 
 _`Baking rights`
-    Baking_/endorsing_ a block_ can only be done by a delegate_ who holds the
-    baking/endorsing right for that block level_ and round_. At the start of a cycle_,
-    baking and endorsing rights are computed for all the block_ levels and rounds in the
+    Baking_/attesting_ a block_ can only be done by a delegate_ who holds the
+    baking/attesting right for that block level_ and round_. At the start of a cycle_,
+    baking and attesting rights are computed for all the block_ levels and rounds in the
     cycle_, based on the proportion of the stake_ of each delegate_.
 
-    For each block_ level and round_, there is exactly one account that is allowed to bake, but several accounts are allowed to endorse.
+    For each block_ level and round_, there is exactly one account that is allowed to bake, but several accounts are allowed to attest.
 
 _`Burn`
     To ensure responsible use of the storage space on the public blockchain,
@@ -171,7 +171,7 @@ _`Delegate`
 _`Delegation`
     An operation_ in which an account_ designates a
     delegate_. The delegating account's balance increases the delegate_'s stake_ and consequently
-    its `baking rights`_ and `endorsing rights`_. However, the delegate_ does not control the funds of
+    its `baking rights`_ and `attesting rights`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
 .. _def_double_signing_alpha:
@@ -180,8 +180,8 @@ _`Double signing`
     The situation when a baker_ signs two different block_\ s at the same level and same round,
     is called double baking. Double baking is detrimental to the network and might be
     indicative of an attempt to double spend.
-    The same goes for signing two different endorsements at the same level and the same round.
-    As such, double signing (i.e., double baking or double endorsing) is punished by the
+    The same goes for signing two different attestations at the same level and the same round.
+    As such, double signing (i.e., double baking or double attesting) is punished by the
     network: an accuser_ can provide proof of the double signing to be awarded
     part of the double signer's deposit -- see :ref:`Slashing<slashing_alpha>`.
 
@@ -193,12 +193,12 @@ _`Failing Noop`
     :ref:`sign arbitrary messages<failing_noop>` which have no
     computational semantics.
 
-_`Endorsing`
+_`Attesting`
     When a block_ is created and propagated on the network, delegates that have
-    `endorsing rights`_ for the matching block level_ and round_ can emit an endorsement operation_.
-    Endorsement operations are included in the next block_.
+    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
+    Attestation operations are included in the next block_.
 
-_`Endorsing rights`
+_`Attesting rights`
     See `baking rights`_.
 
 .. _def_fee_alpha:
@@ -262,7 +262,7 @@ _`Minimal stake`
 _`Operation kinds`
     The main kinds of operations in the protocol are transactions (to transfer funds
     or to execute smart contracts), accusations, activations, delegations,
-    endorsements, and originations.
+    attestations, and originations.
     For the full list of operations, see :doc:`./blocks_ops`.
 
 _`Originated account`
@@ -302,7 +302,7 @@ _`Smart Optimistic Rollups`
 _`Stake`
     The amount of tokens that determines a delegate_'s weight in the
     governance process and in the selection of its baking and
-    `endorsing rights`_. A delegate's stake is usually given by the
+    `attesting rights`_. A delegate's stake is usually given by the
     delegate's own tokens plus the sum of tokens delegated to
     it. However, there are cases when this is not the case, see
     :ref:`here<active_stake_alpha>` for details.
