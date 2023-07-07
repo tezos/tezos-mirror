@@ -52,12 +52,6 @@ module V0 : sig
   val get_preimage :
     #cctxt -> page_hash:Dac_plugin.raw_hash -> bytes tzresult Lwt.t
 
-  (** [post_store_preimage cctxt ~payload] posts a [payload]
-      to v0/store_preimage. It returns the hex encoded root page hash 
-      and the raw bytes. *)
-  val post_store_preimage :
-    #cctxt -> payload:bytes -> (Dac_plugin.raw_hash * bytes) tzresult Lwt.t
-
   (** [put_dac_member_signature cctxt ~signature:Signature_repr.t]
       stores the [signature] generated from signing [hex_root_hash] by
       [dac_member_pkh]. *)

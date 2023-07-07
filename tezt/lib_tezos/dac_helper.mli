@@ -139,10 +139,6 @@ module Call_endpoint : sig
     (** Call GET v0/preimage/page_hash for the provided [page_hash]. *)
     val get_preimage : Dac_node.t -> string -> string Lwt.t
 
-    (** Call POST v0/store_preimage with provided payload. *)
-    val post_store_preimage :
-      Dac_node.t -> payload:string -> (string * string) Lwt.t
-
     (** Call PUT v0/dac_member_signature for the provided [hex_root_hash],
         [dac_member_pkh] and [signature]. *)
     val put_dac_member_signature :

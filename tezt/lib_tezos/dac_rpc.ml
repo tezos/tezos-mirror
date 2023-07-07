@@ -35,28 +35,11 @@ let make ?data ?query_string =
 let encode_bytes_to_hex_string raw =
   "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
 
-let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
-
-let get_bytes_from_json_string_node json =
-  JSON.as_string json |> decode_hex_string_to_bytes
-
 module V0 = struct
   let api_prefix = "v0"
 
   let get_preimage page_hash =
     make GET [api_prefix; "preimage"; page_hash] JSON.as_string
-
-  let post_store_preimage ~payload =
-    let preimage =
-      JSON.parse
-        ~origin:"dal_node_dac_store_preimage_rpc"
-        (Format.sprintf {|{"payload":%s}|} (encode_bytes_to_hex_string payload))
-    in
-    let data : RPC_core.data = Data (JSON.unannotate preimage) in
-    make ~data POST [api_prefix; "store_preimage"] @@ fun json ->
-    JSON.
-      ( json |-> "root_hash" |> as_string,
-        json |-> "external_message" |> get_bytes_from_json_string_node )
 
   let make_put_dac_member_signature_request_body ~dac_member_pkh ~root_hash
       signature =

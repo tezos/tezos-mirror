@@ -27,25 +27,6 @@
 module V0 = struct
   let v0_prefix = Api_version.v0_prefix
 
-  (* A variant of [Sc_rollup_reveal_hash.encoding] that prefers hex
-     encoding over b58check encoding for JSON. *)
-  let store_preimage_request_encoding =
-    Data_encoding.(obj1 (req "payload" Data_encoding.(bytes' Hex)))
-
-  let store_preimage_response_encoding =
-    Data_encoding.(
-      obj2
-        (req "root_hash" Dac_plugin.raw_hash_encoding)
-        (req "external_message" (bytes' Hex)))
-
-  let post_store_preimage =
-    Tezos_rpc.Service.post_service
-      ~description:"Split DAC reveal data"
-      ~query:Tezos_rpc.Query.empty
-      ~input:store_preimage_request_encoding
-      ~output:store_preimage_response_encoding
-      Tezos_rpc.Path.(v0_prefix / "store_preimage")
-
   let get_preimage =
     Tezos_rpc.Service.get_service
       ~description:"Retrieves a page by its page hash and returns its contents"
