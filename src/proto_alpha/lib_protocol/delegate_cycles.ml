@@ -100,8 +100,8 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
 
-let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
-  let endorsing_reward_per_slot =
+let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
+  let attesting_reward_per_slot =
     Delegate_rewards.attesting_reward_per_slot ctxt
   in
   let unrevealed_nonces_set =
@@ -137,7 +137,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
           ~total_active_stake_weight
           ~active_stake_weight
       in
-      let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
+      let rewards = Tez_repr.mul_exn attesting_reward_per_slot expected_slots in
       if sufficient_participation && has_revealed_nonces then
         (* Sufficient participation: we pay the rewards *)
         Delegate_staking_parameters.pay_rewards
@@ -173,7 +173,7 @@ let cycle_end ctxt last_cycle =
     ctxt
     ~new_cycle
   >>= fun ctxt ->
-  distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces
+  distribute_attesting_rewards ctxt last_cycle unrevealed_nonces
   >>=? fun (ctxt, balance_updates) ->
   update_initial_frozen_deposits ctxt ~new_cycle >>=? fun ctxt ->
   Stake_storage.clear_at_cycle_end ctxt ~new_cycle >>=? fun ctxt ->

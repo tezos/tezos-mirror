@@ -28,7 +28,7 @@
 (** Per-cycle management of delegates. *)
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
-    unfreeze the endorsing rewards, potentially deactivate delegates.
+    unfreeze the attesting rewards, potentially deactivate delegates.
     Return the corresponding balances updates and the list of
     deactivated delegates. *)
 val cycle_end :
