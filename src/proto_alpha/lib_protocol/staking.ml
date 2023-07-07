@@ -64,6 +64,8 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
     (ctxt, [])
     finalizable
 
+(* The [check_unfinalizable] function in argument must consume its gas, if
+   relevant. *)
 let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let open Lwt_result_syntax in
   let*? ctxt =
@@ -73,7 +75,7 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   match prepared_opt with
   | None -> return (ctxt, [])
   | Some {finalizable; unfinalizable} -> (
-      let* () = check_unfinalizable unfinalizable in
+      let* ctxt = check_unfinalizable ctxt unfinalizable in
       match finalizable with
       | [] -> return (ctxt, [])
       | _ ->
@@ -92,7 +94,7 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
           perform_finalizable_unstake_transfers ctxt contract finalizable)
 
 let finalize_unstake ctxt contract =
-  let check_unfinalizable _unfinalizable = Lwt_result_syntax.return_unit in
+  let check_unfinalizable ctxt _unfinalizable = return ctxt in
   finalize_unstake_and_check ~check_unfinalizable ctxt contract
 
 let punish_delegate ctxt delegate level mistake ~rewarded =
@@ -126,14 +128,15 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
 
 let stake ctxt ~sender ~delegate amount =
   let open Lwt_result_syntax in
-  let check_unfinalizable
+  let check_unfinalizable ctxt
       Unstake_requests.{delegate = unstake_delegate; requests} =
     match requests with
-    | [] -> return_unit
+    | [] -> return ctxt
     | _ :: _ ->
-        fail_when
-          Signature.Public_key_hash.(delegate <> unstake_delegate)
-          Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+        if Signature.Public_key_hash.(delegate <> unstake_delegate) then
+          tzfail
+            Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
+        else return ctxt
   in
   let sender_contract = Contract.Implicit sender in
   let* ctxt, finalize_balance_updates =
