@@ -50,6 +50,7 @@ pub enum Error {
     UpgradeError(UpgradeProcessError),
     InvalidSignature(SigError),
     InvalidSignatureCheck,
+    Reboot,
 }
 
 impl From<PathError> for StorageError {

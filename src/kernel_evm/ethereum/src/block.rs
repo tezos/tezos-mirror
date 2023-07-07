@@ -96,23 +96,9 @@ impl L2Block {
         L2Block {
             number,
             hash: H256(number.into()),
-            parent_hash: L2Block::dummy_block_hash(),
-            nonce: U256::zero(),
-            sha3_uncles: L2Block::dummy_hash(),
-            logs_bloom: None,
-            transactions_root: L2Block::dummy_hash(),
-            state_root: L2Block::dummy_hash(),
-            receipts_root: L2Block::dummy_hash(),
-            miner: L2Block::dummy_hash(),
-            difficulty: U256::zero(),
-            total_difficulty: U256::zero(),
-            extra_data: L2Block::dummy_hash(),
-            size: U256::zero(),
-            gas_limit: 1u64,
-            gas_used: U256::zero(),
             timestamp,
             transactions,
-            uncles: Vec::new(),
+            ..Self::default()
         }
     }
 
@@ -127,6 +113,32 @@ impl L2Block {
             gas_limit: self.gas_limit,
             base_fee_per_gas: U256::one(),
             chain_id: U256::zero(),
+        }
+    }
+}
+
+impl Default for L2Block {
+    fn default() -> Self {
+        Self {
+            number: U256::default(),
+            hash: H256::default(),
+            parent_hash: L2Block::dummy_block_hash(),
+            nonce: U256::zero(),
+            sha3_uncles: L2Block::dummy_hash(),
+            logs_bloom: None,
+            transactions_root: L2Block::dummy_hash(),
+            state_root: L2Block::dummy_hash(),
+            receipts_root: L2Block::dummy_hash(),
+            miner: L2Block::dummy_hash(),
+            difficulty: U256::zero(),
+            total_difficulty: U256::zero(),
+            extra_data: L2Block::dummy_hash(),
+            size: U256::zero(),
+            gas_limit: 1u64,
+            gas_used: U256::zero(),
+            timestamp: Timestamp::from(0),
+            transactions: Vec::new(),
+            uncles: Vec::new(),
         }
     }
 }

@@ -5,7 +5,7 @@
 
 use crate::apply::apply_transaction;
 use crate::block_in_progress;
-use crate::blueprint::{Blueprint, Queue};
+use crate::blueprint::Queue;
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::StorageError::AccountInitialisation;
@@ -22,16 +22,20 @@ use tezos_ethereum::block::BlockConstants;
 
 fn compute<Host: Runtime>(
     host: &mut Host,
-    proposal: Blueprint,
     block_in_progress: &mut BlockInProgress,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
 ) -> Result<(), Error> {
-    let transactions = proposal.transactions;
-
-    for transaction in transactions.into_iter() {
+    while block_in_progress.has_tx() {
+        if block_in_progress.would_overflow() {
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+            // store the block in progress
+            return Ok(());
+        }
+        let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
+        block_in_progress.account_for_transaction(&transaction);
         let tx_hash = transaction.tx_hash;
 
         // If `apply_transaction` returns `None`, the transaction should be
@@ -70,20 +74,32 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
 
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+    // if there is no more gas for the transaction,
+    // reload current container in progress and rest of queue
+
     for proposal in queue.proposals {
+        // proposal is turn into a ring to allow poping from the front
+        let ring = proposal.transactions.into();
         // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
         // add proposal to the container
-        let mut block_in_progress =
-            BlockInProgress::new(current_block_number, current_constants.gas_price)?;
+        let mut block_in_progress = BlockInProgress::new(
+            current_block_number,
+            current_constants.gas_price,
+            ring,
+        )?;
         compute(
             host,
-            proposal,
             &mut block_in_progress,
             &current_constants,
             &precompiles,
             &mut evm_account_storage,
             &mut accounts_index,
         )?;
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+        // if reboot initiated, store container in progress and exit
+        // else store block
         let new_block = block_in_progress.finalize_and_store(host)?;
         current_block_number = new_block.number + 1;
         current_constants = new_block.constants();
@@ -95,6 +111,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
 mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
+    use crate::inbox::TransactionContent;
     use crate::inbox::{Transaction, TransactionContent::Ethereum};
     use crate::indexable_storage::internal_for_tests::{get_value, length};
     use crate::storage::internal_for_tests::{
@@ -105,6 +122,7 @@ mod tests {
         account_path, init_account_storage, EthereumAccountStorage,
     };
     use primitive_types::{H160, H256, U256};
+    use std::collections::VecDeque;
     use std::str::FromStr;
     use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{TransactionStatus, TRANSACTION_HASH_SIZE};
@@ -656,7 +674,6 @@ mod tests {
             &sender,
             U256::from(10000000000000000000u64),
         );
-
         produce(&mut host, queue).expect("The block production failed.");
 
         let new_number_of_blocks_indexed = length(&host, &blocks_index).unwrap();
@@ -687,5 +704,146 @@ mod tests {
             Ok(tx_hash.to_vec()),
             get_value(&host, &transaction_hashes_index, last_indexed_transaction)
         );
+    }
+
+    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
+        let timestamp = current_timestamp(host);
+        let timestamp = U256::from(timestamp.as_u64());
+        BlockConstants::first_block(timestamp)
+    }
+
+    fn compute_block<MockHost: Runtime>(
+        transactions: VecDeque<Transaction>,
+        host: &mut MockHost,
+        mut evm_account_storage: EthereumAccountStorage,
+    ) -> BlockInProgress {
+        let block_constants = first_block(host);
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut accounts_index = init_account_index().unwrap();
+
+        // init block in progress
+        let mut block_in_progress =
+            BlockInProgress::new(U256::from(1), U256::from(1), transactions)
+                .expect("Should have initialised block in progress");
+
+        compute::<MockHost>(
+            host,
+            &mut block_in_progress,
+            &block_constants,
+            &precompiles,
+            &mut evm_account_storage,
+            &mut accounts_index,
+        )
+        .expect("Should have computed block");
+        block_in_progress
+    }
+
+    #[test]
+    fn test_ticks_transaction() {
+        // init host
+        let mut host = MockHost::default();
+
+        //provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(5000000000000000u64),
+        );
+
+        // tx is valid because correct nonce and account provisionned
+        let valid_tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            content: TransactionContent::Ethereum(dummy_eth_transaction_deploy()),
+        };
+
+        let transactions = vec![valid_tx.clone()].into();
+
+        // act
+        let block_in_progress =
+            compute_block(transactions, &mut host, evm_account_storage);
+
+        // assert
+        let ticks = block_in_progress.estimated_ticks;
+        let block = block_in_progress
+            .finalize_and_store(&mut host)
+            .expect("should have succeeded in processing block");
+
+        assert_eq!(
+            block.gas_used,
+            U256::from(123),
+            "Gas used for contract creation"
+        );
+
+        assert_eq!(ticks, valid_tx.estimate_ticks());
+    }
+
+    #[test]
+    fn test_stop_computation() {
+        // init host
+        let mut host = MockHost::default();
+        let block_constants = first_block(&mut host);
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut accounts_index = init_account_index().unwrap();
+
+        //provision sender account
+        let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(10000000000000000000u64),
+        );
+
+        // tx is valid because correct nonce and account provisionned
+        let valid_tx = Transaction {
+            tx_hash: [0; TRANSACTION_HASH_SIZE],
+            content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
+        };
+        let transactions = vec![valid_tx].into();
+
+        // init block in progress
+        let mut block_in_progress =
+            BlockInProgress::new(U256::from(1), U256::from(1), transactions)
+                .expect("Should have initialised block in progress");
+        // block is almost full wrt ticks
+        block_in_progress.estimated_ticks = block_in_progress::MAX_TICKS - 1000;
+
+        // act
+        compute::<MockHost>(
+            &mut host,
+            &mut block_in_progress,
+            &block_constants,
+            &precompiles,
+            &mut evm_account_storage,
+            &mut accounts_index,
+        )
+        .expect("Should have computed block");
+
+        // assert
+
+        // block in progress should not have registered any gas or ticks
+        assert_eq!(
+            block_in_progress.cumulative_gas,
+            U256::from(0),
+            "should not have consumed any gas"
+        );
+        assert_eq!(
+            block_in_progress.estimated_ticks,
+            block_in_progress::MAX_TICKS - 1000,
+            "should not have consumed any tick"
+        );
+
+        // the transaction should not have been processed
+        let dest_address =
+            H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
+        let sender_balance = get_balance(&mut host, &mut evm_account_storage, &sender);
+        let dest_balance =
+            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+        assert_eq!(sender_balance, U256::from(10000000000000000000u64));
+        assert_eq!(dest_balance, U256::from(0u64))
     }
 }

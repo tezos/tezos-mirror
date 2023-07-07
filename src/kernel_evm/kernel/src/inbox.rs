@@ -11,6 +11,7 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 
+use crate::block_in_progress::BlockInProgress;
 use crate::parsing::{
     Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
 };
@@ -43,6 +44,13 @@ pub enum TransactionContent {
 pub struct Transaction {
     pub tx_hash: TransactionHash,
     pub content: TransactionContent,
+}
+
+impl Transaction {
+    pub fn estimate_ticks(&self) -> u64 {
+        // all details of tick model stay in the same module
+        BlockInProgress::estimate_ticks_for_transaction(self)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

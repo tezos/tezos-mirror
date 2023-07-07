@@ -8,16 +8,28 @@ use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
 use crate::current_timestamp;
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
+use crate::inbox::{Transaction, TransactionContent};
 use crate::storage;
 use primitive_types::{H256, U256};
+use std::collections::VecDeque;
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::*;
-use tezos_smart_rollup_debug::Runtime;
+use tezos_smart_rollup_host::runtime::Runtime;
+
+/// DO NOT TOUCH //////////////////////////////////////////////////////////////
+/// Those constants where derived from benchmarking
+pub const TICK_PER_GAS: u64 = 2000;
+pub const TICK_FOR_CRYPTO: u64 = 25_000_000;
+pub const MAX_TICKS: u64 = 10_000_000_000;
+pub const TICK_FOR_DEPOSIT: u64 = TICK_FOR_CRYPTO;
+/// DO NOT TOUCH //////////////////////////////////////////////////////////////
 
 /// Container for all data needed during block computation
 pub struct BlockInProgress {
     /// block number
     pub number: U256,
+    /// queue containing the transactions to execute
+    tx_queue: VecDeque<Transaction>,
     /// list of transactions executed without issue
     valid_txs: Vec<[u8; 32]>,
     /// gas accumulator
@@ -29,12 +41,19 @@ pub struct BlockInProgress {
     /// hash to use for receipt
     /// (computed from number, not the correct way to do it)
     pub hash: H256,
+    /// Cumulative number of ticks used
+    pub estimated_ticks: u64,
 }
 
 impl BlockInProgress {
-    pub fn new(number: U256, gas_price: U256) -> Result<BlockInProgress, Error> {
+    pub fn new(
+        number: U256,
+        gas_price: U256,
+        transactions: VecDeque<Transaction>,
+    ) -> Result<BlockInProgress, Error> {
         let block_in_progress = BlockInProgress {
             number,
+            tx_queue: transactions,
             valid_txs: Vec::new(),
             cumulative_gas: U256::zero(),
             index: 0,
@@ -43,6 +62,7 @@ impl BlockInProgress {
             // it should be computed at the end, and not included in the receipt
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
+            estimated_ticks: 0,
         };
 
         Ok(block_in_progress)
@@ -67,9 +87,43 @@ impl BlockInProgress {
         host: &mut Host,
     ) -> Result<L2Block, Error> {
         let timestamp = current_timestamp(host);
-        let new_block = L2Block::new(self.number, self.valid_txs, timestamp);
+        let new_block = L2Block {
+            timestamp,
+            gas_used: self.cumulative_gas,
+            ..L2Block::new(self.number, self.valid_txs, timestamp)
+        };
         storage::store_current_block(host, &new_block)?;
         Ok(new_block)
+    }
+
+    pub fn pop_tx(&mut self) -> Option<Transaction> {
+        self.tx_queue.pop_front()
+    }
+
+    pub fn has_tx(&self) -> bool {
+        !self.tx_queue.is_empty()
+    }
+
+    pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
+        match &transaction.content {
+            TransactionContent::Ethereum(eth) => {
+                eth.gas_limit * TICK_PER_GAS + TICK_FOR_CRYPTO
+            }
+            TransactionContent::Deposit(_) => TICK_FOR_DEPOSIT,
+        }
+    }
+
+    pub fn would_overflow(&self) -> bool {
+        match self.tx_queue.front() {
+            Some(transaction) => {
+                self.estimated_ticks + transaction.estimate_ticks() > MAX_TICKS
+            }
+            None => false, // should not happen, but false is a safe value anyway
+        }
+    }
+
+    pub fn account_for_transaction(&mut self, transaction: &Transaction) {
+        self.estimated_ticks += transaction.estimate_ticks();
     }
 
     pub fn make_receipt(
