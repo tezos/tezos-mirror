@@ -858,7 +858,32 @@ let get_protocol hash =
   | None -> raise Not_found
   | Some protocol -> protocol
 
-let get_directory chain_store block ~with_validator =
+let load_proto chain_store block (module Next_proto : Registered_protocol.T) =
+  let open Lwt_syntax in
+  let* o = Store.Block.read_predecessor_opt chain_store block in
+  match o with
+  | None ->
+      (* No predecessors (e.g. pruned caboose), return the
+         current protocol *)
+      Lwt.return (module Next_proto : Registered_protocol.T)
+  | Some pred ->
+      let* _, savepoint_level = Store.Chain.savepoint chain_store in
+      let* protocol_hash =
+        if Compare.Int32.(Store.Block.level pred < savepoint_level) then
+          let* predecessor_protocol =
+            Store.Chain.find_protocol
+              chain_store
+              ~protocol_level:(Store.Block.proto_level pred)
+          in
+          let protocol_hash =
+            WithExceptions.Option.to_exn ~none:Not_found predecessor_protocol
+          in
+          Lwt.return protocol_hash
+        else Store.Block.protocol_hash_exn chain_store pred
+      in
+      Lwt.return (get_protocol protocol_hash)
+
+let get_directory_with_validator chain_store block =
   let open Lwt_syntax in
   let* o = Store.Chain.get_rpc_directory chain_store block in
   match o with
@@ -874,40 +899,15 @@ let get_directory chain_store block ~with_validator =
             (module Block_services.Fake_protocol)
             (module Next_proto)
         in
-        if with_validator then
-          let dir_with_validator =
-            build_raw_rpc_directory_with_validator
-              (module Block_services.Fake_protocol)
-              (module Next_proto)
-          in
-          Lwt.return (Tezos_rpc.Directory.merge dir dir_with_validator)
-        else Lwt.return dir
+        let dir_with_validator =
+          build_raw_rpc_directory_with_validator
+            (module Block_services.Fake_protocol)
+            (module Next_proto)
+        in
+        Lwt.return (Tezos_rpc.Directory.merge dir dir_with_validator)
       else
         let* (module Proto) =
-          let* o = Store.Block.read_predecessor_opt chain_store block in
-          match o with
-          | None ->
-              (* No predecessors (e.g. pruned caboose), return the
-                 current protocol *)
-              Lwt.return (module Next_proto : Registered_protocol.T)
-          | Some pred ->
-              let* _, savepoint_level = Store.Chain.savepoint chain_store in
-              let* protocol_hash =
-                if Compare.Int32.(Store.Block.level pred < savepoint_level) then
-                  let* predecessor_protocol =
-                    Store.Chain.find_protocol
-                      chain_store
-                      ~protocol_level:(Store.Block.proto_level pred)
-                  in
-                  let protocol_hash =
-                    WithExceptions.Option.to_exn
-                      ~none:Not_found
-                      predecessor_protocol
-                  in
-                  Lwt.return protocol_hash
-                else Store.Block.protocol_hash_exn chain_store pred
-              in
-              Lwt.return (get_protocol protocol_hash)
+          load_proto chain_store block (module Next_proto)
         in
         let* o = Store.Chain.get_rpc_directory chain_store block in
         match o with
@@ -919,16 +919,54 @@ let get_directory chain_store block ~with_validator =
                   (module Proto)
                   (module Next_proto)
               in
-              if with_validator then
-                let dir_with_validator =
-                  build_raw_rpc_directory_with_validator
-                    (module Proto)
-                    (module Next_proto)
-                in
-                Tezos_rpc.Directory.merge
-                  dir_without_validator
-                  dir_with_validator
-              else dir_without_validator
+              let dir_with_validator =
+                build_raw_rpc_directory_with_validator
+                  (module Proto)
+                  (module Next_proto)
+              in
+              Tezos_rpc.Directory.merge dir_without_validator dir_with_validator
+            in
+            let* () =
+              Store.Chain.set_rpc_directory
+                chain_store
+                ~protocol_hash:Proto.hash
+                ~next_protocol_hash:Next_proto.hash
+                dir
+            in
+            Lwt.return dir)
+
+let get_directory_without_validator chain_store block =
+  let open Lwt_syntax in
+  let* o = Store.Chain.get_rpc_directory chain_store block in
+  match o with
+  | Some dir -> Lwt.return dir
+  | None -> (
+      let* next_protocol_hash =
+        Store.Block.protocol_hash_exn chain_store block
+      in
+      let (module Next_proto) = get_protocol next_protocol_hash in
+      if Store.Block.is_genesis chain_store (Store.Block.hash block) then
+        let dir =
+          build_raw_rpc_directory_without_validator
+            (module Block_services.Fake_protocol)
+            (module Next_proto)
+        in
+        Lwt.return dir
+      else
+        let* (module Proto) =
+          load_proto chain_store block (module Next_proto)
+        in
+        let* o = Store.Chain.get_rpc_directory chain_store block in
+        match o with
+        | Some dir -> Lwt.return dir
+        | None ->
+            let dir =
+              let dir_without_validator =
+                build_raw_rpc_directory_without_validator
+                  (module Proto)
+                  (module Next_proto)
+              in
+              dir_without_validator
             in
             let* () =
               Store.Chain.set_rpc_directory
@@ -945,7 +983,7 @@ let build_rpc_directory_with_validator chain_store block =
   match o with
   | None -> Lwt.fail Not_found
   | Some b ->
-      let* dir = get_directory ~with_validator:true chain_store b in
+      let* dir = get_directory_with_validator chain_store b in
       Lwt.return
         (Tezos_rpc.Directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
 
@@ -955,6 +993,6 @@ let build_rpc_directory_without_validator chain_store block =
   match o with
   | None -> Lwt.fail Not_found
   | Some b ->
-      let* dir = get_directory ~with_validator:false chain_store b in
+      let* dir = get_directory_without_validator chain_store b in
       Lwt.return
         (Tezos_rpc.Directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
