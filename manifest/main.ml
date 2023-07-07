@@ -335,6 +335,10 @@ let vdf =
 
 let yaml = external_lib "yaml" V.(at_least "3.1.0")
 
+let jingoo = external_lib "jingoo" V.True
+
+let dmap = external_lib "dmap" V.True
+
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith =
   external_lib
@@ -4096,6 +4100,34 @@ let _tezt_testnet_scenarios =
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_ethereum |> open_;
+      ]
+
+let octogram =
+  public_lib
+    "octogram"
+    ~path:"src/lib_octogram"
+    ~synopsis:"An Ansible-inspired environment to run scenarios and experiments"
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        jingoo;
+        dmap;
+      ]
+
+let _octogram_bin =
+  public_exe
+    "octogram"
+    ~path:"src/bin_octogram"
+    ~internal_name:"octogram_main"
+    ~release_status:Unreleased
+    ~opam:"octogram"
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        octogram;
+        yaml;
       ]
 
 let octez_openapi =

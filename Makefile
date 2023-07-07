@@ -44,7 +44,7 @@ ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXE
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
-# build the TPS evaluation tool and the Tezt test suite in the
+# build the TPS evaluation tool, Octogram and the Tezt test suite in the
 # 'build_x86_64-dev-exp-misc' job.
 BUILD_EXTRA ?=
 
@@ -418,6 +418,11 @@ build-tps: lift-protocol-limits-patch all build-tezt
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
+
+.PHONY: build-octogram
+build-octogram: all
+	@dune build ./src/bin_octogram
+	@cp -f ./_build/default/src/bin_octogram/octogram_main.exe octogram
 
 .PHONY: build-unreleased
 build-unreleased: all

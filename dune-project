@@ -47,6 +47,7 @@
 (package (name octez-snoop))
 (package (name octez-testnet-scenarios))
 (package (name octez-wasmer-test)(allow_empty))
+(package (name octogram))
 (package (name scoru-sequencer-test)(allow_empty))
 (package (name tezos-017-PtNairob-test-helpers))
 (package (name tezos-018-Proxford-test-helpers))

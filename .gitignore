@@ -57,6 +57,7 @@ __pycache__
 /octez-dal-node
 /octez-dac-*
 /octez-binaries
+/octogram
 
 /src/proto_*/parameters/*-parameters.json
 

@@ -99,4 +99,11 @@ module Curl : sig
     string ->
     JSON.t ->
     JSON.t Runnable.process
+
+  val post_raw :
+    ?runner:Runner.t ->
+    ?args:string list ->
+    string ->
+    JSON.t ->
+    string Runnable.process
 end
