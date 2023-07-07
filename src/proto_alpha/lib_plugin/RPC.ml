@@ -1037,7 +1037,7 @@ module Scripts = struct
     let*? () =
       match packed_operation.protocol_data with
       | Operation_data {contents = Single (Preattestation _); _}
-      | Operation_data {contents = Single (Endorsement _); _}
+      | Operation_data {contents = Single (Attestation _); _}
       | Operation_data {contents = Single (Dal_attestation _); _} ->
           error Run_operation_does_not_support_consensus_operations
       | _ -> ok ()
@@ -2930,7 +2930,7 @@ module Forge = struct
       ({branch}, Contents_list (Single operation))
 
   let endorsement ctxt b ~branch ~consensus_content () =
-    operation ctxt b ~branch (Endorsement consensus_content)
+    operation ctxt b ~branch (Attestation consensus_content)
 
   let proposals ctxt b ~branch ~source ~period ~proposals () =
     operation ctxt b ~branch (Proposals {source; period; proposals})

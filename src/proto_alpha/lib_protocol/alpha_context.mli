@@ -4135,8 +4135,8 @@ type 'a consensus_operation_type =
 type consensus_content = {
   slot : Slot.t;
   level : Raw_level.t;
-  (* The level is not required to validate an endorsement when it corresponds
-     to the current payload, but if we want to filter endorsements, we need
+  (* The level is not required to validate an attestation when it corresponds
+     to the current payload, but if we want to filter attestations, we need
      the level. *)
   round : Round.t;
   block_payload_hash : Block_payload_hash.t;
@@ -4164,7 +4164,7 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Endorsement : consensus_content -> Kind.attestation contents
+  | Attestation : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;

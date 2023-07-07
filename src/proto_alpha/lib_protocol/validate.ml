@@ -723,7 +723,7 @@ module Consensus = struct
         ~error:(trace_of_error Consensus_operation_not_allowed)
         vi.consensus_info
     in
-    let (Single (Endorsement consensus_content)) =
+    let (Single (Attestation consensus_content)) =
       operation.protocol_data.contents
     in
     let* consensus_key, voting_power =
@@ -749,7 +749,7 @@ module Consensus = struct
 
   let check_endorsement_conflict vs oph (operation : Kind.attestation operation)
       =
-    let (Single (Endorsement {slot; level; round; _})) =
+    let (Single (Attestation {slot; level; round; _})) =
       operation.protocol_data.contents
     in
     match
@@ -769,7 +769,7 @@ module Consensus = struct
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
   let add_endorsement vs oph (op : Kind.attestation operation) =
-    let (Single (Endorsement {slot; level; round; _})) =
+    let (Single (Attestation {slot; level; round; _})) =
       op.protocol_data.contents
     in
     let endorsements_seen =
@@ -793,7 +793,7 @@ module Consensus = struct
   let remove_endorsement vs (operation : Kind.attestation operation) =
     (* We do not remove the endorsement power because it is not
        relevant for the mempool mode. *)
-    let (Single (Endorsement {slot; level; round; _})) =
+    let (Single (Attestation {slot; level; round; _})) =
       operation.protocol_data.contents
     in
     let endorsements_seen =
@@ -1337,7 +1337,7 @@ module Anonymous = struct
     let open Lwt_result_syntax in
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | Single (Preattestation e1), Single (Preattestation e2)
-    | Single (Endorsement e1), Single (Endorsement e2) ->
+    | Single (Attestation e1), Single (Attestation e2) ->
         let op1_hash = Operation.hash op1 in
         let op2_hash = Operation.hash op2 in
         let same_levels = Raw_level.(e1.level = e2.level) in
@@ -1425,7 +1425,7 @@ module Anonymous = struct
   let check_double_attesting_evidence_conflict (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
-    | Single (Preattestation e1) | Single (Endorsement e1) -> (
+    | Single (Preattestation e1) | Single (Attestation e1) -> (
         match
           Double_attesting_evidence_map.find
             (e1.level, e1.round, e1.slot)
@@ -1456,7 +1456,7 @@ module Anonymous = struct
   let add_double_attesting_evidence (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
-    | Single (Preattestation e1) | Single (Endorsement e1) ->
+    | Single (Preattestation e1) | Single (Attestation e1) ->
         let double_attesting_evidences_seen =
           Double_attesting_evidence_map.add
             (e1.level, e1.round, e1.slot)
@@ -1486,7 +1486,7 @@ module Anonymous = struct
   let remove_double_attesting_evidence (type kind) vs
       (op : kind Kind.consensus Operation.t) =
     match op.protocol_data.contents with
-    | Single (Endorsement e) | Single (Preattestation e) ->
+    | Single (Attestation e) | Single (Preattestation e) ->
         let double_attesting_evidences_seen =
           Double_attesting_evidence_map.remove
             (e.level, e.round, e.slot)
@@ -2452,7 +2452,7 @@ let check_operation ?(check_signature = true) info (type kind)
         Consensus.check_preattestation info ~check_signature operation
       in
       return_unit
-  | Single (Endorsement _) ->
+  | Single (Attestation _) ->
       let* (_voting_power : int) =
         Consensus.check_endorsement info ~check_signature operation
       in
@@ -2508,7 +2508,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         operation_conflict_state
         oph
         operation
-  | Single (Endorsement _) ->
+  | Single (Attestation _) ->
       Consensus.check_endorsement_conflict
         operation_conflict_state
         oph
@@ -2571,7 +2571,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
       Consensus.add_preattestation operation_conflict_state oph operation
-  | Single (Endorsement _) ->
+  | Single (Attestation _) ->
       Consensus.add_endorsement operation_conflict_state oph operation
   | Single (Dal_attestation _) ->
       Consensus.add_dal_attestation operation_conflict_state oph operation
@@ -2616,7 +2616,7 @@ let remove_operation operation_conflict_state (type kind)
   match operation.protocol_data.contents with
   | Single (Preattestation _) ->
       Consensus.remove_preattestation operation_conflict_state operation
-  | Single (Endorsement _) ->
+  | Single (Attestation _) ->
       Consensus.remove_endorsement operation_conflict_state operation
   | Single (Dal_attestation _) ->
       Consensus.remove_dal_attestation operation_conflict_state operation
@@ -2708,7 +2708,7 @@ let validate_operation ?(check_signature = true)
             block_state
             oph
             operation
-      | Single (Endorsement _) ->
+      | Single (Attestation _) ->
           Consensus.validate_endorsement
             ~check_signature
             info

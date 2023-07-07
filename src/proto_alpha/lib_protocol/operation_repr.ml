@@ -141,8 +141,8 @@ type 'a consensus_operation_type =
 type consensus_content = {
   slot : Slot_repr.t;
   level : Raw_level_repr.t;
-  (* The level is not required to validate an endorsement when it corresponds
-     to the current payload, but if we want to filter endorsements, we need
+  (* The level is not required to validate an attestation when it corresponds
+     to the current payload, but if we want to filter attestations, we need
      the level. *)
   round : Round_repr.t;
   block_payload_hash : Block_payload_hash.t;
@@ -235,7 +235,7 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Endorsement : consensus_content -> Kind.attestation contents
+  | Attestation : consensus_content -> Kind.attestation contents
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -1081,16 +1081,16 @@ module Encoding = struct
         name = "endorsement";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+          (function Contents (Attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Endorsement consensus_content) ->
+          (fun (Attestation consensus_content) ->
             ( consensus_content.slot,
               consensus_content.level,
               consensus_content.round,
               consensus_content.block_payload_hash ));
         inj =
           (fun (slot, level, round, block_payload_hash) ->
-            Endorsement {slot; level; round; block_payload_hash});
+            Attestation {slot; level; round; block_payload_hash});
       }
 
   let attestation_case =
@@ -1100,16 +1100,16 @@ module Encoding = struct
         name = "attestation";
         encoding = endorsement_encoding;
         select =
-          (function Contents (Endorsement _ as op) -> Some op | _ -> None);
+          (function Contents (Attestation _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Endorsement consensus_content) ->
+          (fun (Attestation consensus_content) ->
             ( consensus_content.slot,
               consensus_content.level,
               consensus_content.round,
               consensus_content.block_payload_hash ));
         inj =
           (fun (slot, level, round, block_payload_hash) ->
-            Endorsement {slot; level; round; block_payload_hash});
+            Attestation {slot; level; round; block_payload_hash});
       }
 
   let endorsement_encoding =
@@ -1847,7 +1847,7 @@ let acceptable_pass (op : packed_operation) =
   match protocol_data.contents with
   | Single (Failing_noop _) -> None
   | Single (Preattestation _) -> Some consensus_pass
-  | Single (Endorsement _) -> Some consensus_pass
+  | Single (Attestation _) -> Some consensus_pass
   | Single (Dal_attestation _) -> Some consensus_pass
   | Single (Proposals _) -> Some voting_pass
   | Single (Ballot _) -> Some voting_pass
@@ -1937,7 +1937,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
       let watermark =
         match op.protocol_data.contents with
         | Single (Preattestation _) -> to_watermark (Preattestation chain_id)
-        | Single (Endorsement _) -> to_watermark (Attestation chain_id)
+        | Single (Attestation _) -> to_watermark (Attestation chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
@@ -2019,8 +2019,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   match (op1, op2) with
   | Preattestation _, Preattestation _ -> Some Eq
   | Preattestation _, _ -> None
-  | Endorsement _, Endorsement _ -> Some Eq
-  | Endorsement _, _ -> None
+  | Attestation _, Attestation _ -> Some Eq
+  | Attestation _, _ -> None
   | Dal_attestation _, Dal_attestation _ -> Some Eq
   | Dal_attestation _, _ -> None
   | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
@@ -2147,9 +2147,9 @@ let round_infos_from_consensus_content (c : consensus_content) =
   | Error _ -> {level; round = -1}
 
 (** Compute a {!endorsement_infos} from a {!consensus_content}. It is
-   used to compute the weight of {!Endorsement} and {!Preattestation}.
+   used to compute the weight of {!Attestation} and {!Preattestation}.
 
-    Precondition: [c] comes from a valid operation. The {!Endorsement}
+    Precondition: [c] comes from a valid operation. The {!Attestation}
    or {!Preattestation} is valid, so its [round] must succeed to
    convert into an {!int}. Hence, for the unreachable path where the
    convertion fails, we put (-1) as [round] value (see
@@ -2188,7 +2188,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
    is used to compare it to an operation of the same pass.
     Operation weight are defined by validation pass.
 
-    The [weight] of an {!Endorsement} or {!Preattestation} depends on
+    The [weight] of an {!Attestation} or {!Preattestation} depends on
    its {!endorsement_infos}.
 
     The [weight] of a {!Dal_attestation} depends on the pair of
@@ -2320,7 +2320,7 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_preattestation
             (endorsement_infos_from_consensus_content consensus_content) )
-  | Single (Endorsement consensus_content) ->
+  | Single (Attestation consensus_content) ->
       W
         ( Consensus,
           Weight_endorsement
@@ -2343,7 +2343,7 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_vdf_revelation solution)
   | Single (Double_attestation_evidence {op1; _}) -> (
       match op1.protocol_data.contents with
-      | Single (Endorsement consensus_content) ->
+      | Single (Attestation consensus_content) ->
           W
             ( Anonymous,
               Weight_double_attestation
@@ -2412,7 +2412,7 @@ let compare_round_infos infos1 infos2 =
     (infos1.level, infos1.round)
     (infos2.level, infos2.round)
 
-(** When comparing {!Endorsement} to {!Preattestation} or
+(** When comparing {!Attestation} to {!Preattestation} or
    {!Double_attestation_evidence} to {!Double_preattestation}, in case
    of {!round_infos} equality, the position is relevant to compute the
    order. *)
@@ -2429,7 +2429,7 @@ let compare_round_infos_with_prioritized_position ~prioritized_position infos1
 (** When comparing consensus operation with {!endorsement_infos}, in
    case of equality of their {!round_infos}, either they are of the
    same kind and their [slot] have to be compared in the reverse
-   order, otherwise the {!Endorsement} is better and
+   order, otherwise the {!Attestation} is better and
    [prioritized_position] gives its position. *)
 let compare_prioritized_position_or_slot ~prioritized_position =
   match prioritized_position with
@@ -2478,7 +2478,7 @@ let compare_dal_attestation (attestor1, endorsements1, level1)
 (** {5 Comparison of valid consensus operations} *)
 
 (** Comparing consensus operations by their [weight] uses the
-   comparison on {!endorsement_infos} for {!Endorsement} and
+   comparison on {!endorsement_infos} for {!Attestation} and
    {!Preattestation}: see {!endorsement_infos} for more details.
 
     {!Dal_attestation} is smaller than the other kinds of

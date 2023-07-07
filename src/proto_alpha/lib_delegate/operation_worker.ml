@@ -181,9 +181,9 @@ module Endorsement_set = Set.Make (struct
   type t = Kind.attestation operation
 
   let compare
-      ({protocol_data = {contents = Single (Endorsement op1); _}; shell = _} :
+      ({protocol_data = {contents = Single (Attestation op1); _}; shell = _} :
         t)
-      ({protocol_data = {contents = Single (Endorsement op2); _}; shell = _} :
+      ({protocol_data = {contents = Single (Attestation op2); _}; shell = _} :
         t) =
     compare_consensus_contents op1 op2
 end)
@@ -391,7 +391,7 @@ let update_monitoring ?(should_lock = true) state ops =
             let {
               shell = _;
               protocol_data =
-                {contents = Single (Endorsement consensus_content); _};
+                {contents = Single (Attestation consensus_content); _};
               _;
             } =
               op
@@ -515,7 +515,7 @@ let update_operations_pool state (head_level, head_round) =
         | {
             protocol_data =
               Operation_data
-                {contents = Single (Endorsement {round; level; _}); _};
+                {contents = Single (Attestation {round; level; _}); _};
             _;
           } ->
             let round_i32 = Round.to_int32 round in

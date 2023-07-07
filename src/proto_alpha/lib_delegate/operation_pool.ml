@@ -242,7 +242,7 @@ let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
       | ( Operation_data
             {
               contents =
-                Single (Endorsement {level; round; block_payload_hash; _});
+                Single (Attestation {level; round; block_payload_hash; _});
               _;
             },
           _ ) ->
@@ -264,7 +264,7 @@ let unpack_preendorsement packed_preendorsement =
 let unpack_endorsement packed_endorsement =
   let {shell; protocol_data = Operation_data data} = packed_endorsement in
   match data with
-  | {contents = Single (Endorsement _); _} ->
+  | {contents = Single (Attestation _); _} ->
       Some ({shell; protocol_data = data} : Kind.attestation Operation.t)
   | _ -> None
 
@@ -297,7 +297,7 @@ let filter_endorsements ops =
       | {
           shell = {branch};
           protocol_data =
-            Operation_data ({contents = Single (Endorsement _); _} as content);
+            Operation_data ({contents = Single (Attestation _); _} as content);
           _;
         } ->
           Some
@@ -344,7 +344,7 @@ let extract_operations_of_list_list = function
                 ( {shell; protocol_data = data} :: preendorsements,
                   endorsements,
                   dal_attestations )
-            | {contents = Single (Endorsement _); _} ->
+            | {contents = Single (Attestation _); _} ->
                 ( preendorsements,
                   {shell; protocol_data = data} :: endorsements,
                   dal_attestations )

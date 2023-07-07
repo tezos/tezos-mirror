@@ -1114,7 +1114,7 @@ module Encoding = struct
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Endorsement _ as op), res) -> Some (op, res)
+          | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1137,7 +1137,7 @@ module Encoding = struct
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Endorsement _ as op), res) -> Some (op, res)
+          | Contents_and_result ((Attestation _ as op), res) -> Some (op, res)
           | _ -> None);
         proj =
           (function
@@ -1970,8 +1970,8 @@ let kind_equal :
     kind contents -> kind2 contents_result -> (kind, kind2) eq option =
  fun op res ->
   match (op, res) with
-  | Endorsement _, Endorsement_result _ -> Some Eq
-  | Endorsement _, _ -> None
+  | Attestation _, Endorsement_result _ -> Some Eq
+  | Attestation _, _ -> None
   | Preattestation _, Preattestation_result _ -> Some Eq
   | Preattestation _, _ -> None
   | Dal_attestation _, Dal_attestation_result _ -> Some Eq

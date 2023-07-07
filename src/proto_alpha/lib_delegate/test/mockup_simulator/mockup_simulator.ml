@@ -1342,7 +1342,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
       | Single op_contents ->
           return
             (match op_contents with
-            | Endorsement _ ->
+            | Attestation _ ->
                 Alpha_context.Operation.to_watermark (Attestation chain_id)
             | Preattestation _ ->
                 Alpha_context.Operation.to_watermark (Preattestation chain_id)
@@ -1403,7 +1403,7 @@ let op_is_endorsement ?level ?round (op_hash : Operation_hash.t)
       match d.contents with
       | Single op_contents -> (
           match op_contents with
-          | Endorsement consensus_content ->
+          | Attestation consensus_content ->
               let right_level =
                 match level with
                 | None -> true

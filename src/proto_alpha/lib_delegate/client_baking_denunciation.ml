@@ -139,14 +139,14 @@ let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
-  | Attestation, Single (Endorsement consensus_content) ->
+  | Attestation, Single (Attestation consensus_content) ->
       consensus_content.block_payload_hash
 
 let get_slot (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
-  | Attestation, Single (Endorsement consensus_content) ->
+  | Attestation, Single (Attestation consensus_content) ->
       consensus_content.slot
 
 let double_consensus_op_evidence (type kind) :
@@ -345,7 +345,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             round
             slot
       | Operation_data
-          ({contents = Single (Endorsement {round; slot; level; _}); _} as
+          ({contents = Single (Attestation {round; slot; level; _}); _} as
           protocol_data) ->
           let new_endorsement : Kind.attestation Alpha_context.operation =
             {shell; protocol_data}

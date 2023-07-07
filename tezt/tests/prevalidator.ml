@@ -2318,7 +2318,7 @@ let get_endorsement_as_bytes client =
             Operation_data
               {
                 contents =
-                  Single (Endorsement {slot; round; level; block_payload_hash});
+                  Single (Attestation {slot; round; level; block_payload_hash});
                 signature = Some signature;
               };
         }

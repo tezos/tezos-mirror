@@ -120,8 +120,8 @@ let covalidation_sanity () =
           match (contents, kind) with
           | Single (Preattestation _), KPreendorsement -> return_unit
           | Single (Preattestation _), _ -> assert false
-          | Single (Endorsement _), KEndorsement -> return_unit
-          | Single (Endorsement _), _ -> assert false
+          | Single (Attestation _), KEndorsement -> return_unit
+          | Single (Attestation _), _ -> assert false
           | Single (Dal_attestation _), KDalattestation -> return_unit
           | Single (Dal_attestation _), _ -> assert false
           | Single (Seed_nonce_revelation _), KNonce -> return_unit

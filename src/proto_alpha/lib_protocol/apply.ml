@@ -1978,7 +1978,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
   match operation.protocol_data.contents with
   | Single (Preattestation _) -> ctxt
-  | Single (Endorsement _) -> ctxt
+  | Single (Attestation _) -> ctxt
   | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
@@ -2136,11 +2136,11 @@ let punish_double_attestation_or_preattestation (type kind) ctxt
     match op1.protocol_data.contents with
     | Single (Preattestation _) ->
         Double_preattestation_evidence_result balance_updates
-    | Single (Endorsement _) ->
+    | Single (Attestation _) ->
         Double_attestation_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
-  | Single (Preattestation e1) | Single (Endorsement e1) ->
+  | Single (Preattestation e1) | Single (Attestation e1) ->
       let level = Level.from_raw ctxt e1.level in
       Stake_distribution.slot_owner ctxt level e1.slot
       >>=? fun (ctxt, consensus_pk1) ->
@@ -2180,7 +2180,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   match contents_list with
   | Single (Preattestation consensus_content) ->
       record_preattestation ctxt mode consensus_content
-  | Single (Endorsement consensus_content) ->
+  | Single (Attestation consensus_content) ->
       record_endorsement ctxt mode consensus_content
   | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115

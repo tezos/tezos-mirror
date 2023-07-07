@@ -481,8 +481,8 @@ let sign_endorsements state endorsements =
         }
       in
       let contents =
-        (* No preendorsements are included *)
-        Single (Endorsement consensus_content)
+        (* No preattestations are included *)
+        Single (Attestation consensus_content)
       in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
