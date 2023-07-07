@@ -84,7 +84,7 @@
       [validate_operation], but not used at all by [finalize_block].
 
     - [block_state] registers global block metrics such as total gas
-      used or endorsement power. It is filled in by [validate_operation],
+      used or attestation power. It is filled in by [validate_operation],
       which also uses it, e.g. to immediately return an error if the
       block gas limit is exceeded. It is also essential to several checks
       in [finalize_block].
@@ -102,7 +102,7 @@
       [validation_state] for the validation of operations outside of the
       process of validation of a block. It is intended for mempools (see
       {!Mempool_validation}) and for some RPCs. The global block
-      properties such as total block gas and endorsement power are not
+      properties such as total block gas and attestation power are not
       checked. Calling [finalize_block] on such a [validation_state] does
       not make much sense and simply returns unit.
 
@@ -131,8 +131,8 @@
     property is that a baker may select any subset of validated
     operations to bake into a new block, which is then guaranteed to be
     applicable (provided that it verifies some additional global
-    properties such as including enough (pre)endorsing power; the baker
-    is responsible for ensuring this).
+    properties such as including enough (pre)attesting power; the
+    baker is responsible for ensuring this).
 
     For a manager operation, validity is mainly solvability, ie. the
     operation must be well-formed and we must be able to take its
@@ -243,7 +243,7 @@ val begin_partial_construction :
 
 (** Similar to [begin_partial_construction] but do not require
     predecessor information that is essential to the validation of
-    preattestation and endorsement operations. As a consequence, the
+    preattestation and attestation operations. As a consequence, the
     validation of these operations will always fail.
 
     This function is used by the plugin RPC [run_operation], which
@@ -281,7 +281,7 @@ val validate_operation :
     This function should only be used after {!validate_operation} has
     been called on every operation in the block. It checks the
     consistency of the block_header with the information computed while
-    validating the block's operations (Endorsement power, payload hash,
+    validating the block's operations (Attestation power, payload hash,
     etc.) Checks vary depending on the mode (ie. which of the
     [begin_...] functions above was used to initialize the
     [validation_state]). *)

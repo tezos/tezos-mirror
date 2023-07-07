@@ -127,6 +127,11 @@ Breaking Changes
 - Field ``missed_endorsements`` from contract storage has been renamed into
   ``missed_attestations``. (MR :gl:`!9486`)
 
+- Fields ``preendorsements_seen``, ``endorsements_seen`` and
+  ``double_endorsing_evidences_seen`` from the mempool's ``operation_state``
+  encoding has been renamed ``preattestations_seen``, ``attestation_seen`` and
+  ``double_attesting_evidences_seen``. (MR :gl:`!9440`)
+
 RPC Changes
 -----------
 
