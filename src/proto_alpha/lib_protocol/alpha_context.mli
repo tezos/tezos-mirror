@@ -4358,7 +4358,7 @@ module Operation : sig
   type nonrec packed_protocol_data = packed_protocol_data
 
   type consensus_watermark =
-    | Endorsement of Chain_id.t
+    | Attestation of Chain_id.t
     | Preattestation of Chain_id.t
     | Dal_attestation of Chain_id.t
 

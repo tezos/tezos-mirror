@@ -113,7 +113,7 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
   let op = Single (Endorsement consensus_content) in
   return
     (sign
-       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
        signer
        branch
        op)

@@ -178,7 +178,7 @@ let pp_consensus_content ppf content =
     content.block_payload_hash
 
 type consensus_watermark =
-  | Endorsement of Chain_id.t
+  | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
@@ -189,11 +189,11 @@ let to_watermark = function
   | Dal_attestation chain_id
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4479
 
-     We reuse the watermark of an endorsement. This is because this
-     operation is temporary and aims to be merged with an endorsement
+     We reuse the watermark of an attestation. This is because this
+     operation is temporary and aims to be merged with an attestation
      later on. Moreover, there is a leak of abstraction with the shell
      which makes adding a new watermark a bit awkward. *)
-  | Endorsement chain_id ->
+  | Attestation chain_id ->
       Signature.Custom
         (Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id))
 
@@ -207,7 +207,7 @@ let of_watermark = function
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | '\x13' ->
             Option.map
-              (fun chain_id -> Endorsement chain_id)
+              (fun chain_id -> Attestation chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
@@ -1937,7 +1937,7 @@ let check_signature (type kind) key chain_id (op : kind operation) =
       let watermark =
         match op.protocol_data.contents with
         | Single (Preattestation _) -> to_watermark (Preattestation chain_id)
-        | Single (Endorsement _) -> to_watermark (Endorsement chain_id)
+        | Single (Endorsement _) -> to_watermark (Attestation chain_id)
         | Single (Dal_attestation _) -> to_watermark (Dal_attestation chain_id)
         | Single
             ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _

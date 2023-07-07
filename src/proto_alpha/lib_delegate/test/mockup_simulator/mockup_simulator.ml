@@ -1343,7 +1343,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
           return
             (match op_contents with
             | Endorsement _ ->
-                Alpha_context.Operation.to_watermark (Endorsement chain_id)
+                Alpha_context.Operation.to_watermark (Attestation chain_id)
             | Preattestation _ ->
                 Alpha_context.Operation.to_watermark (Preattestation chain_id)
             | _ -> Signature.Generic_operation)

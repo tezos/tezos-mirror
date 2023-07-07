@@ -506,7 +506,7 @@ let sign_endorsements state endorsements =
           | false -> return state.global_state.config.force)
       >>=? fun may_sign ->
       (if may_sign then
-       let watermark = Operation.(to_watermark (Endorsement chain_id)) in
+       let watermark = Operation.(to_watermark (Attestation chain_id)) in
        let unsigned_operation = (shell, Contents_list contents) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn

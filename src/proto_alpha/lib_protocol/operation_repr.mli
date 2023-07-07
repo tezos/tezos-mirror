@@ -188,7 +188,7 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
 type consensus_watermark =
-  | Endorsement of Chain_id.t
+  | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
