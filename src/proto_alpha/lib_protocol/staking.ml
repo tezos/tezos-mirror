@@ -69,10 +69,19 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
   match prepared_opt with
   | None -> return (ctxt, [])
-  | Some {finalizable; unfinalizable} ->
+  | Some {finalizable; unfinalizable} -> (
       let* () = check_unfinalizable unfinalizable in
-      let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
-      perform_finalizable_unstake_transfers ctxt contract finalizable
+      match finalizable with
+      | [] -> return (ctxt, [])
+      | _ ->
+          (* We only update the unstake requests if the [finalizable] list is not empty.
+             Indeed, if it is not empty, it means that at least one of the unstake operations
+             will be finalized, and the storage needs to be updated accordingly.
+             Conversely, if finalizable is empty, then [unfinalizable] contains
+             all the previous unstake requests, that should remain as requests after this
+             operation. *)
+          let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
+          perform_finalizable_unstake_transfers ctxt contract finalizable)
 
 let finalize_unstake ctxt contract =
   let check_unfinalizable _unfinalizable = Lwt_result_syntax.return_unit in
