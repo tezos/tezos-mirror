@@ -2148,7 +2148,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
         ctxt
         consensus_pk1.delegate
         level
-        `Double_endorsing
+        `Double_attesting
         mk_result
         ~payload_producer
 
