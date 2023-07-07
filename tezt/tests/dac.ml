@@ -46,8 +46,10 @@ let assert_lwt_failure ?__LOC__ msg lwt_under_inspection =
 
 let init_hex_root_hash ?payload coordinator_node =
   let payload = Option.value payload ~default:"hello test message" in
-  let* root_hash, _l1_op =
-    Dac_helper.Call_endpoint.V0.post_store_preimage coordinator_node ~payload
+  let* root_hash =
+    Dac_helper.Call_endpoint.V0.Coordinator.post_preimage
+      coordinator_node
+      ~payload
   in
   let hex_root_hash = `Hex root_hash in
   return hex_root_hash
@@ -320,28 +322,6 @@ let assert_state_changed ?block sc_rollup_client prev_state_hash =
     module should be refactored. *)
 module Legacy = struct
   (** [Legacy] test suite uses [v0] DAC API. *)
-  let set_coordinator dac_node coordinator =
-    let coordinator =
-      `O
-        [
-          ("rpc-host", `String (Dac_node.rpc_host coordinator));
-          ("rpc-port", `Float (float_of_int (Dac_node.rpc_port coordinator)));
-        ]
-    in
-    let mode_updated =
-      Dac_node.Config_file.read dac_node
-      |> JSON.get "mode"
-      |> JSON.put
-           ( "dac_cctxt_config",
-             JSON.annotate ~origin:"dac_node_config" coordinator )
-    in
-    Dac_node.Config_file.update dac_node (JSON.put ("mode", mode_updated))
-
-  let coordinator_serializes_payload coordinator ~payload ~expected_rh =
-    let* actual_rh, _l1_operation =
-      Dac_helper.Call_endpoint.V0.post_store_preimage coordinator ~payload
-    in
-    return @@ check_valid_root_hash expected_rh actual_rh
 
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
@@ -370,185 +350,6 @@ module Legacy = struct
     let* () = check_not_ready dac_node in
     let* () = Dac_node.terminate dac_node in
     return ()
-
-  (* The following tests involve multiple legacy DAC nodes running at
-     the same time and playing either the coordinator, committee member or
-     observer role. *)
-
-  module Signature_manager = struct
-    let test_non_committee_signer_should_fail tz_client
-        (coordinator_node, hex_root_hash, _dac_committee) =
-      let* invalid_signer_key =
-        Client.bls_gen_and_show_keys ~alias:"invalid_signer" tz_client
-      in
-      let signature = bls_sign_hex_hash invalid_signer_key hex_root_hash in
-      let result =
-        Dac_helper.Call_endpoint.V0.put_dac_member_signature
-          coordinator_node
-          ~hex_root_hash
-          ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
-          ~signature
-      in
-      assert_lwt_failure
-        ~__LOC__
-        "Expected failure with non-committee member signer."
-        result
-
-    (* Tests that trying to store a dac member signature for a different key
-       - one that was not used for creating the signature - fails. *)
-    let test_signature_verification_failure_should_fail
-        (coordinator_node, hex_root_hash, dac_committee) =
-      let member_i = Random.int (List.length dac_committee) in
-      let memberi = List.nth dac_committee member_i in
-      let memberj =
-        List.find
-          (fun (dc : Account.aggregate_key) -> memberi <> dc)
-          dac_committee
-      in
-      let signature = bls_sign_hex_hash memberi hex_root_hash in
-      let result =
-        Dac_helper.Call_endpoint.V0.put_dac_member_signature
-          coordinator_node
-          ~hex_root_hash
-          ~dac_member_pkh:memberj.aggregate_public_key_hash
-          ~signature
-      in
-      assert_lwt_failure
-        ~__LOC__
-        "Expected failure when signature verification fails but did not."
-        result
-
-    (* Tests that a valid signature over [hex_root_hash] that is submitted to
-       the [coordinator_node] is stored. 2 signatures are produced and stored
-       in the [coordinator_node]. The effects of this can be asserted
-       by checking that the witness bitset is set to 3 *)
-    let test_store_valid_signature_should_update_aggregate_signature
-        (coordinator_node, hex_root_hash, dac_committee) =
-      let members =
-        List.map
-          (fun i ->
-            let key = List.nth dac_committee i in
-            let signature = bls_sign_hex_hash key hex_root_hash in
-            (key, signature))
-          (range 0 1)
-      in
-      let* members_keys =
-        List.fold_left
-          (fun keys ((member : Account.aggregate_key), signature) ->
-            let* keys in
-            let* () =
-              Dac_helper.Call_endpoint.V0.put_dac_member_signature
-                coordinator_node
-                ~hex_root_hash
-                ~dac_member_pkh:member.aggregate_public_key_hash
-                ~signature
-            in
-            return (member :: keys))
-          (return [])
-          members
-      in
-      let* witnesses, certificate, _root_hash, _version =
-        Dac_helper.Call_endpoint.V0.get_certificate
-          coordinator_node
-          ~hex_root_hash
-      in
-      assert_witnesses ~__LOC__ 3 witnesses ;
-      assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
-      unit
-
-    let test_store_same_signature_more_than_once_should_be_noop
-        (coordinator_node, _hex_root_hash, dac_committee) =
-      let* hex_root_hash =
-        init_hex_root_hash ~payload:"noop test abc 3210" coordinator_node
-      in
-
-      let member_i = 2 in
-      let member = List.nth dac_committee member_i in
-      let signature = bls_sign_hex_hash member hex_root_hash in
-      let dac_member_pkh = member.aggregate_public_key_hash in
-      let call () =
-        Dac_helper.Call_endpoint.V0.put_dac_member_signature
-          coordinator_node
-          ~hex_root_hash
-          ~dac_member_pkh
-          ~signature
-      in
-      let* () = call () in
-      let* () = call () in
-      let* witnesses, certificate, _root_hash, _version =
-        Dac_helper.Call_endpoint.V0.get_certificate
-          coordinator_node
-          ~hex_root_hash
-      in
-      assert_witnesses ~__LOC__ 4 witnesses ;
-      assert_verify_aggregate_signature [member] hex_root_hash certificate ;
-      unit
-
-    (* Tests that the Coordinator refuses to store a [signature] for
-       a [root_hash] that it doesn't know *)
-    let invalid_signature (coordinator_node, _hex_root_hash, dac_committee) =
-      let false_root_hash =
-        `Hex
-          "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
-      in
-      let member = List.nth dac_committee 0 in
-      let signature = bls_sign_hex_hash member false_root_hash in
-      let dac_member_pkh = member.aggregate_public_key_hash in
-      let result =
-        Dac_helper.Call_endpoint.V0.put_dac_member_signature
-          coordinator_node
-          ~hex_root_hash:false_root_hash
-          ~dac_member_pkh
-          ~signature
-      in
-      assert_lwt_failure
-        ~__LOC__
-        "Expected failure when unknown root_hash"
-        result
-
-    let test_handle_store_signature _protocol _tezos_node tz_client coordinator
-        _threshold dac_committee =
-      let* hex_root_hash = init_hex_root_hash coordinator in
-      let dac_env = (coordinator, hex_root_hash, dac_committee) in
-      let* () = test_non_committee_signer_should_fail tz_client dac_env in
-      let* () = test_signature_verification_failure_should_fail dac_env in
-      let* () =
-        test_store_valid_signature_should_update_aggregate_signature dac_env
-      in
-      let* () =
-        test_store_same_signature_more_than_once_should_be_noop dac_env
-      in
-      let* () = invalid_signature dac_env in
-      unit
-
-    (* Tests that it's possible to retrieve the witness and certificate after
-       storing a dac member signature. Also asserts that the certificate contains
-       the member used for signing. *)
-    let test_get_certificate _protocol _tezos_node _tz_client coordinator
-        _threshold dac_committee =
-      let i = Random.int (List.length dac_committee) in
-      let member = List.nth dac_committee i in
-      let* hex_root_hash =
-        init_hex_root_hash
-          ~payload:"test get certificate payload 123"
-          coordinator
-      in
-      let signature = bls_sign_hex_hash member hex_root_hash in
-      let* () =
-        Dac_helper.Call_endpoint.V0.put_dac_member_signature
-          coordinator
-          ~hex_root_hash
-          ~dac_member_pkh:member.aggregate_public_key_hash
-          ~signature
-      in
-      let* witnesses, certificate, _root_hash, _version =
-        Dac_helper.Call_endpoint.V0.get_certificate coordinator ~hex_root_hash
-      in
-      let expected_witnesses = Z.shift_left Z.one i in
-      assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;
-      assert_verify_aggregate_signature [member] hex_root_hash certificate ;
-      unit
-  end
 end
 
 module Coordinator = struct
@@ -1484,6 +1285,185 @@ module Full_infrastructure = struct
           a root hash that corresponds to the serialized payload in [5].*)
     let* () = committee_member_receives_root_hash_promise in
     observer_receives_root_hash_promise
+
+  module Signature_manager = struct
+    let test_non_committee_signer_should_fail tz_client
+        (coordinator_node, hex_root_hash, _dac_committee) =
+      let* invalid_signer_key =
+        Client.bls_gen_and_show_keys ~alias:"invalid_signer" tz_client
+      in
+      let signature = bls_sign_hex_hash invalid_signer_key hex_root_hash in
+      let result =
+        Dac_helper.Call_endpoint.V0.put_dac_member_signature
+          coordinator_node
+          ~hex_root_hash
+          ~dac_member_pkh:invalid_signer_key.aggregate_public_key_hash
+          ~signature
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure with non-committee member signer."
+        result
+
+    (* Tests that trying to store a dac member signature for a different key
+       - one that was not used for creating the signature - fails. *)
+    let test_signature_verification_failure_should_fail
+        (coordinator_node, hex_root_hash, dac_committee) =
+      let member_i = Random.int (List.length dac_committee) in
+      let memberi = List.nth dac_committee member_i in
+      let memberj =
+        List.find
+          (fun (dc : Account.aggregate_key) -> memberi <> dc)
+          dac_committee
+      in
+      let signature = bls_sign_hex_hash memberi hex_root_hash in
+      let result =
+        Dac_helper.Call_endpoint.V0.put_dac_member_signature
+          coordinator_node
+          ~hex_root_hash
+          ~dac_member_pkh:memberj.aggregate_public_key_hash
+          ~signature
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure when signature verification fails but did not."
+        result
+
+    (* Tests that a valid signature over [hex_root_hash] that is submitted to
+       the [coordinator_node] is stored. 2 signatures are produced and stored
+       in the [coordinator_node]. The effects of this can be asserted
+       by checking that the witness bitset is set to 3 *)
+    let test_store_valid_signature_should_update_aggregate_signature
+        (coordinator_node, hex_root_hash, dac_committee) =
+      let members =
+        List.map
+          (fun i ->
+            let key = List.nth dac_committee i in
+            let signature = bls_sign_hex_hash key hex_root_hash in
+            (key, signature))
+          (range 0 1)
+      in
+      let* members_keys =
+        List.fold_left
+          (fun keys ((member : Account.aggregate_key), signature) ->
+            let* keys in
+            let* () =
+              Dac_helper.Call_endpoint.V0.put_dac_member_signature
+                coordinator_node
+                ~hex_root_hash
+                ~dac_member_pkh:member.aggregate_public_key_hash
+                ~signature
+            in
+            return (member :: keys))
+          (return [])
+          members
+      in
+      let* witnesses, certificate, _root_hash, _version =
+        Dac_helper.Call_endpoint.V0.get_certificate
+          coordinator_node
+          ~hex_root_hash
+      in
+      assert_witnesses ~__LOC__ 3 witnesses ;
+      assert_verify_aggregate_signature members_keys hex_root_hash certificate ;
+      unit
+
+    let test_store_same_signature_more_than_once_should_be_noop
+        (coordinator_node, _hex_root_hash, dac_committee) =
+      let* hex_root_hash =
+        init_hex_root_hash ~payload:"noop test abc 3210" coordinator_node
+      in
+
+      let member_i = 2 in
+      let member = List.nth dac_committee member_i in
+      let signature = bls_sign_hex_hash member hex_root_hash in
+      let dac_member_pkh = member.aggregate_public_key_hash in
+      let call () =
+        Dac_helper.Call_endpoint.V0.put_dac_member_signature
+          coordinator_node
+          ~hex_root_hash
+          ~dac_member_pkh
+          ~signature
+      in
+      let* () = call () in
+      let* () = call () in
+      let* witnesses, certificate, _root_hash, _version =
+        Dac_helper.Call_endpoint.V0.get_certificate
+          coordinator_node
+          ~hex_root_hash
+      in
+      assert_witnesses ~__LOC__ 4 witnesses ;
+      assert_verify_aggregate_signature [member] hex_root_hash certificate ;
+      unit
+
+    (* Tests that the Coordinator refuses to store a [signature] for
+       a [root_hash] that it doesn't know *)
+    let invalid_signature (coordinator_node, _hex_root_hash, dac_committee) =
+      let false_root_hash =
+        `Hex
+          "00b29d7d1e6668fb35a9ff6d46fa321d227e9b93dae91c4649b53168e8c10c1827"
+      in
+      let member = List.nth dac_committee 0 in
+      let signature = bls_sign_hex_hash member false_root_hash in
+      let dac_member_pkh = member.aggregate_public_key_hash in
+      let result =
+        Dac_helper.Call_endpoint.V0.put_dac_member_signature
+          coordinator_node
+          ~hex_root_hash:false_root_hash
+          ~dac_member_pkh
+          ~signature
+      in
+      assert_lwt_failure
+        ~__LOC__
+        "Expected failure when unknown root_hash"
+        result
+
+    let test_handle_store_signature scenario =
+      let Scenarios.{coordinator_node; committee_members; client; _} =
+        scenario
+      in
+      let* hex_root_hash = init_hex_root_hash coordinator_node in
+      let dac_env = (coordinator_node, hex_root_hash, committee_members) in
+      let* () = test_non_committee_signer_should_fail client dac_env in
+      let* () = test_signature_verification_failure_should_fail dac_env in
+      let* () =
+        test_store_valid_signature_should_update_aggregate_signature dac_env
+      in
+      let* () =
+        test_store_same_signature_more_than_once_should_be_noop dac_env
+      in
+      let* () = invalid_signature dac_env in
+      unit
+
+    (* Tests that it's possible to retrieve the witness and certificate after
+       storing a dac member signature. Also asserts that the certificate contains
+       the member used for signing. *)
+    let test_get_certificate scenario =
+      let Scenarios.{coordinator_node; committee_members; _} = scenario in
+      let i = Random.int (List.length committee_members) in
+      let member = List.nth committee_members i in
+      let* hex_root_hash =
+        init_hex_root_hash
+          ~payload:"test get certificate payload 123"
+          coordinator_node
+      in
+      let signature = bls_sign_hex_hash member hex_root_hash in
+      let* () =
+        Dac_helper.Call_endpoint.V0.put_dac_member_signature
+          coordinator_node
+          ~hex_root_hash
+          ~dac_member_pkh:member.aggregate_public_key_hash
+          ~signature
+      in
+      let* witnesses, signature, _root_hash, _version =
+        Dac_helper.Call_endpoint.V0.get_certificate
+          coordinator_node
+          ~hex_root_hash
+      in
+      let expected_witnesses = Z.shift_left Z.one i in
+      assert_witnesses ~__LOC__ (Z.to_int expected_witnesses) witnesses ;
+      assert_verify_aggregate_signature [member] hex_root_hash signature ;
+      unit
+  end
 end
 
 let test_observer_times_out_when_page_cannot_be_fetched _protocol node client
@@ -2846,21 +2826,21 @@ let register ~protocols =
     "committee member downloads pages from coordinator"
     Full_infrastructure.test_observer_downloads_pages
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
+    ~observers:0
     ~committee_size:2
     ~tags:["dac"; "dac_node"]
     "dac_get_certificate"
-    Legacy.Signature_manager.test_get_certificate
+    Full_infrastructure.Signature_manager.test_get_certificate
     protocols ;
-  scenario_with_layer1_and_legacy_dac_nodes
+  scenario_with_full_dac_infrastructure
     ~__FILE__
-    ~threshold:0
+    ~observers:0
     ~committee_size:3
     ~tags:["dac"; "dac_node"]
     "dac_store_member_signature"
-    Legacy.Signature_manager.test_handle_store_signature
+    Full_infrastructure.Signature_manager.test_handle_store_signature
     protocols ;
   scenario_with_full_dac_infrastructure
     ~__FILE__
