@@ -4178,7 +4178,7 @@ and _ contents =
       op2 : Kind.preattestation operation;
     }
       -> Kind.double_preattestation_evidence contents
-  | Double_endorsement_evidence : {
+  | Double_attestation_evidence : {
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
     }

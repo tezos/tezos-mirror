@@ -266,14 +266,14 @@ and _ contents =
       op2 : Kind.preattestation operation;
     }
       -> Kind.double_preattestation_evidence contents
-  (* Double_endorsement_evidence: Similar to double-preattestation but
+  (* Double_attestation_evidence: Similar to double-preattestation but
      for endorsements. *)
-  | Double_endorsement_evidence : {
+  | Double_attestation_evidence : {
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
     }
       -> Kind.double_attestation_evidence contents
-  (* Double_baking_evidence: Similarly to double-endorsement but the
+  (* Double_baking_evidence: Similarly to double-attestation but the
      byzantine attempts to fork by signing two different blocks at the
      same level. *)
   | Double_baking_evidence : {
@@ -595,8 +595,16 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    The global order is as follows:
 
    {!Endorsement} and {!Preattestation} > {!Dal_attestation} >
+<<<<<<< HEAD
    {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
+||||||| parent of 45950febbf (alpha: rename double_endorsement_evidence contents type)
+   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
+   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
+=======
+   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
+   {!Double_attestation_evidence} > {!Double_baking_evidence} >
+>>>>>>> 45950febbf (alpha: rename double_endorsement_evidence contents type)
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.
 

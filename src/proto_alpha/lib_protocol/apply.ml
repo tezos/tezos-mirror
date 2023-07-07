@@ -1982,7 +1982,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-      | Vdf_revelation _ | Double_endorsement_evidence _
+      | Vdf_revelation _ | Double_attestation_evidence _
       | Double_preattestation_evidence _ | Double_baking_evidence _
       | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
@@ -2221,7 +2221,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preattestation_evidence {op1; op2 = _}) ->
       punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
-  | Single (Double_endorsement_evidence {op1; op2 = _}) ->
+  | Single (Double_attestation_evidence {op1; op2 = _}) ->
       punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt bh1 ~payload_producer

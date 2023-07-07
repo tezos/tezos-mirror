@@ -1230,7 +1230,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Double_endorsement_evidence _ as op), res) ->
+          | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
         proj = (fun (Double_endorsement_evidence_result bus) -> bus);
@@ -1254,7 +1254,7 @@ module Encoding = struct
           | _ -> None);
         mselect =
           (function
-          | Contents_and_result ((Double_endorsement_evidence _ as op), res) ->
+          | Contents_and_result ((Double_attestation_evidence _ as op), res) ->
               Some (op, res)
           | _ -> None);
         proj = (fun (Double_endorsement_evidence_result bus) -> bus);
@@ -1983,9 +1983,9 @@ let kind_equal :
   | Double_preattestation_evidence _, Double_preattestation_evidence_result _ ->
       Some Eq
   | Double_preattestation_evidence _, _ -> None
-  | Double_endorsement_evidence _, Double_endorsement_evidence_result _ ->
+  | Double_attestation_evidence _, Double_endorsement_evidence_result _ ->
       Some Eq
-  | Double_endorsement_evidence _, _ -> None
+  | Double_attestation_evidence _, _ -> None
   | Double_baking_evidence _, Double_baking_evidence_result _ -> Some Eq
   | Double_baking_evidence _, _ -> None
   | Activate_account _, Activate_account_result _ -> Some Eq

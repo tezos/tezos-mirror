@@ -639,7 +639,7 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
   }
 
 let double_endorsement ctxt op1 op2 =
-  let contents = Single (Double_endorsement_evidence {op1; op2}) in
+  let contents = Single (Double_attestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
     shell = {branch};
