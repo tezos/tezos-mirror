@@ -7580,6 +7580,30 @@ let _octez_snoop =
           :: [S "package" :: [S "octez-snoop"]];
         ]
 
+let _octez_injector_server =
+  public_exe
+    "octez-injector-server"
+    ~internal_name:"injector_main"
+    ~path:"contrib/octez_injector_server"
+    ~synopsis:"Octez injector"
+    ~release_status:Experimental
+    ~with_macos_security_framework:true
+    ~linkall:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_injector_lib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_rpc_http_server |> open_;
+        octez_rpc_http |> open_;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
+        data_encoding;
+        (* No code from octez_injector_alpha is used, but it's imported in order to *)
+        (* run the protocol registration code *)
+        Protocol.(octez_injector alpha |> if_some);
+      ]
+
 (* We use Dune's select statement and keep uTop optional *)
 (* Keeping uTop optional lets `make build` succeed, *)
 (* which uses tezos/opam-repository to resolve dependencies, *)

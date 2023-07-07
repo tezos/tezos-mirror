@@ -27,6 +27,7 @@
 (package (name octez-evm-proxy-lib-prod)(allow_empty))
 (package (name octez-evm-proxy-tests)(allow_empty))
 (package (name octez-injector))
+(package (name octez-injector-server))
 (package (name octez-l2-libs))
 (package (name octez-libs))
 (package (name octez-node))

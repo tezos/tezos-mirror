@@ -527,6 +527,8 @@ opam:octez-injector:
   variables:
     package: octez-injector
 
+# Ignoring unreleased package octez-injector-server.
+
 opam:octez-l2-libs:
   extends:
     - .opam_template
