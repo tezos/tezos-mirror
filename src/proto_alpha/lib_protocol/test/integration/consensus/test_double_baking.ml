@@ -135,7 +135,7 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let p_de =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
@@ -184,7 +184,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let p_de =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let p_db =
     csts.parametric.percentage_of_frozen_deposits_slashed_per_double_baking

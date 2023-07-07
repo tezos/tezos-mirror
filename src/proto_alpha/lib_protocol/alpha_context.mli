@@ -893,7 +893,7 @@ module Constants : sig
       max_slashing_period : int;
       delegation_over_baking_limit : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : int;
-      percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
+      percentage_of_frozen_deposits_slashed_per_double_attestation : int;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -978,7 +978,7 @@ module Constants : sig
 
   val percentage_of_frozen_deposits_slashed_per_double_baking : context -> int
 
-  val percentage_of_frozen_deposits_slashed_per_double_endorsement :
+  val percentage_of_frozen_deposits_slashed_per_double_attestation :
     context -> int
 
   val testnet_dictator : context -> public_key_hash option

@@ -142,7 +142,7 @@ let punish_double_endorsing =
   let set slashed = Storage.{slashed with for_double_endorsing = true} in
   let get_percentage =
     Constants_storage
-    .percentage_of_frozen_deposits_slashed_per_double_endorsement
+    .percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   punish_double_signing ~get ~set ~get_percentage
 

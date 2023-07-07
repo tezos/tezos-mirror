@@ -1022,10 +1022,10 @@ let prepare_first_block ~level ~timestamp ctxt =
         c_gen.reward_weights
       in
 
-      let percentage_of_frozen_deposits_slashed_per_double_endorsement =
+      let percentage_of_frozen_deposits_slashed_per_double_attestation =
         100
-        * c.ratio_of_frozen_deposits_slashed_per_double_endorsement.numerator
-        / c.ratio_of_frozen_deposits_slashed_per_double_endorsement.denominator
+        * c.ratio_of_frozen_deposits_slashed_per_double_attestation.numerator
+        / c.ratio_of_frozen_deposits_slashed_per_double_attestation.denominator
       in
       let percentage_of_frozen_deposits_slashed_per_double_baking =
         let double_baking_punishment_times_100 =
@@ -1074,7 +1074,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_slashing_period = c.max_slashing_period;
             delegation_over_baking_limit;
             percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_endorsement;
+            percentage_of_frozen_deposits_slashed_per_double_attestation;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator = c.testnet_dictator;
             initial_seed = c.initial_seed;

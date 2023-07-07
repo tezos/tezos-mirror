@@ -171,7 +171,7 @@ type t = {
   delegation_over_baking_limit : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
-  percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
+  percentage_of_frozen_deposits_slashed_per_double_attestation : int;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   cache_script_size : int;

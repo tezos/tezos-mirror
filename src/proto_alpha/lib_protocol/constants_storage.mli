@@ -85,7 +85,7 @@ val delegation_over_baking_limit : Raw_context.t -> int
 val percentage_of_frozen_deposits_slashed_per_double_baking :
   Raw_context.t -> int
 
-val percentage_of_frozen_deposits_slashed_per_double_endorsement :
+val percentage_of_frozen_deposits_slashed_per_double_attestation :
   Raw_context.t -> int
 
 val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option

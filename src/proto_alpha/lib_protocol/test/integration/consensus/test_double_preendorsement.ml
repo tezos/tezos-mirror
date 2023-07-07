@@ -124,7 +124,7 @@ end = struct
     Context.get_constants (B pred) >>=? fun constants ->
     let p =
       constants.parametric
-        .percentage_of_frozen_deposits_slashed_per_double_endorsement
+        .percentage_of_frozen_deposits_slashed_per_double_attestation
     in
     (* let's bake the block on top of pred without denunciating d1 *)
     bake ~policy:(By_account baker) pred >>=? fun bgood ->
