@@ -78,7 +78,7 @@ type ordered_slots = {
 
 (* Slots returned by this function are assumed by consumers to be in increasing
    order, hence the use of [Slot.Range.rev_fold_es]. *)
-let endorsing_rights (ctxt : t) level =
+let attesting_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
   Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
   Slot.Range.rev_fold_es
@@ -103,7 +103,7 @@ let endorsing_rights (ctxt : t) level =
     (ctxt, Signature.Public_key_hash.Map.empty)
     slots
 
-let endorsing_rights_by_first_slot ctxt level =
+let attesting_rights_by_first_slot ctxt level =
   Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   >>?= fun slots ->
   Slot.Range.fold_es

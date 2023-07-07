@@ -132,7 +132,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt, attestations_map =
-    Baking.endorsing_rights_by_first_slot ctxt predecessor_level
+    Baking.attesting_rights_by_first_slot ctxt predecessor_level
   in
   let*? can_contain_preattestations =
     match mode with
@@ -150,7 +150,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let* ctxt, allowed_preattestations =
     if can_contain_preattestations then
       let* ctxt, preattestations_map =
-        Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
+        Baking.attesting_rights_by_first_slot ctxt (Level.current ctxt)
       in
       return (ctxt, Some preattestations_map)
     else return (ctxt, None)
