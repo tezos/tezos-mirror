@@ -453,147 +453,17 @@ let alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
-type sub_lib_documentation_entrypoint = Module | Page | Sub_lib
+(* Container of the registered sublibraries of [octez-libs] *)
+let registered_octez_libs : Sub_lib.container = Sub_lib.make_container ()
 
-type sub_lib = {
-  name : string;
-  synopsis : string option;
-  documentation_type : sub_lib_documentation_entrypoint;
-}
-
-(* List of the registered sublibraries of octez-libs *)
-let registered_octez_libs : sub_lib list ref = ref []
-
-(* Registers [public_name] as a sublibrary of the [octez-libs] package.
-
-   If [documentation] is [None] or only contains a package stanza, then the
-   documentation page of [octez-libs] will point to the module API of the public library.
-   Otherwise, it will assume that the package contains a [package_name.mld] file
-   and it will link to that. *)
-let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
-    ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
-    ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
-    ?release_status ?ctypes ?c_library_flags ?opam_with_test ?synopsis ~path
-    public_name =
-  let name =
-    let s = Option.value ~default:public_name internal_name in
-    String.map
-      (function
-        | '-' | '.' -> '_'
-        | '/' ->
-            invalid_arg ("octez library " ^ s ^ " name cannot contain \"/\"")
-        | c -> c)
-      s
-  in
-  let registered =
-    match documentation with
-    | None | Some Dune.[[S "package"; S "octez-libs"]] ->
-        (* In the case that the documentation stanza is only a package declaration,
-           we don't want the page to be used *)
-        if String.contains (Option.value ~default:public_name internal_name) '.'
-        then
-          {
-            name = String.capitalize_ascii name;
-            synopsis;
-            documentation_type = Sub_lib;
-          }
-        else
-          {
-            name = String.capitalize_ascii name;
-            synopsis;
-            documentation_type = Module;
-          }
-    | Some _docs -> {name; synopsis; documentation_type = Page}
-  in
-
-  if
-    List.exists
-      (fun registered -> String.equal registered.name name)
-      !registered_octez_libs
-  then
-    invalid_arg
-      (Format.sprintf
-         "octez-libs already contains a library that would have the same \
-          internal name, %s, as %s"
-         (Option.value ~default:public_name internal_name)
-         name)
-  else registered_octez_libs := registered :: !registered_octez_libs ;
-  public_lib
-    ("octez-libs." ^ public_name)
-    ~internal_name:name
-    ~opam:"octez-libs"
-    ~synopsis:
+(* Registers a sub-library in [octez-libs] packages.
+   This package should contain all Octez basic libraries. *)
+let octez_lib : Sub_lib.maker =
+  Sub_lib.sub_lib
+    ~package_synopsis:
       "A package that contains multiple base libraries used by the Octez suite"
-    ?opam_with_test
-    ?linkall
-    ?js_compatible
-    ?bisect_ppx
-    ?js_of_ocaml
-    ?inline_tests
-    ?foreign_stubs
-    ?documentation
-    ?conflicts
-    ?flags
-    ?time_measurement_ppx
-    ?deps
-    ?modules
-    ?dune
-    ?preprocess
-    ?opam_only_deps
-    ?cram
-    ?release_status
-    ?ctypes
-    ?c_library_flags
-    ~path
-    ~ocaml:
-      V.(
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
-           Should be in sync with scripts/version.sh *)
-        at_least "4.14.1" && less_than "4.15")
-    ~license:"Apache-2.0"
-    ~extra_authors:["WebAssembly Authors"]
-
-(* Prints all the registered octez libraries as a documentation index *)
-let pp_octez_libs_index fmt registered_octez_libs =
-  let header =
-    "{0 Octez-libs: Octez libraries}\n\n\
-     This is a package containing some libraries used by the Octez project.\n\n\
-     It contains the following libraries:\n\n"
-  in
-  let pp_registered pp = function
-    | {name; synopsis = None; documentation_type = Module} ->
-        Format.fprintf pp "- {{!module-%s}%s}@." name name
-    | {name; synopsis = Some synopsis; documentation_type = Module} ->
-        Format.fprintf pp "- {{!module-%s}%s}: %s@." name name synopsis
-    | {name; synopsis = None; documentation_type = Page} ->
-        Format.fprintf
-          pp
-          "- {{!page-%s}%s}@."
-          name
-          (String.capitalize_ascii name)
-    | {name; synopsis = Some synopsis; documentation_type = Page} ->
-        Format.fprintf
-          pp
-          "- {{!page-%s}%s}: %s@."
-          name
-          (String.capitalize_ascii name)
-          synopsis
-    | {documentation_type = Sub_lib; _} ->
-        (* In case it's a sub_lib, we don't link anything *) ()
-  in
-  Format.fprintf
-    fmt
-    "%s%a"
-    header
-    (Format.pp_print_list
-       ~pp_sep:(fun pp () -> Format.fprintf pp "")
-       pp_registered)
-  @@ List.sort
-       (fun {name = name1; _} {name = name2; _} ->
-         String.compare
-           (String.capitalize_ascii name1)
-           (String.capitalize_ascii name2))
-       registered_octez_libs
+    ~container:registered_octez_libs
+    ~package:"octez-libs"
 
 let octez_test_helpers =
   octez_lib
@@ -2117,6 +1987,13 @@ let octez_base =
     ~js_compatible:true
     ~documentation:[Dune.[S "package"; S "octez-libs"]]
     ~dune:Dune.[ocamllex "point_parser"]
+    ~ocaml:
+      V.(
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
+           Should be in sync with scripts/version.sh *)
+        at_least "4.14.1" && less_than "4.15")
+    ~license:"Apache-2.0"
+    ~extra_authors:["WebAssembly Authors"]
 
 let octez_base_unix =
   octez_lib
@@ -8275,9 +8152,14 @@ let () =
   write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
-(* Generate documentation index for Octez-libs *)
+(* Generate documentation index for [octez-libs] *)
 let () =
   write "src/lib_base/index.mld" @@ fun fmt ->
-  pp_octez_libs_index fmt !registered_octez_libs
+  let header =
+    "{0 Octez-libs: Octez libraries}\n\n\
+     This is a package containing some libraries used by the Octez project.\n\n\
+     It contains the following libraries:\n\n"
+  in
+  Sub_lib.pp_documentation_of_container ~header fmt registered_octez_libs
 
 let () = postcheck ~exclude ()
