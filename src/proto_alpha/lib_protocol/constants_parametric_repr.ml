@@ -606,7 +606,7 @@ let encoding =
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
                       uint8)
                    (req
-                      "percentage_of_frozen_deposits_slashed_per_double_endorsement"
+                      "percentage_of_frozen_deposits_slashed_per_double_attestation"
                       uint8)
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))

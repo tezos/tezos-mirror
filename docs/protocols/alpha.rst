@@ -98,9 +98,10 @@ Breaking Changes
 
 - Operation ``Set_deposits_limit`` removed. (MR :gl:`!8831`)
 
-- Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement`` is
-  converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
-  ``percentage_of_frozen_deposits_slashed_per_double_endorsement``. (MR :gl:`!8753`)
+- Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement``
+  is converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
+  ``percentage_of_frozen_deposits_slashed_per_double_attestation``. (MRs
+  :gl:`!8753`, :gl:`!9440`)
 
 - Protocol parameter ``double_baking_punishment`` is converted from a fixed
   value of ``640tz`` into the percentage ``11%`` and renamed to
