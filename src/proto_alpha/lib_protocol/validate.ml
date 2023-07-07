@@ -143,7 +143,7 @@ module Double_baking_evidence_map = struct
         list (tup2 (tup2 Raw_level.encoding Round.encoding) elt_encoding))
 end
 
-module Double_endorsing_evidence_map = struct
+module Double_attesting_evidence_map = struct
   include Map.Make (struct
     type t = Raw_level.t * Round.t * Slot.t
 
@@ -179,8 +179,8 @@ end
 type anonymous_state = {
   activation_pkhs_seen : Operation_hash.t Ed25519.Public_key_hash.Map.t;
   double_baking_evidences_seen : Operation_hash.t Double_baking_evidence_map.t;
-  double_endorsing_evidences_seen :
-    Operation_hash.t Double_endorsing_evidence_map.t;
+  double_attesting_evidences_seen :
+    Operation_hash.t Double_attesting_evidence_map.t;
   seed_nonce_levels_seen : Operation_hash.t Raw_level.Map.t;
   vdf_solution_seen : Operation_hash.t option;
 }
@@ -200,24 +200,24 @@ let anonymous_state_encoding =
        (fun {
               activation_pkhs_seen;
               double_baking_evidences_seen;
-              double_endorsing_evidences_seen;
+              double_attesting_evidences_seen;
               seed_nonce_levels_seen;
               vdf_solution_seen;
             } ->
          ( activation_pkhs_seen,
            double_baking_evidences_seen,
-           double_endorsing_evidences_seen,
+           double_attesting_evidences_seen,
            seed_nonce_levels_seen,
            vdf_solution_seen ))
        (fun ( activation_pkhs_seen,
               double_baking_evidences_seen,
-              double_endorsing_evidences_seen,
+              double_attesting_evidences_seen,
               seed_nonce_levels_seen,
               vdf_solution_seen ) ->
          {
            activation_pkhs_seen;
            double_baking_evidences_seen;
-           double_endorsing_evidences_seen;
+           double_attesting_evidences_seen;
            seed_nonce_levels_seen;
            vdf_solution_seen;
          })
@@ -230,7 +230,7 @@ let anonymous_state_encoding =
              (Double_baking_evidence_map.encoding Operation_hash.encoding))
           (req
              "double_endorsing_evidences_seen"
-             (Double_endorsing_evidence_map.encoding Operation_hash.encoding))
+             (Double_attesting_evidence_map.encoding Operation_hash.encoding))
           (req
              "seed_nonce_levels_seen"
              (raw_level_map_encoding Operation_hash.encoding))
@@ -240,7 +240,7 @@ let empty_anonymous_state =
   {
     activation_pkhs_seen = Ed25519.Public_key_hash.Map.empty;
     double_baking_evidences_seen = Double_baking_evidence_map.empty;
-    double_endorsing_evidences_seen = Double_endorsing_evidence_map.empty;
+    double_attesting_evidences_seen = Double_attesting_evidence_map.empty;
     seed_nonce_levels_seen = Raw_level.Map.empty;
     vdf_solution_seen = None;
   }
@@ -1330,7 +1330,7 @@ module Anonymous = struct
       (Outdated_denunciation
          {kind; level = given_level; last_cycle = last_slashable_cycle})
 
-  let check_double_endorsing_evidence (type kind)
+  let check_double_attesting_evidence (type kind)
       ~consensus_operation:denunciation_kind vi
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
@@ -1409,27 +1409,27 @@ module Anonymous = struct
     let (Single (Double_preattestation_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
-    check_double_endorsing_evidence
+    check_double_attesting_evidence
       ~consensus_operation:Preattestation
       vi
       op1
       op2
 
-  let check_double_endorsement_evidence vi
+  let check_double_attestation_evidence vi
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; op2})) =
       operation.protocol_data.contents
     in
-    check_double_endorsing_evidence ~consensus_operation:Attestation vi op1 op2
+    check_double_attesting_evidence ~consensus_operation:Attestation vi op1 op2
 
-  let check_double_endorsing_evidence_conflict (type kind) vs oph
+  let check_double_attesting_evidence_conflict (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
     | Single (Preattestation e1) | Single (Endorsement e1) -> (
         match
-          Double_endorsing_evidence_map.find
+          Double_attesting_evidence_map.find
             (e1.level, e1.round, e1.slot)
-            vs.anonymous_state.double_endorsing_evidences_seen
+            vs.anonymous_state.double_attesting_evidences_seen
         with
         | None -> ok_unit
         | Some existing ->
@@ -1440,60 +1440,60 @@ module Anonymous = struct
     let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    check_double_endorsing_evidence_conflict vs oph op1
+    check_double_attesting_evidence_conflict vs oph op1
 
-  let check_double_endorsement_evidence_conflict vs oph
+  let check_double_attestation_evidence_conflict vs oph
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    check_double_endorsing_evidence_conflict vs oph op1
+    check_double_attesting_evidence_conflict vs oph op1
 
   let wrap_denunciation_conflict kind = function
     | Ok () -> ok_unit
     | Error conflict -> error (Conflicting_denunciation {kind; conflict})
 
-  let add_double_endorsing_evidence (type kind) vs oph
+  let add_double_attesting_evidence (type kind) vs oph
       (op1 : kind Kind.consensus Operation.t) =
     match op1.protocol_data.contents with
     | Single (Preattestation e1) | Single (Endorsement e1) ->
-        let double_endorsing_evidences_seen =
-          Double_endorsing_evidence_map.add
+        let double_attesting_evidences_seen =
+          Double_attesting_evidence_map.add
             (e1.level, e1.round, e1.slot)
             oph
-            vs.anonymous_state.double_endorsing_evidences_seen
+            vs.anonymous_state.double_attesting_evidences_seen
         in
         {
           vs with
           anonymous_state =
-            {vs.anonymous_state with double_endorsing_evidences_seen};
+            {vs.anonymous_state with double_attesting_evidences_seen};
         }
 
-  let add_double_endorsement_evidence vs oph
+  let add_double_attestation_evidence vs oph
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    add_double_endorsing_evidence vs oph op1
+    add_double_attesting_evidence vs oph op1
 
   let add_double_preattestation_evidence vs oph
       (operation : Kind.double_preattestation_evidence operation) =
     let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    add_double_endorsing_evidence vs oph op1
+    add_double_attesting_evidence vs oph op1
 
-  let remove_double_endorsing_evidence (type kind) vs
+  let remove_double_attesting_evidence (type kind) vs
       (op : kind Kind.consensus Operation.t) =
     match op.protocol_data.contents with
     | Single (Endorsement e) | Single (Preattestation e) ->
-        let double_endorsing_evidences_seen =
-          Double_endorsing_evidence_map.remove
+        let double_attesting_evidences_seen =
+          Double_attesting_evidence_map.remove
             (e.level, e.round, e.slot)
-            vs.anonymous_state.double_endorsing_evidences_seen
+            vs.anonymous_state.double_attesting_evidences_seen
         in
         let anonymous_state =
-          {vs.anonymous_state with double_endorsing_evidences_seen}
+          {vs.anonymous_state with double_attesting_evidences_seen}
         in
         {vs with anonymous_state}
 
@@ -1502,14 +1502,14 @@ module Anonymous = struct
     let (Single (Double_preattestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    remove_double_endorsing_evidence vs op1
+    remove_double_attesting_evidence vs op1
 
-  let remove_double_endorsement_evidence vs
+  let remove_double_attestation_evidence vs
       (operation : Kind.double_attestation_evidence operation) =
     let (Single (Double_attestation_evidence {op1; _})) =
       operation.protocol_data.contents
     in
-    remove_double_endorsing_evidence vs op1
+    remove_double_attesting_evidence vs op1
 
   let check_double_baking_evidence vi
       (operation : Kind.double_baking_evidence operation) =
@@ -2466,7 +2466,7 @@ let check_operation ?(check_signature = true) info (type kind)
   | Single (Double_preattestation_evidence _) ->
       Anonymous.check_double_preattestation_evidence info operation
   | Single (Double_attestation_evidence _) ->
-      Anonymous.check_double_endorsement_evidence info operation
+      Anonymous.check_double_attestation_evidence info operation
   | Single (Double_baking_evidence _) ->
       Anonymous.check_double_baking_evidence info operation
   | Single (Drain_delegate _) ->
@@ -2533,7 +2533,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         oph
         operation
   | Single (Double_attestation_evidence _) ->
-      Anonymous.check_double_endorsement_evidence_conflict
+      Anonymous.check_double_attestation_evidence_conflict
         operation_conflict_state
         oph
         operation
@@ -2587,7 +2587,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
         oph
         operation
   | Single (Double_attestation_evidence _) ->
-      Anonymous.add_double_endorsement_evidence
+      Anonymous.add_double_attestation_evidence
         operation_conflict_state
         oph
         operation
@@ -2630,7 +2630,7 @@ let remove_operation operation_conflict_state (type kind)
         operation_conflict_state
         operation
   | Single (Double_attestation_evidence _) ->
-      Anonymous.remove_double_endorsement_evidence
+      Anonymous.remove_double_attestation_evidence
         operation_conflict_state
         operation
   | Single (Double_baking_evidence _) ->
@@ -2772,16 +2772,16 @@ let validate_operation ?(check_signature = true)
           return {info; operation_state; block_state}
       | Single (Double_attestation_evidence _) ->
           let open Anonymous in
-          let* () = check_double_endorsement_evidence info operation in
+          let* () = check_double_attestation_evidence info operation in
           let*? () =
-            check_double_endorsement_evidence_conflict
+            check_double_attestation_evidence_conflict
               operation_state
               oph
               operation
             |> wrap_denunciation_conflict Attestation
           in
           let operation_state =
-            add_double_endorsement_evidence operation_state oph operation
+            add_double_attestation_evidence operation_state oph operation
           in
           return {info; operation_state; block_state}
       | Single (Double_baking_evidence _) ->
