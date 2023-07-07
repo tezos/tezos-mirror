@@ -2125,9 +2125,9 @@ let compare_inner_pass : type a b. a pass -> b pass -> int =
    failed to convert in a {!int}, the value of [round] is (-1). *)
 type round_infos = {level : int32; round : int}
 
-(** [endorsement_infos] is the pair of a {!round_infos} and a [slot]
+(** [attestation_infos] is the pair of a {!round_infos} and a [slot]
    convert into an {!int}. *)
-type endorsement_infos = {round : round_infos; slot : int}
+type attestation_infos = {round : round_infos; slot : int}
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
     {!block_header} hash. *)
@@ -2146,7 +2146,7 @@ let round_infos_from_consensus_content (c : consensus_content) =
   | Ok round -> {level; round}
   | Error _ -> {level; round = -1}
 
-(** Compute a {!endorsement_infos} from a {!consensus_content}. It is
+(** Compute a {!attestation_infos} from a {!consensus_content}. It is
    used to compute the weight of {!Attestation} and {!Preattestation}.
 
     Precondition: [c] comes from a valid operation. The {!Attestation}
@@ -2154,7 +2154,7 @@ let round_infos_from_consensus_content (c : consensus_content) =
    convert into an {!int}. Hence, for the unreachable path where the
    convertion fails, we put (-1) as [round] value (see
    {!round_infos_from_consensus_content}). *)
-let endorsement_infos_from_consensus_content (c : consensus_content) =
+let attestation_infos_from_consensus_content (c : consensus_content) =
   let slot = Slot_repr.to_int c.slot in
   let round = round_infos_from_consensus_content c in
   {round; slot}
@@ -2189,7 +2189,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     Operation weight are defined by validation pass.
 
     The [weight] of an {!Attestation} or {!Preattestation} depends on
-   its {!endorsement_infos}.
+   its {!attestation_infos}.
 
     The [weight] of a {!Dal_attestation} depends on the pair of
    the size of its bitset, {!Dal_attestation_repr.t}, and the
@@ -2221,8 +2221,8 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     The [weight] of {!Manager_operation} depends on its [fee] and
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
-  | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
-  | Weight_preattestation : endorsement_infos -> consensus_pass_type weight
+  | Weight_attestation : attestation_infos -> consensus_pass_type weight
+  | Weight_preattestation : attestation_infos -> consensus_pass_type weight
   | Weight_dal_attestation :
       (* attestor * num_attestations * level *)
       (Signature.Public_key_hash.t * int * int32)
@@ -2319,12 +2319,12 @@ let weight_of : packed_operation -> operation_weight =
       W
         ( Consensus,
           Weight_preattestation
-            (endorsement_infos_from_consensus_content consensus_content) )
+            (attestation_infos_from_consensus_content consensus_content) )
   | Single (Attestation consensus_content) ->
       W
         ( Consensus,
-          Weight_endorsement
-            (endorsement_infos_from_consensus_content consensus_content) )
+          Weight_attestation
+            (attestation_infos_from_consensus_content consensus_content) )
   | Single (Dal_attestation Dal_attestation_repr.{attestor; attestation; level})
     ->
       W
@@ -2426,7 +2426,7 @@ let compare_round_infos_with_prioritized_position ~prioritized_position infos1
   if Compare.Int.(cmp <> 0) then cmp
   else match prioritized_position with Fstpos -> 1 | Sndpos -> -1 | Nopos -> 0
 
-(** When comparing consensus operation with {!endorsement_infos}, in
+(** When comparing consensus operation with {!attestation_infos}, in
    case of equality of their {!round_infos}, either they are of the
    same kind and their [slot] have to be compared in the reverse
    order, otherwise the {!Attestation} is better and
@@ -2437,12 +2437,12 @@ let compare_prioritized_position_or_slot ~prioritized_position =
   | Fstpos -> fun _ _ -> 1
   | Sndpos -> fun _ _ -> -1
 
-(** Two {!endorsement_infos} are compared by their {!round_infos}.
+(** Two {!attestation_infos} are compared by their {!round_infos}.
    When their {!round_infos} are equal, they are compared according to
    their priority or their [slot], see
    {!compare_prioritized_position_or_slot} for more details. *)
-let compare_endorsement_infos ~prioritized_position (infos1 : endorsement_infos)
-    (infos2 : endorsement_infos) =
+let compare_attestation_infos ~prioritized_position (infos1 : attestation_infos)
+    (infos2 : attestation_infos) =
   compare_pair_in_lexico_order
     ~cmp_fst:compare_round_infos
     ~cmp_snd:(compare_prioritized_position_or_slot ~prioritized_position)
@@ -2462,45 +2462,45 @@ let compare_baking_infos infos1 infos2 =
 (** Two valid {!Dal_attestation} are compared in the
    lexicographic order of their pairs of bitsets size and attestor
    hash. *)
-let compare_dal_attestation (attestor1, endorsements1, level1)
-    (attestor2, endorsements2, level2) =
+let compare_dal_attestation (attestor1, attestations1, level1)
+    (attestor2, attestations2, level2) =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
          ~cmp_fst:Compare.Int32.compare
          ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    ((level1, endorsements1), attestor1)
-    ((level2, endorsements2), attestor2)
+    ((level1, attestations1), attestor1)
+    ((level2, attestations2), attestor2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
 (** {5 Comparison of valid consensus operations} *)
 
 (** Comparing consensus operations by their [weight] uses the
-   comparison on {!endorsement_infos} for {!Attestation} and
-   {!Preattestation}: see {!endorsement_infos} for more details.
+   comparison on {!attestation_infos} for {!Attestation} and
+   {!Preattestation}: see {!attestation_infos} for more details.
 
     {!Dal_attestation} is smaller than the other kinds of
    consensus operations. Two valid {!Dal_attestation} are
    compared by {!compare_dal_attestation}. *)
 let compare_consensus_weight w1 w2 =
   match (w1, w2) with
-  | Weight_endorsement infos1, Weight_endorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
+  | Weight_attestation infos1, Weight_attestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
   | Weight_preattestation infos1, Weight_preattestation infos2 ->
-      compare_endorsement_infos ~prioritized_position:Nopos infos1 infos2
-  | Weight_endorsement infos1, Weight_preattestation infos2 ->
-      compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
-  | Weight_preattestation infos1, Weight_endorsement infos2 ->
-      compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
+      compare_attestation_infos ~prioritized_position:Nopos infos1 infos2
+  | Weight_attestation infos1, Weight_preattestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Fstpos infos1 infos2
+  | Weight_preattestation infos1, Weight_attestation infos2 ->
+      compare_attestation_infos ~prioritized_position:Sndpos infos1 infos2
   | ( Weight_dal_attestation (attestor1, size1, lvl1),
       Weight_dal_attestation (attestor2, size2, lvl2) ) ->
       compare_dal_attestation (attestor1, size1, lvl1) (attestor2, size2, lvl2)
-  | Weight_dal_attestation _, (Weight_endorsement _ | Weight_preattestation _)
+  | Weight_dal_attestation _, (Weight_attestation _ | Weight_preattestation _)
     ->
       -1
-  | (Weight_endorsement _ | Weight_preattestation _), Weight_dal_attestation _
+  | (Weight_attestation _ | Weight_preattestation _), Weight_dal_attestation _
     ->
       1
 
