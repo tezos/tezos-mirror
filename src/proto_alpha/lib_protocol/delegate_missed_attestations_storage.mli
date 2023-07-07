@@ -28,7 +28,7 @@
 (** This modules deals with delegates' participation in consensus.
 
     This module is responsible for maintaining the
-    {!Storage.Contract.Missed_endorsements} table.  *)
+    {!Storage.Contract.Missed_attestations} table.  *)
 
 val expected_slots_for_given_active_stake :
   Raw_context.t ->
@@ -39,11 +39,11 @@ val expected_slots_for_given_active_stake :
 type level_participation = Participated | Didn't_participate
 
 (** Record the participation of a delegate as a validator. *)
-val record_endorsing_participation :
+val record_attesting_participation :
   Raw_context.t ->
   delegate:Signature.Public_key_hash.t ->
   participation:level_participation ->
-  endorsing_power:int ->
+  attesting_power:int ->
   Raw_context.t tzresult Lwt.t
 
 (** Sets the payload and block producer as active. Pays the baking
@@ -70,19 +70,19 @@ val check_and_reset_delegate_participation :
     - "dynamic" information that may change during the cycle *)
 type participation_info = {
   expected_cycle_activity : int;
-      (** The total expected slots to be endorsed in the cycle. (static) *)
+      (** The total expected slots to be attested in the cycle. (static) *)
   minimal_cycle_activity : int;
-      (** The minimal endorsing slots in the cycle to get endorsing
-      rewards. (static) *)
+      (** The minimal attesting slots in the cycle to get attesting rewards.
+          (static) *)
   missed_slots : int;
-      (** The number of missed endorsing slots in the cycle. (dynamic) *)
+      (** The number of missed attesting slots in the cycle. (dynamic) *)
   missed_levels : int;
-      (** The number of missed endorsing levels in the cycle. (dynamic) *)
+      (** The number of missed attesting levels in the cycle. (dynamic) *)
   remaining_allowed_missed_slots : int;
-      (** Remaining amount of endorsing slots that can be missed in the
+      (** Remaining amount of attesting slots that can be missed in the
       cycle before forfeiting the rewards. (dynamic) *)
-  expected_endorsing_rewards : Tez_repr.t;
-      (** Endorsing rewards that will be distributed at the end of the
+  expected_attesting_rewards : Tez_repr.t;
+      (** Attesting rewards that will be distributed at the end of the
      cycle if activity at that point will be greater than the minimal
      required. If the activity is already known to be below the
      required minimum, then the rewards are zero. (dynamic) *)

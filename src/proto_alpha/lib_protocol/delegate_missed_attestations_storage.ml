@@ -33,29 +33,29 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
   let consensus_committee_size =
     Constants_storage.consensus_committee_size ctxt
   in
-  let number_of_endorsements_per_cycle =
+  let number_of_attestations_per_cycle =
     blocks_per_cycle * consensus_committee_size
   in
   Z.to_int
     (Z.div
        (Z.mul
           (Z.of_int64 active_stake_weight)
-          (Z.of_int number_of_endorsements_per_cycle))
+          (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
 type level_participation = Participated | Didn't_participate
 
 (* Note that the participation for the last block of a cycle is
    recorded in the next cycle. *)
-let record_endorsing_participation ctxt ~delegate ~participation
-    ~endorsing_power =
+let record_attesting_participation ctxt ~delegate ~participation
+    ~attesting_power =
   match participation with
   | Participated -> Stake_storage.set_active ctxt delegate
   | Didn't_participate -> (
       let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_attestations.find ctxt contract >>=? function
       | Some {remaining_slots; missed_levels} ->
-          let remaining_slots = remaining_slots - endorsing_power in
+          let remaining_slots = remaining_slots - attesting_power in
           Storage.Contract.Missed_attestations.update
             ctxt
             contract
@@ -69,7 +69,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
           with
           | None ->
               (* This happens when the block is the first one in a
-                 cycle, and therefore the endorsements are for the last
+                 cycle, and therefore the attestations are for the last
                  block of the previous cycle, and when the delegate does
                  not have an active stake at the current cycle; in this
                  case its participation is simply ignored. *)
@@ -95,7 +95,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
               in
               let minimal_activity = expected_slots * numerator / denominator in
               let maximal_inactivity = expected_slots - minimal_activity in
-              let remaining_slots = maximal_inactivity - endorsing_power in
+              let remaining_slots = maximal_inactivity - attesting_power in
               Storage.Contract.Missed_attestations.init
                 ctxt
                 contract
@@ -142,9 +142,9 @@ let check_and_reset_delegate_participation ctxt delegate =
   Storage.Contract.Missed_attestations.find ctxt contract >>=? fun missed ->
   match missed with
   | None -> return (ctxt, true)
-  | Some missed_endorsements ->
+  | Some missed_attestations ->
       Storage.Contract.Missed_attestations.remove ctxt contract >>= fun ctxt ->
-      return (ctxt, Compare.Int.(missed_endorsements.remaining_slots >= 0))
+      return (ctxt, Compare.Int.(missed_attestations.remaining_slots >= 0))
 
 type participation_info = {
   expected_cycle_activity : int;
@@ -152,7 +152,7 @@ type participation_info = {
   missed_slots : int;
   missed_levels : int;
   remaining_allowed_missed_slots : int;
-  expected_endorsing_rewards : Tez_repr.t;
+  expected_attesting_rewards : Tez_repr.t;
 }
 
 (* Inefficient, only for RPC *)
@@ -175,7 +175,7 @@ let participation_info ctxt delegate =
           missed_slots = 0;
           missed_levels = 0;
           remaining_allowed_missed_slots = 0;
-          expected_endorsing_rewards = Tez_repr.zero;
+          expected_attesting_rewards = Tez_repr.zero;
         }
   | Some active_stake ->
       Stake_storage.get_total_active_stake ctxt level.cycle
@@ -195,7 +195,7 @@ let participation_info ctxt delegate =
       let Ratio_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt
       in
-      let endorsing_reward_per_slot =
+      let attesting_reward_per_slot =
         Delegate_rewards.attesting_reward_per_slot ctxt
       in
       let minimal_cycle_activity =
@@ -204,24 +204,24 @@ let participation_info ctxt delegate =
       let maximal_cycle_inactivity =
         expected_cycle_activity - minimal_cycle_activity
       in
-      let expected_endorsing_rewards =
-        Tez_repr.mul_exn endorsing_reward_per_slot expected_cycle_activity
+      let expected_attesting_rewards =
+        Tez_repr.mul_exn attesting_reward_per_slot expected_cycle_activity
       in
       let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_attestations.find ctxt contract
-      >>=? fun missed_endorsements ->
+      >>=? fun missed_attestations ->
       let missed_slots, missed_levels, remaining_allowed_missed_slots =
-        match missed_endorsements with
+        match missed_attestations with
         | None -> (0, 0, maximal_cycle_inactivity)
         | Some {remaining_slots; missed_levels} ->
             ( maximal_cycle_inactivity - remaining_slots,
               missed_levels,
               Compare.Int.max 0 remaining_slots )
       in
-      let expected_endorsing_rewards =
-        match missed_endorsements with
+      let expected_attesting_rewards =
+        match missed_attestations with
         | Some r when Compare.Int.(r.remaining_slots < 0) -> Tez_repr.zero
-        | _ -> expected_endorsing_rewards
+        | _ -> expected_attesting_rewards
       in
       return
         {
@@ -230,5 +230,5 @@ let participation_info ctxt delegate =
           missed_slots;
           missed_levels;
           remaining_allowed_missed_slots;
-          expected_endorsing_rewards;
+          expected_attesting_rewards;
         }

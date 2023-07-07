@@ -119,7 +119,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
   Stake_storage.get_selected_distribution ctxt last_cycle >>=? fun delegates ->
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, active_stake) ->
-      Delegate_missed_endorsements_storage
+      Delegate_missed_attestations_storage
       .check_and_reset_delegate_participation
         ctxt
         delegate
@@ -131,7 +131,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         Stake_context.staking_weight ctxt active_stake
       in
       let expected_slots =
-        Delegate_missed_endorsements_storage
+        Delegate_missed_attestations_storage
         .expected_slots_for_given_active_stake
           ctxt
           ~total_active_stake_weight

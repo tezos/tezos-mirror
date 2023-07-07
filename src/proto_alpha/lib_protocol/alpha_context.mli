@@ -2097,7 +2097,7 @@ module Consensus_key : sig
 end
 
 (** This module re-exports definitions from {!Deposits_repr}, {!Delegate_storage},
-   {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
+   {!Delegate_consensus_key}, {!Delegate_missed_attestations_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}. *)
 module Delegate : sig
@@ -2124,7 +2124,7 @@ module Delegate : sig
     missed_slots : int;
     missed_levels : int;
     remaining_allowed_missed_slots : int;
-    expected_endorsing_rewards : Tez.t;
+    expected_attesting_rewards : Tez.t;
   }
 
   val participation_info :
@@ -2170,11 +2170,11 @@ module Delegate : sig
     reward_bonus:Tez.t option ->
     (context * Receipt.balance_updates) tzresult Lwt.t
 
-  val record_endorsing_participation :
+  val record_attesting_participation :
     context ->
     delegate:public_key_hash ->
     participation:level_participation ->
-    endorsing_power:int ->
+    attesting_power:int ->
     context tzresult Lwt.t
 
   type deposits = {initial_amount : Tez.t; current_amount : Tez.t}

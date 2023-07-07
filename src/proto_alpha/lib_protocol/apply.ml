@@ -2512,11 +2512,11 @@ let record_endorsing_participation ctxt =
           Delegate.Participated
         else Delegate.Didn't_participate
       in
-      Delegate.record_endorsing_participation
+      Delegate.record_attesting_participation
         ctxt
         ~delegate:consensus_pk.delegate
         ~participation
-        ~endorsing_power:power)
+        ~attesting_power:power)
     validators
     ctxt
 

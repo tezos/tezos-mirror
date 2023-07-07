@@ -200,27 +200,27 @@ let participation_info_encoding =
            missed_slots;
            missed_levels;
            remaining_allowed_missed_slots;
-           expected_endorsing_rewards;
+           expected_attesting_rewards;
          } ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
         missed_levels,
         remaining_allowed_missed_slots,
-        expected_endorsing_rewards ))
+        expected_attesting_rewards ))
     (fun ( expected_cycle_activity,
            minimal_cycle_activity,
            missed_slots,
            missed_levels,
            remaining_allowed_missed_slots,
-           expected_endorsing_rewards ) ->
+           expected_attesting_rewards ) ->
       {
         expected_cycle_activity;
         minimal_cycle_activity;
         missed_slots;
         missed_levels;
         remaining_allowed_missed_slots;
-        expected_endorsing_rewards;
+        expected_attesting_rewards;
       })
     (obj6
        (req "expected_cycle_activity" int31)
