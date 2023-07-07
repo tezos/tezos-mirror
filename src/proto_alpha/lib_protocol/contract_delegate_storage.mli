@@ -52,7 +52,7 @@ val is_delegate :
 type delegate_status =
   | Delegate
   | Delegated of Signature.Public_key_hash.t
-  | No_delegate
+  | Undelegated
 
 (** [find_is_delegate ctxt pkh] returns the delegation status associated to
     [pkh]. *)

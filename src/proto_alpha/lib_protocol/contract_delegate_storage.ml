@@ -50,20 +50,20 @@ let find = Storage.Contract.Delegate.find
 type delegate_status =
   | Delegate
   | Delegated of Signature.Public_key_hash.t
-  | No_delegate
+  | Undelegated
 
 let find_is_delegate ctxt pkh =
   let open Lwt_result_syntax in
   let+ delegate = find ctxt (Contract_repr.Implicit pkh) in
   match delegate with
-  | None -> No_delegate
+  | None -> Undelegated
   | Some delegate when Signature.Public_key_hash.(delegate = pkh) -> Delegate
   | Some delegate -> Delegated delegate
 
 let is_delegate ctxt pkh =
   let open Lwt_result_syntax in
   let+ find_res = find_is_delegate ctxt pkh in
-  match find_res with Delegate -> true | Delegated _ | No_delegate -> false
+  match find_res with Delegate -> true | Delegated _ | Undelegated -> false
 
 let init ctxt contract delegate =
   check_not_tz4 delegate >>?= fun () ->

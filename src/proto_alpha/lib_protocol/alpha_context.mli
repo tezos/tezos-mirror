@@ -1759,7 +1759,7 @@ module Contract : sig
   type delegate_status =
     | Delegate
     | Delegated of Signature.Public_key_hash.t
-    | No_delegate
+    | Undelegated
 
   (** See {!Contract_delegate_storage.find_is_delegate}. *)
   val find_is_delegate :
