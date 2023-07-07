@@ -812,157 +812,24 @@ A detailed description of the following instructions can be found in the `intera
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
 
-Bytes are used for serializing data, in order to check signatures and
-compute hashes on them. They can also be used to incorporate data from
-the wild and untyped outside world.
+A detailed description of the following instructions can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
 -  ``PACK``: Serializes a piece of data to its optimized
-   binary representation.
-
-::
-
-     :: 'a : 'S   ->   bytes : 'S
-
--  ``UNPACK 'a``: Deserializes a piece of data, if valid.
-
-::
-
-     :: bytes : 'S   ->   option 'a : 'S
-
--  ``CONCAT``: Byte sequence concatenation.
-
-::
-
-    :: bytes : bytes : 'S   -> bytes : 'S
-
-    > CONCAT / s : t : S  =>  (s ^ t) : S
-
-    :: bytes list : 'S   -> bytes : 'S
-
-    > CONCAT / {} : S  =>  0x : S
-    > CONCAT / { s ; <ss> } : S  =>  (s ^ r) : S
-       where CONCAT / { <ss> } : S  =>  r : S
-
--  ``SIZE``: size of a sequence of bytes.
-
-::
-
-     :: bytes : 'S   ->   nat : 'S
-
--  ``SLICE``: Bytes access.
-
-::
-
-    :: nat : nat : bytes : 'S   -> option bytes : 'S
-
-    > SLICE / offset : length : s : S  =>  Some ss : S
-       where ss is the substring of s at the given offset and of the given length
-         iff offset and (offset + length) are in bounds
-    > SLICE / offset : length : s : S  =>  None : S
-         iff offset or (offset + length) are out of bounds
-
--  ``COMPARE``: Lexicographic comparison.
-
-::
-
-    :: bytes : bytes : 'S   ->   int : 'S
-
-    > COMPARE / s : t : S  =>  -1 : S
-        iff s < t
-    > COMPARE / s : t : S  =>  0 : S
-        iff s = t
-    > COMPARE / s : t : S  =>  1 : S
-        iff s > t
-
-Bitwise logical operators are also available on bytes.
-
--  ``OR``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > OR / x : y : S  =>  (x | y) : S
-
--  ``AND``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > AND / x : y : S  =>  (x & y) : S
-
--  ``XOR``
-
-::
-
-    :: bytes : bytes : 'S   ->   bytes : 'S
-
-    > XOR / x : y : S  =>  (x ^ y) : S
-
--  ``NOT``
-
-::
-
-    :: bytes : 'S   ->   bytes : 'S
-
-    > NOT / x : S  =>  ~x : S
-
-Logical shifts are also available on bytes.
-
--  ``LSL``
-
-::
-
-    :: bytes : nat : 'S   ->   bytes : 'S
-
-    > LSL / x : s : S  =>  (x << s) : S
-        iff   s <= 64000
-    > LSL / x : s : S  =>  [FAILED]
-        iff   s > 64000
-
--  ``LSR``
-
-::
-
-    :: bytes : nat : 'S   ->   bytes : 'S
-
-    > LSR / x : s : S  =>  (x >> s) : S
-        iff   s <= 256
-    > LSR / x : s : S  =>  [FAILED]
-        iff   s > 256
-
-Bytes can be converted to natural numbers and integers.
-
-- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding.
-  The ``bytes`` are allowed to have leading zeros.
-
-::
-
-    :: bytes : 'S   ->   nat : 'S
-
-    > NAT / s : S  =>  n : S
-        iff s is a big-endian encoding of natural number n
-
-- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding.
-  The ``bytes`` are allowed to have leading zeros for non-negative numbers and leading ones for negative numbers.
-
-::
-
-    :: bytes : 'S   ->   int : 'S
-
-    > INT / s : S  =>  z : S
-        iff s is a big-endian encoding of integer z
-
-- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``).
-
-::
-
-    :: int : 'S -> bytes : 'S
-    :: nat : 'S -> bytes : 'S
-
-    > BYTES / n : S => s : S
-       iff s is the shortest big-endian encoding of natural number or integer n
+   binary representation (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-PACK>`__).
+-  ``UNPACK 'a``: Deserializes a piece of data, if valid (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__).
+-  ``CONCAT``: Concatenate two byte sequences or a list of byte sequences (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-CONCAT>`__).
+-  ``SIZE``: Size of a sequence of bytes (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SIZE>`__).
+-  ``SLICE``: Access a subsequence of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-SLICE>`__).
+-  ``COMPARE``: Lexicographic comparison (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-COMPARE>`__).
+-  ``OR``: Bitwise ``OR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OR>`__).
+-  ``AND``: Bitwise ``AND`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-AND>`__).
+-  ``XOR``: Bitwise ``XOR`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-XOR>`__).
+-  ``NOT``: Bitwise ``NOT`` (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NOT>`__).
+-  ``LSL``: Logically left shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSL>`__).
+-  ``LSR``: Logically right shift of a byte sequence (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-LSR>`__).
+- ``NAT``: Convert ``bytes`` to type ``nat`` using big-endian encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-NAT>`__).
+- ``INT``: Convert ``bytes`` to type ``int`` using big-endian two's complement encoding (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-INT>`__).
+- ``BYTES``: Convert a ``nat`` or an ``int`` to type ``bytes`` using big-endian encoding (and two's complement for ``int``) (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-BYTES>`__).
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
