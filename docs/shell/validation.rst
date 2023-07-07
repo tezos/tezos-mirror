@@ -119,10 +119,10 @@ is in a close enough time window. In protocol Alpha, the check
 performed on block headers is that the baking slots, baker signatures,
 and timestamp deltas are right. It can also detect too large fitness
 gaps, as the fitness difference between two consecutive blocks is
-bounded in Alpha. The operations that act on fitness are endorsements,
-whose checks consist in verifying the endorsement slots and endorsers'
+bounded in Alpha. The operations that act on fitness are attestations,
+whose checks consist in verifying the attestation slots and attesters'
 signatures. For that to be sound, the fork limit is set to not allow
-rewinding before the baking and endorsing slots are set.
+rewinding before the baking and attesting slots are set.
 
 Each of these three peer validator tasks (head increment, bootstrap
 pipeline, or multi-pass) will interact with the distributed DB to get
