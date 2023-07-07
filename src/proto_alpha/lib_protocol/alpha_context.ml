@@ -370,7 +370,7 @@ module Contract = struct
     | Delegated of public_key_hash
     | Undelegated
 
-  let find_is_delegate = Contract_delegate_storage.find_is_delegate
+  let get_delegate_status = Contract_delegate_storage.get_delegate_status
 
   module Delegate = struct
     let find = Contract_delegate_storage.find

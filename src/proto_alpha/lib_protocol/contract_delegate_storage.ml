@@ -52,7 +52,7 @@ type delegate_status =
   | Delegated of Signature.Public_key_hash.t
   | Undelegated
 
-let find_is_delegate ctxt pkh =
+let get_delegate_status ctxt pkh =
   let open Lwt_result_syntax in
   let+ delegate = find ctxt (Contract_repr.Implicit pkh) in
   match delegate with
@@ -62,7 +62,7 @@ let find_is_delegate ctxt pkh =
 
 let is_delegate ctxt pkh =
   let open Lwt_result_syntax in
-  let+ find_res = find_is_delegate ctxt pkh in
+  let+ find_res = get_delegate_status ctxt pkh in
   match find_res with Delegate -> true | Delegated _ | Undelegated -> false
 
 let init ctxt contract delegate =

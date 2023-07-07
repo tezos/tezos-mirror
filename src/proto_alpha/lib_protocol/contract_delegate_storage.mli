@@ -54,9 +54,9 @@ type delegate_status =
   | Delegated of Signature.Public_key_hash.t
   | Undelegated
 
-(** [find_is_delegate ctxt pkh] returns the delegation status associated to
+(** [get_delegate_status ctxt pkh] returns the delegation status associated to
     [pkh]. *)
-val find_is_delegate :
+val get_delegate_status :
   Raw_context.t -> Signature.Public_key_hash.t -> delegate_status tzresult Lwt.t
 
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
