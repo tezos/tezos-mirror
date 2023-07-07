@@ -4129,7 +4129,7 @@ end
 (** All the definitions below are re-exported from {!Operation_repr}. *)
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.attestation consensus_operation_type
+  | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
