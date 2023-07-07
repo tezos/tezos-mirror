@@ -31,7 +31,7 @@
    slots at every level (see {!Dal_slot_repr}). Slots are not posted
    directly onto L1 blocks. Stakeholders, called attestors in this
    context, can commit on the availability of the data (via
-   endorsements or attestation operations, see
+   attestation operations, see
    https://gitlab.com/tezos/tezos/-/issues/3115).
 
     The slot is uniformly split into shards. Each attestor commits,
@@ -39,7 +39,7 @@
    to.
 
     This module encapsulates the representation of this commitment
-   that aims to be provided with endorsement operations. To avoid
+   that aims to be provided with attestation operations. To avoid
    overloading the network, this representation should be compact.  *)
 
 type t = private Bitset.t
