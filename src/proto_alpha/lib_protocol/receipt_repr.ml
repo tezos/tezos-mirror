@@ -30,12 +30,12 @@ type balance =
   | Deposits of Signature.Public_key_hash.t
   | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Nonce_revelation_rewards
-  | Endorsing_rewards
+  | Attesting_rewards
   | Baking_rewards
   | Baking_bonuses
   | Storage_fees
   | Double_signing_punishments
-  | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
   | Liquidity_baking_subsidies
   | Burned
   | Commitments of Blinded_public_key_hash.t
@@ -112,8 +112,8 @@ let balance_encoding ~use_legacy_attestation_name =
                  (constant
                     (if use_legacy_attestation_name then "endorsing rewards"
                     else "attesting rewards"))))
-           (function Endorsing_rewards -> Some ((), ()) | _ -> None)
-           (fun ((), ()) -> Endorsing_rewards);
+           (function Attesting_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Attesting_rewards);
          case
            (Tag 8)
            ~title:"Baking_rewards"
@@ -163,9 +163,9 @@ let balance_encoding ~use_legacy_attestation_name =
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))
            (function
-             | Lost_endorsing_rewards (d, p, r) -> Some ((), (), d, p, r)
+             | Lost_attesting_rewards (d, p, r) -> Some ((), (), d, p, r)
              | _ -> None)
-           (fun ((), (), d, p, r) -> Lost_endorsing_rewards (d, p, r));
+           (fun ((), (), d, p, r) -> Lost_attesting_rewards (d, p, r));
          case
            (Tag 14)
            ~title:"Liquidity_baking_subsidies"
@@ -278,7 +278,7 @@ let compare_balance ba bb =
   | Unstaked_deposits (pkha, ca), Unstaked_deposits (pkhb, cb) ->
       Compare.or_else (Signature.Public_key_hash.compare pkha pkhb) (fun () ->
           Cycle_repr.compare ca cb)
-  | Lost_endorsing_rewards (pkha, pa, ra), Lost_endorsing_rewards (pkhb, pb, rb)
+  | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
     ->
       let c = Signature.Public_key_hash.compare pkha pkhb in
       if is_not_zero c then c
@@ -298,12 +298,12 @@ let compare_balance ba bb =
         | Deposits _ -> 2
         | Unstaked_deposits _ -> 3
         | Nonce_revelation_rewards -> 4
-        | Endorsing_rewards -> 5
+        | Attesting_rewards -> 5
         | Baking_rewards -> 6
         | Baking_bonuses -> 7
         | Storage_fees -> 8
         | Double_signing_punishments -> 9
-        | Lost_endorsing_rewards _ -> 10
+        | Lost_attesting_rewards _ -> 10
         | Liquidity_baking_subsidies -> 11
         | Burned -> 12
         | Commitments _ -> 13

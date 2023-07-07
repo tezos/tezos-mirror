@@ -96,7 +96,7 @@ let credit ctxt receiver amount origin =
         match infinite_sink with
         | `Storage_fees -> Storage_fees
         | `Double_signing_punishments -> Double_signing_punishments
-        | `Lost_endorsing_rewards (d, p, r) -> Lost_endorsing_rewards (d, p, r)
+        | `Lost_endorsing_rewards (d, p, r) -> Lost_attesting_rewards (d, p, r)
         | `Sc_rollup_refutation_punishments -> Sc_rollup_refutation_punishments
         | `Burned -> Burned
       in
@@ -152,7 +152,7 @@ let spend ctxt giver amount origin =
         | `Minted -> Minted
         | `Liquidity_baking_subsidies -> Liquidity_baking_subsidies
         | `Revelation_rewards -> Nonce_revelation_rewards
-        | `Endorsing_rewards -> Endorsing_rewards
+        | `Endorsing_rewards -> Attesting_rewards
         | `Baking_rewards -> Baking_rewards
         | `Baking_bonuses -> Baking_bonuses
         | `Sc_rollup_refutation_rewards -> Sc_rollup_refutation_rewards

@@ -77,12 +77,12 @@ let test_encodings () =
   test_encodings Block_fees >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
-  test_encodings Endorsing_rewards >>=? fun () ->
+  test_encodings Attesting_rewards >>=? fun () ->
   test_encodings Baking_rewards >>=? fun () ->
   test_encodings Baking_bonuses >>=? fun () ->
   test_encodings Storage_fees >>=? fun () ->
   test_encodings Double_signing_punishments >>=? fun () ->
-  test_encodings (Lost_endorsing_rewards (pkh, Random.bool (), Random.bool ()))
+  test_encodings (Lost_attesting_rewards (pkh, Random.bool (), Random.bool ()))
   >>=? fun () ->
   test_encodings Liquidity_baking_subsidies >>=? fun () ->
   test_encodings Burned >>=? fun () ->

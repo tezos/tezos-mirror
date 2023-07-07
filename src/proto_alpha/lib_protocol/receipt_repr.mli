@@ -31,12 +31,12 @@ type balance =
   | Deposits of Signature.Public_key_hash.t
   | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Nonce_revelation_rewards
-  | Endorsing_rewards
+  | Attesting_rewards
   | Baking_rewards
   | Baking_bonuses
   | Storage_fees
   | Double_signing_punishments
-  | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
   | Liquidity_baking_subsidies
   | Burned
   | Commitments of Blinded_public_key_hash.t

@@ -249,7 +249,7 @@ let test_transferring_to_burned ctxt =
     (bupds
     = [
         minted_bupd;
-        (Lost_endorsing_rewards (pkh, p, r), Credited amount, Block_application);
+        (Lost_attesting_rewards (pkh, p, r), Credited amount, Block_application);
       ])
     true
   >>=? fun () ->
@@ -428,7 +428,7 @@ let test_transferring_from_giver () =
       [(Nonce_revelation_rewards, Debited am, Block_application)])
   >>=? fun () ->
   test_transferring_from_infinite_source ctxt `Endorsing_rewards (fun am ->
-      [(Endorsing_rewards, Debited am, Block_application)])
+      [(Attesting_rewards, Debited am, Block_application)])
   >>=? fun () ->
   test_transferring_from_infinite_source ctxt `Baking_rewards (fun am ->
       [(Baking_rewards, Debited am, Block_application)])
