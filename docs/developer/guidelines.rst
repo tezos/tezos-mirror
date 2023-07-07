@@ -418,7 +418,7 @@ During the development of the codebase a lot of RPC endpoints were created, some
 of which are responsible for delicate or computationally intense tasks like
 validating blocks or executing Michelson scripts. While some of them are
 necessary for the node's users to interact with the blockchain, others are there
-to expose API to processes responsible for baking and endorsing, for
+to expose API to processes responsible for baking and attesting, for
 configuration or debugging purposes or to facilitate development of smart
 contracts.
 
