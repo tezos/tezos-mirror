@@ -34,34 +34,87 @@ let string_of_version = function
   | Version_1 -> "1"
   | Version_2 -> "2"
 
+type supported_version = {version : version; use_legacy_attestation_name : bool}
+
+type version_informations = {
+  supported : supported_version list;
+  latest : version;
+  default : version;
+}
+
+let mk_version_informations ~supported ~(latest : version) ~(default : version)
+    () =
+  assert (
+    List.mem
+      ~equal:( == )
+      latest
+      (List.map (fun supported -> supported.version) supported)) ;
+  assert (
+    List.mem
+      ~equal:( == )
+      default
+      (List.map (fun supported -> supported.version) supported)) ;
+  {supported; latest; default}
+
+let version_0 = {version = Version_0; use_legacy_attestation_name = true}
+
+let version_1 = {version = Version_1; use_legacy_attestation_name = false}
+
+let pp_supported_version fmt ~complete {supported; latest; default} =
+  let open Format in
+  (pp_print_list
+     ~pp_sep:(fun fmt () -> fprintf fmt ",")
+     (fun fmt {version; use_legacy_attestation_name} ->
+       fprintf
+         fmt
+         " version %S %s%s"
+         (string_of_version version)
+         (match (version = default, not (version = latest)) with
+         | true, true -> "(default but deprecated)"
+         | true, false -> "(default)"
+         | false, true -> "(deprecated)"
+         | false, false -> "")
+         (if complete then
+          if use_legacy_attestation_name then
+            " that will output attestation operations as \"endorsement\" in \
+             the \"kind\" field"
+          else " that will output \"attestation\" in the \"kind\" field"
+         else "")))
+    fmt
+    supported
+
 let unsupported_version_msg version supported =
   Format.asprintf
     "Unsupported version %s (supported versions %a)"
     version
-    (Format.pp_print_list
-       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
-       (fun fmt version ->
-         Format.fprintf fmt "\"%s\"" (string_of_version version)))
+    (pp_supported_version ~complete:false)
     supported
 
-let is_supported_version version supported =
-  List.mem ~equal:( == ) version supported
+let is_supported_version (version : version)
+    (supported : supported_version list) =
+  List.exists (fun supported -> version == supported.version) supported
 
-let version_of_string supported version =
+let version_of_string version_informations version =
   let open Result_syntax in
   let* version_t =
     match version with
     | "0" -> Ok Version_0
     | "1" -> Ok Version_1
     | "2" -> Ok Version_2
-    | _ -> Error (unsupported_version_msg version supported)
+    | _ -> Error (unsupported_version_msg version version_informations)
   in
-  if is_supported_version version_t supported then Ok version_t
-  else Error (unsupported_version_msg version supported)
+  if is_supported_version version_t version_informations.supported then
+    Ok version_t
+  else Error (unsupported_version_msg version version_informations)
 
 let version_arg supported =
   let open Tezos_rpc.Arg in
   make
+    ~descr:
+      (Format.asprintf
+         "Supported RPC versions are%a"
+         (pp_supported_version ~complete:true)
+         supported)
     ~name:"version"
     ~destruct:(version_of_string supported)
     ~construct:string_of_version
@@ -780,9 +833,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           Tezos_rpc.Path.(path / "protocol_data" / "raw")
     end
 
-    let default_operation_version = Version_0
-
-    let operations_supported_versions = [Version_0; Version_1]
+    let operations_versions =
+      mk_version_informations
+        ~supported:[version_0; version_1]
+        ~latest:Version_1
+        ~default:Version_0
+        ()
 
     let force_operation_metadata_query =
       let open Tezos_rpc.Query in
@@ -796,8 +852,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           end)
       |+ field
            "version"
-           (version_arg operations_supported_versions)
-           default_operation_version
+           (version_arg operations_versions)
+           operations_versions.default
            (fun t -> t#version)
       |+ flag
            "force_metadata"
@@ -1052,9 +1108,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             ~output:block_result_encoding
             Tezos_rpc.Path.(path / "block")
 
-        let default_preapply_operations_version = Version_0
-
-        let preapply_supported_versions = [Version_0; Version_1]
+        let preapply_versions =
+          mk_version_informations
+            ~supported:[version_0; version_1]
+            ~latest:Version_1
+            ~default:Version_0
+            ()
 
         let operations_query =
           let open Tezos_rpc.Query in
@@ -1064,8 +1123,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
               end)
           |+ field
                "version"
-               (version_arg preapply_supported_versions)
-               default_preapply_operations_version
+               (version_arg preapply_versions)
+               preapply_versions.default
                (fun t -> t#version)
           |> seal
 
@@ -1377,10 +1436,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       (* This encoding should be always the one by default. *)
       let encoding = version_1_encoding
 
-      let default_pending_operations_version = Version_1
-
-      let pending_operations_supported_versions =
-        [Version_0; Version_1; Version_2]
+      let pending_operations_versions =
+        mk_version_informations
+          ~supported:
+            [
+              version_0;
+              {version = Version_1; use_legacy_attestation_name = true};
+              {version = Version_2; use_legacy_attestation_name = false};
+            ]
+          ~latest:Version_2
+          ~default:Version_1
+          ()
 
       let pending_query =
         let open Tezos_rpc.Query in
@@ -1414,8 +1480,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             (version_arg pending_operations_supported_versions)
-             default_pending_operations_version
+             (version_arg pending_operations_versions)
+             pending_operations_versions.default
              (fun t -> t#version)
         |+ opt_field
              ~descr:
@@ -1509,9 +1575,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ~output:unit
           Tezos_rpc.Path.(path / "unban_all_operations")
 
-      let default_monitoring_operations_version = Version_0
-
-      let monitoring_operations_supported_versions = [Version_0; Version_1]
+      let monitor_operations_versions =
+        mk_version_informations
+          ~supported:[version_0; version_1]
+          ~latest:Version_1
+          ~default:Version_0
+          ()
 
       let mempool_query =
         let open Tezos_rpc.Query in
@@ -1545,8 +1614,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             (version_arg monitoring_operations_supported_versions)
-             default_monitoring_operations_version
+             (version_arg monitor_operations_versions)
+             monitor_operations_versions.default
              (fun t -> t#version)
         |+ opt_field
              ~descr:
@@ -1750,7 +1819,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   end
 
   module Operations = struct
-    let operations ctxt ?(version = S.default_operation_version)
+    let operations ctxt ?(version = S.operations_versions.default)
         ?(force_metadata = false) ?metadata =
       let open Lwt_result_syntax in
       let f = make_call0 S.Operations.operations ctxt in
@@ -1770,7 +1839,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         in
         return operations
 
-    let operations_in_pass ctxt ?(version = S.default_operation_version)
+    let operations_in_pass ctxt ?(version = S.operations_versions.default)
         ?(force_metadata = false) ?metadata =
       let open Lwt_result_syntax in
       let f = make_call1 S.Operations.operations_in_pass ctxt in
@@ -1791,7 +1860,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         in
         return operations
 
-    let operation ctxt ?(version = S.default_operation_version)
+    let operation ctxt ?(version = S.operations_versions.default)
         ?(force_metadata = false) ?metadata =
       let open Lwt_result_syntax in
       let f = make_call2 S.Operations.operation ctxt in
@@ -1912,7 +1981,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             {protocol_data; operations}
 
       let operations ctxt ?(chain = `Main) ?(block = `Head 0)
-          ?(version = S.default_preapply_operations_version) operations =
+          ?(version = S.preapply_versions.default) operations =
         let open Lwt_result_syntax in
         let* (Version_0 | Version_1 | Version_2), preapply_operations =
           make_call0
@@ -1933,7 +2002,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       fun ?(chain = `Main) ?(block = `Head 0) s -> f chain block s () ()
   end
 
-  let info ctxt ?(version = S.default_operation_version)
+  let info ctxt ?(version = S.operations_versions.default)
       ?(force_metadata = false) ?metadata =
     let open Lwt_result_syntax in
     let f = make_call0 S.info ctxt in
@@ -1964,7 +2033,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     }
 
     let pending_operations ctxt ?(chain = `Main)
-        ?(version = S.Mempool.default_pending_operations_version)
+        ?(version = S.Mempool.pending_operations_versions.default)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
@@ -2007,7 +2076,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       Tezos_rpc.Context.make_call1 s ctxt chain () ()
 
     let monitor_operations ctxt ?(chain = `Main)
-        ?(version = S.Mempool.default_monitoring_operations_version)
+        ?(version = S.Mempool.monitor_operations_versions.default)
         ?(validated = true) ?(branch_delayed = true) ?(branch_refused = false)
         ?(refused = false) ?(outdated = false) ?(validation_passes = []) () =
       let open Lwt_result_syntax in
