@@ -29,7 +29,7 @@ type expected_rewards = {
   cycle : Cycle.t;
   baking_reward_fixed_portion : Tez.t;
   baking_reward_bonus_per_slot : Tez.t;
-  endorsing_reward_per_slot : Tez.t;
+  attesting_reward_per_slot : Tez.t;
   liquidity_baking_subsidy : Tez.t;
   seed_nonce_revelation_tip : Tez.t;
   vdf_revelation_tip : Tez.t;
@@ -42,7 +42,7 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
            cycle;
            baking_reward_fixed_portion;
            baking_reward_bonus_per_slot;
-           endorsing_reward_per_slot;
+           attesting_reward_per_slot;
            liquidity_baking_subsidy;
            seed_nonce_revelation_tip;
            vdf_revelation_tip;
@@ -50,14 +50,14 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
       ( cycle,
         baking_reward_fixed_portion,
         baking_reward_bonus_per_slot,
-        endorsing_reward_per_slot,
+        attesting_reward_per_slot,
         liquidity_baking_subsidy,
         seed_nonce_revelation_tip,
         vdf_revelation_tip ))
     (fun ( cycle,
            baking_reward_fixed_portion,
            baking_reward_bonus_per_slot,
-           endorsing_reward_per_slot,
+           attesting_reward_per_slot,
            liquidity_baking_subsidy,
            seed_nonce_revelation_tip,
            vdf_revelation_tip ) ->
@@ -65,7 +65,7 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
         cycle;
         baking_reward_fixed_portion;
         baking_reward_bonus_per_slot;
-        endorsing_reward_per_slot;
+        attesting_reward_per_slot;
         liquidity_baking_subsidy;
         seed_nonce_revelation_tip;
         vdf_revelation_tip;
@@ -74,7 +74,7 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
        (req "cycle" Cycle.encoding)
        (req "baking_reward_fixed_portion" Tez.encoding)
        (req "baking_reward_bonus_per_slot" Tez.encoding)
-       (req "endorsing_reward_per_slot" Tez.encoding)
+       (req "attesting_reward_per_slot" Tez.encoding)
        (req "liquidity_baking_subsidy" Tez.encoding)
        (req "seed_nonce_revelation_tip" Tez.encoding)
        (req "vdf_revelation_tip" Tez.encoding))
@@ -198,7 +198,7 @@ let collect_expected_rewards ~ctxt =
           cycle;
           baking_reward_fixed_portion = baking_reward_fixed_portion ctxt;
           baking_reward_bonus_per_slot = baking_reward_bonus_per_slot ctxt;
-          endorsing_reward_per_slot = attesting_reward_per_slot ctxt;
+          attesting_reward_per_slot = attesting_reward_per_slot ctxt;
           liquidity_baking_subsidy = liquidity_baking_subsidy ctxt;
           seed_nonce_revelation_tip = seed_nonce_revelation_tip ctxt;
           vdf_revelation_tip = vdf_revelation_tip ctxt;
@@ -222,7 +222,7 @@ let collect_expected_rewards ~ctxt =
               ~coeff
               csts
               ~reward_kind:Baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot =
+          attesting_reward_per_slot =
             reward_from_constants
               ~coeff
               csts
