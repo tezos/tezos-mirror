@@ -235,7 +235,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   | Nairobi_017
   (* Please update [next_protocol] and [previous_protocol] in
      [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
-      (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
+      (* TODO (#2704): possibly handle attestations for migration block (in bakers);
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol.
          /!\ this storage is also use to add the smart rollup
              inbox migration message. see `sc_rollup_inbox_storage`. *)

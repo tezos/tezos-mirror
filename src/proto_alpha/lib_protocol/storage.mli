@@ -809,7 +809,7 @@ module Tenderbake : sig
        and type t := Raw_context.t
 
   (** [Forbidden_delegates] stores the set of delegates that are not
-      allowed to bake or endorse blocks. *)
+      allowed to bake or attest blocks. *)
   module Forbidden_delegates :
     Single_data_storage
       with type value = Signature.Public_key_hash.Set.t

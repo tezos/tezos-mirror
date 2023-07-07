@@ -1225,7 +1225,7 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
             let* dal_params = Dal_parameters.get in
             let inbox_level = Raw_level_repr.to_int32 inbox_level in
             (* the [published_level]'s pages to request is [inbox_level -
-               endorsement_lag - 1]. *)
+               attestation_lag - 1]. *)
             let lvl =
               Int32.sub (Int32.sub inbox_level dal_params.attestation_lag) 1l
             in

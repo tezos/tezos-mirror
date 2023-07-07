@@ -81,7 +81,7 @@ val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 val compute_randao : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Must be run at the end of the cycle, resets the VDF state and returns
-    unrevealed nonces to know which party has to forfeit its endorsing
+    unrevealed nonces to know which party has to forfeit its attesting
     rewards for that cycle.  *)
 val cycle_end :
   Raw_context.t ->

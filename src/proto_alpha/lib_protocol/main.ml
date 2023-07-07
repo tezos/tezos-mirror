@@ -86,7 +86,7 @@ let validation_passes =
   let open Alpha_context.Constants in
   Updater.
     [
-      (* 2048 endorsements *)
+      (* 2048 attestations *)
       {max_size = 2048 * 2048; max_op = Some 2048};
       (* 32k of voting operations *)
       {max_size = 32 * 1024; max_op = None};
@@ -126,7 +126,7 @@ type mode =
     about the validation/application of a block: application, partial
     validation, and full construction.
 
-    In these modes, endorsements must point to the predecessor's level
+    In these modes, attestations must point to the predecessor's level
     and preattestations, if any, to the block's level. *)
 let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
@@ -167,7 +167,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     construction mode).
 
     In the mempool, there are three allowed levels for both
-    endorsements and preattestations: [predecessor_level - 1] (aka the
+    attestations and preattestations: [predecessor_level - 1] (aka the
     grandparent's level), [predecessor_level] (that is, the level of
     the mempool's head), and [predecessor_level + 1] (aka the current
     level in ctxt). *)
@@ -176,7 +176,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
   let open Alpha_context in
   (* We don't want to compute the tables by first slot for all three
      possible levels because it is time-consuming. So we don't compute
-     any [allowed_endorsements] or [allowed_preattestations] tables. *)
+     any [allowed_attestations] or [allowed_preattestations] tables. *)
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt

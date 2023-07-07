@@ -42,7 +42,7 @@
         responsability to ensure that the set of selected operations
         does not exceed gas/size operations quota.
       - The baker must also include the required preattestations and
-        endorsements.
+        attestations.
 
     - The merging of two mempools also maintains the aforementioned
       properties.
