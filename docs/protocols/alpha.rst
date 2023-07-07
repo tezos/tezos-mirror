@@ -155,6 +155,8 @@ RPC Changes
     based on its current stake (MR :gl:`!9350`)
 
 - Two new variants of the ``voting_power`` RPC (which returns the
+  ``expected_endorsing_rewards`` field from ``/participation`` RPC has been
+  renamed in ``expected_attesting_rewards``.
 
 Operation receipts
 ------------------
