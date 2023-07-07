@@ -29,7 +29,7 @@ val baking_reward_fixed_portion : Raw_context.t -> Tez_repr.t
 
 val baking_reward_bonus_per_slot : Raw_context.t -> Tez_repr.t
 
-val endorsing_reward_per_slot : Raw_context.t -> Tez_repr.t
+val attesting_reward_per_slot : Raw_context.t -> Tez_repr.t
 
 val liquidity_baking_subsidy : Raw_context.t -> Tez_repr.t
 
@@ -41,7 +41,7 @@ module For_RPC : sig
   type reward_kind =
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
-    | Endorsing_reward_per_slot
+    | Attesting_reward_per_slot
     | Liquidity_baking_subsidy
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip

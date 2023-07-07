@@ -140,7 +140,7 @@ let test_participation_rpc () =
   let endorsing_reward_per_slot =
     Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       csts.parametric
-      ~reward_kind:Endorsing_reward_per_slot
+      ~reward_kind:Attesting_reward_per_slot
   in
   let expected_endorsing_rewards =
     Tez.mul_exn endorsing_reward_per_slot expected_cycle_activity

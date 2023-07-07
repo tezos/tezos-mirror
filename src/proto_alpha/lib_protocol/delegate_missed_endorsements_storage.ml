@@ -196,7 +196,7 @@ let participation_info ctxt delegate =
         Constants_storage.minimal_participation_ratio ctxt
       in
       let endorsing_reward_per_slot =
-        Delegate_rewards.endorsing_reward_per_slot ctxt
+        Delegate_rewards.attesting_reward_per_slot ctxt
       in
       let minimal_cycle_activity =
         expected_cycle_activity * numerator / denominator

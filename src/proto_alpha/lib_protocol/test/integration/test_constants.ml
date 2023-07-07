@@ -193,7 +193,7 @@ let liquidity_baking_subsidy_param () =
   in
   baking_reward_fixed_portion +? baking_reward_bonus >>?= fun baking_rewards ->
   let endorsing_reward_per_slot =
-    get_reward ~reward_kind:Endorsing_reward_per_slot
+    get_reward ~reward_kind:Attesting_reward_per_slot
   in
   endorsing_reward_per_slot *? Int64.of_int constants.consensus_committee_size
   >>?= fun validators_rewards ->
