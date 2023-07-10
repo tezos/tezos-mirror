@@ -37,23 +37,11 @@ use precompiles::PrecompileSet;
 pub enum DurableStorageError {
     /// Some runtime error happened while using durable storage
     #[error("Runtime error: {0:?}")]
-    RuntimeError(host::runtime::RuntimeError),
+    RuntimeError(#[from] host::runtime::RuntimeError),
     /// Some error happened while constructing the path to some
     /// resource.
     #[error("Path error: {0:?}")]
-    PathError(host::path::PathError),
-}
-
-impl From<host::path::PathError> for DurableStorageError {
-    fn from(error: host::path::PathError) -> Self {
-        Self::PathError(error)
-    }
-}
-
-impl From<host::runtime::RuntimeError> for DurableStorageError {
-    fn from(error: host::runtime::RuntimeError) -> Self {
-        Self::RuntimeError(error)
-    }
+    PathError(#[from] host::path::PathError),
 }
 
 /// Errors when processing Ethereum transactions

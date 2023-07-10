@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use anyhow::Context;
 use evm_execution::Config;
 use primitive_types::U256;
 use storage::{
@@ -147,21 +148,26 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let smart_rollup_address = retrieve_smart_rollup_address(host)?;
-    let chain_id = retrieve_chain_id(host)?;
+pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    let smart_rollup_address = retrieve_smart_rollup_address(host)
+        .context("Failed to retrieve smart rollup address")?;
+    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let ticketer = read_ticketer(host);
 
-    let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)?;
+    let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)
+        .context("Failed during stage 1")?;
 
-    stage_two(host, queue)
+    stage_two(host, queue).context("Failed during stage 2")
 }
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
 
 const ERRORS_PATH: RefPath = RefPath::assert_from(b"/errors");
 
-fn log_error<Host: Runtime>(host: &mut Host, err: &Error) -> Result<(), Error> {
+fn log_error<Host: Runtime>(
+    host: &mut Host,
+    err: &anyhow::Error,
+) -> Result<(), anyhow::Error> {
     let current_level = storage::read_current_block_number(host).unwrap_or_default();
     let err_msg = format!("Error during block {}: {:?}", current_level, err);
 

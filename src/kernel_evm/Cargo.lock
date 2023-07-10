@@ -500,6 +500,7 @@ dependencies = [
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "evm-execution",
  "hex",
  "hex-literal",
@@ -519,6 +520,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum",
+ "thiserror",
 ]
 
 [[package]]
