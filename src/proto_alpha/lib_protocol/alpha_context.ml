@@ -365,6 +365,13 @@ module Contract = struct
 
   let is_delegate = Contract_delegate_storage.is_delegate
 
+  type delegate_status = Contract_delegate_storage.delegate_status =
+    | Delegate
+    | Delegated of public_key_hash
+    | Undelegated
+
+  let get_delegate_status = Contract_delegate_storage.get_delegate_status
+
   module Delegate = struct
     let find = Contract_delegate_storage.find
 

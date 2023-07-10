@@ -47,6 +47,18 @@ val find :
 val is_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
+(** [delegate_status] describes whether an implicit account is a delegate, or if
+    it has a delegate (i.e. other than itself), or has no delegate. *)
+type delegate_status =
+  | Delegate
+  | Delegated of Signature.Public_key_hash.t
+  | Undelegated
+
+(** [get_delegate_status ctxt pkh] returns the delegation status associated to
+    [pkh]. *)
+val get_delegate_status :
+  Raw_context.t -> Signature.Public_key_hash.t -> delegate_status tzresult Lwt.t
+
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
 
     This function assumes that [contract] does not have a delegate already. *)
