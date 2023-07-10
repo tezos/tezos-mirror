@@ -146,10 +146,10 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?branch
       endorsed_block
   in
-  let op = Single (Preendorsement consensus_content) in
+  let op = Single (Preattestation consensus_content) in
   return
     (sign
-       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
+       ~watermark:Operation.(to_watermark (Preattestation Chain_id.zero))
        signer
        branch
        op)

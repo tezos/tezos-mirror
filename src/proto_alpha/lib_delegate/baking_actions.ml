@@ -402,7 +402,7 @@ let inject_preendorsements state ~preendorsements =
             state.level_state.latest_proposal.predecessor.shell.predecessor;
         }
       in
-      let contents = Single (Preendorsement consensus_content) in
+      let contents = Single (Preattestation consensus_content) in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
       let sk_uri = consensus_key.secret_key_uri in
@@ -426,7 +426,7 @@ let inject_preendorsements state ~preendorsements =
       >>=? fun may_sign ->
       (if may_sign then
        let unsigned_operation = (shell, Contents_list contents) in
-       let watermark = Operation.(to_watermark (Preendorsement chain_id)) in
+       let watermark = Operation.(to_watermark (Preattestation chain_id)) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn
            Operation.unsigned_encoding_with_legacy_attestation_name

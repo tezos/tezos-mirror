@@ -170,9 +170,9 @@ module Preendorsement_set = Set.Make (struct
   type t = Kind.preattestation operation
 
   let compare
-      ({protocol_data = {contents = Single (Preendorsement op1); _}; shell = _} :
+      ({protocol_data = {contents = Single (Preattestation op1); _}; shell = _} :
         t)
-      ({protocol_data = {contents = Single (Preendorsement op2); _}; shell = _} :
+      ({protocol_data = {contents = Single (Preattestation op2); _}; shell = _} :
         t) =
     compare_consensus_contents op1 op2
 end)
@@ -319,7 +319,7 @@ let update_monitoring ?(should_lock = true) state ops =
             let {
               shell = _;
               protocol_data =
-                {contents = Single (Preendorsement consensus_content); _};
+                {contents = Single (Preattestation consensus_content); _};
               _;
             } =
               op

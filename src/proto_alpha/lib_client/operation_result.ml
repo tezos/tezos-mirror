@@ -871,12 +871,12 @@ let pp_contents_and_result :
         (Block_header.hash bh2)
         pp_balance_updates
         bus
-  | ( Preendorsement {level; _},
-      Preendorsement_result
+  | ( Preattestation {level; _},
+      Preattestation_result
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf
-        "@[<v 2>Preendorsement:@,\
+        "@[<v 2>Preattestation:@,\
          Level: %a@,\
          Balance updates:%a@,\
          Delegate: %a@,\

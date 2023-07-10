@@ -124,19 +124,19 @@ type mode =
     validation, and full construction.
 
     In these modes, endorsements must point to the predecessor's level
-    and preendorsements, if any, to the block's level. *)
+    and preattestations, if any, to the block's level. *)
 let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt, endorsements_map =
     Baking.endorsing_rights_by_first_slot ctxt predecessor_level
   in
-  let*? can_contain_preendorsements =
+  let*? can_contain_preattestations =
     match mode with
     | Construction _ | Partial_construction _ -> ok true
     | Application block_header | Partial_validation block_header ->
         (* A preexisting block, which has a complete and correct block
-           header, can only contain preendorsements when the locked
+           header, can only contain preattestations when the locked
            round in the fitness has an actual value. *)
         let open Result_syntax in
         let* locked_round =
@@ -144,19 +144,19 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
         in
         return (Option.is_some locked_round)
   in
-  let* ctxt, allowed_preendorsements =
-    if can_contain_preendorsements then
-      let* ctxt, preendorsements_map =
+  let* ctxt, allowed_preattestations =
+    if can_contain_preattestations then
+      let* ctxt, preattestations_map =
         Baking.endorsing_rights_by_first_slot ctxt (Level.current ctxt)
       in
-      return (ctxt, Some preendorsements_map)
+      return (ctxt, Some preattestations_map)
     else return (ctxt, None)
   in
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:(Some endorsements_map)
-      ~allowed_preendorsements
+      ~allowed_preattestations
   in
   return ctxt
 
@@ -164,7 +164,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     construction mode).
 
     In the mempool, there are three allowed levels for both
-    endorsements and preendorsements: [predecessor_level - 1] (aka the
+    endorsements and preattestations: [predecessor_level - 1] (aka the
     grandparent's level), [predecessor_level] (that is, the level of
     the mempool's head), and [predecessor_level + 1] (aka the current
     level in ctxt). *)
@@ -173,12 +173,12 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
   let open Alpha_context in
   (* We don't want to compute the tables by first slot for all three
      possible levels because it is time-consuming. So we don't compute
-     any [allowed_endorsements] or [allowed_preendorsements] tables. *)
+     any [allowed_endorsements] or [allowed_preattestations] tables. *)
   let ctxt =
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_endorsements:None
-      ~allowed_preendorsements:None
+      ~allowed_preattestations:None
   in
   (* However, we want to ensure that the cycle rights are loaded in
      the context, so that {!Stake_distribution.slot_owner} doesn't

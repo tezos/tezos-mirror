@@ -380,7 +380,7 @@ let generate_operation gen_op =
 let generate_preendorsement =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
-  Preendorsement cc
+  Preattestation cc
 
 let generate_endorsement =
   let open QCheck2.Gen in

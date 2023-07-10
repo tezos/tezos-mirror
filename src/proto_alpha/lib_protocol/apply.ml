@@ -1977,7 +1977,7 @@ type application_state = {
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
   match operation.protocol_data.contents with
-  | Single (Preendorsement _) -> ctxt
+  | Single (Preattestation _) -> ctxt
   | Single (Endorsement _) -> ctxt
   | Single (Dal_attestation _) -> ctxt
   | Single
@@ -1998,21 +1998,21 @@ let find_in_slot_map consensus_content slot_map =
           error Faulty_validation_wrong_slot
       | Some (consensus_key, power) -> ok (consensus_key, power))
 
-let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
+let record_preattestation ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let ctxt =
     match mode with
     | Full_construction _ -> (
-        match Consensus.get_preendorsements_quorum_round ctxt with
-        | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
+        match Consensus.get_preattestations_quorum_round ctxt with
+        | None -> Consensus.set_preattestations_quorum_round ctxt content.round
         | Some _ -> ctxt)
     | Application _ | Partial_construction _ -> ctxt
   in
-  let mk_preendorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
+  let mk_preattestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
     Single_result
-      (Preendorsement_result
+      (Preattestation_result
          {
            balance_updates = [];
            delegate;
@@ -2023,29 +2023,29 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_preendorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_preendorsement
+        Consensus.record_preattestation
           ctxt
           ~initial_slot:content.slot
           ~power
           content.round
       in
-      return (ctxt, mk_preendorsement_result consensus_key power)
+      return (ctxt, mk_preattestation_result consensus_key power)
   | Partial_construction _ ->
-      (* In mempool mode, preendorsements are allowed for various levels
-         and rounds. We do not record preendorsements because we could get
-         false-positive conflicts for preendorsements with the same slot
-         but different levels/rounds. We could record just preendorsements
+      (* In mempool mode, preattestations are allowed for various levels
+         and rounds. We do not record preattestations because we could get
+         false-positive conflicts for preattestations with the same slot
+         but different levels/rounds. We could record just preattestations
          for the mempool head's level and round (the most usual
-         preendorsements), but we don't need to, because there is no block
+         preattestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt content.level in
         Stake_distribution.slot_owner ctxt level content.slot
       in
-      return (ctxt, mk_preendorsement_result consensus_key 0 (* Fake power. *))
+      return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
 
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.attestation contents_result_list) tzresult Lwt.t =
@@ -2125,7 +2125,7 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
   >|=? fun (ctxt, balance_updates) ->
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preendorsement (type kind) ctxt
+let punish_double_endorsement_or_preattestation (type kind) ctxt
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
@@ -2134,13 +2134,13 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt
   let mk_result (balance_updates : Receipt.balance_updates) :
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
-    | Single (Preendorsement _) ->
+    | Single (Preattestation _) ->
         Double_preendorsement_evidence_result balance_updates
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
-  | Single (Preendorsement e1) | Single (Endorsement e1) ->
+  | Single (Preattestation e1) | Single (Endorsement e1) ->
       let level = Level.from_raw ctxt e1.level in
       Stake_distribution.slot_owner ctxt level e1.slot
       >>=? fun (ctxt, consensus_pk1) ->
@@ -2178,8 +2178,8 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     | Full_construction _ | Application _ -> false
   in
   match contents_list with
-  | Single (Preendorsement consensus_content) ->
-      record_preendorsement ctxt mode consensus_content
+  | Single (Preattestation consensus_content) ->
+      record_preattestation ctxt mode consensus_content
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content
   | Single (Dal_attestation op) ->
@@ -2220,9 +2220,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_endorsement_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->
@@ -2593,7 +2593,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       ~predecessor_round
       ~timestamp
   in
-  (* The endorsement/preendorsement validation rules for construction are the
+  (* The endorsement/preattestation validation rules for construction are the
      same as for application. *)
   let current_level = Level.current ctxt in
   let* ctxt, _slot, block_producer =
@@ -2886,7 +2886,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
       (* Fake finalization to return a correct type, because there is no
          block to finalize in mempool mode. If this changes in the
          future, beware that consensus operations are not recorded by
-         {!record_preendorsement} and {!record_endorsement} in this mode. *)
+         {!record_preattestation} and {!record_endorsement} in this mode. *)
       let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
       let level_info = Level.current ctxt in
       let result = finalize ctxt predecessor_fitness in

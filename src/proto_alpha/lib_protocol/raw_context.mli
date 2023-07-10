@@ -329,7 +329,7 @@ module type CONSENSUS = sig
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_preendorsements : t -> (consensus_pk * int) slot_map option
+  val allowed_preattestations : t -> (consensus_pk * int) slot_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       endorse blocks; i.e., delegates which have zero frozen deposit
@@ -343,13 +343,13 @@ module type CONSENSUS = sig
      current block. *)
   val current_endorsement_power : t -> int
 
-  (** Initializes the map of allowed endorsements and preendorsements,
+  (** Initializes the map of allowed endorsements and preattestations,
      this function must be called only once and before applying
      any consensus operation.  *)
   val initialize_consensus_operation :
     t ->
     allowed_endorsements:(consensus_pk * int) slot_map option ->
-    allowed_preendorsements:(consensus_pk * int) slot_map option ->
+    allowed_preattestations:(consensus_pk * int) slot_map option ->
     t
 
   (** [record_endorsement ctx ~initial_slot ~power] records an
@@ -360,14 +360,14 @@ module type CONSENSUS = sig
       (pkh, power)].  *)
   val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
 
-  (** [record_preendorsement ctx ~initial_slot ~power round
-     payload_hash power] records a preendorsement for a proposal at
+  (** [record_preattestation ctx ~initial_slot ~power round
+     payload_hash power] records a preattestation for a proposal at
      [round] with payload [payload_hash].
 
-      The preendorsement should be valid in the sense that
-     [Int_map.find_opt initial_slot allowed_preendorsement ctx = Some
+      The preattestation should be valid in the sense that
+     [Int_map.find_opt initial_slot allowed_preattestation ctx = Some
      (pkh, power)].  *)
-  val record_preendorsement :
+  val record_preattestation :
     t -> initial_slot:slot -> power:int -> round -> t tzresult
 
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
@@ -381,21 +381,21 @@ module type CONSENSUS = sig
 
   val endorsements_seen : t -> slot_set
 
-  (** [get_preendorsements_quorum_round ctx] returns [None] if no
-     preendorsement are included in the current block. Otherwise,
-     return [Some r] where [r] is the round of the preendorsements
+  (** [get_preattestations_quorum_round ctx] returns [None] if no
+     preattestation are included in the current block. Otherwise,
+     return [Some r] where [r] is the round of the preattestations
      included in the block. *)
-  val get_preendorsements_quorum_round : t -> round option
+  val get_preattestations_quorum_round : t -> round option
 
-  (** [set_preendorsements_quorum_round ctx round] sets the round for
-     preendorsements included in this block. This function should be
+  (** [set_preattestations_quorum_round ctx round] sets the round for
+     preattestations included in this block. This function should be
      called only once.
 
       This function is only used in [Full_construction] mode.  *)
-  val set_preendorsements_quorum_round : t -> round -> t
+  val set_preattestations_quorum_round : t -> round -> t
 
   (** [locked_round_evidence ctx] returns the round of the recorded
-     preendorsements as well as their power. *)
+     preattestations as well as their power. *)
   val locked_round_evidence : t -> (round * int) option
 
   val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t

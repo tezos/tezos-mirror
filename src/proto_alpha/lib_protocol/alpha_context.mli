@@ -4120,7 +4120,7 @@ end
 
 type 'a consensus_operation_type =
   | Endorsement : Kind.attestation consensus_operation_type
-  | Preendorsement : Kind.preattestation consensus_operation_type
+  | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot.t;
@@ -4153,7 +4153,7 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Preendorsement : consensus_content -> Kind.preattestation contents
+  | Preattestation : consensus_content -> Kind.preattestation contents
   | Endorsement : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
@@ -4349,7 +4349,7 @@ module Operation : sig
 
   type consensus_watermark =
     | Endorsement of Chain_id.t
-    | Preendorsement of Chain_id.t
+    | Preattestation of Chain_id.t
     | Dal_attestation of Chain_id.t
 
   val to_watermark : consensus_watermark -> Signature.watermark

@@ -534,7 +534,7 @@ let pre_filter filter_info config
   match contents with
   | Single (Failing_noop _) ->
       Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
-  | Single (Preendorsement consensus_content)
+  | Single (Preattestation consensus_content)
   | Single (Endorsement consensus_content) ->
       pre_filter_far_future_consensus_ops filter_info config consensus_content
       >>= fun keep ->
@@ -679,7 +679,7 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
   | Single (Manager_operation {source; _}) -> Some source
   | Cons (Manager_operation {source; _}, _) -> Some source
   | Single
-      ( Preendorsement _ | Endorsement _ | Dal_attestation _ | Proposals _
+      ( Preattestation _ | Endorsement _ | Dal_attestation _ | Proposals _
       | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
       | Double_baking_evidence _ | Double_preendorsement_evidence _
       | Double_endorsement_evidence _ | Activate_account _ | Drain_delegate _
