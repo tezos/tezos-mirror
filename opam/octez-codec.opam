@@ -12,9 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "octez-libs"
-  "tezos-client-base-unix"
-  "tezos-client-base"
-  "tezos-signer-services"
+  "octez-shell-libs"
   "tezos-version"
 ]
 depopts: [

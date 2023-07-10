@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   tezos-protocol-alpha
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-client-alpha)
  (flags
   (:standard)

@@ -7,8 +7,8 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  tezos-mockup-commands
-  tezos-client-base-unix
+  octez-shell-libs.tezos-mockup-commands
+  octez-shell-libs.tezos-client-base-unix
   octez-libs.tezos-base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -34,7 +34,7 @@
 
 (rule
  (alias runtest)
- (package tezos-client-base-unix)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

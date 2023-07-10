@@ -10,7 +10,7 @@
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-micheline
   tezos-client-018-Proxford
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix

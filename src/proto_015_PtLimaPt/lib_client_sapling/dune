@@ -10,8 +10,8 @@
   octez-libs.tezos-clic
   octez-libs.tezos-crypto
   octez-libs.tezos-stdlib-unix
-  tezos-client-base
-  tezos-signer-backends
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-signer-backends
   tezos-client-015-PtLimaPt
   tezos-client-015-PtLimaPt.commands
   tezos-protocol-015-PtLimaPt

@@ -661,7 +661,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-013-PtJakart
-  tezos-protocol-updater
+  octez-shell-libs.tezos-protocol-updater
   octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

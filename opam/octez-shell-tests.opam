@@ -12,12 +12,8 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "3.1.1" }
   "octez-libs" {with-test}
-  "tezos-store" {with-test}
-  "tezos-context-ops" {with-test}
-  "tezos-protocol-updater" {with-test}
-  "tezos-shell" {with-test}
+  "octez-shell-libs" {with-test}
   "tezos-embedded-protocol-demo-noops" {with-test}
-  "tezos-validation" {with-test}
   "octez-alcotezt" {with-test}
   "tezos-version" {with-test}
 ]

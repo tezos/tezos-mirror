@@ -13,19 +13,19 @@
   tezos-version.value
   octez-node-config
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
   octez-libs.tezos-p2p
-  tezos-shell
-  tezos-store
-  tezos-store.unix-reconstruction
-  tezos-store.unix-snapshots
+  octez-shell-libs.tezos-shell
+  octez-shell-libs.tezos-store
+  octez-shell-libs.tezos-store.unix-reconstruction
+  octez-shell-libs.tezos-store.unix-snapshots
   octez-libs.tezos-context
-  tezos-validation
-  octez-libs.tezos-shell-context
+  octez-shell-libs.tezos-validation
+  octez-shell-libs.tezos-shell-context
   octez-libs.tezos-workers
-  tezos-protocol-updater
+  octez-shell-libs.tezos-protocol-updater
   cmdliner
   fmt.cli
   fmt.tty

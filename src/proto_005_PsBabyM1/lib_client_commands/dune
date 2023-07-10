@@ -10,10 +10,10 @@
   tezos-protocol-005-PsBabyM1
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-005-PsBabyM1
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
@@ -36,10 +36,10 @@
   octez-libs.tezos-clic
   tezos-protocol-005-PsBabyM1
   octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-005-PsBabyM1
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-client-005-PsBabyM1.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))

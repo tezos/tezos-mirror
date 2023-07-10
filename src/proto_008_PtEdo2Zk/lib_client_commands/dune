@@ -11,10 +11,10 @@
   tezos-protocol-008-PtEdo2Zk
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-008-PtEdo2Zk
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
   tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
@@ -40,10 +40,10 @@
   octez-libs.tezos-clic
   tezos-protocol-008-PtEdo2Zk
   octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-008-PtEdo2Zk
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-client-008-PtEdo2Zk.commands
   octez-libs.tezos-rpc
   tezos-protocol-plugin-008-PtEdo2Zk)

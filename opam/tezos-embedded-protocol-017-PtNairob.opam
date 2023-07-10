@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-protocol-017-PtNairob"
-  "tezos-protocol-updater"
+  "octez-shell-libs"
   "octez-libs"
 ]
 build: [

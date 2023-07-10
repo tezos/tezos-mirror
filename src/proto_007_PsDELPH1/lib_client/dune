@@ -7,11 +7,11 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-protocol-007-PsDELPH1
   tezos-protocol-007-PsDELPH1.lifted
-  tezos-signer-backends
+  octez-shell-libs.tezos-signer-backends
   tezos-protocol-plugin-007-PsDELPH1
   octez-libs.tezos-rpc
   uri)

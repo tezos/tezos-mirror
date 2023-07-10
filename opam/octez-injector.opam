@@ -12,8 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "logs"
-  "tezos-client-base"
-  "tezos-shell"
+  "octez-shell-libs"
   "octez-crawler"
 ]
 build: [

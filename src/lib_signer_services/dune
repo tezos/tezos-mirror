@@ -5,12 +5,12 @@
 
 (library
  (name tezos_signer_services)
- (public_name tezos-signer-services)
+ (public_name octez-shell-libs.tezos-signer-services)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-rpc
-  tezos-client-base)
+  octez-shell-libs.tezos-client-base)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
