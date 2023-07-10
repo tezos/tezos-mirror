@@ -390,8 +390,8 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
     ?challenge_window ?timeout ?variant ?(tags = []) ~kind ~migrate_from
     ~migrate_to ~scenario_prior ~scenario_after ~description () =
   let tags =
-    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "migration"
-    :: tags
+    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "l2"
+    :: "migration" :: tags
   in
   Test.register
     ~__FILE__
@@ -450,6 +450,70 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
     tezos_node
     tezos_client
     prior_res
+
+(** Same as {!test_l2_migration_scenario} but the migration is done when an
+    event is detected. *)
+let test_l2_migration_scenario_event ?parameters_ty
+    ?(mode = Sc_rollup_node.Operator) ?(operator = Constant.bootstrap1.alias)
+    ?boot_sector ?commitment_period ?challenge_window ?rollup_node_name ?timeout
+    ?variant ?(tags = []) ~kind ~migrate_from ~migrate_to ~migration_on_event
+    ~description scenario =
+  let tags =
+    Protocol.tag migrate_from :: Protocol.tag migrate_to :: kind :: "l2"
+    :: "migration" :: tags
+  in
+  Test.register
+    ~__FILE__
+    ~tags
+    ~title:
+      (sf
+         "%s->%s: %s"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         (format_title_scenario kind {variant; tags; description}))
+  @@ fun () ->
+  let* tezos_node, tezos_client =
+    setup_l1 ?commitment_period ?challenge_window ?timeout migrate_from
+  in
+  let* rollup_node, rollup_client, sc_rollup =
+    setup_rollup
+      ~protocol:migrate_from
+      ?parameters_ty
+      ~kind
+      ~mode
+      ?boot_sector
+      ~operator
+      ?rollup_node_name
+      tezos_node
+      tezos_client
+  in
+  let (_migration : unit Lwt.t) =
+    let* () = migration_on_event tezos_node rollup_node in
+    let migration_level = Node.get_last_seen_level tezos_node + 1 in
+    let patch_config =
+      Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+        [(migration_level, migrate_to)]
+    in
+    Log.info
+      "Migrating L1 from %s to %s"
+      (Protocol.name migrate_from)
+      (Protocol.name migrate_to) ;
+    let* () = Node.terminate tezos_node in
+    let nodes_args =
+      Node.
+        [Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+    in
+    let* () = Node.run ~patch_config tezos_node nodes_args in
+    let* () = Node.wait_for_ready tezos_node in
+    Client.bake_for_and_wait tezos_client
+  in
+  scenario
+    migrate_from
+    rollup_node
+    rollup_client
+    sc_rollup
+    tezos_node
+    tezos_client
 
 let commitment_info_inbox_level
     (commitment_info : Sc_rollup_client.commitment_info) =
@@ -3163,8 +3227,7 @@ let remove_state_from_dissection dissection =
    its deposit while the honest one has not.
 
 *)
-let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind
+let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     {
       loser_modes;
       inputs;
@@ -3174,28 +3237,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       reset_honest_on;
       bad_reveal_at;
       priority;
-    } =
-  let regression =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
-       Disabled dissection regressions for parallel games, as it introduces
-       flakyness. *)
-    List.compare_length_with loser_modes 1 <= 0
-  in
-  test_full_scenario
-    ~regression
-    ?hooks:None (* We only want to capture dissections manually *)
-    ?commitment_period
-    ~kind
-    ~mode
-    ~timeout:60
-    ?challenge_window
-    ~rollup_node_name:"honest"
-    {
-      tags = (["refutation"] @ if mode = Accuser then ["accuser"] else []);
-      variant = Some (variant ^ if mode = Accuser then "+accuser" else "");
-      description = "refutation games winning strategies";
-    }
-  @@ fun protocol sc_rollup_node sc_client1 sc_rollup_address node client ->
+    } protocol sc_rollup_node sc_client1 sc_rollup_address node client =
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   let loser_keys =
     List.mapi
@@ -3341,28 +3383,39 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
         loser_sc_rollup_nodes
     else unit
   in
+  (* Calls that can fail because the node is down due to the ongoing migration
+     need to be retried. *)
+  let retry f =
+    let f _ =
+      let* () = Node.wait_for_ready node in
+      f ()
+    in
+    Lwt.catch f f
+  in
   let rec consume_inputs = function
     | [] -> unit
     | inputs :: next_batches as all ->
-        let* level = Client.level client in
+        let level = Node.get_last_seen_level node in
         let* () = stop_losers level in
         if List.mem level empty_levels then
-          let* () = Client.bake_for_and_wait client in
+          let* () = retry @@ fun () -> Client.bake_for_and_wait client in
           consume_inputs all
         else
           let* () =
+            retry @@ fun () ->
             send_text_messages ~src:Constant.bootstrap3.alias client inputs
           in
           consume_inputs next_batches
   in
   let* () = consume_inputs inputs in
-  let* after_inputs_level = Client.level client in
+  let after_inputs_level = Node.get_last_seen_level node in
 
   let hook i =
     let level = after_inputs_level + i in
     let* () =
       if List.mem level bad_reveal_at then
         let hash = reveal_hash ~protocol ~kind "Missing data" in
+        retry @@ fun () ->
         send_text_messages ~src:Constant.bootstrap3.alias client [hash.message]
       else unit
     in
@@ -3370,6 +3423,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   in
   let keep_going client =
     let* games =
+      retry @@ fun () ->
       RPC.Client.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
            ~staker:bootstrap1_key
@@ -3414,12 +3468,14 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
 
   let* {stake_amount; _} = get_sc_rollup_constants client in
   let* honest_deposit_json =
+    retry @@ fun () ->
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap1_key ()
   in
   let* loser_deposits_json =
     Lwt_list.map_p
       (fun id ->
+        retry @@ fun () ->
         RPC.Client.call client
         @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ())
       loser_keys
@@ -3447,6 +3503,56 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
          Regression.capture "\n" ;
          Regression.capture @@ JSON.encode dissection) ;
   unit
+
+let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
+    ~kind scenario =
+  let regression =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
+       Disabled dissection regressions for parallel games, as it introduces
+       flakyness. *)
+    List.compare_length_with scenario.loser_modes 1 <= 0
+  in
+  let tags =
+    ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
+  in
+  let variant = variant ^ if mode = Accuser then "+accuser" else "" in
+  test_full_scenario
+    ~regression
+    ?hooks:None (* We only want to capture dissections manually *)
+    ?commitment_period
+    ~kind
+    ~mode
+    ~timeout:60
+    ?challenge_window
+    ~rollup_node_name:"honest"
+    {
+      tags;
+      variant = Some variant;
+      description = "refutation games winning strategies";
+    }
+    (test_refutation_scenario_aux ~mode ~kind scenario)
+
+let test_refutation_migration_scenario ?commitment_period ?challenge_window
+    ~variant ~mode ~kind scenario ~migrate_from ~migrate_to ~migration_on_event
+    =
+  let tags =
+    ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
+  in
+  let variant = variant ^ if mode = Accuser then "+accuser" else "" in
+  test_l2_migration_scenario_event
+    ?commitment_period
+    ~kind
+    ~mode
+    ~timeout:60
+    ?challenge_window
+    ~rollup_node_name:"honest"
+    ~tags
+    ~variant
+    ~description:"refutation games over migrations"
+    ~migrate_from
+    ~migrate_to
+    ~migration_on_event
+    (test_refutation_scenario_aux ~mode ~kind scenario)
 
 let rec swap i l =
   if i <= 0 then l
@@ -3651,6 +3757,76 @@ let test_refutation protocols ~kind =
         ~variant
         inputs
         protocols)
+    tests
+
+let injecting_refute_event _tezos_node rollup_node =
+  let* _injected = wait_for_injecting_event ~tags:["refute"] rollup_node in
+  unit
+
+let l1_level_event level tezos_node _rollup_node =
+  let* _ = Node.wait_for_level tezos_node level in
+  unit
+
+let published_commitment_event ~inbox_level _tezos_node rollup_node =
+  Sc_rollup_node.wait_for rollup_node "sc_rollup_node_lpc_updated.v0"
+  @@ fun json ->
+  let level = JSON.(json |-> "level" |> as_int) in
+  if level >= inbox_level then Some () else None
+
+let commitment_computed_event ~inbox_level _tezos_node rollup_node =
+  Sc_rollup_node.wait_for
+    rollup_node
+    "sc_rollup_node_commitment_process_head.v0"
+  @@ fun json ->
+  let level = JSON.as_int json in
+  if level >= inbox_level then Some () else None
+
+let test_refutation_migration ~migrate_from ~migrate_to =
+  let challenge_window = 10 in
+  let commitment_period = 10 in
+  let tests =
+    [
+      ( "inbox_proof_1",
+        3,
+        refutation_scenario_parameters
+          ~loser_modes:["3 4 0"]
+          (inputs_for 10)
+          ~final_level:80
+          ~priority:`Priority_loser );
+      ( "pvm_proof_2",
+        7,
+        refutation_scenario_parameters
+          ~loser_modes:["7 7 22_000_002_000"]
+          (inputs_for 10)
+          ~final_level:80
+          ~priority:`Priority_loser );
+    ]
+  in
+  List.iter
+    (fun (variant, fault_level, inputs) ->
+      List.iter
+        (fun (migration_variant, migration_on_event) ->
+          let variant = String.concat "_" [variant; migration_variant] in
+          test_refutation_migration_scenario
+            ~kind:"wasm_2_0_0"
+              (* The tests for refutations over migrations are only ran for wasm
+                 as the arith PVMs do not have the same semantic in all
+                 protocols. *)
+            ~mode:Operator
+            ~challenge_window
+            ~commitment_period
+            ~variant
+            inputs
+            ~migrate_from
+            ~migrate_to
+            ~migration_on_event)
+        [
+          ("ongoing", injecting_refute_event);
+          ("at_inbox", l1_level_event fault_level);
+          ("at_commitment", commitment_computed_event ~inbox_level:fault_level);
+          ( "at_published_commitment",
+            published_commitment_event ~inbox_level:fault_level );
+        ])
     tests
 
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
@@ -6402,6 +6578,10 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to ;
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
+let register_migration_only_wasm ~migrate_from ~migrate_to =
+  test_refutation_migration ~migrate_from ~migrate_to
+
 let register_migration ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;
-  register_migration ~kind:"wasm_2_0_0" ~migrate_from ~migrate_to
+  register_migration ~kind:"wasm_2_0_0" ~migrate_from ~migrate_to ;
+  register_migration_only_wasm ~migrate_from ~migrate_to
