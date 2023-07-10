@@ -19,6 +19,7 @@ depends: [
   "tezos-alpha-test-helpers"
   "tezos-client-alpha"
   "tezos-protocol-plugin-alpha"
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

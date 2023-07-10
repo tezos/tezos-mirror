@@ -10,7 +10,7 @@
   octez-libs.tezos-clic
   tezos-protocol-008-PtEdo2Zk
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-008-PtEdo2Zk
@@ -39,7 +39,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-008-PtEdo2Zk
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-008-PtEdo2Zk

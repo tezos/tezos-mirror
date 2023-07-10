@@ -15,6 +15,7 @@ depends: [
   "tezos-protocol-007-PsDELPH1"
   "tezos-protocol-plugin-007-PsDELPH1"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

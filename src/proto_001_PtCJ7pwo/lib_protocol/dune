@@ -6,7 +6,7 @@
  (public_name tezos-protocol-001-PtCJ7pwo.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_001_PtCJ7pwo))
 
@@ -106,8 +106,8 @@
  (public_name tezos-protocol-001-PtCJ7pwo)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-001-PtCJ7pwo.raw)
  (flags
   (:standard)
@@ -217,8 +217,8 @@
  (public_name tezos-protocol-001-PtCJ7pwo.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-001-PtCJ7pwo)
  (flags
   (:standard)
@@ -237,8 +237,8 @@
 (library
  (name tezos_protocol_001_PtCJ7pwo_functor)
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -329,7 +329,7 @@
  (libraries
   tezos-protocol-001-PtCJ7pwo
   octez-shell-libs.tezos-protocol-updater
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

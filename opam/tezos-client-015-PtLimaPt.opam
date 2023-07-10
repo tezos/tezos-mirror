@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-015-PtLimaPt"
   "tezos-protocol-plugin-015-PtLimaPt"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

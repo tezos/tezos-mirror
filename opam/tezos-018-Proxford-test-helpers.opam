@@ -14,6 +14,7 @@ depends: [
   "octez-libs"
   "tezos-protocol-018-Proxford"
   "tezos-client-018-Proxford"
+  "octez-proto-libs"
   "tezos-protocol-plugin-018-Proxford"
   "octez-shell-libs"
   "tezos-smart-rollup-018-Proxford"

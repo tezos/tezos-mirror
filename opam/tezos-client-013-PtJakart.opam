@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-013-PtJakart"
   "tezos-protocol-plugin-013-PtJakart"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

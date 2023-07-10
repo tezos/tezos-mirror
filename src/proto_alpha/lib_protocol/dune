@@ -6,7 +6,7 @@
  (public_name tezos-protocol-alpha.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_alpha))
 
@@ -275,8 +275,8 @@
  (public_name tezos-protocol-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-alpha.raw)
  (flags
   (:standard)
@@ -554,8 +554,8 @@
  (public_name tezos-protocol-alpha.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-alpha)
  (flags
   (:standard)
@@ -573,8 +573,8 @@
 (library
  (name tezos_protocol_alpha_functor)
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -838,7 +838,7 @@
  (libraries
   tezos-protocol-alpha
   octez-shell-libs.tezos-protocol-updater
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 

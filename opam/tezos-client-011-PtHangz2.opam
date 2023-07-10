@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-011-PtHangz2"
   "tezos-protocol-plugin-011-PtHangz2"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

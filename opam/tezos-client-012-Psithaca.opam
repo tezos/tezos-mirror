@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-012-Psithaca"
   "tezos-protocol-plugin-012-Psithaca"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

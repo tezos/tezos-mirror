@@ -16,6 +16,7 @@ depends: [
   "tezos-protocol-014-PtKathma"
   "tezos-protocol-plugin-014-PtKathma"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

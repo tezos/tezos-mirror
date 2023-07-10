@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment.sigs
   octez-libs.tezos-stdlib-unix
   compiler-libs.common
   lwt.unix
@@ -39,17 +39,17 @@
 
 (rule
  (targets embedded-interfaces-env)
- (deps (package octez-libs))
+ (deps (package octez-proto-libs))
  (action
   (with-stdout-to
    %{targets}
    (run
     bin/cmis_of_cma.exe
-    %{lib:octez-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}))))
+    %{lib:octez-proto-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}))))
 
 (rule
  (targets embedded_cmis_env.ml)
- (deps (package octez-libs))
+ (deps (package octez-proto-libs))
  (action
   (run
    %{bin:ocp-ocamlres} -format variants -o %{targets}

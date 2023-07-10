@@ -9,7 +9,7 @@
   octez-libs.tezos-clic
   tezos-protocol-001-PtCJ7pwo
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-001-PtCJ7pwo
@@ -35,7 +35,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-001-PtCJ7pwo
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-001-PtCJ7pwo

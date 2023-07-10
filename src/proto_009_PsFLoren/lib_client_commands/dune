@@ -10,7 +10,7 @@
   octez-libs.tezos-clic
   tezos-protocol-009-PsFLoren
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-009-PsFLoren
@@ -41,7 +41,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-009-PsFLoren
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-009-PsFLoren

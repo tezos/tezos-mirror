@@ -15,6 +15,7 @@ depends: [
   "tezos-protocol-008-PtEdo2Zk"
   "tezos-protocol-plugin-008-PtEdo2Zk"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

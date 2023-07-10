@@ -6,7 +6,7 @@
  (public_name tezos-protocol-014-PtKathma.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_014_PtKathma))
 
@@ -241,8 +241,8 @@
  (public_name tezos-protocol-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-014-PtKathma.raw)
  (flags
   (:standard)
@@ -484,8 +484,8 @@
  (public_name tezos-protocol-014-PtKathma.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-014-PtKathma)
  (flags
   (:standard)
@@ -503,8 +503,8 @@
 (library
  (name tezos_protocol_014_PtKathma_functor)
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -732,7 +732,7 @@
  (libraries
   tezos-protocol-014-PtKathma
   octez-shell-libs.tezos-protocol-updater
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 
