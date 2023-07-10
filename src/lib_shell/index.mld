@@ -1,9 +1,6 @@
-{0 tezos-shell index}
+{0 Octez-shell-libs: octez shell libraries}
 
-{1 Library tezos-shell}
+This is a package containing some libraries used by the shell of Octez.
 
-The entry point of this library is the module: {!Tezos_shell}.
+It contains the following libraries:
 
-{1 Prevalidator implementation overview}
-
-You can find the implementation overview of the prevalidator {{!page-prevalidator} here}.
