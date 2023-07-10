@@ -8,9 +8,9 @@ use crate::block_in_progress;
 use crate::blueprint::Queue;
 use crate::current_timestamp;
 use crate::error::Error;
-use crate::error::StorageError::AccountInitialisation;
 use crate::indexable_storage::IndexableStorage;
 use crate::storage::{self, init_account_index};
+use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
@@ -27,7 +27,7 @@ fn compute<Host: Runtime>(
     precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     while block_in_progress.has_tx() {
         if block_in_progress.would_overflow() {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
@@ -50,16 +50,21 @@ fn compute<Host: Runtime>(
             accounts_index,
         )? {
             block_in_progress.register_transaction(tx_hash, object_info.gas_used)?;
-            let receipt = block_in_progress.make_receipt(receipt_info)?;
-            storage::store_transaction_receipt(host, &receipt)?;
+            let receipt = block_in_progress.make_receipt(receipt_info);
+            storage::store_transaction_receipt(host, &receipt)
+                .context("Failed to store the receipt")?;
             let object = block_in_progress.make_object(object_info);
-            storage::store_transaction_object(host, &object)?;
+            storage::store_transaction_object(host, &object)
+                .context("Failed to store the transaction object")?;
         }
     }
     Ok(())
 }
 
-pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
+pub fn produce<Host: Runtime>(
+    host: &mut Host,
+    queue: Queue,
+) -> Result<(), anyhow::Error> {
     let (mut current_constants, mut current_block_number) =
         match storage::read_current_block(host) {
             Ok(block) => (block.constants(), block.number + 1),
@@ -70,7 +75,7 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
             }
         };
     let mut evm_account_storage =
-        init_account_storage().map_err(|_| Error::Storage(AccountInitialisation))?;
+        init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
 
@@ -83,11 +88,8 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         let ring = proposal.transactions.into();
         // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
         // add proposal to the container
-        let mut block_in_progress = BlockInProgress::new(
-            current_block_number,
-            current_constants.gas_price,
-            ring,
-        )?;
+        let mut block_in_progress =
+            BlockInProgress::new(current_block_number, current_constants.gas_price, ring);
         compute(
             host,
             &mut block_in_progress,
@@ -100,7 +102,9 @@ pub fn produce<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error
         // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
         // if reboot initiated, store container in progress and exit
         // else store block
-        let new_block = block_in_progress.finalize_and_store(host)?;
+        let new_block = block_in_progress
+            .finalize_and_store(host)
+            .context("Failed to finalize the block in progress")?;
         current_block_number = new_block.number + 1;
         current_constants = new_block.constants();
     }
@@ -723,8 +727,7 @@ mod tests {
 
         // init block in progress
         let mut block_in_progress =
-            BlockInProgress::new(U256::from(1), U256::from(1), transactions)
-                .expect("Should have initialised block in progress");
+            BlockInProgress::new(U256::from(1), U256::from(1), transactions);
 
         compute::<MockHost>(
             host,
@@ -807,8 +810,7 @@ mod tests {
 
         // init block in progress
         let mut block_in_progress =
-            BlockInProgress::new(U256::from(1), U256::from(1), transactions)
-                .expect("Should have initialised block in progress");
+            BlockInProgress::new(U256::from(1), U256::from(1), transactions);
         // block is almost full wrt ticks
         block_in_progress.estimated_ticks = block_in_progress::MAX_TICKS - 1000;
 

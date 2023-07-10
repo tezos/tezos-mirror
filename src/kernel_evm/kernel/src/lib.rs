@@ -94,7 +94,7 @@ fn produce_and_upgrade<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
     kernel_upgrade: KernelUpgrade,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     // Since a kernel upgrade was detected, in case an error is thrown
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
@@ -105,15 +105,20 @@ fn produce_and_upgrade<Host: Runtime>(
                 e
             );
     }
-    let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash);
+    let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash)
+        .context("Failed to upgrade kernel");
     if upgrade_status.is_ok() {
         let kernel_upgrade_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
-        store_kernel_upgrade_nonce(host, kernel_upgrade_nonce)?;
+        store_kernel_upgrade_nonce(host, kernel_upgrade_nonce)
+            .context("Failed to store kernel upgrade nonce")?;
     }
     upgrade_status
 }
 
-pub fn stage_two<Host: Runtime>(host: &mut Host, queue: Queue) -> Result<(), Error> {
+pub fn stage_two<Host: Runtime>(
+    host: &mut Host,
+    queue: Queue,
+) -> Result<(), anyhow::Error> {
     debug_msg!(host, "Stage two\n");
     let kernel_upgrade = queue.kernel_upgrade.clone();
     if let Some(kernel_upgrade) = kernel_upgrade {
