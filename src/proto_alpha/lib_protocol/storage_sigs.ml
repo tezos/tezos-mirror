@@ -231,9 +231,6 @@ module type Indexed_carbonated_data_storage = sig
     ?length:int ->
     t ->
     (Raw_context.t * (key * value) list) tzresult Lwt.t
-
-  (** Returns [true] iff [context] is empty. *)
-  val is_empty : context -> bool Lwt.t
 end
 
 module type Indexed_carbonated_data_storage_INTERNAL = sig

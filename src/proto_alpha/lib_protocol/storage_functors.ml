@@ -385,13 +385,6 @@ module Make_indexed_carbonated_data_storage_INTERNAL
 
   include Make_encoder (V)
 
-  let is_empty i =
-    let open Lwt_syntax in
-    let* root = C.find_tree i [] in
-    match root with
-    | None -> return_true
-    | Some root -> return @@ C.Tree.is_empty root
-
   let data_key i = I.to_path i [data_name]
 
   let len_key i = I.to_path i [len_name]
