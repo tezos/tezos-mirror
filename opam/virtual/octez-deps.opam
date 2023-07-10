@@ -85,8 +85,6 @@ depends: [
   "resto-cohttp-server" { >= "1.2" }
   "resto-directory" { >= "1.2" }
   "ringo" { >= "1.0.0" }
-  "rlp" { >= "0.1" }
-  "rope" { >= "0.6.2" }
   "secp256k1-internal" { >= "0.4.0" }
   "seqes" { >= "0.2" }
   "stdint"

@@ -369,9 +369,7 @@ module RPC = struct
         Fun.id
     in
     match bytes with
-    | Some bytes ->
-        Some
-          (Ethereum_types.transaction_receipt_from_rlp (Bytes.to_string bytes))
+    | Some bytes -> Some (Ethereum_types.transaction_receipt_from_rlp bytes)
     | None -> None
 
   let transaction_object base (Hash tx_hash) =
@@ -383,9 +381,7 @@ module RPC = struct
         Fun.id
     in
     match bytes with
-    | Some bytes ->
-        Some
-          (Ethereum_types.transaction_object_from_rlp (Bytes.to_string bytes))
+    | Some bytes -> Some (Ethereum_types.transaction_object_from_rlp bytes)
     | None -> None
 
   let transactions ~full_transaction_object ~number base =
