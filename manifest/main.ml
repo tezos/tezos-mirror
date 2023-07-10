@@ -459,6 +459,9 @@ let registered_octez_libs : Sub_lib.container = Sub_lib.make_container ()
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs : Sub_lib.container = Sub_lib.make_container ()
 
+(* Container of the registered sublibraries of [octez-proto-libs] *)
+let registered_octez_proto_libs : Sub_lib.container = Sub_lib.make_container ()
+
 (* Registers a sub-library in [octez-libs] packages.
    This package should contain all Octez basic libraries. *)
 let octez_lib : Sub_lib.maker =
@@ -475,6 +478,14 @@ let _octez_shell_lib : Sub_lib.maker =
     ~package_synopsis:"Octez shell libraries"
     ~container:registered_octez_shell_libs
     ~package:"octez-shell-libs"
+
+(* Registers a sub-library in the [octez-proto-libs] package.
+   This package should contain all the libraries related to the protocol. *)
+let _octez_proto_lib : Sub_lib.maker =
+  Sub_lib.sub_lib
+    ~package_synopsis:"Octez protocol libraries"
+    ~container:registered_octez_proto_libs
+    ~package:"octez-proto-libs"
 
 let octez_test_helpers =
   octez_lib
@@ -8183,5 +8194,16 @@ let () =
      It contains the following libraries:\n\n"
   in
   Sub_lib.pp_documentation_of_container ~header fmt registered_octez_shell_libs
+
+(* Generate documentation index for [octez-proto-libs] *)
+let () =
+  write "src/lib_protocol_environment/index.mld" @@ fun fmt ->
+  let header =
+    "{0 Octez-proto-libs: octez protocol libraries}\n\n\
+     This is a package containing some libraries related to the Tezos \
+     protocol.\n\n\
+     It contains the following libraries:\n\n"
+  in
+  Sub_lib.pp_documentation_of_container ~header fmt registered_octez_proto_libs
 
 let () = postcheck ~exclude ()
