@@ -36,7 +36,7 @@ let lwt_model ~name =
     ~conv:(fun () -> ())
     ~model:(Model.unknown_const1 ~name ~const:lwt_variable)
 
-module Lwt_main_run_bench : Benchmark.S = struct
+module Lwt_main_run_bench : Benchmark.Simple = struct
   type config = unit
 
   let default_config = ()
@@ -60,7 +60,7 @@ module Lwt_main_run_bench : Benchmark.S = struct
 
   let group = Benchmark.Generic
 
-  let model = lwt_model
+  let model = lwt_model ~name
 
   let workload_to_vector () = Sparse_vec.String.of_list [("lwt_main", 1.)]
 
@@ -74,4 +74,4 @@ module Lwt_main_run_bench : Benchmark.S = struct
     Generator.Plain {workload; closure}
 end
 
-let () = Registration.register (module Lwt_main_run_bench)
+let () = Registration.register_simple (module Lwt_main_run_bench)

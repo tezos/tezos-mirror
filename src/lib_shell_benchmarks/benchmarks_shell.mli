@@ -23,69 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Benchmark_base = Benchmark
-
-module Benchmark : sig
-  type group = Benchmark.group = Standalone | Group of string | Generic
-
-  type purpose = Benchmark_base.purpose =
-    | Other_purpose of string
-    | Generate_code of string
-
-  (** The module type of benchmarks, a simplification of {!Benchmark.S} used by
-      [registration_simple] below. *)
-  module type S = sig
-    (** Name of the benchmark *)
-    val name : Namespace.t
-
-    (** Description of the benchmark *)
-    val info : string
-
-    (** Filename of the benchmark module *)
-    val module_filename : string
-
-    (** Purpose of the benchmark. *)
-    val purpose : Benchmark.purpose
-
-    (** Inference group of the benchmark *)
-    val group : group
-
-    (** Tags of the benchmark *)
-    val tags : string list
-
-    (** Configuration of the benchmark (eg sampling parameters, paths, etc) *)
-    type config
-
-    (** Default configuration of the benchmark *)
-    val default_config : config
-
-    (** Configuration encoding *)
-    val config_encoding : config Data_encoding.t
-
-    (** Benchmark workload *)
-    type workload
-
-    (** Workload encoding *)
-    val workload_encoding : workload Data_encoding.t
-
-    (** Optional conversion to vector, for report generation purposes *)
-    val workload_to_vector : workload -> Sparse_vec.String.t
-
-    (** Cost model *)
-    val model : name:Namespace.t -> workload Model.t
-
-    (** Creates a  benchmark, ready to be run.
-            The benchmarks are thunked to prevent evaluating the workload until
-            needed. *)
-    val create_benchmark :
-      rng_state:Random.State.t -> config -> workload Generator.benchmark
-  end
-
-  type t = (module S)
-end
-
 module Registration : sig
-  val register : Benchmark.t -> unit
+  val register : ?add_timer:bool -> Benchmark.t -> unit
 
-  val register_base : (module Benchmark_base.S) -> unit
+  val register_simple : ?add_timer:bool -> Benchmark.simple -> unit
+
+  val register_simple_with_num :
+    ?add_timer:bool -> Benchmark.simple_with_num -> unit
 end

@@ -539,7 +539,7 @@ let check_printable_benchmark =
       Generator.Plain {workload; closure})
     ()
 
-let () = Registration_helpers.register check_printable_benchmark
+let () = Registration_helpers.register_simple_with_num check_printable_benchmark
 
 module Ty_eq : Benchmark.S = struct
   type config = {max_size : int}

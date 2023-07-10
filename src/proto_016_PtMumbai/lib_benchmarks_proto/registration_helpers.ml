@@ -27,12 +27,30 @@ let ns = Namespace.make Namespace.root "proto"
 
 let ns = Namespace.make ns Protocol.name
 
+let register_for_codegen _name _model = ()
+
+let adjust_tags tags = Protocol.name :: tags
+
 let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct
     include Bench
 
-    let tags = Protocol.name :: tags
+    let tags = adjust_tags tags
   end in
   Registration.register (module B)
 
-let register_for_codegen _name _model = ()
+let register_simple (module Bench : Benchmark.Simple) =
+  let module B = struct
+    include Bench
+
+    let tags = adjust_tags tags
+  end in
+  Registration.register_simple (module B)
+
+let register_simple_with_num (module Bench : Benchmark.Simple_with_num) =
+  let module B = struct
+    include Bench
+
+    let tags = adjust_tags tags
+  end in
+  Registration.register_simple_with_num (module B)
