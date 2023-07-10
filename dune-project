@@ -27,6 +27,7 @@
 (package (name octez-libs))
 (package (name octez-node))
 (package (name octez-node-config))
+(package (name octez-proto-libs))
 (package (name octez-protocol-compiler))
 (package (name octez-proxy-server))
 (package (name octez-shell-libs))

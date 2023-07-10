@@ -23,7 +23,7 @@
   octez-libs.tezos-sapling
   tezos-client-alpha
   tezos-protocol-plugin-alpha
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

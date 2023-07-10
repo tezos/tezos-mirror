@@ -12,7 +12,7 @@
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.lifted
   tezos-protocol-plugin-018-Proxford
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford
@@ -59,7 +59,7 @@
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford
@@ -89,7 +89,7 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-018-Proxford
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford

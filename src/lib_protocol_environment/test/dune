@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-alcotezt
   octez-libs.tezos-test-helpers
   qcheck-alcotest
@@ -39,7 +39,7 @@
 
 (rule
  (alias runtest)
- (package octez-libs)
+ (package octez-proto-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

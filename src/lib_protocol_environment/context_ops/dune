@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-error-monad
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-context
   octez-shell-libs.tezos-shell-context)
  (flags

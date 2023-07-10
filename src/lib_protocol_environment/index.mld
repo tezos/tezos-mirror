@@ -4,3 +4,4 @@ This is a package containing some libraries related to the Tezos protocol.
 
 It contains the following libraries:
 
+- {{!module-Tezos_protocol_environment}Tezos_protocol_environment}

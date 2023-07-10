@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-shell-libs.tezos-client-base
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-rpc-http
   resto-cohttp-self-serving-client
   octez-libs.tezos-rpc-http-client

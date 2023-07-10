@@ -17,6 +17,7 @@ depends: [
   "tezos-protocol-plugin-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
   "uri" { >= "3.1.0" }
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

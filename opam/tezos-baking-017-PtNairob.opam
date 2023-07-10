@@ -14,6 +14,7 @@ depends: [
   "tezos-version"
   "tezos-protocol-017-PtNairob"
   "tezos-protocol-plugin-017-PtNairob"
+  "octez-proto-libs"
   "octez-shell-libs"
   "tezos-client-017-PtNairob"
   "tezos-dal-node-services"

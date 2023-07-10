@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment)
- (public_name octez-libs.tezos-protocol-environment)
+ (public_name octez-proto-libs.tezos-protocol-environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
@@ -16,8 +16,8 @@
   aches-lwt
   octez-libs.tezos-base
   octez-libs.tezos-sapling
-  octez-libs.tezos-protocol-environment.sigs
-  octez-libs.tezos-protocol-environment.structs
+  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment.structs
   octez-libs.tezos-micheline
   octez-libs.tezos-context.memory
   octez-libs.tezos-scoru-wasm
@@ -27,3 +27,5 @@
   -open Plonk
   -open Tezos_base.TzPervasives
   -open Tezos_micheline))
+
+(documentation (package octez-proto-libs))

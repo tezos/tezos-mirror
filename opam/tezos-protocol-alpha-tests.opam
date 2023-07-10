@@ -23,6 +23,7 @@ depends: [
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-smart-rollup-alpha" {with-test}
   "octez-shell-libs" {with-test}
+  "octez-proto-libs" {with-test}
   "tezos-scoru-wasm-helpers" {with-test}
   "tezos-webassembly-interpreter-extra" {with-test}
 ]

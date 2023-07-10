@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-protocol-003-PsddFKi3"
   "octez-shell-libs"
-  "octez-libs"
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_structs)
- (public_name octez-libs.tezos-protocol-environment.structs)
+ (public_name octez-proto-libs.tezos-protocol-environment.structs)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-stdlib

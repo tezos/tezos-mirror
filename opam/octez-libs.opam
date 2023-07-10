@@ -65,7 +65,6 @@ depends: [
   "integers_stubs_js"
   "tezos-rust-libs" { = "1.6" }
   "tezos-sapling-parameters" { >= "1.1.0" }
-  "class_group_vdf" { >= "0.0.4" }
   "resto-cohttp" { >= "1.2" }
   "resto-cohttp-client" { >= "1.2" }
   "resto-cohttp-server" { >= "1.2" }

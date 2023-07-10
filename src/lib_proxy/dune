@@ -11,7 +11,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   octez-shell-libs.tezos-client-base
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-rpc
   octez-shell-libs.tezos-shell-services
   octez-libs.tezos-context.memory

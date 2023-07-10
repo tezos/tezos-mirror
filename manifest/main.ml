@@ -484,7 +484,7 @@ let octez_shell_lib : Sub_lib.maker =
 
 (* Registers a sub-library in the [octez-proto-libs] package.
    This package should contain all the libraries related to the protocol. *)
-let _octez_proto_lib : Sub_lib.maker =
+let octez_proto_lib : Sub_lib.maker =
   Sub_lib.sub_lib
     ~package_synopsis:"Octez protocol libraries"
     ~container:registered_octez_proto_libs
@@ -2889,12 +2889,12 @@ let _octez_sapling_ctypes_gen =
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
 
 let tezos_protocol_environment_sigs_internals =
-  octez_lib
+  octez_proto_lib
     "tezos-protocol-environment.sigs-internals"
     ~path:"src/lib_protocol_environment/sigs-internals"
 
 let tezos_protocol_environment_sigs =
-  octez_lib
+  octez_proto_lib
     "tezos-protocol-environment.sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~deps:[tezos_protocol_environment_sigs_internals]
@@ -2925,7 +2925,7 @@ let tezos_protocol_environment_sigs =
        List.init (latest_environment_number + 1) gen |> Dune.of_list)
 
 let octez_protocol_environment_structs =
-  octez_lib
+  octez_proto_lib
     "tezos-protocol-environment.structs"
     ~path:"src/lib_protocol_environment/structs"
     ~deps:
@@ -2940,9 +2940,10 @@ let octez_protocol_environment_structs =
       ]
 
 let octez_protocol_environment =
-  octez_lib
+  octez_proto_lib
     "tezos-protocol-environment"
     ~path:"src/lib_protocol_environment"
+    ~documentation:[Dune.[S "package"; S "octez-proto-libs"]]
     ~deps:
       [
         zarith;
@@ -2984,7 +2985,7 @@ let _octez_protocol_environment_tests =
       "test_data_encoding";
     ]
     ~path:"src/lib_protocol_environment/test"
-    ~opam:"octez-libs"
+    ~opam:"octez-proto-libs"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3090,7 +3091,7 @@ let octez_protocol_compiler_lib =
             ~enabled_if:[S ">="; S "%{ocaml_version}"; S "5"];
           targets_rule
             ["embedded-interfaces-env"]
-            ~deps:[Dune.(H [[S "package"; S "octez-libs"]])]
+            ~deps:[Dune.(H [[S "package"; S "octez-proto-libs"]])]
             ~action:
               [
                 S "with-stdout-to";
@@ -3101,13 +3102,13 @@ let octez_protocol_compiler_lib =
                   V
                     [
                       S
-                        "%{lib:octez-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
+                        "%{lib:octez-proto-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
                     ];
                 ];
               ];
           targets_rule
             ["embedded_cmis_env.ml"]
-            ~deps:[Dune.(H [[S "package"; S "octez-libs"]])]
+            ~deps:[Dune.(H [[S "package"; S "octez-proto-libs"]])]
             ~action:
               [
                 S "run";
@@ -8039,7 +8040,7 @@ let () =
   in
   Sub_lib.pp_documentation_of_container ~header fmt registered_octez_proto_libs
 
-(* Generate documentation index for Octez-l2-libs *)
+(* Generate documentation index for [octez-l2-libs] *)
 let () =
   write "src/lib_smart_rollup/index.mld" @@ fun fmt ->
   let header =

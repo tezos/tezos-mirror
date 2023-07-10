@@ -13,7 +13,7 @@
   octez-libs.tezos-context.memory
   octez-shell-libs.tezos-context-ops
   octez-shell-libs.tezos-validation
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-store.shared)
  (flags
   (:standard)
