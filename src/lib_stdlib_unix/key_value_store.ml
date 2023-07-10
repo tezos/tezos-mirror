@@ -64,21 +64,22 @@ type ('file, 'value) directory_spec = {
     [lru_size] file descriptors can be open at the same time.
 *)
 module Directories : sig
-  type t
+  type 'value t
 
-  val init : lru_size:int -> t
+  val init : lru_size:int -> 'value t
 
-  val close : t -> unit Lwt.t
+  val close : 'value t -> unit Lwt.t
 
   val write :
     ?override:bool ->
-    t ->
-    ('b, 'c) directory_spec ->
+    'value t ->
+    ('b, 'value) directory_spec ->
     'b ->
-    'c ->
+    'value ->
     unit tzresult Lwt.t
 
-  val read : t -> ('b, 'c) directory_spec -> 'b -> 'c tzresult Lwt.t
+  val read :
+    'value t -> ('b, 'value) directory_spec -> 'b -> 'value tzresult Lwt.t
 end = struct
   module LRU = Ringo.LRU_Collection
 
@@ -139,10 +140,11 @@ end = struct
 
   let close_virtual_directory handle = Lwt_unix.close handle.fd
 
-  type handle_and_pending_callbacks =
+  type 'value handle_and_pending_callbacks =
     | Entry of {
         handle : handle Lwt.t;
         accessed : Lwt_mutex.t File_table.t;
+        cached : 'value File_table.t;
         (* TODO: Should we use a weak table to automatically collect dangling promises?
            Note that we do clear resolved promises each time we grow this list. *)
         mutable pending_callbacks : unit Lwt.t list;
@@ -159,7 +161,10 @@ end = struct
      The domains of [handles] and [lru] should be the same, before and after
      calling the functions [write] and [read] in this module.
   *)
-  type t = {handles : handle_and_pending_callbacks Table.t; lru : string LRU.t}
+  type 'value t = {
+    handles : 'value handle_and_pending_callbacks Table.t;
+    lru : string LRU.t;
+  }
 
   let init ~lru_size =
     let handles = Table.create 101 in
@@ -172,7 +177,7 @@ end = struct
       (fun _ entry ->
         match entry with
         | Being_evicted p -> p
-        | Entry {handle; pending_callbacks = _; accessed = _} ->
+        | Entry {handle; pending_callbacks = _; accessed = _; cached = _} ->
             (* TODO: should we lock access to [accessed]; then lock on
                all mutex in [accessed], then close? This would ensure that we wait until
                all pending callbacks terminate. *)
@@ -187,7 +192,7 @@ end = struct
     match Table.find dirs.handles removed with
     | None -> assert false
     | Some (Being_evicted _) -> assert false
-    | Some (Entry {handle; accessed = _; pending_callbacks}) ->
+    | Some (Entry {handle; accessed = _; cached = _; pending_callbacks}) ->
         Table.replace dirs.handles removed (Being_evicted await_close) ;
         let* handle and* () = Lwt.join pending_callbacks in
         let+ () = close_virtual_directory handle in
@@ -227,26 +232,36 @@ end = struct
       | None ->
           let handle = load_or_initialize () in
           let accessed = File_table.create 3 in
+          let cached = File_table.create 3 in
           let callback =
-            with_mutex accessed index (fun () -> Lwt.bind handle f)
+            with_mutex accessed index (fun () -> Lwt.bind handle (f cached))
           in
           Table.replace
             dirs.handles
             spec.path
             (Entry
-               {handle; accessed; pending_callbacks = [Lwt.map ignore callback]}) ;
+               {
+                 handle;
+                 accessed;
+                 cached;
+                 pending_callbacks = [Lwt.map ignore callback];
+               }) ;
           callback
       | Some removed ->
           let p, resolver = Lwt.task () in
           let accessed = File_table.create 3 in
-          let callback = with_mutex accessed index (fun () -> Lwt.bind p f) in
+          let cached = File_table.create 3 in
+          let callback =
+            with_mutex accessed index (fun () -> Lwt.bind p (f cached))
+          in
           Table.replace
             dirs.handles
             spec.path
             (Entry
                {
                  handle = p;
-                 accessed = File_table.create 3;
+                 accessed;
+                 cached;
                  pending_callbacks = [Lwt.map ignore callback];
                }) ;
           let* () = resolve_pending_and_close dirs removed in
@@ -260,7 +275,7 @@ end = struct
     match Table.find dirs.handles spec.path with
     | Some (Entry p) ->
         let promise =
-          with_mutex p.accessed index (fun () -> Lwt.bind p.handle f)
+          with_mutex p.accessed index (fun () -> Lwt.bind p.handle (f p.cached))
         in
         p.pending_callbacks <-
           keep_pending (Lwt.map ignore promise :: p.pending_callbacks) ;
@@ -273,8 +288,8 @@ end = struct
   let write ?(override = false) dirs spec file data =
     let open Lwt_result_syntax in
     let index = spec.index_of file in
-    bind_dir_and_lock_file dirs spec index @@ fun handle ->
-    if (not (file_exists handle index)) || override then
+    bind_dir_and_lock_file dirs spec index @@ fun cached handle ->
+    let perform_write () =
       let pos = Int64.of_int (bitset_size + (index * spec.value_size)) in
       let mmap =
         Lwt_bytes.map_file
@@ -292,33 +307,49 @@ end = struct
         Lwt_bytes.blit_from_bytes bytes 0 mmap 0 (Bytes.length bytes) ;
         set_file_exists handle index ;
         return_unit)
+    in
+    if not (file_exists handle index) then (
+      assert (not (File_table.mem cached index)) ;
+      perform_write ())
+    else if override then
+      match File_table.find cached index with
+      | None ->
+          File_table.add cached index data ;
+          perform_write ()
+      | Some cached ->
+          if spec.eq cached data then return_unit else perform_write ()
     else return_unit
 
   let read dirs spec file =
     let open Lwt_result_syntax in
     let index = spec.index_of file in
-    bind_dir_and_lock_file dirs spec index @@ fun handle ->
-    if file_exists handle index then (
-      (* Note that the following code executes atomically Lwt-wise. *)
-      let pos = Int64.of_int (bitset_size + (index * spec.value_size)) in
-      let mmap =
-        Lwt_bytes.map_file
-          ~fd:(Lwt_unix.unix_file_descr handle.fd)
-          ~pos
-          ~size:spec.value_size
-          ~shared:true
-          ()
-      in
-      let bytes = Bytes.make spec.value_size '\000' in
-      Lwt_bytes.blit_to_bytes mmap 0 bytes 0 spec.value_size ;
-      return (Data_encoding.Binary.of_bytes_exn spec.encoding bytes))
+    bind_dir_and_lock_file dirs spec index @@ fun cached handle ->
+    if file_exists handle index then
+      match File_table.find cached index with
+      | None ->
+          (* Note that the following code executes atomically Lwt-wise. *)
+          let pos = Int64.of_int (bitset_size + (index * spec.value_size)) in
+          let mmap =
+            Lwt_bytes.map_file
+              ~fd:(Lwt_unix.unix_file_descr handle.fd)
+              ~pos
+              ~size:spec.value_size
+              ~shared:true
+              ()
+          in
+          let bytes = Bytes.make spec.value_size '\000' in
+          Lwt_bytes.blit_to_bytes mmap 0 bytes 0 spec.value_size ;
+          let data = Data_encoding.Binary.of_bytes_exn spec.encoding bytes in
+          File_table.add cached index data ;
+          return data
+      | Some v -> return v
     else tzfail (Missing_stored_kvs_data (spec.path, index))
 end
 
 type ('dir, 'file, 'value) t =
   | E : {
       directory_of : 'dir -> ('file, 'value) directory_spec;
-      directories : Directories.t;
+      directories : 'value Directories.t;
     }
       -> ('dir, 'file, 'value) t
 
