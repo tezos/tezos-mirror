@@ -42,10 +42,49 @@ let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
 let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
 
+module Value_size_hooks = struct
+  (* The [value_size] required by [Tezos_key_value_store.directory] is known when
+     the daemon loads a protocol, after the store is activated. We use the closure
+     [value_size_fun] to perform delayed protocol-specific parameter passing.
+
+     Note that this mechanism is not sufficient to make the key-value store
+     robust to dynamic changes in [value_size]. For instance, there could be
+     concurrent writes for protocol P-1 and protocol P, if they define
+     distinct [value_size] this will make it so that [P-1] uses the [value_size]
+     of [P].
+
+     A potential solution would have a function [Cryptobox.share_encoding : t -> share encoding]
+     with the property that the produced encodings are of [`Fixed] class.
+     The [Key_value_store.t] type could be parameterized by an extra type parameter
+     corresponding to some dynamic state (corresponding to the cryptobox in our
+     use case), passed explicitly to the [write] and [read] functions.
+
+     Correcting this is left to future work.
+
+     TODO: https://gitlab.com/tezos/tezos/-/issues/6034 *)
+
+  (* We used the [share_size] callback to pass the share size to the store
+     in a delayed fashion, when the protocol becomes known to the daemon. *)
+  let share_size_ref = ref None
+
+  let set_share_size size =
+    match !share_size_ref with
+    | None -> share_size_ref := Some size
+    | Some previous_size ->
+        if Int.equal size previous_size then ()
+        else
+          Stdlib.failwith
+            "Store.set_share_size: new share size incompatible with current \
+             store"
+
+  let share_size () =
+    match !share_size_ref with None -> assert false | Some size -> size
+end
+
 module Shards = struct
   include Key_value_store
 
-  type nonrec t = (Cryptobox.Commitment.t * int, Cryptobox.share) t
+  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) t
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
@@ -53,10 +92,10 @@ module Shards = struct
     let open Lwt_result_syntax in
     List.for_all_es
       (fun index ->
-        let*! value = read_value store (commitment, index) in
+        let*! value = read_value store commitment index in
         match value with
         | Ok _ -> return true
-        | Error [Stored_data.Missing_stored_data _] -> return false
+        | Error [Missing_stored_kvs_data _] -> return false
         | Error e -> fail e)
       shard_indexes
 
@@ -64,7 +103,7 @@ module Shards = struct
     let open Lwt_result_syntax in
     let shards =
       Seq.map
-        (fun {Cryptobox.index; share} -> ((commitment, index), share))
+        (fun {Cryptobox.index; share} -> (commitment, index, share))
         shards
     in
     let* () = write_values shards_store shards |> Errors.other_lwt_result in
@@ -84,13 +123,22 @@ module Shards = struct
     |> read_values shards_store
 
   let init node_store_dir shard_store_dir =
+    let open Lwt_syntax in
     let ( // ) = Filename.concat in
     let dir_path = node_store_dir // shard_store_dir in
-    init ~lru_size:Constants.shards_store_lru_size (fun (commitment, index) ->
+    let+ () =
+      if not (Sys.file_exists dir_path) then Lwt_utils_unix.create_dir dir_path
+      else return_unit
+    in
+    init ~lru_size:Constants.shards_store_lru_size (fun commitment ->
         let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-        let filename = string_of_int index in
-        let filepath = dir_path // commitment_string // filename in
-        Stored_data.make_file ~filepath Cryptobox.share_encoding Stdlib.( = ))
+        let filepath = dir_path // commitment_string in
+        directory
+          ~encoded_value_size:(Value_size_hooks.share_size ())
+          Cryptobox.share_encoding
+          filepath
+          Stdlib.( = )
+          Fun.id)
 end
 
 module Shard_proofs_cache =
@@ -117,15 +165,15 @@ type node_store = {
 let open_shards_stream {shards_watcher; _} =
   Lwt_watcher.create_stream shards_watcher
 
-(** [init gs_worker config] inits the store on the filesystem using the
-    given [config] and [gs_worker]. *)
+(** [init config] inits the store on the filesystem using the
+    given [config]. *)
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let shard_store = Shards.init base_dir shard_store_dir in
+  let*! shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {

@@ -159,6 +159,8 @@ module Handler = struct
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
+          Store.Value_size_hooks.set_share_size
+            (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
           let () =
             let pctxt =
               List.fold_left

@@ -161,7 +161,7 @@ let save_shards store cryptobox commitment shards =
 
 let get_shard store commitment shard_id =
   let open Lwt_result_syntax in
-  let* share = Store.Shards.read_value store (commitment, shard_id) in
+  let* share = Store.Shards.read_value store commitment shard_id in
   return {Cryptobox.share; index = shard_id}
 
 let with_commitment_as_seq commitment shards_indices =
@@ -169,7 +169,7 @@ let with_commitment_as_seq commitment shards_indices =
 
 let rev_fetched_values_as seq f init =
   Seq_s.E.fold_left
-    (fun acc ((_commitment, shard_id), v) ->
+    (fun acc (_commitment, shard_id, v) ->
       match v with
       | Error err -> Error err
       | Ok v -> Ok (f Cryptobox.{index = shard_id; share = v} acc))
