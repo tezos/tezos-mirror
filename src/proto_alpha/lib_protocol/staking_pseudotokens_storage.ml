@@ -268,8 +268,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
                 requested_pseudotokens
                 available_pseudotokens
             in
-            assert (
-              not Staking_pseudotoken_repr.(pseudotokens_to_unstake = zero)) ;
+            assert (Staking_pseudotoken_repr.(pseudotokens_to_unstake <> zero)) ;
             let* ctxt, tez_to_unstake =
               debit_frozen_deposits_pseudotokens
                 ctxt
