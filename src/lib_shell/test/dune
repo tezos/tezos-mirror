@@ -8,20 +8,20 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base-test-helpers
-  tezos-store
-  tezos-store.shared
+  octez-shell-libs.tezos-store
+  octez-shell-libs.tezos-store.shared
   octez-libs.tezos-context
-  tezos-context-ops
-  octez-libs.tezos-shell-context
-  tezos-protocol-updater
+  octez-shell-libs.tezos-context-ops
+  octez-shell-libs.tezos-shell-context
+  octez-shell-libs.tezos-protocol-updater
   octez-libs.tezos-p2p
   octez-libs.tezos-p2p-services
   octez-libs.tezos-requester
-  tezos-shell
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell
+  octez-shell-libs.tezos-shell-services
   tezos-embedded-protocol-demo-noops
   octez-libs.tezos-stdlib-unix
-  tezos-validation
+  octez-shell-libs.tezos-validation
   octez-libs.tezos-event-logging-test-helpers
   octez-libs.tezos-test-helpers
   octez-alcotezt

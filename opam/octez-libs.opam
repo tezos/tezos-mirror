@@ -57,7 +57,6 @@ depends: [
   "prometheus" { >= "1.2" }
   "tezt" { >= "3.1.1" }
   "cohttp-lwt-unix" { >= "5.2.0" }
-  "astring" {with-test}
   "qcheck-core" {with-test}
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }

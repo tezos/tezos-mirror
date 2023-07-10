@@ -10,9 +10,9 @@
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
   octez-libs.tezos-rpc
-  tezos-mockup
-  tezos-mockup-registration
-  tezos-client-base
+  octez-shell-libs.tezos-mockup
+  octez-shell-libs.tezos-mockup-registration
+  octez-shell-libs.tezos-client-base
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -39,7 +39,7 @@
 
 (rule
  (alias runtest)
- (package tezos-mockup)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

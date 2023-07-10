@@ -11,11 +11,9 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "tezos-client-base"
+  "octez-shell-libs"
   "tezos-protocol-004-Pt24m4xi"
-  "tezos-signer-backends"
   "uri" { >= "3.1.0" }
-  "tezos-client-commands"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

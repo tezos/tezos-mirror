@@ -866,7 +866,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-017-PtNairob
-  tezos-protocol-updater
+  octez-shell-libs.tezos-protocol-updater
   octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))

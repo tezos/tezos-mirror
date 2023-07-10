@@ -11,9 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "tezos-client-base"
+  "octez-shell-libs"
   "tezos-protocol-000-Ps9mPmXa"
-  "tezos-client-commands"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

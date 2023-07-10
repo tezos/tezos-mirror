@@ -8,13 +8,13 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-protocol-013-PtJakart
   tezos-protocol-013-PtJakart.lifted
-  tezos-mockup-registration
-  tezos-proxy
-  tezos-signer-backends
+  octez-shell-libs.tezos-mockup-registration
+  octez-shell-libs.tezos-proxy
+  octez-shell-libs.tezos-signer-backends
   tezos-protocol-plugin-013-PtJakart
   tezos-protocol-013-PtJakart.parameters
   octez-libs.tezos-rpc

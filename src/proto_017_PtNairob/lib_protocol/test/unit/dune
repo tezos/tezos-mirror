@@ -10,7 +10,7 @@
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-micheline
   tezos-client-017-PtNairob
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-protocol-017-PtNairob.parameters
   octez-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix

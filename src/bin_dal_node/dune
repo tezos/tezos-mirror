@@ -11,12 +11,12 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-version
   cmdliner
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-commands
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
-  tezos-protocol-updater
+  octez-shell-libs.tezos-protocol-updater
   octez-libs.tezos-rpc-http-client-unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-stdlib
@@ -24,15 +24,15 @@
   tezos-dal-node-services
   tezos_layer2_store
   octez-libs.tezos-crypto-dal
-  tezos-store.unix
-  tezos-store.shared
+  octez-shell-libs.tezos-store.unix
+  octez-shell-libs.tezos-store.shared
   octez-libs.tezos-gossipsub
   tezos-dal-node-lib.gossipsub
   octez-libs.tezos-p2p
   octez-libs.tezos-p2p-services
   octez-libs.tezos-crypto
   octez-libs.tezos-base.p2p-identity-file
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   irmin-pack
   irmin-pack.unix
   irmin

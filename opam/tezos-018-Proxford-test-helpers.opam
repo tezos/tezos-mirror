@@ -15,6 +15,7 @@ depends: [
   "tezos-protocol-018-Proxford"
   "tezos-client-018-Proxford"
   "tezos-protocol-plugin-018-Proxford"
+  "octez-shell-libs"
   "tezos-smart-rollup-018-Proxford"
 ]
 build: [

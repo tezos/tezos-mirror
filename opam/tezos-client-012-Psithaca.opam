@@ -12,17 +12,10 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs"
-  "tezos-client-base"
+  "octez-shell-libs"
   "tezos-protocol-012-Psithaca"
-  "tezos-mockup-registration"
-  "tezos-proxy"
-  "tezos-signer-backends"
   "tezos-protocol-plugin-012-Psithaca"
   "uri" { >= "3.1.0" }
-  "tezos-mockup"
-  "tezos-mockup-commands"
-  "tezos-client-commands"
-  "tezos-client-base-unix"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
