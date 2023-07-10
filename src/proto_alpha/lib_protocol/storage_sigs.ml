@@ -235,6 +235,10 @@ module type Indexed_carbonated_data_storage = sig
   (** Returns [true] iff [context] is empty.
       Consumes [Gas_repr.read_bytes_cost Z.zero].*)
   val is_empty : context -> (Raw_context.t * bool) tzresult Lwt.t
+
+  (** [clear storage] removes all values from the storage.
+      Consumes [Gas_repr.write_bytes_cost Z.zero] .*)
+  val clear : context -> Raw_context.t tzresult Lwt.t
 end
 
 module type Indexed_carbonated_data_storage_INTERNAL = sig
@@ -428,6 +432,14 @@ module type Carbonated_data_set_storage = sig
       Returns the freed size, and a boolean
       indicating if a value was already associated to this key. *)
   val remove : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
+
+  (** Removes all elt from the set.
+      Consumes [Gas_repr.write_bytes_cost Z.zero].
+
+      This function does not returns the freed size. This is because
+      it would need to fold over all keys or add a size accumulator
+      and no usage exists so far. *)
+  val clear : context -> Raw_context.t tzresult Lwt.t
 
   val fold_keys_unaccounted :
     context ->
