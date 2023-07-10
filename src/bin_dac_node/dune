@@ -21,7 +21,7 @@
   octez-libs.tezos-stdlib
   tezos-dac-lib
   tezos_dac_node_lib
-  tezos_layer2_store
+  octez-l2-libs.tezos_layer2_store
   irmin-pack
   irmin-pack.unix
   irmin

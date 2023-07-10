@@ -14,7 +14,7 @@ depends: [
   "octez-shell-libs"
   "tezos-dac-lib"
   "tezos-dac-node-lib"
-  "tezos-layer2-store"
+  "octez-l2-libs"
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "tezos-dac-017-PtNairob"

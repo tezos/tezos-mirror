@@ -20,7 +20,7 @@
   octez-proto-libs.tezos-protocol-environment.structs
   octez-libs.tezos-micheline
   octez-libs.tezos-context.memory
-  octez-libs.tezos-scoru-wasm
+  octez-l2-libs.tezos-scoru-wasm
   octez-libs.tezos-event-logging)
  (flags
   (:standard)

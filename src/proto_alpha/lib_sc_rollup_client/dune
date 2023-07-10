@@ -12,7 +12,7 @@
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
   tezos-client-alpha
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   tezos-smart-rollup-alpha
   tezos-smart-rollup-layer2-alpha)
  (flags

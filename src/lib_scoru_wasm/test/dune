@@ -12,12 +12,12 @@
   octez-libs.tezos-context.disk
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
-  octez-libs.tezos-scoru-wasm
+  octez-l2-libs.tezos-scoru-wasm
   qcheck-alcotest
   octez-alcotezt
-  tezos-scoru-wasm-helpers
-  tezos_scoru_wasm_test_helpers
-  tezos-webassembly-interpreter-extra)
+  octez-l2-libs.tezos-scoru-wasm-helpers
+  octez-l2-libs.tezos_scoru_wasm_test_helpers
+  octez-l2-libs.tezos-webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -61,7 +61,7 @@
 
 (rule
  (alias runtest)
- (package tezos-scoru-wasm-test)
+ (package octez-l2-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

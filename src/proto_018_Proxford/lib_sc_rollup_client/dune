@@ -12,7 +12,7 @@
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
   tezos-client-018-Proxford
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   tezos-smart-rollup-018-Proxford
   tezos-smart-rollup-layer2-018-Proxford)
  (flags

@@ -492,7 +492,7 @@ let octez_proto_lib : Sub_lib.maker =
 
 (* Registers a sub-library in the [octez-l2-libs] package.
    This package should contain all the libraries related to layer 2. *)
-let _octez_l2_lib : Sub_lib.maker =
+let octez_l2_lib : Sub_lib.maker =
   Sub_lib.sub_lib
     ~package_synopsis:"Octez layer2 libraries"
     ~container:registered_octez_l2_libs
@@ -2026,7 +2026,6 @@ let octez_base =
            Should be in sync with scripts/version.sh *)
         at_least "4.14.1" && less_than "4.15")
     ~license:"Apache-2.0"
-    ~extra_authors:["WebAssembly Authors"]
 
 let octez_base_unix =
   octez_lib
@@ -2167,7 +2166,7 @@ let _lazy_containers_tests =
       ]
 
 let octez_webassembly_interpreter =
-  octez_lib
+  octez_l2_lib
     "tezos-webassembly-interpreter"
     ~path:"src/lib_webassembly"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
@@ -2182,7 +2181,7 @@ let octez_webassembly_interpreter =
     ~preprocess:[pps ppx_deriving_show]
 
 let octez_webassembly_interpreter_extra =
-  public_lib
+  octez_l2_lib
     "tezos-webassembly-interpreter-extra"
     ~path:"src/lib_webassembly/extra"
     ~license:"Apache-2.0"
@@ -2216,7 +2215,7 @@ let _octez_webassembly_test =
   tezt
     ["smallint"]
     ~path:"src/lib_webassembly/tests"
-    ~opam:"octez-libs"
+    ~opam:"octez-l2-libs"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:[octez_webassembly_interpreter |> open_; alcotezt]
 
@@ -2578,7 +2577,7 @@ let _octez_gossipsub_test =
       ]
 
 let octez_wasmer =
-  public_lib
+  octez_l2_lib
     "tezos-wasmer"
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
@@ -2604,8 +2603,7 @@ let _octez_wasmer_test =
   tezt
     ["test_wasmer"]
     ~path:"src/lib_wasmer/test"
-    ~opam:"octez-wasmer-test"
-    ~synopsis:"Tests for the Wasmer bindings"
+    ~opam:"octez-l2-libs"
     ~deps:[octez_wasmer; alcotezt]
 
 let octez_context_encoding =
@@ -2654,7 +2652,7 @@ let octez_context_memory =
     ~conflicts:[Conflicts.checkseum]
 
 let octez_scoru_wasm =
-  octez_lib
+  octez_l2_lib
     "tezos-scoru-wasm"
     ~path:"src/lib_scoru_wasm"
     ~deps:
@@ -2670,7 +2668,7 @@ let octez_scoru_wasm =
       ]
 
 let octez_scoru_wasm_fast =
-  public_lib
+  octez_l2_lib
     "tezos-scoru-wasm-fast"
     ~path:"src/lib_scoru_wasm/fast"
     ~synopsis:"WASM functionality for SCORU Fast Execution"
@@ -4089,10 +4087,9 @@ let _octez_embedded_protocol_packer =
     ~modules:["Main_embedded_packer"]
 
 let octez_layer2_store =
-  private_lib
+  octez_l2_lib
     "tezos_layer2_store"
     ~path:"src/lib_layer2_store"
-    ~opam:"tezos-layer2-store"
     ~synopsis:"Tezos: layer2 storage utils"
     ~deps:
       [
@@ -4112,7 +4109,7 @@ let _octez_layer2_indexed_store_test =
   tezt
     ["test_indexed_store"]
     ~path:"src/lib_layer2_store/test/"
-    ~opam:"tezos-layer2-store"
+    ~opam:"octez-l2-libs"
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
@@ -4303,10 +4300,11 @@ let octez_injector =
       ]
 
 let octez_smart_rollup_lib =
-  public_lib
+  octez_l2_lib
     "octez-smart-rollup"
     ~path:"src/lib_smart_rollup"
-    ~synopsis:"Octez: library for Smart Rollups "
+    ~synopsis:"Octez: library for Smart Rollups"
+    ~documentation:[Dune.[S "package"; S "octez-l2-libs"]]
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -4345,10 +4343,9 @@ let octez_smart_rollup_node_lib =
       ]
 
 let octez_scoru_wasm_helpers =
-  public_lib
+  octez_l2_lib
     "tezos-scoru-wasm-helpers"
     ~path:"src/lib_scoru_wasm/helpers"
-    ~opam:"tezos-scoru-wasm-helpers"
     ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
     ~deps:
       [
@@ -4363,10 +4360,9 @@ let octez_scoru_wasm_helpers =
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let octez_scoru_wasm_durable_snapshot =
-  private_lib
+  octez_l2_lib
     "tezos_scoru_wasm_durable_snapshot"
     ~path:"src/lib_scoru_wasm/test/durable_snapshot"
-    ~opam:"tezos-scoru-wasm-durable-snapshot"
     ~synopsis:"Durable storage reference implementation"
     ~deps:
       [
@@ -4377,10 +4373,9 @@ let octez_scoru_wasm_durable_snapshot =
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let octez_scoru_wasm_tests_helpers =
-  private_lib
+  octez_l2_lib
     "tezos_scoru_wasm_test_helpers"
     ~path:"src/lib_scoru_wasm/test/helpers"
-    ~opam:"tezos-scoru-wasm-test-helpers"
     ~synopsis:"Helpers for test of the smart rollup wasm functionality"
     ~deps:
       [
@@ -4401,11 +4396,10 @@ let octez_scoru_wasm_tests_helpers =
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let octez_scoru_wasm_benchmark =
-  private_lib
+  octez_l2_lib
     "octez_smart_rollup_wasm_benchmark_lib"
     ~path:"src/lib_scoru_wasm/bench"
     ~synopsis:"Smart Rollup WASM benchmark library"
-    ~opam:"octez-smart-rollup-wasm-benchmark-lib"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -4422,8 +4416,7 @@ let _octez_scoru_wasm_benchmark_exe =
   private_exe
     "octez_smart_rollup_wasm_benchmark"
     ~path:"src/lib_scoru_wasm/bench/executable"
-    ~synopsis:"Smart rollup WASM benchmark library"
-    ~opam:"octez-smart-rollup-wasm-benchmark"
+    ~opam:"octez-l2-libs"
     ~preprocess:[pps ppx_deriving_show]
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_scoru_wasm_benchmark]
 
@@ -4453,8 +4446,7 @@ let _octez_scoru_wasm_tests =
       "test_wasm_vm";
     ]
     ~path:"src/lib_scoru_wasm/test"
-    ~opam:"tezos-scoru-wasm-test"
-    ~synopsis:"Tests for the scoru-wasm functionality"
+    ~opam:"octez-l2-libs"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -4483,8 +4475,7 @@ let _octez_scoru_wasm_fast_tests =
       "test_memory_access";
     ]
     ~path:"src/lib_scoru_wasm/fast/test"
-    ~opam:"tezos-scoru-wasm-fast-test"
-    ~synopsis:"Tests for the scoru-wasm-fast functionality"
+    ~opam:"octez-l2-libs"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";

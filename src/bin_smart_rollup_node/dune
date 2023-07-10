@@ -13,7 +13,7 @@
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
   octez-shell-libs.tezos-client-commands
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   octez-smart-rollup-node-lib
   octez_smart_rollup_node_PtNairob
   octez_smart_rollup_node_Proxford
