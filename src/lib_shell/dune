@@ -53,4 +53,4 @@
   -open Tezos_version
   -open Tezos_crypto_dal_octez_dal_config))
 
-(documentation (package tezos-shell))
+(documentation (package tezos-shell) (mld_files octez_shell))

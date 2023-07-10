@@ -456,6 +456,9 @@ let alcotezt =
 (* Container of the registered sublibraries of [octez-libs] *)
 let registered_octez_libs : Sub_lib.container = Sub_lib.make_container ()
 
+(* Container of the registered sublibraries of [octez-shell-libs] *)
+let registered_octez_shell_libs : Sub_lib.container = Sub_lib.make_container ()
+
 (* Registers a sub-library in [octez-libs] packages.
    This package should contain all Octez basic libraries. *)
 let octez_lib : Sub_lib.maker =
@@ -464,6 +467,14 @@ let octez_lib : Sub_lib.maker =
       "A package that contains multiple base libraries used by the Octez suite"
     ~container:registered_octez_libs
     ~package:"octez-libs"
+
+(* Registers a sub-library in the [octez-shell-libs] package.
+   This package should contain all the libraries related to the shell. *)
+let _octez_shell_lib : Sub_lib.maker =
+  Sub_lib.sub_lib
+    ~package_synopsis:"Octez shell libraries"
+    ~container:registered_octez_shell_libs
+    ~package:"octez-shell-libs"
 
 let octez_test_helpers =
   octez_lib
@@ -3366,7 +3377,8 @@ let octez_shell =
     ~synopsis:
       "Tezos: core of `octez-node` (gossip, validation scheduling, mempool, \
        ...)"
-    ~documentation:[Dune.[S "package"; S "tezos-shell"]]
+    ~documentation:
+      Dune.[[S "package"; S "tezos-shell"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
     ~deps:
       [
@@ -7987,5 +7999,15 @@ let () =
      It contains the following libraries:\n\n"
   in
   Sub_lib.pp_documentation_of_container ~header fmt registered_octez_libs
+
+(* Generate documentation index for [octez-shell-libs] *)
+let () =
+  write "src/lib_shell/index.mld" @@ fun fmt ->
+  let header =
+    "{0 Octez-shell-libs: octez shell libraries}\n\n\
+     This is a package containing some libraries used by the shell of Octez.\n\n\
+     It contains the following libraries:\n\n"
+  in
+  Sub_lib.pp_documentation_of_container ~header fmt registered_octez_shell_libs
 
 let () = postcheck ~exclude ()
