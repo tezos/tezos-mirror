@@ -304,14 +304,14 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
   let open Latex_syntax in
   let rows =
     List.filter_map
-      (fun (model_name, model) ->
+      (fun (local_model_name, model) ->
         match model with
         | Tezos_benchmark.Model.Aggregate _ -> None
         | Tezos_benchmark.Model.Abstract {model; _} ->
             let module M = (val model) in
             let module Model = M.Def (Pp_impl_abstract) in
             let printed = to_string Model.model in
-            let printed = Format.asprintf "%s: %s" model_name printed in
+            let printed = Format.asprintf "%s: %s" local_model_name printed in
             Some (Row [[normal_text printed]]))
       Bench.models
   in
@@ -387,9 +387,10 @@ type t = Latex_syntax.t
 
 let create_empty ~name = Latex_syntax.{title = name; sections = []}
 
-let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
-    ~(problem : Inference.problem) ~(solution : Inference.solution)
-    ~overrides_map ~short ~display_options document =
+let add_section ~(measure : Measure.packed_measurement)
+    ~(local_model_name : string) ~(problem : Inference.problem)
+    ~(solution : Inference.solution) ~overrides_map ~short ~display_options
+    document =
   let (Measure.Measurement ((module Bench), _)) = measure in
   let figs_files =
     let plot_target = Display.Save in
@@ -405,7 +406,7 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     Format.eprintf "Saving plot in folder %s@." save_directory ;
     Display.perform_plot
       ~measure
-      ~model_name
+      ~local_model_name
       ~problem
       ~solution
       ~plot_target

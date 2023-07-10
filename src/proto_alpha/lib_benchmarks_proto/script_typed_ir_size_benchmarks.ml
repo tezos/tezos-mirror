@@ -35,7 +35,7 @@ let fv s = Free_variable.of_namespace (ns s)
 
 (** Benchmarking {!Script_typed_ir_size.value_size}. *)
 
-let model_name = "ir_size_model"
+let local_model_name = "ir_size_model"
 
 let strict = Script_ir_translator_config.make ~legacy:false ()
 
@@ -71,7 +71,7 @@ module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let models =
     let model = size_based_model ~name in
-    [(model_name, model)]
+    [(local_model_name, model)]
 
   let info = "Benchmarking Script_typed_ir_size.value_size"
 
@@ -154,7 +154,7 @@ module Type_size_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "script_typed_ir_size"
 
-  let group = Benchmark.Group model_name
+  let group = Benchmark.Group local_model_name
 
   let model = size_based_model
 
@@ -187,7 +187,7 @@ module Kinstr_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let name = ns "KINSTR_SIZE"
 
-  let models = [(model_name, size_based_model ~name)]
+  let models = [(local_model_name, size_based_model ~name)]
 
   let info = "Benchmarking Script_typed_ir_size.kinstr_size"
 
@@ -276,7 +276,7 @@ module Node_size_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "script_typed_ir_size"
 
-  let group = Benchmark.Group model_name
+  let group = Benchmark.Group local_model_name
 
   let model =
     Model.make

@@ -121,7 +121,7 @@ let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
 
 (* Infer command *)
 
-let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
+let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
     ~solution ?report ?graph () =
   let regression_method =
     match regression_method with
@@ -146,7 +146,7 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
     "parameters";
     "for";
     "model";
-    model_name;
+    local_model_name;
     "on";
     "data";
     workload_data;
@@ -156,12 +156,12 @@ let infer_command ~model_name ~workload_data ~regression_method ~dump_csv
   @ ["--dump-csv"; dump_csv; "--save-solution"; solution]
   @ report @ graph
 
-let spawn_infer_parameters ~model_name ~workload_data ~regression_method
+let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
     ~dump_csv ~solution ?report ?graph snoop =
   spawn_command
     snoop
     (infer_command
-       ~model_name
+       ~local_model_name
        ~workload_data
        ~regression_method
        ~dump_csv
@@ -170,10 +170,10 @@ let spawn_infer_parameters ~model_name ~workload_data ~regression_method
        ?graph
        ())
 
-let infer_parameters ~model_name ~workload_data ~regression_method ~dump_csv
-    ~solution ?report ?graph snoop =
+let infer_parameters ~local_model_name ~workload_data ~regression_method
+    ~dump_csv ~solution ?report ?graph snoop =
   spawn_infer_parameters
-    ~model_name
+    ~local_model_name
     ~workload_data
     ~regression_method
     ~dump_csv

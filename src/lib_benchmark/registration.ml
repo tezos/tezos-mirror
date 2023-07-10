@@ -177,7 +177,7 @@ let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
           Generate_code destination
   end in
   List.iter
-    (fun (model_local_name, m) -> register_model Bench.name model_local_name m)
+    (fun (local_model_name, m) -> register_model Bench.name local_model_name m)
     Bench.models ;
   Name_table.add bench_table Bench.name (module Bench)
 

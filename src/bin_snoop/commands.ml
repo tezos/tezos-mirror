@@ -346,7 +346,7 @@ module Infer_cmd = struct
         dot_file,
         full_plot_verbosity,
         plot_raw_workload,
-        empirical_plot ) model_name workload_data solver () =
+        empirical_plot ) local_model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -363,7 +363,8 @@ module Infer_cmd = struct
       |> lift_opt set_empirical_plot empirical_plot
     in
     commandline_outcome_ref :=
-      Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
+      Some
+        (Infer {local_model_name; workload_data; solver; infer_opts = options}) ;
     Lwt.return_ok ()
 
   module Options = struct
@@ -938,9 +939,7 @@ module List_cmd = struct
       (Tezos_clic.parameter
          ~autocomplete:(fun _ ->
            let res =
-             List.map
-               (fun model_name -> Namespace.to_string model_name)
-               (Registration.all_model_names ())
+             List.map Namespace.to_string (Registration.all_model_names ())
            in
            Lwt.return_ok res)
          (fun _ str -> Lwt.return_ok str))

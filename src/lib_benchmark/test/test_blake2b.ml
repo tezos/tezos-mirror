@@ -87,7 +87,7 @@ let () =
   let solution =
     Codegen.
       {
-        inference_model_name = "blake2b";
+        local_model_name = "blake2b";
         map = Free_variable.Map.of_seq (List.to_seq solution.mapping);
         scores_list = [];
       }

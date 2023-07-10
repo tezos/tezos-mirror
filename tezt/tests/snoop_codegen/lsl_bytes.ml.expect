@@ -8,7 +8,7 @@
 
 module S = Saturation_repr
 
-(* Inference model name: interpreter *)
+(* Local model name: interpreter *)
 
 (* model builtin/timer_model *)
 (* 19.04 *)

@@ -64,13 +64,13 @@ let csv name = sf "%s_raw.csv" name
 
 let inference_results_dir = "inference_results"
 
-let solution_csv model_name = sf "inferred_%s.csv" model_name
+let solution_csv local_model_name = sf "inferred_%s.csv" local_model_name
 
-let solution_bin model_name = sf "inferred_%s.sol" model_name
+let solution_bin local_model_name = sf "inferred_%s.sol" local_model_name
 
-let report_tex model_name = sf "report_%s.tex" model_name
+let report_tex local_model_name = sf "report_%s.tex" local_model_name
 
-let dep_graph model_name = sf "graph_%s.dot" model_name
+let dep_graph local_model_name = sf "graph_%s.dot" local_model_name
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
