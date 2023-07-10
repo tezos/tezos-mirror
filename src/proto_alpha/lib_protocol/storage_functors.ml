@@ -427,6 +427,15 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     consume_mem_gas s key >>?= fun s ->
     C.mem s key >|= fun exists -> ok (C.project s, exists)
 
+  let is_empty s =
+    let root_key = [] in
+    consume_mem_gas s root_key >>?= fun s ->
+    C.find_tree s root_key >>= function
+    | None -> return @@ (C.project s, true)
+    | Some root ->
+        let is_empty = C.Tree.is_empty root in
+        return @@ (C.project s, is_empty)
+
   let get_unprojected s i =
     consume_read_gas C.get s i >>=? fun s ->
     C.get s (data_key i) >>=? fun b ->
@@ -590,6 +599,8 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
   type elt = I.t
 
   let mem = M.mem
+
+  let is_empty = M.is_empty
 
   let init s i = M.init s i ()
 

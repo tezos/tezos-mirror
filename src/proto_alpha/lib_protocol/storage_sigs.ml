@@ -231,6 +231,10 @@ module type Indexed_carbonated_data_storage = sig
     ?length:int ->
     t ->
     (Raw_context.t * (key * value) list) tzresult Lwt.t
+
+  (** Returns [true] iff [context] is empty.
+      Consumes [Gas_repr.read_bytes_cost Z.zero].*)
+  val is_empty : context -> (Raw_context.t * bool) tzresult Lwt.t
 end
 
 module type Indexed_carbonated_data_storage_INTERNAL = sig
@@ -400,6 +404,10 @@ module type Carbonated_data_set_storage = sig
 
   (** The type of elements. *)
   type elt
+
+  (** Returns true if and only if the set contains no elements.
+      Consumes [Gas_repr.read_bytes_cost Z.zero].*)
+  val is_empty : context -> (Raw_context.t * bool) tzresult Lwt.t
 
   (** Tells whether an elt is a member of the set.
       Consumes [Gas_repr.read_bytes_cost Z.zero] *)
