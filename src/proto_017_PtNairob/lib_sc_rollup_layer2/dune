@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob
   octez-injector
-  octez-smart-rollup)
+  octez-l2-libs.octez-smart-rollup)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

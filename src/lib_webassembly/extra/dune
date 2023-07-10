@@ -3,10 +3,10 @@
 
 (library
  (name tezos_webassembly_interpreter_extra)
- (public_name tezos-webassembly-interpreter-extra)
+ (public_name octez-l2-libs.tezos-webassembly-interpreter-extra)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-webassembly-interpreter
+  octez-l2-libs.tezos-webassembly-interpreter
   lwt.unix
   octez-libs.tezos-lazy-containers)
  (flags

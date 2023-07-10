@@ -24,11 +24,11 @@
   tezos-dal-node-lib
   tezos-dac-lib
   octez-shell-libs.tezos-shell-services
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   tezos-smart-rollup-017-PtNairob
   tezos-smart-rollup-layer2-017-PtNairob
   tezos-layer2-utils-017-PtNairob
-  tezos_layer2_store
+  octez-l2-libs.tezos_layer2_store
   octez-crawler
   octez-libs.tezos-tree-encoding
   data-encoding
@@ -39,8 +39,8 @@
   aches-lwt
   octez-injector
   octez-smart-rollup-node-lib
-  octez-libs.tezos-scoru-wasm
-  tezos-scoru-wasm-fast
+  octez-l2-libs.tezos-scoru-wasm
+  octez-l2-libs.tezos-scoru-wasm-fast
   octez-libs.tezos-crypto-dal
   tezos-version.value)
  (flags

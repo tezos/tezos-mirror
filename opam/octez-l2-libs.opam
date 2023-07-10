@@ -2,22 +2,33 @@
 # Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: ["Tezos devteam"]
+authors: ["Tezos devteam" "WebAssembly Authors"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
-license: "MIT"
+license: "Apache-2.0"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "index" { >= "1.6.0" & < "1.7.0" }
+  "ppx_deriving"
   "octez-libs"
+  "zarith" { >= "1.12" & < "1.13" }
+  "lwt" { >= "5.7.0" }
+  "ctypes" { >= "0.18.0" }
+  "ctypes-foreign" { >= "0.18.0" }
+  "tezos-rust-libs" { = "1.6" }
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "aches-lwt" { >= "1.0.0" }
-  "tezt" { with-test & >= "3.1.1" }
-  "qcheck-alcotest" { with-test & >= "0.20" }
-  "octez-alcotezt" {with-test}
+  "ppx_import"
+  "qcheck-alcotest" { >= "0.20" }
+  "octez-alcotezt"
+  "tezt" { >= "3.1.1" }
+]
+x-opam-monorepo-opam-provided: [
+  "tezos-rust-libs"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
@@ -27,4 +38,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: layer2 storage utils"
+synopsis: "Octez layer2 libraries"

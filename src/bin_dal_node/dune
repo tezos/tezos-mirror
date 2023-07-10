@@ -22,7 +22,7 @@
   octez-libs.tezos-stdlib
   tezos-dal-node-lib
   tezos-dal-node-services
-  tezos_layer2_store
+  octez-l2-libs.tezos_layer2_store
   octez-libs.tezos-crypto-dal
   octez-shell-libs.tezos-store.unix
   octez-shell-libs.tezos-store.shared

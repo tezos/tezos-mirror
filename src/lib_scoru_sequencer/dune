@@ -12,7 +12,7 @@
   octez_smart_rollup_node_alpha
   octez-libs.tezos-workers
   octez-smart-rollup-node-lib
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   octez-shell-libs.tezos-client-base
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http

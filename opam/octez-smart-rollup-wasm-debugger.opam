@@ -13,8 +13,7 @@ depends: [
   "octez-libs"
   "yaml" { >= "3.1.0" }
   "tezos-client-alpha"
-  "tezos-scoru-wasm-helpers"
-  "tezos-webassembly-interpreter-extra"
+  "octez-l2-libs"
   "tezos-version"
 ]
 build: [

@@ -14,7 +14,7 @@ depends: [
   "octez-libs"
   "tezos-protocol-018-Proxford"
   "octez-injector"
-  "octez-smart-rollup"
+  "octez-l2-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

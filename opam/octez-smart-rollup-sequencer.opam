@@ -15,7 +15,7 @@ depends: [
   "tezos-protocol-alpha"
   "octez-smart-rollup-node-alpha"
   "octez-smart-rollup-node-lib"
-  "octez-smart-rollup"
+  "octez-l2-libs"
   "octez-shell-libs"
 ]
 build: [

@@ -528,6 +528,13 @@ opam:octez-injector:
   variables:
     package: octez-injector
 
+opam:octez-l2-libs:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: octez-l2-libs
+
 opam:octez-libs:
   extends:
     - .opam_template
@@ -586,13 +593,6 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
-opam:octez-smart-rollup:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: octez-smart-rollup
-
 opam:octez-smart-rollup-client-Proxford:
   extends:
     - .opam_template
@@ -638,10 +638,6 @@ opam:octez-smart-rollup-node-lib:
 
 # Ignoring unreleased package octez-smart-rollup-sequencer-node.
 
-# Ignoring unreleased package octez-smart-rollup-wasm-benchmark.
-
-# Ignoring unreleased package octez-smart-rollup-wasm-benchmark-lib.
-
 opam:octez-smart-rollup-wasm-debugger:
   extends:
     - .opam_template
@@ -654,8 +650,6 @@ opam:octez-smart-rollup-wasm-debugger:
 # Ignoring unreleased package octez-store-tests.
 
 # Ignoring unreleased package octez-testnet-scenarios.
-
-# Ignoring unreleased package octez-wasmer-test.
 
 # Ignoring unreleased package octogram.
 
@@ -1148,13 +1142,6 @@ opam:tezos-embedded-protocol-genesis:
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:tezos-layer2-store:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-layer2-store
-
 # Ignoring unreleased package tezos-layer2-utils-016-PtMumbai.
 
 opam:tezos-layer2-utils-017-PtNairob:
@@ -1557,29 +1544,7 @@ opam:tezos-proxy-server-config:
 
 # Ignoring unreleased package tezos-sc-rollup-node-test.
 
-# Ignoring unreleased package tezos-scoru-wasm-durable-snapshot.
-
-opam:tezos-scoru-wasm-fast:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-scoru-wasm-fast
-
-# Ignoring unreleased package tezos-scoru-wasm-fast-test.
-
-opam:tezos-scoru-wasm-helpers:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-scoru-wasm-helpers
-
 # Ignoring unreleased package tezos-scoru-wasm-regressions.
-
-# Ignoring unreleased package tezos-scoru-wasm-test.
-
-# Ignoring unreleased package tezos-scoru-wasm-test-helpers.
 
 opam:tezos-smart-rollup-016-PtMumbai:
   extends:
@@ -1639,19 +1604,5 @@ opam:tezos-version:
     - .rules_template__trigger_exec_opam_batch_7
   variables:
     package: tezos-version
-
-opam:tezos-wasmer:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-wasmer
-
-opam:tezos-webassembly-interpreter-extra:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-webassembly-interpreter-extra
 
 # Ignoring unreleased package tezt-ethereum.

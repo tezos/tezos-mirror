@@ -20,9 +20,8 @@ depends: [
   "tezos-dac-client-lib"
   "octez-injector"
   "tezos-version"
-  "tezos-layer2-store"
+  "octez-l2-libs"
   "octez-crawler"
-  "octez-smart-rollup"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
