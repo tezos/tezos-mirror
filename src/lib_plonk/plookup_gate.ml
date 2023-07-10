@@ -541,9 +541,10 @@ module Plookup_gate_impl (PP : Polynomial_protocol.S) = struct
   (*TODO : use mul z_s*)
   let f_map_contribution ~wires ~gates ~tables ~alpha ~beta ~gamma ~domain =
     let wires =
+      let wires_names = List.init nb_plookup_wires Csir.wire_name in
       SMap.filter_map
         (fun k w ->
-          if Csir.int_of_wire_name k >= nb_plookup_wires then None
+          if not (List.mem k wires_names) then None
             (* TODO : remove this conversion *)
           else Some (Evaluations.to_array w))
         wires
