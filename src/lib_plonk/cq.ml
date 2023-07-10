@@ -163,7 +163,9 @@ module Make (PC : Polynomial_commitment.S) = struct
 
   (* This function is used to aggregate commitments for different proofs *)
   let aggregate_cm cm etas =
-    pippenger1 (PC.Commitment.to_map cm |> SMap.values |> Array.of_list) etas
+    pippenger1_with_affine_array
+      (PC.Commitment.to_map cm |> SMap.values |> Array.of_list)
+      etas
 
   (* We don’t need the generator because we don’t evaluate at gX *)
   let get_pc_query gamma =
@@ -183,7 +185,7 @@ module Make (PC : Polynomial_commitment.S) = struct
   (* This function avoid some lines of code duplication *)
   let compute_and_commit f list =
     let m, l = List.map f list |> Array.of_list |> Array.split in
-    (m, pippenger1 l m)
+    (m, pippenger1_with_affine_array l m)
 
   let setup_prover (n, domain) k (table_arrays, table_polys) pc =
     let domain_k = Domain.build k in

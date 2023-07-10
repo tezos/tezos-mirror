@@ -236,11 +236,8 @@ let pippenger pippenger ps ss =
   with Invalid_argument s ->
     raise (Invalid_argument ("Utils.pippenger : " ^ s))
 
-let pippenger1 g =
+let pippenger1_with_affine_array g =
   pippenger G1.pippenger_with_affine_array (G1.to_affine_array g)
-
-let pippenger2 g =
-  pippenger G2.pippenger_with_affine_array (G2.to_affine_array g)
 
 let commit_single pippenger zero srs_size srs p =
   let p_size = 1 + Poly.degree p in

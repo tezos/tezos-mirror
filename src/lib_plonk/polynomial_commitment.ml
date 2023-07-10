@@ -287,11 +287,15 @@ module Kzg_impl = struct
 
     let ws = SMap.values w_map in
     let left =
-      pippenger1
+      pippenger1_with_affine_array
         (Array.of_list @@ (G1.one :: ws) @ cmts)
         (Array.of_list @@ (s :: w_left_exps) @ exponents)
     in
-    let right = pippenger1 (Array.of_list ws) (Array.of_list w_right_exps) in
+    let right =
+      pippenger1_with_affine_array
+        (Array.of_list ws)
+        (Array.of_list w_right_exps)
+    in
     Public_parameters.[(left, srs.encoding_1); (right, srs.encoding_x)]
     |> Pairing.pairing_check
 
