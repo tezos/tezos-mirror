@@ -74,9 +74,6 @@ module type T = sig
   val worker : worker Lazy.t
 end
 
-type t = (module T)
-
-open Prevalidator_worker_state
 open Shell_operation
 module Events = Prevalidator_events
 module Classification = Prevalidator_classification
@@ -1444,7 +1441,7 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) : t =
+let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) =
   let module Prevalidation_t = Prevalidation.Make (Filter) in
   let module Prevalidator =
     Make
@@ -1460,8 +1457,6 @@ let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) : t =
   in
   (module Prevalidator : T)
 
-open Prevalidator_worker_state
-
 module ChainProto_registry = Map.Make (struct
   type t = Chain_id.t * Protocol_hash.t
 
@@ -1469,6 +1464,10 @@ module ChainProto_registry = Map.Make (struct
     let pc = Protocol_hash.compare p1 p2 in
     if pc = 0 then Chain_id.compare c1 c2 else pc
 end)
+
+(** {2 Public interface} *)
+
+type t = (module T)
 
 let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
