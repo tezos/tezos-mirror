@@ -31,11 +31,11 @@ val encoding : t Data_encoding.t
 
 val zero : t
 
-val of_int64_exn : int64 -> t
-
 val of_z_exn : Z.t -> t
 
 val to_z : t -> Z.t
+
+val init_of_tez : Tez_repr.t -> t
 
 val ( = ) : t -> t -> bool
 

@@ -215,8 +215,7 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
           return (ctxt, frozen_deposits_pseudotokens, pseudotokens_to_add)
       else
         let init_frozen_deposits_pseudotokens =
-          Staking_pseudotoken_repr.of_int64_exn
-            (Tez_repr.to_mutez frozen_deposits_tez)
+          Staking_pseudotoken_repr.init_of_tez frozen_deposits_tez
         in
         let*! ctxt =
           Storage.Contract.Costaking_pseudotokens.add
@@ -225,7 +224,7 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
             init_frozen_deposits_pseudotokens
         in
         let pseudotokens_to_add =
-          Staking_pseudotoken_repr.of_int64_exn (Tez_repr.to_mutez tez_amount)
+          Staking_pseudotoken_repr.init_of_tez tez_amount
         in
         return (ctxt, init_frozen_deposits_pseudotokens, pseudotokens_to_add)
     in
