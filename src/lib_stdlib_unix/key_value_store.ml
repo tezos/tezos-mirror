@@ -99,7 +99,8 @@ end = struct
 
   let max_number_of_files = 4096
 
-  (* TODO: for now the bitset is a byte set...
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
+     For now the bitset is a byte set...
      With a true bitset, we'd have [max_number_of_files/8] *)
   let bitset_size = max_number_of_files
 
@@ -128,7 +129,8 @@ end = struct
   let load_virtual_directory path =
     let open Lwt_syntax in
     let* fd = Lwt_unix.openfile path [O_RDWR; O_CLOEXEC] 0o660 in
-    (* TODO: Should we check that the file is at least as big as the bitset?  *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
+       Should we check that the file is at least as big as the bitset? *)
     let bitset =
       Lwt_bytes.map_file
         ~fd:(Lwt_unix.unix_file_descr fd)
@@ -145,7 +147,8 @@ end = struct
         handle : handle Lwt.t;
         accessed : Lwt_mutex.t File_table.t;
         cached : 'value File_table.t;
-        (* TODO: Should we use a weak table to automatically collect dangling promises?
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
+           Should we use a weak table to automatically collect dangling promises?
            Note that we do clear resolved promises each time we grow this list. *)
         mutable pending_callbacks : unit Lwt.t list;
       }
@@ -178,7 +181,8 @@ end = struct
         match entry with
         | Being_evicted p -> p
         | Entry {handle; pending_callbacks = _; accessed = _; cached = _} ->
-            (* TODO: should we lock access to [accessed]; then lock on
+            (* TODO https://gitlab.com/tezos/tezos/-/issues/6033
+               Should we lock access to [accessed]; then lock on
                all mutex in [accessed], then close? This would ensure that we wait until
                all pending callbacks terminate. *)
             let* handle in
