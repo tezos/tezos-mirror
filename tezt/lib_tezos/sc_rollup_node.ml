@@ -47,7 +47,7 @@ module Parameters = struct
 
   let base_default_name = "sc-rollup-node"
 
-  let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
+  let default_colors = Log.Color.[|FG.magenta; FG.green; FG.yellow; FG.cyan|]
 end
 
 open Parameters
