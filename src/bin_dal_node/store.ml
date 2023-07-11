@@ -226,7 +226,7 @@ module Legacy = struct
          that are either [`Waiting_attesattion], [`Attested], or [`Unattested].
 
          "Others" path(s) are used to store information of slots headers when
-         their statuses are [`Not_selected] or [`Unseen]. *)
+         their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
 
       val slots_indices : Services.Types.level -> Path.t
 
@@ -364,7 +364,7 @@ module Legacy = struct
              levels_path)
         store
         levels_path
-        (encode_header_status `Unseen)
+        (encode_header_status `Unseen_or_not_finalized)
 
   let exists_slot_by_commitment node_store cryptobox commitment =
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -383,7 +383,7 @@ module Legacy = struct
         return @@ Some dec)
       res_opt
 
-  let add_slot_headers ~block_level ~block_hash:_ slot_headers node_store =
+  let add_slot_headers ~block_level slot_headers node_store =
     let open Lwt_result_syntax in
     let slots_store = node_store.store in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4388
@@ -414,7 +414,8 @@ module Legacy = struct
             let status_path = Path.Level.accepted_header_status index in
             let data = encode_commitment commitment in
             (* Before adding the item in accepted path, we should remove it from
-               others path, as it may appear there with an Unseen status. *)
+               others path, as it may appear there with an
+               Unseen_or_not_finalized status. *)
             let*! () =
               remove
                 ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)

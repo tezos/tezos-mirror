@@ -105,12 +105,13 @@ module Plugin = struct
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let attested_slot_headers hash (block : block_info) ~number_of_slots =
+  let attested_slot_headers (block : block_info) ~number_of_slots =
     let open Result_syntax in
     let* metadata =
       Option.to_result
         block.metadata
-        ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
+        ~none:
+          (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
     let confirmed_slots =
       Option.value

@@ -45,6 +45,8 @@ val fetched_slot : (int * int) t
 
 val layer1_node_new_head : (Block_hash.t * int32) t
 
+val layer1_node_final_block : int32 t
+
 val layer1_node_tracking_started : unit t
 
 val protocol_plugin_resolved : Protocol_hash.t t

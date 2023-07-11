@@ -25,13 +25,19 @@
 
 exception Status_already_ready
 
+type head_info = {
+  proto : int; (* the [proto_level] from the head's shell header *)
+  level : int32;
+}
+
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
   activation_level : Int32.t;
-  proto_level : int;
+  plugin_proto : int; (* the [proto_level] of the plugin *)
+  last_seen_head : head_info option;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -74,7 +80,7 @@ let init config store gs_worker transport_layer cctxt metrics_server =
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters activation_level
-    proto_level =
+    plugin_proto =
   match ctxt.status with
   | Starting ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
@@ -92,15 +98,16 @@ let set_ready ctxt plugin cryptobox proto_parameters activation_level
             proto_parameters;
             shards_proofs_precomputation;
             activation_level;
-            proto_level;
+            plugin_proto;
+            last_seen_head = None;
           }
   | Ready _ -> raise Status_already_ready
 
-let update_plugin_in_ready ctxt plugin proto_level =
+let update_plugin_in_ready ctxt plugin proto =
   match ctxt.status with
   | Starting -> ()
   | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with plugin; proto_level}
+      ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
 
 type error += Node_not_ready
 
@@ -122,6 +129,14 @@ let get_ready ctxt =
   let open Result_syntax in
   match ctxt.status with
   | Ready ctxt -> Ok ctxt
+  | Starting -> fail [Node_not_ready]
+
+let update_last_seen_head ctxt head_info =
+  let open Result_syntax in
+  match ctxt.status with
+  | Ready ready_ctxt ->
+      ctxt.status <- Ready {ready_ctxt with last_seen_head = Some head_info} ;
+      return_unit
   | Starting -> fail [Node_not_ready]
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt

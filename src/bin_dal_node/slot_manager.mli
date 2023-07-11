@@ -109,7 +109,6 @@ val publish_slot_data :
     baked at level [block_level]. *)
 val store_slot_headers :
   block_level:int32 ->
-  block_hash:Block_hash.t ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
   Store.node_store ->
   unit tzresult Lwt.t

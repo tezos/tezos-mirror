@@ -69,8 +69,8 @@ module Types : sig
   (** The status of a header a DAL node is aware of: *)
   type header_status =
     [ `Waiting_attestation
-      (** The slot header was included and applied in an L1 block but remains to
-          be attested. *)
+      (** The slot header was included and applied in a finalized L1 block
+          but remains to be attested. *)
     | `Attested
       (** The slot header was included in an L1 block and attested. *)
     | `Unattested
@@ -78,12 +78,15 @@ module Types : sig
     | `Not_selected
       (** The slot header was included in an L1 block but was not selected as
           the slot header for that slot index. *)
-    | `Unseen ]
-  (** The slot header was never seen in an L1 block. For instance, this could
-      happen if the RPC `PATCH /commitments/<commitment>` was called but the
-      corresponding slot header was never included into a block. This means that
-      the publish operation was not sent (yet) to L1, or sent but not included
-      (yet) in a block). *)
+    | `Unseen_or_not_finalized
+      (** The slot header was not seen in a *final* L1 block. For instance, this
+          could happen if the RPC `PATCH /commitments/<commitment>` was called
+          but the corresponding slot header was never included into a block; or
+          the slot header was included in a non-final (ie not agreed upon)
+          block. This means that the publish operation was not sent (yet) to L1,
+          or sent but not included (yet) in a block, or included in a not (yet)
+          final block. *)
+    ]
 
   (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in *)

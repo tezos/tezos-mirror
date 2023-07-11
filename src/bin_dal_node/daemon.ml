@@ -251,33 +251,43 @@ module Handler = struct
           return None
     else return (Some current_plugin)
 
+  (* Monitor heads and store *finalized* published slot headers indexed by block
+     hash. A slot header is considered finalized when it is in a block with at
+     least one other block on top of it, as guaranteed by Tenderbake. Note that
+     this means that shard propagation is delayed by one level with respect to
+     the publication level of the corresponding slot header. *)
   let new_head ctxt cctxt =
-    (* Monitor heads and store published slot headers indexed by block hash. *)
     let open Lwt_result_syntax in
-    let handler _stopper (block_hash, (header : Tezos_base.Block_header.t)) =
+    let handler _stopper (head_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
-      | Ready
-          {
-            plugin = current_plugin;
-            proto_parameters;
-            cryptobox;
-            shards_proofs_precomputation = _;
-            activation_level;
-            proto_level;
-          } -> (
-          let block = `Hash (block_hash, 0) in
-          let block_level = header.shell.level in
-          if Compare.Int32.(block_level < activation_level) then return_unit
-          else
+      | Ready ready_ctxt ->
+          let head_level = header.shell.level in
+          let*! () =
+            Event.(emit layer1_node_new_head (head_hash, head_level))
+          in
+          let Node_context.
+                {
+                  plugin = current_plugin;
+                  proto_parameters;
+                  cryptobox;
+                  shards_proofs_precomputation = _;
+                  activation_level;
+                  plugin_proto;
+                  last_seen_head;
+                } =
+            ready_ctxt
+          in
+          let process_block block_proto block_level =
+            let block = `Level block_level in
             let* plugin_opt =
               update_plugin
                 cctxt
                 ctxt
                 current_plugin
                 ~block
-                ~current_proto:proto_level
-                ~block_proto:header.shell.proto_level
+                ~current_proto:plugin_proto
+                ~block_proto
             in
             match plugin_opt with
             | None -> return_unit
@@ -292,13 +302,12 @@ module Handler = struct
                 let* () =
                   Slot_manager.store_slot_headers
                     ~block_level
-                    ~block_hash
                     slot_headers
                     (Node_context.get_store ctxt)
                 in
                 let* () =
                   (* If a slot header was posted to the L1 and we have the corresponding
-                     data, post it to gossipsub.
+                         data, post it to gossipsub.
 
                      FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
                      Should we restrict published slot data to the slots for which
@@ -326,7 +335,6 @@ module Handler = struct
                 in
                 let*? attested_slots =
                   Plugin.attested_slot_headers
-                    block_hash
                     block_info
                     ~number_of_slots:proto_parameters.number_of_slots
                 in
@@ -347,11 +355,26 @@ module Handler = struct
                     (Node_context.get_gs_worker ctxt)
                     committee
                 in
-                let*! () =
-                  Event.(emit layer1_node_new_head (block_hash, block_level))
-                in
-                return_unit)
+                let*! () = Event.(emit layer1_node_final_block block_level) in
+                return_unit
+          in
+          if Compare.Int32.(head_level < activation_level) then return_unit
+          else
+            let* () =
+              match last_seen_head with
+              | Some {level = last_head_level; proto}
+                when Int32.(succ last_head_level = head_level) ->
+                  process_block proto last_head_level
+              | _ -> return_unit
+            in
+            let head_info =
+              Node_context.
+                {proto = header.shell.proto_level; level = head_level}
+            in
+            let*? () = Node_context.update_last_seen_head ctxt head_info in
+            return_unit
     in
+
     let*! () = Event.(emit layer1_node_tracking_started ()) in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
         If the layer1 node reboots, the rpc stream breaks.*)

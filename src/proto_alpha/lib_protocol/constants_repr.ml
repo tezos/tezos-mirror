@@ -341,6 +341,12 @@ let check_constants constants =
         blocks_per_epoch must divide blocks_per_cycle.")
   >>? fun () ->
   error_unless
+    Compare.Int.(constants.dal.attestation_lag > 1)
+    (Invalid_protocol_constants
+       "The attestation_lag must be strictly greater than 1, because only slot \
+        headers in finalized blocks are attested.")
+  >>? fun () ->
+  error_unless
     Compare.Int.(
       constants.sc_rollup.max_number_of_stored_cemented_commitments > 0)
     (Invalid_protocol_constants
