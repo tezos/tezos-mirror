@@ -24,3 +24,17 @@
 (*****************************************************************************)
 
 include Archiver.S with type t = Tezos_client_base.Client_context.full
+
+type chunk =
+  | Block of
+      Int32.t
+      * Block_hash.t
+      * Block_hash.t option
+      * Int32.t
+      * Time.Protocol.t
+      * (string * Time.System.t) list
+      * Tezos_crypto.Signature.Public_key_hash.t
+      * Consensus_ops.block_op list
+  | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
+
+val dump : string -> chunk -> unit Lwt.t

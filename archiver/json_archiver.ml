@@ -484,31 +484,30 @@ type chunk =
 
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
-let launch _cctx prefix =
-  Lwt_stream.iter_p
-    (function
-      | Block
-          ( level,
-            block_hash,
-            predecessor,
-            round,
-            timestamp,
-            reception_times,
-            baker,
-            block_info ) ->
-          dump_included_in_block
-            prefix
-            level
-            block_hash
-            predecessor
-            round
-            timestamp
-            reception_times
-            baker
-            block_info
-      | Mempool (unaccurate, level, items) ->
-          dump_received prefix ?unaccurate level items)
-    chunk_stream
+let dump prefix = function
+  | Block
+      ( level,
+        block_hash,
+        predecessor,
+        round,
+        timestamp,
+        reception_times,
+        baker,
+        block_info ) ->
+      dump_included_in_block
+        prefix
+        level
+        block_hash
+        predecessor
+        round
+        timestamp
+        reception_times
+        baker
+        block_info
+  | Mempool (unaccurate, level, items) ->
+      dump_received prefix ?unaccurate level items
+
+let launch _cctxt prefix = Lwt_stream.iter_p (dump prefix) chunk_stream
 
 let stop () = chunk_feeder None
 
