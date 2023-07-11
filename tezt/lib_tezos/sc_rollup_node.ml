@@ -47,7 +47,7 @@ module Parameters = struct
 
   let base_default_name = "sc-rollup-node"
 
-  let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
+  let default_colors = Log.Color.[|FG.magenta; FG.green; FG.yellow; FG.cyan|]
 end
 
 open Parameters
@@ -93,6 +93,8 @@ let process node =
   | Not_running -> None
 
 let name sc_node = sc_node.name
+
+let color sc_node = sc_node.color
 
 let rpc_host sc_node = sc_node.persistent_state.rpc_host
 

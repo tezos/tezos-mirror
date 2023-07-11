@@ -100,6 +100,9 @@ val create_with_endpoint :
 (** Get the name of an sc node. *)
 val name : t -> string
 
+(** Get the color of the logs of a smart rollup node. *)
+val color : t -> Log.Color.t
+
 (** Get the RPC host given as [--rpc-addr] to an sc node. *)
 val rpc_host : t -> string
 

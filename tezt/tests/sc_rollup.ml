@@ -244,7 +244,8 @@ let wait_for_computed_dissection sc_node =
 *)
 let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string")
-    ?(operator = Constant.bootstrap1.alias) ?data_dir tezos_node tezos_client =
+    ?(operator = Constant.bootstrap1.alias) ?data_dir ?rollup_node_name
+    tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
       ?hooks
@@ -262,6 +263,7 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       ?data_dir
       ~base_dir:(Client.base_dir tezos_client)
       ~default_operator:operator
+      ?name:rollup_node_name
   in
   let rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   return (sc_rollup_node, rollup_client, sc_rollup)
@@ -333,7 +335,7 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    {variant; tags; description} scenario =
+    ?rollup_node_name {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?supports
@@ -353,6 +355,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?hooks
       ?mode
       ?boot_sector
+      ?rollup_node_name
       tezos_node
       tezos_client
   in
@@ -3050,6 +3053,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~mode
     ~timeout:60
     ?challenge_window
+    ~rollup_node_name:"honest"
     {
       tags = (["refutation"] @ if mode = Accuser then ["accuser"] else []);
       variant = Some (variant ^ if mode = Accuser then "+accuser" else "");
@@ -3139,13 +3143,17 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   in
 
   let loser_sc_rollup_nodes =
+    let i = ref 0 in
     List.map2
       (fun default_operator _ ->
+        incr i ;
+        let rollup_node_name = "loser" ^ string_of_int !i in
         Sc_rollup_node.create
           Operator
           node
           ~base_dir:(Client.base_dir client)
-          ~default_operator)
+          ~default_operator
+          ~name:rollup_node_name)
       loser_keys
       loser_modes
   in
@@ -3220,16 +3228,17 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     stop_losers level
   in
   let keep_going client =
-    let* game =
+    let* games =
       RPC.Client.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
            ~staker:bootstrap1_key
            sc_rollup_address
            ()
     in
-    if !game_started then return @@ not (JSON.is_null game)
+    let has_games = JSON.as_list games <> [] in
+    if !game_started then return has_games
     else (
-      game_started := not @@ JSON.is_null game ;
+      game_started := has_games ;
       return true)
   in
 
