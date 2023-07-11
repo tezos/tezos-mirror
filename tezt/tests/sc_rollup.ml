@@ -3220,16 +3220,17 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     stop_losers level
   in
   let keep_going client =
-    let* game =
+    let* games =
       RPC.Client.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
            ~staker:bootstrap1_key
            sc_rollup_address
            ()
     in
-    if !game_started then return @@ not (JSON.is_null game)
+    let has_games = JSON.as_list games <> [] in
+    if !game_started then return has_games
     else (
-      game_started := not @@ JSON.is_null game ;
+      game_started := has_games ;
       return true)
   in
 
