@@ -130,26 +130,22 @@ type error += Cannot_stake_on_fully_slashed_delegate
 (** Tez -> pseudotokens conversion *)
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
-  if Tez_repr.(frozen_deposits_tez = zero) then (
-    (* When there are no pseudotokens, the conversion rate is one (1
-       pseudotoken = 1 mutez). *)
-    assert (Staking_pseudotoken_repr.(frozen_deposits_pseudotokens = zero)) ;
-    Staking_pseudotoken_repr.of_int64_exn (Tez_repr.to_mutez tez_amount))
-  else
-    let frozen_deposits_tez_z =
-      Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
-    in
-    let frozen_deposits_pseudotokens_z =
-      Z.of_int64
-        (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
-    in
-    let tez_amount_z = Z.of_int64 (Tez_repr.to_mutez tez_amount) in
-    let res_z =
-      Z.div
-        (Z.mul tez_amount_z frozen_deposits_pseudotokens_z)
-        frozen_deposits_tez_z
-    in
-    Staking_pseudotoken_repr.of_int64_exn (Z.to_int64 res_z)
+  assert (Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero)) ;
+  assert (Tez_repr.(frozen_deposits_tez <> zero)) ;
+  assert (Tez_repr.(tez_amount <> zero)) ;
+  let frozen_deposits_tez_z =
+    Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
+  in
+  let frozen_deposits_pseudotokens_z =
+    Z.of_int64 (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
+  in
+  let tez_amount_z = Z.of_int64 (Tez_repr.to_mutez tez_amount) in
+  let res_z =
+    Z.div
+      (Z.mul tez_amount_z frozen_deposits_pseudotokens_z)
+      frozen_deposits_tez_z
+  in
+  Staking_pseudotoken_repr.of_int64_exn (Z.to_int64 res_z)
 
 let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~pseudotoken_amount =
