@@ -74,19 +74,23 @@ let kill_process ~pid ~signal =
     signal ;
   Unix.kill pid (signal_to_int signal)
 
+let rec wait_for_killing pid =
+  let alive =
+    try
+      Unix.kill pid 0 ;
+      true
+    with _ -> false
+  in
+  if alive then
+    let* () = Lwt_unix.sleep 0.2 in
+    wait_for_killing pid
+  else Lwt.return_unit
+
 let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"external validator kill"
-    ~tags:
-      [
-        "node";
-        "external";
-        "validator";
-        "kill";
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5467 *)
-        Tag.flaky;
-      ]
+    ~tags:["node"; "external"; "validator"; "kill"]
   @@ fun protocol ->
   let node = Node.create [] in
   let wait_for_validator_pid = wait_for_external_validator_pid node in
@@ -102,6 +106,7 @@ let test_kill =
     let wait_for_new_validator_pid = wait_for_external_validator_pid node in
     let wait_for_failure = wait_for_external_validator_failure node in
     let () = kill_process ~pid:validator_pid ~signal in
+    let* () = wait_for_killing validator_pid in
     Log.info "External validator was killed by %a" pp_signal signal ;
     Log.info "Baking a block with a dead validator" ;
     let* () = Client.bake_for_and_wait client in
