@@ -94,6 +94,8 @@ let process node =
 
 let name sc_node = sc_node.name
 
+let color sc_node = sc_node.color
+
 let rpc_host sc_node = sc_node.persistent_state.rpc_host
 
 let rpc_port sc_node = sc_node.persistent_state.rpc_port

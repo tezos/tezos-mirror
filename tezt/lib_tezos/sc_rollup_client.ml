@@ -98,19 +98,22 @@ let commitment_info_from_json json =
 
 let next_name = ref 1
 
-let fresh_name () =
-  let index = !next_name in
-  incr next_name ;
-  "client" ^ string_of_int index
-
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ~protocol ?runner ?name ?base_dir ?(color = Log.Color.FG.green)
-    sc_node =
-  let name = match name with None -> fresh_name () | Some name -> name in
+let create ~protocol ?runner ?name ?base_dir ?color sc_node =
+  let name =
+    match name with
+    | Some name -> name
+    | None -> Sc_rollup_node.name sc_node ^ "_client"
+  in
   let path = Protocol.sc_rollup_client protocol in
   let base_dir =
     match base_dir with None -> Temp.dir ?runner name | Some dir -> dir
+  in
+  let color =
+    match color with
+    | Some c -> c
+    | None -> Log.Color.(bold ++ Sc_rollup_node.color sc_node)
   in
   {name; path; sc_node; base_dir; color; runner}
 
