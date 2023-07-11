@@ -318,28 +318,44 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
       let* available_pseudotokens =
         costaking_pseudotokens_balance ctxt contract
       in
-      if Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) then (
+      if Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) then
         if Staking_pseudotoken_repr.(available_pseudotokens = zero) then
           return (ctxt, Tez_repr.zero)
         else
-          let requested_pseudotokens =
-            pseudotokens_of
-              ~frozen_deposits_pseudotokens
-              ~frozen_deposits_tez
-              ~tez_amount:requested_amount
-          in
-          assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
           let pseudotokens_to_unstake, tez_to_unstake =
-            if
-              Staking_pseudotoken_repr.(
-                requested_pseudotokens < available_pseudotokens)
-            then (requested_pseudotokens, requested_amount)
-            else
+            if Tez_repr.(requested_amount >= frozen_deposits_tez) then
+              (* definitely a full unstake, make sure we can empty the costaking
+                 balance *)
               ( available_pseudotokens,
-                tez_of
+                if
+                  Staking_pseudotoken_repr.(
+                    frozen_deposits_pseudotokens = available_pseudotokens)
+                then
+                  (* ...and the frozen deposits if from last staker *)
+                  frozen_deposits_tez
+                else
+                  tez_of
+                    ~frozen_deposits_pseudotokens
+                    ~frozen_deposits_tez
+                    ~pseudotoken_amount:available_pseudotokens )
+            else
+              let requested_pseudotokens =
+                pseudotokens_of
                   ~frozen_deposits_pseudotokens
                   ~frozen_deposits_tez
-                  ~pseudotoken_amount:requested_pseudotokens )
+                  ~tez_amount:requested_amount
+              in
+              assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
+              if
+                Staking_pseudotoken_repr.(
+                  requested_pseudotokens < available_pseudotokens)
+              then (requested_pseudotokens, requested_amount)
+              else
+                ( available_pseudotokens,
+                  tez_of
+                    ~frozen_deposits_pseudotokens
+                    ~frozen_deposits_tez
+                    ~pseudotoken_amount:available_pseudotokens )
           in
           let*? new_frozen_deposits_pseudotokens =
             Staking_pseudotoken_repr.(
@@ -354,7 +370,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
           let+ ctxt =
             debit_costaking_pseudotokens ctxt contract pseudotokens_to_unstake
           in
-          (ctxt, tez_to_unstake))
+          (ctxt, tez_to_unstake)
       else (
         (* [delegate] must be non-costaked and have their pseudotokens
            non-initialized.
