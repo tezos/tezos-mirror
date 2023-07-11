@@ -111,7 +111,3 @@ let spend_only_call_from_token ctxt delegate cycle amount =
   in
   let* ctxt = Stake_storage.remove_stake ctxt delegate amount in
   Internal.update_balance ~f ctxt contract ~normalized_cycle
-
-let squash_unslashable_unstaked_frozen_deposits_at_cycle_end ctxt ~last_cycle:_
-    =
-  return ctxt
