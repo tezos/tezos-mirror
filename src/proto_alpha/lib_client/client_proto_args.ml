@@ -36,8 +36,6 @@ type error += Bad_minimal_fees of string
 
 type error += Bad_max_waiting_time of string
 
-type error += Bad_endorsement_delay of string
-
 type error += Bad_preserved_levels of string
 
 type error += Forbidden_Negative_int of string
@@ -93,20 +91,6 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_max_waiting_time parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_max_waiting_time parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"badEndorsementDelayArg"
-    ~title:"Bad -endorsement-delay arg"
-    ~description:"invalid duration in -endorsement-delay"
-    ~pp:(fun ppf literal ->
-      Format.fprintf
-        ppf
-        "Bad argument value for -endorsement-delay. Expected an integer, but \
-         given '%s'"
-        literal)
-    Data_encoding.(obj1 (req "parameter" string))
-    (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_endorsement_delay parameter) ;
   register_error_kind
     `Permanent
     ~id:"badPreservedLevelsArg"
@@ -337,12 +321,6 @@ let force_switch =
       "disables the node's injection checks\n\
        Force the injection of branch-invalid operation or force  the injection \
        of block without a fitness greater than the  current head."
-    ()
-
-let no_endorse_switch =
-  Tezos_clic.switch
-    ~long:"no-endorse"
-    ~doc:"Do not let the client automatically endorse a block that it baked."
     ()
 
 let minimal_timestamp_switch =
@@ -698,25 +676,6 @@ let display_names_flag =
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
-
-module Daemon = struct
-  let baking_switch =
-    Tezos_clic.switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
-
-  let endorsement_switch =
-    Tezos_clic.switch
-      ~long:"endorsement"
-      ~short:'E'
-      ~doc:"run the endorsement daemon"
-      ()
-
-  let denunciation_switch =
-    Tezos_clic.switch
-      ~long:"denunciation"
-      ~short:'D'
-      ~doc:"run the denunciation daemon"
-      ()
-end
 
 module Sc_rollup_params = struct
   let rollup_kind_parameter =
