@@ -1008,6 +1008,48 @@ let bls12_381 =
           ];
         ]
 
+let _bls12_381_tests =
+  tezt
+    [
+      "test_fr";
+      "test_g1";
+      "test_g2";
+      "test_pairing";
+      "test_hash_to_curve";
+      "test_random_state";
+      "test_fq12";
+      "test_gt";
+      "utils";
+      "ff_pbt";
+      "test_ec_make";
+    ]
+    ~path:"src/lib_bls12_381/test"
+    ~opam:"bls12-381"
+    ~deps:[alcotezt; qcheck_alcotest; bisect_ppx; bls12_381]
+    ~modes:[Native; JS]
+    ~js_compatible:true
+    ~dep_globs_rec:["test_vectors/*"]
+
+let _octez_bls12_381_utils =
+  let names =
+    [
+      "generate_pairing_vectors";
+      "generate_miller_loop_vectors";
+      "generate_final_exponentiation_vectors";
+      "generate_g1_test_vectors";
+      "generate_g2_test_vectors";
+      "generate_fr_test_vectors";
+      "generate_hash_to_curve_vectors";
+    ]
+  in
+  private_exes
+    names
+    ~path:"src/lib_bls12_381/utils"
+    ~opam:"bls12-381"
+    ~bisect_ppx:No
+    ~modules:names
+    ~deps:[hex; bls12_381]
+
 let octez_bls12_381_signature =
   public_lib
     "octez-bls12-381-signature"
