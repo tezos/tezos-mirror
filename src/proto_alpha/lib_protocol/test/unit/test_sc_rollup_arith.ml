@@ -648,6 +648,104 @@ let test_filter_internal_message () =
 
   return ()
 
+module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+
+(** Instructs the PVM to reveal [hashed_preimage], and providing
+   [input_preimage] when required. The proof for the reveal step
+   is generated and then verified. *)
+let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let rollup = Sc_rollup.Address.zero in
+  let level = Raw_level.root in
+
+  let*? inbox =
+    Sc_rollup_helpers.Node_inbox.new_inbox ~inbox_creation_level:level ()
+  in
+  let snapshot = Sc_rollup.Inbox.take_snapshot inbox.inbox in
+  let dal_snapshot = Dal.Slots_history.genesis in
+  let dal_parameters = Default_parameters.constants_mainnet.dal in
+  let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
+
+  let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
+  let metadata =
+    Sc_rollup.Metadata.{address = rollup; origination_level = level}
+  in
+  let reveal_hash =
+    Sc_rollup_reveal_hash.(
+      hash_string ~scheme:Blake2B [hashed_preimage] |> to_hex)
+  in
+
+  let source = "hash:" ^ reveal_hash in
+  let input =
+    Sc_rollup_helpers.make_external_input ~inbox_level:inbox.inbox.level source
+  in
+  let* state, _, _ =
+    Sc_rollup_helpers.Arith_pvm_eval.eval_inputs_from_initial_state
+      ~metadata
+      [[input]]
+  in
+
+  let pvm_with_context_and_state =
+    Sc_rollup_helpers.make_pvm_with_context_and_state
+      (module Arith_pvm)
+      ~state
+      ~context:ctxt
+      ~reveal:(fun _ -> Lwt.return_some input_preimage)
+      ~inbox
+      ()
+  in
+  let*@ proof =
+    Sc_rollup.Proof.produce
+      ~metadata
+      pvm_with_context_and_state
+      Raw_level.root
+      ~is_reveal_enabled
+  in
+  let*?@ pvm_step =
+    Sc_rollup.Proof.unserialize_pvm_step ~pvm:(module Arith_pvm) proof.pvm_step
+  in
+
+  wrap
+  @@ Sc_rollup.Proof.valid
+       ~pvm:(module Arith_pvm)
+       ~metadata
+       snapshot
+       Raw_level.root
+       dal_snapshot
+       dal_parameters.cryptobox_parameters
+       ~dal_attestation_lag:dal_parameters.attestation_lag
+       ~is_reveal_enabled
+       {proof with pvm_step}
+
+(** Test that sending a invalid serialized reveal proof to
+    {Sc_rollup_proof_repr.valid} is rejected. *)
+let test_invalid_serialized_reveal_proof () : (unit, tztrace) result Lwt.t =
+  let open Lwt_result_syntax in
+  let*! check =
+    test_serialized_reveal_proof
+      ~hashed_preimage:"preimage"
+      ~input_preimage:"wrong preimage"
+      ()
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    check
+    (( = ) (Sc_rollup_proof_repr.Sc_rollup_proof_check "Invalid reveal"))
+
+(** Test that sending a valid serialized reveal proof to
+    {Sc_rollup_proof_repr.valid} is accepted. *)
+let test_valid_serialized_reveal_proof () : (unit, tztrace) result Lwt.t =
+  let open Lwt_result_syntax in
+  let hashed_preimage = "preimage" in
+  let*! _check =
+    test_serialized_reveal_proof
+      ~hashed_preimage
+      ~input_preimage:hashed_preimage
+      ()
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
@@ -684,6 +782,14 @@ let tests =
       "Reveal above threshold"
       `Quick
       (test_reveal_enabled ~threshold:10_000l ~inbox_level:10_001l);
+    Tztest.tztest
+      "Invalid serialized reveal proof"
+      `Quick
+      test_invalid_serialized_reveal_proof;
+    Tztest.tztest
+      "Valid serialized reveal proof"
+      `Quick
+      test_valid_serialized_reveal_proof;
   ]
 
 let () =
