@@ -214,6 +214,11 @@ Client
 
 - The ``typecheck script`` command can now be used to typecheck several scripts.
 
+- From protocol ``alpha`` operation receipt output ``attestation`` instead of
+  ``endorsement``. For example ``double preendorsement evidence`` become
+  ``double preattesation evidence``, ``lost endorsing rewards`` become ``lost
+  attesting rewards``. (MR :gl:`!9232`)
+
 Baker
 -----
 
