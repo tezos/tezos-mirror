@@ -166,6 +166,13 @@ let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
   in
   Tez_repr.of_mutez_exn (Z.to_int64 res_z)
 
+let get_frozen_deposits_tez ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ {current_amount; initial_amount = _} =
+    Frozen_deposits_storage.get ctxt (Implicit delegate)
+  in
+  current_amount
+
 (** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
   increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
   [tez_amount] multiplied by the current rate of the delegate's frozen
@@ -182,9 +189,7 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     return (ctxt, Staking_pseudotoken_repr.zero)
   else
     let contract = Contract_repr.Implicit delegate in
-    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-      Frozen_deposits_storage.get ctxt contract
-    in
+    let* frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
     let* frozen_deposits_pseudotokens_opt =
       Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
     in
@@ -249,9 +254,7 @@ let costaking_balance_as_tez ctxt ~contract ~delegate =
   match frozen_deposits_pseudotokens_opt with
   | Some frozen_deposits_pseudotokens
     when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-      let+ {current_amount = frozen_deposits_tez; initial_amount = _} =
-        Frozen_deposits_storage.get ctxt delegate_contract
-      in
+      let+ frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
       tez_of
         ~frozen_deposits_pseudotokens
         ~frozen_deposits_tez
@@ -259,9 +262,7 @@ let costaking_balance_as_tez ctxt ~contract ~delegate =
   | _ ->
       assert (Staking_pseudotoken_repr.(pseudotoken_amount = zero)) ;
       if Contract_repr.(contract = delegate_contract) then
-        let+ {current_amount = frozen_deposits_tez; initial_amount = _} =
-          Frozen_deposits_storage.get ctxt delegate_contract
-        in
+        let+ frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
         frozen_deposits_tez
       else return Tez_repr.zero
 
@@ -307,9 +308,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
   if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)
   else
     let delegate_contract = Contract_repr.Implicit delegate in
-    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-      Frozen_deposits_storage.get ctxt delegate_contract
-    in
+    let* frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
     if Tez_repr.(frozen_deposits_tez = zero) then return (ctxt, Tez_repr.zero)
     else
       let* frozen_deposits_pseudotokens_opt =
