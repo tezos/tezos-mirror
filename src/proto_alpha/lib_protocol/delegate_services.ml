@@ -239,6 +239,15 @@ let deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t =
     (fun (cycle, deposit) -> {cycle; deposit})
     (obj2 (req "cycle" Cycle.encoding) (req "deposit" Tez.encoding))
 
+type pending_staking_parameters = Cycle.t * Staking_parameters_repr.t
+
+let pending_staking_parameters_encoding :
+    pending_staking_parameters Data_encoding.t =
+  let open Data_encoding in
+  obj2
+    (req "cycle" Cycle.encoding)
+    (req "parameters" Staking_parameters_repr.encoding)
+
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
 
@@ -450,6 +459,24 @@ module S = struct
       ~query:RPC_query.empty
       ~output:participation_info_encoding
       RPC_path.(path / "participation")
+
+  let active_staking_parameters =
+    RPC_service.get_service
+      ~description:
+        "Returns the currently active staking parameters for the given \
+         delegate."
+      ~query:RPC_query.empty
+      ~output:Staking_parameters_repr.encoding
+      RPC_path.(path / "active_staking_parameters")
+
+  let pending_staking_parameters =
+    RPC_service.get_service
+      ~description:
+        "Returns the pending values for the given delegate's staking \
+         parameters."
+      ~query:RPC_query.empty
+      ~output:(list pending_staking_parameters_encoding)
+      RPC_path.(path / "pending_staking_parameters")
 end
 
 let check_delegate_registered ctxt pkh =
@@ -600,7 +627,11 @@ let register () =
       return {active = {consensus_key_pk; consensus_key_pkh}; pendings}) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
-      Delegate.participation_info ctxt pkh)
+      Delegate.participation_info ctxt pkh) ;
+  register1 ~chunked:false S.active_staking_parameters (fun ctxt pkh () () ->
+      Delegate.Staking_parameters.of_delegate ctxt pkh) ;
+  register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
+      Delegate.Staking_parameters.pending_updates ctxt pkh >>= return)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
@@ -660,3 +691,9 @@ let consensus_key ctxt block pkh =
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()
+
+let active_staking_parameters ctxt block pkh =
+  RPC_context.make_call1 S.active_staking_parameters ctxt block pkh () ()
+
+let pending_staking_parameters ctxt block pkh =
+  RPC_context.make_call1 S.pending_staking_parameters ctxt block pkh () ()
