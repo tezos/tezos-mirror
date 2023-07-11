@@ -33,7 +33,9 @@ val zero : t
 
 val of_int64_exn : int64 -> t
 
-val to_int64 : t -> int64
+val of_z_exn : Z.t -> t
+
+val to_z : t -> Z.t
 
 val ( = ) : t -> t -> bool
 

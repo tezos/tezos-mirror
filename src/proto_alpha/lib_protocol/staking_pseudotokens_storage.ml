@@ -138,7 +138,7 @@ let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
   in
   let frozen_deposits_pseudotokens_z =
-    Z.of_int64 (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
+    Staking_pseudotoken_repr.to_z frozen_deposits_pseudotokens
   in
   let tez_amount_z = Z.of_int64 (Tez_repr.to_mutez tez_amount) in
   let res_z =
@@ -146,7 +146,7 @@ let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
       (Z.mul tez_amount_z frozen_deposits_pseudotokens_z)
       frozen_deposits_tez_z
   in
-  Staking_pseudotoken_repr.of_int64_exn (Z.to_int64 res_z)
+  Staking_pseudotoken_repr.of_z_exn res_z
 
 let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~pseudotoken_amount =
@@ -155,11 +155,9 @@ let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     Z.of_int64 (Tez_repr.to_mutez frozen_deposits_tez)
   in
   let frozen_deposits_pseudotokens_z =
-    Z.of_int64 (Staking_pseudotoken_repr.to_int64 frozen_deposits_pseudotokens)
+    Staking_pseudotoken_repr.to_z frozen_deposits_pseudotokens
   in
-  let pseudotoken_amount_z =
-    Z.of_int64 (Staking_pseudotoken_repr.to_int64 pseudotoken_amount)
-  in
+  let pseudotoken_amount_z = Staking_pseudotoken_repr.to_z pseudotoken_amount in
   let res_z =
     Z.div
       (Z.mul frozen_deposits_tez_z pseudotoken_amount_z)
