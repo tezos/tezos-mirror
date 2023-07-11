@@ -338,11 +338,25 @@ let update_call_stack current_tick current_time (current_node, call_stack)
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
     kernel up to the next result, and returns the call stack. *)
-  let eval_and_profile ?write_debug ?reveal_builtins with_time symbols tree =
+  let eval_and_profile ?write_debug ?reveal_builtins ~with_time ~no_reboot
+      symbols tree =
     let open Lwt_syntax in
     (* The call context is built as a side effect of the evaluation. *)
     let call_stack = ref (Toplevel [], []) in
 
+    (* Successive kernel runs are pushed on the stack. If one the unresolved
+       function calls stack is not empty at the end of a kernel, this implies
+       its result might be inconsistent and the profiling has failed. *)
+    let kernel_runs = ref [] in
+    let push_kernel_run () =
+      match !call_stack with
+      | (Toplevel _ as run), [] ->
+          kernel_runs := Some run :: !kernel_runs ;
+          call_stack := (Toplevel [], [])
+      | _ ->
+          kernel_runs := None :: !kernel_runs ;
+          call_stack := (Toplevel [], [])
+    in
     (* [current_time] is defined as a closure instead as a direct call to avoid
        calling it at each tick and avoid a non necessary system call. *)
     let current_time () =
@@ -364,9 +378,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         updated_stack ;
 
       let* input_request_val = Wasm_vm.get_info pvm_state in
-      match (input_request_val.input_request, pvm_state.tick_state) with
-      | Reveal_required _, _ when reveal_builtins <> None -> return_true
-      | Input_required, _ | Reveal_required _, _ -> return_false
+      if pvm_state.tick_state = Snapshot || pvm_state.tick_state = Collect then
+        push_kernel_run () ;
+      match input_request_val.input_request with
+      | Reveal_required _ when reveal_builtins <> None -> return_true
+      | Input_required | Reveal_required _ -> return_false
       | _ -> return_true
     in
     let rec eval_until_input_requested accumulated_ticks tree =
@@ -383,9 +399,15 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             compute_and_snapshot
             tree
         in
-        eval_until_input_requested
-          (Z.add accumulated_ticks @@ Z.of_int64 ticks)
-          tree
+        let* pvm_state =
+          Wasm_utils.Tree_encoding_runner.decode
+            Wasm_pvm.pvm_state_encoding
+            tree
+        in
+        let accumulated_ticks = Z.add accumulated_ticks @@ Z.of_int64 ticks in
+        if no_reboot && pvm_state.tick_state = Snapshot then
+          return (tree, accumulated_ticks)
+        else eval_until_input_requested accumulated_ticks tree
       in
       match info.Wasm_pvm_state.input_request with
       | No_input_required -> run ()
@@ -393,12 +415,16 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
     in
     let+ tree, ticks = eval_until_input_requested Z.zero tree in
-    let call_stack =
-      match !call_stack with
-      | Toplevel l, stack -> (Toplevel (List.rev l), stack)
-      | n -> n
+    let kernel_runs =
+      (List.fold_left
+         (fun runs graph ->
+           match graph with
+           | Some (Toplevel l) -> Some (Toplevel (List.rev l)) :: runs
+           | n -> n :: runs)
+         [])
+        !kernel_runs
     in
-    (tree, ticks, call_stack)
+    (tree, ticks, kernel_runs)
 end
 
 (** Flamegraph building

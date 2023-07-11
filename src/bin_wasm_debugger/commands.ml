@@ -33,7 +33,7 @@ type eval_step =
   | Kernel_run  (** Up to the end of the current `kernel_run` *)
   | Inbox  (** Until input requested *)
 
-type profile_options = {collapse : bool; with_time : bool}
+type profile_options = {collapse : bool; with_time : bool; no_reboot : bool}
 
 (* Possible commands for the REPL. *)
 type commands =
@@ -88,9 +88,13 @@ let parse_profile_options =
         Option.map (fun opts -> {opts with collapse = true}) profile_options
     | "--without-time" ->
         Option.map (fun opts -> {opts with with_time = false}) profile_options
+    | "--no-reboot" ->
+        Option.map (fun opts -> {opts with no_reboot = true}) profile_options
     | _ -> None
   in
-  List.fold_left set_option (Some {collapse = false; with_time = true})
+  List.fold_left
+    set_option
+    (Some {collapse = false; with_time = true; no_reboot = false})
 
 (* Documentation for commands type *)
 type command_description = {
@@ -238,7 +242,8 @@ let rec commands_docs =
          the identical stacks, at the cost of not being able to track the call \
          stack on a time basis.\n\
         \ - `--without-time`: does not profile the time (can have an impact on \
-         performance if the kernel does too many function calls).";
+         performance if the kernel does too many function calls).\n\
+        \ - `--no-reboot`: profile a single `kernel_run`, not a full inbox.";
     };
     {
       parse =
@@ -388,26 +393,55 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   type extra = {functions : string Custom_section.FuncMap.t}
 
-  let produce_flamegraph ~collapse ~max_depth (current_node, remaining_nodes) =
+  let produce_flamegraph ~collapse ~max_depth kernel_runs =
     let filename =
       Time.System.(
         Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
     in
     let path = Filename.(concat (get_temp_dir_name ()) filename) in
     let file = open_out path in
-    if remaining_nodes <> [] then
-      Format.printf
-        "The resulting call graph is inconsistent, please open an issue.\n%!" ;
-    Profiling.pp_flamegraph
-      ~collapse
-      ~max_depth
-      Profiling.pp_call
+    let pp_kernel_run ppf = function
+      | Some run ->
+          Profiling.pp_flamegraph ~collapse ~max_depth Profiling.pp_call ppf run
+      | None -> ()
+    in
+    let pp_kernel_runs ppf runs =
+      Format.pp_print_list ~pp_sep:(fun _ _ -> ()) pp_kernel_run ppf runs
+    in
+    Format.fprintf
       (Format.formatter_of_out_channel file)
-      current_node ;
+      "%a"
+      pp_kernel_runs
+      kernel_runs ;
     close_out file ;
     Format.printf "Profiling result can be found in %s\n%!" path
 
-  let eval_and_profile ~collapse ~with_time config extra tree =
+  let profiling_results = function
+    | Some run ->
+        let pvm_steps = Profiling.aggregate_toplevel_time_and_ticks run in
+        let full_ticks, full_time = Profiling.full_ticks_and_time pvm_steps in
+        Format.printf
+          "----------------------\n\
+           Detailed results for a `kernel_run`:\n\
+           %a\n\n\
+           Full execution: %a ticks%a\n\
+           %!"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+             Profiling.pp_ticks_and_time)
+          pvm_steps
+          Z.pp_print
+          full_ticks
+          Profiling.pp_time_opt
+          full_time
+    | None ->
+        Format.printf
+          "----------------------\n\
+           The resulting call graph is inconsistent for this specific \
+           `kernel_run`, please open an issue.\n\
+           %!"
+
+  let eval_and_profile ~collapse ~with_time ~no_reboot config extra tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         Format.printf
@@ -419,31 +453,15 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Prof.eval_and_profile
             ~write_debug
             ~reveal_builtins:(reveals config)
-            with_time
+            ~with_time
+            ~no_reboot
             extra.functions
             tree
         in
         produce_flamegraph ~collapse ~max_depth:100 graph ;
-        let pvm_steps =
-          Profiling.aggregate_toplevel_time_and_ticks (fst graph)
-        in
-        let full_ticks, full_time = Profiling.full_ticks_and_time pvm_steps in
+        List.iter profiling_results graph ;
         Format.printf
-          "----------------------\n\
-           Detailed results:\n\
-           %a\n\n\
-           Full execution: %a ticks%a\n\
-           Full execution with padding: %a ticks\n\
-           ----------------------\n\
-           %!"
-          (Format.pp_print_list
-             ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
-             Profiling.pp_ticks_and_time)
-          pvm_steps
-          Z.pp_print
-          full_ticks
-          Profiling.pp_time_opt
-          full_time
+          "----------------------\nFull execution with padding: %a ticks\n%!"
           Z.pp_print
           ticks ;
         tree)
@@ -522,16 +540,41 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return (tree, ticks, inboxes, level)
         | Error _ -> return' (eval_until_input_requested config tree))
 
-  let profile ~collapse ~with_time level inboxes config extra tree =
+  let profile ~collapse ~with_time ~no_reboot level inboxes config extra tree =
     let open Lwt_result_syntax in
+    let*! pvm_state =
+      Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
+    in
     let*! status = check_input_request tree in
+    let is_profilable =
+      match pvm_state.tick_state with
+      | Collect | Snapshot
+      | Decode Tezos_webassembly_interpreter.Decode.{module_kont = MKStart; _}
+        ->
+          true
+      | _ -> false
+    in
+
     match status with
-    | Ok () ->
+    | Ok () when is_profilable ->
         let* tree, inboxes, level = load_inputs inboxes level tree in
-        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
+        let* tree =
+          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+        in
         return (tree, inboxes, level)
-    | Error _ ->
-        let* tree = eval_and_profile ~collapse ~with_time config extra tree in
+    | Error _ when is_profilable ->
+        let* tree =
+          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+        in
+        return (tree, inboxes, level)
+    | _ ->
+        let*! () =
+          Lwt_io.printf
+            "Profiling can only be done from a snapshotable state or when \
+             waiting for input. You can use `step kernel_run` to go to the \
+             next snapshotable state.\n\
+             %!"
+        in
         return (tree, inboxes, level)
 
   let pp_input_request ppf = function
@@ -906,9 +949,17 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Reveal_metadata ->
           let*! tree = reveal_metadata config tree in
           return ~tree ()
-      | Profile {collapse; with_time} ->
+      | Profile {collapse; with_time; no_reboot} ->
           let* tree, inboxes, level =
-            profile ~collapse ~with_time level inboxes config extra tree
+            profile
+              ~collapse
+              ~with_time
+              ~no_reboot
+              level
+              inboxes
+              config
+              extra
+              tree
           in
           Lwt.return_ok (tree, inboxes, level)
       | Unknown s ->
