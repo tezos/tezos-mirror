@@ -171,44 +171,6 @@ let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     in
     Tez_repr.of_mutez_exn (Z.to_int64 res_z)
 
-let update_frozen_deposits_pseudotokens ~f ctxt delegate =
-  let open Lwt_result_syntax in
-  let contract = Contract_repr.Implicit delegate in
-  let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt contract
-  in
-  let* frozen_deposits_pseudotokens_opt =
-    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-  in
-  let* ctxt, frozen_deposits_pseudotokens =
-    match frozen_deposits_pseudotokens_opt with
-    | Some frozen_deposits_pseudotokens
-      when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-        return (ctxt, frozen_deposits_pseudotokens)
-    | _ ->
-        let init_frozen_deposits_pseudotokens =
-          Staking_pseudotoken_repr.of_int64_exn
-            (Tez_repr.to_mutez frozen_deposits_tez)
-        in
-        let*! ctxt =
-          Storage.Contract.Costaking_pseudotokens.add
-            ctxt
-            contract
-            init_frozen_deposits_pseudotokens
-        in
-        return (ctxt, init_frozen_deposits_pseudotokens)
-  in
-  let*? new_frozen_deposits_pseudotokens, x =
-    f ~frozen_deposits_pseudotokens ~frozen_deposits_tez
-  in
-  let*! ctxt =
-    Storage.Contract.Frozen_deposits_pseudotokens.add
-      ctxt
-      contract
-      new_frozen_deposits_pseudotokens
-  in
-  return (ctxt, x)
-
 (** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
   increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
   [tez_amount] multiplied by the current rate of the delegate's frozen
@@ -278,24 +240,43 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     The function also returns the amount of tez [p_amount] current worth.
 *)
 let debit_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
+  let open Lwt_result_syntax in
   if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
     return (ctxt, Tez_repr.zero)
   else
-    let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
-      let open Result_syntax in
-      let+ new_pseudotokens_balance =
-        Staking_pseudotoken_repr.(
-          frozen_deposits_pseudotokens -? pseudotoken_amount)
-      in
-      let tez_amount =
-        tez_of
-          ~frozen_deposits_pseudotokens
-          ~frozen_deposits_tez
-          ~pseudotoken_amount
-      in
-      (new_pseudotokens_balance, tez_amount)
+    let contract = Contract_repr.Implicit delegate in
+    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
+      Frozen_deposits_storage.get ctxt contract
     in
-    update_frozen_deposits_pseudotokens ~f ctxt delegate
+    let* frozen_deposits_pseudotokens_opt =
+      Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
+    in
+    let frozen_deposits_pseudotokens =
+      match frozen_deposits_pseudotokens_opt with
+      | Some frozen_deposits_pseudotokens
+        when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+          frozen_deposits_pseudotokens
+      | _ ->
+          Staking_pseudotoken_repr.of_int64_exn
+            (Tez_repr.to_mutez frozen_deposits_tez)
+    in
+    let*? new_frozen_deposits_pseudotokens =
+      Staking_pseudotoken_repr.(
+        frozen_deposits_pseudotokens -? pseudotoken_amount)
+    in
+    let tez_amount =
+      tez_of
+        ~frozen_deposits_pseudotokens
+        ~frozen_deposits_tez
+        ~pseudotoken_amount
+    in
+    let*! ctxt =
+      Storage.Contract.Frozen_deposits_pseudotokens.add
+        ctxt
+        contract
+        new_frozen_deposits_pseudotokens
+    in
+    return (ctxt, tez_amount)
 
 (** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
     current costaking balance. *)
