@@ -24,8 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
+(** Argument that will be provided to {!Worker.MakeGroup} to create
+    the prevalidator worker. *)
 module Name = struct
   type t = Chain_id.t * Protocol_hash.t
 
@@ -48,6 +51,8 @@ end
 
 open Prevalidator_worker_state
 
+(** A prevalidator instance, tailored to a specific protocol (even if
+    it is not visible in this module type). *)
 module type T = sig
   type types_state
 
