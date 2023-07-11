@@ -70,8 +70,9 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Play game -> on_play game state
-    | Request.Play_opening conflict -> on_play_opening conflict state
+    | Request.Play game -> protect @@ fun () -> on_play game state
+    | Request.Play_opening conflict ->
+        protect @@ fun () -> on_play_opening conflict state
 
   type launch_error = error trace
 
