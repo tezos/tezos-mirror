@@ -25,7 +25,7 @@
 
 (** This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
-    {!Storage.Contract.Costaking_pseudotokens} tables.
+    {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
 (** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
     current costaking balance converted into tez using [delegate] frozen

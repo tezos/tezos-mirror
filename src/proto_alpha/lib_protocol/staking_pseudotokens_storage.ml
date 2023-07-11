@@ -125,6 +125,8 @@
          {debit_frozen_deposits_pseudotokens} in {request_unstake}.
 *)
 
+type error += Cannot_stake_on_fully_slashed_delegate
+
 (** Tez -> pseudotokens conversion *)
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
@@ -222,24 +224,58 @@ let update_frozen_deposits_pseudotokens ~f ctxt delegate =
   [delegate]'s frozen deposits. *)
 let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     =
+  let open Lwt_result_syntax in
   if Tez_repr.(tez_amount = zero) then
     return (ctxt, Staking_pseudotoken_repr.zero)
   else
-    let f ~frozen_deposits_pseudotokens ~frozen_deposits_tez =
-      let open Result_syntax in
-      let pseudotokens_to_add =
-        pseudotokens_of
-          ~frozen_deposits_pseudotokens
-          ~frozen_deposits_tez
-          ~tez_amount
-      in
-      let+ new_pseudotokens_balance =
-        Staking_pseudotoken_repr.(
-          pseudotokens_to_add +? frozen_deposits_pseudotokens)
-      in
-      (new_pseudotokens_balance, pseudotokens_to_add)
+    let contract = Contract_repr.Implicit delegate in
+    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
+      Frozen_deposits_storage.get ctxt contract
     in
-    update_frozen_deposits_pseudotokens ~f ctxt delegate
+    let* frozen_deposits_pseudotokens_opt =
+      Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
+    in
+    let* ctxt, frozen_deposits_pseudotokens, pseudotokens_to_add =
+      match frozen_deposits_pseudotokens_opt with
+      | Some frozen_deposits_pseudotokens
+        when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
+          if Tez_repr.(frozen_deposits_tez = zero) then
+            tzfail Cannot_stake_on_fully_slashed_delegate
+          else
+            let pseudotokens_to_add =
+              pseudotokens_of
+                ~frozen_deposits_pseudotokens
+                ~frozen_deposits_tez
+                ~tez_amount
+            in
+            return (ctxt, frozen_deposits_pseudotokens, pseudotokens_to_add)
+      | _ ->
+          let init_frozen_deposits_pseudotokens =
+            Staking_pseudotoken_repr.of_int64_exn
+              (Tez_repr.to_mutez frozen_deposits_tez)
+          in
+          let*! ctxt =
+            Storage.Contract.Costaking_pseudotokens.add
+              ctxt
+              contract
+              init_frozen_deposits_pseudotokens
+          in
+          let pseudotokens_to_add =
+            Staking_pseudotoken_repr.of_int64_exn (Tez_repr.to_mutez tez_amount)
+          in
+          return (ctxt, init_frozen_deposits_pseudotokens, pseudotokens_to_add)
+    in
+    let*? new_frozen_deposits_pseudotokens =
+      Staking_pseudotoken_repr.(
+        pseudotokens_to_add +? frozen_deposits_pseudotokens)
+    in
+    let*! ctxt =
+      Storage.Contract.Frozen_deposits_pseudotokens.add
+        ctxt
+        contract
+        new_frozen_deposits_pseudotokens
+    in
+    return (ctxt, pseudotokens_to_add)
 
 (** [debit_frozen_deposits_pseudotokens ctxt delegate p_amount] decreases
     [delegate]'s stake pseudotokens by [p_amount].
