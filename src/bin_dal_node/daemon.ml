@@ -202,13 +202,12 @@ module Handler = struct
       | Starting -> handler stopper el
       | Ready _ -> return_unit
     in
-    let*! () = Event.(emit layer1_node_tracking_started ()) in
+    let*! () = Event.(emit layer1_node_tracking_started_for_plugin ()) in
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
 
-  let may_update_plugin cctxt ctxt current_plugin ~block ~current_proto
-      ~block_proto =
+  let may_update_plugin cctxt ctxt ~block ~current_proto ~block_proto =
     let open Lwt_result_syntax in
     if current_proto <> block_proto then
       let* protocols =

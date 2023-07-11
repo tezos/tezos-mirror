@@ -1461,8 +1461,10 @@ let test_dal_node_startup =
   let* () = Dal_node.init_config dal_node in
   let* () = run_dal dal_node in
   let* () =
-    Dal_node.wait_for dal_node "dal_node_layer_1_start_tracking.v0" (fun _ ->
-        Some ())
+    Dal_node.wait_for
+      dal_node
+      "dal_node_layer_1_start_tracking_for_plugin.v0"
+      (fun _ -> Some ())
   in
   assert (Dal_node.is_running_not_ready dal_node) ;
   let* () = Dal_node.terminate dal_node in
