@@ -27,10 +27,19 @@
     for all *)
 type endpoint = {auth : string * string; endpoint : Uri.t}
 
+type chunk =
+  | Block of
+      Int32.t (* level *)
+      * (Data.Block.t
+        * (Consensus_ops.block_op list (* endos *)
+          * Consensus_ops.block_op list (* preendos *)))
+  | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
+  | Rights of (Int32.t (* level *) * Consensus_ops.rights)
+
 type ctx = {
   cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
   endpoints : endpoint list;
-  backup_path : string option;
+  backup : chunk -> unit Lwt.t;
 }
 
 val extract_auth : Uri.t -> endpoint

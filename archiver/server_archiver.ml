@@ -27,10 +27,19 @@ open Lwt_result_syntax
 
 type endpoint = {auth : string * string; endpoint : Uri.t}
 
+type chunk =
+  | Block of
+      Int32.t (* level *)
+      * (Data.Block.t
+        * (Consensus_ops.block_op list (* endos *)
+          * Consensus_ops.block_op list (* preendos *)))
+  | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
+  | Rights of (Int32.t (* level *) * Consensus_ops.rights)
+
 type ctx = {
   cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
   endpoints : endpoint list;
-  backup_path : string option;
+  backup : chunk -> unit Lwt.t;
 }
 
 type t = ctx
@@ -93,23 +102,17 @@ let send_mempool ctx level ops =
   let log_msg_prefix = Format.sprintf "level %li: " level in
   send_something ctx path body log_msg_prefix
 
-type chunk =
-  | Block of
-      Int32.t (* level *)
-      * (Data.Block.t
-        * (Consensus_ops.block_op list (* endos *)
-          * Consensus_ops.block_op list (* preendos *)))
-  | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
-  | Rights of (Int32.t (* level *) * Consensus_ops.rights)
-
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
+
+let send actx = function
+  | Block (level, block) -> send_block actx level block
+  | Mempool (level, ops) -> send_mempool actx level ops
+  | Rights (level, rights) -> send_rights actx level rights
 
 let launch actx _source =
   Lwt_stream.iter_p
-    (function
-      | Block (level, block) -> send_block actx level block
-      | Mempool (level, ops) -> send_mempool actx level ops
-      | Rights (level, rights) -> send_rights actx level rights)
+    (fun chunk ->
+      Lwt.catch (fun () -> send actx chunk) (fun _ -> actx.backup chunk))
     chunk_stream
 
 let stop () = chunk_feeder None
