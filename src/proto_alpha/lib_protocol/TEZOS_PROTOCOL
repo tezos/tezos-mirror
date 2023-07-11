@@ -22,8 +22,10 @@
 
         "Michelson_v1_primitives",
         "Slot_repr",
+        "Cycle_repr",
         "Tez_repr",
         "Deposits_repr",
+        "Unstaked_frozen_deposits_repr",
         "Staking_pseudotoken_repr",
         "Period_repr",
         "Time_repr",
@@ -38,7 +40,6 @@
         "Constants_parametric_previous_repr",
         "Constants_repr",
         "Fitness_repr",
-        "Cycle_repr",
         "Level_repr",
         "Script_repr",
         "Cache_memory_helpers",

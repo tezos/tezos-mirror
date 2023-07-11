@@ -50,8 +50,10 @@
   Context_binary_proof
   Michelson_v1_primitives
   Slot_repr
+  Cycle_repr
   Tez_repr
   Deposits_repr
+  Unstaked_frozen_deposits_repr
   Staking_pseudotoken_repr
   Period_repr
   Time_repr
@@ -66,7 +68,6 @@
   Constants_parametric_previous_repr
   Constants_repr
   Fitness_repr
-  Cycle_repr
   Level_repr
   Script_repr
   Cache_memory_helpers
@@ -315,8 +316,10 @@
   context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
+  cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
@@ -332,7 +335,6 @@
   constants_parametric_previous_repr.mli
   constants_repr.ml constants_repr.mli
   fitness_repr.ml fitness_repr.mli
-  cycle_repr.ml cycle_repr.mli
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
@@ -585,8 +587,10 @@
   context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
+  cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
@@ -602,7 +606,6 @@
   constants_parametric_previous_repr.mli
   constants_repr.ml constants_repr.mli
   fitness_repr.ml fitness_repr.mli
-  cycle_repr.ml cycle_repr.mli
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
@@ -839,8 +842,10 @@
   context_binary_proof.ml context_binary_proof.mli
   michelson_v1_primitives.ml michelson_v1_primitives.mli
   slot_repr.ml slot_repr.mli
+  cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
   time_repr.ml time_repr.mli
@@ -856,7 +861,6 @@
   constants_parametric_previous_repr.mli
   constants_repr.ml constants_repr.mli
   fitness_repr.ml fitness_repr.mli
-  cycle_repr.ml cycle_repr.mli
   level_repr.ml level_repr.mli
   script_repr.ml script_repr.mli
   cache_memory_helpers.ml
