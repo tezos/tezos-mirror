@@ -1086,10 +1086,10 @@ module Consensus_keys =
 
 (** Per cycle storage *)
 
-type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
+type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
 
 let default_slashed_level =
-  {for_double_endorsing = false; for_double_baking = false}
+  {for_double_attesting = false; for_double_baking = false}
 
 module Slashed_level = struct
   type t = slashed_level
@@ -1097,10 +1097,10 @@ module Slashed_level = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {for_double_endorsing; for_double_baking} ->
-        (for_double_endorsing, for_double_baking))
-      (fun (for_double_endorsing, for_double_baking) ->
-        {for_double_endorsing; for_double_baking})
+      (fun {for_double_attesting; for_double_baking} ->
+        (for_double_attesting, for_double_baking))
+      (fun (for_double_attesting, for_double_baking) ->
+        {for_double_attesting; for_double_baking})
       (obj2 (req "for_double_endorsing" bool) (req "for_double_baking" bool))
 end
 

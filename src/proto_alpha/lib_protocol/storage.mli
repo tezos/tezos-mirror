@@ -475,7 +475,7 @@ module Consensus_keys :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
+type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
 
 (** [slashed_level] with all fields being [false]. *)
 val default_slashed_level : slashed_level
