@@ -299,9 +299,11 @@ let replay_one_block strict main_chain_store validator_process block =
         (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
         (fun () ->
           let to_json block =
-            Data_encoding.Json.construct Proto.block_header_metadata_encoding
+            Data_encoding.Json.construct
+              Proto.block_header_metadata_encoding_with_legacy_attestation_name
             @@ Data_encoding.Binary.of_bytes_exn
-                 Proto.block_header_metadata_encoding
+                 Proto
+                 .block_header_metadata_encoding_with_legacy_attestation_name
                  block
           in
           let exp = to_json expected_block_receipt_bytes in
