@@ -83,6 +83,22 @@ let main_server state cctxt =
   let*! out = Lwt.join [dumper; main] in
   return out
 
+let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
+  function
+  | Block (level, (block, (endos, preendos))) ->
+      Some
+        (Block
+           ( level,
+             block.Data.Block.hash,
+             block.Data.Block.predecessor,
+             block.round,
+             block.timestamp,
+             block.reception_times,
+             block.delegate,
+             endos @ preendos ))
+  | Mempool (level, ops) -> Some (Mempool (None, level, ops))
+  | Rights (_, _) -> None
+
 let select_commands _ctxt Client_config.{chain; _} =
   return
     [
@@ -133,7 +149,8 @@ let select_commands _ctxt Client_config.{chain; _} =
           let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
           let endpoints = [Server_archiver.extract_auth endpoint] in
           let state =
-            Server_archiver.{cohttp_ctx; endpoints; backup_path = None}
+            Server_archiver.
+              {cohttp_ctx; endpoints; backup = (fun _ -> Lwt.return_unit)}
           in
           let dumper = Server_archiver.launch state "source-not-used" in
           let main =
@@ -161,7 +178,8 @@ let select_commands _ctxt Client_config.{chain; _} =
           let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
           let endpoints = [Server_archiver.extract_auth endpoint] in
           let state =
-            Server_archiver.{cohttp_ctx; endpoints; backup_path = None}
+            Server_archiver.
+              {cohttp_ctx; endpoints; backup = (fun _ -> Lwt.return_unit)}
           in
           let dumper = Server_archiver.launch state "source-not-used" in
           let main =
@@ -199,7 +217,14 @@ let select_commands _ctxt Client_config.{chain; _} =
               {
                 cohttp_ctx;
                 endpoints = List.map Server_archiver.extract_auth endpoints;
-                backup_path;
+                backup =
+                  Option.fold
+                    ~none:(fun _ -> Lwt.return_unit)
+                    ~some:(fun prefix chunk ->
+                      match server_to_json_chunk chunk with
+                      | None -> Lwt.return_unit
+                      | Some chunk -> Json_archiver.dump prefix chunk)
+                    backup_path;
               }
           in
           main_server state cctxt);
