@@ -1026,7 +1026,7 @@ let _bls12_381_tests =
     ]
     ~path:"src/lib_bls12_381/test"
     ~opam:"bls12-381"
-    ~deps:[alcotezt; qcheck_alcotest; bisect_ppx; bls12_381]
+    ~deps:[alcotezt; qcheck_alcotest; bls12_381]
     ~modes:[Native; JS]
     ~js_compatible:true
     ~dep_globs_rec:["test_vectors/*"]
@@ -1199,7 +1199,7 @@ let octez_bls12_381_hash =
       "Implementation of some cryptographic hash primitives using the scalar \
        field of BLS12-381"
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
-    ~deps:[bls12_381; bisect_ppx]
+    ~deps:[bls12_381]
     ~js_compatible:false
     ~foreign_stubs:
       {
@@ -1306,7 +1306,7 @@ let octez_polynomial =
     ~path:"src/lib_polynomial"
     ~internal_name:"polynomial"
     ~synopsis:"Polynomials over finite fields"
-    ~deps:[bls12_381; bisect_ppx; zarith]
+    ~deps:[bls12_381; zarith]
 
 let _octez_polynomial_tests =
   tezt
@@ -1360,7 +1360,6 @@ let _octez_bls12_381_polynomial_tests =
         alcotezt;
         qcheck_alcotest;
         octez_polynomial;
-        bisect_ppx;
         bls12_381;
         octez_bls12_381_polynomial;
       ]

@@ -17,7 +17,6 @@ depends: [
   "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-polynomial" {with-test}
-  "bisect_ppx" { with-test & >= "2.7.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
