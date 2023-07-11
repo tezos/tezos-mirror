@@ -25,44 +25,7 @@
 
 (** This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
-    {!Storage.Contract.Costaking_pseudotokens} tables. *)
-
-(* Invariant 1:
-     For {!Storage.Contract.Frozen_deposits_pseudotokens}, a missing key is
-     equivalent to a value of [0], in which case it is also equivalent to having
-     the same amount of tokens in the balances
-     {!Storage.Contract.Frozen_deposits_pseudotokens} and
-     {!Storage.Contract.Frozen_deposits}.
-
-     This is ensured by:
-       - checking that the result of
-         {!Storage.Contract.Frozen_deposits_pseudotokens.find} is always matched
-         with [Some v when Staking_pseudotoken_repr.(v <> zero)];
-       - and that there is no call to
-         {!Storage.Contract.Frozen_deposits_pseudotokens.get}.
-
-
-   Invariant 2:
-     All delegates with non-zero frozen deposits tez have:
-       - either their costaking balance pseudotokens initialized (possibly to
-         zero) and their frozen deposits pseudotokens initialized to non-zero;
-       - or have no costakers, in which case their costaking balance and
-         frozen deposits pseudotokens are assumed to be equal to their frozen
-         deposits tez.
-
-
-   Invariant 3:
-     For a given delegate, their frozen deposits pseudotokens equal the sum of
-     all costaking pseudotokens of their delegators (including the delegate
-     itself).
-
-     It is ensured by:
-       - {credit_costaking_pseudotokens} always called with (the pseudotokens
-         result of) {credit_frozen_deposits_pseudotokens_for_tez_amount} in
-         {stake};
-       - {dedit_costaking_pseudotokens} always called with (the same value as)
-         {debit_frozen_deposits_pseudotokens} in {request_unstake}.
-*)
+    {!Storage.Contract.Costaking_pseudotokens} tables.
 
 (** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
     current costaking balance converted into tez using [delegate] frozen

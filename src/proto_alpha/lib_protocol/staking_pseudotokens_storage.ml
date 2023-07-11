@@ -23,10 +23,114 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module is responsible for maintaining the
+    {!Storage.Contract.Frozen_deposits_pseudotokens} and
+    {!Storage.Contract.Costaking_pseudotokens} tables.
+
+
+    Pseudo-tokens
+
+    These tables are used to keep track of the distribution of frozen
+    deposits between a delegate and its costakers. The amounts stored
+    in these tables don't have a fixed value in tez, they represent
+    shares of the frozen deposits called pseudotokens. Pseudotokens
+    are minted when the delegate or a costaker increases its share
+    using the stake pseudo-operation; they are burnt when the delegate
+    or a costaker decreases its share using the request-unstake
+    pseudo-operation. Events which modify uniformly the stake of all
+    costakers (reward distribution and slashing) don't lead to minting
+    nor burning any pseudotokens; that's the main motivation for using
+    these pseudotokens: thanks to them we never need to iterate over
+    the costakers (whose number is unbounded).
+
+
+    Conversion rate:
+
+    The conversion rate between pseudotokens and mutez (the value in
+    mutez of a pseudotoken) should be given by the ratio between the
+    delegate's current frozen deposits and the total number of
+    pseudotokens of the delegate; it's actually the case when this
+    total number of pseudotokens is positive. When the total number of
+    pseudotokens of a delegate is null, the conversion rate could
+    theoretically have any value but extreme values are dangerous
+    because of overflows and loss of precision; for these reasons, we
+    use one as the conversion rate when the total number of
+    pseudotokens is null, which can happen in two situations:
+
+    - the first time a baker modifies its staking balance since the
+    migration which created the pseudotoken tables, and
+
+    - when a baker empties its frozen deposits and later receives
+    rewards.
+
+
+    Implementation:
+
+    The {!Storage.Contract.Costaking_pseudotokens} table stores for
+    each staker (delegate or costaker) its /staking balance
+    pseudotokens/ which is the number of pseudotokens owned by the
+    staker.
+
+    The {!Storage.Contract.Frozen_deposits_pseudotokens} table stores
+    for each delegate the /frozen deposits pseudotokens/ of the
+    delegate which is defined as the sum of all the staking balance
+    pseudotokens of the delegate and its costakers.
+
+    For both tables, pseudotokens are represented using the
+    [Pseudotoken_repr.t] type which is, like [Tez_repr.t], stored on
+    non-negative signed int64.
+
+
+    Invariants:
+
+    Invariant 1: frozen deposits pseudotokens initialization
+
+      For {!Storage.Contract.Frozen_deposits_pseudotokens}, a missing
+      key is equivalent to a value of [0]. This case means that there are
+      no pseudotokens, the delegate has no costaker, the conversion rate is [1].
+
+      This state is equivalent to having as many pseudotokens as the tez frozen
+      deposits of the delegate, all owned by the delegate.
+
+
+    Invariant 2: staking balance pseudotokens initialization
+
+      For {!Storage.Contract.Costaking_pseudotokens}, a missing key is
+      equivalent to a value of [0].
+
+    Invariant 3: relationship between frozen deposits and staking
+    balance pseudotokens
+
+      For a given delegate, their frozen deposits pseudotokens equal
+      the sum of all costaking pseudotokens of their delegators
+      (including the delegate itself).
+
+
+    Ensuring invariants
+
+    Invariant 1:
+     This is ensured by:
+       - checking that the result of
+         {!Storage.Contract.Frozen_deposits_pseudotokens.find} is always matched
+         with [Some v when Staking_pseudotoken_repr.(v <> zero)];
+       - and that there is no call to
+         {!Storage.Contract.Frozen_deposits_pseudotokens.get}.
+
+    Invariant 3:
+     It is ensured by:
+       - {credit_costaking_pseudotokens} always called with (the pseudotokens
+         result of) {credit_frozen_deposits_pseudotokens_for_tez_amount} in
+         {stake};
+       - {debit_costaking_pseudotokens} always called with (the same value as)
+         {debit_frozen_deposits_pseudotokens} in {request_unstake}.
+*)
+
+(** Tez -> pseudotokens conversion *)
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
   if Tez_repr.(frozen_deposits_tez = zero) then (
-    (* When there are no frozen deposits, starts with 1 pseudotoken = 1 mutez. *)
+    (* When there are no pseudotokens, the conversion rate is one (1
+       pseudotoken = 1 mutez). *)
     assert (Staking_pseudotoken_repr.(frozen_deposits_pseudotokens = zero)) ;
     Staking_pseudotoken_repr.of_int64_exn (Tez_repr.to_mutez tez_amount))
   else
