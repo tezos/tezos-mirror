@@ -149,7 +149,8 @@ module Handlers = struct
       =
    fun w request ->
     let state = Worker.state w in
-    match request with Request.Process b -> on_process b state
+    match request with
+    | Request.Process b -> protect @@ fun () -> on_process b state
 
   type launch_error = error trace
 
