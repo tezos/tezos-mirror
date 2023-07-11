@@ -353,7 +353,7 @@ and infer_for_measurements ~local_model_name measurements
       (overrides_map, scores_list, report)
       solved_list
   in
-  let solution = Codegen.{local_model_name; map; scores_list} in
+  let solution = Codegen.{map; scores_list} in
   perform_save_solution solution infer_opts ;
   (match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
@@ -388,8 +388,7 @@ and process_output measure local_model_name problem solution infer_opts =
   perform_csv_export scores_label solution infer_opts ;
   let map = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
   perform_save_solution
-    Codegen.
-      {local_model_name; map; scores_list = [(scores_label, solution.scores)]}
+    Codegen.{map; scores_list = [(scores_label, solution.scores)]}
     infer_opts ;
   perform_plot measure local_model_name problem solution infer_opts
 
@@ -518,18 +517,6 @@ let codegen_all_cmd solution_fn regexp codegen_options =
        ~exclusions:String.Set.empty
 
 let codegen_for_a_solution solution codegen_options ~exclusions =
-  let found_codegen_models =
-    (* They include builtin/TIMER_LATENCY. *)
-    List.filter
-      Registration.(
-        fun (_, {from; _}) ->
-          List.exists
-            (fun {local_model_name; _} ->
-              solution.Codegen.local_model_name = local_model_name)
-            from)
-      (Registration.all_models ())
-  in
-
   let fvs_of_codegen_model model =
     let (Model.Model model) = model in
     let module Model = (val model) in
@@ -540,16 +527,15 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
   let model_fvs_included_in_sol model =
     let fvs = fvs_of_codegen_model model in
     Free_variable.Set.for_all
-      (fun fv -> Free_variable.Map.mem fv solution.map)
+      (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
 
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter
-      (fun (_model_name, {Registration.model; _}) ->
+    List.filter (fun (_model_name, {Registration.model; _}) ->
         model_fvs_included_in_sol model)
-      found_codegen_models
+    @@ Registration.all_models ()
   in
   generate_code_for_models solution codegen_models codegen_options ~exclusions
 

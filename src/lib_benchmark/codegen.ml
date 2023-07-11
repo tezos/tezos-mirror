@@ -177,7 +177,6 @@ module Lift_then_print = Costlang.Let_lift (Codegen)
 
 (* ------------------------------------------------------------------------- *)
 type solution = {
-  local_model_name : string;
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
@@ -187,12 +186,12 @@ type solution = {
 
 let pp_solution ppf solution =
   let open Format in
-  fprintf ppf "@[<v>local_model_name: %s@;" solution.local_model_name ;
   let alist =
     List.sort (fun (fv1, _) (fv2, _) -> Free_variable.compare fv1 fv2)
     @@ List.of_seq
     @@ Free_variable.Map.to_seq solution.map
   in
+  fprintf ppf "@[" ;
   fprintf
     ppf
     "@[<2>free_variables:@ @[<v>%a@]@]@;"
@@ -333,16 +332,13 @@ let codegen (Model.Model model) (sol : solution)
   Item {comments; code = generate_let_binding fun_name expr}
 
 let codegen_models models sol transform ~exclusions =
-  let codes =
-    List.filter_map
-      (fun (model_name, {Registration.model; _}) ->
-        (* Exclusion is done by the function name *)
-        let fun_name = function_name model_name in
-        if String.Set.mem fun_name exclusions then None
-        else Some (codegen model sol transform model_name))
-      models
-  in
-  comment ["Local model name: " ^ sol.local_model_name] :: codes
+  List.filter_map
+    (fun (model_name, {Registration.model; _}) ->
+      (* Exclusion is done by the function name *)
+      let fun_name = function_name model_name in
+      if String.Set.mem fun_name exclusions then None
+      else Some (codegen model sol transform model_name))
+    models
 
 let%expect_test "basic_printing" =
   let open Codegen in
