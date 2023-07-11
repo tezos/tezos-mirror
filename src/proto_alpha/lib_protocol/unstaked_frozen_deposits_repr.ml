@@ -22,3 +22,41 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type t = (Cycle_repr.t * Deposits_repr.t) list
+
+type squashed = t
+
+let empty = []
+
+let encoding =
+  let open Data_encoding in
+  list (tup2 Cycle_repr.encoding Deposits_repr.encoding)
+
+let squash_unslashable ~unslashable_cycle l =
+  let open Result_syntax in
+  let rec aux unslashable slashable = function
+    | [] -> ok ((unslashable_cycle, unslashable) :: slashable)
+    | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle) ->
+        let* unslashable = Deposits_repr.(unslashable ++? d) in
+        aux unslashable slashable tl
+    | hd :: tl -> aux unslashable (hd :: slashable) tl
+  in
+  aux Deposits_repr.zero [] l
+
+let no_unslashable_cycle l = l
+
+let get ~normalized_cycle l =
+  List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l
+  |> Option.value ~default:Deposits_repr.zero
+
+let update ~f ~normalized_cycle l =
+  let open Result_syntax in
+  let rec aux acc = function
+    | [] -> return acc
+    | (c, d) :: tl when Cycle_repr.(c = normalized_cycle) ->
+        let+ d = f d in
+        List.rev_append acc ((c, d) :: tl)
+    | hd :: tl -> aux (hd :: acc) tl
+  in
+  aux [] l

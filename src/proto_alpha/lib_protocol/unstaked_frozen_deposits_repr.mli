@@ -22,3 +22,24 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type t
+
+type squashed = private t
+
+val empty : squashed
+
+val encoding : t Data_encoding.t
+
+val squash_unslashable :
+  unslashable_cycle:Cycle_repr.t -> t -> squashed tzresult
+
+val no_unslashable_cycle : t -> squashed
+
+val get : normalized_cycle:Cycle_repr.t -> squashed -> Deposits_repr.t
+
+val update :
+  f:(Deposits_repr.t -> Deposits_repr.t tzresult) ->
+  normalized_cycle:Cycle_repr.t ->
+  squashed ->
+  squashed tzresult

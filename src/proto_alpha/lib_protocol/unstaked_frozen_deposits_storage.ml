@@ -23,33 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Internal = struct
-  let get ctxt contract ~normalized_cycle =
-    let open Lwt_result_syntax in
-    let+ balance_opt =
-      Storage.Contract.Unstaked_frozen_deposits.find
-        (ctxt, contract)
-        normalized_cycle
-    in
-    Option.value balance_opt ~default:Deposits_repr.zero
-
-  let update_balance ~f ctxt contract ~normalized_cycle =
-    let open Lwt_result_syntax in
-    let* frozen_deposits = get ctxt contract ~normalized_cycle in
-    let*? new_deposits = f frozen_deposits in
-    let*! ctxt =
-      Storage.Contract.Unstaked_frozen_deposits.add
-        (ctxt, contract)
-        normalized_cycle
-        new_deposits
-    in
-    return ctxt
-end
-
 let unslashable_cycle ctxt ~cycle =
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let max_slashing_period = Constants_storage.max_slashing_period ctxt in
   Cycle_repr.sub cycle (preserved_cycles + max_slashing_period - 1)
+
+let current_unslashable_cycle ctxt =
+  let cycle = (Raw_context.current_level ctxt).cycle in
+  unslashable_cycle ctxt ~cycle
+
+module Internal = struct
+  let get_all ctxt contract =
+    let open Lwt_result_syntax in
+    let* unstaked_frozen_deposits_opt =
+      Storage.Contract.Unstaked_frozen_deposits.find ctxt contract
+    in
+    match unstaked_frozen_deposits_opt with
+    | None -> return Unstaked_frozen_deposits_repr.empty
+    | Some unstaked_frozen_deposits -> (
+        match current_unslashable_cycle ctxt with
+        | None ->
+            return
+              (Unstaked_frozen_deposits_repr.no_unslashable_cycle
+                 unstaked_frozen_deposits)
+        | Some unslashable_cycle ->
+            Lwt.return
+            @@ Unstaked_frozen_deposits_repr.squash_unslashable
+                 ~unslashable_cycle
+                 unstaked_frozen_deposits)
+
+  let get ctxt contract ~normalized_cycle =
+    let open Lwt_result_syntax in
+    let+ unstaked_frozen_deposits = get_all ctxt contract in
+    Unstaked_frozen_deposits_repr.get ~normalized_cycle unstaked_frozen_deposits
+
+  let update_balance ~f ctxt contract ~normalized_cycle =
+    let open Lwt_result_syntax in
+    let* unstaked_frozen_deposits = get_all ctxt contract in
+    let*? unstaked_frozen_deposits =
+      Unstaked_frozen_deposits_repr.update
+        ~f
+        ~normalized_cycle
+        unstaked_frozen_deposits
+    in
+    let*! ctxt =
+      Storage.Contract.Unstaked_frozen_deposits.add
+        ctxt
+        contract
+        (unstaked_frozen_deposits :> Unstaked_frozen_deposits_repr.t)
+    in
+    return ctxt
+end
 
 let normalized_cycle ctxt ~cycle =
   let current_cycle = (Raw_context.current_level ctxt).cycle in
@@ -88,54 +112,6 @@ let spend_only_call_from_token ctxt delegate cycle amount =
   let* ctxt = Stake_storage.remove_stake ctxt delegate amount in
   Internal.update_balance ~f ctxt contract ~normalized_cycle
 
-let squash_unstaked_frozen_deposits ctxt ~from_cycle ~into_cycle ~delegate =
-  let open Lwt_result_syntax in
-  let contract = Contract_repr.Implicit delegate in
-  let* from_unstaked_frozen_deposits_opt =
-    Storage.Contract.Unstaked_frozen_deposits.find (ctxt, contract) from_cycle
-  in
-  match from_unstaked_frozen_deposits_opt with
-  | None -> (* nothing to squash *) return ctxt
-  | Some from_unstaked_frozen_deposits ->
-      let* ctxt =
-        Storage.Contract.Unstaked_frozen_deposits.remove_existing
-          (ctxt, contract)
-          from_cycle
-      in
-      let* into_unstaked_frozen_deposits_opt =
-        Storage.Contract.Unstaked_frozen_deposits.find
-          (ctxt, contract)
-          into_cycle
-      in
-      let*? squashed_unstaked_frozen_deposits =
-        match into_unstaked_frozen_deposits_opt with
-        | None -> Ok from_unstaked_frozen_deposits
-        | Some into_unstaked_frozen_deposits ->
-            Deposits_repr.(
-              from_unstaked_frozen_deposits ++? into_unstaked_frozen_deposits)
-      in
-      let*! ctxt =
-        Storage.Contract.Unstaked_frozen_deposits.add
-          (ctxt, contract)
-          into_cycle
-          squashed_unstaked_frozen_deposits
-      in
-      return ctxt
-
-let squash_unslashable_unstaked_frozen_deposits_at_cycle_end ctxt ~last_cycle =
-  match unslashable_cycle ctxt ~cycle:last_cycle with
-  | None -> return ctxt
-  | Some last_unslashable_cycle ->
-      let new_unslashable_cycle = Cycle_repr.succ last_unslashable_cycle in
-      Storage.Delegates.fold
-        ctxt
-        ~order:`Undefined
-        ~init:(ok ctxt)
-        ~f:(fun delegate ctxt ->
-          let open Lwt_result_syntax in
-          let*? ctxt in
-          squash_unstaked_frozen_deposits
-            ctxt
-            ~from_cycle:last_unslashable_cycle
-            ~into_cycle:new_unslashable_cycle
-            ~delegate)
+let squash_unslashable_unstaked_frozen_deposits_at_cycle_end ctxt ~last_cycle:_
+    =
+  return ctxt
