@@ -328,21 +328,22 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
               ~frozen_deposits_tez
               ~tez_amount:requested_amount
           in
-          let pseudotokens_to_unstake =
-            Staking_pseudotoken_repr.min
-              requested_pseudotokens
-              available_pseudotokens
+          assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
+          let pseudotokens_to_unstake, tez_to_unstake =
+            if
+              Staking_pseudotoken_repr.(
+                requested_pseudotokens < available_pseudotokens)
+            then (requested_pseudotokens, requested_amount)
+            else
+              ( available_pseudotokens,
+                tez_of
+                  ~frozen_deposits_pseudotokens
+                  ~frozen_deposits_tez
+                  ~pseudotoken_amount:requested_pseudotokens )
           in
-          assert (Staking_pseudotoken_repr.(pseudotokens_to_unstake <> zero)) ;
           let*? new_frozen_deposits_pseudotokens =
             Staking_pseudotoken_repr.(
               frozen_deposits_pseudotokens -? pseudotokens_to_unstake)
-          in
-          let tez_to_unstake =
-            tez_of
-              ~frozen_deposits_pseudotokens
-              ~frozen_deposits_tez
-              ~pseudotoken_amount:pseudotokens_to_unstake
           in
           let* ctxt =
             Storage.Contract.Frozen_deposits_pseudotokens.update
