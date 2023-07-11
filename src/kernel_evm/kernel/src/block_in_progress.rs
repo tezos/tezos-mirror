@@ -10,6 +10,7 @@ use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::inbox::{Transaction, TransactionContent};
 use crate::storage;
+use anyhow::Context;
 use primitive_types::{H256, U256};
 use std::collections::VecDeque;
 use tezos_ethereum::block::L2Block;
@@ -50,8 +51,8 @@ impl BlockInProgress {
         number: U256,
         gas_price: U256,
         transactions: VecDeque<Transaction>,
-    ) -> Result<BlockInProgress, Error> {
-        let block_in_progress = BlockInProgress {
+    ) -> BlockInProgress {
+        BlockInProgress {
             number,
             tx_queue: transactions,
             valid_txs: Vec::new(),
@@ -63,16 +64,14 @@ impl BlockInProgress {
             // the block is referenced in the storage by the block number anyway
             hash: H256(number.into()),
             estimated_ticks: 0,
-        };
-
-        Ok(block_in_progress)
+        }
     }
 
     pub fn register_transaction(
         &mut self,
         tx_hash: [u8; 32],
         gas_used: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), anyhow::Error> {
         self.cumulative_gas = self
             .cumulative_gas
             .checked_add(gas_used)
@@ -85,14 +84,15 @@ impl BlockInProgress {
     pub fn finalize_and_store<Host: Runtime>(
         self,
         host: &mut Host,
-    ) -> Result<L2Block, Error> {
+    ) -> Result<L2Block, anyhow::Error> {
         let timestamp = current_timestamp(host);
         let new_block = L2Block {
             timestamp,
             gas_used: self.cumulative_gas,
             ..L2Block::new(self.number, self.valid_txs, timestamp)
         };
-        storage::store_current_block(host, &new_block)?;
+        storage::store_current_block(host, &new_block)
+            .context("Failed to store the current block")?;
         Ok(new_block)
     }
 
@@ -129,7 +129,7 @@ impl BlockInProgress {
     pub fn make_receipt(
         &self,
         receipt_info: TransactionReceiptInfo,
-    ) -> Result<TransactionReceipt, Error> {
+    ) -> TransactionReceipt {
         let TransactionReceiptInfo {
             tx_hash: hash,
             index,
@@ -147,7 +147,7 @@ impl BlockInProgress {
             ..
         } = self;
 
-        let tx_receipt = match execution_outcome {
+        match execution_outcome {
             Some(outcome) => TransactionReceipt {
                 hash,
                 index,
@@ -180,9 +180,7 @@ impl BlockInProgress {
                 type_: TransactionType::Legacy,
                 status: TransactionStatus::Failure,
             },
-        };
-
-        Ok(tx_receipt)
+        }
     }
 
     pub fn make_object(&self, object_info: TransactionObjectInfo) -> TransactionObject {
