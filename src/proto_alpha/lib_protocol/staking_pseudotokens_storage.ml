@@ -235,49 +235,6 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     in
     return (ctxt, pseudotokens_to_add)
 
-(** [debit_frozen_deposits_pseudotokens ctxt delegate p_amount] decreases
-    [delegate]'s stake pseudotokens by [p_amount].
-    The function also returns the amount of tez [p_amount] current worth.
-*)
-let debit_frozen_deposits_pseudotokens ctxt delegate pseudotoken_amount =
-  let open Lwt_result_syntax in
-  if Staking_pseudotoken_repr.(pseudotoken_amount = zero) then
-    return (ctxt, Tez_repr.zero)
-  else
-    let contract = Contract_repr.Implicit delegate in
-    let* {current_amount = frozen_deposits_tez; initial_amount = _} =
-      Frozen_deposits_storage.get ctxt contract
-    in
-    let* frozen_deposits_pseudotokens_opt =
-      Storage.Contract.Frozen_deposits_pseudotokens.find ctxt contract
-    in
-    let frozen_deposits_pseudotokens =
-      match frozen_deposits_pseudotokens_opt with
-      | Some frozen_deposits_pseudotokens
-        when Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero) ->
-          frozen_deposits_pseudotokens
-      | _ ->
-          Staking_pseudotoken_repr.of_int64_exn
-            (Tez_repr.to_mutez frozen_deposits_tez)
-    in
-    let*? new_frozen_deposits_pseudotokens =
-      Staking_pseudotoken_repr.(
-        frozen_deposits_pseudotokens -? pseudotoken_amount)
-    in
-    let tez_amount =
-      tez_of
-        ~frozen_deposits_pseudotokens
-        ~frozen_deposits_tez
-        ~pseudotoken_amount
-    in
-    let*! ctxt =
-      Storage.Contract.Frozen_deposits_pseudotokens.add
-        ctxt
-        contract
-        new_frozen_deposits_pseudotokens
-    in
-    return (ctxt, tez_amount)
-
 (** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
     current costaking balance. *)
 let costaking_pseudotokens_balance ctxt contract =
@@ -386,11 +343,21 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
                 available_pseudotokens
             in
             assert (Staking_pseudotoken_repr.(pseudotokens_to_unstake <> zero)) ;
-            let* ctxt, tez_to_unstake =
-              debit_frozen_deposits_pseudotokens
+            let*? new_frozen_deposits_pseudotokens =
+              Staking_pseudotoken_repr.(
+                frozen_deposits_pseudotokens -? pseudotokens_to_unstake)
+            in
+            let tez_to_unstake =
+              tez_of
+                ~frozen_deposits_pseudotokens
+                ~frozen_deposits_tez
+                ~pseudotoken_amount:pseudotokens_to_unstake
+            in
+            let* ctxt =
+              Storage.Contract.Frozen_deposits_pseudotokens.update
                 ctxt
-                delegate
-                pseudotokens_to_unstake
+                contract
+                new_frozen_deposits_pseudotokens
             in
             let+ ctxt =
               debit_costaking_pseudotokens ctxt contract pseudotokens_to_unstake
