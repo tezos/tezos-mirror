@@ -143,7 +143,8 @@ let fmt_tty = external_sublib fmt "fmt.tty"
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~npm_deps:[Npm.make "hacl-wasm" V.(at_least "1.4.0" && less_than "1.5.0")]
+    ~npm_deps:
+      [Npm.make "hacl-wasm" (Version V.(at_least "1.4.0" && less_than "1.5.0"))]
     "hacl-star"
     V.(at_least "0.7.1" && less_than "0.8")
 
@@ -298,7 +299,7 @@ let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
 let secp256k1_internal =
   let version = V.(at_least "0.4.0") in
   external_lib
-    ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" version]
+    ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" (Version version)]
     ~js_compatible:true
     "secp256k1-internal"
     version
@@ -836,7 +837,6 @@ let octez_rpc =
     ~js_compatible:true
 
 let bls12_381 =
-  let version = V.(at_least "6.1.0" && less_than "6.2.0") in
   public_lib
     "bls12-381"
     ~path:"src/lib_bls12_381"
@@ -869,7 +869,7 @@ let bls12_381 =
             S "blst_bindings_stubs.js";
           ];
         ]
-    ~npm_deps:[Npm.make "@nomadic-labs/ocaml-bls12-381" version]
+    ~npm_deps:[Npm.make "ocaml-bls12-381" (Path "src/lib_bls12_381/blst.js")]
     ~foreign_archives:["blst"]
     ~foreign_stubs:
       {
@@ -941,6 +941,7 @@ let bls12_381 =
           ];
           [
             S "rule";
+            [S "mode"; S "fallback"];
             [
               S "deps";
               [S "source_tree"; S "libblst"];

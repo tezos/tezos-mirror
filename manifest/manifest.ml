@@ -496,9 +496,11 @@ module Version = struct
 end
 
 module Npm = struct
-  type t = {package : string; version : Version.constraints}
+  type version_or_path = Version of Version.constraints | Path of string
 
-  let make package version = {package; version}
+  type t = {package : string; version_or_path : version_or_path}
+
+  let make package version_or_path = {package; version_or_path}
 
   let node_preload t =
     match String.index_opt t.package '/' with
@@ -3024,12 +3026,15 @@ let generate_package_json_file () =
           b
   in
   let pp_dep fmt (npm : Npm.t) =
-    Format.fprintf
-      fmt
-      {|    "%s": "%a"|}
-      npm.package
-      (pp_version_constraint ~in_and:false)
-      npm.version
+    match npm.version_or_path with
+    | Version version ->
+        Format.fprintf
+          fmt
+          {|    "%s": "%a"|}
+          npm.package
+          (pp_version_constraint ~in_and:false)
+          version
+    | Path path -> Format.fprintf fmt {|    "%s": "file:%s"|} npm.package path
   in
   write "package.json" @@ fun fmt ->
   Format.fprintf

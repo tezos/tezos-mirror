@@ -50,6 +50,7 @@
       (run cp libblst/libblst.dylib dllblst.so)))))))
 
 (rule
+ (mode fallback)
  (deps
   (source_tree libblst)
   needed-wasm-names
