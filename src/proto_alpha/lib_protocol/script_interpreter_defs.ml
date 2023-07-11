@@ -420,7 +420,7 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KList_enter_body (_, xs, _, _, len, _) ->
       Interp_costs.Control.list_enter_body xs len
   | KList_exit_body (_, _, _, _, _, _) -> Interp_costs.Control.list_exit_body
-  | KMap_enter_body (_, _, _, _, _) -> Interp_costs.Control.map_enter_body
+  | KMap_enter_body (_, _, map, _, _) -> Interp_costs.Control.map_enter_body map
   | KMap_exit_body (_, _, map, key, _, _) ->
       Interp_costs.Control.map_exit_body key map
   | KView_exit (_, _) -> Interp_costs.Control.view_exit
