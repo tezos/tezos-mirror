@@ -1,3 +1,10 @@
+v1.2
+
+* Fixed streaming RPCs in servers to be closed as soon as the clients
+  leave (instead of waiting for the next flush)
+* Added the possibility to specify a conn_closed hook function at the
+  creation of servers
+
 v1.1
 
 * fix: The client do not wait for a first element of a stream to arrive.
