@@ -151,10 +151,7 @@ module Handler = struct
     let handler stopper (block_hash, block_header) =
       let block = `Hash (block_hash, 0) in
       let* protocols =
-        Tezos_shell_services.Chain_services.Blocks.protocols
-          cctxt
-          ~block:(`Hash (block_hash, 0))
-          ()
+        Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
       in
       let*! plugin_opt = resolve_plugin protocols in
       match plugin_opt with
