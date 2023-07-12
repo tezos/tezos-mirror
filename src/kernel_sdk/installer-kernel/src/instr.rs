@@ -6,9 +6,7 @@
 
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::{Path, RefPath};
-use tezos_smart_rollup_installer_config::binary::{
-    read_size, reveal_root_hash_to_store, RefConfigInstruction,
-};
+use tezos_smart_rollup_installer_config::binary::read_size;
 
 pub fn read_config_program_size(
     host: &impl Runtime,
@@ -39,26 +37,4 @@ pub fn read_instruction_bytes(
         buffer = &mut buffer[read_size..];
     }
     Ok(())
-}
-
-pub fn handle_instruction(
-    host: &mut impl Runtime,
-    instr: RefConfigInstruction,
-) -> Result<(), &'static str> {
-    match instr {
-        RefConfigInstruction::Reveal(instr) => {
-            let to_path: RefPath = instr.to;
-            reveal_root_hash_to_store(host, &instr.hash.into(), &to_path)
-        }
-        RefConfigInstruction::Move(instr) => {
-            let from_path: RefPath = instr.from;
-            let to_path: RefPath = instr.to;
-            Runtime::store_move(host, &from_path, &to_path)
-                .map_err(|_| "Couldn't move path during config application")
-        }
-        RefConfigInstruction::Set(instr) => {
-            Runtime::store_write(host, &instr.to, instr.value.0, 0)
-                .map_err(|_| "Couldn't set key during config application")
-        }
-    }
 }

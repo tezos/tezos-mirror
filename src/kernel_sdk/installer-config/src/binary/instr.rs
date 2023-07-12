@@ -54,8 +54,12 @@ pub type RefConfigInstruction<'a> = ConfigInstruction<RefPath<'a>, RefBytes<'a>>
 
 #[cfg(feature = "alloc")]
 pub mod owned {
+    use crate::binary::evaluation::eval_config_instr;
     use tezos_smart_rollup_encoding::dac::PreimageHash;
-    use tezos_smart_rollup_host::path::{OwnedPath, PathError};
+    use tezos_smart_rollup_host::{
+        path::{OwnedPath, PathError},
+        runtime::Runtime,
+    };
     use thiserror::Error;
 
     use super::*;
@@ -73,6 +77,15 @@ pub mod owned {
 
     #[derive(Debug, PartialEq, Eq)]
     pub struct OwnedConfigProgram(pub Vec<OwnedConfigInstruction>);
+
+    impl OwnedConfigProgram {
+        pub fn evaluate(&self, host: &mut impl Runtime) -> Result<(), &'static str> {
+            for instruction in self.0.iter() {
+                eval_config_instr(host, instruction)?
+            }
+            Ok(())
+        }
+    }
 
     #[derive(Debug, Error, PartialEq)]
     pub enum RevealInstrError {
@@ -100,48 +113,22 @@ pub mod owned {
     }
 }
 
-#[cfg(feature = "alloc")]
 pub mod evaluation {
-    use crate::binary::instr::{
-        owned::{OwnedConfigInstruction, OwnedConfigProgram},
-        MoveInstruction, RevealInstruction, SetInstruction,
-    };
+    use crate::binary::instr::{MoveInstruction, RevealInstruction, SetInstruction};
     use crate::binary::reveal_root_hash_to_store;
+    use tezos_smart_rollup_host::path::Path as HostPath;
     use tezos_smart_rollup_host::runtime::Runtime;
 
-    fn eval_config_instr(
-        host: &mut impl Runtime,
-        config_instr: &OwnedConfigInstruction,
-    ) -> Result<(), &'static str> {
-        match config_instr {
-            OwnedConfigInstruction::Reveal(RevealInstruction { hash, to }) => {
-                let hash = &hash
-                    .as_ref()
-                    .try_into()
-                    .map_err(|_| "Invalid hash conversion.")?;
-                reveal_root_hash_to_store(host, hash, to)
-            }
-            OwnedConfigInstruction::Move(MoveInstruction { from, to }) => {
-                Runtime::store_move(host, from, to)
-                    .map_err(|_| "Couldn't move path during config application")
-            }
-            OwnedConfigInstruction::Set(SetInstruction { value, to }) => {
-                Runtime::store_write(host, to, &value.0, 0)
-                    .map_err(|_| "Couldn't set key during config application")
-            }
-        }
-    }
+    use super::ConfigInstruction;
 
-    /// Configuration program evaluation
+    /// Configuration instruction evaluation
     ///
-    /// This functions takes a config program, which is a sequence of config
-    /// instructions, and sequentially evaluates them.
-    /// Each config instruction is evaluated with the according intended behaviour.
+    /// This functions takes a config instruction and evaluates it with the according
+    /// intended behaviour.
     ///
     /// Here's an example of how you can use this function:
     /// ```
-    /// use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_program;
-    /// use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
+    /// use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_instr;
     /// use tezos_smart_rollup_host::KERNEL_BOOT_PATH;
     /// use tezos_smart_rollup_host::path::OwnedPath;
     /// use tezos_smart_rollup_host::path::RefPath;
@@ -155,22 +142,33 @@ pub mod evaluation {
     /// pub fn upgrade_kernel(host: &mut impl Runtime) -> Result<(), &'static str> {
     ///     let root_hash = [0; PREIMAGE_HASH_SIZE];
     ///
-    ///     // Create config consisting of a reveal instruction.
-    ///     let config_program = upgrade_reveal_flow(root_hash);
+    ///     // Create config consisting of a reveal instruction followed by a move.
+    ///     let config = upgrade_reveal_flow(root_hash);
     ///
-    ///     eval_config_program(host, &config_program)?;
-    ///     Runtime::store_move(host, &TMP_REVEAL_PATH, &KERNEL_BOOT_PATH)
-    ///         .map_err(|_| "Upgrade completion failed.")
+    ///     config.evaluate(host)
     /// }
     /// ```
-    pub fn eval_config_program(
+    pub fn eval_config_instr<Path: HostPath, Bytes: AsRef<[u8]>>(
         host: &mut impl Runtime,
-        config_program: &OwnedConfigProgram,
+        config_instr: &ConfigInstruction<Path, Bytes>,
     ) -> Result<(), &'static str> {
-        for config_instr in config_program.0.iter() {
-            eval_config_instr(host, config_instr)?;
+        match config_instr {
+            ConfigInstruction::Reveal(RevealInstruction { hash, to }) => {
+                let hash = &hash
+                    .as_ref()
+                    .try_into()
+                    .map_err(|_| "Invalid hash conversion.")?;
+                reveal_root_hash_to_store(host, hash, to)
+            }
+            ConfigInstruction::Move(MoveInstruction { from, to }) => {
+                Runtime::store_move(host, from, to)
+                    .map_err(|_| "Couldn't move path during config application")
+            }
+            ConfigInstruction::Set(SetInstruction { value, to }) => {
+                Runtime::store_write(host, to, value.as_ref(), 0)
+                    .map_err(|_| "Couldn't set key during config application")
+            }
         }
-        Ok(())
     }
 }
 
@@ -178,16 +176,25 @@ pub mod evaluation {
 pub mod promote {
     use super::owned::{OwnedConfigInstruction, OwnedConfigProgram};
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+    use tezos_smart_rollup_host::{
+        path::{OwnedPath, RefPath},
+        KERNEL_BOOT_PATH,
+    };
 
-    pub const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
+    const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");
 
     pub fn upgrade_reveal_flow(
         root_hash: [u8; PREIMAGE_HASH_SIZE],
     ) -> OwnedConfigProgram {
-        OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
-            root_hash.to_vec().into(),
-            OwnedPath::from(&TMP_REVEAL_PATH),
-        )])
+        OwnedConfigProgram(vec![
+            OwnedConfigInstruction::reveal_instr(
+                root_hash.to_vec().into(),
+                OwnedPath::from(&TMP_REVEAL_PATH),
+            ),
+            OwnedConfigInstruction::move_instr(
+                (&TMP_REVEAL_PATH).into(),
+                (&KERNEL_BOOT_PATH).into(),
+            ),
+        ])
     }
 }

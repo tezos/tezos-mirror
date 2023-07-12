@@ -20,15 +20,15 @@
 
 mod instr;
 
+use crate::instr::read_instruction_bytes;
 use core::panic::PanicInfo;
 use instr::read_config_program_size;
 use tezos_smart_rollup::host::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
+use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_instr;
 use tezos_smart_rollup_installer_config::binary::{
     completed, read_size, EncodingSize, NomReader, RefConfigInstruction,
 };
-
-use crate::instr::{handle_instruction, read_instruction_bytes};
 
 // Path of currently running kernel.
 const KERNEL_BOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/boot.wasm");
@@ -107,7 +107,7 @@ pub fn install_kernel(
                 RefConfigInstruction::nom_read(&config_instruction_buffer[..instr_size])
                     .map_err(|_| "Couldn't decode config instruction")
                     .and_then(completed)?;
-            handle_instruction(host, instr)?;
+            eval_config_instr(host, &instr)?;
         }
 
         host.store_delete(&AUXILIARY_CONFIG_INTERPRETATION_PATH)

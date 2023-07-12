@@ -10,7 +10,7 @@
 - Implement `core::fmt::Display` for `OwnedPath` and `RefPath` to get paths as strings for tests, errors, etc.
 - Adjust `Path` trait to require `Display` on types that implement it.
 - Add `KERNEL_BOOT_PATH` constant to `tezos-smart-rollup-host`.
-- `tezos-smart-rollup-installer-config`: add `eval_config_program` and `upgrade_reveal_flow` functions to
+- `tezos-smart-rollup-installer-config`: add `eval_config_instr` and `upgrade_reveal_flow` functions to
   simplify kernel upgrades.
 
 ### Installer client/kernel

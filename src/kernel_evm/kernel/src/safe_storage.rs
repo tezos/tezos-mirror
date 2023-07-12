@@ -12,7 +12,6 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
     KERNEL_BOOT_PATH,
 };
-use tezos_smart_rollup_installer_config::binary::promote::TMP_REVEAL_PATH;
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
@@ -163,7 +162,7 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn promote_upgrade(&mut self) -> Result<(), RuntimeError> {
-        let safe_kernel_boot_path = safe_path(&TMP_REVEAL_PATH)?;
+        let safe_kernel_boot_path = safe_path(&KERNEL_BOOT_PATH)?;
         match self.0.store_read(&safe_kernel_boot_path, 0, 0) {
             Ok(_) => {
                 // Upgrade detected
