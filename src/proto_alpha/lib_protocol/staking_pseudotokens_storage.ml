@@ -128,7 +128,10 @@
 
 type error += Cannot_stake_on_fully_slashed_delegate
 
-(** Tez -> pseudotokens conversion *)
+(** Tez -> pseudotokens conversion.
+    Precondition: all arguments are <> 0.
+    Postcondition: result is <> 0.
+*)
 let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~tez_amount =
   assert (Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero)) ;
@@ -148,6 +151,9 @@ let pseudotokens_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
   in
   Staking_pseudotoken_repr.of_z_exn res_z
 
+(** Pseudotokens -> tez conversion.
+    Precondition: [frozen_deposits_pseudotokens <> 0].
+*)
 let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
     ~pseudotoken_amount =
   assert (Staking_pseudotoken_repr.(frozen_deposits_pseudotokens <> zero)) ;
@@ -189,7 +195,12 @@ let get_frozen_deposits_pseudotokens ctxt delegate =
   The function also returns [pa].
 
   This function must be called on "stake" before transferring tez to
-  [delegate]'s frozen deposits. *)
+  [delegate]'s frozen deposits.
+
+  Breaks invariant 3 because it does not credit the pseudotoken
+  balance of any staker. The returned [pa] value should be credited to
+  one of the stakers delegating to [delegate].
+*)
 let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     =
   let open Lwt_result_syntax in
@@ -241,7 +252,7 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
     return (ctxt, pseudotokens_to_add)
 
 (** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
-    current costaking balance. *)
+    current costaking balance in pseudotokens. *)
 let costaking_pseudotokens_balance ctxt contract =
   let open Lwt_result_syntax in
   let+ costaking_pseudotokens_opt =
@@ -263,11 +274,20 @@ let costaking_balance_as_tez ctxt ~contract ~delegate =
       ~pseudotoken_amount
   else (
     assert (Staking_pseudotoken_repr.(pseudotoken_amount = zero)) ;
+    (* By invariant 3, pseudotoken_amount <= frozen_deposits_pseudotokens = 0 *)
+    (* There are no pseudotokens, the delegate owns the totality of
+       the frozen deposits. *)
     if Contract_repr.(contract = Implicit delegate) then
       let+ frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
       frozen_deposits_tez
     else return Tez_repr.zero)
 
+(** [update_costaking_pseudotokens ~f ctxt contract] updates
+    [contract]'s costaking pseudotokens balance by applying function
+    [f].
+
+    Breaks invariant 3.
+*)
 let update_costaking_pseudotokens ~f ctxt contract =
   let open Lwt_result_syntax in
   let* costaking_pseudotokens = costaking_pseudotokens_balance ctxt contract in
@@ -281,7 +301,10 @@ let update_costaking_pseudotokens ~f ctxt contract =
   return ctxt
 
 (** [credit_costaking_pseudotokens ctxt contract p_amount] increases
-    [contract]'s costaking pseudotokens balance by [p_amount]. *)
+    [contract]'s costaking pseudotokens balance by [p_amount].
+
+    Breaks invariant 3.
+*)
 let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
   let f current_pseudotokens_balance =
     Staking_pseudotoken_repr.(
@@ -290,7 +313,10 @@ let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
   update_costaking_pseudotokens ~f ctxt contract
 
 (** [debit_costaking_pseudotokens ctxt contract p_amount] decreases
-    [contract]'s costaking pseudotokens balance by [p_amount]. *)
+    [contract]'s costaking pseudotokens balance by [p_amount].
+
+    Breaks invariant 3.
+*)
 let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
   let f current_pseudotokens_balance =
     Staking_pseudotoken_repr.(
@@ -298,6 +324,7 @@ let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
   in
   update_costaking_pseudotokens ~f ctxt contract
 
+(** Does not break invariants. *)
 let stake ctxt ~contract ~delegate amount =
   let open Lwt_result_syntax in
   let* ctxt, new_pseudotokens =
@@ -346,6 +373,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
                   ~tez_amount:requested_amount
               in
               assert (Staking_pseudotoken_repr.(requested_pseudotokens <> zero)) ;
+              (* by postcondition of pseudotokens_of *)
               if
                 Staking_pseudotoken_repr.(
                   requested_pseudotokens < available_pseudotokens)
