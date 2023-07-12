@@ -238,13 +238,13 @@ Baker
   and ``reading_per_block`` into ``reading_per_block_votes`` (MR :gl:`!8661`),
   for baker events.
 
-- Rename ``endorsement`` into ``attestation`` for baker errors and events.
+- **Breaking change** Rename ``endorsement`` into ``attestation`` for baker errors and events.
   (MR :gl:`!9195`)
 
 Accuser
 -------
 
-- Rename ``endorsement`` into ``attestation`` for accuser errors and events.
+- **Breaking change** Rename ``endorsement`` into ``attestation`` for accuser errors and events.
   (MR :gl:`!9196`)
 
 Signer
