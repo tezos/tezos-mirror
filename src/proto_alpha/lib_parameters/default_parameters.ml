@@ -107,7 +107,7 @@ let constants_mainnet =
               base_total_rewards_per_minute;
               baking_reward_fixed_portion_weight;
               baking_reward_bonus_weight;
-              endorsing_reward_weight;
+              attesting_reward_weight;
               liquidity_baking_subsidy_weight;
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
@@ -145,8 +145,8 @@ let constants_mainnet =
         (* 1/4th of total block rewards *)
         baking_reward_bonus_weight;
         (* all bonus rewards = fixed rewards *)
-        endorsing_reward_weight;
-        (* all baking rewards = all endorsing rewards *)
+        attesting_reward_weight;
+        (* all baking rewards = all attesting rewards *)
         liquidity_baking_subsidy_weight;
         (* 1/16th of block rewards *)
         seed_nonce_revelation_tip_weight;

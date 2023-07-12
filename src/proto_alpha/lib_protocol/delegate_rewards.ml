@@ -27,7 +27,7 @@
 let sum_weights (rewards : Constants_parametric_repr.reward_weights) =
   let r = rewards.baking_reward_fixed_portion_weight in
   let r = rewards.baking_reward_bonus_weight + r in
-  let r = rewards.endorsing_reward_weight + r in
+  let r = rewards.attesting_reward_weight + r in
   let r = rewards.liquidity_baking_subsidy_weight + r in
   let r = rewards.seed_nonce_revelation_tip_weight + r in
   let r = rewards.vdf_revelation_tip_weight + r in
@@ -79,7 +79,7 @@ module M = struct
           reward_weights.baking_reward_fixed_portion_weight
       | Baking_reward_bonus_per_slot ->
           reward_weights.baking_reward_bonus_weight
-      | Endorsing_reward_per_slot -> reward_weights.endorsing_reward_weight
+      | Endorsing_reward_per_slot -> reward_weights.attesting_reward_weight
       | Liquidity_baking_subsidy ->
           reward_weights.liquidity_baking_subsidy_weight
       | Seed_nonce_revelation_tip ->
