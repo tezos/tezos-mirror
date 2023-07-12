@@ -134,14 +134,13 @@ let cost_N_ICheck_signature_bls size =
   let v0 = S.safe_int size in
   S.safe_int 1_570_000 + (v0 lsl 1) + v0
 
-(* model N_IComb *)
-(* Approximating 25.816900 + 3.531001 * (x - 2) term *)
-(* Note: size >= 2, so the cost is never 0 *)
+(* model interpreter/N_IComb *)
+(* fun size -> (37.081349025 + (3.44618694899 * (sat_sub size 2))) *)
 let cost_N_IComb size =
-  let open S_syntax in
+  let open S.Syntax in
   let size = S.safe_int size in
   let v0 = S.sub size (S.safe_int 2) in
-  S.safe_int 30 + (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
+  S.safe_int 40 + ((v0 lsl 1) + v0 + (v0 lsr 2))
 
 (* model N_IComb_get *)
 (* Approximating 19.706849 + 0.573180 x term *)
