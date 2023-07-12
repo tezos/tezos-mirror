@@ -215,6 +215,10 @@ Node
 
 - Added a syntactic operation filter in the protocol's plugins.
 
+- Fixed a behavior where each time a new data was received from a
+  peer, a new p2p request would be triggered instead of waiting for
+  the delayed retry. (MR :gl:`!9470`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
