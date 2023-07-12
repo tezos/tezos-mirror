@@ -112,9 +112,9 @@ module Delegate_slots : sig
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int option
 
-  (** Returns the list of rounds up to [committee_size], in ascending order, for
-      which one of our *own* delegates is a proposer. *)
-  val all_proposer_rounds : t -> (int * Slot.t) list
+  (** Returns the list of rounds up to (and excluding) [committee_size], in
+      ascending order, for which one of our *own* delegates is a proposer. *)
+  val all_proposer_rounds : t -> committee_size:int -> (int * Slot.t) list
 end
 
 type delegate_slots = Delegate_slots.t

@@ -255,11 +255,6 @@ module Delegate_slots = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
-    all_slots_by_round : Slot.t array;
-        (* This is actually just the "identity array": [all_slots_by_round.(r) =
-           r], except that the rhs has the [Slot.t] type; without it, a
-           conversion from int to Slot.t would need to be made (and this is
-           currently not possible ). *)
   }
 
   let own_delegates slots = slots.own_delegates
@@ -271,17 +266,21 @@ module Delegate_slots = struct
     | Some {endorsing_power; _} -> Some endorsing_power
     | None -> None
 
-  let all_proposer_rounds slots =
-    (* We could avoid going through all the [committee_size] slots if we had a
-       way to convert from slot to round (that is, to [int]). *)
-    slots.all_slots_by_round |> Array.to_seqi
-    |> Seq.fold_left
-         (fun acc (round, slot) ->
-           if SlotMap.mem slot slots.own_delegate_slots then
-             (round, slot) :: acc
-           else acc)
-         []
-    |> List.rev
+  let all_proposer_rounds slots ~committee_size =
+    let rec iter acc r =
+      if r >= 0 then
+        match Round.of_int r with
+        | Error _ -> iter acc (r - 1)
+        | Ok round -> (
+            Round.to_slot round ~committee_size |> function
+            | Error _ -> iter acc (r - 1)
+            | Ok slot ->
+                if SlotMap.mem slot slots.own_delegate_slots then
+                  iter ((r, slot) :: acc) (r - 1)
+                else iter acc (r - 1))
+      else acc
+    in
+    iter [] (committee_size - 1)
 end
 
 type delegate_slots = Delegate_slots.t
@@ -695,24 +694,15 @@ end
 
 let delegate_slots endorsing_rights delegates =
   let own_delegates = DelegateSet.of_list delegates in
-  let ( own_delegate_first_slots,
-        own_delegate_slots,
-        all_delegate_first_slots,
-        all_slots ) =
+  let own_delegate_first_slots, own_delegate_slots, all_delegate_first_slots =
     List.fold_left
-      (fun (own_list, own_map, all_map, all_slots) slot ->
+      (fun (own_list, own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
         let first_slot = Stdlib.List.hd slots in
         let endorsing_slot =
           {endorsing_power = List.length slots; first_slot}
         in
         let all_map = SlotMap.add first_slot endorsing_slot all_map in
-        let all_slots =
-          List.fold_left
-            (fun all_slots slot -> SlotMap.add slot () all_slots)
-            all_slots
-            slots
-        in
         let own_list, own_map =
           match DelegateSet.find_pkh consensus_key own_delegates with
           | Some consensus_key ->
@@ -727,19 +717,15 @@ let delegate_slots endorsing_rights delegates =
                   slots )
           | None -> (own_list, own_map)
         in
-        (own_list, own_map, all_map, all_slots))
-      ([], SlotMap.empty, SlotMap.empty, SlotMap.empty)
+        (own_list, own_map, all_map))
+      ([], SlotMap.empty, SlotMap.empty)
       endorsing_rights
-  in
-  let all_slots_by_round =
-    all_slots |> SlotMap.bindings |> List.split |> fst |> Array.of_list
   in
   Delegate_slots.
     {
       own_delegates = own_delegate_first_slots;
       own_delegate_slots;
       all_delegate_first_slots;
-      all_slots_by_round;
     }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
@@ -755,12 +741,12 @@ let round_proposer state ~level round =
     | `Current -> state.level_state.delegate_slots
     | `Next -> state.level_state.next_level_delegate_slots
   in
-  let round_mod =
-    Int32.to_int (Round.to_int32 round)
-    mod state.global_state.constants.parametric.consensus_committee_size
+  let committee_size =
+    state.global_state.constants.parametric.consensus_committee_size
   in
-  let slot = slots.all_slots_by_round.(round_mod) in
-  Delegate_slots.own_slot_owner slots ~slot
+  Round.to_slot round ~committee_size |> function
+  | Error _ -> None
+  | Ok slot -> Delegate_slots.own_slot_owner slots ~slot
 
 let cache_size_limit = 100
 

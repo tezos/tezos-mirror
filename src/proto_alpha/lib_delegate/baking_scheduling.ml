@@ -295,18 +295,19 @@ let compute_next_round_time state =
     is meant to be multiplied back again to find the round value. *)
 let first_potential_round_at_next_level state ~earliest_round =
   let open Baking_state in
+  let committee_size =
+    state.global_state.constants.parametric.consensus_committee_size
+  in
   let rounds =
     Delegate_slots.all_proposer_rounds
       state.level_state.next_level_delegate_slots
+      ~committee_size
   in
   match Round.to_int earliest_round with
   | Error _ -> None
   | Ok earliest_round -> (
-      let consensus_committee_size =
-        state.global_state.constants.parametric.consensus_committee_size
-      in
-      let q = earliest_round / consensus_committee_size in
-      let r = earliest_round mod consensus_committee_size in
+      let q = earliest_round / committee_size in
+      let r = earliest_round mod committee_size in
       let first_round = List.find (fun (round, _) -> round >= r) rounds in
       match first_round with
       | None -> None
@@ -318,7 +319,7 @@ let first_potential_round_at_next_level state ~earliest_round =
           | None -> None (* impossible *)
           | Some (delegate, _) -> (
               (* TODO? check with [Node_rpc.first_proposer_round] if we also need the q+1 *)
-              match Round.of_int ((q * consensus_committee_size) + round) with
+              match Round.of_int ((q * committee_size) + round) with
               | Error _ -> None
               | Ok first_potential_round ->
                   Some (first_potential_round, delegate))))
