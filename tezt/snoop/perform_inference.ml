@@ -50,7 +50,8 @@ let models =
     "sc_rollup/Sc_rollup_deserialize_output_proof_benchmark/model";
     "sc_rollup/Sc_rollup_verify_output_proof_benchmark/model";
     "bloomer";
-    "strip_locations_model";
+    "strip_annotations_model";
+    "micheline/strip_locations_micheline/model";
     "apply_diff";
   ]
 
