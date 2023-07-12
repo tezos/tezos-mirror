@@ -227,10 +227,16 @@ Baker
   data directory when searching an existing file. The previous
   semantics, which looks for this file in the current working
   directory, takes predecence.
+
 - Bakers are now asked (but not required) to set their votes for the adoption of the
   adaptive inflation feature. They may use the CLI option ``--adaptive-inflation-vote``
   or the per-block votes file (which is re-read at each block, and overrides the CLI option).
   Absence of vote is equivalent to voting "pass".
+
+- **Breaking change** Rename ``liquidity_baking_toggle_vote`` into
+  ``read_liquidity_baking_toggle_vote`` (MR :gl:`!9464`)
+  and ``reading_per_block`` into ``reading_per_block_votes`` (MR :gl:`!8661`),
+  for baker events.
 
 - Rename ``endorsement`` into ``attestation`` for baker errors and events.
   (MR :gl:`!9195`)
