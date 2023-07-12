@@ -4170,7 +4170,7 @@ and _ contents =
       solution : Seed.vdf_solution;
     }
       -> Kind.vdf_revelation contents
-  | Double_preendorsement_evidence : {
+  | Double_preattestation_evidence : {
       op1 : Kind.preattestation operation;
       op2 : Kind.preattestation operation;
     }

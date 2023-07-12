@@ -1983,7 +1983,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_endorsement_evidence _
-      | Double_preendorsement_evidence _ | Double_baking_evidence _
+      | Double_preattestation_evidence _ | Double_baking_evidence _
       | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
@@ -2135,7 +2135,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
       kind Kind.double_consensus_operation_evidence contents_result =
     match op1.protocol_data.contents with
     | Single (Preattestation _) ->
-        Double_preendorsement_evidence_result balance_updates
+        Double_preattestation_evidence_result balance_updates
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
@@ -2219,7 +2219,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
-  | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
+  | Single (Double_preattestation_evidence {op1; op2 = _}) ->
       punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_endorsement_evidence {op1; op2 = _}) ->
       punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
