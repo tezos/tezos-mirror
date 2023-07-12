@@ -4,9 +4,9 @@
 
 ### SDK
 
-- Add functionality in `dac::certificate` to verify that a certificate has been a signed by a number of
 - Add `Certificate::verify` to verify that a *DAC* certificate has been a signed by a number of
   committee members greater than a given threshold.
+- Add `Certificate::reveal_to_store` to reveal up to ~10MB of DAC payload to storage in one go.
 - Implement `core::fmt::Display` for `OwnedPath` and `RefPath` to get paths as strings for tests, errors, etc.
 - Adjust `Path` trait to require `Display` on types that implement it.
 - Add `KERNEL_BOOT_PATH` constant to `tezos-smart-rollup-host`.

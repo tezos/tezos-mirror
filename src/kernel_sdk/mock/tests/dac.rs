@@ -1,7 +1,85 @@
 //! Test of reveal preimage mechanism from [encoding::dac].
 
+use tezos_crypto_rs::hash::BlsSignature;
+use tezos_smart_rollup_encoding::dac::certificate::CertificateError;
+use tezos_smart_rollup_encoding::dac::certificate::*;
 use tezos_smart_rollup_encoding::dac::pages::*;
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
+
+const MAX_DAC_ONE_SHOT_SIZE: usize = 10063860;
+
+#[test]
+fn certificate_reveal_to_store_small() {
+    let data = vec![7];
+    let mut host = tezos_smart_rollup_mock::MockHost::default();
+    let root_hash = prepare_preimages(&data, |_hash, page| {
+        host.set_preimage(page);
+    })
+    .unwrap();
+
+    let path = RefPath::assert_from(b"/dac/contents");
+    host.store_write_all(&path, &[1, 2, 3, 4, 5]).unwrap();
+
+    let cert = Certificate::V0(V0Certificate {
+        root_hash,
+        aggregated_signature: BlsSignature(Vec::new()),
+        witnesses: tezos_data_encoding::types::Zarith(0.into()),
+    });
+
+    let size = cert.reveal_to_store(&mut host, &path).unwrap();
+
+    assert_eq!(size, data.len());
+    assert_eq!(data, host.store_read_all(&path).unwrap());
+}
+
+#[test]
+fn certificate_reveal_to_store_max() {
+    let data = vec![7; MAX_DAC_ONE_SHOT_SIZE];
+    let mut host = tezos_smart_rollup_mock::MockHost::default();
+    let root_hash = prepare_preimages(&data, |_hash, page| {
+        host.set_preimage(page);
+    })
+    .unwrap();
+
+    let path = RefPath::assert_from(b"/dac/contents");
+    host.store_write_all(&path, &[1, 2, 3, 4, 5]).unwrap();
+
+    let cert = Certificate::V0(V0Certificate {
+        root_hash,
+        aggregated_signature: BlsSignature(Vec::new()),
+        witnesses: tezos_data_encoding::types::Zarith(0.into()),
+    });
+
+    let size = cert.reveal_to_store(&mut host, &path).unwrap();
+
+    assert_eq!(size, data.len());
+    assert_eq!(data, host.store_read_all(&path).unwrap());
+}
+
+#[test]
+fn certificate_reveal_to_store_too_large() {
+    let data = vec![7; MAX_DAC_ONE_SHOT_SIZE + 1];
+    let mut host = tezos_smart_rollup_mock::MockHost::default();
+    let root_hash = prepare_preimages(&data, |_hash, page| {
+        host.set_preimage(page);
+    })
+    .unwrap();
+
+    let path = RefPath::assert_from(b"/dac/contents");
+    host.store_write_all(&path, &[1, 2, 3, 4, 5]).unwrap();
+
+    let cert = Certificate::V0(V0Certificate {
+        root_hash,
+        aggregated_signature: BlsSignature(Vec::new()),
+        witnesses: tezos_data_encoding::types::Zarith(0.into()),
+    });
+
+    assert!(matches!(
+        cert.reveal_to_store(&mut host, &path),
+        Err(CertificateError::PayloadTooLarge)
+    ));
+}
 
 #[test]
 fn encode_decode_preimages() {

@@ -13,17 +13,26 @@
 #![cfg(feature = "alloc")]
 
 use super::PreimageHash;
+use super::SlicePage;
+use super::SlicePageError;
+use super::V0SliceContentPage;
+use super::MAX_PAGE_SIZE;
+use super::PAGE_PREFIX_SIZE;
 use tezos_crypto_rs::hash::{BlsSignature, PublicKeyBls};
 use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::path::Path;
+use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-/// Errors that can be obtained when verifying an invalid certificate
+/// Errors that can be obtained when handling a certificate.
 #[derive(Debug, Error)]
-pub enum CertificateVerificationError {
+pub enum CertificateError {
     /// Number of signatures is lower than the required threshold
     #[error(
         "Insufficient number of signatures - threshold: {threshold}, actual: {actual}"
@@ -40,6 +49,24 @@ pub enum CertificateVerificationError {
     /// Signature Verification failed
     #[error("Verification of aggregate signature failed")]
     InvalidAggregateSignature,
+    /// Storage error when revealing a certificate
+    #[error("Failed to write certificate contents to {0}:{1}")]
+    StorageError(String, RuntimeError),
+    /// Error occurred revealing page of content
+    #[error("Could not reveal content of {0:?}:{1}")]
+    RevealError(PreimageHash, RuntimeError),
+    /// Revealed page has invalid encoding
+    #[error("Revealed page is invalid: {0:?}")]
+    PageError(SlicePageError),
+    /// Revealed content is/would be larger than 10,063,860 bytes
+    #[error("Payload too large")]
+    PayloadTooLarge,
+}
+
+impl From<SlicePageError> for CertificateError {
+    fn from(e: SlicePageError) -> Self {
+        Self::PageError(e)
+    }
 }
 
 /// DAC certificates are signed by committee members to ensure validity.
@@ -76,7 +103,7 @@ impl Certificate {
         &self,
         committee_members_pks: &[PublicKeyBls],
         threshold: u8,
-    ) -> Result<(), CertificateVerificationError> {
+    ) -> Result<(), CertificateError> {
         match self {
             Certificate::V0(V0Certificate {
                 root_hash,
@@ -100,29 +127,134 @@ impl Certificate {
                     .collect();
                 let num_of_signatures = root_hash_with_signing_committee_members.len();
                 if num_of_signatures < threshold.into() {
-                    return Err(
-                        CertificateVerificationError::InsufficientNumberOfSignatures {
-                            threshold: threshold.into(),
-                            actual: num_of_signatures,
-                        },
-                    );
+                    return Err(CertificateError::InsufficientNumberOfSignatures {
+                        threshold: threshold.into(),
+                        actual: num_of_signatures,
+                    });
                 }
                 let is_valid_signature = aggregated_signature
                     .aggregate_verify(
                         &mut root_hash_with_signing_committee_members.into_iter(),
                     )
-                    .map_err(|e| {
-                        CertificateVerificationError::SignatureVerificationFailed(e)
-                    })?;
+                    .map_err(CertificateError::SignatureVerificationFailed)?;
                 if is_valid_signature {
                     Ok(())
                 } else {
-                    Err(CertificateVerificationError::InvalidAggregateSignature)
+                    Err(CertificateError::InvalidAggregateSignature)
                 }
             }
         }
     }
+
+    /// Reveal the contents of the certificate to a path in storage.
+    ///
+    /// Write the revealed content of the certificate to the given path. Any previous value is
+    /// overwritten.
+    ///
+    /// Up to ~10MB of content may be revealed in one go (`10,063,860 bytes`). The
+    /// content overwrites any pre-existing value in `path`. If an error occurs,
+    /// the content revealed up-to the error occuring will be written in `path`.
+    ///
+    /// **CAUTION**: this function will consume up to `~1.3 Billion` ticks, it is
+    /// recommended to limit any other computation done within the same `kernel_run`,
+    /// and to perform your own benchmarking.
+    ///
+    /// If `reveal_to_store` returns an error, any content succesfully revealed
+    /// up until the error occurred will remain in storage; use [Runtime::store_value_size] to
+    /// determine the size of this value.
+    pub fn reveal_to_store<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        path: &impl Path,
+    ) -> Result<usize, CertificateError> {
+        // Notes on implementation:
+        // We choose to nest loops in this implementation, for the following reasons:
+        // - avoiding unneccessary allocations (this uses ~10KB on the stack)
+        // - uses nested loops to eleminate recursive function calls, and allow correct tracking
+        //   of lifetimes w.r.t. buffer
+        // - consistency of tick usage: there is nothing within this function that can affect the ticks
+        //   consumed, apart from the structure of the DAC tree (up to the limit enforced by the size of
+        //   buffer). ie we can be confident that this function won't suddenly consume extra ticks, beyond
+        //   the limit of the size of the content.
+        //
+        // In future, a more compact (but more expensive) function can be defined in terms of a stack, for
+        // revealing larger trees incrementally.
+
+        host.store_delete_value(path)
+            .map_err(|error| CertificateError::StorageError(path.to_string(), error))?;
+
+        const MAX_TOP_LEVEL_HASHES: usize = 20;
+        const TOP_LEVEL_HASHES_SIZE: usize = PREIMAGE_HASH_SIZE * MAX_TOP_LEVEL_HASHES;
+        const TOP_LEVEL_SIZE: usize = PAGE_PREFIX_SIZE + TOP_LEVEL_HASHES_SIZE;
+
+        let buffer = &mut [0u8; MAX_PAGE_SIZE * 2 + TOP_LEVEL_SIZE];
+        let mut written = 0;
+
+        let mut save = |host: &mut Host, content: V0SliceContentPage| {
+            let content = content.as_ref();
+            host.store_write(path, content, written)
+                .map_err(|e| CertificateError::StorageError(path.to_string(), e))
+                .map(|()| {
+                    written += content.len();
+                    written
+                })
+        };
+
+        let Self::V0(V0Certificate { root_hash, .. }) = self;
+
+        // Top-level
+        let (page, buffer) = fetch_page(host, root_hash.as_ref(), buffer)?;
+
+        let top_level = match page {
+            SlicePage::V0HashPage(hashes) => {
+                if hashes.inner.len() > TOP_LEVEL_HASHES_SIZE {
+                    return Err(CertificateError::PayloadTooLarge);
+                };
+                hashes
+            }
+            SlicePage::V0ContentPage(content) => return save(host, content),
+        };
+
+        // Mid-level
+        for hash in top_level.hashes() {
+            let (page, buffer) = fetch_page(host, hash, buffer)?;
+
+            let mid_level = match page {
+                SlicePage::V0HashPage(hashes) => hashes,
+                SlicePage::V0ContentPage(content) => {
+                    save(host, content)?;
+                    continue;
+                }
+            };
+
+            // Bottom layer (content)
+            for hash in mid_level.hashes() {
+                let (page, _buffer) = fetch_page(host, hash, buffer)?;
+                match page {
+                    SlicePage::V0HashPage(_) => {
+                        return Err(CertificateError::PayloadTooLarge)
+                    }
+                    SlicePage::V0ContentPage(content) => {
+                        save(host, content)?;
+                    }
+                };
+            }
+        }
+
+        Ok(written)
+    }
 }
+
+fn fetch_page<'a>(
+    host: &impl Runtime,
+    hash: &[u8; PREIMAGE_HASH_SIZE],
+    buffer: &'a mut [u8],
+) -> Result<(SlicePage<'a>, &'a mut [u8]), CertificateError> {
+    super::fetch_page_raw(host, hash, buffer)
+        .map_err(|err| CertificateError::RevealError(hash.into(), err))
+        .and_then(|(page, buffer)| Ok((SlicePage::try_from(page)?, buffer)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,12 +333,10 @@ mod tests {
         let (_, certificate) = Certificate::nom_read(EXAMPLE_CERTIFICATE).unwrap();
         assert!(matches!(
             certificate.verify(&committee, 3),
-            Err(
-                CertificateVerificationError::InsufficientNumberOfSignatures {
-                    threshold: 3,
-                    actual: 2
-                }
-            )
+            Err(CertificateError::InsufficientNumberOfSignatures {
+                threshold: 3,
+                actual: 2
+            })
         ))
     }
 
@@ -219,7 +349,7 @@ mod tests {
         let (_, certificate) = Certificate::nom_read(EXAMPLE_CERTIFICATE).unwrap();
         assert!(matches!(
             certificate.verify(&committee, 2),
-            Err(CertificateVerificationError::InvalidAggregateSignature),
+            Err(CertificateError::InvalidAggregateSignature),
         ))
     }
 
@@ -237,7 +367,7 @@ mod tests {
         let (_, certificate) = Certificate::nom_read(EXAMPLE_CERTIFICATE).unwrap();
         assert!(matches!(
             certificate.verify(&committee, 2),
-            Err(CertificateVerificationError::InvalidAggregateSignature),
-        ))
+            Err(CertificateError::InvalidAggregateSignature),
+        ));
     }
 }
