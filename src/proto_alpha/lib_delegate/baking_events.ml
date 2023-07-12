@@ -1028,9 +1028,9 @@ module Per_block_votes = struct
   let liquidity_baking_toggle_vote =
     declare_1
       ~section
-      ~name:"liquidity_baking_toggle_vote"
+      ~name:"read_liquidity_baking_toggle_vote"
       ~level:Notice
-      ~msg:"liquidity baking toggle vote = {value}"
+      ~msg:"read liquidity baking toggle vote = {value}"
       ( "value",
         Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
 
@@ -1046,9 +1046,9 @@ module Per_block_votes = struct
   let adaptive_inflation_vote =
     declare_1
       ~section
-      ~name:"adaptive_inflation_vote"
+      ~name:"read_adaptive_inflation_vote"
       ~level:Notice
-      ~msg:"adaptive inflation vote = {value}"
+      ~msg:"read adaptive inflation vote = {value}"
       ( "value",
         Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
       )
