@@ -92,7 +92,13 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 
 module SlotMap : Map.S with type key = Slot.t
 
-type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
+(** A delegate slot consists of the delegate's consensus key, its public key
+    hash, its first slot, and its endorsing power at some level. *)
+type delegate_slot = {
+  consensus_key_and_delegate : consensus_key_and_delegate;
+  first_slot : Slot.t;
+  endorsing_power : int;
+}
 
 module Delegate_slots : sig
   (** Information regarding the slot distribution at some level. *)
@@ -100,13 +106,12 @@ module Delegate_slots : sig
 
   (** Returns the list of our own delegates that have at least a slot. There are
      no duplicates, the associated slot is the first one. *)
-  val own_delegates : t -> (consensus_key_and_delegate * endorsing_slot) list
+  val own_delegates : t -> delegate_slot list
 
   (** Returns, among our *own* delegates, the delegate (together with its
       first endorsing slot) that owns the given slot, if any (even if the
       given slot is not the delegate's first slot). *)
-  val own_slot_owner :
-    t -> slot:Slot.t -> (consensus_key_and_delegate * endorsing_slot) option
+  val own_slot_owner : t -> slot:Slot.t -> delegate_slot option
 
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
@@ -186,10 +191,7 @@ val update_current_phase : t -> phase -> t
     that has a proposer slot at the given round and the current or next level,
     if any. *)
 val round_proposer :
-  state ->
-  level:[`Current | `Next] ->
-  Round.t ->
-  (consensus_key_and_delegate * endorsing_slot) option
+  state -> level:[`Current | `Next] -> Round.t -> delegate_slot option
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
@@ -256,8 +258,7 @@ val pp_endorsable_payload : Format.formatter -> endorsable_payload -> unit
 
 val pp_elected_block : Format.formatter -> elected_block -> unit
 
-val pp_endorsing_slot :
-  Format.formatter -> consensus_key_and_delegate * endorsing_slot -> unit
+val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
 
 val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
 

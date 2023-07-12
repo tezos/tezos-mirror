@@ -77,9 +77,9 @@ let make_consensus_list state proposal =
   let round = proposal.block.round in
   let block_payload_hash = proposal.block.payload_hash in
   List.map
-    (fun (consensus_key_and_delegate, endorsing_slot) ->
-      ( consensus_key_and_delegate,
-        {slot = endorsing_slot.first_slot; level; round; block_payload_hash} ))
+    (fun delegate_slot ->
+      ( delegate_slot.consensus_key_and_delegate,
+        {slot = delegate_slot.first_slot; level; round; block_payload_hash} ))
     (Delegate_slots.own_delegates state.level_state.delegate_slots)
 
 (* If we do not have any slots, we won't inject any operation but we
@@ -598,7 +598,7 @@ let end_of_round state current_round =
          level block arrive. Meanwhile, we are idle *)
       let new_state = update_current_phase new_state Idle in
       do_nothing new_state
-  | Some (delegate, _) ->
+  | Some {consensus_key_and_delegate; _} ->
       let latest_proposal = state.level_state.latest_proposal in
       if Baking_state.is_first_block_in_protocol latest_proposal then
         (* Do not inject a block for the previous protocol! (Let the
@@ -608,12 +608,15 @@ let end_of_round state current_round =
         Events.(
           emit
             proposal_slot
-            (current_round, state.level_state.current_level, new_round, delegate))
+            ( current_round,
+              state.level_state.current_level,
+              new_round,
+              consensus_key_and_delegate ))
         >>= fun () ->
         (* We have a delegate, we need to determine what to inject *)
         propose_block_action
           new_state
-          delegate
+          consensus_key_and_delegate
           new_round
           state.level_state.latest_proposal
         >>= fun action -> Lwt.return (new_state, action)
@@ -629,7 +632,7 @@ let time_to_bake_at_next_level state at_round =
       (* Unreachable: the [Time_to_bake_next_level] event can only be
          triggered when we have a slot and an elected block *)
       assert false
-  | Some elected_block, Some (delegate, _) ->
+  | Some elected_block, Some {consensus_key_and_delegate; _} ->
       let endorsements = elected_block.endorsement_qc in
       let dal_attestations =
         (* Unlike endorsements, we don't watch and store DAL attestations for
@@ -645,7 +648,7 @@ let time_to_bake_at_next_level state at_round =
         ~dal_attestations
         ~predecessor:elected_block.proposal.block
         new_state
-        delegate
+        consensus_key_and_delegate
         at_round
       >>= fun action -> Lwt.return (new_state, action)
 

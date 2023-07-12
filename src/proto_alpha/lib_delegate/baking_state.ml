@@ -227,20 +227,17 @@ let round_of_shell_header shell_header =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
-(** An endorsing slot consists of the public key hash of a delegate, a
-    list of slots (i.e., a list of position indexes in the slot map, in
-    other words the list of rounds when it will be the proposer), and
-    its endorsing power. *)
-type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
+type delegate_slot = {
+  consensus_key_and_delegate : consensus_key_and_delegate;
+  first_slot : Slot.t;
+  endorsing_power : int;
+}
 
 module Delegate_slots = struct
   (* Note that we also use the delegate slots as proposal slots. *)
   type t = {
-    own_delegates : (consensus_key_and_delegate * endorsing_slot) list;
-    (* In this list, there is no duplicate delegate. Delegates appear with their
-       first slot. *)
-    own_delegate_slots :
-      (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
+    own_delegates : delegate_slot list;
+    own_delegate_slots : delegate_slot SlotMap.t;
         (* This map cannot have as keys just the first slot of delegates,
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
@@ -697,22 +694,21 @@ let delegate_slots endorsing_rights delegates =
       (fun (own_list, own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
         let first_slot = Stdlib.List.hd slots in
-        let endorsing_slot =
-          {endorsing_power = List.length slots; first_slot}
-        in
-        let all_map =
-          SlotMap.add first_slot endorsing_slot.endorsing_power all_map
-        in
+        let endorsing_power = List.length slots in
+        let all_map = SlotMap.add first_slot endorsing_power all_map in
         let own_list, own_map =
           match DelegateSet.find_pkh consensus_key own_delegates with
           | Some consensus_key ->
-              ( ((consensus_key, delegate), endorsing_slot) :: own_list,
+              let endorsing_slot =
+                {
+                  consensus_key_and_delegate = (consensus_key, delegate);
+                  first_slot;
+                  endorsing_power;
+                }
+              in
+              ( endorsing_slot :: own_list,
                 List.fold_left
-                  (fun own_map slot ->
-                    SlotMap.add
-                      slot
-                      ((consensus_key, delegate), endorsing_slot)
-                      own_map)
+                  (fun own_map slot -> SlotMap.add slot endorsing_slot own_map)
                   own_map
                   slots )
           | None -> (own_list, own_map)
@@ -853,8 +849,8 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt
-    (consensus_key_and_delegate, {first_slot; endorsing_power}) =
+let pp_delegate_slot fmt
+    {consensus_key_and_delegate; first_slot; endorsing_power} =
   Format.fprintf
     fmt
     "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attestation_power: %d"
@@ -875,7 +871,7 @@ let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
             "slot: %a, %a"
             Slot.pp
             slot
-            pp_endorsing_slot
+            pp_delegate_slot
             endorsing_slot))
     (SlotMap.bindings own_delegate_slots)
 

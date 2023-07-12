@@ -317,12 +317,12 @@ let first_potential_round_at_next_level state ~earliest_round =
             ~slot
           |> function
           | None -> None (* impossible *)
-          | Some (delegate, _) -> (
+          | Some {consensus_key_and_delegate; _} -> (
               (* TODO? check with [Node_rpc.first_proposer_round] if we also need the q+1 *)
               match Round.of_int ((q * committee_size) + round) with
               | Error _ -> None
               | Ok first_potential_round ->
-                  Some (first_potential_round, delegate))))
+                  Some (first_potential_round, consensus_key_and_delegate))))
 
 (** From the current [state], the function returns an optional
     association pair, which consists of the next baking timestamp and

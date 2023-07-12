@@ -340,11 +340,11 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             >>= function
             | Invalid | Outdated_proposal -> (
                 match round_proposer state ~level:`Current round with
-                | Some (delegate, _) ->
+                | Some {consensus_key_and_delegate; _} ->
                     let*! action =
                       State_transitions.propose_block_action
                         state
-                        delegate
+                        consensus_key_and_delegate
                         round
                         state.level_state.latest_proposal
                     in

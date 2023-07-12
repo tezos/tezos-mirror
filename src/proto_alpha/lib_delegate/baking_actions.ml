@@ -629,7 +629,7 @@ let get_dal_attestations state ~level =
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
       let delegates =
         List.map
-          fst
+          (fun delegate_slot -> delegate_slot.consensus_key_and_delegate)
           (Delegate_slots.own_delegates state.level_state.delegate_slots)
       in
       let signing_key delegate = (fst delegate).public_key_hash in
