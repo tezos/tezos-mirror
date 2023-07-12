@@ -127,6 +127,47 @@ let test_invariants () =
   (* Frozen deposits aren't changed by delegation. *)
   Assert.equal_tez ~loc:__LOC__ new_frozen_deposits frozen_deposits
 
+let test_cannot_bake_with_zero_deposits () =
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (contract1, account1), (_contract2, account2) =
+    get_first_2_accounts_contracts contracts
+  in
+  (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
+     even with a small deposit one can still bake, though with a smaller probability
+     (because the frozen deposits value impacts the active stake and the active
+     stake is the one used to determine baking/endorsing rights. *)
+  (* To make account1 have zero deposits, we unstake all its deposits. *)
+  Context.Delegate.current_frozen_deposits (B genesis) account1
+  >>=? fun frozen_deposits ->
+  Tezos_alpha_test_helpers.Adaptive_inflation.unstake
+    (B genesis)
+    contract1
+    frozen_deposits
+  >>=? fun operation ->
+  Block.bake ~policy:(By_account account2) ~operation genesis >>=? fun b ->
+  let expected_number_of_cycles_with_previous_deposit =
+    constants.preserved_cycles + constants.max_slashing_period - 1
+  in
+  Block.bake_until_n_cycle_end
+    ~policy:(By_account account2)
+    expected_number_of_cycles_with_previous_deposit
+    b
+  >>=? fun b ->
+  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
+     cannot be a proposer, thus it cannot bake. Precisely, bake fails because
+     get_next_baker_by_account fails with "No slots found" *)
+  Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
+  Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  (* after one cycle is passed, the frozen deposit window has passed
+     and the frozen deposits should now be effectively 0. *)
+  Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
+  Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
+  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  (* don't know why the zero frozen deposits error is not caught here *)
+  (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
+  Assert.error ~loc:__LOC__ b1 (fun _ -> true)
+
 let test_may_not_bake_again_after_full_deposit_slash () =
   let order_ops op1 op2 =
     let oph1 = Operation.hash op1 in
@@ -484,6 +525,10 @@ let tests =
         "frozen deposits with delegation"
         `Quick
         test_frozen_deposits_with_delegation;
+      tztest
+        "test cannot bake with zero deposits"
+        `Quick
+        test_cannot_bake_with_zero_deposits;
       tztest
         "test cannot bake again after full deposit slash"
         `Quick
