@@ -22,6 +22,7 @@
 (package (name octez-evm-chunker)(allow_empty))
 (package (name octez-evm-proxy))
 (package (name octez-evm-proxy-lib)(allow_empty))
+(package (name octez-evm-proxy-tests)(allow_empty))
 (package (name octez-evm-upgrade-signer)(allow_empty))
 (package (name octez-injector))
 (package (name octez-libs))

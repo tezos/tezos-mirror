@@ -7864,6 +7864,23 @@ let evm_proxy_lib =
         lwt_exit;
       ]
 
+let _octez_evm_proxy_tests =
+  tezt
+    ["test_rlp"]
+    ~path:"src/bin_evm_proxy/test"
+    ~opam:"octez-evm-proxy-tests"
+    ~synopsis:"Tests for the EVM Proxy"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+        evm_proxy_lib;
+      ]
+
 let octez_scoru_sequencer =
   private_lib
     "octez_smart_rollup_sequencer"
