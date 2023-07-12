@@ -76,5 +76,16 @@ type balance_updates = (balance * balance_update * update_origin) list
     [balance_update] [(_ Tez_repr.zero)] always decodes into [(Credited Tez_repr.zero)]. *)
 val balance_updates_encoding : balance_updates Data_encoding.t
 
+(** Balance updates encoding that uses legacy attestation name : `endorsing
+    right` and `lost endorsing right` when encoding to JSON
+
+    https://gitlab.com/tezos/tezos/-/issues/5529
+
+    This encoding is temporary and should be removed when the endorsements kinds
+    in JSON will not be accepted any more by the protocol.
+*)
+val balance_updates_encoding_with_legacy_attestation_name :
+  balance_updates Data_encoding.t
+
 (** Group updates by (balance x origin), and remove zero-valued balances. *)
 val group_balance_updates : balance_updates -> balance_updates tzresult

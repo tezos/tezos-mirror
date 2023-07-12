@@ -1110,6 +1110,9 @@ struct
 
     include P
 
+    let block_header_metadata_encoding_with_legacy_attestation_name =
+      block_header_metadata_encoding
+
     let operation_data_encoding_with_legacy_attestation_name =
       operation_data_encoding
 

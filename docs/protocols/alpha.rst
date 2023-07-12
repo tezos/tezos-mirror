@@ -245,3 +245,9 @@ Internal
 - ``version_value`` moved from ``raw_context.ml`` to ``constants_repr.ml``. (MR :gl:`!8867`)
 
 - Transaction rollup: removed left parameters (:gl:`!8700`)
+
+- ``balance_update_encoding`` now output ``attesting rewards`` and ``lost
+  attesting rewards`` in JSON.
+  ``balance_update_encoding_with_legacy_attestation_name`` has been added and
+  output legacy ``endorsing rewards`` and ``lost endorsing rewards``. (MR
+  :gl:`!9251`)

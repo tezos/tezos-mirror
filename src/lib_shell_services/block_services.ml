@@ -466,7 +466,8 @@ module type PROTO = sig
 
   type block_header_metadata
 
-  val block_header_metadata_encoding : block_header_metadata Data_encoding.t
+  val block_header_metadata_encoding_with_legacy_attestation_name :
+    block_header_metadata Data_encoding.t
 
   type operation_data
 
@@ -603,7 +604,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                (req
                   "max_operation_list_length"
                   (dynamic_size (list operation_list_quota_encoding))))
-            Proto.block_header_metadata_encoding)
+            Proto.block_header_metadata_encoding_with_legacy_attestation_name)
 
   let next_operation_encoding_with_legacy_attestation_name =
     let open Data_encoding in
@@ -2143,7 +2144,8 @@ module Fake_protocol = struct
 
   type block_header_metadata = unit
 
-  let block_header_metadata_encoding = Data_encoding.empty
+  let block_header_metadata_encoding_with_legacy_attestation_name =
+    Data_encoding.empty
 
   type operation_data = unit
 

@@ -346,4 +346,7 @@ type block_metadata = {
   dal_attestation : Dal.Attestation.t option;
 }
 
+val block_metadata_encoding_with_legacy_attestation_name :
+  block_metadata Data_encoding.encoding
+
 val block_metadata_encoding : block_metadata Data_encoding.encoding

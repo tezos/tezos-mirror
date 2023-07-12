@@ -47,7 +47,7 @@ type balance =
   | Sc_rollup_refutation_punishments
   | Sc_rollup_refutation_rewards
 
-let balance_encoding =
+let balance_encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   let case = function
     | Tag tag ->
@@ -59,7 +59,10 @@ let balance_encoding =
         case (Tag tag)
     | _ as c -> case c
   in
-  def "operation_metadata.alpha.balance"
+  def
+    (if use_legacy_attestation_name then
+     "operation_metadata_with_legacy_attestation_name.alpha.balance"
+    else "operation_metadata.alpha.balance")
   @@ union
        [
          case
@@ -99,10 +102,16 @@ let balance_encoding =
             https://gitlab.com/tezos/tezos/-/merge_requests/7758 *)
          case
            (Tag 7)
-           ~title:"Endorsing_rewards"
+           ~title:
+             (if use_legacy_attestation_name then "Endorsing_rewards"
+             else "Attesting_rewards")
            (obj2
               (req "kind" (constant "minted"))
-              (req "category" (constant "endorsing rewards")))
+              (req
+                 "category"
+                 (constant
+                    (if use_legacy_attestation_name then "endorsing rewards"
+                    else "attesting rewards"))))
            (function Endorsing_rewards -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Endorsing_rewards);
          case
@@ -139,10 +148,17 @@ let balance_encoding =
            (fun ((), ()) -> Double_signing_punishments);
          case
            (Tag 13)
-           ~title:"Lost_endorsing_rewards"
+           ~title:
+             (if use_legacy_attestation_name then "Lost_endorsing_rewards"
+             else "Lost_attesting_rewards")
            (obj5
               (req "kind" (constant "burned"))
-              (req "category" (constant "lost endorsing rewards"))
+              (req
+                 "category"
+                 (constant
+                    (if use_legacy_attestation_name then
+                     "lost endorsing rewards"
+                    else "lost attesting rewards")))
               (req "delegate" Signature.Public_key_hash.encoding)
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))
@@ -247,6 +263,11 @@ let balance_encoding =
              | Unstaked_deposits (d, c) -> Some ((), (), d, c) | _ -> None)
            (fun ((), (), d, c) -> Unstaked_deposits (d, c));
        ]
+
+let balance_encoding_with_legacy_attestation_name =
+  balance_encoding ~use_legacy_attestation_name:true
+
+let balance_encoding = balance_encoding ~use_legacy_attestation_name:false
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
@@ -371,6 +392,22 @@ let update_origin_encoding =
        ]
 
 type balance_updates = (balance * balance_update * update_origin) list
+
+let balance_updates_encoding_with_legacy_attestation_name =
+  let open Data_encoding in
+  def "operation_metadata_with_legacy_attestation_name.alpha.balance_updates"
+  @@ list
+       (conv
+          (function
+            | balance, balance_update, update_origin ->
+                ((balance, balance_update), update_origin))
+          (fun ((balance, balance_update), update_origin) ->
+            (balance, balance_update, update_origin))
+          (merge_objs
+             (merge_objs
+                balance_encoding_with_legacy_attestation_name
+                balance_update_encoding)
+             update_origin_encoding))
 
 let balance_updates_encoding =
   let open Data_encoding in

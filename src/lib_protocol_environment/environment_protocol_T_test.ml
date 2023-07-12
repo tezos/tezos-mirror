@@ -111,6 +111,9 @@ module Mock_all_unit :
   let operation_data_encoding_with_legacy_attestation_name =
     operation_data_encoding
 
+  let block_header_metadata_encoding_with_legacy_attestation_name =
+    Data_encoding.unit
+
   let block_header_metadata_encoding = Data_encoding.unit
 
   let block_header_data_encoding = Data_encoding.unit

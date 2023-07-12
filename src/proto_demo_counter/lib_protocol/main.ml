@@ -42,6 +42,9 @@ let block_header_data_encoding = Header.encoding
 
 type block_header_metadata = State.t
 
+let block_header_metadata_encoding_with_legacy_attestation_name =
+  State.encoding
+
 let block_header_metadata_encoding = State.encoding
 
 type operation_data = Proto_operation.t

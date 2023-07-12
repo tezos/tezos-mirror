@@ -499,7 +499,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let block_metadata =
       let metadata =
         Data_encoding.Binary.to_bytes_exn
-          Proto.block_header_metadata_encoding
+          Proto.block_header_metadata_encoding_with_legacy_attestation_name
           block_data
       in
       let metadata_hash_opt =

@@ -197,7 +197,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     let* metadata = Store.Block.get_block_metadata chain_store block in
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
-        Proto.block_header_metadata_encoding
+        Proto.block_header_metadata_encoding_with_legacy_attestation_name
         (Store.Block.block_metadata metadata)
     in
     let* test_chain_status, _ =
