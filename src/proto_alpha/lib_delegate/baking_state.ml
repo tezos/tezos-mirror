@@ -241,12 +241,12 @@ module Delegate_slots = struct
        first slot. *)
     own_delegate_slots :
       (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
-        (* This map cannot contain just the first slot for a delegate, because
-           it is used in [round_proposer] for which we need all slots, as the
-           round can be arbitrary. *)
-    all_delegate_first_slots : endorsing_slot SlotMap.t;
-        (* In this map, there is no duplicate delegate. Delegates appear with
-           their first slot.
+        (* This map cannot have as keys just the first slot of delegates,
+           because it is used in [round_proposer] for which we need all slots,
+           as the round can be arbitrary. *)
+    all_delegate_voting_power : int SlotMap.t;
+        (* This is a map having as keys the first slot of all delegates, and as
+           values their endorsing power.
            This map contains just the first slot for a delegate, because it is
            only used in [slot_voting_power] which is about (pre)endorsements,
            not proposals. Indeed, only (pre)endorsements that use the delegate's
@@ -262,9 +262,7 @@ module Delegate_slots = struct
   let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
 
   let voting_power slots ~slot =
-    match SlotMap.find slot slots.all_delegate_first_slots with
-    | Some {endorsing_power; _} -> Some endorsing_power
-    | None -> None
+    SlotMap.find slot slots.all_delegate_voting_power
 
   let all_proposer_rounds slots ~committee_size =
     let rec iter acc r =
@@ -694,7 +692,7 @@ end
 
 let delegate_slots endorsing_rights delegates =
   let own_delegates = DelegateSet.of_list delegates in
-  let own_delegate_first_slots, own_delegate_slots, all_delegate_first_slots =
+  let own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
     List.fold_left
       (fun (own_list, own_map, all_map) slot ->
         let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
@@ -702,7 +700,9 @@ let delegate_slots endorsing_rights delegates =
         let endorsing_slot =
           {endorsing_power = List.length slots; first_slot}
         in
-        let all_map = SlotMap.add first_slot endorsing_slot all_map in
+        let all_map =
+          SlotMap.add first_slot endorsing_slot.endorsing_power all_map
+        in
         let own_list, own_map =
           match DelegateSet.find_pkh consensus_key own_delegates with
           | Some consensus_key ->
@@ -725,7 +725,7 @@ let delegate_slots endorsing_rights delegates =
     {
       own_delegates = own_delegate_first_slots;
       own_delegate_slots;
-      all_delegate_first_slots;
+      all_delegate_voting_power;
     }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
