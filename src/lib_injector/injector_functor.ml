@@ -1355,6 +1355,7 @@ module Make (Parameters : PARAMETERS) = struct
         let protocols =
           {current_protocol = state.protocols.next_protocol; next_protocol}
         in
+        state.proto_client <- Inj_proto.proto_client_for_protocol next_protocol ;
         state.protocols <- protocols)
       workers
 

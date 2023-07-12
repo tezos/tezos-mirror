@@ -1458,26 +1458,38 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
 let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
   let tags = ["store"] in
   let description = "node can read data after store migration" in
-  let commitment_period = 10 in
-  let challenge_window = 10 in
+  let commitment_period = 5 in
+  let challenge_window = 5 in
   let scenario_prior ~sc_rollup:_ ~rollup_node ~rollup_client:_ _tezos_node
       tezos_client =
     let* () = send_messages commitment_period tezos_client in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     unit
   in
-  let scenario_after ~sc_rollup:_ ~rollup_node ~rollup_client tezos_node
+  let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
       tezos_client () =
     let migration_level = Node.get_level tezos_node in
-    let* () = send_messages 1 tezos_client in
+    let* () = send_messages (commitment_period + 3) tezos_client in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let*! _l2_block =
       Sc_rollup_client.rpc_get
         rollup_client
         ["global"; "block"; string_of_int (migration_level - 1)]
     in
-    let*! _l2_block =
+    let*! l2_head =
       Sc_rollup_client.rpc_get rollup_client ["global"; "block"; "head"]
+    in
+    let last_l2_commitment =
+      JSON.(l2_head |-> "previous_commitment_hash" |> as_string)
+    in
+    Log.info
+      "Checking that last commitment in the new protocol was published on L1" ;
+    let* _commitment_on_l1 =
+      RPC.Client.call tezos_client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
+           ~sc_rollup
+           ~hash:last_l2_commitment
+           ()
     in
     unit
   in
