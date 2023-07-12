@@ -310,6 +310,9 @@ Smart Rollup node
   now contains *serialized* messages (external messages start with ``01`` and
   internal start with ``00``). (MR :gl:`!8876`)
 
+- **Breaking change** RPC ``/global/helpers/proof/outbox`` is moved to
+  ``/global/block/head/helpers/proof/outbox``. (MR :gl:`!9233`)
+
 
 Smart Rollup client
 -------------------
