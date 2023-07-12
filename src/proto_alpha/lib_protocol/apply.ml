@@ -1982,7 +1982,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Single (Dal_attestation _) -> ctxt
   | Single
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-      | Vdf_revelation _ | Double_endorsement_evidence _
+      | Vdf_revelation _ | Double_attestation_evidence _
       | Double_preattestation_evidence _ | Double_baking_evidence _
       | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
@@ -2125,7 +2125,7 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
   >|=? fun (ctxt, balance_updates) ->
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preattestation (type kind) ctxt
+let punish_double_attestation_or_preattestation (type kind) ctxt
     ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
@@ -2137,7 +2137,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
     | Single (Preattestation _) ->
         Double_preattestation_evidence_result balance_updates
     | Single (Endorsement _) ->
-        Double_endorsement_evidence_result balance_updates
+        Double_attestation_evidence_result balance_updates
   in
   match op1.protocol_data.contents with
   | Single (Preattestation e1) | Single (Endorsement e1) ->
@@ -2148,7 +2148,7 @@ let punish_double_endorsement_or_preattestation (type kind) ctxt
         ctxt
         consensus_pk1.delegate
         level
-        `Double_endorsing
+        `Double_attesting
         mk_result
         ~payload_producer
 
@@ -2220,9 +2220,9 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
   | Single (Double_preattestation_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
-  | Single (Double_endorsement_evidence {op1; op2 = _}) ->
-      punish_double_endorsement_or_preattestation ctxt ~op1 ~payload_producer
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
+  | Single (Double_attestation_evidence {op1; op2 = _}) ->
+      punish_double_attestation_or_preattestation ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2 = _}) ->
       punish_double_baking ctxt bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->

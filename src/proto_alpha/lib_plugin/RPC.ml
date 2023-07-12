@@ -2951,7 +2951,7 @@ module Forge = struct
     operation ctxt block ~branch (Double_baking_evidence {bh1; bh2})
 
   let double_endorsement_evidence ctxt block ~branch ~op1 ~op2 () =
-    operation ctxt block ~branch (Double_endorsement_evidence {op1; op2})
+    operation ctxt block ~branch (Double_attestation_evidence {op1; op2})
 
   let double_preendorsement_evidence ctxt block ~branch ~op1 ~op2 () =
     operation ctxt block ~branch (Double_preattestation_evidence {op1; op2})

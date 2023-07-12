@@ -239,12 +239,12 @@ let check_constants constants =
   >>? fun () ->
   error_unless
     Compare.Int.(
-      constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
       >= 0
-      && constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+      && constants.percentage_of_frozen_deposits_slashed_per_double_attestation
          <= 100)
     (Invalid_protocol_constants
-       "The percentage of frozen deposits slashed per double endorsement must \
+       "The percentage of frozen deposits slashed per double attestation must \
         be between 0 and 100 included.")
   >>? fun () ->
   error_unless

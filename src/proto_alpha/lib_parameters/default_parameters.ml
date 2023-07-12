@@ -179,7 +179,7 @@ let constants_mainnet =
     max_slashing_period = 2;
     delegation_over_baking_limit = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking = 10;
-    percentage_of_frozen_deposits_slashed_per_double_endorsement = 50;
+    percentage_of_frozen_deposits_slashed_per_double_attestation = 50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
     testnet_dictator = None;
     initial_seed = None;

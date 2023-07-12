@@ -39,33 +39,33 @@ val already_slashed_for_double_baking :
   bool tzresult Lwt.t
 
 (** Returns true if the given delegate has already been slashed
-    for double preattesting or double endorsing for the given level. *)
-val already_slashed_for_double_endorsing :
+    for double preattesting or double attesting for the given level. *)
+val already_slashed_for_double_attesting :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
   bool tzresult Lwt.t
 
 (** The [reward_and_burn] type embeds amounts involved when slashing a
-    delegate for double endorsing or double baking. *)
+    delegate for double attesting or double baking. *)
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
 (** The [punishing_amounts] type embeds amounts involved when slashing a
-    delegate for double endorsing or double baking. *)
+    delegate for double attesting or double baking. *)
 type punishing_amounts = {
   staked : reward_and_burn;
   unstaked : (Cycle_repr.t * reward_and_burn) list;
 }
 
 (** Record in the context that the given delegate has now been slashed
-    for double endorsing for the given level and return the amounts to
+    for double attesting for the given level and return the amounts to
     burn and to reward. If the delegate has no remaining frozen
-    deposits, this will also forbid it to bake or endorse until a new
+    deposits, this will also forbid it to bake or attest until a new
     deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has
-    already been slashed for double endorsing for the given level.  *)
-val punish_double_endorsing :
+    already been slashed for double attesting for the given level.  *)
+val punish_double_attesting :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Level_repr.t ->
@@ -74,7 +74,7 @@ val punish_double_endorsing :
 (** Record in the context that the given delegate has now been slashed
     for double baking for the given level and returns the amounts to
     burn and to reward. If the delegate has no remaining frozen
-    deposits, this will also forbid it to bake or endorse until a new
+    deposits, this will also forbid it to bake or attest until a new
     deposit is frozen.
 
     Fails with [Unrequired_denunciation] if the given delegate has

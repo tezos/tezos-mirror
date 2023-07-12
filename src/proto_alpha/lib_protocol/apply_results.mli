@@ -82,7 +82,7 @@ and 'kind contents_result =
   | Vdf_revelation_result :
       Receipt.balance_updates
       -> Kind.vdf_revelation contents_result
-  | Double_endorsement_evidence_result :
+  | Double_attestation_evidence_result :
       Receipt.balance_updates
       -> Kind.double_attestation_evidence contents_result
   | Double_preattestation_evidence_result :

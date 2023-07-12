@@ -893,7 +893,7 @@ module Constants : sig
       max_slashing_period : int;
       delegation_over_baking_limit : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : int;
-      percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
+      percentage_of_frozen_deposits_slashed_per_double_attestation : int;
       testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
@@ -978,7 +978,7 @@ module Constants : sig
 
   val percentage_of_frozen_deposits_slashed_per_double_baking : context -> int
 
-  val percentage_of_frozen_deposits_slashed_per_double_endorsement :
+  val percentage_of_frozen_deposits_slashed_per_double_attestation :
     context -> int
 
   val testnet_dictator : context -> public_key_hash option
@@ -2135,7 +2135,7 @@ module Delegate : sig
     Cycle.t ->
     (context * Receipt.balance_updates * public_key_hash list) tzresult Lwt.t
 
-  val already_slashed_for_double_endorsing :
+  val already_slashed_for_double_attesting :
     context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
 
   val already_slashed_for_double_baking :
@@ -2148,7 +2148,7 @@ module Delegate : sig
     unstaked : (Cycle.t * reward_and_burn) list;
   }
 
-  val punish_double_endorsing :
+  val punish_double_attesting :
     context ->
     public_key_hash ->
     Level.t ->
@@ -4178,7 +4178,7 @@ and _ contents =
       op2 : Kind.preattestation operation;
     }
       -> Kind.double_preattestation_evidence contents
-  | Double_endorsement_evidence : {
+  | Double_attestation_evidence : {
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
     }

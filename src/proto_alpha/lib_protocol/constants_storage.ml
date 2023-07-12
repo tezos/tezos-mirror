@@ -136,9 +136,9 @@ let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
   constants.percentage_of_frozen_deposits_slashed_per_double_baking
 
-let percentage_of_frozen_deposits_slashed_per_double_endorsement c =
+let percentage_of_frozen_deposits_slashed_per_double_attestation c =
   let constants = Raw_context.constants c in
-  constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+  constants.percentage_of_frozen_deposits_slashed_per_double_attestation
 
 let testnet_dictator c =
   let constants = Raw_context.constants c in

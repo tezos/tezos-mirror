@@ -415,7 +415,7 @@ let generate_double_endorsement =
   let open QCheck2.Gen in
   let* op1 = generate_op generate_endorsement in
   let+ op2 = generate_op generate_endorsement in
-  Double_endorsement_evidence {op1; op2}
+  Double_attestation_evidence {op1; op2}
 
 let generate_double_baking =
   let open QCheck2.Gen in

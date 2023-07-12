@@ -188,7 +188,7 @@ type t = {
   max_slashing_period : int;
   delegation_over_baking_limit : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
-  percentage_of_frozen_deposits_slashed_per_double_endorsement : int;
+  percentage_of_frozen_deposits_slashed_per_double_attestation : int;
   testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
@@ -479,7 +479,7 @@ let encoding =
                 c.max_slashing_period,
                 c.delegation_over_baking_limit,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
-                c.percentage_of_frozen_deposits_slashed_per_double_endorsement,
+                c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
@@ -515,7 +515,7 @@ let encoding =
                    max_slashing_period,
                    delegation_over_baking_limit,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
-                   percentage_of_frozen_deposits_slashed_per_double_endorsement,
+                   percentage_of_frozen_deposits_slashed_per_double_attestation,
                    testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
@@ -552,7 +552,7 @@ let encoding =
         consensus_threshold;
         delegation_over_baking_limit;
         percentage_of_frozen_deposits_slashed_per_double_baking;
-        percentage_of_frozen_deposits_slashed_per_double_endorsement;
+        percentage_of_frozen_deposits_slashed_per_double_attestation;
         testnet_dictator;
         initial_seed;
         cache_script_size;

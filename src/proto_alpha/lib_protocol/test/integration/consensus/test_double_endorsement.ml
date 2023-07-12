@@ -100,7 +100,7 @@ let test_valid_double_endorsement_evidence () =
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let p =
-    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_endorsement
+    csts.parametric.percentage_of_frozen_deposits_slashed_per_double_attestation
   in
   let expected_frozen_deposits_after =
     Test_tez.(frozen_deposits_before *! Int64.of_int (100 - p) /! 100L)
@@ -395,7 +395,7 @@ let test_freeze_more_with_low_balance =
         consensus_threshold = 0;
         origination_size = 0;
         preserved_cycles = 5;
-        percentage_of_frozen_deposits_slashed_per_double_endorsement =
+        percentage_of_frozen_deposits_slashed_per_double_attestation =
           (* enforce that percentage is 50% in the test's params. *)
           50;
       }
@@ -434,7 +434,7 @@ let test_freeze_more_with_low_balance =
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
     let slash_percentage =
-      constants.percentage_of_frozen_deposits_slashed_per_double_endorsement
+      constants.percentage_of_frozen_deposits_slashed_per_double_attestation
     in
     let expected_frozen_deposits_after =
       Test_tez.(

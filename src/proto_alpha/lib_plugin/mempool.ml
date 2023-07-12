@@ -546,7 +546,7 @@ let pre_filter filter_info config
   | Single (Dal_attestation _)
   | Single (Seed_nonce_revelation _)
   | Single (Double_preattestation_evidence _)
-  | Single (Double_endorsement_evidence _)
+  | Single (Double_attestation_evidence _)
   | Single (Double_baking_evidence _)
   | Single (Activate_account _)
   | Single (Proposals _)
@@ -682,7 +682,7 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
       ( Preattestation _ | Endorsement _ | Dal_attestation _ | Proposals _
       | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
       | Double_baking_evidence _ | Double_preattestation_evidence _
-      | Double_endorsement_evidence _ | Activate_account _ | Drain_delegate _
+      | Double_attestation_evidence _ | Activate_account _ | Drain_delegate _
       | Failing_noop _ ) ->
       None
 
