@@ -168,6 +168,109 @@ let test_cannot_bake_with_zero_deposits () =
   (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
+let adjust_staking_towards_limit ~limit ~block ~account ~contract =
+  (* Since we do not have the set_deposit_limit operation anymore (nor
+     do we have automatic staking) this function adjusts the amount of
+     staking towards the given [limit] for the given [account],
+     [contract]. It takes a block and returns a new block if a stake
+     or unstake operation is necessary, or the same block if the limit
+     was already reached. *)
+  Context.Delegate.current_frozen_deposits (B block) account >>=? fun fd ->
+  if limit = fd then return block
+  else
+    match Tez.sub_opt limit fd with
+    | Some diff ->
+        Tezos_alpha_test_helpers.Adaptive_inflation.stake
+          (B block)
+          contract
+          diff
+        >>=? fun adjustment_operation ->
+        Block.bake ~operation:adjustment_operation block
+    | None -> (
+        match Tez.sub_opt fd limit with
+        | None -> return block
+        | Some diff ->
+            Tezos_alpha_test_helpers.Adaptive_inflation.unstake
+              (B block)
+              contract
+              diff
+            >>=? fun adjustment_operation ->
+            Block.bake ~operation:adjustment_operation block)
+
+let test_limit_with_overdelegation () =
+  let constants = {constants with delegation_over_baking_limit = 9} in
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (contract1, account1), (contract2, account2) =
+    get_first_2_accounts_contracts contracts
+  in
+  (* - [account1] and [account2] will give 80% of their balance to
+       [new_account]
+     - [new_account] will overdelegate to [account1] but [account1] will apply
+       a frozen deposits target and limit to 15% of its stake *)
+  Context.Delegate.staking_balance (B genesis) account1
+  >>=? fun initial_staking_balance ->
+  Context.Delegate.staking_balance (B genesis) account2
+  >>=? fun initial_staking_balance' ->
+  let amount = Test_tez.(initial_staking_balance *! 8L /! 10L) in
+  let amount' = Test_tez.(initial_staking_balance' *! 8L /! 10L) in
+  let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
+  let new_account = (Account.new_account ()).pkh in
+  let new_contract = Contract.Implicit new_account in
+  Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
+  >>=? fun transfer1 ->
+  Op.transaction ~force_reveal:true (B genesis) contract2 new_contract amount'
+  >>=? fun transfer2 ->
+  Block.bake ~operations:[transfer1; transfer2] genesis >>=? fun b ->
+  let expected_new_staking_balance =
+    Test_tez.(initial_staking_balance -! amount)
+  in
+  Context.Delegate.staking_balance (B b) account1
+  >>=? fun new_staking_balance ->
+  Assert.equal_tez ~loc:__LOC__ new_staking_balance expected_new_staking_balance
+  >>=? fun () ->
+  let expected_new_staking_balance' =
+    Test_tez.(initial_staking_balance' -! amount')
+  in
+  Context.Delegate.staking_balance (B b) account2
+  >>=? fun new_staking_balance' ->
+  Assert.equal_tez
+    ~loc:__LOC__
+    new_staking_balance'
+    expected_new_staking_balance'
+  >>=? fun () ->
+  Op.delegation ~force_reveal:true (B b) new_contract (Some account1)
+  >>=? fun delegation ->
+  Block.bake ~operation:delegation b >>=? fun b ->
+  (* Overdelegation means that now there isn't enough staking, and the
+     baker who wants to have its stake close to its defined limit
+     should adjust it. *)
+  adjust_staking_towards_limit
+    ~block:b
+    ~account:account1
+    ~contract:contract1
+    ~limit
+  >>=? fun b ->
+  let expected_new_frozen_deposits = limit in
+  Context.Delegate.current_frozen_deposits (B b) account1
+  >>=? fun frozen_deposits ->
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
+  >>=? fun () ->
+  let cycles_to_bake =
+    2 * (constants.preserved_cycles + constants.max_slashing_period)
+  in
+  let rec loop b n =
+    if n = 0 then return b
+    else
+      Block.bake_until_cycle_end ~policy:(By_account account1) b >>=? fun b ->
+      Context.Delegate.current_frozen_deposits (B b) account1
+      >>=? fun frozen_deposits ->
+      Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_new_frozen_deposits
+      >>=? fun () -> loop b (pred n)
+  in
+  (* Check that frozen deposits do not change for a sufficient period of
+     time *)
+  loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
+
 let test_may_not_bake_again_after_full_deposit_slash () =
   let order_ops op1 op2 =
     let oph1 = Operation.hash op1 in
@@ -529,6 +632,10 @@ let tests =
         "test cannot bake with zero deposits"
         `Quick
         test_cannot_bake_with_zero_deposits;
+      tztest
+        "test simulation of limited staking with overdelegation"
+        `Quick
+        test_limit_with_overdelegation;
       tztest
         "test cannot bake again after full deposit slash"
         `Quick
