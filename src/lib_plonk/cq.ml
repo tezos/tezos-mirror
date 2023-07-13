@@ -244,7 +244,7 @@ module Make (PC : Polynomial_commitment.S) = struct
     (* cm (X^n - 1) *)
     let cm_zv =
       try G2.(add (Srs_g2.get srs2 n) (negate one))
-      with _ ->
+      with Invalid_argument _ ->
         raise
           (Utils.SRS_too_short
              (Printf.sprintf
@@ -270,9 +270,19 @@ module Make (PC : Polynomial_commitment.S) = struct
       if n = len_t then table
       else
         List.map
-          (fun t -> Array.(append t (init (n - len_t) (Fun.const t.(0)))))
+          (fun t ->
+            if Array.length t <> len_t then
+              raise (Invalid_argument "Table columns have different lengths.") ;
+            Array.(append t (init (n - len_t) (Fun.const t.(0)))))
           table
     in
+    if wire_size > n then
+      raise
+        (Invalid_argument
+           (Printf.sprintf
+              "Wire (size = %d) greater than table (size = %d)."
+              wire_size
+              n)) ;
     let domain = Domain.build n in
     let table_polys = List.map (Evaluations.interpolation_fft2 domain) table in
     let pc = PC.Public_parameters.setup 0 (srs, srs) in
