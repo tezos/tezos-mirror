@@ -226,7 +226,7 @@ let create_lockfile chain_dir =
   protect (fun () ->
       let* fd =
         Lwt_unix.openfile
-          (Naming.lock_file chain_dir |> Naming.file_path)
+          (Naming.lockfile chain_dir |> Naming.file_path)
           [Unix.O_CREAT; O_RDWR; O_CLOEXEC; O_SYNC]
           0o644
       in
