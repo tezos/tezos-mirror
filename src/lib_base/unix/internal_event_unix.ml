@@ -42,6 +42,21 @@ end
    run with [Singleprocess]. *)
 let env_var_name = "TEZOS_EVENTS_CONFIG"
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["internal_event_unix"]
+
+  let loaded_from_env =
+    declare_2
+      ~section
+      ~name:"uri_loaded_from_env"
+      ~msg:"Loaded URIs from environment"
+      ~level:Notice
+      ("variable", Data_encoding.string)
+      ("value", Data_encoding.string)
+end
+
 let init_raw ~internal_events () =
   let _ =
     (* This is just here to force the linking (and hence
@@ -74,13 +89,8 @@ let init_raw ~internal_events () =
                 | Some _ -> Internal_event.All_sinks.activate uri)
               uris
           in
-          Internal_event.Debug_event.(
-            emit
-              (make
-                 "Loaded URIs from environment"
-                 ~attach:
-                   (`O
-                     [("variable", `String env_var_name); ("value", `String s)])))
+          let*! () = Event.(emit loaded_from_env (env_var_name, s)) in
+          return_unit
     in
     Configuration.apply internal_events
   in

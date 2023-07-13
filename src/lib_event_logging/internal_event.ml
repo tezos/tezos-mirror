@@ -1149,40 +1149,6 @@ module Simple = struct
     fun parameters -> Event.emit ?section parameters
 end
 
-module Debug_event = struct
-  type t = {message : string; attachment : Data_encoding.Json.t}
-
-  let make ?(attach = `Null) message = {message; attachment = attach}
-
-  let v0_encoding =
-    let open Data_encoding in
-    conv
-      (fun {message; attachment} -> (message, attachment))
-      (fun (message, attachment) -> {message; attachment})
-      (obj2 (req "message" string) (req "attachment" json))
-
-  module Definition = struct
-    let section = None
-
-    let name = "debug-event"
-
-    type nonrec t = t
-
-    let encoding =
-      Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
-
-    let pp ~all_fields:_ ~block:_ ppf {message; attachment} =
-      let open Format in
-      fprintf ppf "%s:@ %s@ %a" name message Data_encoding.Json.pp attachment
-
-    let doc = "Generic event for semi-structured debug information."
-
-    let level = Debug
-  end
-
-  include (Make (Definition) : EVENT with type t := t)
-end
-
 module Lwt_worker_logger = struct
   module Started_event = Make (struct
     type t = unit

@@ -452,16 +452,6 @@ end
 
 (** {3 Common Event Definitions } *)
 
-(** The debug-event is meant for emitting (temporarily)
-    semi-structured data in the event stream. *)
-module Debug_event : sig
-  type t = {message : string; attachment : Data_encoding.Json.t}
-
-  val make : ?attach:Data_encoding.Json.t -> string -> t
-
-  include EVENT with type t := t
-end
-
 (** The worker logger is meant for use with {!Lwt_utils.worker}. *)
 module Lwt_worker_logger : sig
   (** [on_event status] emits an event of type [t] and matches
