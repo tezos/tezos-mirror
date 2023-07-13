@@ -40,7 +40,7 @@ val costaking_balance_as_tez :
   Tez_repr.t tzresult Lwt.t
 
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
-    costaking pseudotokens and the [delagte]'s frozen deposits pseudotokens by
+    costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s 
     frozen deposits pseudotokens/tez rate. 
     

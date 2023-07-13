@@ -23,12 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is responsible for maintaining the
+(** {0} Introduction
+
+    This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables.
 
 
-    Pseudo-tokens
+    {1} Pseudo-tokens
 
     These tables are used to keep track of the distribution of frozen
     deposits between a delegate and its costakers. The amounts stored
@@ -44,7 +46,7 @@
     the costakers (whose number is unbounded).
 
 
-    Conversion rate:
+    {1} Conversion rate:
 
     The conversion rate between pseudotokens and mutez (the value in
     mutez of a pseudotoken) should be given by the ratio between the
@@ -64,15 +66,15 @@
     rewards.
 
 
-    Implementation:
+    {2} Implementation:
 
     The {!Storage.Contract.Costaking_pseudotokens} table stores for
-    each staker (delegate or costaker) its /staking balance
-    pseudotokens/ which is the number of pseudotokens owned by the
+    each staker (delegate or costaker) its {i staking balance
+    pseudotokens} which is the number of pseudotokens owned by the
     staker.
 
     The {!Storage.Contract.Frozen_deposits_pseudotokens} table stores
-    for each delegate the /frozen deposits pseudotokens/ of the
+    for each delegate the {i frozen deposits pseudotokens} of the
     delegate which is defined as the sum of all the staking balance
     pseudotokens of the delegate and its costakers.
 
@@ -81,9 +83,9 @@
     non-negative signed int64.
 
 
-    Invariants:
+    {2} Invariants:
 
-    Invariant 1: frozen deposits pseudotokens initialization
+    {3} Invariant 1: frozen deposits pseudotokens initialization
 
       For {!Storage.Contract.Frozen_deposits_pseudotokens}, a missing
       key is equivalent to a value of [0]. This case means that there are
@@ -93,43 +95,29 @@
       deposits of the delegate, all owned by the delegate.
 
 
-    Invariant 2: staking balance pseudotokens initialization
+    {3} Invariant 2: staking balance pseudotokens initialization
 
       For {!Storage.Contract.Costaking_pseudotokens}, a missing key is
       equivalent to a value of [0].
 
-    Invariant 3: relationship between frozen deposits and staking
+    {3} Invariant 3: relationship between frozen deposits and staking
     balance pseudotokens
 
       For a given delegate, their frozen deposits pseudotokens equal
       the sum of all costaking pseudotokens of their delegators
       (including the delegate itself).
-
-
-    Ensuring invariants
-
-    Invariant 1:
-     This is ensured by:
-       - Frozen deposits pseudotokens are always got with
-         {!get_frozen_deposits_pseudotokens} which matches the result of
-         {!Storage.Contract.Frozen_deposits_pseudotokens.find} with
-         [Some v when Staking_pseudotoken_repr.(v <> zero)];
-       - and that there is no call to
-         {!Storage.Contract.Frozen_deposits_pseudotokens.get}.
-
-    Invariant 3:
-     It is ensured by:
-       - {credit_costaking_pseudotokens} always called with (the pseudotokens
-         result of) {credit_frozen_deposits_pseudotokens_for_tez_amount} in
-         {stake};
-       - {debit_costaking_pseudotokens} always called with (the same value as)
-         {debit_frozen_deposits_pseudotokens} in {request_unstake}.
 *)
 
+(** When a delegate gets totally slashed, the value of its
+    pseudotokens becomes 0 and before minting any new token we would
+    need to iterate over all costakers to empty their pseudotoken
+    balances. We want to avoid iterating over costakers so we forbid
+    {b stake} in this case. *)
 type error += Cannot_stake_on_fully_slashed_delegate
 
-(** These two types are not exported, they are used to avoid fetching
-    the same keys in the context several times. *)
+(** These two types are not exported, they are views to the portions
+    of the storage which are relevent in this module when a delegate
+    or a staker are considered. *)
 type delegate_balances = {
   delegate : Signature.public_key_hash;
   frozen_deposits_tez : Tez_repr.t;
@@ -142,8 +130,13 @@ type contract_balances = {
   delegate_balances : delegate_balances;
 }
 
-(* Note that Frozen_deposits_storage.get is expected to default to 0
-   when the key is missing. *)
+(** {0} Functions reading from the storage *)
+
+(** [get_frozen_deposits_tez ctxt delegate] returns the sum of frozen
+    deposits, in tez, of the delegate and its costakers.
+
+    Note that [Frozen_deposits_storage.get] is expected to default to
+    [0] when the key is missing. *)
 let get_frozen_deposits_tez ctxt delegate =
   let open Lwt_result_syntax in
   let+ {current_amount; initial_amount = _} =
@@ -151,9 +144,15 @@ let get_frozen_deposits_tez ctxt delegate =
   in
   current_amount
 
-(* To preserve invariant 1, this should be the only function of this
-   module reading from the
-   Storage.Contract.Frozen_deposits_pseudotokens table. *)
+(** [get_frozen_deposits_pseudotokens ctxt delegate] returns the total
+    number of pseudotokens in circulation for the given
+    [delegate]. This should, by invariant 3 be the sum of the
+    costaking balance (in pseudotokens) of the delegate and all its
+    delegators.
+
+    To preserve invariant 1, this should be the only function of this
+    module reading from the
+    {!Storage.Contract.Frozen_deposits_pseudotokens} table. *)
 let get_frozen_deposits_pseudotokens ctxt delegate =
   let open Lwt_result_syntax in
   let+ frozen_deposits_pseudotokens_opt =
@@ -163,11 +162,13 @@ let get_frozen_deposits_pseudotokens ctxt delegate =
     frozen_deposits_pseudotokens_opt
     ~default:Staking_pseudotoken_repr.zero
 
-(** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
-    current costaking balance in pseudotokens.
+(** [costaking_pseudotokens_balance ctxt contract] returns
+    [contract]'s current costaking balance in pseudotokens.
+
+    [contract] can be either a delegate or a delegator.
 
     To preserve invariant 2, this should be the only function of this
-    module reading from the Storage.Contract.Costaking_pseudotokens
+    module reading from the {!Storage.Contract.Costaking_pseudotokens}
     table.
 *)
 let costaking_pseudotokens_balance ctxt contract =
@@ -177,6 +178,14 @@ let costaking_pseudotokens_balance ctxt contract =
   in
   Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
 
+(** [get_delegate_balances ctxt delegate] records the frozen deposits
+    in tez and pseudotokens of a given delegate.
+
+    Postcondition:
+      delegate = result.delegate /\
+      get_frozen_deposits_tez ctxt delegate = return result.frozen_deposits_tez /\
+      get_frozen_deposits_pseudotokens ctxt delegate = return result.frozen_deposits_pseudotokens
+*)
 let get_delegate_balances ctxt delegate =
   let open Lwt_result_syntax in
   let* frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
@@ -185,19 +194,37 @@ let get_delegate_balances ctxt delegate =
   in
   {delegate; frozen_deposits_tez; frozen_deposits_pseudotokens}
 
+(** [get_contract_balances ctxt ~contract ~delegate_balances] enriches
+    the ~delegate_balance with [contract]'s pseudotoken balance.
+
+    Precondition:
+      unchecked: [contract] delegates to [delegate_balance.delegate]
+         (which is considered to be the case when [contract = delegate]) /\
+      unchecked: get_delegate_balances ctxt delegate = return delegate_balances
+    Postcondition:
+      result.contract = contract /\
+      result.delegate_balances = delegate_balances /\
+      costaking_pseudotoken_balance ctxt contract = return result.pseudotoken_balance
+*)
 let get_contract_balances ctxt ~contract ~delegate_balances =
   let open Lwt_result_syntax in
   let+ pseudotoken_balance = costaking_pseudotokens_balance ctxt contract in
   {contract; pseudotoken_balance; delegate_balances}
 
-(*
+(** [init_pseudotokens ctxt delegate_balances_before] initializes the
+    pseudotokens of [delegate_balances_before.delegate] by:
+    - assigning the totality of the pseudotokens to the delegate,
+    - initializing the conversion rate to 1.
+
    Precondition:
-     asserted: delegate_balances_before.frozen_deposits_pseudotokens = zero
-     fails unless: delegate_balances_before.frozen_deposits_tez <> zero
+     unchecked: get_delegate_balances ctxt delegate_balances_before.delegate = return delegate_balances_before /\
+     unchecked: invariant3(ctxt) /\
+     asserted: delegate_balances_before.frozen_deposits_pseudotokens = 0
    Postcondition:
-     result.frozen_deposits_pseudotokens = delegate_balances_before.frozen_deposits_tez
-     other fields unmodified
-     context is updated to maintain invariant 3.
+     result.frozen_deposits_pseudotokens = delegate_balances_before.frozen_deposits_tez /\
+     other fields unmodified /\
+     get_delegate_balances ctxt result.delegate = return result /\
+     invariant3(ctxt)
 *)
 let init_pseudotokens ctxt delegate_balances_before =
   let open Lwt_result_syntax in
@@ -237,7 +264,21 @@ let init_pseudotokens ctxt delegate_balances_before =
     in
     return (ctxt, result)
 
-(* Writes to both tables, maintains invariant 3. *)
+(** [mint_pseudotokens ctxt contract_balances_before
+    pseudotokens_to_mint] mints [pseudotokens_to_mint] pseudotokens
+    and assign them to [contract_balances_before.contract]. Both
+    tables are updated to maintain invariant 3.
+
+   Precondition:
+     unchecked: get_contract_balances ctxt contract_balances_before.contract = return contract_balances_before /\
+     unchecked: invariant3(ctxt)
+   Postcondition:
+     get_contract_balances ctxt contract_balances_before.contract =
+       return {contract_balances_before with
+                pseudotoken_balance += pseudotokens_to_mint;
+                delegate_balances.frozen_deposits_pseudotokens += pseudotokens_to_mint} /\
+     invariant3(ctxt)
+*)
 let mint_pseudotokens ctxt (contract_balances_before : contract_balances)
     pseudotokens_to_mint =
   let open Lwt_result_syntax in
@@ -264,7 +305,21 @@ let mint_pseudotokens ctxt (contract_balances_before : contract_balances)
   in
   return ctxt
 
-(* Writes to both tables, maintains invariant 3. *)
+(** [burn_pseudotokens ctxt contract_balances_before
+    pseudotokens_to_burn] burns [pseudotokens_to_burn] pseudotokens
+    from the balance of [contract_balances_before.contract]. Both
+    tables are updated to maintain invariant 3.
+
+   Precondition:
+     unchecked: get_contract_balances ctxt contract_balances_before.contract = return contract_balances_before /\
+     unchecked: invariant3(ctxt)
+   Postcondition:
+     get_contract_balances ctxt contract_balances_before.contract =
+       return {contract_balances_before with
+                pseudotoken_balance -= pseudotokens_to_mint;
+                delegate_balances.frozen_deposits_pseudotokens -= pseudotokens_to_mint} /\
+     invariant3(ctxt)
+*)
 let burn_pseudotokens ctxt (contract_balances_before : contract_balances)
     pseudotokens_to_burn =
   let open Lwt_result_syntax in
@@ -291,13 +346,15 @@ let burn_pseudotokens ctxt (contract_balances_before : contract_balances)
   in
   return ctxt
 
+(** {0} Conversion between tez and pseudotokens *)
+
 (** Tez -> pseudotokens conversion.
     Precondition:
       tez_amount <> 0 /\
       delegate_balances.frozen_deposits_pseudotokens <> 0 /\
       delegate_balances.frozen_deposits_tez <> 0.
     Postcondition:
-      result is <> 0.
+      result <> 0.
 *)
 let pseudotokens_of (delegate_balances : delegate_balances) tez_amount =
   assert (
@@ -341,6 +398,10 @@ let tez_of (delegate_balances : delegate_balances) pseudotoken_amount =
   in
   Tez_repr.of_mutez_exn (Z.to_int64 res_z)
 
+(** [compute_pseudotoken_credit_for_tez_amount delegate_balances
+    tez_amount] is a safe wrapper around [pseudotokens_of
+    delegate_balances tez_amount].
+*)
 let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
   let open Result_syntax in
   if Tez_repr.(tez_amount = zero) then
@@ -351,11 +412,18 @@ let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
   else if
     Staking_pseudotoken_repr.(
       delegate_balances.frozen_deposits_pseudotokens = zero)
-  then return @@ Staking_pseudotoken_repr.init_of_tez tez_amount
+  then
+    (* Pseudotokens are not yet initialized, the conversion rate is
+       1. *)
+    return @@ Staking_pseudotoken_repr.init_of_tez tez_amount
   else if Tez_repr.(delegate_balances.frozen_deposits_tez = zero) then
+    (* Can only happen in an attempt to stake after a full
+       slashing. We forbid this case to avoid having to iterate over
+       all costakers to reset their pseudotoken balances. *)
     tzfail Cannot_stake_on_fully_slashed_delegate
   else return @@ pseudotokens_of delegate_balances tez_amount
 
+(** {0} Exported functions, see the mli file. *)
 let stake ctxt ~contract ~delegate tez_amount =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt delegate in
