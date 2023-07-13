@@ -128,6 +128,17 @@
 
 type error += Cannot_stake_on_fully_slashed_delegate
 
+(** This type is not exported, it is used to avoid fetching the same
+    key in the context several times. *)
+type contract_balances = {
+  contract : Contract_repr.t;
+  delegate : Signature.public_key_hash;
+  is_delegate : bool;
+  pseudotoken_balance : Staking_pseudotoken_repr.t;
+  delegate_total_frozen_deposits_tez : Tez_repr.t;
+  delegate_total_frozen_deposits_pseudotokens : Staking_pseudotoken_repr.t;
+}
+
 let get_frozen_deposits_tez ctxt delegate =
   let open Lwt_result_syntax in
   let+ {current_amount; initial_amount = _} =
@@ -152,6 +163,24 @@ let costaking_pseudotokens_balance ctxt contract =
     Storage.Contract.Costaking_pseudotokens.find ctxt contract
   in
   Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
+
+let get_contract_balances ctxt ~contract ~delegate =
+  let open Lwt_result_syntax in
+  let* pseudotoken_balance = costaking_pseudotokens_balance ctxt contract in
+  let* delegate_total_frozen_deposits_tez =
+    get_frozen_deposits_tez ctxt delegate
+  in
+  let+ delegate_total_frozen_deposits_pseudotokens =
+    get_frozen_deposits_pseudotokens ctxt delegate
+  in
+  {
+    contract;
+    delegate;
+    is_delegate = Contract_repr.(contract = Implicit delegate);
+    pseudotoken_balance;
+    delegate_total_frozen_deposits_tez;
+    delegate_total_frozen_deposits_pseudotokens;
+  }
 
 (** [credit_costaking_pseudotokens ctxt contract p_amount] increases
     [contract]'s costaking pseudotokens balance by [p_amount].
