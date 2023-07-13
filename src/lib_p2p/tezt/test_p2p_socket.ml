@@ -33,10 +33,6 @@
 
 open P2p_test_utils
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "test.p2p.connection"
-end)
-
 let p2p_peer_id_typ = Check.comparable P2p_peer.Id.pp P2p_peer.Id.compare
 
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
@@ -82,7 +78,7 @@ let nack_test () =
     | Error (Tezos_p2p_services.P2p_errors.Rejected_by_nack _ :: _) -> true
     | Ok _ -> false
     | Error err ->
-        log_notice "Error: %a" pp_print_trace err ;
+        Tezt.Log.info "Error: %a" pp_print_trace err ;
         false
   in
 
