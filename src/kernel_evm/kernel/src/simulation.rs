@@ -353,7 +353,7 @@ mod tests {
             callee,
             caller,
             call_data,
-            Some(10000),
+            Some(31000),
             Some(transaction_value),
         );
         assert!(outcome.is_ok(), "contract should have been created");
