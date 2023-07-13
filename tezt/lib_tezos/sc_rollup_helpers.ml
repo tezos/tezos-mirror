@@ -167,12 +167,17 @@ let make_parameter name = function
   | None -> []
   | Some value -> [([name], `Int value)]
 
+let make_bool_parameter name = function
+  | None -> []
+  | Some value -> [([name], `Bool value)]
+
 let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
-    ?timeout protocol =
+    ?timeout ?whitelist_enable protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
+    @ make_bool_parameter "smart_rollup_private_enable" whitelist_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
@@ -187,7 +192,7 @@ let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
-let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
+let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999)) ?whitelist
     ?(alias = "rollup") ?(src = Constant.bootstrap1.alias) ~kind
     ?(parameters_ty = "string") ?(boot_sector = default_boot_sector_of ~kind)
     client =
@@ -196,6 +201,7 @@ let originate_sc_rollup ?hooks ?(burn_cap = Tez.(of_int 9999999))
       originate
         ?hooks
         ~burn_cap
+        ?whitelist
         ~alias
         ~src
         ~kind

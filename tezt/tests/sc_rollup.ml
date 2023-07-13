@@ -275,21 +275,27 @@ let format_title_scenario kind {variant; tags = _; description} =
     description
     (match variant with Some variant -> " (" ^ variant ^ ")" | None -> "")
 
-let test_l1_scenario ?regression ?hooks ~kind ?boot_sector ?commitment_period
-    ?challenge_window ?timeout ?(src = Constant.bootstrap1.alias)
-    {variant; tags; description} scenario =
+let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
+    ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
+    ?(src = Constant.bootstrap1.alias) {variant; tags; description} scenario =
   let tags = kind :: tags in
   register_test
+    ?supports
     ?regression
     ~__FILE__
     ~tags
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
-    setup_l1 ?commitment_period ?challenge_window ?timeout protocol
+    setup_l1
+      ?commitment_period
+      ?challenge_window
+      ?timeout
+      ?whitelist_enable
+      protocol
   in
   let* sc_rollup =
-    originate_sc_rollup ?hooks ~kind ?boot_sector ~src tezos_client
+    originate_sc_rollup ?hooks ~kind ?boot_sector ?whitelist ~src tezos_client
   in
   scenario protocol sc_rollup tezos_node tezos_client
 
@@ -702,8 +708,8 @@ let forged_commitment ?(compressed_state = Constant.sc_rollup_compressed_state)
     Sc_rollup_client.commitment =
   {compressed_state; inbox_level; predecessor; number_of_ticks}
 
-let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
-    ~predecessor ~sc_rollup ~src client =
+let forge_and_publish_commitment_return_runnable ?compressed_state
+    ?number_of_ticks ~inbox_level ~predecessor ~sc_rollup ~src client =
   let commitment =
     forged_commitment
       ?compressed_state
@@ -712,7 +718,21 @@ let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
       ~predecessor
       ()
   in
-  let*! () = publish_commitment ~src ~commitment client sc_rollup in
+  (commitment, publish_commitment ~src ~commitment client sc_rollup)
+
+let forge_and_publish_commitment ?compressed_state ?number_of_ticks ~inbox_level
+    ~predecessor ~sc_rollup ~src client =
+  let commitment, runnable =
+    forge_and_publish_commitment_return_runnable
+      ?compressed_state
+      ?number_of_ticks
+      ~inbox_level
+      ~predecessor
+      ~sc_rollup
+      ~src
+      client
+  in
+  let*! () = runnable in
   let* () = Client.bake_for_and_wait client in
   let* hash = get_staked_on_commitment ~sc_rollup ~staker:src client in
   return (commitment, hash)
@@ -5528,6 +5548,54 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
   in
   Lwt.return_unit
 
+let test_private_rollup_whitelist ?check_error ~regression ~description
+    ~commit_publisher ~whitelist =
+  test_l1_scenario
+    ~regression
+    ~supports:(From_protocol 019)
+    ~whitelist_enable:true
+    ~whitelist
+    ~src:Constant.bootstrap1.public_key_hash
+    {variant = None; tags = ["whitelist"]; description}
+    ~kind:"arith"
+  @@ fun _protocol sc_rollup _node client ->
+  let* () = Client.bake_for_and_wait client in
+  let* predecessor, inbox_level =
+    last_cemented_commitment_hash_with_level ~sc_rollup client
+  in
+  let _, client_runnable =
+    forge_and_publish_commitment_return_runnable
+      ~predecessor
+      ~inbox_level
+      ~sc_rollup
+      ~src:commit_publisher
+      client
+  in
+  let client_process = client_runnable.value in
+  match check_error with
+  | Some check -> check client_process
+  | None -> return ()
+
+let test_private_rollup_whitelisted_staker =
+  test_private_rollup_whitelist
+    ~regression:true
+    ~whitelist:[Constant.bootstrap1.public_key_hash]
+    ~commit_publisher:Constant.bootstrap1.alias
+    ~description:"Whitelisted staker can publish a commitment"
+
+let test_private_rollup_non_whitelisted_staker =
+  test_private_rollup_whitelist
+    ~regression:false
+    ~whitelist:[Constant.bootstrap2.public_key_hash]
+    ~commit_publisher:Constant.bootstrap1.alias
+    ~description:"Non-whitelisted staker cannot publish a commitment"
+    ~check_error:
+      (Process.check_error
+         ~msg:
+           (rex
+              "The rollup is private and the submitter of the commitment is \
+               not present in the whitelist"))
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5705,7 +5773,9 @@ let register ~protocols =
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
   (* Both Arith and Wasm PVM tezts *)
-  test_bootstrap_smart_rollup_originated protocols
+  test_bootstrap_smart_rollup_originated protocols ;
+  test_private_rollup_whitelisted_staker protocols ;
+  test_private_rollup_non_whitelisted_staker protocols
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
