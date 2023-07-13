@@ -290,7 +290,7 @@ let test_unrevealed () =
       reward_weights =
         {
           base_total_rewards_per_minute = Tez.one;
-          endorsing_reward_weight = 1;
+          attesting_reward_weight = 1;
           baking_reward_bonus_weight = 0;
           baking_reward_fixed_portion_weight = 0;
           seed_nonce_revelation_tip_weight = 0;

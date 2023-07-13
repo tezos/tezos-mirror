@@ -262,7 +262,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     ~reward_weights:
       {
         base_total_rewards_per_minute = Tez.zero;
-        endorsing_reward_weight = 1;
+        attesting_reward_weight = 1;
         baking_reward_bonus_weight = 1;
         baking_reward_fixed_portion_weight = 1;
         seed_nonce_revelation_tip_weight = 1;

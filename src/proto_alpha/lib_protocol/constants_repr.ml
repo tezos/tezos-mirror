@@ -386,9 +386,9 @@ module Generated = struct
             (* 1/4 or 0 *)
             (if Compare.Int.(bonus_committee_size <= 0) then 0
             else reward_parts_quarter);
-          endorsing_reward_weight = reward_parts_half;
+          attesting_reward_weight = reward_parts_half;
           (* 1/2 *)
-          (* All block (baking + endorsing)rewards sum to 1 ( *256*80 ) *)
+          (* All block (baking + attesting)rewards sum to 1 ( *256*80 ) *)
           liquidity_baking_subsidy_weight = reward_parts_16th;
           (* 1/16 *)
           seed_nonce_revelation_tip_weight = 1;

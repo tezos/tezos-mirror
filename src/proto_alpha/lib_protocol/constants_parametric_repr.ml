@@ -153,7 +153,7 @@ type reward_weights = {
   base_total_rewards_per_minute : Tez_repr.t;
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
-  endorsing_reward_weight : int;
+  attesting_reward_weight : int;
   liquidity_baking_subsidy_weight : int;
   seed_nonce_revelation_tip_weight : int;
   vdf_revelation_tip_weight : int;
@@ -409,7 +409,7 @@ let reward_weights_encoding =
             base_total_rewards_per_minute;
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
-            endorsing_reward_weight;
+            attesting_reward_weight;
             liquidity_baking_subsidy_weight;
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
@@ -418,14 +418,14 @@ let reward_weights_encoding =
       ( base_total_rewards_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
-        endorsing_reward_weight,
+        attesting_reward_weight,
         liquidity_baking_subsidy_weight,
         seed_nonce_revelation_tip_weight,
         vdf_revelation_tip_weight ))
     (fun ( base_total_rewards_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
-           endorsing_reward_weight,
+           attesting_reward_weight,
            liquidity_baking_subsidy_weight,
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight ) ->
@@ -433,7 +433,7 @@ let reward_weights_encoding =
         base_total_rewards_per_minute;
         baking_reward_fixed_portion_weight;
         baking_reward_bonus_weight;
-        endorsing_reward_weight;
+        attesting_reward_weight;
         liquidity_baking_subsidy_weight;
         seed_nonce_revelation_tip_weight;
         vdf_revelation_tip_weight;
@@ -442,7 +442,7 @@ let reward_weights_encoding =
        (req "base_total_rewards_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
-       (req "endorsing_reward_weight" int31)
+       (req "attesting_reward_weight" int31)
        (req "liquidity_baking_subsidy_weight" int31)
        (req "seed_nonce_revelation_tip_weight" int31)
        (req "vdf_revelation_tip_weight" int31))

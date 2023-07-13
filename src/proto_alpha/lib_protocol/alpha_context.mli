@@ -858,7 +858,7 @@ module Constants : sig
       base_total_rewards_per_minute : Tez.t;
       baking_reward_fixed_portion_weight : int;
       baking_reward_bonus_weight : int;
-      endorsing_reward_weight : int;
+      attesting_reward_weight : int;
       liquidity_baking_subsidy_weight : int;
       seed_nonce_revelation_tip_weight : int;
       vdf_revelation_tip_weight : int;
