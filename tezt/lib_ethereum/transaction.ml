@@ -86,7 +86,7 @@ let logs_of_json json =
     removed = json |-> "removed" |> as_string;
   }
 
-(* as per https://web3js.readthedocs.io/en/v1.2.9/web3-eth.html#gettransactionreceipt *)
+(* as per https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt *)
 type transaction_receipt = {
   status : bool;
   blockHash : string;

@@ -46,11 +46,10 @@ let spawn_command_and_read_json command decode =
 
 let balance ~account ~endpoint =
   let* balance =
-    spawn_command_and_read_json
+    spawn_command_and_read_string
       ["address:balance"; account; "--network"; endpoint]
-      JSON.as_int
   in
-  return @@ Wei.of_eth_int balance
+  return @@ Wei.of_eth_string balance
 
 let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
     () =

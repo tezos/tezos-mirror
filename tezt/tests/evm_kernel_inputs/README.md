@@ -32,11 +32,13 @@ npm install @ethereumjs/common @ethereumjs/tx
 ./signer.js > 100-inputs-for-proxy
 ```
 
-# 100-loops
+# 100-loops and 100-loops-transfers
 The file `100-loops` has been produced by a scenario in `kernel_evm/benchmarks`
 ```
-node src/kernel_evm/benchmark/scripts/benchmarks/bench_loop_expensive.js raw
+node src/kernel_evm/benchmarks/scripts/benchmarks/bench_loop_expensive.js for-test
 ```
+This produces both transfers and calls. The transfers goes in a file `100-loops-transfers`.
+The calls go in `100-loops`.
 
 # Smart contracts inputs
 

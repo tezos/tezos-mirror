@@ -54,6 +54,12 @@ val of_wei_z : t -> Z.t
     This doesn't perform any bounds checks. *)
 val of_eth_int : int -> t
 
+(** Convert a [string] amount of eth to a wei one.
+    This doesn't perform any bounds checks.
+    It assumes the string represents either an integer
+    or a float - both denoting an amount of eth. *)
+val of_eth_string : string -> t
+
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t
 
