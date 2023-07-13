@@ -462,25 +462,23 @@ module V2_0_0 = struct
 
     type output_proof = {
       output_proof : Context.proof;
-      output_proof_state : hash;
       output_proof_output : PS.output;
     }
 
     let output_proof_encoding =
       let open Data_encoding in
       conv
-        (fun {output_proof; output_proof_state; output_proof_output} ->
-          (output_proof, output_proof_state, output_proof_output))
-        (fun (output_proof, output_proof_state, output_proof_output) ->
-          {output_proof; output_proof_state; output_proof_output})
-        (obj3
+        (fun {output_proof; output_proof_output} ->
+          (output_proof, output_proof_output))
+        (fun (output_proof, output_proof_output) ->
+          {output_proof; output_proof_output})
+        (obj2
            (req "output_proof" Context.proof_encoding)
-           (req "output_proof_state" State_hash.encoding)
            (req "output_proof_output" PS.output_encoding))
 
     let output_of_output_proof s = s.output_proof_output
 
-    let state_of_output_proof s = s.output_proof_state
+    let state_of_output_proof s = proof_start_state s.output_proof
 
     let has_output : PS.output -> bool Monad.t = function
       | {outbox_level; message_index; message} -> (
@@ -515,15 +513,13 @@ module V2_0_0 = struct
 
     let produce_output_proof context state output_proof_output =
       let open Lwt_result_syntax in
-      let*! output_proof_state = state_hash state in
       let*! result =
         Context.produce_proof context state
         @@ run
         @@ has_output output_proof_output
       in
       match result with
-      | Some (output_proof, true) ->
-          return {output_proof; output_proof_state; output_proof_output}
+      | Some (output_proof, true) -> return {output_proof; output_proof_output}
       | Some (_, false) -> fail WASM_invalid_claim_about_outbox
       | None -> fail WASM_output_proof_production_failed
 
