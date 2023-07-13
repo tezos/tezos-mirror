@@ -119,19 +119,19 @@ xrefscheck:
 	$(CHECKXREFS) -l oxford
 	$(CHECKXREFS) -l alpha
 
-scriptsindoccheck:
-	scripts/test_doc_scripts.sh install-bin-focal
-	scripts/test_doc_scripts.sh install-bin-jammy
-	scripts/test_doc_scripts.sh install-bin-fedora37
-	scripts/test_doc_scripts.sh install-bin-fedora38
-	scripts/test_doc_scripts.sh install-bin-rc-focal
-	scripts/test_doc_scripts.sh install-bin-rc-jammy
-	scripts/test_doc_scripts.sh install-bin-rc-fedora37
-	scripts/test_doc_scripts.sh install-bin-rc-fedora38
-	scripts/test_doc_scripts.sh install-opam-scratch
-	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-release-sources-bullseye
-	scripts/test_doc_scripts.sh compile-sources-bullseye
+installcheck:
+	scripts/test_install_scripts.sh install-bin-focal
+	scripts/test_install_scripts.sh install-bin-jammy
+	scripts/test_install_scripts.sh install-bin-fedora37
+	scripts/test_install_scripts.sh install-bin-fedora38
+	scripts/test_install_scripts.sh install-bin-rc-focal
+	scripts/test_install_scripts.sh install-bin-rc-jammy
+	scripts/test_install_scripts.sh install-bin-rc-fedora37
+	scripts/test_install_scripts.sh install-bin-rc-fedora38
+	scripts/test_install_scripts.sh install-opam-scratch
+	scripts/test_install_scripts.sh install-opam-focal
+	scripts/test_install_scripts.sh compile-release-sources-bullseye
+	scripts/test_install_scripts.sh compile-sources-bullseye
 
 # build dune targets together to avoid concurrent dunes
 docexes:
