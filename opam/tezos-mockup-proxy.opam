@@ -14,7 +14,7 @@ depends: [
   "tezos-client-base"
   "tezos-protocol-environment"
   "tezos-rpc-http"
-  "resto-cohttp-self-serving-client" { >= "1.0" }
+  "resto-cohttp-self-serving-client" { >= "1.2" }
   "tezos-rpc-http-client"
   "tezos-shell-services"
   "uri" { >= "3.1.0" }

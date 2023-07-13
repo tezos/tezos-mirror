@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezos-base"
   "tezos-rpc"
-  "resto-cohttp" { >= "1.0" }
+  "resto-cohttp" { >= "1.2" }
   "uri" { >= "3.1.0" }
 ]
 build: [
