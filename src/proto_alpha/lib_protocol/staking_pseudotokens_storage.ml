@@ -153,6 +153,48 @@ let costaking_pseudotokens_balance ctxt contract =
   in
   Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
 
+(** [update_costaking_pseudotokens ~f ctxt contract] updates
+    [contract]'s costaking pseudotokens balance by applying function
+    [f].
+
+    Breaks invariant 3.
+*)
+let update_costaking_pseudotokens ~f ctxt contract =
+  let open Lwt_result_syntax in
+  let* costaking_pseudotokens = costaking_pseudotokens_balance ctxt contract in
+  let*? new_costaking_pseudotokens = f costaking_pseudotokens in
+  let*! ctxt =
+    Storage.Contract.Costaking_pseudotokens.add
+      ctxt
+      contract
+      new_costaking_pseudotokens
+  in
+  return ctxt
+
+(** [credit_costaking_pseudotokens ctxt contract p_amount] increases
+    [contract]'s costaking pseudotokens balance by [p_amount].
+
+    Breaks invariant 3.
+*)
+let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
+  let f current_pseudotokens_balance =
+    Staking_pseudotoken_repr.(
+      current_pseudotokens_balance +? pseudotokens_to_add)
+  in
+  update_costaking_pseudotokens ~f ctxt contract
+
+(** [debit_costaking_pseudotokens ctxt contract p_amount] decreases
+    [contract]'s costaking pseudotokens balance by [p_amount].
+
+    Breaks invariant 3.
+*)
+let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
+  let f current_pseudotokens_balance =
+    Staking_pseudotoken_repr.(
+      current_pseudotokens_balance -? pseudotokens_to_subtract)
+  in
+  update_costaking_pseudotokens ~f ctxt contract
+
 (** Tez -> pseudotokens conversion.
     Precondition: all arguments are <> 0.
     Postcondition: result is <> 0.
@@ -281,48 +323,6 @@ let costaking_balance_as_tez ctxt ~contract ~delegate =
       let+ frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
       frozen_deposits_tez
     else return Tez_repr.zero)
-
-(** [update_costaking_pseudotokens ~f ctxt contract] updates
-    [contract]'s costaking pseudotokens balance by applying function
-    [f].
-
-    Breaks invariant 3.
-*)
-let update_costaking_pseudotokens ~f ctxt contract =
-  let open Lwt_result_syntax in
-  let* costaking_pseudotokens = costaking_pseudotokens_balance ctxt contract in
-  let*? new_costaking_pseudotokens = f costaking_pseudotokens in
-  let*! ctxt =
-    Storage.Contract.Costaking_pseudotokens.add
-      ctxt
-      contract
-      new_costaking_pseudotokens
-  in
-  return ctxt
-
-(** [credit_costaking_pseudotokens ctxt contract p_amount] increases
-    [contract]'s costaking pseudotokens balance by [p_amount].
-
-    Breaks invariant 3.
-*)
-let credit_costaking_pseudotokens ctxt contract pseudotokens_to_add =
-  let f current_pseudotokens_balance =
-    Staking_pseudotoken_repr.(
-      current_pseudotokens_balance +? pseudotokens_to_add)
-  in
-  update_costaking_pseudotokens ~f ctxt contract
-
-(** [debit_costaking_pseudotokens ctxt contract p_amount] decreases
-    [contract]'s costaking pseudotokens balance by [p_amount].
-
-    Breaks invariant 3.
-*)
-let debit_costaking_pseudotokens ctxt contract pseudotokens_to_subtract =
-  let f current_pseudotokens_balance =
-    Staking_pseudotoken_repr.(
-      current_pseudotokens_balance -? pseudotokens_to_subtract)
-  in
-  update_costaking_pseudotokens ~f ctxt contract
 
 (** Does not break invariants. *)
 let stake ctxt ~contract ~delegate amount =
