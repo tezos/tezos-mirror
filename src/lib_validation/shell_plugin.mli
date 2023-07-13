@@ -77,8 +77,11 @@ module type FILTER = sig
       filter_info ->
       config ->
       Proto.operation ->
-      [ `Passed_prefilter of Prevalidator_pending_operations.priority
-      | Prevalidator_classification.error_classification ]
+      [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     (** Return a conflict handler for [Proto.Mempool.add_operation].
