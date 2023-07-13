@@ -161,13 +161,7 @@ module Event_filter = struct
     | _ :: _ as levels -> level_in levels
 end
 
-type t = {
-  path : string;
-  (* Hopefully temporary hack to handle event which are emitted with
-     the non-cooperative log functions in `Legacy_logging`: *)
-  lwt_bad_citizen_hack : (string * Data_encoding.json) list ref;
-  event_filter : Event_filter.t;
-}
+type t = {path : string; event_filter : Event_filter.t}
 
 type 'event wrapped = {
   time_stamp : Micro_seconds.t;
@@ -248,9 +242,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         | [] -> t
         | more -> any more)
     in
-    let t =
-      {path = Uri.path uri; lwt_bad_citizen_hack = ref []; event_filter}
-    in
+    let t = {path = Uri.path uri; event_filter} in
     Lwt.return_ok t
 
   let output_json ~pp file_path event_json =
@@ -284,8 +276,8 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     Event_filter.run ~section ~level:M.level ~name:M.name event_filter
 
-  let handle (type a) {path; lwt_bad_citizen_hack; _} m
-      ?(section = Internal_event.Section.empty) (event : a) =
+  let handle (type a) {path; _} m ?(section = Internal_event.Section.empty)
+      (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
@@ -308,21 +300,13 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let file_path =
       Filename.concat dir_path (Printf.sprintf "%s_%s_%s.json" date time tag)
     in
-    lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
     let* () =
       output_json file_path event_json ~pp:(fun fmt () ->
           M.pp ~block:true ~all_fields:true fmt event)
     in
-    lwt_bad_citizen_hack :=
-      List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
     return_unit
 
-  let close {lwt_bad_citizen_hack; _} =
-    List.iter_es
-      (fun (f, j) ->
-        output_json f j ~pp:(fun fmt () ->
-            Format.fprintf fmt "Destacking: %s" f))
-      !lwt_bad_citizen_hack
+  let close _ = Lwt_result_syntax.return_unit
 end
 
 let () = Internal_event.All_sinks.register (module Sink_implementation)

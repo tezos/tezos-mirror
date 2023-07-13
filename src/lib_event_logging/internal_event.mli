@@ -83,7 +83,7 @@ module Section : sig
 end
 
 (** All the section that has been registered. Currently, sections are registered
-    by the `Simple` module and the `Legacy_logging` module. *)
+    by the `Simple`. *)
 val get_registered_sections : unit -> string Seq.t
 
 val register_section : Section.t -> unit
