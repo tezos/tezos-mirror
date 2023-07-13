@@ -178,7 +178,14 @@ module MakeAbstract
     create_aux ~old_state chain_store head timestamp
 
   let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
-    Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
+    match Filter.Mempool.syntactic_check op.protocol with
+    | `Ill_formed ->
+        Lwt.return
+          (`Refused
+            (Error_monad.TzTrace.make
+               (Error_monad.error_of_fmt "Ill-formed operation filtered")))
+    | `Well_formed ->
+        Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 

@@ -269,6 +269,8 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
   let resources = Q.max size_ratio gas_ratio in
   (Q.(fee_f / resources), resources)
 
+let syntactic_check _ = `Well_formed
+
 let pre_filter_manager :
     type t.
     filter_info ->

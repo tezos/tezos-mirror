@@ -557,6 +557,8 @@ let pre_filter filter_info config
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
+let syntactic_check _ = `Well_formed
+
 let is_manager_operation op =
   match Operation.acceptable_pass op with
   | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
