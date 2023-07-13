@@ -55,3 +55,6 @@ val decode_z : bytes -> Z.t tzresult
 (** [decode bytes] decodes an RLP value from the given [bytes]. Returns an
     {!Rlp_decoding_error} if the bytes is not an RLP encoded value. *)
 val decode : bytes -> item tzresult
+
+(** [pp ppf item] pretty-prints an item. *)
+val pp : Format.formatter -> item -> unit

@@ -198,3 +198,14 @@ let decode_int bytes = decode_int bytes 0 (Bytes.length bytes)
 let decode_z bytes = decode_z bytes 0 (Bytes.length bytes)
 
 let decode str = decode str 0 |> Result.map fst
+
+let rec pp ppf = function
+  | Value data -> Hex.pp ppf (Hex.of_bytes data)
+  | List items ->
+      Format.fprintf
+        ppf
+        "List [%a]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+           pp)
+        items
