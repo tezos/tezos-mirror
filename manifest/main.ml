@@ -5462,7 +5462,7 @@ let hash = Protocol.hash
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             embedded |> open_;
             plugin |> open_;
-            octez_shell |> open_;
+            octez_validation |> open_;
           ]
         ~modules:["Plugin_registerer"]
         ~bisect_ppx:(if N.(number >= 008) then Yes else No)

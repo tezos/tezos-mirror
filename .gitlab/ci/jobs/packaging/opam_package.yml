@@ -330,7 +330,7 @@ opam:octez-node:
 opam:octez-node-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: octez-node-config
 
@@ -372,7 +372,7 @@ opam:octez-proxy-server:
 opam:octez-signer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: octez-signer
 
@@ -1243,7 +1243,7 @@ opam:tezos-protocol-plugin-007-PsDELPH1:
 opam:tezos-protocol-plugin-007-PsDELPH1-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-protocol-plugin-007-PsDELPH1-registerer
 
@@ -1257,7 +1257,7 @@ opam:tezos-protocol-plugin-008-PtEdo2Zk:
 opam:tezos-protocol-plugin-008-PtEdo2Zk-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-protocol-plugin-008-PtEdo2Zk-registerer
 

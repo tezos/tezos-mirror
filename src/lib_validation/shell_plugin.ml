@@ -50,8 +50,11 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       Proto.operation ->
-      [ `Passed_prefilter of Prevalidator_pending_operations.priority
-      | Prevalidator_classification.error_classification ]
+      [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     val add_operation_and_enforce_mempool_bound :
@@ -62,9 +65,15 @@ module type FILTER = sig
       ( state
         * [ `No_replace
           | `Replace of
-            Operation_hash.t * Prevalidator_classification.error_classification
-          ],
-        Prevalidator_classification.error_classification )
+            Operation_hash.t
+            * [ `Branch_delayed of tztrace
+              | `Branch_refused of tztrace
+              | `Refused of tztrace
+              | `Outdated of tztrace ] ],
+        [ `Branch_delayed of tztrace
+        | `Branch_refused of tztrace
+        | `Refused of tztrace
+        | `Outdated of tztrace ] )
       result
       Lwt.t
 
