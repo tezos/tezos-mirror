@@ -146,6 +146,9 @@ let get_frozen_deposits_tez ctxt delegate =
   in
   current_amount
 
+(* To preserve invariant 1, this should be the only function of this
+   module reading from the
+   Storage.Contract.Frozen_deposits_pseudotokens table. *)
 let get_frozen_deposits_pseudotokens ctxt delegate =
   let open Lwt_result_syntax in
   let+ frozen_deposits_pseudotokens_opt =
@@ -156,7 +159,12 @@ let get_frozen_deposits_pseudotokens ctxt delegate =
     ~default:Staking_pseudotoken_repr.zero
 
 (** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
-    current costaking balance in pseudotokens. *)
+    current costaking balance in pseudotokens.
+
+    To preserve invariant 2, this should be the only function of this
+    module reading from the Storage.Contract.Costaking_pseudotokens
+    table.
+*)
 let costaking_pseudotokens_balance ctxt contract =
   let open Lwt_result_syntax in
   let+ costaking_pseudotokens_opt =
