@@ -1124,12 +1124,75 @@ module Block = struct
       Operation.Anonymous.Double_preattestation_evidence
       protocol
 
+  let test_block_metadata =
+    register_test
+      ~title:"Block metadata consensus rewards encoding"
+      ~additionnal_tags:["metadata"; "block"]
+    @@ fun protocol ->
+    let* node, client = Client.init_with_protocol ~protocol `Client () in
+    Log.info
+      "Bake 7 blocks to reach the end of a cycle with the metadata containing \
+       consensus rewards" ;
+    let* () = repeat 7 (fun () -> Client.bake_for_and_wait ~node client) in
+    let get_name use_legacy_attestation_name =
+      if use_legacy_attestation_name then "endorsing" else "attesting"
+    in
+
+    Log.info "Check block info RPC" ;
+    let check ~use_legacy_name:_ json name =
+      let balance_updates =
+        JSON.(json |-> "metadata" |-> "balance_updates" |> as_list)
+      in
+      let categories =
+        List.filter_map
+          (fun balance_update ->
+            JSON.(balance_update |-> "category" |> as_string_opt))
+          balance_updates
+      in
+      let check_category name =
+        if not (List.mem name categories) then
+          Test.fail
+            ~__LOC__
+            "At least one balance update should have %s kind"
+            name
+      in
+      check_category (sf "%s rewards" name) ;
+      check_category (sf "lost %s rewards" name)
+    in
+    let rpc ~version _ = RPC.get_chain_block ~version () in
+    let* () = check_rpc_versions ~check ~rpc ~get_name ~data:() client in
+
+    Log.info "Check the block metadata RPC" ;
+    let check ~use_legacy_name:_ (metadata : RPC.block_metadata) name =
+      let check_category name =
+        if
+          not
+            (List.mem
+               name
+               (List.filter_map
+                  (fun (balance_update : RPC.balance_update) ->
+                    balance_update.category)
+                  metadata.balance_updates))
+        then
+          Test.fail
+            ~__LOC__
+            "At least one balance update should have %s kind"
+            name
+      in
+      check_category (sf "%s rewards" name) ;
+      check_category (sf "lost %s rewards" name)
+    in
+    let rpc ~version data = RPC.get_chain_block_metadata ~version data in
+    let* () = check_rpc_versions ~check ~rpc ~get_name ~data:() client in
+    unit
+
   let register ~protocols =
     test_block_operation_consensus protocols
     (* There is no test for preconsensus since crafting a block with
        preconsensus operations in it may be complicated to do. *) ;
     test_block_operation_double_consensus_evidence protocols ;
-    test_block_operation_double_preconsensus_evidence protocols
+    test_block_operation_double_preconsensus_evidence protocols ;
+    test_block_metadata protocols
 end
 
 let register ~protocols =

@@ -295,16 +295,21 @@ let get_chain_block ?(chain = "main") ?(block = "head") ?version
   in
   make ~query_string GET ["chains"; chain; "blocks"; block] Fun.id
 
+type balance_update = {kind : string; category : string option}
+
 type block_metadata = {
   protocol : string;
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
   dal_attestation : bool Array.t option;
+  balance_updates : balance_update list;
 }
 
-let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
+let get_chain_block_metadata ?(chain = "main") ?(block = "head") ?version () =
+  let query_string = Query_arg.opt "version" Fun.id version in
+  make ~query_string GET ["chains"; chain; "blocks"; block; "metadata"]
+  @@ fun json ->
   let dal_attestation =
     match JSON.(json |-> "dal_attestation" |> as_string_opt) with
     | None -> None
@@ -325,7 +330,23 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
     | Some proposer -> proposer
   in
   let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
-  {dal_attestation; protocol; next_protocol; proposer; max_operations_ttl}
+  let balance_updates = JSON.(json |-> "balance_updates" |> as_list) in
+  let balance_updates =
+    List.map
+      (fun json ->
+        let kind = JSON.(json |-> "kind" |> as_string) in
+        let category = JSON.(json |-> "category" |> as_string_opt) in
+        {kind; category})
+      balance_updates
+  in
+  {
+    dal_attestation;
+    protocol;
+    next_protocol;
+    proposer;
+    max_operations_ttl;
+    balance_updates;
+  }
 
 let get_chain_block_protocols ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "protocols"] Fun.id

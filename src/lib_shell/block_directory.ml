@@ -218,8 +218,9 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
             Next_proto.validation_passes;
       }
   in
-  register0 S.metadata (fun (chain_store, block) () () ->
-      block_metadata chain_store block) ;
+  register0 S.metadata (fun (chain_store, block) q () ->
+      let* res = block_metadata chain_store block in
+      return (q#version, res)) ;
   let fail_opt = function None -> Lwt.fail Not_found | Some v -> return v in
   register0 S.metadata_hash (fun (_, block) () () ->
       fail_opt (Store.Block.block_metadata_hash block)) ;

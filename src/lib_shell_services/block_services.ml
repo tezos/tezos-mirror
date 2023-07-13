@@ -469,6 +469,8 @@ module type PROTO = sig
   val block_header_metadata_encoding_with_legacy_attestation_name :
     block_header_metadata Data_encoding.t
 
+  val block_header_metadata_encoding : block_header_metadata Data_encoding.t
+
   type operation_data
 
   type operation_receipt
@@ -558,8 +560,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     operation_list_quota : operation_list_quota list;
   }
 
-  let block_metadata_encoding =
-    def "block_header_metadata"
+  let block_metadata_encoding ~use_legacy_attestation_name =
+    def
+      (if use_legacy_attestation_name then
+       "block_header_metadata_with_legacy_attestation_name"
+      else "block_header_metadata")
     @@ conv
          (fun {
                 protocol_data;
@@ -604,7 +609,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                (req
                   "max_operation_list_length"
                   (dynamic_size (list operation_list_quota_encoding))))
-            Proto.block_header_metadata_encoding_with_legacy_attestation_name)
+            (if use_legacy_attestation_name then
+             Proto.block_header_metadata_encoding_with_legacy_attestation_name
+            else Proto.block_header_metadata_encoding))
 
   let next_operation_encoding_with_legacy_attestation_name =
     let open Data_encoding in
@@ -737,7 +744,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
          (req "chain_id" Chain_id.encoding)
          (req "hash" Block_hash.encoding)
          (req "header" (dynamic_size raw_block_header_encoding))
-         (opt "metadata" (dynamic_size block_metadata_encoding))
+         (opt
+            "metadata"
+            (dynamic_size
+               (block_metadata_encoding ~use_legacy_attestation_name)))
          (req "operations" (list (dynamic_size (list operation_encoding)))))
 
   let block_info_encoding =
@@ -772,10 +782,38 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ~output:bytes
         Tezos_rpc.Path.(path / "header" / "raw")
 
+    let block_metadata_encoding =
+      encoding_versioning
+        ~encoding_name:"block_metadata_encoding"
+        ~latest_encoding:
+          (Version_1, block_metadata_encoding ~use_legacy_attestation_name:false)
+        ~old_encodings:
+          [
+            ( Version_0,
+              block_metadata_encoding ~use_legacy_attestation_name:true );
+          ]
+
+    let metadata_versions =
+      mk_version_informations
+        ~supported:[version_0; version_1]
+        ~latest:Version_1
+        ~default:Version_0
+        ()
+
+    let metadata_query =
+      let open Tezos_rpc.Query in
+      query (fun version ->
+          object
+            method version = version
+          end)
+      |+ field "version" (version_arg metadata_versions) Version_0 (fun t ->
+             t#version)
+      |> seal
+
     let metadata =
       Tezos_rpc.Service.get_service
         ~description:"All the metadata associated to the block."
-        ~query:Tezos_rpc.Query.empty
+        ~query:metadata_query
         ~output:block_metadata_encoding
         Tezos_rpc.Path.(path / "metadata")
 
@@ -1787,9 +1825,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
     let f = make_call0 S.raw_header ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
 
-  let metadata ctxt =
+  let metadata ctxt ?(version = Version_0) =
+    let open Lwt_result_syntax in
     let f = make_call0 S.metadata ctxt in
-    fun ?(chain = `Main) ?(block = `Head 0) () -> f chain block () ()
+    fun ?(chain = `Main) ?(block = `Head 0) () ->
+      let* (Version_0 | Version_1 | Version_2), res =
+        f
+          chain
+          block
+          (object
+             method version = version
+          end)
+          ()
+      in
+      return res
 
   let metadata_hash ctxt =
     let f = make_call0 S.metadata_hash ctxt in
@@ -2146,6 +2195,8 @@ module Fake_protocol = struct
 
   let block_header_metadata_encoding_with_legacy_attestation_name =
     Data_encoding.empty
+
+  let block_header_metadata_encoding = Data_encoding.empty
 
   type operation_data = unit
 

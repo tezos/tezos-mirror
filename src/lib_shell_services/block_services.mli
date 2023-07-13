@@ -104,6 +104,8 @@ module type PROTO = sig
   val block_header_metadata_encoding_with_legacy_attestation_name :
     block_header_metadata Data_encoding.t
 
+  val block_header_metadata_encoding : block_header_metadata Data_encoding.t
+
   type operation_data
 
   type operation_receipt
@@ -220,6 +222,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
   val metadata :
     #simple ->
+    ?version:version ->
     ?chain:chain ->
     ?block:block ->
     unit ->
@@ -513,7 +516,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ([`GET], prefix, prefix, unit, unit, Bytes.t) Tezos_rpc.Service.t
 
     val metadata :
-      ([`GET], prefix, prefix, unit, unit, block_metadata) Tezos_rpc.Service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        < version : version >,
+        unit,
+        version * block_metadata )
+      Tezos_rpc.Service.t
 
     val metadata_hash :
       ( [`GET],

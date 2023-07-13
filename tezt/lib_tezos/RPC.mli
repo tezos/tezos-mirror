@@ -295,6 +295,8 @@ val get_chain_block :
   unit ->
   JSON.t t
 
+type balance_update = {kind : string; category : string option}
+
 type block_metadata = {
   protocol : string;
   next_protocol : string;
@@ -302,6 +304,7 @@ type block_metadata = {
   max_operations_ttl : int;
   dal_attestation : bool Array.t option;
       (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
+  balance_updates : balance_update list;
 }
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/metadata]
@@ -309,7 +312,7 @@ type block_metadata = {
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_metadata :
-  ?chain:string -> ?block:string -> unit -> block_metadata t
+  ?chain:string -> ?block:string -> ?version:string -> unit -> block_metadata t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/protocols]
 
