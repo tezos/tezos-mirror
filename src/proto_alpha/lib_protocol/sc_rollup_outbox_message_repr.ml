@@ -78,7 +78,7 @@ let pp_untyped_transaction fmt {destination; entrypoint; unparsed_parameters} =
   in
   Format.fprintf
     fmt
-    "@[%a@;%a@;%a@]"
+    "@[<2>destination: %a@, entrypoint: %a@, unparsed_parameters: %a@]"
     Contract_hash.pp
     destination
     Entrypoint_repr.pp
@@ -116,15 +116,18 @@ let pp_typed_transaction fmt
   in
   Format.fprintf
     fmt
-    "@[%a@;%a@;%a@;%a@]"
+    "@[<v2>destination: %a@,\
+     entrypoint: %a@,\
+     unparsed_ty: %a@,\
+     unparsed_parameters: %a@]"
     Contract_hash.pp
     destination
     Entrypoint_repr.pp
     entrypoint
     Data_encoding.Json.pp
-    json_param
-    Data_encoding.Json.pp
     json_ty
+    Data_encoding.Json.pp
+    json_param
 
 type t =
   | Atomic_transaction_batch of {transactions : transaction list}
