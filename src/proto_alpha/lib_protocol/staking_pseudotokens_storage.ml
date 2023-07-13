@@ -128,6 +128,31 @@
 
 type error += Cannot_stake_on_fully_slashed_delegate
 
+let get_frozen_deposits_tez ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ {current_amount; initial_amount = _} =
+    Frozen_deposits_storage.get ctxt (Implicit delegate)
+  in
+  current_amount
+
+let get_frozen_deposits_pseudotokens ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ frozen_deposits_pseudotokens_opt =
+    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt (Implicit delegate)
+  in
+  Option.value
+    frozen_deposits_pseudotokens_opt
+    ~default:Staking_pseudotoken_repr.zero
+
+(** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
+    current costaking balance in pseudotokens. *)
+let costaking_pseudotokens_balance ctxt contract =
+  let open Lwt_result_syntax in
+  let+ costaking_pseudotokens_opt =
+    Storage.Contract.Costaking_pseudotokens.find ctxt contract
+  in
+  Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
+
 (** Tez -> pseudotokens conversion.
     Precondition: all arguments are <> 0.
     Postcondition: result is <> 0.
@@ -170,22 +195,6 @@ let tez_of ~frozen_deposits_pseudotokens ~frozen_deposits_tez
       frozen_deposits_pseudotokens_z
   in
   Tez_repr.of_mutez_exn (Z.to_int64 res_z)
-
-let get_frozen_deposits_tez ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ {current_amount; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt (Implicit delegate)
-  in
-  current_amount
-
-let get_frozen_deposits_pseudotokens ctxt delegate =
-  let open Lwt_result_syntax in
-  let+ frozen_deposits_pseudotokens_opt =
-    Storage.Contract.Frozen_deposits_pseudotokens.find ctxt (Implicit delegate)
-  in
-  Option.value
-    frozen_deposits_pseudotokens_opt
-    ~default:Staking_pseudotoken_repr.zero
 
 (** [credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount]
   increases [delegate]'s stake pseudotokens by an amount [pa] corresponding to
@@ -250,15 +259,6 @@ let credit_frozen_deposits_pseudotokens_for_tez_amount ctxt delegate tez_amount
         new_frozen_deposits_pseudotokens
     in
     return (ctxt, pseudotokens_to_add)
-
-(** [costaking_pseudotokens_balance ctxt contract] returns [contract]'s
-    current costaking balance in pseudotokens. *)
-let costaking_pseudotokens_balance ctxt contract =
-  let open Lwt_result_syntax in
-  let+ costaking_pseudotokens_opt =
-    Storage.Contract.Costaking_pseudotokens.find ctxt contract
-  in
-  Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
 
 let costaking_balance_as_tez ctxt ~contract ~delegate =
   let open Lwt_result_syntax in
