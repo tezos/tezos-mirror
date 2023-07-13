@@ -73,7 +73,7 @@
 
 (rule
  (alias runtest)
- (package tezos-store)
+ (package octez-store-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

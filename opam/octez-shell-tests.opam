@@ -10,20 +10,20 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "ppx_expect"
-  "lwt-watcher" { = "0.2" }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "prometheus" { >= "1.2" }
-  "octez-libs"
-  "tezos-store"
-  "tezos-context-ops"
-  "tezos-protocol-updater"
-  "tezos-validation"
-  "lwt-exit"
+  "tezt" { with-test & >= "3.1.1" }
+  "octez-libs" {with-test}
+  "tezos-store" {with-test}
+  "tezos-context-ops" {with-test}
+  "tezos-protocol-updater" {with-test}
+  "tezos-shell" {with-test}
+  "tezos-embedded-protocol-demo-noops" {with-test}
+  "tezos-validation" {with-test}
+  "octez-alcotezt" {with-test}
+  "tezos-version" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: core of `octez-node` (gossip, validation scheduling, mempool, ...)"
+synopsis: "Shell tests"
