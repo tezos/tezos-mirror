@@ -260,22 +260,6 @@ module Delegate_slots = struct
 
   let voting_power slots ~slot =
     SlotMap.find slot slots.all_delegate_voting_power
-
-  let all_proposer_rounds slots ~committee_size =
-    let rec iter acc r =
-      if r >= 0 then
-        match Round.of_int r with
-        | Error _ -> iter acc (r - 1)
-        | Ok round -> (
-            Round.to_slot round ~committee_size |> function
-            | Error _ -> iter acc (r - 1)
-            | Ok slot ->
-                if SlotMap.mem slot slots.own_delegate_slots then
-                  iter ((r, slot) :: acc) (r - 1)
-                else iter acc (r - 1))
-      else acc
-    in
-    iter [] (committee_size - 1)
 end
 
 type delegate_slots = Delegate_slots.t

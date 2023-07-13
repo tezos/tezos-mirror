@@ -284,45 +284,46 @@ let compute_next_round_time state =
         | Ok timestamp -> Some (timestamp, next_round)
         | _ -> assert false)
 
-(** [first_potential_round_at_next_level state ~earliest_round] yields
-    an optional pair of the earliest possible round (at or after
-    [earliest_round]), along with the delegate having the slot to
-    propose.
+let rec first_own_round_in_range delegate_slots ~committee_size ~included_min
+    ~excluded_max =
+  if included_min >= excluded_max then None
+  else
+    match Round.of_int included_min with
+    | Error _ ->
+        (* Should not happen because in practice, [included_min] is
+           non-negative and not big enough to overflow as an Int32. *)
+        None
+    | Ok round -> (
+        match Round.to_slot round ~committee_size with
+        | Error _ ->
+            (* Impossible because [Round.of_int] builds a sound round. *) None
+        | Ok slot -> (
+            match Delegate_slots.own_slot_owner delegate_slots ~slot with
+            | Some {consensus_key_and_delegate; _} ->
+                Some (round, consensus_key_and_delegate)
+            | None ->
+                first_own_round_in_range
+                  delegate_slots
+                  ~committee_size
+                  ~included_min:(included_min + 1)
+                  ~excluded_max))
 
-    In particular when the required round value is higher than the
-    consensus committee size, an Euclidean division allows to
-    recycle. Then, the earliest round when it exists is extracted. This
-    is meant to be multiplied back again to find the round value. *)
 let first_potential_round_at_next_level state ~earliest_round =
-  let open Baking_state in
-  let committee_size =
-    state.global_state.constants.parametric.consensus_committee_size
-  in
-  let rounds =
-    Delegate_slots.all_proposer_rounds
-      state.level_state.next_level_delegate_slots
-      ~committee_size
-  in
   match Round.to_int earliest_round with
   | Error _ -> None
-  | Ok earliest_round -> (
-      let q = earliest_round / committee_size in
-      let r = earliest_round mod committee_size in
-      let first_round = List.find (fun (round, _) -> round >= r) rounds in
-      match first_round with
-      | None -> None
-      | Some (round, slot) -> (
-          Delegate_slots.own_slot_owner
-            state.level_state.next_level_delegate_slots
-            ~slot
-          |> function
-          | None -> None (* impossible *)
-          | Some {consensus_key_and_delegate; _} -> (
-              (* TODO? check with [Node_rpc.first_proposer_round] if we also need the q+1 *)
-              match Round.of_int ((q * committee_size) + round) with
-              | Error _ -> None
-              | Ok first_potential_round ->
-                  Some (first_potential_round, consensus_key_and_delegate))))
+  | Ok earliest_round ->
+      let committee_size =
+        state.global_state.constants.parametric.consensus_committee_size
+      in
+      first_own_round_in_range
+        state.level_state.next_level_delegate_slots
+        ~committee_size
+        ~included_min:earliest_round
+        ~excluded_max:(earliest_round + committee_size)
+(* If no own round is found between [earliest_round] included and
+   [earliest_round + committee_size] excluded, then we can stop
+   searching, because baking slots repeat themselves modulo the
+   [committee_size]. *)
 
 (** From the current [state], the function returns an optional
     association pair, which consists of the next baking timestamp and
