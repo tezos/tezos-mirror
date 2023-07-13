@@ -70,7 +70,7 @@ let chain_config_file dir =
     chain_config_encoding
     chain_config_equal
 
-let lock_file dir = mk_file dir "lock"
+let lockfile dir = mk_file dir "lock"
 
 let gc_lockfile dir = mk_file dir "gc_lock"
 
