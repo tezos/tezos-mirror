@@ -31,7 +31,7 @@
     Subject:      Test the launch vote feature of Adaptive Inflation.
 *)
 
-open Adaptive_inflation
+open Adaptive_inflation_helpers
 
 let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
