@@ -130,7 +130,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 8736.880 units (will add 100 for safety)
+Estimated gas: 8735.404 units (will add 100 for safety)
 Estimated storage: 230 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -141,19 +141,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.002244
+    Fee to the baker: ꜩ0.002212
     Expected counter: 8
-    Gas limit: 8837
+    Gas limit: 8836
     Storage limit: 250 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.002244
-      payload fees(the block proposer) ....... +ꜩ0.002244
+      [PUBLIC_KEY_HASH] ... -ꜩ0.002212
+      payload fees(the block proposer) ....... +ꜩ0.002212
     Smart rollup output message execution:
       Address: [SMART_ROLLUP_HASH]
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart output message execution was successfully applied
       Paid storage size diff: 72 bytes
-      Consumed gas: 5085.533
+      Consumed gas: 5084.057
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.018
         storage fees ........................... +ꜩ0.018
