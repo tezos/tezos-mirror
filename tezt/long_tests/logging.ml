@@ -58,10 +58,6 @@ let event_i = simple_event "info" Info
 
 let event_n = simple_event "notice" Notice
 
-module Legacy_logging_test = Legacy_logging.Make (struct
-  let name = "legacy-test"
-end)
-
 let id = "TEST"
 
 let num = 52
@@ -112,18 +108,10 @@ let () =
   @@ let* x = All_sinks.activate (Uri.of_string "test://") in
      match x with Error _ -> assert false | Ok () -> unit
 
-let sei, sen, lei, len =
-  ( "simple_event_info",
-    "simple_event_notice",
-    "legacy_event_info",
-    "legacy_event_notice" )
+let sei, sen = ("simple_event_info", "simple_event_notice")
 
-let grafana_panels = grafana_panels [sei; sen; lei; len]
+let grafana_panels = grafana_panels [sei; sen]
 
 let register ~executors () =
   test_simple_event_logging_time ~executors sei event_i ;
-  test_simple_event_logging_time ~executors sen event_n ;
-  test_legacy_event_logging_time ~executors lei (fun () ->
-      Legacy_logging_test.lwt_log_info "legacy_event") ;
-  test_legacy_event_logging_time ~executors len (fun () ->
-      Legacy_logging_test.lwt_log_notice "legacy_event")
+  test_simple_event_logging_time ~executors sen event_n
