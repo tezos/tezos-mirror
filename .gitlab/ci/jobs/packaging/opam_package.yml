@@ -556,6 +556,8 @@ opam:octez-proxy-server:
   variables:
     package: octez-proxy-server
 
+# Ignoring unreleased package octez-shell-tests.
+
 opam:octez-signer:
   extends:
     - .opam_template
@@ -627,6 +629,8 @@ opam:octez-smart-rollup-wasm-debugger:
     package: octez-smart-rollup-wasm-debugger
 
 # Ignoring unreleased package octez-snoop.
+
+# Ignoring unreleased package octez-store-tests.
 
 # Ignoring unreleased package octez-testnet-scenarios.
 

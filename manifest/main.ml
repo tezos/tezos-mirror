@@ -6796,7 +6796,7 @@ let _octez_micheline_rewriting_tests =
         Protocol.(client_exn alpha);
       ]
 
-let _octez_store_tests =
+let octez_store_tests =
   tezt
     [
       "test";
@@ -6816,7 +6816,8 @@ let _octez_store_tests =
     ]
     ~path:"src/lib_store/unix/test"
     ~with_macos_security_framework:true
-    ~opam:"tezos-store"
+    ~opam:"octez-store-tests"
+    ~synopsis:"Store tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -6852,7 +6853,7 @@ let _octez_bench_store_lib_tests_exe =
         octez_base |> open_ ~m:"TzPervasives";
         tezt_lib;
         alcotezt;
-        _octez_store_tests |> open_;
+        octez_store_tests |> open_;
       ]
 
 (* [_octez_slow_store_lib_tests_exe] is a very long test, running a huge
@@ -6873,7 +6874,7 @@ let _octez_slow_store_lib_tests_exe =
         octez_base |> open_ ~m:"TzPervasives";
         tezt_lib;
         alcotezt;
-        _octez_store_tests |> open_;
+        octez_store_tests |> open_;
       ]
 
 let _octez_shell_tests =
@@ -6898,7 +6899,8 @@ let _octez_shell_tests =
     ]
     ~path:"src/lib_shell/test"
     ~with_macos_security_framework:true
-    ~opam:"tezos-shell"
+    ~opam:"octez-shell-tests"
+    ~synopsis:"Shell tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
