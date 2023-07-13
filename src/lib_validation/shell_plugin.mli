@@ -193,8 +193,10 @@ val register_rpc : (module RPC) -> unit
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
 
-(** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Protocol_hash.t -> (module FILTER) option
+(** Looks for a protocol filter plug-in for a specific protocol. The
+    [block_hash] argument is used for the error message. *)
+val find_filter :
+  block_hash:Block_hash.t -> Protocol_hash.t -> (module FILTER) tzresult Lwt.t
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option

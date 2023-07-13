@@ -1383,12 +1383,7 @@ let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    match Shell_plugin.find_filter pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let module Block_validation = Make (Filter) in
   Block_validation.recompute_metadata
@@ -1430,12 +1425,7 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    match Shell_plugin.find_filter pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let module Block_validation = Make (Filter) in
   Block_validation.precheck
@@ -1464,12 +1454,7 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    match Shell_plugin.find_filter pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let* () =
     if should_precheck && Filter.Proto.(compare environment_version V7 >= 0)
@@ -1553,15 +1538,7 @@ let preapply ~chain_id ~user_activated_upgrades
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    match Shell_plugin.find_filter protocol with
-    | None ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1718 *)
-        (* This should not happen: it should be handled in the validator. *)
-        failwith
-          "Prevalidation: missing protocol '%a' for the current block."
-          Protocol_hash.pp_short
-          protocol
-    | Some protocol -> return protocol
+    Shell_plugin.find_filter ~block_hash:predecessor_hash protocol
   in
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)

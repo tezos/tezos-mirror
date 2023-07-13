@@ -350,31 +350,6 @@ let may_switch_test_chain w active_chains spawn_child block =
       let*! () = Events.(emit could_not_switch_testchain) err in
       Lwt.return_unit
 
-let safe_get_prevalidator_filter hash =
-  let open Lwt_syntax in
-  match Shell_plugin.find_filter hash with
-  | Some filter -> return_ok filter
-  | None -> (
-      match Registered_protocol.get hash with
-      | None ->
-          (* FIXME. *)
-          (* This should not happen: it should be handled in the validator. *)
-          failwith
-            "chain_validator: missing protocol '%a' for the current block."
-            Protocol_hash.pp_short
-            hash
-      | Some (module Proto : Registered_protocol.T) ->
-          let* () =
-            match Proto.environment_version with
-            | V0 ->
-                (* This is normal for protocols Genesis and 000
-                   because they don't have a plugin. *)
-                Lwt.return_unit
-            | _ -> Events.(emit prevalidator_filter_not_found) hash
-          in
-          return_ok
-            (module Shell_plugin.No_filter (Proto) : Shell_plugin.FILTER))
-
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
   let* r =
@@ -382,7 +357,9 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
     let* new_protocol =
       Store.Block.protocol_hash parameters.chain_store block
     in
-    let* filter = safe_get_prevalidator_filter new_protocol in
+    let* filter =
+      Shell_plugin.find_filter ~block_hash:(Store.Block.hash block) new_protocol
+    in
     Prevalidator.create parameters.prevalidator_limits filter chain_db
   in
   match r with
