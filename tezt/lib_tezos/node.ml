@@ -599,13 +599,31 @@ let handle_event node {name; value; timestamp = _} =
   match name with
   | "node_is_ready.v0" -> set_ready node
   | "head_increment.v0" | "branch_switch.v0" -> (
-      match JSON.(value |-> "level" |> as_int_opt) with
-      | None ->
-          (* Names [head_increment] and [branch_switch] correspond to
-             multiple different events. Some of those events carry a
-             [level], some do not. *)
-          ()
-      | Some level -> update_level node level)
+      if
+        (* Consider [head_increment] and [branch_switch] events only
+           with the local RPC server. *)
+        not node.persistent_state.rpc_external
+      then
+        match JSON.(value |-> "level" |> as_int_opt) with
+        | None ->
+            (* Names [head_increment] and [branch_switch] correspond to
+               multiple different events. Some of those events carry a
+               [level], some do not. *)
+            ()
+        | Some level -> update_level node level)
+  | "store_synchronized_on_head.v0" -> (
+      if
+        (* Consider [store_synchronized_on_head] event only with the
+           local RPC server. *)
+        node.persistent_state.rpc_external
+      then
+        match JSON.(value |-> "level" |> as_int_opt) with
+        | None ->
+            (* Names [head_increment] and [branch_switch] correspond to
+               multiple different events. Some of those events carry a
+               [level], some do not. *)
+            ()
+        | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
   | "compilation_error.v0" -> (
       match JSON.as_string_opt value with
@@ -623,7 +641,9 @@ let handle_event node {name; value; timestamp = _} =
   | "set_head.v0" -> (
       match JSON.(value |> geti 1 |> as_int_opt) with
       | None -> ()
-      | Some level -> update_level node level)
+      | Some level ->
+          if not node.persistent_state.rpc_external then update_level node level
+      )
   | _ -> ()
 
 let check_event ?where node name promise =
