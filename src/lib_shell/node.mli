@@ -69,6 +69,10 @@ val create :
 
 val shutdown : t -> unit Lwt.t
 
+(** [build_rpc_directory ~node_version ~commit_info node] builds a Tezos RPC
+    directory for the node by gathering all the subdirectories. [node_version],
+    [commit_info] and [node] contain all informations required to build such a
+    directory. *)
 val build_rpc_directory :
   node_version:Tezos_version.Node_version.t ->
   commit_info:Node_version.commit_info ->
