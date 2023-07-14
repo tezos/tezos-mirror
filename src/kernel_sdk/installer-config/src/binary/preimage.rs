@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::dac::pages::reveal_loop;
 use tezos_smart_rollup_encoding::dac::pages::V0SliceContentPage;
@@ -57,18 +56,9 @@ fn append_content<Host: Runtime>(
 ) -> Result<usize, &'static str> {
     let content = content.as_ref();
 
-    let mut size_written = 0;
-    while size_written < content.len() {
-        let num_to_write = usize::min(MAX_FILE_CHUNK_SIZE, content.len() - size_written);
-        let bytes_to_write = &content[size_written..(size_written + num_to_write)];
-
-        Runtime::store_write(host, reveal_to, bytes_to_write, kernel_size + size_written)
-            .map_err(|_| "Failed to write kernel content page")?;
-
-        size_written += num_to_write;
-    }
-
-    Ok(size_written)
+    host.store_write(reveal_to, content, kernel_size)
+        .map_err(|_| "Failed to write kernel content page")?;
+    Ok(content.len())
 }
 
 #[cfg(test)]

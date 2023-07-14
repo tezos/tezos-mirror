@@ -124,8 +124,11 @@ pub trait Runtime {
     #[cfg(feature = "alloc")]
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError>;
 
-    /// Write the bytes given by `src` to storage at `path`, starting
-    /// `at_offset`. Fails if `src.len() > MAX_FILE_CHUNK_SIZE`.
+    /// Write the bytes given by `src` to storage at `path`, starting `at_offset`.
+    ///
+    /// Contrary to `store_write_all`, this does not replace the value (if any)
+    /// previously stored under `path`. This allows for splicing/patching values
+    /// directly in storage, without having to read the entire value from disk.
     fn store_write<T: Path>(
         &mut self,
         path: &T,
@@ -133,10 +136,10 @@ pub trait Runtime {
         at_offset: usize,
     ) -> Result<(), RuntimeError>;
 
-    /// Write the bytes given by `src` to storage at `path`, starting from `0`.
-    /// Contrary to `store_write`, it can write more than `MAX_FILE_CHUNK_SIZE`.
-    /// Note that if any value exists at `path`, it will be removed
-    /// beforehand.
+    /// Write the bytes given by `src` to storage at `path`.
+    ///
+    /// Contrary to `store_write`, this replaces the value (if any) that
+    /// was previously stored at `path`.
     #[cfg(feature = "proto-nairobi")]
     fn store_write_all<T: Path>(
         &mut self,
@@ -403,22 +406,43 @@ where
     fn store_write<T: Path>(
         &mut self,
         path: &T,
-        src: &[u8],
-        at_offset: usize,
+        mut src: &[u8],
+        mut at_offset: usize,
     ) -> Result<(), RuntimeError> {
-        let result_code = unsafe {
-            SmartRollupCore::store_write(
-                self,
-                path.as_ptr(),
-                path.size(),
-                at_offset,
-                src.as_ptr(),
-                src.len(),
-            )
+        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+
+        let write = |bytes: &[u8], offset| {
+            let result_code = unsafe {
+                SmartRollupCore::store_write(
+                    self,
+                    path.as_ptr(),
+                    path.size(),
+                    offset,
+                    bytes.as_ptr(),
+                    bytes.len(),
+                )
+            };
+            match Error::wrap(result_code) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(RuntimeError::HostErr(e)),
+            }
         };
-        match Error::wrap(result_code) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+
+        if src.len() <= MAX_FILE_CHUNK_SIZE {
+            return write(src, at_offset);
+        }
+
+        while src.len() > MAX_FILE_CHUNK_SIZE {
+            write(&src[..MAX_FILE_CHUNK_SIZE], at_offset)?;
+            at_offset += MAX_FILE_CHUNK_SIZE;
+            src = &src[MAX_FILE_CHUNK_SIZE..];
+        }
+
+        // Don't do final extra write of zero bytes
+        if !src.is_empty() {
+            write(src, at_offset)
+        } else {
+            Ok(())
         }
     }
 
@@ -428,7 +452,6 @@ where
         path: &T,
         value: &[u8],
     ) -> Result<(), RuntimeError> {
-        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
         // Removing the value first prevents some cases where a value already
         // exists in the storage at the given path and is bigger than the one
         // being written. Keeping the old value would lead to a situation where
@@ -443,16 +466,7 @@ where
         // exists, hence there is no need to check the value exists beforehand.
         Runtime::store_delete_value(self, path)?;
 
-        // To be consistent with `store_write` that allocates the path even if
-        // the written value is empty, as nothing will be written otherwise.
-        if value.is_empty() {
-            Runtime::store_write(self, path, &[0; 0], 0)?;
-        }
-
-        for (i, chunk) in value.chunks(MAX_FILE_CHUNK_SIZE).enumerate() {
-            Runtime::store_write(self, path, chunk, i * MAX_FILE_CHUNK_SIZE)?;
-        }
-        Ok(())
+        Runtime::store_write(self, path, value, 0)
     }
 
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {

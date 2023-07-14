@@ -12,6 +12,7 @@
 - Add `KERNEL_BOOT_PATH` constant to `tezos-smart-rollup-host`.
 - `tezos-smart-rollup-installer-config`: add `eval_config_instr` and `upgrade_reveal_flow` functions to
   simplify kernel upgrades.
+- Update `Runtime::store_write` to write the whole slice; previously errored on slices longer than 2KB.
 
 ### Installer client/kernel
 
