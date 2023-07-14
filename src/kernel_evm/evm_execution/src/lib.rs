@@ -107,6 +107,9 @@ pub enum EthereumError {
 /// a _success_ (by Ethereum definition). Note that a REVERT instruction _can_ return
 /// data even though it will mean rollback of the transaction effect. This is also true
 /// for sub-transactions, ie, REVERT can _always_ return data.
+///
+/// If the gas limit is given as `None` (there is no gas limit), then there will be no
+/// accounting for gas usage at all. So the gas usage in the return value will be zero.
 #[allow(clippy::too_many_arguments)]
 pub fn run_transaction<'a, Host>(
     host: &'a mut Host,
@@ -134,7 +137,6 @@ where
         block,
         &config,
         precompiles,
-        gas_limit.unwrap_or(0_u64),
     );
 
     // TODO: check gas_limit vs caller balance. Make sure caller has
@@ -1121,7 +1123,7 @@ mod test {
         // Since we execute an invalid instruction (for a static call that is) we spend
         // _all_ the gas.
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: all_the_gas,
+            gas_used: 86653,
             is_success: false,
             new_address: None,
             logs: vec![],
@@ -1196,7 +1198,7 @@ mod test {
         // Since we execute an invalid instruction (for a static call that is), we
         // expect to spend _all_ the gas.
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: all_the_gas,
+            gas_used: 86653,
             is_success: false,
             new_address: None,
             logs: vec![],
@@ -1302,7 +1304,7 @@ mod test {
         };
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 22345,
+            gas_used: 87048,
             is_success: true,
             new_address: None,
             logs: vec![log_record1, log_record2],
@@ -1392,7 +1394,7 @@ mod test {
         };
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 21908,
+            gas_used: 87048,
             is_success: true,
             new_address: None,
             logs: vec![log_record1],
@@ -1471,7 +1473,7 @@ mod test {
         );
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 51124,
+            gas_used: 86656,
             is_success: true,
             new_address: None,
             logs: vec![],

@@ -22,6 +22,7 @@
 
 - The kernel reboots before reaching maximum number of ticks (!9369)
 - Refactor `TransactionCommon` and transactions' signatures modules. (!9590)
+- One gasometer per transaction-level (AKA sub-context). (!9492)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 

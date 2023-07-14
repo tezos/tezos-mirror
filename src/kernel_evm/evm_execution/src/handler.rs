@@ -21,7 +21,7 @@ use alloc::rc::Rc;
 use core::convert::Infallible;
 use debug::debug_msg;
 use evm::executor::stack::Log;
-use evm::gasometer::Gasometer;
+use evm::gasometer::{GasCost, Gasometer, MemoryCost};
 use evm::{
     Capture, Config, Context, CreateScheme, ExitError, ExitFatal, ExitReason, ExitRevert,
     ExitSucceed, Handler, Opcode, Stack, Transfer,
@@ -93,7 +93,11 @@ fn ethereum_error_to_exit_reason(exit_reason: EthereumError) -> ExitReason {
 }
 
 /// Data related to the current transaction layer
-struct TransactionLayerData {
+struct TransactionLayerData<'config> {
+    /// Gasometer for the current transaction layer. If this value is
+    /// `None`, then the current transaction has no gas limit and no
+    /// gas accounting.
+    pub gasometer: Option<Gasometer<'config>>,
     /// Whether the current transaction is static or not, ie, if the
     /// transaction is allowed to update durable storage.
     pub is_static: bool,
@@ -105,12 +109,15 @@ struct TransactionLayerData {
     pub deleted_contracts: Vec<H160>,
 }
 
-impl TransactionLayerData {
+impl<'config> TransactionLayerData<'config> {
     /// Create the data associated with one layer of transactions -
     /// one Ethereum transaction context. It initially has no log
-    /// records.
-    pub fn new(is_static: bool) -> Self {
+    /// records. If the gas limit is `None`, then there will be no
+    /// accounting for gas usage throughout the transaction, ie, there
+    /// will be no gasometer.
+    pub fn new(is_static: bool, gas_limit: Option<u64>, config: &'config Config) -> Self {
         TransactionLayerData {
+            gasometer: gas_limit.map(|gl| Gasometer::new(gl, config)),
             is_static,
             logs: vec![],
             deleted_contracts: vec![],
@@ -130,13 +137,11 @@ pub struct EvmHandler<'a, Host: Runtime> {
     pub block: &'a BlockConstants,
     /// The precompiled functions
     precompiles: &'a dyn PrecompileSet<Host>,
-    /// The gasometer for measuring and keeping track of gas usage
-    gasometer: Gasometer<'a>,
     /// The configuration, eg, London or Frontier for execution
     config: &'a Config,
     /// The contexts associated with transaction(s) currently in
     /// progress
-    transaction_data: Vec<TransactionLayerData>,
+    transaction_data: Vec<TransactionLayerData<'a>>,
 }
 
 #[allow(unused_variables)]
@@ -149,7 +154,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         block: &'a BlockConstants,
         config: &'a Config,
         precompiles: &'a dyn PrecompileSet<Host>,
-        gas_limit: u64,
     ) -> Self {
         Self {
             host,
@@ -158,15 +162,53 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             block,
             config,
             precompiles,
-            gasometer: Gasometer::<'a>::new(gas_limit, config),
             transaction_data: vec![],
         }
     }
 
-    /// Get the total amount of gas used for the duration of the handlers
-    /// lifetime.
+    /// Get the total amount of gas used for the duration of the current
+    /// transaction.
     pub fn gas_used(&self) -> u64 {
-        self.gasometer.total_used_gas()
+        self.transaction_data
+            .last()
+            .map(|layer| {
+                layer
+                    .gasometer
+                    .as_ref()
+                    .map(|g| g.total_used_gas())
+                    .unwrap_or(0_u64)
+            })
+            .unwrap_or(0_u64)
+    }
+
+    /// Record the cost of a static-cost opcode
+    fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
+        let Some(layer) = self.transaction_data.last_mut() else {
+            return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
+        };
+
+        layer
+            .gasometer
+            .as_mut()
+            .map(|gasometer| gasometer.record_cost(cost))
+            .unwrap_or(Ok(()))
+    }
+
+    /// Record the cost of a dynamic-cost opcode
+    fn record_dynamic_cost(
+        &mut self,
+        cost: GasCost,
+        memory_cost: Option<MemoryCost>,
+    ) -> Result<(), ExitError> {
+        let Some(layer) = self.transaction_data.last_mut() else {
+            return Err(ExitError::Other(Cow::from("Recording cost, but there is no transaction in progress")))
+        };
+
+        layer
+            .gasometer
+            .as_mut()
+            .map(|gasometer| gasometer.record_dynamic_cost(cost, memory_cost))
+            .unwrap_or(Ok(()))
     }
 
     /// Returns true if there is a static transaction in progress, otherwise
@@ -181,7 +223,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Record the base fee part of the transaction cost. We need the SputnikVM
     /// error code in case this goes wrong, so that's what we return.
     fn record_base_gas_cost(&mut self) -> Result<(), ExitError> {
-        self.gasometer.record_cost(self.config.gas_transaction_call)
+        self.record_cost(self.config.gas_transaction_call)
     }
 
     /// Execute a SputnikVM runtime with this handler
@@ -234,7 +276,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         from: H160,
         to: H160,
         value: U256,
-        gas_limit: Option<u64>,
     ) -> Result<ExitReason, EthereumError> {
         debug_msg!(self.host, "Executing a transfer");
 
@@ -287,7 +328,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         scheme: CreateScheme,
         value: U256,
         initial_code: Vec<u8>,
-        gas_limit: Option<u64>,
         create_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         debug_msg!(self.host, "Executing a contract create");
@@ -315,7 +355,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // nonce)
         // issue: https://gitlab.com/tezos/tezos/-/issues/4865
 
-        if let Err(error) = self.execute_transfer(caller, address, value, gas_limit) {
+        if let Err(error) = self.execute_transfer(caller, address, value) {
             debug_msg!(
                 self.host,
                 "Failed transfer for create, funds: {:?}, from: {:?}, to: {:?}",
@@ -370,7 +410,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         address: H160,
         transfer: Option<Transfer>,
         input: Vec<u8>,
-        gas_limit: Option<u64>,
         transaction_context: TransactionContext,
     ) -> Result<CreateOutcome, EthereumError> {
         debug_msg!(
@@ -403,7 +442,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 transaction_context.context.caller,
                 address,
                 transfer.value,
-                gas_limit,
             )? {
                 r @ ExitReason::Fatal(_) => {
                     return Ok((r, None, vec![]));
@@ -428,7 +466,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self,
             address,
             &input,
-            gas_limit,
             &transaction_context.context,
             self.is_static(),
         ) {
@@ -470,7 +507,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
         is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
-        self.begin_initial_transaction(is_static)?;
+        self.begin_initial_transaction(is_static, gas_limit)?;
 
         if let Err(err) = self.record_base_gas_cost() {
             return self.end_initial_transaction(Ok((
@@ -488,7 +525,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 value,
             }),
             input,
-            gas_limit,
             TransactionContext::new(caller, callee, value.unwrap_or(U256::zero())),
         );
 
@@ -503,7 +539,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         input: Vec<u8>,
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
-        self.begin_initial_transaction(false)?;
+        self.begin_initial_transaction(false, gas_limit)?;
 
         if let Err(err) = self.record_base_gas_cost() {
             return self.end_initial_transaction(Ok((
@@ -520,7 +556,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             default_create_scheme,
             value.unwrap_or(U256::zero()),
             input,
-            gas_limit,
             false,
         );
 
@@ -535,7 +570,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         value: U256,
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
-        self.begin_initial_transaction(false)?;
+        self.begin_initial_transaction(false, gas_limit)?;
 
         if let Err(err) = self.record_base_gas_cost() {
             return self.end_initial_transaction(Ok((
@@ -545,7 +580,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             )));
         }
 
-        let result = self.execute_transfer(from, to, value, gas_limit)?;
+        let result = self.execute_transfer(from, to, value)?;
 
         self.end_initial_transaction(Ok((result, None, vec![])))
     }
@@ -671,6 +706,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn begin_initial_transaction(
         &mut self,
         is_static: bool,
+        gas_limit: Option<u64>,
     ) -> Result<(), EthereumError> {
         let current_depth = self.evm_account_storage.stack_depth();
 
@@ -694,8 +730,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
-        self.transaction_data
-            .push(TransactionLayerData::new(self.is_static() || is_static));
+        self.transaction_data.push(TransactionLayerData::new(
+            self.is_static() || is_static,
+            gas_limit,
+            self.config,
+        ));
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -741,13 +780,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             ));
         }
 
+        let gas_used = self.gas_used();
+
         if let Some(last_layer) = self.transaction_data.pop() {
             self.evm_account_storage
                 .commit_transaction(self.host)
                 .map_err(EthereumError::from)?;
 
             Ok(ExecutionOutcome {
-                gas_used: self.gas_used(),
+                gas_used,
                 is_success: true,
                 new_address,
                 logs: last_layer.logs,
@@ -869,7 +910,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Begin an intermediate transaction
-    fn begin_inter_transaction(&mut self, is_static: bool) -> Result<(), EthereumError> {
+    fn begin_inter_transaction(
+        &mut self,
+        is_static: bool,
+        gas_limit: Option<u64>,
+    ) -> Result<(), EthereumError> {
         let current_depth = self.evm_account_storage.stack_depth();
 
         debug_msg!(
@@ -882,8 +927,11 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             return Err(EthereumError::InconsistentTransactionStack(0, false, true));
         }
 
-        self.transaction_data
-            .push(TransactionLayerData::new(self.is_static() || is_static));
+        self.transaction_data.push(TransactionLayerData::new(
+            self.is_static() || is_static,
+            gas_limit,
+            self.config,
+        ));
 
         self.evm_account_storage
             .begin_transaction(self.host)
@@ -1162,7 +1210,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
         let balance = self.balance(address);
 
-        self.execute_transfer(address, target, balance, None)
+        self.execute_transfer(address, target, balance)
             .map_err(|err| {
                 ExitError::Other(Cow::from(
                     "Could not execute transfer on contract delete",
@@ -1192,15 +1240,14 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         init_code: Vec<u8>,
         target_gas: Option<u64>,
     ) -> Capture<CreateOutcome, Self::CreateInterrupt> {
-        if let Err(err) = self.begin_inter_transaction(false) {
+        if let Err(err) = self.begin_inter_transaction(false, target_gas) {
             Capture::Exit((
                 ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{err:?}")))),
                 None,
                 vec![],
             ))
         } else {
-            let result =
-                self.execute_create(caller, scheme, value, init_code, target_gas, true);
+            let result = self.execute_create(caller, scheme, value, init_code, true);
 
             self.end_inter_transaction(result, false)
         }
@@ -1215,7 +1262,20 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         is_static: bool,
         context: Context,
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
-        if let Err(err) = self.begin_inter_transaction(is_static) {
+        if let Err(err) = self.record_cost(target_gas.unwrap_or(0)) {
+            debug_msg!(
+                self.host,
+                "Not enought gas for call. Required at least: {:?}",
+                target_gas
+            );
+
+            return Capture::Exit((
+                ExitReason::Fatal(ExitFatal::CallErrorAsFatal(ExitError::OutOfGas)),
+                vec![],
+            ));
+        }
+
+        if let Err(err) = self.begin_inter_transaction(is_static, target_gas) {
             return Capture::Exit((ethereum_error_to_exit_reason(err), vec![]));
         }
 
@@ -1223,7 +1283,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             code_address,
             transfer,
             input,
-            target_gas,
             TransactionContext::from_context(context),
         );
 
@@ -1243,7 +1302,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         stack: &Stack,
     ) -> Result<(), ExitError> {
         if let Some(cost) = evm::gasometer::static_opcode_cost(opcode) {
-            self.gasometer.record_cost(cost)
+            self.record_cost(cost)
         } else {
             let (cost, _target, memory_cost) = evm::gasometer::dynamic_opcode_cost(
                 context.address,
@@ -1254,7 +1313,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 &self,
             )?;
 
-            self.gasometer.record_dynamic_cost(cost, memory_cost)
+            self.record_dynamic_cost(cost, memory_cost)
         }
     }
 
@@ -1332,7 +1391,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
 
         // This is a randomly generated address. It has been used for testing legacy address
         // generation with zero nonce using Ethereum. To replicate (with new address):
@@ -1351,7 +1409,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let result = handler.create_address(CreateScheme::Legacy { caller });
@@ -1369,7 +1426,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -1380,7 +1436,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -1405,7 +1460,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller: H160 =
             H160::from_str("9bbfed6889322e016e0a02ee459d306fc19545d8").unwrap();
 
@@ -1416,7 +1470,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -1444,7 +1497,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(28349_u64);
 
         // We use an origin distinct from caller for testing purposes
@@ -1457,12 +1509,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(213_u64);
         let input = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1479,13 +1529,9 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
@@ -1495,7 +1541,7 @@ mod test {
                     H256::from(origin).0.to_vec(),
                 );
                 assert_eq!(result, expected_result);
-                assert_eq!(handler.gas_used(), 17);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
@@ -1510,7 +1556,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(28349_u64);
 
         let mut handler = EvmHandler::new(
@@ -1520,12 +1565,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(213_u64);
         let input = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1574,13 +1617,9 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
@@ -1590,7 +1629,7 @@ mod test {
                     vec![0xFF_u8, 0x01_u8],
                 );
                 assert_eq!(result, expected_result);
-                assert_eq!(handler.gas_used(), 18);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
@@ -1611,7 +1650,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(2340);
 
         let mut handler = EvmHandler::new(
@@ -1621,7 +1659,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let input_value = U256::from(2026_u32);
@@ -1629,7 +1666,6 @@ mod test {
         input_value.to_big_endian(&mut input);
 
         let address = H160::from_low_u64_be(118);
-        let gas_limit: Option<u64> = Some(10_000_000_000_u64);
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1676,13 +1712,10 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input.to_vec(),
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_call(address, transfer, input.to_vec(), transaction_context);
 
         match result {
             Ok(result) => {
@@ -1717,7 +1750,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(8213);
 
         let mut handler = EvmHandler::new(
@@ -1727,7 +1759,6 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let input_value = U256::from(1025_u32); // transaction depth for contract below is callarg - 1
@@ -1735,7 +1766,6 @@ mod test {
         input_value.to_big_endian(&mut input);
 
         let address = H160::from_low_u64_be(12389);
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1782,13 +1812,10 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input.to_vec(),
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_call(address, transfer, input.to_vec(), transaction_context);
 
         match result {
             Ok(result) => {
@@ -1810,7 +1837,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 100000_u64;
         let caller = H160::from_low_u64_be(444);
 
         let mut handler = EvmHandler::new(
@@ -1820,12 +1846,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(312);
         let input: Vec<u8> = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
         let code: Vec<u8> = vec![
@@ -1847,13 +1871,9 @@ mod test {
 
         set_code(&mut handler, &address, code);
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
@@ -1868,7 +1888,7 @@ mod test {
                     get_durable_slot(&mut handler, &address, &H256::zero()),
                     expected_in_storage
                 );
-                assert_eq!(handler.gas_used(), 20215);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
@@ -1883,7 +1903,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 100000_u64;
         let caller = H160::from_low_u64_be(117);
 
         let mut handler = EvmHandler::new(
@@ -1893,24 +1912,18 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
-        let gas_limit: Option<u64> = None;
         let value = U256::zero();
         let create_scheme = CreateScheme::Legacy { caller };
         let init_code: Vec<u8> = hex::decode("608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c63430008120033").unwrap();
 
         let expected_address = handler.create_address(create_scheme);
 
-        let result = handler.execute_create(
-            caller,
-            create_scheme,
-            value,
-            init_code,
-            gas_limit,
-            false,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result =
+            handler.execute_create(caller, create_scheme, value, init_code, false);
 
         match result {
             Ok(result) => {
@@ -1921,7 +1934,7 @@ mod test {
                 );
                 assert_eq!(result, expected_result);
                 assert_eq!(get_durable_slot(&mut handler, &expected_address, &H256::zero()), H256::from_str("000000000000000000000000000000000000000000000000000000000000002a").unwrap());
-                assert_eq!(handler.gas_used(), 20131);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
@@ -1936,7 +1949,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(118);
 
         let mut handler = EvmHandler::new(
@@ -1946,12 +1958,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(117);
         let input = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context =
             TransactionContext::new(caller, address, U256::from(50_u32));
         let transfer: Option<Transfer> = Some(Transfer {
@@ -1970,13 +1980,9 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(101_u32));
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
@@ -1985,7 +1991,7 @@ mod test {
                 assert_eq!(result, expected_result);
                 assert_eq!(get_balance(&mut handler, &address), U256::from(100_u32));
                 assert_eq!(get_balance(&mut handler, &caller), U256::from(1_u32));
-                assert_eq!(handler.gas_used(), 6);
+                assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
                 panic!("Expected Ok, but got {:?}", err);
@@ -2000,7 +2006,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -2010,12 +2015,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(210_u64);
         let input = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = Some(Transfer {
             source: caller,
@@ -2033,13 +2036,9 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
@@ -2066,7 +2065,6 @@ mod test {
         let precompiles = precompiles::precompile_set::<MockHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
         let config = Config::london();
-        let gas_limit = 1000_u64;
         let caller = H160::from_low_u64_be(523_u64);
 
         let mut handler = EvmHandler::new(
@@ -2076,12 +2074,10 @@ mod test {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
 
         let address = H160::from_low_u64_be(210_u64);
         let input = vec![0_u8];
-        let gas_limit: Option<u64> = None;
         let transaction_context = TransactionContext::new(caller, address, U256::zero());
         let transfer: Option<Transfer> = None;
 
@@ -2108,13 +2104,9 @@ mod test {
         set_code(&mut handler, &address, code);
         set_balance(&mut handler, &caller, U256::from(99_u32));
 
-        let result = handler.execute_call(
-            address,
-            transfer,
-            input,
-            gas_limit,
-            transaction_context,
-        );
+        handler.begin_initial_transaction(false, None).unwrap();
+
+        let result = handler.execute_call(address, transfer, input, transaction_context);
 
         match result {
             Ok(result) => {
