@@ -475,9 +475,12 @@ let ir_model instr_or_cont =
   let name = name_of_instr_or_cont instr_or_cont in
   let m s = TimeModel s in
   let m2 name (time, alloc) =
-    (* Naming convention for backward compatibility.
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6072
+       Change naming convention.
+       The current naming convention is for backward compatibility.
        When we finally switch to the time-allocation model,
-       "_synthesized" should be removed and the time model should be qualified with "_time" *)
+       "_synthesized" should be removed and the time model should be qualified with "_time"
+    *)
     TimeAllocModel
       {
         name = ns (name ^ "_synthesized");

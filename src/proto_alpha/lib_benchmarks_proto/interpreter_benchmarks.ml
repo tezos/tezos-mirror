@@ -63,7 +63,9 @@ let sf = Printf.sprintf
 let eos = Script_typed_ir.(EmptyCell, EmptyCell)
 
 let info_and_name ~benchmark_type ~intercept ?(salt = "") s =
-  (* Time benchmarks should be qualified with "time" when we switch to time-alloc cost model *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6072
+     Time benchmarks should be qualified with "time" when we switch to time-alloc cost model
+  *)
   let s = s ^ salt in
 
   let info =
