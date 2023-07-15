@@ -295,6 +295,16 @@ let nat_decoding =
 
 let () = Registration.register_simple_with_num nat_decoding
 
+let nat_decoding_intercept =
+  make_decode_variable_size
+    ~name:"DECODING_NAT"
+    ~encoding:Data_encoding.n
+    ~intercept:true
+    ~generator:(fun _ -> (Z.zero, {bytes = 0}))
+    ()
+
+let () = Registration.register_simple_with_num nat_decoding_intercept
+
 let int_encoding =
   make_encode_variable_size
     ~name:"ENCODING_INT"
@@ -322,6 +332,16 @@ let int_decoding =
     ()
 
 let () = Registration.register_simple_with_num int_decoding
+
+let int_decoding_intercept =
+  make_decode_variable_size
+    ~name:"DECODING_INT"
+    ~encoding:Data_encoding.z
+    ~intercept:true
+    ~generator:(fun _ -> (Z.zero, {bytes = 0}))
+    ()
+
+let () = Registration.register_simple_with_num int_decoding_intercept
 
 let string_encoding =
   make_encode_variable_size
