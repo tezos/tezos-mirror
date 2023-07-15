@@ -107,33 +107,37 @@ let perform_benchmark (bench_pattern : Namespace.t)
 let benchmark_cmd bench_pattern bench_opts =
   ignore @@ perform_benchmark bench_pattern bench_opts
 
-let rec infer_cmd model_name workload_data solver infer_opts =
+let rec infer_cmd local_model_name workload_data solver infer_opts =
   Pyinit.pyinit () ;
   let file_stats = Unix.stat workload_data in
   match file_stats.st_kind with
   | S_DIR ->
       (* User specified a directory. Automatically process all workload data in that directory. *)
-      infer_cmd_full_auto model_name workload_data solver infer_opts
+      infer_cmd_full_auto local_model_name workload_data solver infer_opts
   | S_REG ->
       (* User specified a workload data file. Only process that file. *)
-      infer_cmd_one_shot model_name workload_data solver infer_opts
+      infer_cmd_one_shot local_model_name workload_data solver infer_opts
   | _ ->
       Format.eprintf
         "Error: %s is neither a regular file nor a directory.@."
         workload_data ;
       exit 1
 
-and infer_cmd_one_shot model_name workload_data solver
+and infer_cmd_one_shot local_model_name workload_data solver
     (infer_opts : Cmdline.infer_parameters_options) =
   let measure = Measure.load ~filename:workload_data in
   match measure with
   | Measure.Measurement
       ((module Bench), {bench_opts = _; workload_data; date = _}) ->
       let model =
-        match List.assoc_opt ~equal:String.equal model_name Bench.models with
+        match
+          List.assoc_opt ~equal:String.equal local_model_name Bench.models
+        with
         | Some m -> m
         | None ->
-            Format.eprintf "Requested model: \"%s\" not found@." model_name ;
+            Format.eprintf
+              "Requested local model: \"%s\" not found@."
+              local_model_name ;
             Format.eprintf
               "Available for this workload: @[%a@] @."
               (Format.pp_print_list
@@ -169,7 +173,7 @@ and infer_cmd_one_shot model_name workload_data solver
           let report =
             Report.add_section
               ~measure
-              ~model_name
+              ~local_model_name
               ~problem
               ~solution
               ~overrides_map
@@ -192,13 +196,13 @@ and infer_cmd_one_shot model_name workload_data solver
               Lwt.return_unit) ;
             Format.eprintf "Produced report on %s@." output_file
       in
-      process_output measure model_name problem solution infer_opts
+      process_output measure local_model_name problem solution infer_opts
 
-and infer_cmd_full_auto model_name workload_data solver
+and infer_cmd_full_auto local_model_name workload_data solver
     (infer_opts : Cmdline.infer_parameters_options) =
   let workload_files = get_all_workload_data_files workload_data in
   let graph, measurements =
-    Dep_graph.load_workload_files ~model_name workload_files
+    Dep_graph.load_workload_files ~local_model_name workload_files
   in
   if Dep_graph.Graph.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
@@ -209,9 +213,14 @@ and infer_cmd_full_auto model_name workload_data solver
   Format.eprintf "Performing topological run@." ;
   let solution = Dep_graph.Graph.to_sorted_list graph in
   ignore
-  @@ infer_for_measurements ~model_name measurements solution ~solver infer_opts
+  @@ infer_for_measurements
+       ~local_model_name
+       measurements
+       solution
+       ~solver
+       infer_opts
 
-and infer_for_measurements ~model_name measurements
+and infer_for_measurements ~local_model_name measurements
     (solved_list :
       Dep_graph.Solver.Solved.t list (* sorted in the topological order *))
     ~solver (infer_opts : Cmdline.infer_parameters_options) =
@@ -243,16 +252,16 @@ and infer_for_measurements ~model_name measurements
                solved.Dep_graph.Solver.Solved.name
         in
         let (Measure.Measurement ((module Bench), m)) = measure in
-        (* Run inference of the models only bound by the local [model_name] *)
+        (* Run inference of the models only bound by the local [local_model_name] *)
         Option.fold
-          (Dep_graph.find_model_or_generic model_name Bench.models)
+          (Dep_graph.find_model_or_generic local_model_name Bench.models)
           ~none:(overrides_map, scores_list, report)
           ~some:(fun model ->
             Format.eprintf
-              "Running inference for %a (model_name: %s)@."
+              "Running inference for %a (local_model_name: %s)@."
               Namespace.pp
               solved.Dep_graph.Solver.Solved.name
-              model_name ;
+              local_model_name ;
             Format.eprintf "  @[%a@]@." Dep_graph.Solver.Solved.pp solved ;
             let overrides var = Free_variable.Map.find var overrides_map in
             let problem =
@@ -269,7 +278,7 @@ and infer_for_measurements ~model_name measurements
               Option.map
                 (Report.add_section
                    ~measure
-                   ~model_name
+                   ~local_model_name
                    ~problem
                    ~solution
                    ~overrides_map
@@ -336,17 +345,15 @@ and infer_for_measurements ~model_name measurements
                     Free_variable.pp
                     fv)
               solved.provides ;
-            let scores_label = (model_name, Bench.name) in
+            let scores_label = (local_model_name, Bench.name) in
             let scores_list = (scores_label, solution.scores) :: scores_list in
-            perform_plot measure model_name problem solution infer_opts ;
+            perform_plot measure local_model_name problem solution infer_opts ;
             perform_csv_export scores_label solution infer_opts ;
             (overrides_map, scores_list, report)))
       (overrides_map, scores_list, report)
       solved_list
   in
-  let solution =
-    Codegen.{inference_model_name = model_name; map; scores_list}
-  in
+  let solution = Codegen.{local_model_name; map; scores_list} in
   perform_save_solution solution infer_opts ;
   (match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
@@ -375,20 +382,16 @@ and solver_of_string solver (infer_opts : Cmdline.infer_parameters_options) =
       list_solvers Format.err_formatter ;
       exit 1
 
-and process_output measure model_name problem solution infer_opts =
+and process_output measure local_model_name problem solution infer_opts =
   let (Measure.Measurement ((module Bench), _)) = measure in
-  let scores_label = (model_name, Bench.name) in
+  let scores_label = (local_model_name, Bench.name) in
   perform_csv_export scores_label solution infer_opts ;
   let map = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
   perform_save_solution
     Codegen.
-      {
-        inference_model_name = model_name;
-        map;
-        scores_list = [(scores_label, solution.scores)];
-      }
+      {local_model_name; map; scores_list = [(scores_label, solution.scores)]}
     infer_opts ;
-  perform_plot measure model_name problem solution infer_opts
+  perform_plot measure local_model_name problem solution infer_opts
 
 and perform_csv_export scores_label solution
     (infer_opts : Cmdline.infer_parameters_options) =
@@ -413,13 +416,13 @@ and perform_save_solution solution
       Codegen.(save_solution solution filename) ;
       Format.eprintf "Saved solution to %s@." filename
 
-and perform_plot measure model_name problem solution
+and perform_plot measure local_model_name problem solution
     (infer_opts : Cmdline.infer_parameters_options) =
   if infer_opts.plot then
     ignore
     @@ Display.perform_plot
          ~measure
-         ~model_name
+         ~local_model_name
          ~problem
          ~solution
          ~plot_target:Display.Show
@@ -522,7 +525,7 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
         fun (_, {from; _}) ->
           List.exists
             (fun {local_model_name; _} ->
-              solution.Codegen.inference_model_name = local_model_name)
+              solution.Codegen.local_model_name = local_model_name)
             from)
       (Registration.all_models ())
   in
@@ -901,7 +904,7 @@ module Auto_build = struct
     in
     let solution =
       infer_for_measurements
-        ~model_name:local_model_name
+        ~local_model_name
         measurements
         solution
         ~solver
@@ -1062,8 +1065,8 @@ let () =
       | No_command -> exit 0
       | Benchmark {bench_name; bench_opts} ->
           benchmark_cmd bench_name bench_opts
-      | Infer {model_name; workload_data; solver; infer_opts} ->
-          infer_cmd model_name workload_data solver infer_opts
+      | Infer {local_model_name; workload_data; solver; infer_opts} ->
+          infer_cmd local_model_name workload_data solver infer_opts
       | Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
       | Codegen_all {solution; matching; codegen_options} ->

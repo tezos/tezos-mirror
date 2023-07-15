@@ -89,7 +89,7 @@ type auto_build_options = {
 type command =
   | Benchmark of {bench_name : Namespace.t; bench_opts : benchmark_options}
   | Infer of {
-      model_name : string;
+      local_model_name : string;
       workload_data : string;
       solver : string;
       infer_opts : infer_parameters_options;

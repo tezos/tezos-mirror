@@ -520,7 +520,8 @@ let raw_workload (workload_data : (Sparse_vec.String.t * float array) list) =
         [Histogram.hist ~binwidth:50.0 ~points ()])
     workload_data
 
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
+let perform_plot ~measure ~local_model_name ~problem ~solution ~plot_target
+    ~options =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let filename_prefix ?index kind =
     let dir = options.save_directory in
@@ -538,7 +539,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
       // Format.asprintf
            "%s_%s_%s"
            bench_name
-           (Benchmark_helpers.filename_of_local_model_name model_name)
+           (Benchmark_helpers.filename_of_local_model_name local_model_name)
            kind)
   in
   let workload_data =

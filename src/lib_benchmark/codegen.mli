@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 type solution = {
-  inference_model_name : string;
+  local_model_name : string;
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;

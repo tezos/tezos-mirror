@@ -177,7 +177,7 @@ module Lift_then_print = Costlang.Let_lift (Codegen)
 
 (* ------------------------------------------------------------------------- *)
 type solution = {
-  inference_model_name : string;
+  local_model_name : string;
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
@@ -187,7 +187,7 @@ type solution = {
 
 let pp_solution ppf solution =
   let open Format in
-  fprintf ppf "@[<v>inference_model_name: %s@;" solution.inference_model_name ;
+  fprintf ppf "@[<v>local_model_name: %s@;" solution.local_model_name ;
   let alist =
     List.sort (fun (fv1, _) (fv2, _) -> Free_variable.compare fv1 fv2)
     @@ List.of_seq
@@ -342,7 +342,7 @@ let codegen_models models sol transform ~exclusions =
         else Some (codegen model sol transform model_name))
       models
   in
-  comment ["Inference model name: " ^ sol.inference_model_name] :: codes
+  comment ["Local model name: " ^ sol.local_model_name] :: codes
 
 let%expect_test "basic_printing" =
   let open Codegen in

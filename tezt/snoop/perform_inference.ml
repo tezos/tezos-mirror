@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Local model names *)
-let models =
+let local_model_names =
   [
     "interpreter";
     "gas_translator_model";
@@ -55,15 +54,15 @@ let models =
     "apply_diff";
   ]
 
-let cleanup model_name =
+let cleanup local_model_name =
   let open Files in
   let inference_root = Files.(working_dir // inference_results_dir) in
   let files =
     [
-      inference_root // solution_csv model_name;
-      inference_root // solution_bin model_name;
-      inference_root // report_tex model_name;
-      inference_root // dep_graph model_name;
+      inference_root // solution_csv local_model_name;
+      inference_root // solution_bin local_model_name;
+      inference_root // report_tex local_model_name;
+      inference_root // dep_graph local_model_name;
     ]
   in
   List.iter Files.unlink_if_present files
@@ -79,23 +78,25 @@ let main () =
   let snoop = Snoop.create () in
   let inference_root = Files.(working_dir // inference_results_dir) in
   Lwt_list.iter_s
-    (fun model_name ->
-      let saved_model_name =
-        String.split_on_char '/' model_name |> String.concat "__"
+    (fun local_model_name ->
+      let saved_local_model_name =
+        String.split_on_char '/' local_model_name |> String.concat "__"
       in
-      cleanup saved_model_name ;
+      cleanup saved_local_model_name ;
       (* Python bindings tend to crash, hence the need to retry and resume inference midway,
          multiple times. When python bindings are removed, this needs to be removed as well
          See https://gitlab.com/tezos/tezos/-/issues/1523
       *)
       retry ~max_tries:5 (fun () ->
           Snoop.infer_parameters
-            ~model_name
+            ~local_model_name
             ~workload_data:Files.(working_dir // benchmark_results_dir)
             ~regression_method:Snoop.(Lasso {positive = true})
-            ~dump_csv:Files.(inference_root // solution_csv saved_model_name)
-            ~solution:Files.(inference_root // solution_bin saved_model_name)
-            ~report:Files.(inference_root // report_tex saved_model_name)
-            ~graph:Files.(inference_root // dep_graph saved_model_name)
+            ~dump_csv:
+              Files.(inference_root // solution_csv saved_local_model_name)
+            ~solution:
+              Files.(inference_root // solution_bin saved_local_model_name)
+            ~report:Files.(inference_root // report_tex saved_local_model_name)
+            ~graph:Files.(inference_root // dep_graph saved_local_model_name)
             snoop))
-    models
+    local_model_names

@@ -70,9 +70,9 @@ let pp_scores ppf {r2_score; rmse_score; tvalues} =
     ppf
     scores
 
-let scores_to_csv_column (model_name, bench_name) scores =
+let scores_to_csv_column (local_model_name, bench_name) scores =
   let {r2_score; rmse_score; tvalues} = scores in
-  let name = model_name ^ "-" ^ Namespace.to_string bench_name in
+  let name = local_model_name ^ "-" ^ Namespace.to_string bench_name in
   let table =
     (match r2_score with
     | None -> []
