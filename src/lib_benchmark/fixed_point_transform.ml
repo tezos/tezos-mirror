@@ -213,7 +213,8 @@ module Fixed_point_arithmetic (Lang : Fixed_point_lang_sig) : sig
       of [i * f] by positive constants. [precision] is a paramter to control
       how many bit shifts are used.
   *)
-  val approx_mult : int -> Lang.size Lang.repr -> float -> Lang.size Lang.repr
+  val approx_mult :
+    cast_mode -> int -> Lang.size Lang.repr -> float -> Lang.size Lang.repr
 end = struct
   (* IEEE754 redux
      -------------
@@ -270,8 +271,22 @@ end = struct
   (* Decompose a float into sign/exponent/mantissa *)
   let decompose (x : float) = split (all_bits x)
 
+  let increment_bits exp bits =
+    let rec f = function
+      | [] -> (true, [])
+      | 0L :: rest ->
+          let up, rest = f rest in
+          (false, (if up then 1L else 0L) :: rest)
+      | 1L :: rest ->
+          let up, rest = f rest in
+          if up then (true, 0L :: rest) else (false, 1L :: rest)
+      | _ -> assert false
+    in
+    let up, bits = f bits in
+    if up then (exp + 1, 1L :: bits) else (exp, bits)
+
   (* Generate fixed-precision multiplication by positive constants. *)
-  let approx_mult (precision : int) (i : Lang.size Lang.repr) (x : float) :
+  let approx_mult mode (precision : int) (i : Lang.size Lang.repr) (x : float) :
       Lang.size Lang.repr =
     assert (precision > 0) ;
     let fpcl = assert_fp_is_correct x in
@@ -280,12 +295,26 @@ end = struct
     | _ -> (
         let _sign, exp, mant = decompose x in
         let exp = Int64.to_int @@ exponent_bits_to_int exp in
-        let bits, _ = take precision mant in
         (* The mantissa is always implicitly prefixed by one (except for
-           denormalized numbers, excluded here).
-           Therefore, we have at most precision + 1 ones in [bits]. *)
-        let bits = 1L :: bits in
-        (* convert mantissa to sum of powers of 2 computed with shifts *)
+           denormalized numbers, excluded here). *)
+        let bits = 1L :: mant in
+        (* Get the top [precision] bits *)
+        let bits, rest = take precision bits in
+        (* Rounding. [bits_rounded] has [precision+1] bits at most.
+           The number of ones in it is at most [precision] *)
+        let exp, bits_rounded =
+          match mode with
+          | Ceil ->
+              if List.for_all (fun x -> x = 0L) rest then (exp, bits)
+              else increment_bits exp bits
+          | Floor -> (exp, bits)
+          | Round -> (
+              match rest with
+              | 1L :: _ -> increment_bits exp bits
+              | [] | 0L :: _ -> (exp, bits)
+              | _ -> assert false)
+        in
+        (* convert bits to sum of powers of 2 computed with shifts *)
         let _, terms =
           List.fold_left
             (fun (k, acc) bit ->
@@ -301,7 +330,7 @@ end = struct
               in
               (k + 1, acc))
             (0, [])
-            bits
+            bits_rounded
         in
         match List.rev terms with
         | [] -> assert false (* impossible *)
@@ -383,7 +412,8 @@ end = struct
     | Term x, Float y | Float y, Term x ->
         (* let-bind the non-constant term [x] to avoid copying it. *)
         Term
-          (X.let_ ~name:(gensym ()) x (fun x -> FPA.approx_mult precision x y))
+          (X.let_ ~name:(gensym ()) x (fun x ->
+               FPA.approx_mult Ceil precision x y))
     | Float x, Float y -> Float (x *. y)
 
   let ( / ) = lift_binop X.( / )
