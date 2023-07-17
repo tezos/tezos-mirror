@@ -121,17 +121,15 @@ let credit ctxt receiver amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
       | `Frozen_deposits staker ->
-          let delegate = Stake_repr.staker_delegate staker in
           Frozen_deposits_storage.credit_only_call_from_token ctxt staker amount
-          >|=? fun ctxt -> (ctxt, Deposits delegate)
+          >|=? fun ctxt -> (ctxt, Deposits staker)
       | `Unstaked_frozen_deposits (staker, cycle) ->
-          let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.credit_only_call_from_token
             ctxt
             staker
             cycle
             amount
-          >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))
+          >|=? fun ctxt -> (ctxt, Unstaked_deposits (staker, cycle))
       | `Block_fees ->
           Raw_context.credit_collected_fees_only_call_from_token ctxt amount
           >>?= fun ctxt -> return (ctxt, Block_fees)
@@ -177,18 +175,15 @@ let spend ctxt giver amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
       | `Frozen_deposits staker ->
-          let delegate = Stake_repr.staker_delegate staker in
-
           Frozen_deposits_storage.spend_only_call_from_token ctxt staker amount
-          >|=? fun ctxt -> (ctxt, Deposits delegate)
+          >|=? fun ctxt -> (ctxt, Deposits staker)
       | `Unstaked_frozen_deposits (staker, cycle) ->
-          let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.spend_only_call_from_token
             ctxt
             staker
             cycle
             amount
-          >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))
+          >|=? fun ctxt -> (ctxt, Unstaked_deposits (staker, cycle))
       | `Block_fees ->
           Raw_context.spend_collected_fees_only_call_from_token ctxt amount
           >>?= fun ctxt -> return (ctxt, Block_fees)

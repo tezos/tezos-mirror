@@ -31,8 +31,8 @@ type staker = Stake_repr.staker =
 type balance =
   | Contract of Contract_repr.t
   | Block_fees
-  | Deposits of Signature.Public_key_hash.t
-  | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of staker
+  | Unstaked_deposits of staker * Cycle_repr.t
   | Nonce_revelation_rewards
   | Attesting_rewards
   | Baking_rewards
@@ -91,9 +91,9 @@ let balance_encoding ~use_legacy_attestation_name =
            (obj3
               (req "kind" (constant "freezer"))
               (req "category" (constant "deposits"))
-              (req "delegate" Signature.Public_key_hash.encoding))
-           (function Deposits d -> Some ((), (), d) | _ -> None)
-           (fun ((), (), d) -> Deposits d);
+              (req "staker" Stake_repr.staker_encoding))
+           (function Deposits staker -> Some ((), (), staker) | _ -> None)
+           (fun ((), (), staker) -> Deposits staker);
          case
            (Tag 5)
            ~title:"Nonce_revelation_rewards"
@@ -261,11 +261,12 @@ let balance_encoding ~use_legacy_attestation_name =
            (obj4
               (req "kind" (constant "freezer"))
               (req "category" (constant "unstaked_deposits"))
-              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "staker" Stake_repr.staker_encoding)
               (req "cycle" Cycle_repr.encoding))
            (function
-             | Unstaked_deposits (d, c) -> Some ((), (), d, c) | _ -> None)
-           (fun ((), (), d, c) -> Unstaked_deposits (d, c));
+             | Unstaked_deposits (staker, cycle) -> Some ((), (), staker, cycle)
+             | _ -> None)
+           (fun ((), (), staker, cycle) -> Unstaked_deposits (staker, cycle));
        ]
 
 let balance_encoding_with_legacy_attestation_name =
@@ -278,9 +279,9 @@ let is_not_zero c = not (Compare.Int.equal c 0)
 let compare_balance ba bb =
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb
-  | Deposits pkha, Deposits pkhb -> Signature.Public_key_hash.compare pkha pkhb
-  | Unstaked_deposits (pkha, ca), Unstaked_deposits (pkhb, cb) ->
-      Compare.or_else (Signature.Public_key_hash.compare pkha pkhb) (fun () ->
+  | Deposits sa, Deposits sb -> Stake_repr.compare_staker sa sb
+  | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
+      Compare.or_else (Stake_repr.compare_staker sa sb) (fun () ->
           Cycle_repr.compare ca cb)
   | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
     ->

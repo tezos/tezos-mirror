@@ -36,21 +36,39 @@ open QCheck2
 open Qcheck2_helpers
 
 (** {2 Generators}  *)
-let contract =
+let default_delegate =
   let pkh, _, _ = Signature.generate_key () in
-  Receipt_repr.Contract (Contract_repr.Implicit pkh)
+  pkh
+
+let default_contract =
+  let pkh, _, _ = Signature.generate_key () in
+  Contract_repr.Implicit pkh
+
+let contract = Receipt_repr.Contract default_contract
+
+let staker =
+  let open Gen in
+  oneofl
+    [
+      Receipt_repr.Shared default_delegate;
+      Receipt_repr.Single
+        (Contract_repr.Implicit default_delegate, default_delegate);
+      Receipt_repr.Single (default_contract, default_delegate);
+    ]
 
 let deposits =
-  let pkh, _, _ = Signature.generate_key () in
-  Receipt_repr.Deposits pkh
+  let open Gen in
+  let+ staker in
+  Receipt_repr.Deposits staker
 
 let lost_endorsing_rewards =
   let pkh, _, _ = Signature.generate_key () in
   Receipt_repr.Lost_attesting_rewards (pkh, false, false)
 
 let unstaked_deposits =
-  let pkh, _, _ = Signature.generate_key () in
-  Receipt_repr.Unstaked_deposits (pkh, Cycle_repr.root)
+  let open Gen in
+  let+ staker in
+  Receipt_repr.Unstaked_deposits (staker, Cycle_repr.root)
 
 let commitments = Receipt_repr.Commitments Blinded_public_key_hash.zero
 
@@ -66,29 +84,29 @@ let frozen_bonds =
 let generate_balance =
   let open Gen in
   let open Receipt_repr in
-  oneofl
+  oneof
     [
-      contract;
-      Block_fees;
+      return contract;
+      return Block_fees;
       deposits;
       unstaked_deposits;
-      Nonce_revelation_rewards;
-      Attesting_rewards;
-      Baking_rewards;
-      Baking_bonuses;
-      Storage_fees;
-      Double_signing_punishments;
-      lost_endorsing_rewards;
-      Liquidity_baking_subsidies;
-      Burned;
-      commitments;
-      Bootstrap;
-      Invoice;
-      Initial_commitments;
-      Minted;
-      frozen_bonds;
-      Sc_rollup_refutation_punishments;
-      Sc_rollup_refutation_rewards;
+      return Nonce_revelation_rewards;
+      return Attesting_rewards;
+      return Baking_rewards;
+      return Baking_bonuses;
+      return Storage_fees;
+      return Double_signing_punishments;
+      return lost_endorsing_rewards;
+      return Liquidity_baking_subsidies;
+      return Burned;
+      return commitments;
+      return Bootstrap;
+      return Invoice;
+      return Initial_commitments;
+      return Minted;
+      return frozen_bonds;
+      return Sc_rollup_refutation_punishments;
+      return Sc_rollup_refutation_rewards;
     ]
 
 let generate_balance_update =

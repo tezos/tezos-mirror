@@ -329,6 +329,18 @@ let pp_balance_updates ppf balance_updates =
       Format.fprintf ppf "the baker who will include this operation"
     else Signature.Public_key_hash.pp ppf baker
   in
+  let pp_staker ppf = function
+    | Receipt.Single (contract, delegate) ->
+        Format.fprintf
+          ppf
+          "%a delegated to %a"
+          Contract.pp
+          contract
+          pp_baker
+          delegate
+    | Receipt.Shared delegate ->
+        Format.fprintf ppf "shared between delegators of %a" pp_baker delegate
+  in
   let balance_updates =
     List.map
       (fun (balance, update, origin) ->
@@ -336,12 +348,12 @@ let pp_balance_updates ppf balance_updates =
           match balance with
           | Contract c -> Format.asprintf "%a" Contract.pp c
           | Block_fees -> "payload fees(the block proposer)"
-          | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
-          | Unstaked_deposits (pkh, cycle) ->
+          | Deposits staker -> Format.asprintf "deposits(%a)" pp_staker staker
+          | Unstaked_deposits (staker, cycle) ->
               Format.asprintf
                 "unstaked_deposits(%a,%a)"
-                pp_baker
-                pkh
+                pp_staker
+                staker
                 Cycle.pp
                 cycle
           | Nonce_revelation_rewards -> "nonce revelation rewards"

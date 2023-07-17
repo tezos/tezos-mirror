@@ -216,7 +216,7 @@ let test_transferring_to_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Credited amount, Block_application)]
+      [(Deposits staker, Credited amount, Block_application)]
   in
   let* () =
     let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
@@ -224,7 +224,7 @@ let test_transferring_to_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Credited amount, Block_application)]
+      [(Deposits staker, Credited amount, Block_application)]
   in
   let* () =
     let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
@@ -232,7 +232,7 @@ let test_transferring_to_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Credited amount, Block_application)]
+      [(Deposits staker, Credited amount, Block_application)]
   in
   return_unit
 
@@ -426,7 +426,7 @@ let test_transferring_from_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Debited amount, Block_application)]
+      [(Deposits staker, Debited amount, Block_application)]
   in
   let* () =
     let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
@@ -434,7 +434,7 @@ let test_transferring_from_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Debited amount, Block_application)]
+      [(Deposits staker, Debited amount, Block_application)]
   in
   let* () =
     let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
@@ -442,7 +442,7 @@ let test_transferring_from_frozen_deposits ctxt =
       ctxt
       (`Frozen_deposits staker)
       amount
-      [(Deposits pkh, Debited amount, Block_application)]
+      [(Deposits staker, Debited amount, Block_application)]
   in
   return_unit
 

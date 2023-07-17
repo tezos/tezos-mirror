@@ -2038,8 +2038,8 @@ module Receipt : sig
   type balance =
     | Contract of Contract.t
     | Block_fees
-    | Deposits of public_key_hash
-    | Unstaked_deposits of public_key_hash * Cycle.t
+    | Deposits of staker
+    | Unstaked_deposits of staker * Cycle.t
     | Nonce_revelation_rewards
     | Attesting_rewards
     | Baking_rewards
