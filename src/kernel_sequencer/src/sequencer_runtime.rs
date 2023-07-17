@@ -109,9 +109,19 @@ where
         self.host.store_write(&path, src, at_offset)
     }
 
+    fn store_write_all<T: Path>(&mut self, path: &T, src: &[u8]) -> Result<(), RuntimeError> {
+        let path = map_user_path(path)?;
+        self.host.store_write_all(&path, src)
+    }
+
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         let path = map_user_path(path)?;
         self.host.store_delete(&path)
+    }
+
+    fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
+        let path = map_user_path(path)?;
+        self.host.store_delete_value(&path)
     }
 
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {

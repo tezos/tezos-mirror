@@ -13,6 +13,7 @@
 - `tezos-smart-rollup-installer-config`: add `eval_config_instr` and `upgrade_reveal_flow` functions to
   simplify kernel upgrades.
 - Update `Runtime::store_write` to write the whole slice; previously errored on slices longer than 2KB.
+- Remove uses of `proto-nairobi` feature flag. Feature flag remains on crates, but does nothing.
 
 ### Installer client/kernel
 
