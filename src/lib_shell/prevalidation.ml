@@ -166,10 +166,17 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     return {validation_info; mempool; filter_state}
 
   let pre_filter state filter_config op =
-    Filter.Mempool.pre_filter
-      ~filter_state:state.filter_state
-      filter_config
-      op.protocol
+    match Filter.Mempool.syntactic_check op.protocol with
+    | `Ill_formed ->
+        Lwt.return
+          (`Refused
+            (Error_monad.TzTrace.make
+               (Error_monad.error_of_fmt "Ill-formed operation filtered")))
+    | `Well_formed ->
+        Filter.Mempool.pre_filter
+          ~filter_state:state.filter_state
+          filter_config
+          op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 

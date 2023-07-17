@@ -495,6 +495,8 @@ module Toy_filter = struct
       | F_crash -> assert false
 
     let conflict_handler _ ~existing_operation:_ ~new_operation:_ = assert false
+
+    let syntactic_check _ = `Well_formed
   end
 end
 

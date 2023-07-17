@@ -535,6 +535,8 @@ let check_minimal_weight config state ~fee ~gas_limit op =
             (`Branch_delayed
               [Environment.wrap_tzerror (Fees_too_low_for_mempool required_fee)])
 
+let syntactic_check _ = `Well_formed
+
 let pre_filter_manager :
     type t.
     config ->

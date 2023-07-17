@@ -1028,3 +1028,5 @@ let conflict_handler config : Mempool.conflict_handler =
     | Ok _ | Error _ -> `Keep
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
+
+let syntactic_check _ = `Well_formed

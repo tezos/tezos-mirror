@@ -58,6 +58,14 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Operation_hash.t -> state
 
+    (** Perform some syntactic checks on the operation.
+
+        To be used mostly as an exceptional mechanism to prevent
+        ill-formed operations to block block application.
+
+        Should be called before the {!pre_filter}, does not need a context. *)
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+
     (** [pre_filter config ~filter_state operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
