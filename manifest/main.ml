@@ -101,8 +101,7 @@ let caqti_dynload = external_lib "caqti-dynload" V.True
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
-let cohttp_lwt_unix =
-  external_lib "cohttp-lwt-unix" V.(at_least "4.0.0" && different_from "5.1.0")
+let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "5.2.0")
 
 let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
@@ -276,7 +275,7 @@ let re = external_lib ~js_compatible:true "re" V.(at_least "1.9.0")
 
 let repr = external_lib "repr" V.True
 
-let resto_version = V.(at_least "1.0")
+let resto_version = V.(at_least "1.2")
 
 let resto = external_lib ~js_compatible:true "resto" resto_version
 

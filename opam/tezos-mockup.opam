@@ -13,7 +13,7 @@ depends: [
   "tezos-base"
   "tezos-client-base"
   "tezos-mockup-proxy"
-  "resto-cohttp-self-serving-client" { >= "1.0" }
+  "resto-cohttp-self-serving-client" { >= "1.2" }
   "tezos-rpc"
   "tezos-p2p-services"
   "tezos-p2p"

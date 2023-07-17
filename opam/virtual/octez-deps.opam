@@ -24,7 +24,7 @@ depends: [
   "caqti-lwt"
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp-lwt-unix" { >= "4.0.0" & != "5.1.0" }
+  "cohttp-lwt-unix" { >= "5.2.0" }
   "conf-libev"
   "conf-rust"
   "ctypes" { >= "0.18.0" }
@@ -76,13 +76,13 @@ depends: [
   "qcheck-core"
   "re" { >= "1.9.0" }
   "repr"
-  "resto" { >= "1.0" }
-  "resto-acl" { >= "1.0" }
-  "resto-cohttp" { >= "1.0" }
-  "resto-cohttp-client" { >= "1.0" }
-  "resto-cohttp-self-serving-client" { >= "1.0" }
-  "resto-cohttp-server" { >= "1.0" }
-  "resto-directory" { >= "1.0" }
+  "resto" { >= "1.2" }
+  "resto-acl" { >= "1.2" }
+  "resto-cohttp" { >= "1.2" }
+  "resto-cohttp-client" { >= "1.2" }
+  "resto-cohttp-self-serving-client" { >= "1.2" }
+  "resto-cohttp-server" { >= "1.2" }
+  "resto-directory" { >= "1.2" }
   "ringo" { >= "1.0.0" }
   "rlp" { >= "0.1" }
   "rope" { >= "0.6.2" }
