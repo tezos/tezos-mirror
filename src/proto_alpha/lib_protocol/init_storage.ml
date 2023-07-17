@@ -242,6 +242,10 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
+      Storage.Tenderbake.Endorsement_branch.find ctxt >>=? fun opt ->
+      Storage.Tenderbake.Endorsement_branch.remove ctxt >>= fun ctxt ->
+      Storage.Tenderbake.Attestation_branch.add_or_remove ctxt opt
+      >>= fun ctxt ->
       Storage.Tenderbake.Forbidden_delegates.init
         ctxt
         Signature.Public_key_hash.Set.empty

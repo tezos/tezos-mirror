@@ -130,6 +130,13 @@ module Tenderbake = struct
       end)
       (Branch)
 
+  module Attestation_branch =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["attestation_branch"]
+      end)
+      (Branch)
+
   module Forbidden_delegates =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

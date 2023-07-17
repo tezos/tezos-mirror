@@ -789,10 +789,20 @@ module Tenderbake : sig
       with type t := Raw_context.t
        and type value = Raw_level_repr.t
 
-  (** [Endorsement_branch] stores a single value composed of the
+  (** [Attestation_branch] stores a single value composed of the
       grandparent hash and the predecessor's payload (computed with
       the grandparent hash) used to verify the validity of
-      endorsements. *)
+      attestations. *)
+  module Attestation_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
+
+  (** Similar to [Attestation_branch] but only used for the stitching from
+      Nairobi.
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/6082
+      This should be removed once in the next protocol. *)
   module Endorsement_branch :
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t
