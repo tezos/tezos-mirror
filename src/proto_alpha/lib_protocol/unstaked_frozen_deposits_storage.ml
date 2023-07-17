@@ -23,14 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let unslashable_cycle ctxt ~cycle =
+let current_unslashable_cycle ctxt =
+  let cycle = (Raw_context.current_level ctxt).cycle in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let max_slashing_period = Constants_storage.max_slashing_period ctxt in
   Cycle_repr.sub cycle (preserved_cycles + max_slashing_period - 1)
-
-let current_unslashable_cycle ctxt =
-  let cycle = (Raw_context.current_level ctxt).cycle in
-  unslashable_cycle ctxt ~cycle
 
 module Internal = struct
   let get_all ctxt contract =
