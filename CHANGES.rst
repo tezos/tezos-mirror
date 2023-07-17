@@ -213,6 +213,8 @@ Node
   to output ``attesting rewards`` and ``lost attesting rewards`` kinds in the
   JSON result. (MR :gl:`!9253`)
 
+- Added a syntactic operation filter in the protocol's plugins.
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
