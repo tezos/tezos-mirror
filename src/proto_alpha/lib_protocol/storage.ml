@@ -1107,7 +1107,7 @@ module Slashed_level = struct
         (for_double_attesting, for_double_baking))
       (fun (for_double_attesting, for_double_baking) ->
         {for_double_attesting; for_double_baking})
-      (obj2 (req "for_double_endorsing" bool) (req "for_double_baking" bool))
+      (obj2 (req "for_double_attestating" bool) (req "for_double_baking" bool))
 end
 
 module Cycle = struct

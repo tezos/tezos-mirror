@@ -117,6 +117,10 @@ Breaking Changes
   baker's spendable balance to their frozen deposits. Bakers need to use the
   ``stake`` pseudo-operation to increase their frozen deposits. (MR :gl:`!8087`)
 
+- Field ``for_double_endorsing`` from context storage has been renamed into
+  ``for_double_attesting``. (MR :gl:`!9486`)
+
+
 RPC Changes
 -----------
 
