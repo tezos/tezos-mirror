@@ -11,24 +11,20 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "ppx_expect"
-  "tezos-base"
+  "octez-libs"
   "tezos-clic"
-  "tezos-shell-services"
   "tezos-client-base"
   "tezos-protocol-015-PtLimaPt"
   "tezos-mockup-registration"
   "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-015-PtLimaPt"
-  "tezos-rpc"
   "uri" { >= "3.1.0" }
-  "tezos-stdlib-unix"
   "tezos-protocol-environment"
   "tezos-mockup"
   "tezos-mockup-commands"
   "tezos-client-commands"
   "tezos-client-base-unix"
-  "tezos-crypto"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

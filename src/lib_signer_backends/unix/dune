@@ -8,18 +8,18 @@
  (libraries
   ocplib-endian.bigstring
   fmt
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-clic
-  tezos-stdlib-unix
-  tezos-stdlib
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
   tezos-client-base
-  tezos-rpc-http
-  tezos-rpc-http-client
-  tezos-rpc-http-client-unix
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-rpc-http-client
+  octez-libs.tezos-rpc-http-client-unix
   tezos-signer-services
   tezos-signer-backends
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   uri
   (select ledger.ml from
    (ledgerwallet-tezos -> ledger.available.ml)

@@ -3,14 +3,14 @@
 
 (library
  (name tezos_stdlib_unix)
- (public_name tezos-stdlib-unix)
+ (public_name octez-libs.tezos-stdlib-unix)
  (instrumentation (backend bisect_ppx))
  (libraries
   unix
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   tezos-lwt-result-stdlib
-  tezos-event-logging
-  tezos-stdlib
+  octez-libs.tezos-event-logging
+  octez-libs.tezos-stdlib
   data-encoding
   aches-lwt
   lwt.unix

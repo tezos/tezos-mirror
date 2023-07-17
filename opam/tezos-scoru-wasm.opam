@@ -10,11 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
-  "tezos-tree-encoding"
-  "tezos-lazy-containers"
+  "octez-libs"
   "tezos-webassembly-interpreter"
-  "tezos-context"
   "tezos-lwt-result-stdlib"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]

@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "caqti"
   "caqti-dynload"
   "caqti-lwt"
@@ -21,7 +21,6 @@ depends: [
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
   "tezt" { >= "3.1.1" }
-  "tezt-tezos"
   "tezt-performance-regression"
   "uri" { >= "3.1.0" }
 ]

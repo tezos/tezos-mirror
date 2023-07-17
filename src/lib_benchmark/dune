@@ -7,10 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   str
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-micheline
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
+  octez-libs.tezos-micheline
   tezos-clic
   data-encoding
   prbnmcn-linalg

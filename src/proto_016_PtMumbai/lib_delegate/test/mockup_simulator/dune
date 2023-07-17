@@ -5,12 +5,12 @@
  (name tezos_016_PtMumbai_mockup_simulator)
  (public_name tezos-baking-016-PtMumbai.mockup-simulator)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-016-PtMumbai
   tezos-client-016-PtMumbai
   tezos-client-commands
   tezos-baking-016-PtMumbai
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-client-base-unix
   tezos-protocol-016-PtMumbai.parameters
   tezos-mockup

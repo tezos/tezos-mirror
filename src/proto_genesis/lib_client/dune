@@ -6,15 +6,15 @@
  (public_name tezos-client-genesis)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-shell-services
+  octez-libs.tezos-base
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-protocol-environment
   tezos-protocol-genesis
   tezos-protocol-genesis.lifted
   tezos-client-commands
   tezos-proxy
-  tezos-stdlib-unix)
+  octez-libs.tezos-stdlib-unix)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

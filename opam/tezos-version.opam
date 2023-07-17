@@ -10,15 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "ppx_deriving"
-  "tezos-base"
+  "octez-libs"
   "dune-configurator"
-  "tezt" { with-test & >= "3.1.1" }
-  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: version information generated from Git"
+synopsis: "Tezos: version value generated from Git"

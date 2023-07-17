@@ -6,7 +6,7 @@
  (public_name tezos-protocol-plugin-008-PtEdo2Zk)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-008-PtEdo2Zk)
  (flags
   (:standard)
@@ -20,7 +20,7 @@
  (public_name tezos-protocol-plugin-008-PtEdo2Zk-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-embedded-protocol-008-PtEdo2Zk
   tezos-protocol-plugin-008-PtEdo2Zk
   tezos-validation)

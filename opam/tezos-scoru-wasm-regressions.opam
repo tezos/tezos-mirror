@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_import"
   "ppx_deriving"
-  "tezos-base"
+  "octez-libs"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-helpers"
   "tezos-test-helpers"

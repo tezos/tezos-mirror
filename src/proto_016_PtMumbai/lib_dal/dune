@@ -6,9 +6,9 @@
  (public_name tezos-dal-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   octez-protocol-compiler.registerer
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-dal-node-lib
   tezos-client-016-PtMumbai
   tezos-protocol-plugin-016-PtMumbai

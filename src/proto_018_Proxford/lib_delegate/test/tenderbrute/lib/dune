@@ -6,8 +6,8 @@
  (public_name tezos-baking-018-Proxford.tenderbrute)
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-protocol-018-Proxford
   tezos-client-base
   tezos-client-018-Proxford)

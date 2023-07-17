@@ -10,9 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
-  "tezos-rpc-http"
-  "tezos-rpc-http-client-unix"
+  "octez-libs"
   "tezos-version"
   "lwt-exit"
   "rlp" { >= "0.1" }

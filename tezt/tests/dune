@@ -9,12 +9,12 @@
   tezt
   str
   bls12-381
-  tezt-tezos
+  octez-libs.tezt-tezos
   tezt_ethereum
   data-encoding
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-alpha
   tezos_scoru_wasm_regressions
   tezt_self_tests_tezt_lib

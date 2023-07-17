@@ -5,17 +5,17 @@
 
 (library
  (name tezos_crypto)
- (public_name tezos-crypto)
+ (public_name octez-libs.tezos-crypto)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib
+  octez-libs.tezos-stdlib
   data-encoding
   tezos-lwt-result-stdlib
   lwt
-  tezos-hacl
+  octez-libs.tezos-hacl
   secp256k1-internal
-  tezos-error-monad
-  tezos-rpc
+  octez-libs.tezos-error-monad
+  octez-libs.tezos-rpc
   aches
   zarith
   zarith_stubs_js

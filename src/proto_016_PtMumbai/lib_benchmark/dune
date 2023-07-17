@@ -5,15 +5,15 @@
  (name tezos_benchmark_016_PtMumbai)
  (public_name tezos-benchmark-016-PtMumbai)
  (libraries
-  tezos-stdlib
-  tezos-base
-  tezos-error-monad
-  tezos-micheline
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-base
+  octez-libs.tezos-error-monad
+  octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-benchmark
   tezos-benchmark-type-inference-016-PtMumbai
   tezos-protocol-016-PtMumbai
-  tezos-crypto
+  octez-libs.tezos-crypto
   tezos-protocol-016-PtMumbai.parameters
   hashcons
   tezos-016-PtMumbai-test-helpers

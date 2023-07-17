@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-plonk
-  octez-bls12-381-polynomial)
+  octez-libs.octez-bls12-381-polynomial)
  (preprocess (pps ppx_repr))
  (flags
   (:standard)

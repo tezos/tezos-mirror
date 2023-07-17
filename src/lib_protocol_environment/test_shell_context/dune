@@ -9,7 +9,7 @@
   tezos-shell-context
   octez-alcotezt
   tezos-test-helpers
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

@@ -7,14 +7,14 @@
  (libraries
   tezt.core
   tezt
-  tezos-context
+  octez-libs.tezos-context
   octez-alcotezt
-  tezos-base
+  octez-libs.tezos-base
   tezos-client-alpha
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-alpha-test-helpers
-  tezos-base-test-helpers)
+  octez-libs.tezos-base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

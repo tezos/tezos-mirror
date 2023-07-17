@@ -4,11 +4,11 @@
 (executables
  (names test_uf test_inference)
  (libraries
-  tezos-micheline
+  octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-benchmark-type-inference-018-Proxford
   tezos-protocol-018-Proxford
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   tezos-client-018-Proxford)
  (link_flags
   (:standard)

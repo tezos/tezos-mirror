@@ -6,8 +6,8 @@
  (package tezos-scoru-wasm-durable-snapshot)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-tree-encoding
+  octez-libs.tezos-base
+  octez-libs.tezos-tree-encoding
   tezos-webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags

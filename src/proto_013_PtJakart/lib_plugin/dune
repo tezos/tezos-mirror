@@ -6,7 +6,7 @@
  (public_name tezos-protocol-plugin-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-013-PtJakart)
  (flags
   (:standard)
@@ -20,7 +20,7 @@
  (public_name tezos-protocol-plugin-013-PtJakart-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-embedded-protocol-013-PtJakart
   tezos-protocol-plugin-013-PtJakart
   tezos-validation)

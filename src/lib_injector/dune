@@ -6,14 +6,14 @@
  (public_name octez-injector)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   logs.lwt
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-micheline
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
+  octez-libs.tezos-micheline
   tezos-client-base
-  tezos-workers
+  octez-libs.tezos-workers
   tezos-shell
   octez-crawler)
  (flags

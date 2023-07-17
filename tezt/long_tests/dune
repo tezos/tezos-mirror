@@ -1,18 +1,18 @@
 (executable
  (name main)
  (libraries tezt
-            tezt-tezos
+            octez-libs.tezt-tezos
             tezt-performance-regression
             tezos-lwt-result-stdlib
             tezos-alpha-test-helpers
-            tezos-micheline
+            octez-libs.tezos-micheline
             tezos-openapi
             tezos-protocol-alpha
             qcheck-core
             tezos-time-measurement
             data-encoding
-            tezos-event-logging
-            tezos-test-helpers
+            octez-libs.tezos-event-logging
+	    tezos-test-helpers
             )
  (flags (:standard
           -open Tezt

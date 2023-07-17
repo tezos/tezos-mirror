@@ -7,13 +7,13 @@
  (libraries
   tezt.core
   octez-alcotezt
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-alpha-test-helpers
-  tezos-base-test-helpers
+  octez-libs.tezos-base-test-helpers
   tezos-client-alpha
   tezos-benchmark
-  tezos-micheline
+  octez-libs.tezos-micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
   tezos-protocol-plugin-alpha

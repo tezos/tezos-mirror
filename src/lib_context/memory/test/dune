@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base.unix
-  tezos-context.disk
-  tezos-context.memory
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-context.disk
+  octez-libs.tezos-context.memory
+  octez-libs.tezos-stdlib-unix
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -32,7 +32,7 @@
 
 (rule
  (alias runtest)
- (package tezos-context)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

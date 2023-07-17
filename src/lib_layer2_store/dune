@@ -7,13 +7,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   index
-  tezos-base
+  octez-libs.tezos-base
   irmin-pack
   irmin-pack.unix
   irmin
   aches-lwt
-  tezos-stdlib-unix
-  tezos-context.encoding)
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-context.encoding)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

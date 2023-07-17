@@ -6,20 +6,20 @@
  (public_name tezos-client-014-PtKathma.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-protocol-014-PtKathma
   tezos-protocol-014-PtKathma.parameters
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-mockup
   tezos-mockup-registration
   tezos-mockup-commands
   tezos-client-base
   tezos-client-014-PtKathma
   tezos-client-commands
-  tezos-rpc
+  octez-libs.tezos-rpc
   tezos-client-base-unix
   tezos-protocol-plugin-014-PtKathma
   uri)
@@ -44,18 +44,18 @@
  (public_name tezos-client-014-PtKathma.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-protocol-014-PtKathma
   tezos-protocol-014-PtKathma.parameters
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-014-PtKathma
   tezos-client-commands
   tezos-client-014-PtKathma.commands
   tezos-client-014-PtKathma.sapling
-  tezos-rpc
+  octez-libs.tezos-rpc
   tezos-protocol-plugin-014-PtKathma)
  (library_flags (:standard -linkall))
  (flags

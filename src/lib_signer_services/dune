@@ -8,8 +8,8 @@
  (public_name tezos-signer-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc
+  octez-libs.tezos-base
+  octez-libs.tezos-rpc
   tezos-client-base)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

@@ -10,14 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
-  "tezos-base"
-  "tezos-error-monad"
+  "octez-libs"
   "tezos-benchmark"
-  "tezos-crypto"
-  "tezos-context"
   "tezos-shell-context"
-  "tezos-micheline"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

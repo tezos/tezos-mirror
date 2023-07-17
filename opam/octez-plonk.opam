@@ -14,7 +14,7 @@ depends: [
   "repr"
   "hacl-star" { >= "0.7.1" & < "0.8" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "octez-bls12-381-polynomial"
+  "octez-libs"
   "octez-plompiler"
   "logs"
   "octez-distributed-lwt-internal"

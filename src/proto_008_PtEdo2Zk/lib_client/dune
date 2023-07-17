@@ -6,15 +6,15 @@
  (public_name tezos-client-008-PtEdo2Zk)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-protocol-008-PtEdo2Zk
   tezos-protocol-008-PtEdo2Zk.lifted
   tezos-signer-backends
   tezos-protocol-plugin-008-PtEdo2Zk
-  tezos-rpc
+  octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))
  (flags

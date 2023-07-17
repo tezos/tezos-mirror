@@ -6,7 +6,7 @@
  (public_name tezos-protocol-plugin-011-PtHangz2)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-011-PtHangz2)
  (flags
   (:standard)
@@ -20,7 +20,7 @@
  (public_name tezos-protocol-plugin-011-PtHangz2-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-embedded-protocol-011-PtHangz2
   tezos-protocol-plugin-011-PtHangz2
   tezos-validation)

@@ -10,28 +10,21 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib-unix"
-  "tezos-base"
-  "tezos-crypto"
-  "tezos-shell-services"
+  "octez-libs"
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
   "tezos-validation"
-  "tezos-version"
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
   "tezos-protocol-environment"
-  "tezos-context"
   "tezos-context-ops"
   "tezos-shell-context"
   "tezos-protocol-updater"
-  "tezos-stdlib"
   "lwt-watcher" { = "0.2" }
   "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { >= "2.0.1" & < "3.0.0" }
   "prometheus" { >= "1.2" }
-  "tezos-rpc"
   "tezt" { with-test & >= "3.1.1" }
   "tezos-embedded-protocol-demo-noops" {with-test}
   "tezos-embedded-protocol-genesis" {with-test}

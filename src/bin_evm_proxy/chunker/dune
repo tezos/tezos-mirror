@@ -5,7 +5,7 @@
  (name octez_evm_chunker)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   evm_proxy_lib)
  (flags
   (:standard)

@@ -6,9 +6,9 @@
  (public_name tezos-benchmark-examples)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
   tezos-benchmark)
  (flags
   (:standard)

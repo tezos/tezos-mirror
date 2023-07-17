@@ -10,20 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-client-base"
   "tezos-mockup-proxy"
   "resto-cohttp-self-serving-client" { >= "1.2" }
-  "tezos-rpc"
-  "tezos-p2p-services"
-  "tezos-p2p"
   "tezos-protocol-environment"
-  "tezos-stdlib-unix"
-  "tezos-rpc-http"
-  "tezos-rpc-http-client"
   "tezos-mockup-registration"
   "tezt" { with-test & >= "3.1.1" }
-  "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}

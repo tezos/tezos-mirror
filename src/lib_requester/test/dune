@@ -6,12 +6,12 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-test-helpers
-  tezos-base-test-helpers
-  tezos-stdlib
-  tezos-stdlib-unix
+  octez-libs.tezos-base-test-helpers
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-stdlib-unix
   tezos-requester
   octez-alcotezt
   qcheck-alcotest)

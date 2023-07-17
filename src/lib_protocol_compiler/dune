@@ -6,10 +6,10 @@
  (public_name octez-protocol-compiler)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-protocol-environment.sigs
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   compiler-libs.common
   lwt.unix
   ocplib-ocamlres
@@ -74,7 +74,7 @@
  (public_name octez-protocol-compiler.native)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   octez-protocol-compiler
   compiler-libs.optcomp)
  (flags

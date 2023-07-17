@@ -6,26 +6,26 @@
  (public_name tezos-baking-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-version.value
   tezos-protocol-alpha
   tezos-protocol-alpha.lifted
   tezos-protocol-plugin-alpha
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-alpha
   tezos-client-commands
-  tezos-stdlib
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-stdlib-unix
   tezos-shell-context
-  tezos-context
-  tezos-context.memory
-  tezos-rpc-http-client-unix
+  octez-libs.tezos-context
+  octez-libs.tezos-context.memory
+  octez-libs.tezos-rpc-http-client-unix
   tezos-context-ops
-  tezos-rpc
-  tezos-rpc-http
+  octez-libs.tezos-rpc
+  octez-libs.tezos-rpc-http
   tezos-dal-node-services
   lwt-canceler
   lwt-exit
@@ -55,17 +55,17 @@
  (public_name tezos-baking-alpha-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-alpha
   tezos-client-commands
   tezos-baking-alpha
-  tezos-rpc
+  octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -87,16 +87,16 @@
  (public_name tezos-baking-alpha-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-alpha
   tezos-client-commands
   tezos-baking-alpha
   tezos-baking-alpha-commands
-  tezos-rpc)
+  octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

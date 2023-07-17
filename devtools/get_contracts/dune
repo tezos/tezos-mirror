@@ -4,8 +4,8 @@
 (library
  (name get_contracts_lib)
  (libraries
-  tezos-micheline
-  tezos-base
+  octez-libs.tezos-micheline
+  octez-libs.tezos-base
   tezos-store
   tezos-protocol-016-PtMumbai
   tezos-client-016-PtMumbai
@@ -25,8 +25,8 @@
 (executable
  (name get_contracts)
  (libraries
-  tezos-micheline
-  tezos-base
+  octez-libs.tezos-micheline
+  octez-libs.tezos-base
   get_contracts_lib)
  (link_flags
   (:standard)

@@ -5,8 +5,8 @@
  (name test_gossipsub)
  (libraries
   fmt
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-gossipsub
   tezt
   qcheck-core

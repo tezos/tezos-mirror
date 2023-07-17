@@ -5,14 +5,14 @@
  (name tezos_client_004_Pt24m4xi)
  (public_name tezos-client-004-Pt24m4xi)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-protocol-004-Pt24m4xi
   tezos-protocol-004-Pt24m4xi.lifted
   tezos-signer-backends
-  tezos-rpc
+  octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))
  (flags

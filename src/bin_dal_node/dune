@@ -7,32 +7,32 @@
  (package octez-dal-node)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-version
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-version
   cmdliner
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands
-  tezos-rpc-http
-  tezos-rpc-http-server
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-rpc-http-server
   tezos-protocol-updater
-  tezos-rpc-http-client-unix
-  tezos-stdlib-unix
-  tezos-stdlib
+  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
   tezos-dal-node-lib
   tezos-dal-node-services
   tezos_layer2_store
-  tezos-crypto-dal
+  octez-libs.tezos-crypto-dal
   tezos-store.unix
   tezos-store.shared
   tezos-gossipsub
   tezos-dal-node-lib.gossipsub
-  tezos-p2p
-  tezos-p2p-services
-  tezos-crypto
-  tezos-base.p2p-identity-file
-  tezos-shell-services
+  octez-libs.tezos-p2p
+  octez-libs.tezos-p2p-services
+  octez-libs.tezos-crypto
+  octez-libs.tezos-base.p2p-identity-file
+  octez-libs.tezos-shell-services
   irmin-pack
   irmin-pack.unix
   irmin

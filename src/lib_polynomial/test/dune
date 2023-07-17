@@ -9,7 +9,7 @@
   bls12-381
   octez-mec
   octez-alcotezt
-  octez-polynomial)
+  octez-libs.octez-polynomial)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -28,7 +28,7 @@
 
 (rule
  (alias runtest)
- (package octez-polynomial)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

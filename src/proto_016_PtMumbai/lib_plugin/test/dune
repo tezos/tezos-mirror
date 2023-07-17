@@ -6,14 +6,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base-test-helpers
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base-test-helpers
+  octez-libs.tezos-base.unix
   octez-alcotezt
   tezos-test-helpers
   qcheck-alcotest
-  tezos-stdlib-unix
-  tezos-micheline
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-micheline
   tezos-protocol-plugin-016-PtMumbai
   tezos-protocol-016-PtMumbai
   tezos-protocol-016-PtMumbai.parameters

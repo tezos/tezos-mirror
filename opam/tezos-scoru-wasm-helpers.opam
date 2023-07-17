@@ -12,9 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_import"
   "ppx_deriving"
-  "tezos-base"
-  "tezos-tree-encoding"
-  "tezos-context"
+  "octez-libs"
   "tezos-scoru-wasm"
   "tezos-scoru-wasm-fast"
   "tezos-webassembly-interpreter-extra"

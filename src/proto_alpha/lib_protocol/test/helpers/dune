@@ -8,17 +8,17 @@
  (libraries
   qcheck-alcotest
   tezos-test-helpers
-  tezos-base
-  tezos-micheline
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-micheline
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-alpha
   tezos-client-alpha
   tezos-protocol-alpha.parameters
   tezos-protocol-environment
   tezos-protocol-plugin-alpha
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   octez-plompiler
-  tezos-crypto-dal
+  octez-libs.tezos-crypto-dal
   tezos-smart-rollup-alpha)
  (flags
   (:standard)

@@ -6,7 +6,7 @@
  (public_name octez-srs-extraction)
  (libraries
   bls12-381
-  octez-bls12-381-polynomial)
+  octez-libs.octez-bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_bls12_381_polynomial)
@@ -19,7 +19,7 @@
   cmdliner
   unix
   bls12-381
-  octez-bls12-381-polynomial)
+  octez-libs.octez-bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_srs_extraction

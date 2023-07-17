@@ -36,7 +36,7 @@
  (libraries
   octez-plonk.plonk-test
   qcheck-alcotest
-  octez-bls12-381-polynomial)
+  octez-libs.octez-bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_bls12_381_polynomial)

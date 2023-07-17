@@ -6,15 +6,15 @@
  (public_name tezos-client-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc
+  octez-libs.tezos-base
+  octez-libs.tezos-rpc
   tezos-clic
   tezos-clic.unix
   tezos-client-base
-  tezos-shell-services
-  tezos-p2p-services
-  tezos-stdlib-unix
-  tezos-base.unix
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-p2p-services
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-base.unix
   tezos-signer-backends
   data-encoding
   uri)

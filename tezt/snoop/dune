@@ -1,5 +1,5 @@
 (executable
  (name main)
  (libraries
-   tezt-tezos)
+   octez-libs.tezt-tezos)
  (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

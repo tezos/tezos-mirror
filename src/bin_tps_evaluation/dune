@@ -7,7 +7,7 @@
  (package tezos-tps-evaluation)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   caqti
   caqti-dynload
   caqti-lwt
@@ -18,7 +18,7 @@
   tezos-client-base-unix
   tezos-protocol-alpha
   tezt
-  tezt-tezos
+  octez-libs.tezt-tezos
   tezt-performance-regression
   uri)
  (link_flags

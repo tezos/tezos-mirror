@@ -15,17 +15,17 @@
   test_p2p_maintenance)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-p2p
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-p2p
   tezos-test-helpers
-  tezos-base-test-helpers
-  tezos-event-logging-test-helpers
-  tezos_p2p_test_common
-  tezos-p2p-services
-  tezt-tezos
+  octez-libs.tezos-base-test-helpers
+  octez-libs.tezos-event-logging-test-helpers
+  octez-libs.tezos_p2p_test_common
+  octez-libs.tezos-p2p-services
+  octez-libs.tezt-tezos
   tezt
   octez-alcotezt
   astring)
@@ -44,60 +44,60 @@
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_socket.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_pool.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_broadcast.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_io_scheduler.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_peerset.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_buffer_reader.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_banned_peers.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_node.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_connect_handler.exe})))
 
 (rule
  (alias runtest)
- (package tezos-p2p)
+ (package octez-libs)
  (locks /locks/p2p)
  (action (run %{dep:./test_p2p_maintenance.exe})))

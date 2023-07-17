@@ -3,11 +3,11 @@
 
 (library
  (name tezos_context_encoding)
- (public_name tezos-context.encoding)
+ (public_name octez-libs.tezos-context.encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib
   irmin
   irmin-pack)
  (flags

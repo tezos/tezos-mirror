@@ -13,11 +13,7 @@ depends: [
   "ringo" { >= "1.0.0" }
   "aches" { >= "1.0.0" }
   "fmt" { >= "0.8.7" }
-  "tezos-error-monad"
-  "tezos-base"
-  "tezos-stdlib-unix"
-  "tezos-stdlib"
-  "tezos-version"
+  "octez-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

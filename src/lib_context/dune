@@ -3,8 +3,8 @@
 
 (library
  (name tezos_context)
- (public_name tezos-context)
+ (public_name octez-libs.tezos-context)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-context.disk
-  tezos-context.memory))
+  octez-libs.tezos-context.disk
+  octez-libs.tezos-context.memory))

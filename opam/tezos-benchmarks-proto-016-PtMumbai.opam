@@ -10,17 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
-  "tezos-base"
-  "tezos-error-monad"
+  "octez-libs"
   "tezos-protocol-016-PtMumbai"
-  "tezos-lazy-containers"
   "tezos-benchmark"
   "tezos-benchmark-016-PtMumbai"
   "tezos-benchmark-type-inference-016-PtMumbai"
-  "tezos-crypto"
   "tezos-shell-benchmarks"
-  "tezos-micheline"
   "tezos-016-PtMumbai-test-helpers"
   "tezos-sapling"
   "tezos-client-016-PtMumbai"

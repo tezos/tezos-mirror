@@ -7,18 +7,18 @@
  (package octez-proxy-server)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-rpc
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-rpc
   cmdliner
   lwt-exit
   lwt.unix
   tezos-proxy
   tezos-proxy-server-config
-  tezos-rpc-http-client-unix
-  tezos-rpc-http-server
-  tezos-shell-services
+  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.tezos-rpc-http-server
+  octez-libs.tezos-shell-services
   tezos-shell-context
   tezos-version.value
   uri

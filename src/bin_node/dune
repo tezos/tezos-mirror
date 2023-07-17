@@ -7,24 +7,24 @@
  (package octez-node)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-version
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-version
   tezos-version.value
   octez-node-config
-  tezos-stdlib-unix
-  tezos-shell-services
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-p2p
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-rpc-http-server
+  octez-libs.tezos-p2p
   tezos-shell
   tezos-store
   tezos-store.unix-reconstruction
   tezos-store.unix-snapshots
-  tezos-context
+  octez-libs.tezos-context
   tezos-validation
   tezos-shell-context
-  tezos-workers
+  octez-libs.tezos-workers
   tezos-protocol-updater
   cmdliner
   fmt.cli
@@ -33,7 +33,7 @@
   prometheus-app.unix
   lwt-exit
   uri
-  tezos-base.p2p-identity-file
+  octez-libs.tezos-base.p2p-identity-file
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))

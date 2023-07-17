@@ -10,13 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-clic"
   "tezos-protocol-018-Proxford"
   "tezos-client-018-Proxford"
   "tezos-client-commands"
   "tezos-baking-018-Proxford-commands"
-  "tezos-stdlib-unix"
   "tezos-client-base-unix"
 ]
 build: [

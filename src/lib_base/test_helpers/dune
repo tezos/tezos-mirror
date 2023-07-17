@@ -3,12 +3,12 @@
 
 (library
  (name tezos_base_test_helpers)
- (public_name tezos-base-test-helpers)
+ (public_name octez-libs.tezos-base-test-helpers)
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-event-logging-test-helpers
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-event-logging-test-helpers
   tezos-test-helpers
   octez-alcotezt
   qcheck-alcotest)

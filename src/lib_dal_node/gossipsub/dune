@@ -6,12 +6,12 @@
  (public_name tezos-dal-node-lib.gossipsub)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-crypto-dal
+  octez-libs.tezos-base
+  octez-libs.tezos-crypto-dal
   tezos-gossipsub
-  tezos-p2p
-  tezos-p2p-services
-  tezos-crypto)
+  octez-libs.tezos-p2p
+  octez-libs.tezos-p2p-services
+  octez-libs.tezos-crypto)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

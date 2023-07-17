@@ -6,23 +6,23 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base-test-helpers
+  octez-libs.tezos-base
+  octez-libs.tezos-base-test-helpers
   tezos-store
   tezos-store.shared
-  tezos-context
+  octez-libs.tezos-context
   tezos-context-ops
   tezos-shell-context
   tezos-protocol-updater
-  tezos-p2p
-  tezos-p2p-services
+  octez-libs.tezos-p2p
+  octez-libs.tezos-p2p-services
   tezos-requester
   tezos-shell
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-embedded-protocol-demo-noops
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-validation
-  tezos-event-logging-test-helpers
+  octez-libs.tezos-event-logging-test-helpers
   tezos-test-helpers
   octez-alcotezt
   tezos-version.value)

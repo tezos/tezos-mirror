@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-stdlib
+  octez-libs.tezos-stdlib
   octez-alcotezt
   bigstring
   lwt.unix
@@ -36,7 +36,7 @@
 
 (rule
  (alias runtest)
- (package tezos-stdlib)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

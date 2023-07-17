@@ -6,10 +6,10 @@
  (public_name tezos-scoru-wasm-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-context.disk
+  octez-libs.tezos-base
+  octez-libs.tezos-tree-encoding
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-context.disk
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
   tezos-webassembly-interpreter-extra)
