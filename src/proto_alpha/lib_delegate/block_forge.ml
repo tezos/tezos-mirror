@@ -312,7 +312,7 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
       pred_info
       chain_id
   in
-  (* We still need to filter endorsements. Two endorsements could be
+  (* We still need to filter attestations. Two attestations could be
      referring to the same slot. *)
   let* incremental, ordered_pool =
     Operation_selection.filter_consensus_operations_only
