@@ -397,8 +397,8 @@ let adaptive_inflation_encoding =
         adaptive_rewards_params;
       })
     (obj4
-       (req "staking_over_baking_global_limit" uint8)
-       (req "staking_over_delegation_edge" uint8)
+       (req "global_limit_of_staking_over_baking" uint8)
+       (req "edge_of_staking_over_delegation" uint8)
        (req "adaptive_inflation_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
@@ -601,7 +601,7 @@ let encoding =
                 (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "max_slashing_period" int31)
-                   (req "delegation_over_baking_limit" uint8)
+                   (req "limit_of_delegation_over_baking" uint8)
                    (req
                       "percentage_of_frozen_deposits_slashed_per_double_baking"
                       uint8)
