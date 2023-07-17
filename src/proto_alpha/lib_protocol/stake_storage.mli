@@ -34,15 +34,27 @@
     - {!Storage.Stake.Total_active_stake}
 *)
 
-val remove_stake :
+val remove_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val add_stake :
+val remove_frozen_stake :
+  Raw_context.t ->
+  Stake_repr.staker ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val add_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val add_frozen_stake :
+  Raw_context.t ->
+  Stake_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 

@@ -58,7 +58,7 @@ module Contract = struct
     Contract_delegate_storage.init ctxt contract delegate >>=? fun ctxt ->
     Contract_storage.get_balance_and_frozen_bonds ctxt contract
     >>=? fun balance_and_frozen_bonds ->
-    Stake_storage.add_stake ctxt delegate balance_and_frozen_bonds
+    Stake_storage.add_delegated_stake ctxt delegate balance_and_frozen_bonds
 
   type error +=
     | (* `Temporary *) Active_delegate
@@ -120,7 +120,9 @@ module Contract = struct
         Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
       in
       let* c = Contract_delegate_storage.set c contract delegate in
-      let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+      let* c =
+        Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+      in
       let*! c = Storage.Delegates.add c delegate in
       let* c = Delegate_consensus_key.init c delegate pk in
       let* c = Stake_storage.set_active c delegate in
@@ -197,7 +199,9 @@ module Contract = struct
             (Unregistered_delegate delegate)
         in
         let* c = Contract_delegate_storage.set c contract delegate in
-        let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+        let* c =
+          Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+        in
         return c
 
   let set c contract delegate =

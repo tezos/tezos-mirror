@@ -73,7 +73,7 @@ let credit_only_call_from_token ctxt staker cycle amount =
   let delegate = Stake_repr.staker_delegate staker in
   let delegate_contract = Contract_repr.Implicit delegate in
   let f deposits = Deposits_repr.(deposits +? amount) in
-  let* ctxt = Stake_storage.add_stake ctxt delegate amount in
+  let* ctxt = Stake_storage.add_delegated_stake ctxt delegate amount in
   update_balance ~f ctxt delegate_contract cycle
 
 let spend_only_call_from_token ctxt staker cycle amount =
@@ -85,5 +85,5 @@ let spend_only_call_from_token ctxt staker cycle amount =
     let+ current_amount = Tez_repr.(current_amount -? amount) in
     Deposits_repr.{initial_amount; current_amount}
   in
-  let* ctxt = Stake_storage.remove_stake ctxt delegate amount in
+  let* ctxt = Stake_storage.remove_delegated_stake ctxt delegate amount in
   update_balance ~f ctxt delegate_contract cycle

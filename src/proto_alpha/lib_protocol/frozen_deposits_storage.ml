@@ -47,13 +47,13 @@ let credit_only_call_from_token ctxt staker amount =
   let open Lwt_result_syntax in
   let delegate = Stake_repr.staker_delegate staker in
   let* ctxt = update_balance ctxt delegate Tez_repr.( +? ) amount in
-  Stake_storage.add_stake ctxt delegate amount
+  Stake_storage.add_frozen_stake ctxt staker amount
 
 let spend_only_call_from_token ctxt staker amount =
   let open Lwt_result_syntax in
   let delegate = Stake_repr.staker_delegate staker in
   let* ctxt = update_balance ctxt delegate Tez_repr.( -? ) amount in
-  Stake_storage.remove_stake ctxt delegate amount
+  Stake_storage.remove_frozen_stake ctxt staker amount
 
 let update_initial_amount ctxt delegate_contract deposits_cap =
   let open Lwt_result_syntax in

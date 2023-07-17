@@ -124,6 +124,19 @@ let remove_stake ctxt delegate amount =
 let add_stake ctxt delegate amount =
   update_stake ctxt delegate ~f:(fun stake -> Tez_repr.(stake +? amount))
 
+let remove_delegated_stake ctxt delegate amount =
+  remove_stake ctxt delegate amount
+
+let remove_frozen_stake ctxt staker amount =
+  let delegate = Stake_repr.staker_delegate staker in
+  remove_stake ctxt delegate amount
+
+let add_delegated_stake ctxt delegate amount = add_stake ctxt delegate amount
+
+let add_frozen_stake ctxt staker amount =
+  let delegate = Stake_repr.staker_delegate staker in
+  add_stake ctxt delegate amount
+
 let set_inactive ctxt delegate =
   Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
