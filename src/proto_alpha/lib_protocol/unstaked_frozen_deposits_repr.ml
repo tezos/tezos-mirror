@@ -23,8 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Associative list acting like a map, i.e. not duplicated keys are expected.
+   Though sorting is not required. *)
 type t = (Cycle_repr.t * Deposits_repr.t) list
 
+(* A version of {!t} in which all cycles older than a given [unslashable_cycle]
+   are squashed together using {!Deposits_repr.(++?)}. *)
 type squashed = t
 
 let empty = []
