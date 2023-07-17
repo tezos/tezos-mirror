@@ -23,14 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Datatype for a map from cycle to deposits, where all unslashable cycles
+    are squashed. *)
+
+(** Storable version. *)
 type t
 
+(** To be used locally, do not preserve values of this type over cycles. *)
 type squashed = private t
 
 val empty : squashed
 
 val encoding : t Data_encoding.t
 
+(** Once read, [t] must be converted to [squashed] with [squash_unslashable]
+    to be used efficiently.
+    For a given [unslashable_cycle], [squash_unslashable ~unslashable_cycle] is
+    idempotent. *)
 val squash_unslashable :
   unslashable_cycle:Cycle_repr.t option -> t -> squashed tzresult
 
