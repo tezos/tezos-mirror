@@ -2031,6 +2031,10 @@ end
 
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
+  type staker =
+    | Single of Contract.t * Signature.public_key_hash
+    | Shared of Signature.public_key_hash
+
   type balance =
     | Contract of Contract.t
     | Block_fees
@@ -4868,8 +4872,8 @@ module Token : sig
   type container =
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
-    | `Frozen_deposits of public_key_hash
-    | `Unstaked_frozen_deposits of public_key_hash * Cycle.t
+    | `Frozen_deposits of Receipt.staker
+    | `Unstaked_frozen_deposits of Receipt.staker * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 

@@ -26,8 +26,8 @@
 type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
-  | `Frozen_deposits of Signature.Public_key_hash.t
-  | `Unstaked_frozen_deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | `Frozen_deposits of Stake_repr.staker
+  | `Unstaked_frozen_deposits of Stake_repr.staker * Cycle_repr.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
@@ -75,12 +75,17 @@ let balance ctxt stored =
   | `Collected_commitments bpkh ->
       Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
       (ctxt, balance)
-  | `Frozen_deposits delegate ->
-      let contract = Contract_repr.Implicit delegate in
+  | `Frozen_deposits staker ->
+      let contract =
+        Contract_repr.Implicit (Stake_repr.staker_delegate staker)
+      in
       Frozen_deposits_storage.get ctxt contract >|=? fun frozen_deposits ->
       (ctxt, frozen_deposits.current_amount)
-  | `Unstaked_frozen_deposits (delegate, cycle) ->
-      Unstaked_frozen_deposits_storage.balance ctxt delegate cycle
+  | `Unstaked_frozen_deposits (staker, cycle) ->
+      Unstaked_frozen_deposits_storage.balance
+        ctxt
+        (Stake_repr.staker_delegate staker)
+        cycle
       >|=? fun balance -> (ctxt, balance)
   | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
   | `Frozen_bonds (contract, bond_id) ->
@@ -115,13 +120,15 @@ let credit ctxt receiver amount origin =
             bpkh
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
-      | `Frozen_deposits delegate ->
+      | `Frozen_deposits staker ->
+          let delegate = Stake_repr.staker_delegate staker in
           Frozen_deposits_storage.credit_only_call_from_token
             ctxt
             delegate
             amount
           >|=? fun ctxt -> (ctxt, Deposits delegate)
-      | `Unstaked_frozen_deposits (delegate, cycle) ->
+      | `Unstaked_frozen_deposits (staker, cycle) ->
+          let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.credit_only_call_from_token
             ctxt
             delegate
@@ -172,13 +179,15 @@ let spend ctxt giver amount origin =
             bpkh
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
-      | `Frozen_deposits delegate ->
+      | `Frozen_deposits staker ->
+          let delegate = Stake_repr.staker_delegate staker in
           Frozen_deposits_storage.spend_only_call_from_token
             ctxt
             delegate
             amount
           >|=? fun ctxt -> (ctxt, Deposits delegate)
-      | `Unstaked_frozen_deposits (delegate, cycle) ->
+      | `Unstaked_frozen_deposits (staker, cycle) ->
+          let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.spend_only_call_from_token
             ctxt
             delegate

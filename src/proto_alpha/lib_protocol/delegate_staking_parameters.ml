@@ -170,7 +170,11 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
     compute_reward_distrib ctxt delegate active_stake rewards
   in
   let* ctxt, balance_updates_frozen_rewards =
-    Token.transfer ctxt source (`Frozen_deposits delegate) to_frozen
+    Token.transfer
+      ctxt
+      source
+      (`Frozen_deposits (Stake_repr.Shared delegate))
+      to_frozen
   in
   let+ ctxt, balance_updates_spendable_rewards =
     Token.transfer

@@ -56,7 +56,8 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
       let+ ctxt, new_balance_updates =
         Token.transfer
           ctxt
-          (`Unstaked_frozen_deposits (delegate, cycle))
+          (`Unstaked_frozen_deposits
+            (Receipt.Single (contract, delegate), cycle))
           (`Contract contract)
           amount
       in
@@ -107,13 +108,15 @@ let punish_delegate ctxt delegate level mistake ~rewarded =
   let* ctxt, {staked; unstaked} = punish ctxt delegate level in
   let init_to_burn_to_reward =
     let Delegate.{amount_to_burn; reward} = staked in
-    let giver = `Frozen_deposits delegate in
+    let giver = `Frozen_deposits (Receipt.Shared delegate) in
     ([(giver, amount_to_burn)], [(giver, reward)])
   in
   let to_burn, to_reward =
     List.fold_left
       (fun (to_burn, to_reward) (cycle, Delegate.{amount_to_burn; reward}) ->
-        let giver = `Unstaked_frozen_deposits (delegate, cycle) in
+        let giver =
+          `Unstaked_frozen_deposits (Receipt.Shared delegate, cycle)
+        in
         ((giver, amount_to_burn) :: to_burn, (giver, reward) :: to_reward))
       init_to_burn_to_reward
       unstaked
@@ -149,7 +152,7 @@ let stake ctxt ~sender ~delegate amount =
     Token.transfer
       ctxt
       (`Contract sender_contract)
-      (`Frozen_deposits delegate)
+      (`Frozen_deposits (Receipt.Single (sender_contract, delegate)))
       amount
   in
   (ctxt, stake_balance_updates @ finalize_balance_updates)
@@ -172,8 +175,9 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
     let* ctxt, balance_updates =
       Token.transfer
         ctxt
-        (`Frozen_deposits delegate)
-        (`Unstaked_frozen_deposits (delegate, current_cycle))
+        (`Frozen_deposits (Receipt.Single (sender_contract, delegate)))
+        (`Unstaked_frozen_deposits
+          (Receipt.Single (sender_contract, delegate), current_cycle))
         tez_to_unstake
     in
     let* ctxt, finalize_balance_updates =

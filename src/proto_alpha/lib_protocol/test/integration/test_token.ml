@@ -136,7 +136,17 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
   let receiver = `Collected_commitments Blinded_public_key_hash.zero in
   test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
-  let receiver = `Frozen_deposits pkh in
+  let receiver = `Frozen_deposits (Receipt.Shared pkh) in
+  test_allocated_and_still_allocated_when_empty ctxt receiver true
+  >>=? fun () ->
+  let receiver =
+    `Frozen_deposits (Receipt.Single (Contract.Implicit pkh, pkh))
+  in
+  test_allocated_and_still_allocated_when_empty ctxt receiver true
+  >>=? fun () ->
+  let receiver =
+    `Frozen_deposits (Receipt.Single (Contract.Implicit pkh, baker_pkh))
+  in
   test_allocated_and_still_allocated_when_empty ctxt receiver true
   >>=? fun () ->
   let receiver = `Block_fees in
@@ -196,13 +206,35 @@ let test_transferring_to_collected_commitments ctxt =
     [(Commitments bpkh, Credited amount, Block_application)]
 
 let test_transferring_to_frozen_deposits ctxt =
+  let open Lwt_result_syntax in
   let pkh, _pk, _sk = Signature.generate_key () in
+  let pkh2, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
-  test_transferring_to_receiver
-    ctxt
-    (`Frozen_deposits pkh)
-    amount
-    [(Deposits pkh, Credited amount, Block_application)]
+  let* () =
+    let staker = Receipt.Shared pkh in
+    test_transferring_to_receiver
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Credited amount, Block_application)]
+  in
+  let* () =
+    let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
+    test_transferring_to_receiver
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Credited amount, Block_application)]
+  in
+  let* () =
+    let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
+    test_transferring_to_receiver
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Credited amount, Block_application)]
+  in
+  return_unit
 
 let test_transferring_to_collected_fees ctxt =
   let amount = random_amount () in
@@ -384,13 +416,35 @@ let test_transferring_from_collected_commitments ctxt =
     [(Commitments bpkh, Debited amount, Block_application)]
 
 let test_transferring_from_frozen_deposits ctxt =
+  let open Lwt_result_syntax in
   let pkh, _pk, _sk = Signature.generate_key () in
+  let pkh2, _pk, _sk = Signature.generate_key () in
   let amount = random_amount () in
-  test_transferring_from_container
-    ctxt
-    (`Frozen_deposits pkh)
-    amount
-    [(Deposits pkh, Debited amount, Block_application)]
+  let* () =
+    let staker = Receipt.Shared pkh in
+    test_transferring_from_container
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Debited amount, Block_application)]
+  in
+  let* () =
+    let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
+    test_transferring_from_container
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Debited amount, Block_application)]
+  in
+  let* () =
+    let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
+    test_transferring_from_container
+      ctxt
+      (`Frozen_deposits staker)
+      amount
+      [(Deposits pkh, Debited amount, Block_application)]
+  in
+  return_unit
 
 let test_transferring_from_collected_fees ctxt =
   let amount = random_amount () in

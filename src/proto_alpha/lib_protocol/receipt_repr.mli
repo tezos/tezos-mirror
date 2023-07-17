@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type staker = Stake_repr.staker =
+  | Single of Contract_repr.t * Signature.public_key_hash
+  | Shared of Signature.public_key_hash
+
 (** Places where tez can be found in the ledger's state. *)
 type balance =
   | Contract of Contract_repr.t
