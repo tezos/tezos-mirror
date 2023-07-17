@@ -85,10 +85,10 @@ let make_consensus_list state proposal =
 (* If we do not have any slots, we won't inject any operation but we
    will still participate to determine an elected block *)
 let make_preendorse_action state proposal =
-  let preendorsements : (consensus_key_and_delegate * consensus_content) list =
+  let preattestations : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
-  Inject_preendorsements {preendorsements}
+  Inject_preattestations {preattestations}
 
 let update_proposal ~is_proposal_applied state proposal =
   Events.(emit updating_latest_proposal proposal.block.hash) >>= fun () ->
@@ -658,10 +658,10 @@ let update_locked_round state round payload_hash =
   {state with level_state = new_level_state}
 
 let make_endorse_action state proposal =
-  let endorsements : (consensus_key_and_delegate * consensus_content) list =
+  let attestations : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
-  Inject_endorsements {endorsements}
+  Inject_attestations {attestations}
 
 let prequorum_reached_when_awaiting_preendorsements state candidate
     preattestations =

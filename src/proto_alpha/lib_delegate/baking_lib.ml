@@ -86,7 +86,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
           Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
-  Baking_actions.inject_preendorsements state ~preendorsements:consensus_list
+  Baking_actions.inject_preattestations state ~preattestations:consensus_list
 
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
@@ -120,7 +120,7 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_endorsements state ~endorsements:consensus_list
+  Baking_actions.inject_attestations state ~attestations:consensus_list
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in
@@ -461,7 +461,7 @@ let baking_minimal_timestamp state =
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_endorsements =
-    Baking_actions.sign_endorsements state own_endorsements
+    Baking_actions.sign_attestations state own_endorsements
   in
   let pool =
     Operation_pool.add_operations
