@@ -310,7 +310,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                 round_state =
                   {
                     state.round_state with
-                    current_phase = Baking_state.Awaiting_endorsements;
+                    current_phase = Baking_state.Awaiting_attestations;
                   };
               }
             in

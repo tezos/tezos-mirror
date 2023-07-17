@@ -131,7 +131,7 @@ let preendorse state proposal =
       (* We await for the block to be applied before updating its
          locked values. *)
       if state.level_state.is_latest_proposal_applied then
-        update_current_phase state Awaiting_preendorsements
+        update_current_phase state Awaiting_preattestations
       else update_current_phase state Awaiting_application
     in
     Lwt.return (new_state, make_preendorse_action state proposal)
@@ -158,19 +158,19 @@ let extract_pqc state (new_proposal : proposal) =
         | Some endorsing_power -> acc + endorsing_power
       in
       let voting_power =
-        List.fold_left add_voting_power 0 pqc.preendorsements
+        List.fold_left add_voting_power 0 pqc.preattestations
       in
       let consensus_threshold =
         state.global_state.constants.parametric.consensus_threshold
       in
       if Compare.Int.(voting_power >= consensus_threshold) then
-        Some (pqc.preendorsements, pqc.round)
+        Some (pqc.preattestations, pqc.round)
       else None
 
 let may_update_endorsable_payload_with_internal_pqc state
     (new_proposal : proposal) =
   match
-    (new_proposal.block.prequorum, state.level_state.endorsable_payload)
+    (new_proposal.block.prequorum, state.level_state.attestable_payload)
   with
   | None, _ ->
       (* The proposal does not contain a PQC: no need to update *)
@@ -189,7 +189,7 @@ let may_update_endorsable_payload_with_internal_pqc state
         Some {proposal = new_proposal; prequorum = better_prequorum}
       in
       let new_level_state =
-        {state.level_state with endorsable_payload = new_endorsable_payload}
+        {state.level_state with attestable_payload = new_endorsable_payload}
       in
       {state with level_state = new_level_state}
 
@@ -289,7 +289,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                        for the proposal to be applied. *)
                     if is_proposal_applied then
                       let new_state =
-                        update_current_phase new_state Awaiting_preendorsements
+                        update_current_phase new_state Awaiting_preattestations
                       in
                       Lwt.return (new_state, Watch_proposal)
                     else do_nothing new_state)
@@ -317,7 +317,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           is_latest_proposal_applied = is_proposal_applied;
           (* Unlock values *)
           locked_round = None;
-          endorsable_payload = None;
+          attestable_payload = None;
           elected_block = None;
           delegate_slots;
           next_level_delegate_slots;
@@ -358,7 +358,7 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
        trigger an [End_of_round] to participate *)
     Lwt.return (new_state, Synchronize_round round_update)
   in
-  let current_endorsable_payload = state.level_state.endorsable_payload in
+  let current_endorsable_payload = state.level_state.attestable_payload in
   match (current_endorsable_payload, new_proposal.block.prequorum) with
   | None, Some _ | None, None ->
       Events.(emit branch_proposal_has_better_fitness ()) >>= fun () ->
@@ -487,7 +487,7 @@ let propose_block_action state delegate round (proposal : proposal) =
      2. There was a proposal and the PQC was reached. We repropose the
      [endorsable_payload] if it exists, not the [locked_round] as it
      may be older. *)
-  match state.level_state.endorsable_payload with
+  match state.level_state.attestable_payload with
   | None ->
       Events.(emit no_attestable_payload_fresh_block ()) >>= fun () ->
       (* For case 1, we may re-inject with the same payload or a fresh
@@ -538,7 +538,7 @@ let propose_block_action state delegate round (proposal : proposal) =
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
             (List.map Operation.pack proposal.block.quorum
-            @ List.map Operation.pack prequorum.preendorsements)
+            @ List.map Operation.pack prequorum.preattestations)
         in
         let attestation_filter =
           {
@@ -633,7 +633,7 @@ let time_to_bake_at_next_level state at_round =
          triggered when we have a slot and an elected block *)
       assert false
   | Some elected_block, Some {consensus_key_and_delegate; _} ->
-      let endorsements = elected_block.endorsement_qc in
+      let endorsements = elected_block.attestation_qc in
       let dal_attestations =
         (* Unlike endorsements, we don't watch and store DAL attestations for
            each proposal, we'll retrieve them from the mempool *)
@@ -664,7 +664,7 @@ let make_endorse_action state proposal =
   Inject_endorsements {endorsements}
 
 let prequorum_reached_when_awaiting_preendorsements state candidate
-    preendorsements =
+    preattestations =
   let latest_proposal = state.level_state.latest_proposal in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
@@ -682,7 +682,7 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
         level = latest_proposal.block.shell.level;
         round = latest_proposal.block.round;
         block_payload_hash = latest_proposal.block.payload_hash;
-        preendorsements
+        preattestations
         (* preendorsements may be nil when [consensus_threshold] is 0 *);
       }
     in
@@ -691,10 +691,10 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
       let level_state_with_new_payload =
         {
           state.level_state with
-          endorsable_payload = Some new_endorsable_payload;
+          attestable_payload = Some new_endorsable_payload;
         }
       in
-      match state.level_state.endorsable_payload with
+      match state.level_state.attestable_payload with
       | None -> level_state_with_new_payload
       | Some endorsable_payload ->
           if
@@ -711,10 +711,10 @@ let prequorum_reached_when_awaiting_preendorsements state candidate
         latest_proposal.block.round
         latest_proposal.block.payload_hash
     in
-    let new_state = update_current_phase new_state Awaiting_endorsements in
+    let new_state = update_current_phase new_state Awaiting_attestations in
     Lwt.return (new_state, make_endorse_action new_state latest_proposal)
 
-let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
+let quorum_reached_when_waiting_endorsements state candidate attestation_qc =
   let latest_proposal = state.level_state.latest_proposal in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
@@ -728,7 +728,7 @@ let quorum_reached_when_waiting_endorsements state candidate endorsement_qc =
       match state.level_state.elected_block with
       | None ->
           let elected_block =
-            Some {proposal = latest_proposal; endorsement_qc}
+            Some {proposal = latest_proposal; attestation_qc}
           in
           {state.level_state with elected_block}
       | Some _ ->
@@ -750,7 +750,7 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   match new_state.round_state.delayed_prequorum with
   | None ->
       (* The application arrived before the prequorum: just wait for the prequorum. *)
-      let new_state = update_current_phase new_state Awaiting_preendorsements in
+      let new_state = update_current_phase new_state Awaiting_preattestations in
       do_nothing new_state
   | Some (candidate, preendorsement_qc) ->
       (* The application arrived after the prequorum: handle the
@@ -821,8 +821,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       else
         Events.(emit applied_expected_proposal_received proposal.block.hash)
         >>= fun () -> handle_expected_applied_proposal state
-  | Awaiting_endorsements, New_head_proposal proposal
-  | Awaiting_preendorsements, New_head_proposal proposal ->
+  | Awaiting_preattestations, New_head_proposal proposal
+  | Awaiting_attestations, New_head_proposal proposal ->
       Events.(
         emit
           new_head
@@ -837,8 +837,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
           (proposal.block.hash, proposal.block.shell.level, proposal.block.round))
       >>= fun () -> handle_proposal ~is_proposal_applied:false state proposal
   | Awaiting_application, New_valid_proposal proposal
-  | Awaiting_endorsements, New_valid_proposal proposal
-  | Awaiting_preendorsements, New_valid_proposal proposal ->
+  | Awaiting_preattestations, New_valid_proposal proposal
+  | Awaiting_attestations, New_valid_proposal proposal ->
       Events.(
         emit
           new_valid_proposal
@@ -852,18 +852,18 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
         handle_proposal ~is_proposal_applied:false state proposal
   | Awaiting_application, Prequorum_reached (candidate, preendorsement_qc) ->
       may_register_early_prequorum state (candidate, preendorsement_qc)
-  | Awaiting_preendorsements, Prequorum_reached (candidate, preendorsement_qc)
+  | Awaiting_preattestations, Prequorum_reached (candidate, preendorsement_qc)
     ->
       prequorum_reached_when_awaiting_preendorsements
         state
         candidate
         preendorsement_qc
-  | Awaiting_endorsements, Quorum_reached (candidate, endorsement_qc) ->
+  | Awaiting_attestations, Quorum_reached (candidate, endorsement_qc) ->
       quorum_reached_when_waiting_endorsements state candidate endorsement_qc
   (* Unreachable cases *)
   | Idle, (Prequorum_reached _ | Quorum_reached _)
-  | Awaiting_preendorsements, Quorum_reached _
-  | Awaiting_endorsements, Prequorum_reached _
+  | Awaiting_preattestations, Quorum_reached _
+  | Awaiting_attestations, Prequorum_reached _
   | Awaiting_application, Quorum_reached _ ->
       (* This cannot/should not happen *)
       do_nothing state

@@ -59,8 +59,8 @@ let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
     operations
     ~protocol_data
 
-let extract_prequorum preendorsements =
-  match preendorsements with
+let extract_prequorum preattestations =
+  match preattestations with
   | h :: _ ->
       let ({protocol_data = {contents = Single (Preattestation content); _}; _})
           =
@@ -71,7 +71,7 @@ let extract_prequorum preendorsements =
           level = Raw_level.to_int32 content.level;
           round = content.round;
           block_payload_hash = content.block_payload_hash;
-          preendorsements;
+          preattestations;
         }
   | _ -> None
 
