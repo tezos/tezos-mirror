@@ -73,7 +73,7 @@ end
 let normalized_cycle ctxt ~cycle =
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   assert (Cycle_repr.(cycle <= current_cycle)) ;
-  match unslashable_cycle ctxt ~cycle:current_cycle with
+  match current_unslashable_cycle ctxt with
   | None -> cycle
   | Some unslashable_cycle -> Cycle_repr.max cycle unslashable_cycle
 
