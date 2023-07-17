@@ -47,10 +47,10 @@ val encoding : t Data_encoding.t
 val squash_unslashable :
   unslashable_cycle:Cycle_repr.t option -> t -> squashed tzresult
 
-val get : normalized_cycle:Cycle_repr.t -> squashed -> Deposits_repr.t
+val get : Cycle_repr.t -> squashed -> Deposits_repr.t
 
 val update :
   f:(Deposits_repr.t -> Deposits_repr.t tzresult) ->
-  normalized_cycle:Cycle_repr.t ->
+  Cycle_repr.t ->
   squashed ->
   squashed tzresult

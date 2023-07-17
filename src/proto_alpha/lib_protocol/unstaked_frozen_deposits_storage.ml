@@ -47,7 +47,7 @@ module Internal = struct
   let get ctxt contract ~normalized_cycle =
     let open Lwt_result_syntax in
     let+ unstaked_frozen_deposits = get_all ctxt contract in
-    Unstaked_frozen_deposits_repr.get ~normalized_cycle unstaked_frozen_deposits
+    Unstaked_frozen_deposits_repr.get normalized_cycle unstaked_frozen_deposits
 
   let update_balance ~f ctxt contract ~normalized_cycle =
     let open Lwt_result_syntax in
@@ -55,7 +55,7 @@ module Internal = struct
     let*? unstaked_frozen_deposits =
       Unstaked_frozen_deposits_repr.update
         ~f
-        ~normalized_cycle
+        normalized_cycle
         unstaked_frozen_deposits
     in
     let*! ctxt =

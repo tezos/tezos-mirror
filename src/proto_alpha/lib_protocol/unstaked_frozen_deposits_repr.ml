@@ -72,8 +72,14 @@ let squash_unslashable ~unslashable_cycle t =
       aux unslashable tl
   | _ -> return {unslashable_cycle; t}
 
-let get ~normalized_cycle l =
-  List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l.t
+let normalize_cycle cycle ~unslashable_cycle =
+  match unslashable_cycle with
+  | None -> cycle
+  | Some unslashable_cycle -> Cycle_repr.max cycle unslashable_cycle
+
+let get cycle {unslashable_cycle; t} =
+  let normalized_cycle = normalize_cycle cycle ~unslashable_cycle in
+  List.assoc ~equal:Cycle_repr.( = ) normalized_cycle t
   |> Option.value ~default:Deposits_repr.zero
 
 (* not tail-rec *)
@@ -90,7 +96,8 @@ let rec update_t ~f ~normalized_cycle l =
       let+ d = f Deposits_repr.zero in
       (normalized_cycle, d) :: l
 
-let update ~f ~normalized_cycle {unslashable_cycle; t} =
+let update ~f cycle {unslashable_cycle; t} =
   let open Result_syntax in
+  let normalized_cycle = normalize_cycle cycle ~unslashable_cycle in
   let+ t = update_t ~f ~normalized_cycle t in
   {unslashable_cycle; t}
