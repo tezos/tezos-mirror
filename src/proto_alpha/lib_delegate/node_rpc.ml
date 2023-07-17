@@ -88,7 +88,7 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
       (* The first block in the protocol is baked using the previous
          protocol, the encodings might change. The baker's logic is to
          consider final the first block of a new protocol and not
-         endorse it. Therefore, we do not need to have the correct
+         attest it. Therefore, we do not need to have the correct
          values here. *)
       ( dummy_payload_hash,
         Round.zero,
@@ -107,12 +107,12 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
             (payload_hash, payload_round)
         | None -> assert false
       in
-      let preendorsements, quorum, dal_attestations, payload =
+      let preattestations, quorum, dal_attestations, payload =
         WithExceptions.Option.get
           ~loc:__LOC__
           (Operation_pool.extract_operations_of_list_list operations)
       in
-      let prequorum = Option.bind preendorsements extract_prequorum in
+      let prequorum = Option.bind preattestations extract_prequorum in
       (payload_hash, payload_round, prequorum, quorum, dal_attestations, payload)
   in
   return
