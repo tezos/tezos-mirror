@@ -78,7 +78,8 @@ let data_dir dal_node = dal_node.persistent_state.data_dir
 let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
-let spawn_config_init ?(expected_pow = 0.) ?(peers = []) dal_node =
+let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
+    ?(attestor_profiles = []) ?(producer_profiles = []) dal_node =
   spawn_command dal_node
   @@ List.filter_map
        Fun.id
@@ -96,6 +97,10 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = []) dal_node =
          Some "--peers";
          Some (String.concat "," peers);
        ]
+  @ List.concat_map (fun pkh -> ["--attestor-profile"; pkh]) attestor_profiles
+  @ List.concat_map
+      (fun slot_index -> ["--producer-profile"; string_of_int slot_index])
+      producer_profiles
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
@@ -107,8 +112,16 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?expected_pow ?peers dal_node =
-  let process = spawn_config_init ?expected_pow ?peers dal_node in
+let init_config ?expected_pow ?peers ?attestor_profiles ?producer_profiles
+    dal_node =
+  let process =
+    spawn_config_init
+      ?expected_pow
+      ?peers
+      ?attestor_profiles
+      ?producer_profiles
+      dal_node
+  in
   Process.check process
 
 let read_identity dal_node =
