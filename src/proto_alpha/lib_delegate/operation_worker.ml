@@ -306,14 +306,17 @@ let update_monitoring ?(should_lock = true) state ops =
            preattestations_received;
            _;
          } as proposal_watched)) ->
-      let preendorsements = Operation_pool.filter_preattestations ops in
-      let preendorsements =
+      let preattestations = Operation_pool.filter_preattestations ops in
+      let preattestations =
         List.filter
-          (fun new_preendo ->
-            not (Preattestation_set.mem new_preendo preattestations_received))
-          preendorsements
+          (fun new_preattestation ->
+            not
+              (Preattestation_set.mem
+                 new_preattestation
+                 preattestations_received))
+          preattestations
       in
-      let preendorsements_count, voting_power =
+      let preattestations_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.preattestation Operation.t) ->
             let {
@@ -334,17 +337,17 @@ let update_monitoring ?(should_lock = true) state ops =
                       proposal_watched.preattestations_received ;
                   (succ count, power + op_power)
               | None ->
-                  (* preendorsements that do not use the first slot of a
+                  (* preattestations that do not use the first slot of a
                      delegate are not added to the quorum *)
                   (count, power)
             else (count, power))
           (0, 0)
-          preendorsements
+          preattestations
       in
       proposal_watched.current_voting_power <-
         proposal_watched.current_voting_power + voting_power ;
       proposal_watched.preattestations_count <-
-        proposal_watched.preattestations_count + preendorsements_count ;
+        proposal_watched.preattestations_count + preattestations_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
         Events.(
           emit
@@ -365,7 +368,7 @@ let update_monitoring ?(should_lock = true) state ops =
         Events.(
           emit
             preattestations_received
-            ( preendorsements_count,
+            ( preattestations_count,
               voting_power,
               proposal_watched.current_voting_power,
               proposal_watched.preattestations_count ))
@@ -378,14 +381,14 @@ let update_monitoring ?(should_lock = true) state ops =
            attestations_received;
            _;
          } as proposal_watched)) ->
-      let endorsements = Operation_pool.filter_attestations ops in
-      let endorsements =
+      let attestations = Operation_pool.filter_attestations ops in
+      let attestations =
         List.filter
-          (fun new_endo ->
-            not (Attestation_set.mem new_endo attestations_received))
-          endorsements
+          (fun new_attestation ->
+            not (Attestation_set.mem new_attestation attestations_received))
+          attestations
       in
-      let endorsements_count, voting_power =
+      let attestations_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.attestation Operation.t) ->
             let {
@@ -406,17 +409,17 @@ let update_monitoring ?(should_lock = true) state ops =
                       proposal_watched.attestations_received ;
                   (succ count, power + op_power)
               | None ->
-                  (* endorsements that do not use the first slot of a delegate
+                  (* attestations that do not use the first slot of a delegate
                      are not added to the quorum *)
                   (count, power)
             else (count, power))
           (0, 0)
-          endorsements
+          attestations
       in
       proposal_watched.current_voting_power <-
         proposal_watched.current_voting_power + voting_power ;
       proposal_watched.attestations_count <-
-        proposal_watched.attestations_count + endorsements_count ;
+        proposal_watched.attestations_count + attestations_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
         Events.(
           emit
@@ -437,7 +440,7 @@ let update_monitoring ?(should_lock = true) state ops =
         Events.(
           emit
             attestations_received
-            ( endorsements_count,
+            ( attestations_count,
               voting_power,
               proposal_watched.current_voting_power,
               proposal_watched.attestations_count ))
@@ -453,7 +456,7 @@ let monitor_quorum state new_proposal_watched =
   (* initialize with the currently present consensus operations *)
   update_monitoring ~should_lock:false state current_consensus_operations
 
-let monitor_preendorsement_quorum state ~consensus_threshold
+let monitor_preattestation_quorum state ~consensus_threshold
     ~get_slot_voting_power candidate_watched =
   let new_proposal =
     Some
@@ -469,7 +472,7 @@ let monitor_preendorsement_quorum state ~consensus_threshold
   in
   monitor_quorum state new_proposal
 
-let monitor_endorsement_quorum state ~consensus_threshold ~get_slot_voting_power
+let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
     candidate_watched =
   let new_proposal =
     Some
@@ -491,23 +494,23 @@ let shutdown_worker state =
 
 (* Each time a new head is received, the operation_pool field of the state is
    cleaned/reset by this function. Instead of emptying it completely, we keep
-   the endorsements of at most 5 rounds and 1 level in the past, to be able to
-   include as much endorsements as possible in the next block if this baker is
+   the attestations of at most 5 rounds and 1 level in the past, to be able to
+   include as much attestations as possible in the next block if this baker is
    the proposer. This allows to handle the following situations:
 
    - The baker observes an EQC for (L, R), but a proposal arrived for (L, R+1).
-   After the flush, extra endorsements on top of (L, R) are 'Branch_refused',
+   After the flush, extra attestations on top of (L, R) are 'Branch_refused',
    and are not re-sent by the node. If the baker proposes at (L+1, 1), he should
-   be able to include these extra endorsements. Hence the cache for old rounds.
+   be able to include these extra attestations. Hence the cache for old rounds.
 
    - The baker receives a head at (L+1, 0) on top of (L, 0), but this head
    didn't reach consensus. If the baker who proposes at (L+1, 1) observed some
-   extra endorsements for (L, 0) that are not included in (L+1, 0), he may want
-   to add them. But these endorsements become 'Outdated' in the mempool once
+   extra attestations for (L, 0) that are not included in (L+1, 0), he may want
+   to add them. But these attestations become 'Outdated' in the mempool once
    (L+1, 0) is received. Hence the cache for previous level.
 *)
 let update_operations_pool state (head_level, head_round) =
-  let endorsements =
+  let attestations =
     let head_round_i32 = Round.to_int32 head_round in
     let head_level_i32 = head_level in
     Operation_pool.Operation_set.filter
@@ -522,13 +525,13 @@ let update_operations_pool state (head_level, head_round) =
             let level_i32 = Raw_level.to_int32 level in
             let delta_round = Int32.sub head_round_i32 round_i32 in
             let delta_level = Int32.sub head_level_i32 level_i32 in
-            (* Only retain endorsements that are maximum 5 rounds old and
+            (* Only retain attestations that are maximum 5 rounds old and
                1 level in the last *)
             Compare.Int32.(delta_round <= 5l && delta_level <= 1l)
         | _ -> false)
       state.operation_pool.consensus
   in
-  let operation_pool = {Operation_pool.empty with consensus = endorsements} in
+  let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
 let create ?(monitor_node_operations = true)

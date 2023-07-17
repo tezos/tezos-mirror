@@ -797,7 +797,7 @@ let start_waiting_for_preendorsement_quorum state =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
-  Operation_worker.monitor_preendorsement_quorum
+  Operation_worker.monitor_preattestation_quorum
     operation_worker
     ~consensus_threshold
     ~get_slot_voting_power
@@ -808,7 +808,7 @@ let start_waiting_for_endorsement_quorum state =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
-  Operation_worker.monitor_endorsement_quorum
+  Operation_worker.monitor_attestation_quorum
     operation_worker
     ~consensus_threshold
     ~get_slot_voting_power

@@ -69,14 +69,14 @@ val get_quorum_event_stream : t -> event Lwt_stream.t
 
 (** {1 Observers} *)
 
-val monitor_preendorsement_quorum :
+val monitor_preattestation_quorum :
   t ->
   consensus_threshold:int ->
   get_slot_voting_power:(slot:Slot.t -> int option) ->
   candidate ->
   unit Lwt.t
 
-val monitor_endorsement_quorum :
+val monitor_attestation_quorum :
   t ->
   consensus_threshold:int ->
   get_slot_voting_power:(slot:Slot.t -> int option) ->
