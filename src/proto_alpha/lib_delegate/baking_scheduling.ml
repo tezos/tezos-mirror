@@ -243,14 +243,14 @@ let rec wait_next_event ~timeout loop_state =
       loop_state.last_future_block_event <- None ;
       return_some (New_valid_proposal proposal)
   | `QC_reached
-      (Some (Operation_worker.Prequorum_reached (candidate, preendorsement_qc)))
+      (Some (Operation_worker.Prequorum_reached (candidate, preattestation_qc)))
     ->
       loop_state.last_get_qc_event <- None ;
-      return_some (Prequorum_reached (candidate, preendorsement_qc))
+      return_some (Prequorum_reached (candidate, preattestation_qc))
   | `QC_reached
-      (Some (Operation_worker.Quorum_reached (candidate, endorsement_qc))) ->
+      (Some (Operation_worker.Quorum_reached (candidate, attestation_qc))) ->
       loop_state.last_get_qc_event <- None ;
-      return_some (Quorum_reached (candidate, endorsement_qc))
+      return_some (Quorum_reached (candidate, attestation_qc))
   | `Timeout e -> return_some (Timeout e)
 
 (** From the current [state], the function returns an optional
@@ -550,7 +550,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   | Some next_round, None -> (
       (* If there is an elected block, then we make the assumption
          that the bakers at the next level have also received an
-         endorsement quorum, and we delay a bit injecting at the next
+         attestation quorum, and we delay a bit injecting at the next
          round, so that there are not two blocks injected at the same
          time. *)
       match state.level_state.elected_block with
@@ -580,7 +580,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
         (* same observation is in the [(Some next_round, None)] case *)
         delay_next_round_timeout next_round_info
 
-(* initialises endorsable_payload with the PQC included in the latest block
+(* initialises attestable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk
    if any *)
 let may_initialise_with_latest_proposal_pqc state =
@@ -590,7 +590,7 @@ let may_initialise_with_latest_proposal_pqc state =
   | Some pqc -> (
       match state.level_state.attestable_payload with
       | Some ep when ep.prequorum.round >= pqc.round ->
-          (*do not change the endorsable_payload loaded from disk if it's
+          (*do not change the attestable_payload loaded from disk if it's
             more recent *)
           return state
       | Some _ | None ->
@@ -626,7 +626,7 @@ let create_dal_node_rpc_ctxt endpoint =
 
 let create_initial_state cctxt ?(synchronize = true) ~chain config
     operation_worker ~(current_proposal : Baking_state.proposal) delegates =
-  (* FIXME? consider saved endorsable value *)
+  (* FIXME? consider saved attestable value *)
   let open Protocol in
   let open Baking_state in
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
@@ -708,7 +708,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       })
   >>?= fun round_state ->
   let state = {global_state; level_state; round_state} in
-  (* Try loading locked round and endorsable round from disk *)
+  (* Try loading locked round and attestable round from disk *)
   Baking_state.may_load_attestable_data state >>=? fun state ->
   may_initialise_with_latest_proposal_pqc state
 
@@ -720,7 +720,7 @@ let compute_bootstrap_event state =
       state.level_state.latest_proposal.block.round
       = state.round_state.current_round)
   then
-    (* If so, then trigger the new proposal event to possibly preendorse *)
+    (* If so, then trigger the new proposal event to possibly preattest *)
     ok @@ Baking_state.New_head_proposal state.level_state.latest_proposal
   else
     (* Otherwise, trigger the end of round to check whether we
