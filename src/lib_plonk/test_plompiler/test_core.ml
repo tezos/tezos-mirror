@@ -817,7 +817,7 @@ functor
     let test_rotate_left l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let o = rotate_left l i in
+      let* o = rotate_left l i in
       assert_equal o z
 
     let tests_rotate_left =
@@ -864,7 +864,7 @@ functor
     let test_rotate_right l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let o = rotate_right l i in
+      let* o = rotate_right l i in
       assert_equal o z
 
     let tests_rotate_right =

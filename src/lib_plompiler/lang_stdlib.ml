@@ -126,9 +126,9 @@ module type LIB = sig
        significant. The most significant bit becomes the least significant
        i.e. it is "rotated".
        [rotate_left bl (length bl) = bl] *)
-    val rotate_left : bl repr -> int -> bl repr
+    val rotate_left : bl repr -> int -> bl repr t
 
-    val rotate_right : bl repr -> int -> bl repr
+    val rotate_right : bl repr -> int -> bl repr t
 
     (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
        significant. The most signigicant bit is lost and the least significant
@@ -734,7 +734,7 @@ module Lib (C : COMMON) = struct
         aux [] 0 l
       in
       let head, tail = split_n i (of_list a) in
-      to_list @@ tail @ head
+      ret @@ to_list @@ tail @ head
 
     let rotate_left a i = rotate_right a (length a - i)
 

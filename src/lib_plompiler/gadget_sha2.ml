@@ -119,7 +119,7 @@ struct
 
   let bnot = Bytes.not
 
-  let rotate_right b i = ret @@ Bytes.rotate_right b i
+  let rotate_right = Bytes.rotate_right
 
   let shift_right = Bytes.shift_right
 
