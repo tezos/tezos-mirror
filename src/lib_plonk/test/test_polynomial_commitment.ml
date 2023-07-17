@@ -27,7 +27,7 @@ open Kzg.Bls
 open Kzg.Utils
 
 module Internal = struct
-  open Plonk.Polynomial_commitment.Kzg_impl
+  open Kzg.Polynomial_commitment
 
   let test_verifier_srs () =
     let n = 2 in
@@ -38,7 +38,7 @@ module Internal = struct
     assert (G2.eq pp_prv.encoding_x pp_vrf.encoding_x)
 end
 
-module External (PC : Plonk.Polynomial_commitment.S) = struct
+module External (PC : Kzg.Interfaces.Polynomial_commitment) = struct
   module SMap = Kzg.SMap
 
   let generate_random_poly degree =
@@ -71,7 +71,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
           generate_f_map ~prefix:(string_of_int i) max_degree nb_polys_per_batch)
     in
     let cmt_list, prover_aux_list =
-      List.map (PC.Commitment.commit pp_prover) f_map_list |> List.split
+      List.map (PC.commit pp_prover) f_map_list |> List.split
     in
     let transcript =
       Transcript.list_expand PC.Commitment.t cmt_list Bytes.empty
@@ -147,7 +147,7 @@ module External (PC : Plonk.Polynomial_commitment.S) = struct
     assert (not @@ prove_and_verify_instance ~wrong_transcript:true instance)
 end
 
-module KZG_Tests = External (Plonk.Polynomial_commitment)
+module KZG_Tests = External (Kzg.Polynomial_commitment)
 module KZG_Pack_Tests = External (Aggregation.Polynomial_commitment)
 
 let tests =

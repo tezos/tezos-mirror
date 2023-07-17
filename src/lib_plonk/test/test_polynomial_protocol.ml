@@ -151,7 +151,7 @@ module External (PP : Plonk.Polynomial_protocol.S) = struct
         ~srs:Plonk_test.Helpers.srs
     in
     (* prover *)
-    let cm, prover_aux = PP.PC.Commitment.commit prover_pp poly_map in
+    let cm, prover_aux = PP.PC.commit prover_pp poly_map in
     let secrets = [(poly_map, prover_aux)] in
     let eval_points = [[X]] in
     (* The generator is not needed since we evaluate only at X *)

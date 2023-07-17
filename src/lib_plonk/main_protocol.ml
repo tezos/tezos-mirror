@@ -452,7 +452,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       let cm_wires, cm_aux_wires =
         Commitment.commit
           ?all_keys
-          pp.common_pp.pp_public_parameters
+          (PP.PC.Public_parameters.get_commit_parameters
+             pp.common_pp.pp_public_parameters)
           all_f_wires
       in
       (wires_list_map, f_wires, f_blinds, all_f_wires, cm_wires, cm_aux_wires)
@@ -750,7 +751,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
 
       let cm_perm_plook_rc, perm_plook_rc_prv_aux =
-        Commitment.commit pp.common_pp.pp_public_parameters f_map_contributions
+        PP.PC.commit pp.common_pp.pp_public_parameters f_map_contributions
       in
       let transcript =
         Transcript.expand Commitment.t cm_perm_plook_rc transcript
@@ -1296,7 +1297,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       in
       (* Generating public parameters *)
       let pp_prover, pp_verifier = PP.setup ~setup_params:pack_size ~srs in
-      let cm_g, g_prover_aux = Commitment.commit pp_prover g_map in
+      let cm_g, g_prover_aux = PP.PC.commit pp_prover g_map in
       (* Generating transcript *)
       let transcript =
         PP.PC.Public_parameters.to_bytes n pp_prover
@@ -1364,7 +1365,8 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
     Input_commitment.commit
       ?size
       ?shift
-      pp.common_pp.pp_public_parameters
+      (PP.PC.Public_parameters.get_commit_parameters
+         pp.common_pp.pp_public_parameters)
       pp.common_pp.n
       secret
 

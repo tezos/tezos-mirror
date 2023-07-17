@@ -266,7 +266,7 @@ module Common (PP : Polynomial_protocol.S) = struct
          Implement Plookup
       *)
       let all_keys = build_all_keys_z pp in
-      PP.PC.Commitment.commit ~all_keys pp.common_pp.pp_public_parameters f_map
+      PP.PC.commit ~all_keys pp.common_pp.pp_public_parameters f_map
     in
     ( {batched_wires_map; cmt; f_map; prover_aux},
       {beta = rd.beta; gamma = rd.gamma} )
@@ -357,10 +357,7 @@ module Common (PP : Polynomial_protocol.S) = struct
     in
     let cmt =
       let all_keys = build_all_keys_z pp in
-      Commitment.commit
-        ~all_keys
-        pp.common_pp.pp_public_parameters
-        f_map_perm_rc
+      PP.PC.commit ~all_keys pp.common_pp.pp_public_parameters f_map_perm_rc
     in
     (f_map_perm_rc, evaluated_perm_ids, cmt)
 

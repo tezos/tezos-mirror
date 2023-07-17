@@ -61,7 +61,7 @@ struct
           generate_f_map ~prefix:(string_of_int i) max_degree nb_polys_per_batch)
     in
     let cmt_list, prover_aux_list =
-      List.map (PC.Commitment.commit pp_prover) f_map_list |> List.split
+      List.map (PC.commit pp_prover) f_map_list |> List.split
     in
     let transcript =
       Transcript.list_expand PC.Commitment.t cmt_list Bytes.empty

@@ -57,7 +57,7 @@ open Identities
 
 (** Functor building an implementation of a polynomial protocol given a
     polynomial commitment scheme [PC]. *)
-module Make_impl (PC : Polynomial_commitment.S) = struct
+module Make_impl (PC : Kzg.Interfaces.Polynomial_commitment) = struct
   module PC = PC
 
   type prover_public_parameters = PC.Public_parameters.prover [@@deriving repr]
@@ -122,7 +122,7 @@ module Make_impl (PC : Polynomial_commitment.S) = struct
     let alpha, transcript = Fr_generation.random_fr transcript in
     let evaluated_ids = identities evaluations in
     let t = compute_t ~n ~alpha ~nb_of_t_chunks evaluated_ids in
-    let cm_t, t_prover_aux = PC.Commitment.commit pc_public_parameters t in
+    let cm_t, t_prover_aux = PC.commit pc_public_parameters t in
     let transcript = Transcript.expand PC.Commitment.t cm_t transcript in
     let x, transcript = Fr_generation.random_fr transcript in
     let prover_aux_list = t_prover_aux :: List.map snd secrets in
@@ -207,7 +207,7 @@ end
 module type S = sig
   (** Underlying polynomial commitment scheme on which the polynomial protocol
       is based. Input of the functor [Polynomial_protocol.Make]. *)
-  module PC : Polynomial_commitment.S
+  module PC : Kzg.Interfaces.Polynomial_commitment
 
   (** The type of prover public parameters. *)
   type prover_public_parameters = PC.Public_parameters.prover [@@deriving repr]
@@ -280,7 +280,8 @@ module type S = sig
     bool * transcript
 end
 
-module Make : functor (PC : Polynomial_commitment.S) -> S with module PC = PC =
+module Make : functor (PC : Kzg.Interfaces.Polynomial_commitment) ->
+  S with module PC = PC =
   Make_impl
 
-include Make (Polynomial_commitment)
+include Make (Kzg.Polynomial_commitment)

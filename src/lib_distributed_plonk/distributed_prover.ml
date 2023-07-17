@@ -135,7 +135,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     let t =
       compute_t ~n ~alpha ~nb_of_t_chunks (SMap.singleton "batched" batched_ids)
     in
-    let cm_t, t_prover_aux = PC.Commitment.commit pc_public_parameters t in
+    let cm_t, t_prover_aux = PC.commit pc_public_parameters t in
     let transcript = Transcript.expand PC.Commitment.t cm_t transcript in
     let* pc_answers_worker =
       dmap

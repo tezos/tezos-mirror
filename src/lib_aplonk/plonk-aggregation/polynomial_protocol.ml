@@ -231,6 +231,5 @@ module Make_aggregation : functor
   S with module Answers_commitment = Answers_commitment with module PC = PC =
   Make_impl
 
-module KZG_Answers_commitment =
-  Plonk.Input_commitment.Make (Plonk.Polynomial_commitment.Commitment)
+module KZG_Answers_commitment = Plonk.Input_commitment.Make (Kzg.Commitment)
 include Make_aggregation (Polynomial_commitment) (KZG_Answers_commitment)

@@ -4,9 +4,9 @@ module SMap = Kzg.SMap
 
 module type S = sig
   module Commitment :
-    Polynomial_commitment.Commitment_sig with type secret = Poly.t SMap.t
+    Kzg.Interfaces.Commitment with type secret = Poly.t Kzg.SMap.t
 
-  type public_parameters = Commitment.prover_public_parameters
+  type public_parameters = Commitment.public_parameters
 
   type prover_aux = {poly : Poly.t; pc_prover_aux : Commitment.prover_aux}
   [@@deriving repr]
@@ -22,10 +22,10 @@ module type S = sig
     ?size:int -> ?shift:int -> public_parameters -> int -> Scalar.t array -> t
 end
 
-module Make_impl (Commitment : Polynomial_commitment.Commitment_sig) = struct
+module Make_impl (Commitment : Kzg.Interfaces.Commitment) = struct
   module Commitment = Commitment
 
-  type public_parameters = Commitment.prover_public_parameters
+  type public_parameters = Commitment.public_parameters
 
   type prover_aux = {poly : Poly.t; pc_prover_aux : Commitment.prover_aux}
   [@@deriving repr]
@@ -54,6 +54,6 @@ module Make_impl (Commitment : Polynomial_commitment.Commitment_sig) = struct
     {public; prover_aux = {poly; pc_prover_aux}}
 end
 
-module Make : functor (Commitment : Polynomial_commitment.Commitment_sig) ->
+module Make : functor (Commitment : Kzg.Interfaces.Commitment) ->
   S with module Commitment = Commitment =
   Make_impl
