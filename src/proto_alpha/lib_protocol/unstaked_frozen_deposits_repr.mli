@@ -34,9 +34,9 @@
 type t
 
 (** To be used locally, do not preserve values of this type over cycles. *)
-type squashed = private t
+type squashed = private {unslashable_cycle : Cycle_repr.t option; t : t}
 
-val empty : squashed
+val empty : unslashable_cycle:Cycle_repr.t option -> squashed
 
 val encoding : t Data_encoding.t
 

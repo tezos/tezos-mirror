@@ -40,11 +40,11 @@ let id_check_well_formed l =
   let+ () = check_well_formed l in
   l
 
-(* A version of {!t} in which all cycles older than a given [unslashable_cycle]
-   are squashed together using {!Deposits_repr.(++?)}. *)
-type squashed = t
+(* A version of {!t} in which all cycles older than [unslashable_cycle] are
+   squashed together using {!Deposits_repr.(++?)}. *)
+type squashed = {unslashable_cycle : Cycle_repr.t option; t : t}
 
-let empty = []
+let empty ~unslashable_cycle = {unslashable_cycle; t = []}
 
 let encoding =
   let open Data_encoding in
@@ -53,34 +53,44 @@ let encoding =
     id_check_well_formed
     (list (tup2 Cycle_repr.encoding Deposits_repr.encoding))
 
-let squash_unslashable ~unslashable_cycle l =
+let squash_unslashable ~unslashable_cycle t =
   let open Result_syntax in
-  match (unslashable_cycle, l) with
-  | Some unslashable_cycle, (c, unslashable) :: tl
-    when Cycle_repr.(c <= unslashable_cycle) ->
+  match (unslashable_cycle, t) with
+  | Some unslashable_cycle', (c, unslashable) :: tl
+    when Cycle_repr.(c <= unslashable_cycle') ->
       let rec aux unslashable = function
-        | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle) ->
+        | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle') ->
             let* unslashable = Deposits_repr.(unslashable ++? d) in
             aux unslashable tl
-        | slashable -> return ((unslashable_cycle, unslashable) :: slashable)
+        | slashable ->
+            return
+              {
+                unslashable_cycle;
+                t = (unslashable_cycle', unslashable) :: slashable;
+              }
       in
       aux unslashable tl
-  | _ -> return l
+  | _ -> return {unslashable_cycle; t}
 
 let get ~normalized_cycle l =
-  List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l
+  List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l.t
   |> Option.value ~default:Deposits_repr.zero
 
 (* not tail-rec *)
-let rec update ~f ~normalized_cycle l =
+let rec update_t ~f ~normalized_cycle l =
   let open Result_syntax in
   match l with
   | (c, d) :: tl when Cycle_repr.(c = normalized_cycle) ->
       let+ d = f d in
       (c, d) :: tl
   | ((c, _) as hd) :: tl when Cycle_repr.(c < normalized_cycle) ->
-      let+ tl = update ~f ~normalized_cycle tl in
+      let+ tl = update_t ~f ~normalized_cycle tl in
       hd :: tl
   | _ ->
       let+ d = f Deposits_repr.zero in
       (normalized_cycle, d) :: l
+
+let update ~f ~normalized_cycle {unslashable_cycle; t} =
+  let open Result_syntax in
+  let+ t = update_t ~f ~normalized_cycle t in
+  {unslashable_cycle; t}

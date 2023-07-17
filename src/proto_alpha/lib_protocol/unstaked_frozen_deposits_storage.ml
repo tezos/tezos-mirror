@@ -35,10 +35,10 @@ module Internal = struct
     let* unstaked_frozen_deposits_opt =
       Storage.Contract.Unstaked_frozen_deposits.find ctxt contract
     in
+    let unslashable_cycle = current_unslashable_cycle ctxt in
     match unstaked_frozen_deposits_opt with
-    | None -> return Unstaked_frozen_deposits_repr.empty
+    | None -> return (Unstaked_frozen_deposits_repr.empty ~unslashable_cycle)
     | Some unstaked_frozen_deposits ->
-        let unslashable_cycle = current_unslashable_cycle ctxt in
         Lwt.return
         @@ Unstaked_frozen_deposits_repr.squash_unslashable
              ~unslashable_cycle
@@ -62,7 +62,7 @@ module Internal = struct
       Storage.Contract.Unstaked_frozen_deposits.add
         ctxt
         contract
-        (unstaked_frozen_deposits :> Unstaked_frozen_deposits_repr.t)
+        unstaked_frozen_deposits.t
     in
     return ctxt
 end
