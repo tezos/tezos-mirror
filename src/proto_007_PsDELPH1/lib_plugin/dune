@@ -21,12 +21,12 @@
   tezos-base
   tezos-embedded-protocol-007-PsDELPH1
   tezos-protocol-plugin-007-PsDELPH1
-  tezos-shell)
+  tezos-validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_embedded_protocol_007_PsDELPH1
   -open Tezos_protocol_plugin_007_PsDELPH1
-  -open Tezos_shell)
+  -open Tezos_validation)
  (modules Plugin_registerer))

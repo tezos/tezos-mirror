@@ -13,7 +13,7 @@ depends: [
   "tezos-base"
   "tezos-embedded-protocol-014-PtKathma"
   "tezos-protocol-plugin-014-PtKathma"
-  "tezos-shell"
+  "tezos-validation"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

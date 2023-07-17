@@ -23,12 +23,12 @@
   tezos-base
   tezos-embedded-protocol-015-PtLimaPt
   tezos-protocol-plugin-015-PtLimaPt
-  tezos-shell)
+  tezos-validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_embedded_protocol_015_PtLimaPt
   -open Tezos_protocol_plugin_015_PtLimaPt
-  -open Tezos_shell)
+  -open Tezos_validation)
  (modules Plugin_registerer))

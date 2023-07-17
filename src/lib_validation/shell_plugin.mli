@@ -64,6 +64,14 @@ module type FILTER = sig
       head:Tezos_base.Block_header.shell_header ->
       filter_info tzresult Lwt.t
 
+    (** Perform some syntactic checks on the operation.
+
+        To be used mostly as an exceptional mechanism to prevent
+        ill-formed operations to block block application.
+
+        Should be called before the {!pre_filter}, does not need a context. *)
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+
     (** Perform some light preliminary checks on the operation.
 
         If successful, return [`Passed_prefilter] with the priority of the
@@ -77,8 +85,11 @@ module type FILTER = sig
       filter_info ->
       config ->
       Proto.operation ->
-      [ `Passed_prefilter of Prevalidator_pending_operations.priority
-      | Prevalidator_classification.error_classification ]
+      [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     (** Return a conflict handler for [Proto.Mempool.add_operation].
@@ -182,8 +193,10 @@ val register_rpc : (module RPC) -> unit
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
 
-(** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Protocol_hash.t -> (module FILTER) option
+(** Looks for a protocol filter plug-in for a specific protocol. The
+    [block_hash] argument is used for the error message. *)
+val find_filter :
+  block_hash:Block_hash.t -> Protocol_hash.t -> (module FILTER) tzresult Lwt.t
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option

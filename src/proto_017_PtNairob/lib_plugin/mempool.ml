@@ -269,6 +269,63 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
   let resources = Q.max size_ratio gas_ratio in
   (Q.(fee_f / resources), resources)
 
+let output_proof_encoding =
+  let open Data_encoding in
+  obj3
+    (req
+       "output_proof"
+       Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding)
+    (req "output_proof_state" Sc_rollup.State_hash.encoding)
+    (req "output_proof_output" Variable.bytes)
+
+let kinded_hash_to_state_hash = function
+  | `Value hash | `Node hash ->
+      Sc_rollup.State_hash.context_hash_to_state_hash hash
+
+let is_invalid_op : type t. t manager_operation -> bool = function
+  | Sc_rollup_execute_outbox_message
+      {rollup = _; cemented_commitment = _; output_proof} -> (
+      match
+        Data_encoding.Binary.of_string_opt output_proof_encoding output_proof
+      with
+      | None -> true
+      | Some (output_proof, output_proof_state, _) ->
+          not
+            (Sc_rollup.State_hash.equal
+               output_proof_state
+               (kinded_hash_to_state_hash
+                  output_proof.Environment.Context.Proof.before)))
+  | _ -> false
+
+let rec contains_invalid_op : type t. t Kind.manager contents_list -> bool =
+  function
+  | Single (Manager_operation {operation; _}) -> is_invalid_op operation
+  | Cons (Manager_operation {operation; _}, rest) ->
+      is_invalid_op operation || contains_invalid_op rest
+
+let syntactic_check
+    ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
+    =
+  match contents with
+  | Single (Failing_noop _)
+  | Single (Preendorsement _)
+  | Single (Endorsement _)
+  | Single (Dal_attestation _)
+  | Single (Seed_nonce_revelation _)
+  | Single (Double_preendorsement_evidence _)
+  | Single (Double_endorsement_evidence _)
+  | Single (Double_baking_evidence _)
+  | Single (Activate_account _)
+  | Single (Proposals _)
+  | Single (Vdf_revelation _)
+  | Single (Drain_delegate _)
+  | Single (Ballot _) ->
+      `Well_formed
+  | Single (Manager_operation _) as op ->
+      if contains_invalid_op op then `Ill_formed else `Well_formed
+  | Cons (Manager_operation _, _) as op ->
+      if contains_invalid_op op then `Ill_formed else `Well_formed
+
 let pre_filter_manager :
     type t.
     filter_info ->

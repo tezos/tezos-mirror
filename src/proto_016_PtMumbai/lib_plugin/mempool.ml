@@ -508,6 +508,8 @@ let pre_filter_far_future_consensus_ops filter_info config
   in
   match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
 
+let syntactic_check _ = `Well_formed
+
 (** A quasi infinite amount of "valid" (pre)endorsements could be
       sent by a committee member, one for each possible round number.
 
