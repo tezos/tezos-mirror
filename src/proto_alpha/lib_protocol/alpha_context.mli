@@ -4898,8 +4898,6 @@ module Token : sig
     | `Sc_rollup_refutation_punishments
     | container ]
 
-  val allocated : context -> container -> (context * bool) tzresult Lwt.t
-
   val balance : context -> container -> (context * Tez.t) tzresult Lwt.t
 
   val transfer_n :
@@ -4916,6 +4914,10 @@ module Token : sig
     [< receiver] ->
     Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val allocated : context -> container -> (context * bool) tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Unstake_requests_storage}. *)

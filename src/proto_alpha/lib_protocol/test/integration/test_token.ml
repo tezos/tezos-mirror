@@ -105,16 +105,19 @@ let test_simple_balance_updates () =
 let test_allocated_and_deallocated ctxt receiver initial_status
     status_when_empty =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.allocated ctxt receiver) >>=? fun (ctxt, allocated) ->
+  wrap (Token.Internal_for_tests.allocated ctxt receiver)
+  >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
   wrap (Token.transfer ctxt `Minted receiver amount) >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' receiver) >>=? fun (ctxt', allocated) ->
+  wrap (Token.Internal_for_tests.allocated ctxt' receiver)
+  >>=? fun (ctxt', allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
   wrap (Token.balance ctxt' receiver) >>=? fun (ctxt', bal_receiver') ->
   wrap (Token.transfer ctxt' receiver `Burned bal_receiver')
   >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' receiver) >>=? fun (_, allocated) ->
+  wrap (Token.Internal_for_tests.allocated ctxt' receiver)
+  >>=? fun (_, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated status_when_empty >>=? fun () ->
   return_unit
 
@@ -344,7 +347,8 @@ let test_transferring_from_infinite_source ctxt giver expected_bupds =
    [Tez.zero] otherwise. *)
 let balance_no_fail ctxt account =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.allocated ctxt account) >>=? fun (ctxt, allocated) ->
+  wrap (Token.Internal_for_tests.allocated ctxt account)
+  >>=? fun (ctxt, allocated) ->
   if allocated then wrap (Token.balance ctxt account)
   else return (ctxt, Tez.zero)
 

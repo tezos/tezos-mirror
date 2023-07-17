@@ -54,19 +54,6 @@ type infinite_sink =
 
 type receiver = [infinite_sink | container]
 
-let allocated ctxt stored =
-  match stored with
-  | `Contract contract ->
-      Contract_storage.allocated ctxt contract >|= fun allocated ->
-      ok (ctxt, allocated)
-  | `Collected_commitments bpkh ->
-      Commitment_storage.exists ctxt bpkh >|= fun allocated ->
-      ok (ctxt, allocated)
-  | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees ->
-      return (ctxt, true)
-  | `Frozen_bonds (contract, bond_id) ->
-      Contract_storage.bond_allocated ctxt contract bond_id
-
 let balance ctxt stored =
   match stored with
   | `Contract contract ->
@@ -234,3 +221,18 @@ let transfer_n ?(origin = Receipt_repr.Block_application) ctxt givers receiver =
 let transfer ?(origin = Receipt_repr.Block_application) ctxt giver receiver
     amount =
   transfer_n ~origin ctxt [(giver, amount)] receiver
+
+module Internal_for_tests = struct
+  let allocated ctxt stored =
+    match stored with
+    | `Contract contract ->
+        Contract_storage.allocated ctxt contract >|= fun allocated ->
+        ok (ctxt, allocated)
+    | `Collected_commitments bpkh ->
+        Commitment_storage.exists ctxt bpkh >|= fun allocated ->
+        ok (ctxt, allocated)
+    | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees ->
+        return (ctxt, true)
+    | `Frozen_bonds (contract, bond_id) ->
+        Contract_storage.bond_allocated ctxt contract bond_id
+end

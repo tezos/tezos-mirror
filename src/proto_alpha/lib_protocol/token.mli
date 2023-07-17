@@ -104,13 +104,6 @@ type infinite_sink =
     containers are considered to have infinite capacity. *)
 type receiver = [infinite_sink | container]
 
-(** [allocated ctxt container] returns a new context because of possible access
-    to carbonated data, and a boolean that is [true] when
-    [balance ctxt container] is guaranteed not to fail, and [false] when
-    [balance ctxt container] may fail. *)
-val allocated :
-  Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
-
 (** [balance ctxt container] returns a new context because of an access to
     carbonated data, and the balance associated to the token holder.
     This function may fail if [allocated ctxt container] returns [false].
@@ -162,3 +155,12 @@ val transfer :
   [< receiver] ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [allocated ctxt container] returns a new context because of possible access
+    to carbonated data, and a boolean that is [true] when
+    [balance ctxt container] is guaranteed not to fail, and [false] when
+    [balance ctxt container] may fail. *)
+  val allocated :
+    Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
+end
