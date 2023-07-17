@@ -171,6 +171,9 @@ type ('protocol_data, 'a) types_state_shell = {
   mutable live_blocks : Block_hash.Set.t;
   mutable live_operations : Operation_hash.Set.t;
   mutable fetching : Operation_hash.Set.t;
+      (** An operation is in [fetching] while the ddb is actively
+          requesting it from peers. It is removed from it when the
+          operation arrives or if the request fails (e.g. timeout). *)
   mutable pending : 'protocol_data Pending_ops.t;
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
@@ -319,8 +322,6 @@ module Make_s
     lock : Lwt_mutex.t;
   }
 
-  let is_fetching shell oph = Operation_hash.Set.mem oph shell.fetching
-
   let already_handled ~origin shell oph =
     if Operation_hash.Set.mem oph shell.banned_operations then (
       (* In order to avoid data-races (for instance in
@@ -332,7 +333,6 @@ module Make_s
       true)
     else
       Pending_ops.mem oph shell.pending
-      || Operation_hash.Set.mem oph shell.fetching
       || Operation_hash.Set.mem oph shell.live_operations
       || Classification.is_in_mempool oph shell.classification <> None
       || Classification.is_known_unparsable oph shell.classification
@@ -544,11 +544,12 @@ module Make_s
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
      usual. *)
-  let fetch_operation (shell : ('operation_data, _) types_state_shell) ?peer oph
-      =
+  let fetch_operation ~notify_arrival
+      (shell : ('operation_data, _) types_state_shell) ?peer oph =
     let open Lwt_syntax in
-    let+ () = Events.(emit fetching_operation) oph in
+    let* () = Events.(emit fetching_operation) oph in
     let* r =
+      protect @@ fun () ->
       shell.parameters.tools.fetch
         ~timeout:shell.parameters.limits.operation_timeout
         ?peer
@@ -556,13 +557,19 @@ module Make_s
     in
     match r with
     | Ok op ->
-        shell.worker.push_request_now (Arrived (oph, op)) ;
+        if notify_arrival then shell.worker.push_request_now (Arrived (oph, op)) ;
         Lwt.return_unit
-    | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        Events.(emit operation_included) oph
-    | Error _ ->
-        (* This may happen if the peer timed out for example. *)
-        Events.(emit operation_not_fetched) oph
+    | Error err -> (
+        (* Make sure to remove the operation from fetching if the
+           retrieval fails. This only needs to be done once. *)
+        if notify_arrival then
+          shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
+        match err with
+        | Distributed_db.Operation.Canceled _ :: _ ->
+            Events.(emit operation_included) oph
+        | _ ->
+            (* This may happen if the peer timed out for example. *)
+            Events.(emit operation_not_fetched) oph)
 
   (* This function fetches an operation if it is not already handled
      by the mempool. To ensure we fetch at most a given operation,
@@ -580,16 +587,23 @@ module Make_s
     let origin =
       match peer with Some peer -> Events.Peer peer | None -> Leftover
     in
-    if not (already_handled ~origin shell oph) then
+    let spawn_fetch_operation ~notify_arrival =
       ignore
-        (Lwt.finalize
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-             fetch_operation shell ?peer oph)
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
-             Lwt.return_unit)) ;
-    Lwt.return_unit
+        (Unit.catch_s (fun () ->
+             fetch_operation ~notify_arrival shell ?peer oph))
+    in
+    if Operation_hash.Set.mem oph shell.fetching then (
+      (* If the operation is already being fetched, we notify the DDB
+         that another peer may also be requested for the resource. In
+         any case, the initial fetching thread will still be resolved
+         and push an arrived worker request. *)
+      spawn_fetch_operation ~notify_arrival:false ;
+      Lwt.return_unit)
+    else if already_handled ~origin shell oph then Lwt.return_unit
+    else (
+      shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
+      spawn_fetch_operation ~notify_arrival:true ;
+      Lwt.return_unit)
 
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
@@ -599,6 +613,7 @@ module Make_s
 
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
+      pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
       if already_handled ~origin:Events.Arrived pv.shell oph then return_ok_unit
       else
         match Parser.parse oph op with
