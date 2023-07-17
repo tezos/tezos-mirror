@@ -23,47 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  type scalar
+type scalar = Bls12_381.Fr.t
 
-  module Domain : Domain.Domain_sig with type scalar = scalar
+module Domain : Domain.Domain_sig with type scalar = scalar
 
-  module Polynomial : Polynomial.Polynomial_sig with type scalar = scalar
+module Polynomial : Polynomial.Polynomial_sig with type scalar = scalar
 
-  module Evaluations :
-    Evaluations.Evaluations_sig
-      with type scalar = scalar
-       and type domain = Domain.t
-       and type polynomial = Polynomial.t
+module type Evaluations_sig =
+  Evaluations.Evaluations_sig
+    with type scalar = scalar
+     and type domain = Domain.t
+     and type polynomial = Polynomial.t
 
-  module Srs : sig
-    module Srs_g1 : Srs.S with type polynomial = Polynomial.t
+module Evaluations :
+  Evaluations.Evaluations_sig
+    with type scalar = scalar
+     and type domain = Domain.t
+     and type polynomial = Polynomial.t
 
-    module Srs_g2 : Srs.S with type polynomial = Polynomial.t
+module Srs : sig
+  module Srs_g1 :
+    Srs.S with type polynomial = Polynomial.t and type elt = Bls12_381.G1.t
 
-    type t = Srs_g1.t * Srs_g2.t
+  module Srs_g2 :
+    Srs.S with type polynomial = Polynomial.t and type elt = Bls12_381.G2.t
 
-    val generate_insecure : int -> int -> t
+  type t = Srs_g1.t * Srs_g2.t
 
-    val check : t -> unit
-  end
+  val generate_insecure : int -> int -> t
 
-  module G1_carray :
-    Ec_carray.EC_carray_sig
-      with type elt = Bls12_381.G1.t
-       and type domain = Domain.t
-       and type evaluations = Evaluations.t
-
-  module G2_carray :
-    Ec_carray.EC_carray_sig
-      with type elt = Bls12_381.G2.t
-       and type domain = Domain.t
-       and type evaluations = Evaluations.t
+  (* [check {[x^i]₁, [x^i]₂}] performs pairing checks on SRS’s elements to ensure SRS well-formedness :
+     e([x^i]₁, [1]₂) = e([1]₁, [x^i]₂) for all i
+     e([x^i]₁, [x]₂) = e([x^(i + 1)]₁, [1]₂) for all i
+     e([x]₁, [x^i]₂) = e([1]₁, [x^(i + 1)]₂) for all i
+  *)
+  val check : t -> unit
 end
 
-include
-  S
-    with type scalar = Bls12_381.Fr.t
-     and type Srs.Srs_g1.elt = Bls12_381.G1.t
-     and type Srs.Srs_g2.elt = Bls12_381.G2.t
-     and type Evaluations.t = Evaluations.t
+module G1_carray :
+  Ec_carray.EC_carray_sig
+    with type elt = Bls12_381.G1.t
+     and type domain = Domain.t
+     and type evaluations = Evaluations.t
+
+module G2_carray :
+  Ec_carray.EC_carray_sig
+    with type elt = Bls12_381.G2.t
+     and type domain = Domain.t
+     and type evaluations = Evaluations.t
