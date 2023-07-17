@@ -1,4 +1,4 @@
-Version 17.1
+Version 17.2
 ============
 
 Version 17.0 contains a new version (V9) of the protocol environment,
@@ -17,20 +17,22 @@ More details can be found in a recent `blog post <https://research-development.n
 Version 17.1 fixes an issue causing file descriptor leaks for streamed RPCs.
 In addition, it improves the performance of RPC responses when requesting older blocks.
 
+Version 17.2 adds a filtering mechanism which enables the Octez baker to remove ill-formed operations.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v17.1
+  git checkout v17.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v17.1`` Docker images of Octez.
+If you are using Docker instead, use the ``v17.2`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
