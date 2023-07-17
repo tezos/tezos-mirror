@@ -53,12 +53,12 @@ impl Default for HostState {
 
         let metadata = RollupMetadata {
             raw_rollup_address,
-            origination_level: crate::MUMBAI_ACTIVATION_LEVEL,
+            origination_level: crate::NAIROBI_ACTIVATION_LEVEL,
         };
         Self {
             store,
             metadata,
-            curr_level: crate::MUMBAI_ACTIVATION_LEVEL,
+            curr_level: crate::NAIROBI_ACTIVATION_LEVEL,
             curr_input_id: 0,
             input: vec![],
         }
@@ -222,7 +222,6 @@ impl HostState {
         Ok(())
     }
 
-    #[cfg(feature = "proto-nairobi")]
     pub(crate) fn handle_store_delete_value(
         &mut self,
         prefix: &[u8],
