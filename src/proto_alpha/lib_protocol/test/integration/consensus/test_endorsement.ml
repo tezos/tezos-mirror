@@ -579,7 +579,7 @@ let test_no_conflict_various_levels_and_rounds () =
     let (Operation_data protocol_data) = op.protocol_data in
     let content =
       match protocol_data.contents with
-      | Single (Endorsement content) -> content
+      | Single (Attestation content) -> content
       | _ -> assert false
     in
     Format.eprintf

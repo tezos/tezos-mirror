@@ -142,7 +142,7 @@ let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
 
 let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
   let endorsing_reward_per_slot =
-    Delegate_rewards.endorsing_reward_per_slot ctxt
+    Delegate_rewards.attesting_reward_per_slot ctxt
   in
   let unrevealed_nonces_set =
     List.fold_left
@@ -183,7 +183,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         Delegate_staking_parameters.pay_rewards
           ctxt
           ~active_stake
-          ~source:`Endorsing_rewards
+          ~source:`Attesting_rewards
           ~delegate
           rewards
         >|=? fun (ctxt, payed_rewards_receipts) ->
@@ -192,8 +192,8 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         (* Insufficient participation or unrevealed nonce: no rewards *)
         Token.transfer
           ctxt
-          `Endorsing_rewards
-          (`Lost_endorsing_rewards
+          `Attesting_rewards
+          (`Lost_attesting_rewards
             (delegate, not sufficient_participation, not has_revealed_nonces))
           rewards
         >|=? fun (ctxt, payed_rewards_receipts) ->

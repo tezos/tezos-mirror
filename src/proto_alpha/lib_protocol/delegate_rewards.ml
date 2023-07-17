@@ -65,7 +65,7 @@ module M = struct
   type reward_kind =
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_slot
-    | Endorsing_reward_per_slot
+    | Attesting_reward_per_slot
     | Liquidity_baking_subsidy
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
@@ -79,7 +79,7 @@ module M = struct
           reward_weights.baking_reward_fixed_portion_weight
       | Baking_reward_bonus_per_slot ->
           reward_weights.baking_reward_bonus_weight
-      | Endorsing_reward_per_slot -> reward_weights.attesting_reward_weight
+      | Attesting_reward_per_slot -> reward_weights.attesting_reward_weight
       | Liquidity_baking_subsidy ->
           reward_weights.liquidity_baking_subsidy_weight
       | Seed_nonce_revelation_tip ->
@@ -104,7 +104,7 @@ module M = struct
           in
           if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
           else Tez_repr.div_exn rewards bonus_committee_size
-      | Endorsing_reward_per_slot ->
+      | Attesting_reward_per_slot ->
           Tez_repr.div_exn rewards csts.consensus_committee_size
       | _ -> rewards
     in
@@ -126,8 +126,8 @@ let baking_reward_fixed_portion ctxt =
 let baking_reward_bonus_per_slot ctxt =
   reward_from_context ~ctxt ~reward_kind:Baking_reward_bonus_per_slot
 
-let endorsing_reward_per_slot ctxt =
-  reward_from_context ~ctxt ~reward_kind:Endorsing_reward_per_slot
+let attesting_reward_per_slot ctxt =
+  reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_slot
 
 let liquidity_baking_subsidy ctxt =
   reward_from_context ~ctxt ~reward_kind:Liquidity_baking_subsidy

@@ -535,7 +535,7 @@ let pre_filter filter_info config
   | Single (Failing_noop _) ->
       Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Preattestation consensus_content)
-  | Single (Endorsement consensus_content) ->
+  | Single (Attestation consensus_content) ->
       pre_filter_far_future_consensus_ops filter_info config consensus_content
       >>= fun keep ->
       if keep then Lwt.return @@ `Passed_prefilter consensus_prio
@@ -679,7 +679,7 @@ let find_manager {shell = _; protocol_data = Operation_data {contents; _}} =
   | Single (Manager_operation {source; _}) -> Some source
   | Cons (Manager_operation {source; _}, _) -> Some source
   | Single
-      ( Preattestation _ | Endorsement _ | Dal_attestation _ | Proposals _
+      ( Preattestation _ | Attestation _ | Dal_attestation _ | Proposals _
       | Ballot _ | Seed_nonce_revelation _ | Vdf_revelation _
       | Double_baking_evidence _ | Double_preattestation_evidence _
       | Double_attestation_evidence _ | Activate_account _ | Drain_delegate _

@@ -46,7 +46,7 @@ let deposits =
 
 let lost_endorsing_rewards =
   let pkh, _, _ = Signature.generate_key () in
-  Receipt_repr.Lost_endorsing_rewards (pkh, false, false)
+  Receipt_repr.Lost_attesting_rewards (pkh, false, false)
 
 let unstaked_deposits =
   let pkh, _, _ = Signature.generate_key () in
@@ -73,7 +73,7 @@ let generate_balance =
       deposits;
       unstaked_deposits;
       Nonce_revelation_rewards;
-      Endorsing_rewards;
+      Attesting_rewards;
       Baking_rewards;
       Baking_bonuses;
       Storage_fees;

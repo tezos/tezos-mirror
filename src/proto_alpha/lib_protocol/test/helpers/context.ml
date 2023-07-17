@@ -239,7 +239,7 @@ let get_endorsing_reward ctxt ~expected_endorsing_power =
   let endorsing_reward_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
-      ~reward_kind:Endorsing_reward_per_slot
+      ~reward_kind:Attesting_reward_per_slot
   in
   Lwt.return
     (Environment.wrap_tzresult

@@ -2037,12 +2037,12 @@ module Receipt : sig
     | Deposits of public_key_hash
     | Unstaked_deposits of public_key_hash * Cycle.t
     | Nonce_revelation_rewards
-    | Endorsing_rewards
+    | Attesting_rewards
     | Baking_rewards
     | Baking_bonuses
     | Storage_fees
     | Double_signing_punishments
-    | Lost_endorsing_rewards of public_key_hash * bool * bool
+    | Lost_attesting_rewards of public_key_hash * bool * bool
     | Liquidity_baking_subsidies
     | Burned
     | Commitments of Blinded_public_key_hash.t
@@ -2222,7 +2222,7 @@ module Delegate : sig
 
     val baking_reward_bonus_per_slot : t -> Tez.t
 
-    val endorsing_reward_per_slot : t -> Tez.t
+    val attesting_reward_per_slot : t -> Tez.t
 
     val liquidity_baking_subsidy : t -> Tez.t
 
@@ -2234,7 +2234,7 @@ module Delegate : sig
       type reward_kind =
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_slot
-        | Endorsing_reward_per_slot
+        | Attesting_reward_per_slot
         | Liquidity_baking_subsidy
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
@@ -4129,14 +4129,14 @@ end
 (** All the definitions below are re-exported from {!Operation_repr}. *)
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.attestation consensus_operation_type
+  | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot.t;
   level : Raw_level.t;
-  (* The level is not required to validate an endorsement when it corresponds
-     to the current payload, but if we want to filter endorsements, we need
+  (* The level is not required to validate an attestation when it corresponds
+     to the current payload, but if we want to filter attestations, we need
      the level. *)
   round : Round.t;
   block_payload_hash : Block_payload_hash.t;
@@ -4164,7 +4164,7 @@ and _ contents_list =
 
 and _ contents =
   | Preattestation : consensus_content -> Kind.preattestation contents
-  | Endorsement : consensus_content -> Kind.attestation contents
+  | Attestation : consensus_content -> Kind.attestation contents
   | Dal_attestation : Dal.Attestation.operation -> Kind.dal_attestation contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
@@ -4358,7 +4358,7 @@ module Operation : sig
   type nonrec packed_protocol_data = packed_protocol_data
 
   type consensus_watermark =
-    | Endorsement of Chain_id.t
+    | Attestation of Chain_id.t
     | Preattestation of Chain_id.t
     | Dal_attestation of Chain_id.t
 
@@ -4878,7 +4878,7 @@ module Token : sig
     | `Bootstrap
     | `Initial_commitments
     | `Revelation_rewards
-    | `Endorsing_rewards
+    | `Attesting_rewards
     | `Baking_rewards
     | `Baking_bonuses
     | `Minted
@@ -4889,7 +4889,7 @@ module Token : sig
   type receiver =
     [ `Storage_fees
     | `Double_signing_punishments
-    | `Lost_endorsing_rewards of public_key_hash * bool * bool
+    | `Lost_attesting_rewards of public_key_hash * bool * bool
     | `Burned
     | `Sc_rollup_refutation_punishments
     | container ]

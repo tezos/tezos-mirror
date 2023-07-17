@@ -345,12 +345,12 @@ let pp_balance_updates ppf balance_updates =
                 Cycle.pp
                 cycle
           | Nonce_revelation_rewards -> "nonce revelation rewards"
-          | Endorsing_rewards -> "attesting rewards"
+          | Attesting_rewards -> "attesting rewards"
           | Baking_rewards -> "baking rewards"
           | Baking_bonuses -> "baking bonuses"
           | Storage_fees -> "storage fees"
           | Double_signing_punishments -> "double signing punishments"
-          | Lost_endorsing_rewards (pkh, p, r) ->
+          | Lost_attesting_rewards (pkh, p, r) ->
               let reason =
                 match (p, r) with
                 | false, false -> ""
@@ -888,8 +888,8 @@ let pp_contents_and_result :
         Consensus_key.pp
         {delegate; consensus_pkh = consensus_key}
         consensus_power
-  | ( Endorsement {level; _},
-      Endorsement_result
+  | ( Attestation {level; _},
+      Attestation_result
         {balance_updates; delegate; consensus_key; consensus_power} ) ->
       Format.fprintf
         ppf

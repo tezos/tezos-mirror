@@ -385,7 +385,7 @@ let generate_preendorsement =
 let generate_endorsement =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
-  Endorsement cc
+  Attestation cc
 
 let generate_dal_attestation =
   let open QCheck2.Gen in

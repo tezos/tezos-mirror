@@ -79,7 +79,7 @@ type infinite_source =
   | `Initial_commitments
     (** Funding of Genesis' prefunded accounts requiring an activation *)
   | `Revelation_rewards  (** Seed nonce revelation rewards *)
-  | `Endorsing_rewards  (** Consensus endorsing rewards *)
+  | `Attesting_rewards  (** Consensus attesting rewards *)
   | `Baking_rewards  (** Consensus baking fixed rewards *)
   | `Baking_bonuses  (** Consensus baking variable bonus *)
   | `Minted  (** Generic source for test purpose *)
@@ -94,7 +94,7 @@ type giver = [infinite_source | container]
 type infinite_sink =
   [ `Storage_fees  (** Fees burnt to compensate storage usage *)
   | `Double_signing_punishments  (** Consensus slashing *)
-  | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | `Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
     (** Consensus rewards not distributed because the participation of the delegate was too low. *)
   | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
   | `Burned  (** Generic sink mainly for test purpose *) ]

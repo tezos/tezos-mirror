@@ -481,8 +481,8 @@ let sign_endorsements state endorsements =
         }
       in
       let contents =
-        (* No preendorsements are included *)
-        Single (Endorsement consensus_content)
+        (* No preattestations are included *)
+        Single (Attestation consensus_content)
       in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
@@ -506,7 +506,7 @@ let sign_endorsements state endorsements =
           | false -> return state.global_state.config.force)
       >>=? fun may_sign ->
       (if may_sign then
-       let watermark = Operation.(to_watermark (Endorsement chain_id)) in
+       let watermark = Operation.(to_watermark (Attestation chain_id)) in
        let unsigned_operation = (shell, Contents_list contents) in
        let unsigned_operation_bytes =
          Data_encoding.Binary.to_bytes_exn

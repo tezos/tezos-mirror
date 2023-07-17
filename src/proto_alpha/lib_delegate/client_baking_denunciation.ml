@@ -139,14 +139,14 @@ let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
-  | Endorsement, Single (Endorsement consensus_content) ->
+  | Attestation, Single (Attestation consensus_content) ->
       consensus_content.block_payload_hash
 
 let get_slot (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
   | Preattestation, Single (Preattestation consensus_content)
-  | Endorsement, Single (Endorsement consensus_content) ->
+  | Attestation, Single (Attestation consensus_content) ->
       consensus_content.slot
 
 let double_consensus_op_evidence (type kind) :
@@ -158,7 +158,7 @@ let double_consensus_op_evidence (type kind) :
     op2:kind Alpha_context.operation ->
     unit ->
     bytes Environment.Error_monad.shell_tzresult Lwt.t = function
-  | Endorsement -> Plugin.RPC.Forge.double_endorsement_evidence
+  | Attestation -> Plugin.RPC.Forge.double_endorsement_evidence
   | Preattestation -> Plugin.RPC.Forge.double_preendorsement_evidence
 
 let lookup_recorded_consensus (type kind) consensus_key
@@ -167,7 +167,7 @@ let lookup_recorded_consensus (type kind) consensus_key
   | None -> No_operation_seen
   | Some {endorsement; preendorsement} -> (
       match op_kind with
-      | Endorsement -> endorsement
+      | Attestation -> endorsement
       | Preattestation -> preendorsement)
 
 let add_consensus_operation (type kind) consensus_key
@@ -186,7 +186,7 @@ let add_consensus_operation (type kind) consensus_key
           x
       in
       match op_kind with
-      | Endorsement -> Some {record with endorsement = recorded_operation}
+      | Attestation -> Some {record with endorsement = recorded_operation}
       | Preattestation -> Some {record with preendorsement = recorded_operation})
     map
 
@@ -290,7 +290,7 @@ let process_consensus_op (type kind) state cctxt
             let double_op_detected, double_op_denounced =
               Events.(
                 match op_kind with
-                | Endorsement ->
+                | Attestation ->
                     (double_attestation_detected, double_attestation_denounced)
                 | Preattestation ->
                     ( double_preattestation_detected,
@@ -345,7 +345,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
             round
             slot
       | Operation_data
-          ({contents = Single (Endorsement {round; slot; level; _}); _} as
+          ({contents = Single (Attestation {round; slot; level; _}); _} as
           protocol_data) ->
           let new_endorsement : Kind.attestation Alpha_context.operation =
             {shell; protocol_data}
@@ -353,7 +353,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
           process_consensus_op
             state
             cctxt
-            Endorsement
+            Attestation
             new_endorsement
             chain_id
             level

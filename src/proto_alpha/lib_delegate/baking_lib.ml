@@ -199,7 +199,7 @@ let state_endorsing_power =
     Operation_pool.filter_endorsements
     (fun
       ({
-         protocol_data = {contents = Single (Endorsement consensus_content); _};
+         protocol_data = {contents = Single (Attestation consensus_content); _};
          _;
        } :
         Kind.attestation operation)
@@ -422,7 +422,7 @@ let baking_minimal_timestamp state =
          (fun
            ({
               protocol_data =
-                {contents = Single (Endorsement consensus_content); _};
+                {contents = Single (Attestation consensus_content); _};
               _;
             } :
              Kind.attestation operation)

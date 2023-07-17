@@ -242,14 +242,14 @@ let test_transferring_to_burned ctxt =
   let pkh = Signature.Public_key_hash.zero in
   let p, r = (Random.bool (), Random.bool ()) in
   wrap
-    (Token.transfer ctxt `Minted (`Lost_endorsing_rewards (pkh, p, r)) amount)
+    (Token.transfer ctxt `Minted (`Lost_attesting_rewards (pkh, p, r)) amount)
   >>=? fun (_, bupds) ->
   Assert.equal_bool
     ~loc:__LOC__
     (bupds
     = [
         minted_bupd;
-        (Lost_endorsing_rewards (pkh, p, r), Credited amount, Block_application);
+        (Lost_attesting_rewards (pkh, p, r), Credited amount, Block_application);
       ])
     true
   >>=? fun () ->
@@ -427,8 +427,8 @@ let test_transferring_from_giver () =
   test_transferring_from_infinite_source ctxt `Revelation_rewards (fun am ->
       [(Nonce_revelation_rewards, Debited am, Block_application)])
   >>=? fun () ->
-  test_transferring_from_infinite_source ctxt `Endorsing_rewards (fun am ->
-      [(Endorsing_rewards, Debited am, Block_application)])
+  test_transferring_from_infinite_source ctxt `Attesting_rewards (fun am ->
+      [(Attesting_rewards, Debited am, Block_application)])
   >>=? fun () ->
   test_transferring_from_infinite_source ctxt `Baking_rewards (fun am ->
       [(Baking_rewards, Debited am, Block_application)])

@@ -169,18 +169,18 @@ module Kind : sig
 end
 
 type 'a consensus_operation_type =
-  | Endorsement : Kind.attestation consensus_operation_type
+  | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
 
 type consensus_content = {
   slot : Slot_repr.t;
   (* By convention, this is the validator's first slot. *)
   level : Raw_level_repr.t;
-  (* The level of (pre)endorsed block. *)
+  (* The level of (pre)attested block. *)
   round : Round_repr.t;
-  (* The round of (pre)endorsed block. *)
+  (* The round of (pre)attested block. *)
   block_payload_hash : Block_payload_hash.t;
-      (* The payload hash of (pre)endorsed block. *)
+      (* The payload hash of (pre)attested block. *)
 }
 
 val consensus_content_encoding : consensus_content Data_encoding.t
@@ -188,7 +188,7 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
 type consensus_watermark =
-  | Endorsement of Chain_id.t
+  | Attestation of Chain_id.t
   | Preattestation of Chain_id.t
   | Dal_attestation of Chain_id.t
 
@@ -231,12 +231,12 @@ and _ contents =
   (* Preattestation: About consensus, preattestation of a block held by a
      validator (specific to Tenderbake). *)
   | Preattestation : consensus_content -> Kind.preattestation contents
-  (* Endorsement: About consensus, endorsement of a block held by a
+  (* Attestation: About consensus, attestation of a block held by a
      validator. *)
-  | Endorsement : consensus_content -> Kind.attestation contents
+  | Attestation : consensus_content -> Kind.attestation contents
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
-     Temporary operation to avoid modifying endorsement encoding. *)
+     Temporary operation to avoid modifying attestation encoding. *)
   | Dal_attestation :
       Dal_attestation_repr.operation
       -> Kind.dal_attestation contents
@@ -257,7 +257,7 @@ and _ contents =
       -> Kind.vdf_revelation contents
   (* Double_preattestation_evidence: Double-preattestation is a
      kind of malicious attack where a byzantine attempts to fork
-     the chain by preendorsing blocks with different
+     the chain by preattesting blocks with different
      contents (at the same level and same round)
      twice. This behavior may be reported and the byzantine will have
      its security deposit forfeited. *)
@@ -267,7 +267,7 @@ and _ contents =
     }
       -> Kind.double_preattestation_evidence contents
   (* Double_attestation_evidence: Similar to double-preattestation but
-     for endorsements. *)
+     for attestations. *)
   | Double_attestation_evidence : {
       op1 : Kind.attestation operation;
       op2 : Kind.attestation operation;
@@ -594,33 +594,25 @@ val compare_by_passes : packed_operation -> packed_operation -> int
 
    The global order is as follows:
 
-   {!Endorsement} and {!Preattestation} > {!Dal_attestation} >
-<<<<<<< HEAD
+   {!Attestation} and {!Preattestation} > {!Dal_attestation} >
    {!Proposals} > {!Ballot} > {!Double_preattestation_evidence} >
-   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
-||||||| parent of 45950febbf (alpha: rename double_endorsement_evidence contents type)
-   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
-   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
-=======
-   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
    {!Double_attestation_evidence} > {!Double_baking_evidence} >
->>>>>>> 45950febbf (alpha: rename double_endorsement_evidence contents type)
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
    > {!Drain_delegate} > {!Manager_operation}.
 
-   {!Endorsement} and {!Preattestation} are compared by the pair of
+   {!Attestation} and {!Preattestation} are compared by the pair of
    their [level] and [round] such as the farther to the current state
    [level] and [round] is greater; e.g. the greater pair in
    lexicographic order being the better. When equal and both
    operations being of the same kind, we compare their [slot]: the
-   The smaller being the better, assuming that the more slots an endorser
+   The smaller being the better, assuming that the more slots an attester
    has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Endorsement] to a {!Preattestation}, the
-   {!Endorsement} is better.
+   and comparing an {!Attestation] to a {!Preattestation}, the
+   {!Attestation} is better.
 
    Two {!Dal_attestation} ops are compared in the lexicographic
-   order of the pair of their number of endorsed slots as available
-   and their endorsers.
+   order of the pair of their number of attested slots as available
+   and their attesters.
 
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
