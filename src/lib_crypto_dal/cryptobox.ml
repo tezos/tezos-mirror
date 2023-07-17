@@ -850,7 +850,7 @@ module Inner = struct
   let shards_from_polynomial t p =
     let codeword = encode t p in
     let rec loop index seq =
-      if index = t.number_of_shards then seq
+      if index < 0 then seq
       else
         (* For each shard index [index], a [share] consists of the
            elements from [codeword] of indices w^index W_0.
@@ -859,9 +859,9 @@ module Inner = struct
         for j = 0 to t.shard_length - 1 do
           share.(j) <- codeword.((t.number_of_shards * j) + index)
         done ;
-        loop (index + 1) (Seq.cons {index; share} seq)
+        loop (index - 1) (Seq.cons {index; share} seq)
     in
-    loop 0 Seq.empty
+    loop (t.number_of_shards - 1) Seq.empty
 
   module ShardSet = Set.Make (struct
     type t = shard
