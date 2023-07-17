@@ -136,7 +136,7 @@ module Inner = struct
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
   module Polynomials = Octez_bls12_381_polynomial.Polynomial
-  module G1_array = Octez_bls12_381_polynomial.Ec_carray.G1_carray
+  module G1_array = Octez_bls12_381_polynomial.G1_carray
 
   (* Operations on vector of scalars *)
   module Evaluations = Octez_bls12_381_polynomial.Evaluations
@@ -1586,13 +1586,12 @@ module Inner = struct
   let precompute_shards_proofs t =
     (* Precomputes step. 1 of multiple multi-reveals. *)
     let domain, precomputation = preprocess_multiple_multi_reveals t in
-    ( Domains.Domain_unsafe.to_array domain,
+    ( Octez_bls12_381_polynomial.Domain.to_array domain,
       Array.map G1_array.to_array precomputation )
 
   let prove_shards t ~precomputation:(domain, precomp) ~polynomial =
     let setup =
-      ( Domains.Domain_unsafe.of_array domain,
-        Array.map G1_array.of_array precomp )
+      (Domains.of_array domain, Array.map G1_array.of_array precomp)
     in
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
     let coefficients =

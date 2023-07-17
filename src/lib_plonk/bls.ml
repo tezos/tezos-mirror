@@ -1,10 +1,10 @@
 module Scalar = Plompiler.Csir.Scalar
 module Scalar_map = Map.Make (Scalar)
-module Poly = Bls12_381_polynomial.Polynomial
-module Domain = Bls12_381_polynomial.Domain
+module Poly = Polynomial
+module Domain = Domain
 
 (* Module to operate with polynomials in FFT evaluations form. *)
-module Evaluations = Evaluations_map.Make (Bls12_381_polynomial.Evaluations)
+module Evaluations = Evaluations_map.Make (Evaluations)
 
 module G1 = struct
   include Bls12_381.G1
@@ -36,5 +36,5 @@ module GT = struct
 end
 
 module Pairing = Bls12_381.Pairing
-module Srs_g1 = Bls12_381_polynomial.Srs.Srs_g1
-module Srs_g2 = Bls12_381_polynomial.Srs.Srs_g2
+module Srs_g1 = Srs.Srs_g1
+module Srs_g2 = Srs.Srs_g2

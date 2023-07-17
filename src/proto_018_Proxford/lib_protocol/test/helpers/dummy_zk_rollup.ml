@@ -379,7 +379,7 @@ end = struct
 
   let lazy_srs =
     lazy
-      (let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
+      (let open Octez_bls12_381_polynomial in
       (Srs.generate_insecure 9 1, Srs.generate_insecure 1 1))
 
   let dummy_l1_dst =

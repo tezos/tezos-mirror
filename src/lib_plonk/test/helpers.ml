@@ -84,7 +84,7 @@ let bigstring_of_file filename ~hash =
   bs
 
 let load_real_srs prefix =
-  let open Octez_bls12_381_polynomial.Bls12_381_polynomial.Srs in
+  let open Octez_bls12_381_polynomial.Srs in
   let ( // ) s1 s2 = s1 ^ "/" ^ s2 in
   ( ( Srs_g1.of_bigstring
         (bigstring_of_file
@@ -116,7 +116,7 @@ let load_real_srs prefix =
       |> Result.get_ok ) )
 
 let make_fake_srs () =
-  let open Octez_bls12_381_polynomial.Bls12_381_polynomial in
+  let open Octez_bls12_381_polynomial in
   (Srs.generate_insecure 14 5, Srs.generate_insecure 1 14)
 
 let srs =

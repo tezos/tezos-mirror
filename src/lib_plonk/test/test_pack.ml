@@ -44,7 +44,7 @@ module External = struct
     (res, end_time -. start_time)
 
   let srs =
-    let open Octez_bls12_381_polynomial.Bls12_381_polynomial.Srs in
+    let open Octez_bls12_381_polynomial.Srs in
     let x = Bls12_381.Fr.random () in
     (Srs_g1.generate_insecure 2 x, Srs_g2.generate_insecure 256 x)
 
