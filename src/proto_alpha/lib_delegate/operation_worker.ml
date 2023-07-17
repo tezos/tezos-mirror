@@ -166,7 +166,7 @@ let compare_consensus_contents (op1 : consensus_content)
   Compare.or_else (Slot.compare op1.slot op2.slot) @@ fun () ->
   Block_payload_hash.compare op1.block_payload_hash op2.block_payload_hash
 
-module Preendorsement_set = Set.Make (struct
+module Preattestation_set = Set.Make (struct
   type t = Kind.preattestation operation
 
   let compare
@@ -177,7 +177,7 @@ module Preendorsement_set = Set.Make (struct
     compare_consensus_contents op1 op2
 end)
 
-module Endorsement_set = Set.Make (struct
+module Attestation_set = Set.Make (struct
   type t = Kind.attestation operation
 
   let compare
@@ -193,7 +193,7 @@ type pqc_watched = {
   get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
   mutable current_voting_power : int;
-  mutable preendorsements_received : Preendorsement_set.t;
+  mutable preendorsements_received : Preattestation_set.t;
   mutable preendorsements_count : int;
 }
 
@@ -202,7 +202,7 @@ type qc_watched = {
   get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
   mutable current_voting_power : int;
-  mutable endorsements_received : Endorsement_set.t;
+  mutable endorsements_received : Attestation_set.t;
   mutable endorsements_count : int;
 }
 
@@ -283,12 +283,12 @@ let reset_monitoring state =
   | Some (Pqc_watch pqc_watched) ->
       pqc_watched.current_voting_power <- 0 ;
       pqc_watched.preendorsements_count <- 0 ;
-      pqc_watched.preendorsements_received <- Preendorsement_set.empty ;
+      pqc_watched.preendorsements_received <- Preattestation_set.empty ;
       Lwt.return_unit
   | Some (Qc_watch qc_watched) ->
       qc_watched.current_voting_power <- 0 ;
       qc_watched.endorsements_count <- 0 ;
-      qc_watched.endorsements_received <- Endorsement_set.empty ;
+      qc_watched.endorsements_received <- Attestation_set.empty ;
       Lwt.return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
@@ -310,7 +310,7 @@ let update_monitoring ?(should_lock = true) state ops =
       let preendorsements =
         List.filter
           (fun new_preendo ->
-            not (Preendorsement_set.mem new_preendo preendorsements_received))
+            not (Preattestation_set.mem new_preendo preendorsements_received))
           preendorsements
       in
       let preendorsements_count, voting_power =
@@ -329,7 +329,7 @@ let update_monitoring ?(should_lock = true) state ops =
               match get_slot_voting_power ~slot:consensus_content.slot with
               | Some op_power ->
                   proposal_watched.preendorsements_received <-
-                    Preendorsement_set.add
+                    Preattestation_set.add
                       op
                       proposal_watched.preendorsements_received ;
                   (succ count, power + op_power)
@@ -356,7 +356,7 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Prequorum_reached
                 ( candidate_watched,
-                  Preendorsement_set.elements
+                  Preattestation_set.elements
                     proposal_watched.preendorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
@@ -382,7 +382,7 @@ let update_monitoring ?(should_lock = true) state ops =
       let endorsements =
         List.filter
           (fun new_endo ->
-            not (Endorsement_set.mem new_endo endorsements_received))
+            not (Attestation_set.mem new_endo endorsements_received))
           endorsements
       in
       let endorsements_count, voting_power =
@@ -401,7 +401,7 @@ let update_monitoring ?(should_lock = true) state ops =
               match get_slot_voting_power ~slot:consensus_content.slot with
               | Some op_power ->
                   proposal_watched.endorsements_received <-
-                    Endorsement_set.add
+                    Attestation_set.add
                       op
                       proposal_watched.endorsements_received ;
                   (succ count, power + op_power)
@@ -428,7 +428,7 @@ let update_monitoring ?(should_lock = true) state ops =
           (Some
              (Quorum_reached
                 ( candidate_watched,
-                  Endorsement_set.elements
+                  Attestation_set.elements
                     proposal_watched.endorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
@@ -463,7 +463,7 @@ let monitor_preendorsement_quorum state ~consensus_threshold
            get_slot_voting_power;
            consensus_threshold;
            current_voting_power = 0;
-           preendorsements_received = Preendorsement_set.empty;
+           preendorsements_received = Preattestation_set.empty;
            preendorsements_count = 0;
          })
   in
@@ -479,7 +479,7 @@ let monitor_endorsement_quorum state ~consensus_threshold ~get_slot_voting_power
            get_slot_voting_power;
            consensus_threshold;
            current_voting_power = 0;
-           endorsements_received = Endorsement_set.empty;
+           endorsements_received = Attestation_set.empty;
            endorsements_count = 0;
          })
   in
