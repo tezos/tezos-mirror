@@ -132,7 +132,11 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
     If [dal_node] is specified, then it is the DAL node that the baker queries
     in order to determine the attestations it sends to the L1 node. A
-    [--dal_node] argument is passed to specify the DAL node's endpoint. *)
+    [--dal_node] argument is passed to specify the DAL node's endpoint.
+
+    [minimal_nanotez_per_gas_unit] is an integer passed to the baker daemon
+    through the flag [--minimal-nanotez-per-gas-unit].
+ *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -146,6 +150,7 @@ val create :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?minimal_nanotez_per_gas_unit:int ->
   Node.t ->
   Client.t ->
   t
@@ -204,6 +209,7 @@ val init :
   ?remote_mode:bool ->
   ?operations_pool:string ->
   ?dal_node:Dal_node.t ->
+  ?minimal_nanotez_per_gas_unit:int ->
   Node.t ->
   Client.t ->
   t Lwt.t
