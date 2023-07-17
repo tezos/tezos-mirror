@@ -53,10 +53,10 @@ let record_endorsing_participation ctxt ~delegate ~participation
   | Participated -> Stake_storage.set_active ctxt delegate
   | Didn't_participate -> (
       let contract = Contract_repr.Implicit delegate in
-      Storage.Contract.Missed_endorsements.find ctxt contract >>=? function
+      Storage.Contract.Missed_attestations.find ctxt contract >>=? function
       | Some {remaining_slots; missed_levels} ->
           let remaining_slots = remaining_slots - endorsing_power in
-          Storage.Contract.Missed_endorsements.update
+          Storage.Contract.Missed_attestations.update
             ctxt
             contract
             {remaining_slots; missed_levels = missed_levels + 1}
@@ -96,7 +96,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
               let minimal_activity = expected_slots * numerator / denominator in
               let maximal_inactivity = expected_slots - minimal_activity in
               let remaining_slots = maximal_inactivity - endorsing_power in
-              Storage.Contract.Missed_endorsements.init
+              Storage.Contract.Missed_attestations.init
                 ctxt
                 contract
                 {remaining_slots; missed_levels = 1}))
@@ -139,11 +139,11 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
 
 let check_and_reset_delegate_participation ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
-  Storage.Contract.Missed_endorsements.find ctxt contract >>=? fun missed ->
+  Storage.Contract.Missed_attestations.find ctxt contract >>=? fun missed ->
   match missed with
   | None -> return (ctxt, true)
   | Some missed_endorsements ->
-      Storage.Contract.Missed_endorsements.remove ctxt contract >>= fun ctxt ->
+      Storage.Contract.Missed_attestations.remove ctxt contract >>= fun ctxt ->
       return (ctxt, Compare.Int.(missed_endorsements.remaining_slots >= 0))
 
 type participation_info = {
@@ -208,7 +208,7 @@ let participation_info ctxt delegate =
         Tez_repr.mul_exn endorsing_reward_per_slot expected_cycle_activity
       in
       let contract = Contract_repr.Implicit delegate in
-      Storage.Contract.Missed_endorsements.find ctxt contract
+      Storage.Contract.Missed_attestations.find ctxt contract
       >>=? fun missed_endorsements ->
       let missed_slots, missed_levels, remaining_allowed_missed_slots =
         match missed_endorsements with

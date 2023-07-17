@@ -147,10 +147,10 @@ end
 
 (** Contracts handling *)
 
-type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
-module Missed_endorsements_info = struct
-  type t = missed_endorsements_info
+module Missed_attestations_info = struct
+  type t = missed_attestations_info
 
   let encoding =
     let open Data_encoding in
@@ -270,13 +270,13 @@ module Contract = struct
       end)
       (Tez_repr)
 
-  module Missed_endorsements =
+  module Missed_attestations =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["missed_endorsements"]
+        let name = ["missed_attestations"]
       end)
-      (Missed_endorsements_info)
+      (Missed_attestations_info)
 
   module Manager =
     Indexed_context.Make_map

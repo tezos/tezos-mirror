@@ -123,6 +123,9 @@ Breaking Changes
 - Field ``endorsing_reward_per_slot`` from rewards storage has been renamed into
   ``attesting_reward_per_slot``. (MR :gl:`!9486`)
 
+- Field ``missed_endorsements`` from contract storage has been renamed into
+  ``missed_attestations``. (MR :gl:`!9486`)
+
 RPC Changes
 -----------
 
