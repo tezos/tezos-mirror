@@ -4898,7 +4898,10 @@ module Token : sig
     | `Sc_rollup_refutation_punishments
     | container ]
 
-  val balance : context -> container -> (context * Tez.t) tzresult Lwt.t
+  val balance :
+    context ->
+    [< `Block_fees | `Collected_commitments of Blinded_public_key_hash.t] ->
+    (context * Tez.t) tzresult Lwt.t
 
   val transfer_n :
     ?origin:Receipt.update_origin ->

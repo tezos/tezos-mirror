@@ -108,9 +108,14 @@ type receiver = [infinite_sink | container]
     carbonated data, and the balance associated to the token holder.
     This function may fail if [allocated ctxt container] returns [false].
     Returns an error with the message "get_balance" if [container] refers to an
-    originated contract that is not allocated. *)
+    originated contract that is not allocated.
+
+    This function is only defined on the few cases for which it is
+    actually needed. *)
 val balance :
-  Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+  Raw_context.t ->
+  [< `Block_fees | `Collected_commitments of Blinded_public_key_hash.t] ->
+  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
 (** [transfer_n ?origin ctxt givers receiver] transfers [amount] Tez from [giver] to
     [receiver] for each [(giver, amount)] pair in [givers], and returns a new
