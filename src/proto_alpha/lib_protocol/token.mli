@@ -169,11 +169,19 @@ module Internal_for_tests : sig
   val allocated :
     Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
 
+  type container_with_balance =
+    [ `Contract of Contract_repr.t
+    | `Collected_commitments of Blinded_public_key_hash.t
+    | `Block_fees
+    | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
+
   (** [balance ctxt container] returns a new context because of an access to
     carbonated data, and the balance associated to the token holder.
     This function may fail if [allocated ctxt container] returns [false].
     Returns an error with the message "get_balance" if [container] refers to an
     originated contract that is not allocated. *)
   val balance :
-    Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+    Raw_context.t ->
+    [< container_with_balance] ->
+    (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 end

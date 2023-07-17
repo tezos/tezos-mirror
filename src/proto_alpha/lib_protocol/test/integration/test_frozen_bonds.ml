@@ -231,7 +231,7 @@ let test_allocated_when_frozen_deposits_exists ~user_is_delegate () =
   Token.Internal_for_tests.balance ctxt user_account
   >>>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
-  Token.Internal_for_tests.allocated ctxt user_account
+  Token.Internal_for_tests.allocated ctxt (user_account :> Token.container)
   >>>=? fun (ctxt, user_allocated) ->
   Token.Internal_for_tests.allocated ctxt deposit_account
   >>>=? fun (ctxt, dep_allocated) ->
@@ -241,7 +241,7 @@ let test_allocated_when_frozen_deposits_exists ~user_is_delegate () =
   Token.transfer ctxt deposit_account `Burned deposit_amount
   >>>=? fun (ctxt, _) ->
   (* Check that user and deposit accounts have been unallocated. *)
-  Token.Internal_for_tests.allocated ctxt user_account
+  Token.Internal_for_tests.allocated ctxt (user_account :> Token.container)
   >>>=? fun (ctxt, user_allocated) ->
   Token.Internal_for_tests.allocated ctxt deposit_account
   >>>=? fun (_, dep_allocated) ->

@@ -4921,7 +4921,14 @@ module Token : sig
   module Internal_for_tests : sig
     val allocated : context -> container -> (context * bool) tzresult Lwt.t
 
-    val balance : context -> container -> (context * Tez.t) tzresult Lwt.t
+    type container_with_balance =
+      [ `Contract of Contract.t
+      | `Collected_commitments of Blinded_public_key_hash.t
+      | `Block_fees
+      | `Frozen_bonds of Contract.t * Bond_id.t ]
+
+    val balance :
+      context -> [< container_with_balance] -> (context * Tez.t) tzresult Lwt.t
   end
 end
 

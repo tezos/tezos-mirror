@@ -217,24 +217,18 @@ module Internal_for_tests = struct
     | `Frozen_bonds (contract, bond_id) ->
         Contract_storage.bond_allocated ctxt contract bond_id
 
-  let balance ctxt stored =
+  type container_with_balance =
+    [ `Contract of Contract_repr.t
+    | `Collected_commitments of Blinded_public_key_hash.t
+    | `Block_fees
+    | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
+
+  let balance ctxt (stored : [< container_with_balance]) =
     match stored with
     | (`Collected_commitments _ | `Block_fees) as stored -> balance ctxt stored
     | `Contract contract ->
         Contract_storage.get_balance ctxt contract >|=? fun balance ->
         (ctxt, balance)
-    | `Frozen_deposits staker ->
-        let contract =
-          Contract_repr.Implicit (Stake_repr.staker_delegate staker)
-        in
-        Frozen_deposits_storage.get ctxt contract >|=? fun frozen_deposits ->
-        (ctxt, frozen_deposits.current_amount)
-    | `Unstaked_frozen_deposits (staker, cycle) ->
-        Unstaked_frozen_deposits_storage.balance
-          ctxt
-          (Stake_repr.staker_delegate staker)
-          cycle
-        >|=? fun balance -> (ctxt, balance)
     | `Frozen_bonds (contract, bond_id) ->
         Contract_storage.find_bond ctxt contract bond_id
         >|=? fun (ctxt, balance_opt) ->

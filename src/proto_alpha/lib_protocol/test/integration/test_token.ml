@@ -109,19 +109,21 @@ let test_simple_balance_updates () =
 let test_allocated_and_deallocated ctxt receiver initial_status
     status_when_empty =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.Internal_for_tests.allocated ctxt receiver)
+  let receiver_container = (receiver :> Token.container) in
+  wrap (Token.Internal_for_tests.allocated ctxt receiver_container)
   >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
-  wrap (Token.transfer ctxt `Minted receiver amount) >>=? fun (ctxt', _) ->
-  wrap (Token.Internal_for_tests.allocated ctxt' receiver)
+  wrap (Token.transfer ctxt `Minted receiver_container amount)
+  >>=? fun (ctxt', _) ->
+  wrap (Token.Internal_for_tests.allocated ctxt' receiver_container)
   >>=? fun (ctxt', allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
   wrap (Token.Internal_for_tests.balance ctxt' receiver)
   >>=? fun (ctxt', bal_receiver') ->
-  wrap (Token.transfer ctxt' receiver `Burned bal_receiver')
+  wrap (Token.transfer ctxt' receiver_container `Burned bal_receiver')
   >>=? fun (ctxt', _) ->
-  wrap (Token.Internal_for_tests.allocated ctxt' receiver)
+  wrap (Token.Internal_for_tests.allocated ctxt' receiver_container)
   >>=? fun (_, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated status_when_empty >>=? fun () ->
   return_unit
@@ -144,19 +146,6 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
   let receiver = `Collected_commitments Blinded_public_key_hash.zero in
   test_allocated_and_deallocated_when_empty ctxt receiver >>=? fun () ->
-  let receiver = `Frozen_deposits (Receipt.Shared pkh) in
-  test_allocated_and_still_allocated_when_empty ctxt receiver true
-  >>=? fun () ->
-  let receiver =
-    `Frozen_deposits (Receipt.Single (Contract.Implicit pkh, pkh))
-  in
-  test_allocated_and_still_allocated_when_empty ctxt receiver true
-  >>=? fun () ->
-  let receiver =
-    `Frozen_deposits (Receipt.Single (Contract.Implicit pkh, baker_pkh))
-  in
-  test_allocated_and_still_allocated_when_empty ctxt receiver true
-  >>=? fun () ->
   let receiver = `Block_fees in
   test_allocated_and_still_allocated_when_empty ctxt receiver true
   >>=? fun () ->
@@ -215,37 +204,6 @@ let test_transferring_to_collected_commitments ctxt =
     (`Collected_commitments bpkh)
     amount
     [(Commitments bpkh, Credited amount, Block_application)]
-
-let test_transferring_to_frozen_deposits ctxt =
-  let open Lwt_result_syntax in
-  let pkh, _pk, _sk = Signature.generate_key () in
-  let pkh2, _pk, _sk = Signature.generate_key () in
-  let amount = random_amount () in
-  let* () =
-    let staker = Receipt.Shared pkh in
-    test_transferring_to_receiver
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Credited amount, Block_application)]
-  in
-  let* () =
-    let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
-    test_transferring_to_receiver
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Credited amount, Block_application)]
-  in
-  let* () =
-    let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
-    test_transferring_to_receiver
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Credited amount, Block_application)]
-  in
-  return_unit
 
 let test_transferring_to_collected_fees ctxt =
   let amount = random_amount () in
@@ -324,7 +282,6 @@ let test_transferring_to_receiver () =
   create_context () >>=? fun (ctxt, _) ->
   test_transferring_to_contract ctxt >>=? fun () ->
   test_transferring_to_collected_commitments ctxt >>=? fun () ->
-  test_transferring_to_frozen_deposits ctxt >>=? fun () ->
   test_transferring_to_collected_fees ctxt >>=? fun () ->
   test_transferring_to_burned ctxt >>=? fun () ->
   test_transferring_to_frozen_bonds ctxt
@@ -356,7 +313,7 @@ let test_transferring_from_infinite_source ctxt giver expected_bupds =
    [Tez.zero] otherwise. *)
 let balance_no_fail ctxt account =
   let open Lwt_result_wrap_syntax in
-  wrap (Token.Internal_for_tests.allocated ctxt account)
+  wrap (Token.Internal_for_tests.allocated ctxt (account :> Token.container))
   >>=? fun (ctxt, allocated) ->
   if allocated then wrap (Token.Internal_for_tests.balance ctxt account)
   else return (ctxt, Tez.zero)
@@ -428,37 +385,6 @@ let test_transferring_from_collected_commitments ctxt =
     amount
     [(Commitments bpkh, Debited amount, Block_application)]
 
-let test_transferring_from_frozen_deposits ctxt =
-  let open Lwt_result_syntax in
-  let pkh, _pk, _sk = Signature.generate_key () in
-  let pkh2, _pk, _sk = Signature.generate_key () in
-  let amount = random_amount () in
-  let* () =
-    let staker = Receipt.Shared pkh in
-    test_transferring_from_container
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Debited amount, Block_application)]
-  in
-  let* () =
-    let staker = Receipt.Single (Contract.Implicit pkh, pkh) in
-    test_transferring_from_container
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Debited amount, Block_application)]
-  in
-  let* () =
-    let staker = Receipt.Single (Contract.Implicit pkh2, pkh) in
-    test_transferring_from_container
-      ctxt
-      (`Frozen_deposits staker)
-      amount
-      [(Deposits staker, Debited amount, Block_application)]
-  in
-  return_unit
-
 let test_transferring_from_collected_fees ctxt =
   let amount = random_amount () in
   test_transferring_from_container
@@ -513,7 +439,6 @@ let test_transferring_from_giver () =
   >>=? fun () ->
   test_transferring_from_contract ctxt >>=? fun () ->
   test_transferring_from_collected_commitments ctxt >>=? fun () ->
-  test_transferring_from_frozen_deposits ctxt >>=? fun () ->
   test_transferring_from_collected_fees ctxt >>=? fun () ->
   test_transferring_from_frozen_bonds ctxt
 
@@ -671,17 +596,18 @@ let coalesce_balance_updates bu1 bu2 =
 (** Check that elt has the same balance in ctxt1 and ctxt2. *)
 let check_balances_are_consistent ctxt1 ctxt2 elt =
   match elt with
-  | #Token.container as elt ->
+  | #Token.Internal_for_tests.container_with_balance as elt ->
       Token.Internal_for_tests.balance ctxt1 elt >>=? fun (_, elt_bal1) ->
       Token.Internal_for_tests.balance ctxt2 elt >>=? fun (_, elt_bal2) ->
       assert (elt_bal1 = elt_bal2) ;
       return_unit
-  | `Invoice | `Bootstrap | `Initial_commitments | `Minted
-  | `Liquidity_baking_subsidies | `Burned ->
+  | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Invoice | `Bootstrap
+  | `Initial_commitments | `Minted | `Liquidity_baking_subsidies | `Burned ->
       return_unit
 
 (** Test that [transfer_n] is equivalent to n debits followed by n credits. *)
-let test_transfer_n ctxt giver receiver =
+let test_transfer_n ctxt (giver : ([< Token.container] * Tez.t) list)
+    (receiver : [< Token.container]) =
   (* Run transfer_n. *)
   Token.transfer_n ctxt giver receiver >>=? fun (ctxt1, bal_updates1) ->
   (* Debit all givers. *)
