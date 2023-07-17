@@ -96,8 +96,6 @@ module type BOOL = sig
 
   val bor : bool repr -> bool repr -> bool repr t
 
-  val bor_lookup : bool repr -> bool repr -> bool repr t
-
   val bnot : bool repr -> bool repr t
 
   val ifthenelse : bool repr -> 'a repr -> 'a repr -> 'a repr t
@@ -111,6 +109,16 @@ module type BOOL = sig
   val constant : bool -> bool repr t
 
   val band_list : bool repr list -> bool repr t
+
+  module Internal : sig
+    val bor_lookup : bool repr -> bool repr -> bool repr t
+
+    val xor_lookup : bool repr -> bool repr -> bool repr t
+
+    val band_lookup : bool repr -> bool repr -> bool repr t
+
+    val bnot_lookup : bool repr -> bool repr t
+  end
 end
 
 module type COMMON = sig
@@ -228,6 +236,18 @@ module type COMMON = sig
       with type scalar = scalar
        and type 'a repr = 'a repr
        and type 'a t = 'a t
+
+  module Limb (N : sig
+    val nb_bits : int
+  end) : sig
+    val xor_lookup : scalar repr -> scalar repr -> scalar repr t
+
+    val band_lookup : scalar repr -> scalar repr -> scalar repr t
+
+    val bnot_lookup : scalar repr -> scalar repr t
+
+    val rotate_right_lookup : scalar repr -> scalar repr -> int -> scalar repr t
+  end
 
   module Ecc : sig
     val weierstrass_add :

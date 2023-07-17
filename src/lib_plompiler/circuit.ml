@@ -799,11 +799,6 @@ module Bool = struct
       |]
     >* ret @@ Bool o
 
-  let bor_lookup (Bool l) (Bool r) =
-    let* (Bool o) = fresh Dummy.bool in
-    append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
-    >* ret @@ Bool o
-
   let swap : type a. bool repr -> a repr -> a repr -> (a * a) repr t =
     let scalar_swap (Bool b) (Scalar x) (Scalar y) =
       let*& u = fresh Dummy.scalar in
@@ -858,6 +853,79 @@ module Bool = struct
           foldM Num.add (scalar_of_bool hd) (List.map scalar_of_bool tl)
         in
         is_eq_const sum (S.of_int @@ (List.length tl + 1))
+
+  module Internal = struct
+    let bor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup ~wires:[Input l; Input r; Output o] ~table:"or" "bor lookup"
+      >* ret @@ Bool o
+
+    let xor_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"xor"
+        "xor lookup"
+      >* ret @@ Bool o
+
+    let band_lookup (Bool l) (Bool r) =
+      let* (Bool o) = fresh Dummy.bool in
+      append_lookup
+        ~wires:[Input l; Input r; Output o]
+        ~table:"band"
+        "band lookup"
+      >* ret @@ Bool o
+
+    let bnot_lookup (Bool b) =
+      let* (Bool o) = fresh Dummy.bool in
+      let* (Scalar zero) = fresh Dummy.scalar in
+      append_lookup
+        ~wires:[Input b; Input zero; Output o]
+        ~table:"bnot"
+        "bnot lookup"
+      >* ret @@ Bool o
+  end
+end
+
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits = N.nb_bits
+
+  let xor_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("xor" ^ Int.to_string nb_bits)
+      ("xor lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let band_lookup (Scalar l) (Scalar r) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("band" ^ Int.to_string nb_bits)
+      ("band lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let bnot_lookup (Scalar l) =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let* (Scalar zero) = fresh Dummy.scalar in
+    append_lookup
+      ~wires:[Input l; Input zero; Output o]
+      ~table:("bnot" ^ Int.to_string nb_bits)
+      ("bnot lookup" ^ Int.to_string nb_bits)
+    >* ret @@ Scalar o
+
+  let rotate_right_lookup (Scalar l) (Scalar r) i =
+    let* (Scalar o) = fresh Dummy.scalar in
+    let nb_bits_i = Int.to_string nb_bits ^ "_" ^ Int.to_string i in
+    append_lookup
+      ~wires:[Input l; Input r; Output o]
+      ~table:("rotate_right" ^ nb_bits_i)
+      ("rotate_right lookup" ^ nb_bits_i)
+    >* ret @@ Scalar o
 end
 
 let hd (List l) = match l with [] -> assert false | x :: _ -> ret x

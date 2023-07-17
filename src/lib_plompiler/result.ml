@@ -297,8 +297,6 @@ module Bool = struct
 
   let bor (B l) (B r) = ret @@ B (l || r)
 
-  let bor_lookup (B l) (B r) = bor (B l) (B r)
-
   let bnot (B b) = ret @@ B (not b)
 
   let ifthenelse (B b) l r = if b then ret l else ret r
@@ -307,6 +305,49 @@ module Bool = struct
 
   let band_list l : bool repr t =
     ret @@ List.fold_left (fun (B a) (B b) -> B (a && b)) (B true) l
+
+  module Internal = struct
+    let bor_lookup (B l) (B r) = bor (B l) (B r)
+
+    let xor_lookup (B l) (B r) = xor (B l) (B r)
+
+    let band_lookup (B l) (B r) = band (B l) (B r)
+
+    let bnot_lookup (B b) = bnot (B b)
+  end
+end
+
+module Limb (N : sig
+  val nb_bits : int
+end) =
+struct
+  let nb_bits =
+    (* As we use the Int functions (logxor, logand, etc.) to compute
+       the lookup table, the nb_bits is limited to int_size / 2. *)
+    assert (N.nb_bits <= 8) ;
+    N.nb_bits
+
+  let xor_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logxor (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let band_lookup (S (X l)) (S (X r)) =
+    ret @@ to_s @@ S.of_int
+    @@ Int.logand (Z.to_int (S.to_z l)) (Z.to_int (S.to_z r))
+
+  let bnot_lookup (S (X l)) =
+    let mask = (1 lsl nb_bits) - 1 in
+    ret @@ to_s @@ S.of_int @@ Int.(logand (lognot (Z.to_int (S.to_z l))) mask)
+
+  let rotate_right_lookup (S (X l)) (S (X r)) i =
+    assert (i < nb_bits) ;
+    ret @@ to_s
+    @@ S.of_int
+         (Csir.rotate_right
+            ~nb_bits
+            (Z.to_int (S.to_z l))
+            (Z.to_int (S.to_z r))
+            i)
 end
 
 let point x y = P (S (X x), S (X y))

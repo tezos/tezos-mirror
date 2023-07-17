@@ -3256,6 +3256,408 @@ Constraints: 96
 Bool.test_bor_bytes_optimized:
 Constraints: 48
 
+Bool.test_xor_lookup:
+Constraints: 6
+
+Bool.test_xor_lookup_optimized:
+Constraints: 3
+
+Bool.test_xor_lookup:
+Constraints: 6
+
+Bool.test_xor_lookup_optimized:
+Constraints: 3
+
+Bool.test_xor_lookup:
+Constraints: 6
+
+Bool.test_xor_lookup_optimized:
+Constraints: 3
+
+Bool.test_xor_lookup:
+Constraints: 6
+
+Bool.test_xor_lookup_optimized:
+Constraints: 3
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes1:
+Constraints: 48
+
+Bool.test_xor_bytes1_optimized:
+Constraints: 24
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_xor_bytes4:
+Constraints: 67
+
+Bool.test_xor_bytes4_optimized:
+Constraints: 30
+
+Bool.test_bnot_lookup:
+Constraints: 5
+
+Bool.test_bnot_lookup_optimized:
+Constraints: 2
+
+Bool.test_bnot_lookup:
+Constraints: 5
+
+Bool.test_bnot_lookup_optimized:
+Constraints: 2
+
+Bool.test_bnot_bytes1:
+Constraints: 40
+
+Bool.test_bnot_bytes1_optimized:
+Constraints: 16
+
+Bool.test_bnot_bytes1:
+Constraints: 40
+
+Bool.test_bnot_bytes1_optimized:
+Constraints: 16
+
+Bool.test_bnot_bytes1:
+Constraints: 40
+
+Bool.test_bnot_bytes1_optimized:
+Constraints: 16
+
+Bool.test_bnot_bytes1:
+Constraints: 40
+
+Bool.test_bnot_bytes1_optimized:
+Constraints: 16
+
+Bool.test_bnot_bytes4:
+Constraints: 51
+
+Bool.test_bnot_bytes4_optimized:
+Constraints: 20
+
+Bool.test_bnot_bytes4:
+Constraints: 51
+
+Bool.test_bnot_bytes4_optimized:
+Constraints: 20
+
+Bool.test_bnot_bytes4:
+Constraints: 51
+
+Bool.test_bnot_bytes4_optimized:
+Constraints: 20
+
+Bool.test_bnot_bytes4:
+Constraints: 51
+
+Bool.test_bnot_bytes4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 49
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 16
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 49
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 16
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 51
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 20
+
+Bytes.test_rotate_right4:
+Constraints: 49
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 16
+
+Bytes.test_rotate_right4:
+Constraints: 97
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 32
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 97
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 32
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 97
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 32
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 101
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 40
+
+Bytes.test_rotate_right4:
+Constraints: 145
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 48
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 145
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 48
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_rotate_right4:
+Constraints: 145
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 48
+
+Bytes.test_rotate_right4:
+Constraints: 151
+
+Bytes.test_rotate_right4_optimized:
+Constraints: 60
+
+Bytes.test_shift_right4:
+Constraints: 49
+
+Bytes.test_shift_right4_optimized:
+Constraints: 16
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 20
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 20
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 20
+
+Bytes.test_shift_right4:
+Constraints: 49
+
+Bytes.test_shift_right4_optimized:
+Constraints: 16
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 19
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 19
+
+Bytes.test_shift_right4:
+Constraints: 51
+
+Bytes.test_shift_right4_optimized:
+Constraints: 19
+
+Bytes.test_shift_right4:
+Constraints: 49
+
+Bytes.test_shift_right4_optimized:
+Constraints: 16
+
 Range-checks:
 Constraints: 24
 

@@ -126,9 +126,9 @@ module type LIB = sig
        significant. The most significant bit becomes the least significant
        i.e. it is "rotated".
        [rotate_left bl (length bl) = bl] *)
-    val rotate_left : bl repr -> int -> bl repr
+    val rotate_left : bl repr -> int -> bl repr t
 
-    val rotate_right : bl repr -> int -> bl repr
+    val rotate_right : bl repr -> int -> bl repr t
 
     (* [shift_left bl 1] shifts all bits left by 1 position, so each bit is more
        significant. The most signigicant bit is lost and the least significant
@@ -137,6 +137,38 @@ module type LIB = sig
     val shift_left : bl repr -> int -> bl repr t
 
     val shift_right : bl repr -> int -> bl repr t
+
+    module Internal : sig
+      val xor_lookup : bl repr -> bl repr -> bl repr t
+
+      val band_lookup : bl repr -> bl repr -> bl repr t
+
+      val not_lookup : bl repr -> bl repr t
+    end
+  end
+
+  module Limbs (N : sig
+    val nb_bits : int
+  end) : sig
+    (* This module is a more generic version of Bytes, where each scalar
+       stores an [nb_bits]-bit number. *)
+    type sl = scalar list
+
+    val of_bytes : Bytes.bl repr -> sl repr t
+
+    val to_bytes : sl repr -> Bytes.bl repr t
+
+    val to_scalar : sl repr -> scalar repr t
+
+    val xor_lookup : sl repr -> sl repr -> sl repr t
+
+    val band_lookup : sl repr -> sl repr -> sl repr t
+
+    val bnot_lookup : sl repr -> sl repr t
+
+    val rotate_right_lookup : sl repr -> int -> sl repr t
+
+    val shift_right_lookup : sl repr -> int -> sl repr t
   end
 
   val add2 :
@@ -702,7 +734,7 @@ module Lib (C : COMMON) = struct
         aux [] 0 l
       in
       let head, tail = split_n i (of_list a) in
-      to_list @@ tail @ head
+      ret @@ to_list @@ tail @ head
 
     let rotate_left a i = rotate_right a (length a - i)
 
@@ -724,6 +756,104 @@ module Lib (C : COMMON) = struct
         List.filteri (fun j _x -> j >= i) l @ List.init i (fun _ -> zero)
       in
       ret @@ to_list res
+
+    module Internal = struct
+      let xor_lookup a b =
+        check_args_length "Bytes.xor_lookup" a b ;
+        let* l = map2M Bool.Internal.xor_lookup (of_list a) (of_list b) in
+        ret @@ to_list l
+
+      let band_lookup a b =
+        check_args_length "Bytes.band_lookup" a b ;
+        let* l = map2M Bool.Internal.band_lookup (of_list a) (of_list b) in
+        ret @@ to_list l
+
+      let not_lookup b =
+        let* l = mapM Bool.Internal.bnot_lookup (of_list b) in
+        ret @@ to_list l
+    end
+  end
+
+  module Limbs (N : sig
+    val nb_bits : int
+  end) =
+  struct
+    module Limb = Limb (N)
+
+    type sl = scalar list
+
+    let nb_bits = N.nb_bits
+
+    let of_bytes x =
+      let bl = Utils.split_exactly (of_list x) nb_bits in
+      let* r = mapM (fun x -> Num.scalar_of_bytes (to_list x)) bl in
+      ret @@ to_list r
+
+    let to_bytes l =
+      let* lb =
+        mapM
+          (fun z ->
+            let* bz = bits_of_scalar ~nb_bits z in
+            ret @@ of_list bz)
+          (of_list l)
+      in
+      ret @@ to_list (List.concat lb)
+
+    (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2^nb_bits with Horner's method:
+       P(2^nb_bits) = b₀ + 2^nb_bits (b₁+ 2^nb_bits (b₂ + 2^nb_bits (…))). *)
+    let to_scalar b =
+      let pow2_nb_bits = 1 lsl nb_bits |> S.of_int in
+      let* zero = Num.zero in
+      foldM
+        (fun acc b -> Num.add acc b ~ql:pow2_nb_bits ~qr:S.one)
+        zero
+        (List.rev (of_list b))
+
+    let xor_lookup a b =
+      let* r = map2M Limb.xor_lookup (of_list a) (of_list b) in
+      ret @@ to_list r
+
+    let band_lookup a b =
+      let* r = map2M Limb.band_lookup (of_list a) (of_list b) in
+      ret @@ to_list r
+
+    let bnot_lookup b =
+      let* r = mapM Limb.bnot_lookup (of_list b) in
+      ret @@ to_list r
+
+    let rotate_or_shift_right_rem0 ~is_shift a ind =
+      let a = Array.of_list (of_list a) in
+      let len = Array.length a in
+      let* zero = Num.zero in
+      let r =
+        List.init (len - ind) (fun i -> a.(i + ind))
+        @ List.init ind (fun i -> if is_shift then zero else a.(i))
+      in
+      ret @@ to_list r
+
+    let rotate_or_shift_right_rem ~is_shift a rem =
+      assert (rem < nb_bits) ;
+      let a = Array.of_list (of_list a) in
+      let len = Array.length a in
+      let get_i i : scalar repr t =
+        if i < len - 1 then Limb.rotate_right_lookup a.(i) a.(i + 1) rem
+        else
+          let* zero = Num.zero in
+          let a0 = if is_shift then zero else a.(0) in
+          Limb.rotate_right_lookup a.(i) a0 rem
+      in
+      let* r = mapM get_i (List.init len (fun i -> i)) in
+      ret @@ to_list r
+
+    let rotate_or_shift_right ~is_shift a i =
+      let ind = i / nb_bits in
+      let rem = i mod nb_bits in
+      let* res = rotate_or_shift_right_rem0 ~is_shift a ind in
+      if rem > 0 then rotate_or_shift_right_rem ~is_shift res rem else ret res
+
+    let rotate_right_lookup a i = rotate_or_shift_right ~is_shift:false a i
+
+    let shift_right_lookup a i = rotate_or_shift_right ~is_shift:true a i
   end
 
   let add2 p1 p2 =

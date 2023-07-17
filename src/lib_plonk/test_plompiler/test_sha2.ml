@@ -38,7 +38,9 @@ functor
 
     open Utils (L)
 
-    module H = Plompiler__Gadget_sha2.MAKE (Plompiler__Sha2_variants.Sha256) (L)
+    module O = Plompiler__Gadget_sha2.Op_bits_impl (L)
+    module H =
+      Plompiler__Gadget_sha2.MAKE (L) (Plompiler__Sha2_variants.Sha256) (O)
 
     let bytes_of_hex = Plompiler.Utils.bytes_of_hex
 
