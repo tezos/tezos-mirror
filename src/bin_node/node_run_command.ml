@@ -407,7 +407,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Config_file.t) node
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
   let cors =
-    RPC_server.
+    Resto_cohttp.Cors.
       {
         allowed_origins = rpc_config.cors_origins;
         allowed_headers = cors_headers;

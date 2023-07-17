@@ -27,36 +27,10 @@
 
 type cors = {allowed_headers : string list; allowed_origins : string list}
 
-(** A handle on the server worker. *)
-type server
+module RPC_logging : Resto_cohttp_server.Server.LOGGING
 
-type callback =
-  Cohttp_lwt_unix.Server.conn ->
-  Cohttp.Request.t ->
-  Cohttp_lwt.Body.t ->
-  Cohttp_lwt_unix.Server.response_action Lwt.t
-
-val resto_callback : server -> callback
-
-(** Initializes a RPC server *)
-val init_server :
-  ?cors:cors ->
-  ?agent:string ->
-  ?acl:Resto_acl.Acl.t ->
-  media_types:Media_type.t list ->
-  unit Tezos_rpc.Directory.t ->
-  server
-
-(** Promise [server].*)
-val launch :
-  ?host:string ->
-  server ->
-  ?callback:callback ->
-  Conduit_lwt_unix.server ->
-  unit Lwt.t
-
-(** Kill an RPC server. *)
-val shutdown : server -> unit Lwt.t
+include module type of
+    Resto_cohttp_server.Server.Make (Tezos_rpc.Encoding) (RPC_logging)
 
 module Acl : sig
   include module type of Resto_acl.Acl
