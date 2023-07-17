@@ -40,17 +40,12 @@ module Internal = struct
     in
     match unstaked_frozen_deposits_opt with
     | None -> return Unstaked_frozen_deposits_repr.empty
-    | Some unstaked_frozen_deposits -> (
-        match current_unslashable_cycle ctxt with
-        | None ->
-            return
-              (Unstaked_frozen_deposits_repr.no_unslashable_cycle
-                 unstaked_frozen_deposits)
-        | Some unslashable_cycle ->
-            Lwt.return
-            @@ Unstaked_frozen_deposits_repr.squash_unslashable
-                 ~unslashable_cycle
-                 unstaked_frozen_deposits)
+    | Some unstaked_frozen_deposits ->
+        let unslashable_cycle = current_unslashable_cycle ctxt in
+        Lwt.return
+        @@ Unstaked_frozen_deposits_repr.squash_unslashable
+             ~unslashable_cycle
+             unstaked_frozen_deposits
 
   let get ctxt contract ~normalized_cycle =
     let open Lwt_result_syntax in

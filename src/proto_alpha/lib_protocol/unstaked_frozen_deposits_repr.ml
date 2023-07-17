@@ -35,16 +35,17 @@ let encoding =
 
 let squash_unslashable ~unslashable_cycle l =
   let open Result_syntax in
-  let rec aux unslashable slashable = function
-    | [] -> ok ((unslashable_cycle, unslashable) :: slashable)
-    | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle) ->
-        let* unslashable = Deposits_repr.(unslashable ++? d) in
-        aux unslashable slashable tl
-    | hd :: tl -> aux unslashable (hd :: slashable) tl
-  in
-  aux Deposits_repr.zero [] l
-
-let no_unslashable_cycle l = l
+  match unslashable_cycle with
+  | None -> return l
+  | Some unslashable_cycle ->
+      let rec aux unslashable slashable = function
+        | [] -> ok ((unslashable_cycle, unslashable) :: slashable)
+        | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle) ->
+            let* unslashable = Deposits_repr.(unslashable ++? d) in
+            aux unslashable slashable tl
+        | hd :: tl -> aux unslashable (hd :: slashable) tl
+      in
+      aux Deposits_repr.zero [] l
 
 let get ~normalized_cycle l =
   List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l

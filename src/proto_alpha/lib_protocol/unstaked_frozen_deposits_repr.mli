@@ -32,9 +32,7 @@ val empty : squashed
 val encoding : t Data_encoding.t
 
 val squash_unslashable :
-  unslashable_cycle:Cycle_repr.t -> t -> squashed tzresult
-
-val no_unslashable_cycle : t -> squashed
+  unslashable_cycle:Cycle_repr.t option -> t -> squashed tzresult
 
 val get : normalized_cycle:Cycle_repr.t -> squashed -> Deposits_repr.t
 
