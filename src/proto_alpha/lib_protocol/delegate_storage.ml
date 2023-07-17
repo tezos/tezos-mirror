@@ -117,7 +117,10 @@ module Contract = struct
         Contract_storage.get_balance_and_frozen_bonds c contract
       in
       let* c =
-        Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+        Stake_storage.remove_contract_delegated_stake
+          c
+          contract
+          balance_and_frozen_bonds
       in
       let* c = Contract_delegate_storage.set c contract delegate in
       let* c =
@@ -185,7 +188,10 @@ module Contract = struct
       Contract_storage.get_balance_and_frozen_bonds c contract
     in
     let* c =
-      Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+      Stake_storage.remove_contract_delegated_stake
+        c
+        contract
+        balance_and_frozen_bonds
     in
     match delegate with
     | None ->

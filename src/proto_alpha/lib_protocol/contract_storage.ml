@@ -617,7 +617,7 @@ let spend_only_call_from_token c contract amount =
   let balance = Option.value balance ~default:Tez_repr.zero in
   let*? new_balance = spend_from_balance contract balance amount in
   let* c = Storage.Contract.Spendable_balance.update c contract new_balance in
-  let* c = Stake_storage.remove_contract_stake c contract amount in
+  let* c = Stake_storage.remove_contract_delegated_stake c contract amount in
   let+ () =
     when_
       Tez_repr.(new_balance <= Tez_repr.zero)
@@ -686,7 +686,8 @@ let find_bond ctxt contract bond_id =
 let spend_bond_only_call_from_token ctxt contract bond_id amount =
   fail_when Tez_repr.(amount = zero) (Failure "Expecting : [amount > 0]")
   >>=? fun () ->
-  Stake_storage.remove_contract_stake ctxt contract amount >>=? fun ctxt ->
+  Stake_storage.remove_contract_delegated_stake ctxt contract amount
+  >>=? fun ctxt ->
   Storage.Contract.Frozen_bonds.get (ctxt, contract) bond_id
   >>=? fun (ctxt, frozen_bonds) ->
   error_when
