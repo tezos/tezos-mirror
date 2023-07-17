@@ -52,7 +52,7 @@
   "smart_rollup_max_number_of_cemented_commitments": 5,
   "smart_rollup_max_number_of_parallel_games": 32,
   "smart_rollup_reveal_activation_level":
-    { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 0 },
+    { "raw_data": { "Blake2B": 0 }, "metadata": 0, "dal_page": 2147483646 },
   "zk_rollup_enable": false, "zk_rollup_origination_size": 4000,
   "zk_rollup_min_pending_to_process": 10,
   "zk_rollup_max_ticket_payload_size": 2048,
