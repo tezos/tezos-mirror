@@ -66,4 +66,4 @@ let run subcommand cli_options =
 
 let _ =
   let commands = Cli.make ~run in
-  Cmdliner.Cmd.eval commands
+  exit @@ Cmdliner.Cmd.eval commands
