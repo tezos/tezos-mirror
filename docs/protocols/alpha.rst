@@ -118,6 +118,11 @@ Breaking Changes
   baker's spendable balance to their frozen deposits. Bakers need to use the
   ``stake`` pseudo-operation to increase their frozen deposits. (MR :gl:`!8087`)
 
+- Receipts involving the ``Deposits`` kind of balance are updated in a
+  non-backward-compatible manner. It allows non-delegates, and
+  distinguishes updates to a delegate's balance from sharing of rewards
+  and punishments. (MR :gl:`!9498`)
+
 - Field ``for_double_endorsing`` from context storage has been renamed into
   ``for_double_attesting``. (MR :gl:`!9486`)
 
@@ -165,6 +170,25 @@ RPC Changes
 
 Operation receipts
 ------------------
+
+- To handle the new staking pseudo-operations, the following changes
+  to receipts have been made:
+
+  - the ``Deposits`` kind of balance, which used to be associated to
+    the public key hash of a delegate, has been generalized to handle
+    non-delegate staking and sharing of rewards and punishments; it is
+    now associated to either a ``Single`` delegator (represented by a
+    pair of the delegator address and its delegate public key hash) or
+    ``Shared`` between all the delegators of a given delegate in
+    proportion to their stake (represented by the public key hash of
+    the delegate). (MR :gl:`!9498`)
+
+  - a new ``Unstaked_deposits`` kind of balance has been added to
+    represent tez for which unstaking has been requested. This kind of
+    balance is associated with the cycle at which the tez become
+    liquid and, like in the ``Deposits`` case, it is either associated
+    with a ``Single`` delegator or ``Shared`` between a delegate and
+    its delegators. (MR :gl:`!9498`)
 
 Bug Fixes
 ---------
