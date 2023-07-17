@@ -128,7 +128,7 @@ let credit ctxt receiver amount origin =
           let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.credit_only_call_from_token
             ctxt
-            delegate
+            staker
             cycle
             amount
           >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))
@@ -185,7 +185,7 @@ let spend ctxt giver amount origin =
           let delegate = Stake_repr.staker_delegate staker in
           Unstaked_frozen_deposits_storage.spend_only_call_from_token
             ctxt
-            delegate
+            staker
             cycle
             amount
           >|=? fun ctxt -> (ctxt, Unstaked_deposits (delegate, cycle))

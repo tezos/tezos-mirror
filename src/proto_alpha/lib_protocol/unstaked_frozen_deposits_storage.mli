@@ -46,26 +46,26 @@ val get :
   Cycle_repr.t ->
   Deposits_repr.t tzresult Lwt.t
 
-(** [credit_only_call_from_token ctxt delegate cycle amount] credits the
-    unstaked frozen deposits for [delegate] at [cycle] by [amount].
+(** [credit_only_call_from_token ctxt staker cycle amount] credits the
+    unstaked frozen deposits for [staker] at [cycle] by [amount].
     If [cycle] is an unslashable cycle, the credited cycle is the last
     unslashable cycle. *)
 val credit_only_call_from_token :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Stake_repr.staker ->
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [spend_only_call_from_token ctxt delegate cycle amount] spends [amount]
-    from the unstaked frozen deposits for [delegate] at [cycle].
+(** [spend_only_call_from_token ctxt staker cycle amount] spends [amount]
+    from the unstaked frozen deposits for [staker] at [cycle].
     If [cycle] is an unslashable cycle, the amount is spent from the last
     unslashable cycle.
     The function returns the error [Subtraction_underflow] if the balance is
     too low. *)
 val spend_only_call_from_token :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Stake_repr.staker ->
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
