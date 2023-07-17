@@ -23,39 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4443
-   Node profiles should be stored into the memory as well
-   so that we can cache them *)
-
 module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
 (** A profile context stores profile-specific data used by the daemon.  *)
-type t = {producers : Slot_set.t}
+type t = {producers : Slot_set.t; attestors : Pkh_set.t}
 
-let empty = {producers = Slot_set.empty}
+let empty = {producers = Slot_set.empty; attestors = Pkh_set.empty}
 
-let init_attestor number_of_slots gs_worker pkh =
+let init_attestor ctxt number_of_slots gs_worker pkh =
   List.iter
     (fun slot_index ->
       Join Gossipsub.{slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
-    Utils.Infix.(0 -- (number_of_slots - 1))
+    Utils.Infix.(0 -- (number_of_slots - 1)) ;
+  {ctxt with attestors = Pkh_set.add pkh ctxt.attestors}
 
 let init_producer ctxt slot_index =
-  {producers = Slot_set.add slot_index ctxt.producers}
+  {ctxt with producers = Slot_set.add slot_index ctxt.producers}
 
-let add_profile ctxt proto_parameters node_store gs_worker profile =
-  let open Lwt_result_syntax in
+let add_profile ctxt proto_parameters gs_worker profile =
   let Dal_plugin.{number_of_slots; _} = proto_parameters in
   let ctxt =
     match profile with
     | Services.Types.Attestor pkh ->
-        init_attestor number_of_slots gs_worker pkh ;
-        ctxt
+        init_attestor ctxt number_of_slots gs_worker pkh
     | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index
   in
-  let*! () = Store.Legacy.add_profile node_store profile in
-  return ctxt
+  ctxt
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
@@ -73,7 +67,20 @@ let join_topics_for_producer gs_worker committee ctxt =
 let on_new_head ctxt gs_worker committee =
   join_topics_for_producer gs_worker committee ctxt
 
-let get_profiles node_store = Store.Legacy.get_profiles node_store
+let get_profiles ctxt =
+  let producer_profiles =
+    Slot_set.fold
+      (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
+      ctxt.producers
+      []
+  in
+  let attestor_profiles =
+    Pkh_set.fold
+      (fun pkh acc -> Services.Types.Attestor pkh :: acc)
+      ctxt.attestors
+      producer_profiles
+  in
+  attestor_profiles @ producer_profiles
 
 let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in

@@ -159,14 +159,13 @@ module Handler = struct
           let (module Dal_plugin : Dal_plugin.T) = plugin in
           let* proto_parameters = Dal_plugin.get_constants `Main block cctxt in
           let* cryptobox = init_cryptobox dal_config proto_parameters in
-          let* () =
-            let+ pctxt =
-              List.fold_left_es
+          let () =
+            let pctxt =
+              List.fold_left
                 (fun profile_ctxt profile ->
                   Profile_manager.add_profile
                     profile_ctxt
                     proto_parameters
-                    (Node_context.get_store ctxt)
                     (Node_context.get_gs_worker ctxt)
                     profile)
                 (Node_context.get_profile_ctxt ctxt)
