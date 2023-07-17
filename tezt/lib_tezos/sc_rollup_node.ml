@@ -394,6 +394,16 @@ let run ?legacy ?event_level ?event_sections_levels ?loser_mode
   let* () = if wait_ready then wait_for_ready node else unit in
   return ()
 
+let run_sequencer ?event_level ?event_sections_levels ?(wait_ready = true) node
+    rollup_address extra_arguments =
+  let cmd =
+    ["run"; "for"; rollup_address; "with"; "operator"]
+    @ operators_params node @ common_node_args node @ extra_arguments
+  in
+  let* () = do_runlike_command ?event_level ?event_sections_levels node cmd in
+  let* () = if wait_ready then wait_for_ready node else unit in
+  return ()
+
 let spawn_run node rollup_address extra_arguments =
   let mode, args = node_args node rollup_address in
   spawn_command node (["run"; mode] @ args @ extra_arguments)

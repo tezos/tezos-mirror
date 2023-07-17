@@ -285,17 +285,6 @@ let inspect_durable_state_value :
       rpc_req ()
       |> Runnable.map (fun json -> List.map JSON.as_string (JSON.as_list json))
 
-(* match expected with
-   | Expected_success -> (
-       let*! json = rpc_req () in
-       match operation with
-       | Value -> return (JSON.as_string json : a)
-       | Length -> return (JSON.as_int64 json : a)
-       | Subkeys -> return (List.map JSON.as_string (JSON.as_list json)))
-   | Expected_error msg ->
-       let*? process = rpc_req () in
-       Process.check_error ~msg process *)
-
 let ticks ?hooks ?(block = "head") sc_client =
   let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
   Runnable.map JSON.as_int res

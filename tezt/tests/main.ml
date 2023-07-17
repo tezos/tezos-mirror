@@ -224,6 +224,7 @@ let register_protocol_specific_because_regression_tests () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
          re-enable Mumbai when DAC is separated from Dal node. *)
   Tx_sc_rollup.register ~protocols:[Alpha] ;
+  Sc_sequencer.register ~protocols:[Alpha] ;
   Snoop_codegen.register ~protocols:[Alpha] ;
   Timelock.register ~protocols:[Alpha] ;
   Timelock_disabled.register ~protocols:[Mumbai]

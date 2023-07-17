@@ -11,5 +11,6 @@ build_kernels:
     paths:
       - evm_kernel.wasm
       - smart-rollup-installer
+      - sequenced_kernel.wasm
     expire_in: 1 day
     when: on_success
