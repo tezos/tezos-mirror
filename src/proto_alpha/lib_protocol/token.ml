@@ -219,11 +219,9 @@ module Internal_for_tests = struct
 
   let balance ctxt stored =
     match stored with
+    | (`Collected_commitments _ | `Block_fees) as stored -> balance ctxt stored
     | `Contract contract ->
         Contract_storage.get_balance ctxt contract >|=? fun balance ->
-        (ctxt, balance)
-    | `Collected_commitments bpkh ->
-        Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
         (ctxt, balance)
     | `Frozen_deposits staker ->
         let contract =
@@ -237,7 +235,6 @@ module Internal_for_tests = struct
           (Stake_repr.staker_delegate staker)
           cycle
         >|=? fun balance -> (ctxt, balance)
-    | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
     | `Frozen_bonds (contract, bond_id) ->
         Contract_storage.find_bond ctxt contract bond_id
         >|=? fun (ctxt, balance_opt) ->
