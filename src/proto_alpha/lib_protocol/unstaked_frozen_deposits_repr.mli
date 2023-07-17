@@ -24,7 +24,11 @@
 (*****************************************************************************)
 
 (** Datatype for a map from cycle to deposits, where all unslashable cycles
-    are squashed. *)
+    are squashed.
+    
+    Expected to be used for a small number of cycles at a time, typically
+    bounded by [preserved_cycles + max_slashing_period] plus a small constant.
+*)
 
 (** Storable version. *)
 type t

@@ -23,9 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Associative list acting like a map, i.e. not duplicated keys are expected.
-   Though sorting is not required. *)
+(* Associative list acting like a map.
+   Invariants:
+     - the list is sorted by keys,
+     - not duplicated keys. *)
 type t = (Cycle_repr.t * Deposits_repr.t) list
+
+let rec check_well_formed = function
+  | [] -> Result_syntax.return_unit
+  | (c1, _) :: (c2, _) :: _ when Cycle_repr.(c2 <= c1) ->
+      Error "Malformed unstaked frozen deposits"
+  | _ :: tl -> check_well_formed tl
+
+let id_check_well_formed l =
+  let open Result_syntax in
+  let+ () = check_well_formed l in
+  l
 
 (* A version of {!t} in which all cycles older than a given [unslashable_cycle]
    are squashed together using {!Deposits_repr.(++?)}. *)
@@ -35,33 +48,39 @@ let empty = []
 
 let encoding =
   let open Data_encoding in
-  list (tup2 Cycle_repr.encoding Deposits_repr.encoding)
+  conv_with_guard
+    (fun l -> l)
+    id_check_well_formed
+    (list (tup2 Cycle_repr.encoding Deposits_repr.encoding))
 
 let squash_unslashable ~unslashable_cycle l =
   let open Result_syntax in
-  match unslashable_cycle with
-  | None -> return l
-  | Some unslashable_cycle ->
-      let rec aux unslashable slashable = function
-        | [] -> ok ((unslashable_cycle, unslashable) :: slashable)
+  match (unslashable_cycle, l) with
+  | Some unslashable_cycle, (c, unslashable) :: tl
+    when Cycle_repr.(c <= unslashable_cycle) ->
+      let rec aux unslashable = function
         | (c, d) :: tl when Cycle_repr.(c <= unslashable_cycle) ->
             let* unslashable = Deposits_repr.(unslashable ++? d) in
-            aux unslashable slashable tl
-        | hd :: tl -> aux unslashable (hd :: slashable) tl
+            aux unslashable tl
+        | slashable -> return ((unslashable_cycle, unslashable) :: slashable)
       in
-      aux Deposits_repr.zero [] l
+      aux unslashable tl
+  | _ -> return l
 
 let get ~normalized_cycle l =
   List.assoc ~equal:Cycle_repr.( = ) normalized_cycle l
   |> Option.value ~default:Deposits_repr.zero
 
-let update ~f ~normalized_cycle l =
+(* not tail-rec *)
+let rec update ~f ~normalized_cycle l =
   let open Result_syntax in
-  let rec aux acc = function
-    | [] -> return acc
-    | (c, d) :: tl when Cycle_repr.(c = normalized_cycle) ->
-        let+ d = f d in
-        List.rev_append acc ((c, d) :: tl)
-    | hd :: tl -> aux (hd :: acc) tl
-  in
-  aux [] l
+  match l with
+  | (c, d) :: tl when Cycle_repr.(c = normalized_cycle) ->
+      let+ d = f d in
+      (c, d) :: tl
+  | ((c, _) as hd) :: tl when Cycle_repr.(c < normalized_cycle) ->
+      let+ tl = update ~f ~normalized_cycle tl in
+      hd :: tl
+  | _ ->
+      let+ d = f Deposits_repr.zero in
+      (normalized_cycle, d) :: l
