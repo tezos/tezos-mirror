@@ -204,7 +204,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let make_bench_helper rng_state config () =
     let open Result_syntax in
-    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state) in
+    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state ()) in
     let ctxt = Gas_helpers.set_limit ctxt in
     let size = Random.State.int rng_state config.max_size in
     let (Ex_ty ty) = dummy_type_generator ~rng_state size in
@@ -252,7 +252,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in
     let open Result_syntax in
-    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state) in
+    let* ctxt, _ = Lwt_main.run (Execution_context.make ~rng_state ()) in
     let ctxt = Gas_helpers.set_limit ctxt in
     let ty =
       match list_t (-1) ticket_ty with Error _ -> assert false | Ok t -> t

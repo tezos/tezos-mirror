@@ -84,7 +84,7 @@ module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
     (* FIXME: cleanup and factorize this code between translator benches and these ones. *)
     let open Translator_benchmarks in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         match ex_ty with
         | Script_typed_ir.Ex_ty ty -> (
@@ -200,7 +200,7 @@ module Kinstr_size_benchmark : Tezos_benchmark.Benchmark.S = struct
     (* FIXME: cleanup and factorize this code between translator benches and these ones. *)
     let open Translator_benchmarks in
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_stack_ty =
           Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in

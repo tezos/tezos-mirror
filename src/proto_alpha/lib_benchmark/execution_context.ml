@@ -29,9 +29,12 @@ type context = Alpha_context.context * Script_interpreter.step_constants
 
 let initial_balance = 4_000_000_000_000L
 
-let context_init_memory ~rng_state =
+let context_init_memory ?dal ~rng_state () =
+  let dal_enable = Option.is_some dal in
   Context.init_n
     ~rng_state
+    ~dal_enable
+    ?dal
     ~bootstrap_balances:
       [
         initial_balance;
@@ -48,10 +51,10 @@ let context_init_memory ~rng_state =
       return (`Mem_block (block, (bs1, bs2, bs3, bs4, bs5)))
   | _ -> assert false
 
-let context_init ~rng_state = context_init_memory ~rng_state
+let context_init ?dal ~rng_state () = context_init_memory ?dal ~rng_state ()
 
-let make ~rng_state =
-  context_init_memory ~rng_state >>=? fun context ->
+let make ?dal ~rng_state () =
+  context_init_memory ?dal ~rng_state () >>=? fun context ->
   let amount = Alpha_context.Tez.one in
   let chain_id = Tezos_crypto.Hashed.Chain_id.zero in
   let now = Script_timestamp.of_zint Z.zero in

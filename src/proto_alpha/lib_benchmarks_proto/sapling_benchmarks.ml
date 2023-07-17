@@ -96,7 +96,7 @@ module Apply_diff_bench : Benchmark.S = struct
            seed
     in
     Lwt_main.run
-      ( Execution_context.make ~rng_state:sapling_forge_rng_state
+      ( Execution_context.make ~rng_state:sapling_forge_rng_state ()
       >>=? fun (ctxt, step_constants) ->
         Sapling_generation.prepare_seeded_state sapling_transition ctxt
         >>=? fun (_, _, _, _, ctxt, state_id) ->

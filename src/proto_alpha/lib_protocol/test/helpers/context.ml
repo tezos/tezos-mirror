@@ -516,7 +516,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?reward_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
     ?dal_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold () =
+    ?nonce_revelation_threshold ?dal () =
   let n = tup_n tup in
   Account.generate_accounts ?rng_state n >>?= fun accounts ->
   let contracts =
@@ -546,6 +546,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
+    ?dal
     bootstrap_accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 

@@ -34,7 +34,7 @@ let fv s = Free_variable.of_namespace (ns s)
 let group = Benchmark.Group "carbonated_map"
 
 let make_context ~rng_state =
-  match Lwt_main.run @@ Execution_context.make ~rng_state with
+  match Lwt_main.run @@ Execution_context.make ~rng_state () with
   | Ok (ctxt, _) -> ctxt
   | Error _ -> assert false
 
