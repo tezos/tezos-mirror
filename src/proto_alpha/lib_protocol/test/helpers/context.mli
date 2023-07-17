@@ -126,6 +126,8 @@ val get_adaptive_inflation_launch_cycle : t -> Cycle.t option tzresult Lwt.t
 
 val get_total_frozen_stake : t -> Tez.t tzresult Lwt.t
 
+val get_total_supply : t -> Tez.t tzresult Lwt.t
+
 val get_seed_nonce_revelation_tip : t -> Tez.t tzresult Lwt.t
 
 val get_vdf_revelation_tip : t -> Tez.t tzresult Lwt.t
@@ -182,6 +184,15 @@ module Contract : sig
   val frozen_bonds : t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val balance_and_frozen_bonds : t -> Contract.t -> Tez.t tzresult Lwt.t
+
+  val staked_balance : t -> Contract.t -> Tez.t option tzresult Lwt.t
+
+  val unstaked_frozen_balance : t -> Contract.t -> Tez.t option tzresult Lwt.t
+
+  val unstaked_finalizable_balance :
+    t -> Contract.t -> Tez.t option tzresult Lwt.t
+
+  val full_balance : t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val counter : t -> Contract.t -> Manager_counter.t tzresult Lwt.t
 

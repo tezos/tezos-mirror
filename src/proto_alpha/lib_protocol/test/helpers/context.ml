@@ -261,6 +261,9 @@ let get_adaptive_inflation_launch_cycle ctxt =
 let get_total_frozen_stake ctxt =
   Adaptive_inflation_services.total_frozen_stake rpc_ctxt ctxt
 
+let get_total_supply ctxt =
+  Adaptive_inflation_services.total_supply rpc_ctxt ctxt
+
 let get_seed_nonce_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
   return
@@ -338,6 +341,18 @@ module Contract = struct
 
   let balance_and_frozen_bonds ctxt contract =
     Alpha_services.Contract.balance_and_frozen_bonds rpc_ctxt ctxt contract
+
+  let staked_balance ctxt contract =
+    Alpha_services.Contract.staked_balance rpc_ctxt ctxt contract
+
+  let unstaked_frozen_balance ctxt contract =
+    Alpha_services.Contract.unstaked_frozen_balance rpc_ctxt ctxt contract
+
+  let unstaked_finalizable_balance ctxt contract =
+    Alpha_services.Contract.unstaked_finalizable_balance rpc_ctxt ctxt contract
+
+  let full_balance ctxt contract =
+    Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
 
   let counter ctxt (contract : Contract.t) =
     match contract with
