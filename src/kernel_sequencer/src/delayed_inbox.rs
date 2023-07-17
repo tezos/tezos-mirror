@@ -3,8 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
-use tezos_data_encoding_derive::BinWriter;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -17,13 +17,14 @@ use crate::{
     message::{Framed, KernelMessage, Sequence, SequencerMsg, SetSequencer},
     queue::Queue,
     routing::FilterBehavior,
+    state::update_state,
 };
 
 /// Message added to the delayed inbox
-#[derive(BinWriter)]
+#[derive(BinWriter, NomReader)]
 pub struct UserMessage {
-    timeout_level: u32,
-    payload: Vec<u8>,
+    pub(crate) timeout_level: u32,
+    pub(crate) payload: Vec<u8>,
 }
 
 /// Return a message from the inbox
@@ -47,6 +48,11 @@ pub fn read_input<Host: Runtime>(
             None => return Ok(None), // No more messages to be processed
             Some(msg) => {
                 let payload = msg.as_ref();
+                // Verify the state of the delayed inbox on SoL
+                if let [0x00, 0x00, ..] = payload {
+                    update_state(host, delayed_inbox_queue, msg.level)?;
+                }
+
                 let message = KernelMessage::nom_read(payload);
                 match message {
                     Err(_) => {}
