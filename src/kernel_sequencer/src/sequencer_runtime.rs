@@ -11,7 +11,10 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
 };
 
-use crate::{delayed_inbox::read_input, routing::FilterBehavior, storage::map_user_path};
+use crate::{
+    delayed_inbox::read_input, queue::Queue, routing::FilterBehavior, storage::map_user_path,
+    storage::DELAYED_INBOX_PATH,
+};
 
 pub struct SequencerRuntime<R>
 where
@@ -20,6 +23,10 @@ where
     host: R,
     /// if true then the input is added to the delayed inbox
     input_predicate: FilterBehavior,
+    /// maximum number of level a message can stay in the delayed inbox
+    timeout_window: u32,
+    /// The delayed inbox queue
+    delayed_inbox_queue: Queue,
 }
 
 /// Runtime that handles the delayed inbox and the sequencer protocol.
@@ -30,10 +37,13 @@ impl<R> SequencerRuntime<R>
 where
     R: Runtime,
 {
-    pub fn new(host: R, input_predicate: FilterBehavior) -> Self {
+    pub fn new(host: R, input_predicate: FilterBehavior, timeout_window: u32) -> Self {
+        let delayed_inbox_queue = Queue::new(&host, &DELAYED_INBOX_PATH).unwrap();
         Self {
             host,
             input_predicate,
+            timeout_window,
+            delayed_inbox_queue,
         }
     }
 }
@@ -51,7 +61,12 @@ where
     }
 
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        read_input(&mut self.host, self.input_predicate)
+        read_input(
+            &mut self.host,
+            self.input_predicate,
+            self.timeout_window,
+            &mut self.delayed_inbox_queue,
+        )
     }
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
@@ -163,5 +178,59 @@ where
 
     fn runtime_version(&self) -> Result<String, RuntimeError> {
         self.host.runtime_version()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::SequencerRuntime;
+    use tezos_data_encoding_derive::BinWriter;
+    use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+    use tezos_smart_rollup_mock::MockHost;
+
+    #[derive(BinWriter)]
+    struct UserMessage {
+        payload: u32,
+    }
+
+    impl UserMessage {
+        fn new(payload: u32) -> UserMessage {
+            UserMessage { payload }
+        }
+    }
+
+    #[test]
+    fn test_add_user_message() {
+        let mut mock_host = MockHost::default();
+        mock_host.add_external(UserMessage::new(1));
+        mock_host.add_external(UserMessage::new(2));
+        mock_host.add_external(UserMessage::new(3));
+
+        let mut sequencer_runtime =
+            SequencerRuntime::new(mock_host, crate::FilterBehavior::AllowAll, 1);
+
+        let input = sequencer_runtime.read_input().unwrap();
+        let SequencerRuntime { host, .. } = sequencer_runtime;
+
+        assert!(input.is_none());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/0"
+            ))
+            .unwrap()
+            .is_some());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/1"
+            ))
+            .unwrap()
+            .is_some());
+        assert!(host
+            .store_has(&RefPath::assert_from(
+                b"/__sequencer/delayed-inbox/elements/2"
+            ))
+            .unwrap()
+            .is_some());
     }
 }
