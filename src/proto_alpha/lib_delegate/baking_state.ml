@@ -151,7 +151,7 @@ let prequorum_encoding =
         round;
         block_payload_hash;
         preendorsements =
-          List.filter_map Operation_pool.unpack_preendorsement preendorsements;
+          List.filter_map Operation_pool.unpack_preattestation preendorsements;
       })
     (obj4
        (req "level" int32)
@@ -200,7 +200,7 @@ let block_info_encoding =
         payload_round;
         round;
         prequorum;
-        quorum = List.filter_map Operation_pool.unpack_endorsement quorum;
+        quorum = List.filter_map Operation_pool.unpack_attestation quorum;
         dal_attestations =
           List.filter_map Operation_pool.unpack_dal_attestation dal_attestations;
         payload;
@@ -448,7 +448,7 @@ let event_encoding =
           | _ -> None)
         (fun ((), candidate, ops) ->
           Prequorum_reached
-            (candidate, Operation_pool.filter_preendorsements ops));
+            (candidate, Operation_pool.filter_preattestations ops));
       case
         (Tag 3)
         ~title:"Quorum_reached"
@@ -462,7 +462,7 @@ let event_encoding =
               Some ((), candidate, List.map Operation.pack ops)
           | _ -> None)
         (fun ((), candidate, ops) ->
-          Quorum_reached (candidate, Operation_pool.filter_endorsements ops));
+          Quorum_reached (candidate, Operation_pool.filter_attestations ops));
       case
         (Tag 4)
         ~title:"Timeout"

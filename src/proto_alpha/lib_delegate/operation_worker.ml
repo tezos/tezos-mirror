@@ -306,7 +306,7 @@ let update_monitoring ?(should_lock = true) state ops =
            preendorsements_received;
            _;
          } as proposal_watched)) ->
-      let preendorsements = Operation_pool.filter_preendorsements ops in
+      let preendorsements = Operation_pool.filter_preattestations ops in
       let preendorsements =
         List.filter
           (fun new_preendo ->
@@ -378,7 +378,7 @@ let update_monitoring ?(should_lock = true) state ops =
            endorsements_received;
            _;
          } as proposal_watched)) ->
-      let endorsements = Operation_pool.filter_endorsements ops in
+      let endorsements = Operation_pool.filter_attestations ops in
       let endorsements =
         List.filter
           (fun new_endo ->

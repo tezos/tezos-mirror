@@ -196,7 +196,7 @@ let generic_endorsing_power (filter : packed_operation list -> 'a list)
 
 let state_endorsing_power =
   generic_endorsing_power
-    Operation_pool.filter_endorsements
+    Operation_pool.filter_attestations
     (fun
       ({
          protocol_data = {contents = Single (Attestation consensus_content); _};
@@ -414,7 +414,7 @@ let baking_minimal_timestamp state =
   in
   let endorsements_in_mempool =
     Operation_pool.(
-      filter_endorsements (Operation_set.elements current_mempool.consensus))
+      filter_attestations (Operation_set.elements current_mempool.consensus))
     |> List.filter_map
          (fun
            ({

@@ -444,7 +444,7 @@ let propose_fresh_block_action ~endorsements ~dal_attestations ?last_proposal
     in
     (* 2. Filter and only retain relevant endorsements. *)
     let relevant_consensus_operations =
-      let endorsement_filter =
+      let attestation_filter =
         {
           Operation_pool.level = predecessor.shell.level;
           round = predecessor.round;
@@ -452,8 +452,8 @@ let propose_fresh_block_action ~endorsements ~dal_attestations ?last_proposal
         }
       in
       Operation_pool.filter_with_relevant_consensus_ops
-        ~endorsement_filter
-        ~preendorsement_filter:None
+        ~attestation_filter
+        ~preattestation_filter:None
         current_mempool.consensus
     in
     let filtered_mempool =
@@ -540,14 +540,14 @@ let propose_block_action state delegate round (proposal : proposal) =
             (List.map Operation.pack proposal.block.quorum
             @ List.map Operation.pack prequorum.preendorsements)
         in
-        let endorsement_filter =
+        let attestation_filter =
           {
             Operation_pool.level = proposal.predecessor.shell.level;
             round = proposal.predecessor.round;
             payload_hash = proposal.predecessor.payload_hash;
           }
         in
-        let preendorsement_filter =
+        let preattestation_filter =
           Some
             {
               Operation_pool.level = prequorum.level;
@@ -557,8 +557,8 @@ let propose_block_action state delegate round (proposal : proposal) =
         in
         Operation_pool.(
           filter_with_relevant_consensus_ops
-            ~endorsement_filter
-            ~preendorsement_filter
+            ~attestation_filter
+            ~preattestation_filter
             all_consensus_operations
           |> Operation_set.elements)
       in
