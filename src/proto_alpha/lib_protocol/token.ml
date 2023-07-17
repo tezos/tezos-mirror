@@ -56,29 +56,10 @@ type receiver = [infinite_sink | container]
 
 let balance ctxt stored =
   match stored with
-  | `Contract contract ->
-      Contract_storage.get_balance ctxt contract >|=? fun balance ->
-      (ctxt, balance)
   | `Collected_commitments bpkh ->
       Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
       (ctxt, balance)
-  | `Frozen_deposits staker ->
-      let contract =
-        Contract_repr.Implicit (Stake_repr.staker_delegate staker)
-      in
-      Frozen_deposits_storage.get ctxt contract >|=? fun frozen_deposits ->
-      (ctxt, frozen_deposits.current_amount)
-  | `Unstaked_frozen_deposits (staker, cycle) ->
-      Unstaked_frozen_deposits_storage.balance
-        ctxt
-        (Stake_repr.staker_delegate staker)
-        cycle
-      >|=? fun balance -> (ctxt, balance)
   | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
-  | `Frozen_bonds (contract, bond_id) ->
-      Contract_storage.find_bond ctxt contract bond_id
-      >|=? fun (ctxt, balance_opt) ->
-      (ctxt, Option.value ~default:Tez_repr.zero balance_opt)
 
 let credit ctxt receiver amount origin =
   let open Receipt_repr in
