@@ -163,4 +163,12 @@ module Internal_for_tests : sig
     [balance ctxt container] may fail. *)
   val allocated :
     Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
+
+  (** [balance ctxt container] returns a new context because of an access to
+    carbonated data, and the balance associated to the token holder.
+    This function may fail if [allocated ctxt container] returns [false].
+    Returns an error with the message "get_balance" if [container] refers to an
+    originated contract that is not allocated. *)
+  val balance :
+    Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 end

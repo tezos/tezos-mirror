@@ -108,7 +108,8 @@ let test_delegate_then_freeze_deposit () =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate) ->
   (* Fetch user's initial balance before freeze. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, user_balance) ->
   (* Let user delegate to "delegate". *)
   Contract.Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
   (* Fetch staking balance after delegation and before freeze. *)
@@ -143,7 +144,8 @@ let test_delegate_then_freeze_deposit () =
   Assert.equal_tez ~loc:__LOC__ staking_balance''' staking_balance''
   >>=? fun () ->
   (* Fetch user's balance again. *)
-  Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (_, user_balance') ->
   (* Ensure user's balance is unchanged. *)
   Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
@@ -160,7 +162,8 @@ let test_freeze_deposit_then_delegate () =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate) ->
   (* Fetch user's initial balance before freeze. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, user_balance) ->
   (* Freeze a sc-rollup deposit. *)
   let sc_rollup, _ = mk_sc_rollup () in
   let bond_id = Bond_id.Sc_rollup_bond_id sc_rollup in
@@ -200,7 +203,8 @@ let test_freeze_deposit_then_delegate () =
     (staking_balance'' -! user_balance)
   >>=? fun () ->
   (* Fetch user's balance. *)
-  Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (_, user_balance') ->
   (* Ensure user's balance is unchanged. *)
   Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
@@ -213,7 +217,8 @@ let test_allocated_when_frozen_deposits_exists ~user_is_delegate () =
   init_test ~user_is_delegate
   >>=? fun (ctxt, user_contract, user_account, _delegate) ->
   (* Fetch user's initial balance before freeze. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, user_balance) ->
   Assert.equal_bool ~loc:__LOC__ Tez.(user_balance > zero) true >>=? fun () ->
   (* Freeze a sc-rollup deposit. *)
   let sc_rollup, _ = mk_sc_rollup () in
@@ -223,7 +228,8 @@ let test_allocated_when_frozen_deposits_exists ~user_is_delegate () =
   Token.transfer ctxt user_account deposit_account deposit_amount
   >>>=? fun (ctxt, _) ->
   (* Check that user contract is still allocated, despite a null balance. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
   Token.Internal_for_tests.allocated ctxt user_account
   >>>=? fun (ctxt, user_allocated) ->
@@ -254,7 +260,8 @@ let test_total_stake ~user_is_delegate () =
   init_test ~user_is_delegate
   >>=? fun (ctxt, user_contract, user_account, _delegate) ->
   (* Fetch user's initial balance before freeze. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, user_balance) ->
   Assert.equal_bool ~loc:__LOC__ Tez.(user_balance > zero) true >>=? fun () ->
   (* Freeze 2 sc-rollup deposits. *)
   let sc_rollup, nonce = mk_sc_rollup () in
@@ -287,7 +294,8 @@ let test_total_stake ~user_is_delegate () =
   (* Check that the stake of user contract is balance + two deposits. *)
   Contract.get_balance_and_frozen_bonds ctxt user_contract >>>=? fun stake ->
   Contract.get_frozen_bonds ctxt user_contract >>>=? fun frozen_bonds ->
-  Token.balance ctxt user_account >>>=? fun (ctxt, balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ (stake -! balance) frozen_bonds >>=? fun () ->
   Assert.equal_tez ~loc:__LOC__ (stake -! balance) (deposit_amount *! 2L)
   >>=? fun () ->
@@ -332,7 +340,8 @@ let test_delegated_balance () =
   let delegate_contract = Contract.Implicit delegate in
   let delegate_account = `Contract delegate_contract in
   (* Fetch user's initial balance before freeze. *)
-  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (ctxt, user_balance) ->
   (* Fetch staking balance before freeze. *)
   Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
   (* Freeze a sc-rollup deposit for the delegate. *)
@@ -381,7 +390,8 @@ let test_delegated_balance () =
   (* Check that the delegated balance of [delegate] is null. *)
   check_delegated_balance_is ctxt ~loc:__LOC__ delegate Tez.zero >>=? fun () ->
   (* Fetch user's balance. *)
-  Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+  Token.Internal_for_tests.balance ctxt user_account
+  >>>=? fun (_, user_balance') ->
   (* Ensure user's balance is unchanged. *)
   Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
@@ -499,7 +509,8 @@ let test_scenario scenario =
     (* Fetch staking balance before undelegate *)
     Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
     (* Fetch user's initial balance before undelegate. *)
-    Token.balance ctxt user_account >>>=? fun (_, user_balance) ->
+    Token.Internal_for_tests.balance ctxt user_account
+    >>>=? fun (_, user_balance) ->
     (* Remove delegation. *)
     Contract.Delegate.set ctxt user_contract None >>>=? fun ctxt ->
     (* Fetch staking balance after delegation removal. *)
@@ -508,7 +519,8 @@ let test_scenario scenario =
     Assert.equal_tez ~loc:__LOC__ staking_balance' (staking_balance -! amount)
     >>=? fun () ->
     (* Fetch user's balance again. *)
-    Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+    Token.Internal_for_tests.balance ctxt user_account
+    >>>=? fun (_, user_balance') ->
     (* Ensure user's balance unchanged. *)
     Assert.equal_tez ~loc:__LOC__ user_balance' user_balance >|=? fun () -> ctxt
   in

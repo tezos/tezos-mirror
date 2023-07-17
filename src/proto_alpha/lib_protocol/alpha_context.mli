@@ -4917,6 +4917,8 @@ module Token : sig
 
   module Internal_for_tests : sig
     val allocated : context -> container -> (context * bool) tzresult Lwt.t
+
+    val balance : context -> container -> (context * Tez.t) tzresult Lwt.t
   end
 end
 
