@@ -64,8 +64,8 @@ type 'kind recorded_consensus =
     }
 
 type recorded_consensus_operations = {
-  endorsement : Kind.attestation recorded_consensus;
-  preendorsement : Kind.preattestation recorded_consensus;
+  attestation : Kind.attestation recorded_consensus;
+  preattestation : Kind.preattestation recorded_consensus;
 }
 
 type 'a state = {
@@ -165,10 +165,10 @@ let lookup_recorded_consensus (type kind) consensus_key
     (op_kind : kind consensus_operation_type) map : kind recorded_consensus =
   match Delegate_map.find consensus_key map with
   | None -> No_operation_seen
-  | Some {endorsement; preendorsement} -> (
+  | Some {attestation; preattestation} -> (
       match op_kind with
-      | Attestation -> endorsement
-      | Preattestation -> preendorsement)
+      | Attestation -> attestation
+      | Preattestation -> preattestation)
 
 let add_consensus_operation (type kind) consensus_key
     (op_kind : kind consensus_operation_type)
@@ -180,14 +180,14 @@ let add_consensus_operation (type kind) consensus_key
         Option.value
           ~default:
             {
-              endorsement = No_operation_seen;
-              preendorsement = No_operation_seen;
+              attestation = No_operation_seen;
+              preattestation = No_operation_seen;
             }
           x
       in
       match op_kind with
-      | Attestation -> Some {record with endorsement = recorded_operation}
-      | Preattestation -> Some {record with preendorsement = recorded_operation})
+      | Attestation -> Some {record with attestation = recorded_operation}
+      | Preattestation -> Some {record with preattestation = recorded_operation})
     map
 
 let get_validator_rights state cctxt level =
@@ -230,8 +230,8 @@ let process_consensus_op (type kind) state cctxt
     in
     return_unit
   else
-    let* endorsing_rights = get_validator_rights state cctxt level in
-    match Slot.Map.find slot endorsing_rights with
+    let* attesting_rights = get_validator_rights state cctxt level in
+    match Slot.Map.find slot attesting_rights with
     | None ->
         (* We do not handle operations that do not have a valid slot *)
         return_unit
@@ -324,7 +324,7 @@ let process_consensus_op (type kind) state cctxt
         | _ -> return_unit)
 
 let process_operations (cctxt : #Protocol_client_context.full) state
-    (endorsements : 'a list) ~packed_op chain_id =
+    (attestations : 'a list) ~packed_op chain_id =
   List.iter_es
     (fun op ->
       let {shell; protocol_data; _} = packed_op op in
@@ -332,14 +332,14 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       | Operation_data
           ({contents = Single (Preattestation {round; slot; level; _}); _} as
           protocol_data) ->
-          let new_preendorsement : Kind.preattestation Alpha_context.operation =
+          let new_preattestation : Kind.preattestation Alpha_context.operation =
             {shell; protocol_data}
           in
           process_consensus_op
             state
             cctxt
             Preattestation
-            new_preendorsement
+            new_preattestation
             chain_id
             level
             round
@@ -347,14 +347,14 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       | Operation_data
           ({contents = Single (Attestation {round; slot; level; _}); _} as
           protocol_data) ->
-          let new_endorsement : Kind.attestation Alpha_context.operation =
+          let new_attestation : Kind.attestation Alpha_context.operation =
             {shell; protocol_data}
           in
           process_consensus_op
             state
             cctxt
             Attestation
-            new_endorsement
+            new_attestation
             chain_id
             level
             round
@@ -362,7 +362,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
       | _ ->
           (* not a consensus operation *)
           return_unit)
-    endorsements
+    attestations
 
 let context_block_header cctxt ~chain b_hash =
   Alpha_block_services.header cctxt ~chain ~block:(`Hash (b_hash, 0)) ()
@@ -468,8 +468,8 @@ let cleanup_old_operations state =
     filter state.blocks_table)
 
 (* Each new block is processed :
-   - Checking that every baker injected only once at this level
-   - Checking that every (pre)endorser operated only once at this level
+   - Check that every baker injected a proposal only once at the block's level and round
+   - Check that every baker (pre)attested only once at the block's level and round
 *)
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; level; protocol; next_protocol; _} =
@@ -485,7 +485,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
     (Alpha_block_services.info cctxt ~chain ~block () >>= function
      | Ok block_info -> (
          process_block cctxt state block_info >>=? fun () ->
-         (* Processing (pre)endorsements in the block *)
+         (* Processing (pre)attestations in the block *)
          match block_info.operations with
          | consensus_ops :: _ ->
              let packed_op {Alpha_block_services.shell; protocol_data; _} =
