@@ -807,29 +807,40 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
   let* _lvl = Node.wait_for_level node (level_before + 1) in
   unit
 
-(* Handle endorsing and preendorsing similarly *)
-type tenderbake_action = Preendorse | Endorse | Propose
+(* Handle attesting and preattesting similarly *)
+type tenderbake_action = Preattest | Attest | Propose
 
-let tenderbake_action_to_string = function
-  | Preendorse -> "preendorse"
-  | Endorse -> "endorse"
+let tenderbake_action_to_string ~use_legacy_attestation_name = function
+  | Preattest ->
+      if use_legacy_attestation_name then "preendorse" else "preattest"
+  | Attest -> if use_legacy_attestation_name then "endorse" else "attest"
   | Propose -> "propose"
 
 let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false)
     ?(force = false) client =
+  let use_legacy_attestation_name =
+    match protocol with
+    | None -> false
+    | Some protocol -> Protocol.(number protocol < 018)
+  in
   spawn_command
     ?endpoint
     client
     (optional_arg "protocol" Protocol.hash protocol
-    @ [tenderbake_action_to_string tenderbake_action; "for"]
+    @ [
+        tenderbake_action_to_string
+          ~use_legacy_attestation_name
+          tenderbake_action;
+        "for";
+      ]
     @ key
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ if force then ["--force"] else [])
 
-let spawn_endorse_for ?endpoint ?protocol ?key ?force client =
+let spawn_attest_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for
-    ~tenderbake_action:Endorse
+    ~tenderbake_action:Attest
     ~minimal_timestamp:false
     ?endpoint
     ?protocol
@@ -837,9 +848,9 @@ let spawn_endorse_for ?endpoint ?protocol ?key ?force client =
     ?force
     client
 
-let spawn_preendorse_for ?endpoint ?protocol ?key ?force client =
+let spawn_preattest_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for
-    ~tenderbake_action:Preendorse
+    ~tenderbake_action:Preattest
     ~minimal_timestamp:false
     ?endpoint
     ?protocol
@@ -858,11 +869,11 @@ let spawn_propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
     ?force
     client
 
-let endorse_for ?endpoint ?protocol ?key ?force client =
-  spawn_endorse_for ?endpoint ?protocol ?key ?force client |> Process.check
+let attest_for ?endpoint ?protocol ?key ?force client =
+  spawn_attest_for ?endpoint ?protocol ?key ?force client |> Process.check
 
-let preendorse_for ?endpoint ?protocol ?key ?force client =
-  spawn_preendorse_for ?endpoint ?protocol ?key ?force client |> Process.check
+let preattest_for ?endpoint ?protocol ?key ?force client =
+  spawn_preattest_for ?endpoint ?protocol ?key ?force client |> Process.check
 
 let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
     client =

@@ -148,13 +148,13 @@ let double_consensus_wrong_slot
   unit
 
 let attest_utils =
-  ( Client.endorse_for,
+  ( Client.attest_for,
     Operation.Consensus.attestation ~use_legacy_name:true,
     double_attestation_waiter,
     get_consensus_operation_name )
 
 let preattest_utils =
-  ( Client.preendorse_for,
+  ( Client.preattest_for,
     Operation.Consensus.preattestation ~use_legacy_name:true,
     double_preattestation_waiter,
     fun protocol -> sf "pre%s" (get_consensus_operation_name protocol) )
@@ -322,7 +322,7 @@ let operation_too_old =
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
-    Client.endorse_for
+    Client.attest_for
       ~protocol
       ~force:true
       ~key:[Constant.bootstrap1.alias]
@@ -386,7 +386,7 @@ let operation_too_far_in_future =
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
-    Client.endorse_for
+    Client.attest_for
       ~protocol
       ~force:true
       ~key:[Constant.bootstrap1.alias]

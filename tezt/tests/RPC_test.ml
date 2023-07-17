@@ -814,7 +814,7 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let* _ = bake_empty_block ?endpoint client in
 
   (* Outdated operation after the second empty baking. *)
-  let* () = Client.endorse_for ~protocol ~force:true client in
+  let* () = Client.attest_for ~protocol ~force:true client in
   let* _ = bake_empty_block ?endpoint client in
 
   let monitor_path =
