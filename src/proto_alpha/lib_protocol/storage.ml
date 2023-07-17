@@ -1567,7 +1567,7 @@ module Ramp_up = struct
   type reward = {
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
-    endorsing_reward_per_slot : Tez_repr.t;
+    attesting_reward_per_slot : Tez_repr.t;
   }
 
   module Rewards =
@@ -1586,23 +1586,23 @@ module Ramp_up = struct
               (fun {
                      baking_reward_fixed_portion;
                      baking_reward_bonus_per_slot;
-                     endorsing_reward_per_slot;
+                     attesting_reward_per_slot;
                    } ->
                 ( baking_reward_fixed_portion,
                   baking_reward_bonus_per_slot,
-                  endorsing_reward_per_slot ))
+                  attesting_reward_per_slot ))
               (fun ( baking_reward_fixed_portion,
                      baking_reward_bonus_per_slot,
-                     endorsing_reward_per_slot ) ->
+                     attesting_reward_per_slot ) ->
                 {
                   baking_reward_fixed_portion;
                   baking_reward_bonus_per_slot;
-                  endorsing_reward_per_slot;
+                  attesting_reward_per_slot;
                 })
               (obj3
                  (req "baking_reward_fixed_portion" Tez_repr.encoding)
                  (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                 (req "endorsing_reward_per_slot" Tez_repr.encoding)))
+                 (req "attesting_reward_per_slot" Tez_repr.encoding)))
       end)
 end
 
