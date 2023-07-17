@@ -30,4 +30,5 @@ let () =
   Sc_rollup.register ~testnet ;
   Evm_rollup.register ~testnet ;
   Evm_rollup_upgrade.register ~testnet ;
+  Dal.register () ;
   Test.run ()
