@@ -160,6 +160,7 @@ let replace_preimages ~smart_rollup_node ~kernel_dir ~new_kernel =
         "Couldn't obtain the root hash of the preimages of the chunked kernel."
 
 let upgrade_kernel ~testnet () =
+  let testnet = testnet () in
   let path =
     Cli.get_string
       ~default:"kernel_upgrade_scenario.json"

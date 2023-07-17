@@ -25,11 +25,9 @@
 (*****************************************************************************)
 
 let () =
-  let path = Cli.get_string ~default:"scenarios.json" "configuration" in
-  let testnet = Testnet.get_testnet_config path in
-
+  let path () = Cli.get_string ~default:"scenarios.json" "configuration" in
+  let testnet () = Testnet.get_testnet_config (path ()) in
   Sc_rollup.register ~testnet ;
   Evm_rollup.register ~testnet ;
   Evm_rollup_upgrade.register ~testnet ;
-
   Test.run ()

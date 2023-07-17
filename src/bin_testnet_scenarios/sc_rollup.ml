@@ -84,11 +84,12 @@ let rec wait_for_end_of_game ~staker rollup_address client node =
     wait_for_end_of_game ~staker rollup_address client node)
   else unit
 
-let rejection_with_proof ~(testnet : Testnet.t) () =
+let rejection_with_proof ~(testnet : unit -> Testnet.t) () =
   (* We expect each player to have at least 11,000 xtz. This is enough
      to originate a rollup (1.68 xtz for one of the player), commit
      (10,000 xtz for both player), and play the game (each
      [Smart_rollup_refute] operation should be relatively cheap). *)
+  let testnet = testnet () in
   let min_balance = Tez.(of_mutez_int 11_000_000_000) in
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* honest_operator = Client.gen_and_show_keys client in

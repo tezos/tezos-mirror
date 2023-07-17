@@ -103,7 +103,8 @@ let stop_or_keep_going ~node =
     unit
   else unit
 
-let deploy_evm_rollup ~(testnet : Testnet.t) () =
+let deploy_evm_rollup ~(testnet : unit -> Testnet.t) () =
+  let testnet = testnet () in
   let* client, node = Helpers.setup_octez_node ~testnet () in
   let* operator = Client.gen_and_show_keys client in
   let mode =
