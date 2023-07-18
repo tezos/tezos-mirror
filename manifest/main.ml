@@ -6342,7 +6342,7 @@ let hash = Protocol.hash
           ]
     in
     let octez_injector =
-      only_if N.(number >= 018) @@ fun () ->
+      only_if N.(number >= 017) @@ fun () ->
       private_lib
         (sf "octez_injector_%s" short_hash)
         ~path:(path // "lib_injector")
@@ -7590,19 +7590,19 @@ let _octez_injector_server =
     ~with_macos_security_framework:true
     ~linkall:true
     ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_injector_lib |> open_;
-        octez_stdlib_unix |> open_;
-        octez_rpc_http_server |> open_;
-        octez_rpc_http |> open_;
-        octez_client_base |> open_;
-        octez_client_base_unix |> open_;
-        data_encoding;
-        (* No code from octez_injector_alpha is used, but it's imported in order to *)
-        (* run the protocol registration code *)
-        Protocol.(octez_injector alpha |> if_some);
-      ]
+      ([
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_injector_lib |> open_;
+         octez_stdlib_unix |> open_;
+         octez_rpc_http_server |> open_;
+         octez_rpc_http |> open_;
+         octez_client_base |> open_;
+         octez_client_base_unix |> open_;
+         data_encoding;
+       ]
+      (* No code from octez_injector_alpha is used, but it's imported in order to *)
+      (* run the protocol registration code *)
+      @ Protocol.(all_optionally [octez_injector]))
 
 (* We use Dune's select statement and keep uTop optional *)
 (* Keeping uTop optional lets `make build` succeed, *)

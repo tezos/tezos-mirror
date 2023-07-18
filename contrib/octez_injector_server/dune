@@ -15,7 +15,15 @@
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
   data-encoding
-  octez_injector_alpha)
+  (select void_for_linking-octez_injector_PtNairob from
+   (octez_injector_PtNairob -> void_for_linking-octez_injector_PtNairob.empty)
+   (-> void_for_linking-octez_injector_PtNairob.empty))
+  (select void_for_linking-octez_injector_Proxford from
+   (octez_injector_Proxford -> void_for_linking-octez_injector_Proxford.empty)
+   (-> void_for_linking-octez_injector_Proxford.empty))
+  (select void_for_linking-octez_injector_alpha from
+   (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
+   (-> void_for_linking-octez_injector_alpha.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -30,3 +38,10 @@
   -open Tezos_rpc_http
   -open Tezos_client_base
   -open Tezos_client_base_unix))
+
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-octez_injector_PtNairob.empty "")
+   (write-file void_for_linking-octez_injector_Proxford.empty "")
+   (write-file void_for_linking-octez_injector_alpha.empty ""))))
