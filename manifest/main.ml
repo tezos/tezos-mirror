@@ -6342,7 +6342,7 @@ let hash = Protocol.hash
           ]
     in
     let octez_injector =
-      only_if N.(number >= 019) @@ fun () ->
+      only_if N.(number >= 018) @@ fun () ->
       private_lib
         (sf "octez_injector_%s" short_hash)
         ~path:(path // "lib_injector")
