@@ -154,16 +154,20 @@ let test_cannot_bake_with_zero_deposits () =
   (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
      cannot be a proposer, thus it cannot bake. Precisely, bake fails because
      get_next_baker_by_account fails with "No slots found" *)
-  Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
+  Assert.error ~loc:__LOC__ b1 (function
+      | Block.No_slots_found_for _ -> true
+      | _ -> false)
+  >>=? fun () ->
   Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
   (* after one cycle is passed, the frozen deposit window has passed
      and the frozen deposits should now be effectively 0. *)
   Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
   Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
   Block.bake ~policy:(By_account account1) b >>= fun b1 ->
-  (* don't know why the zero frozen deposits error is not caught here *)
-  (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
-  Assert.error ~loc:__LOC__ b1 (fun _ -> true)
+  (* Since there's zero frozen deposits, there won't be a baking slot available: *)
+  Assert.error ~loc:__LOC__ b1 (function
+      | Block.No_slots_found_for _ -> true
+      | _ -> false)
 
 let adjust_staking_towards_limit ~limit ~block ~account ~contract =
   (* Since we do not have the set_deposit_limit operation anymore (nor
