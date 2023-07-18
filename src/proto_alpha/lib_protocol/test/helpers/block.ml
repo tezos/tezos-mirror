@@ -80,12 +80,30 @@ let get_next_baker_by_round round block =
     round,
     WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
+type error += No_slots_found_for of Signature.Public_key_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Block.No_slots_found_for"
+    ~title:"No slots found for given pkh"
+    ~description:"No slots found for given public key hash"
+    ~pp:(fun ppf pkh ->
+      Format.fprintf
+        ppf
+        "No slots found for %a"
+        Signature.Public_key_hash.pp
+        pkh)
+    Data_encoding.(obj1 (req "pkh" Signature.Public_key_hash.encoding))
+    (function No_slots_found_for pkh -> Some pkh | _ -> None)
+    (fun pkh -> No_slots_found_for pkh)
+
 let get_next_baker_by_account pkh block =
   Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] block
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
+  | None -> fail (No_slots_found_for pkh))
   >>=? fun {
              Plugin.RPC.Baking_rights.delegate = pkh;
              consensus_key;
