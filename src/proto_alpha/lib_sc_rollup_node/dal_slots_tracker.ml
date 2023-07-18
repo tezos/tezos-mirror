@@ -70,7 +70,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
   let lag =
     node_ctxt.Node_context.current_protocol.constants.dal.attestation_lag
   in
-  (* we are downloading endorsemented for slots at level [level], so
+  (* we are downloading attestation for slots at level [level], so
      we need to download the data at level [level - lag].
   *)
   let* published_slots_block_hash =
@@ -90,9 +90,9 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           ~none:(TzTrace.make @@ Layer1_services.Cannot_read_block_metadata hash)
           metadata
       in
-      (* `metadata.protocol_data.dal_attestation` is `None` if we are behind
-          the `Dal feature flag`: in this case we return an empty slot endorsement.
-      *)
+      (* `metadata.protocol_data.dal_attestation` is `None` if we are behind the
+         `Dal feature flag`: in this case we return an empty slot
+         attestation. *)
       let confirmed_slots =
         Option.value
           ~default:Dal.Attestation.empty
@@ -222,7 +222,7 @@ module Confirmed_slots_history = struct
     in
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
-  (** Depending on the rollup's origination level and on the DAL's endorsement
+  (** Depending on the rollup's origination level and on the DAL's attestation
       lag, the rollup node should start processing confirmed slots and update its
       slots_history and slots_history's cache entries in the store after
       [origination_level + attestation_lag] blocks. This function checks if
