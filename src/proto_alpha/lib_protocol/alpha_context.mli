@@ -4963,6 +4963,12 @@ end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
+  val costaking_balance_as_tez :
+    context ->
+    contract:Contract.t ->
+    delegate:public_key_hash ->
+    Tez.t tzresult Lwt.t
+
   val stake :
     context ->
     contract:Contract.t ->
