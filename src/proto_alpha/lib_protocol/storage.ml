@@ -311,15 +311,6 @@ module Contract = struct
       end)
       (Staking_parameters_repr)
 
-  module Pending_staking_parameters =
-    Make_indexed_data_storage
-      (Make_subcontext (Registered) (Indexed_context.Raw_context)
-         (struct
-           let name = ["staking_parameters"; "pendings"]
-         end))
-         (Make_index (Cycle_repr.Index))
-      (Staking_parameters_repr)
-
   module Delegate =
     Indexed_context.Make_map
       (Registered)
@@ -1276,9 +1267,19 @@ module Cycle = struct
 
         let encoding = Seed_repr.seed_encoding
       end)
+
+  module Pending_staking_parameters =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_staking_parameters"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Staking_parameters_repr)
 end
 
 module Slashed_deposits = Cycle.Slashed_deposits
+module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct
   module Staking_balance =
