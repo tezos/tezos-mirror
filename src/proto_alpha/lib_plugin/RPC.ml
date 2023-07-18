@@ -2929,7 +2929,7 @@ module Forge = struct
       ()
       ({branch}, Contents_list (Single operation))
 
-  let endorsement ctxt b ~branch ~consensus_content () =
+  let attestation ctxt b ~branch ~consensus_content () =
     operation ctxt b ~branch (Attestation consensus_content)
 
   let proposals ctxt b ~branch ~source ~period ~proposals () =
@@ -2950,10 +2950,10 @@ module Forge = struct
   let double_baking_evidence ctxt block ~branch ~bh1 ~bh2 () =
     operation ctxt block ~branch (Double_baking_evidence {bh1; bh2})
 
-  let double_endorsement_evidence ctxt block ~branch ~op1 ~op2 () =
+  let double_attestation_evidence ctxt block ~branch ~op1 ~op2 () =
     operation ctxt block ~branch (Double_attestation_evidence {op1; op2})
 
-  let double_preendorsement_evidence ctxt block ~branch ~op1 ~op2 () =
+  let double_preattestation_evidence ctxt block ~branch ~op1 ~op2 () =
     operation ctxt block ~branch (Double_preattestation_evidence {op1; op2})
 
   let empty_proof_of_work_nonce =
@@ -3341,7 +3341,7 @@ module Attestation_rights = struct
     estimated_time : Time.t option;
   }
 
-  let delegate_rights_encoding use_endorsement =
+  let delegate_rights_encoding use_legacy_attestation_name =
     let open Data_encoding in
     conv
       (fun {delegate; consensus_key; first_slot; attestation_power} ->
@@ -3352,11 +3352,12 @@ module Attestation_rights = struct
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
          (req
-            (if use_endorsement then "endorsing_power" else "attestation_power")
+            (if use_legacy_attestation_name then "endorsing_power"
+            else "attestation_power")
             uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
-  let encoding ~use_endorsement =
+  let encoding ~use_legacy_attestation_name =
     let open Data_encoding in
     conv
       (fun {level; delegates_rights; estimated_time} ->
@@ -3365,7 +3366,9 @@ module Attestation_rights = struct
         {level; delegates_rights; estimated_time})
       (obj3
          (req "level" Raw_level.encoding)
-         (req "delegates" (list (delegate_rights_encoding use_endorsement)))
+         (req
+            "delegates"
+            (list (delegate_rights_encoding use_legacy_attestation_name)))
          (opt "estimated_time" Timestamp.encoding))
 
   module S = struct
@@ -3413,7 +3416,7 @@ module Attestation_rights = struct
            block's, based on the hypothesis that all predecessor blocks were \
            baked at the first round."
         ~query:attestation_rights_query
-        ~output:(list (encoding ~use_endorsement:false))
+        ~output:(list (encoding ~use_legacy_attestation_name:false))
         attestation_path
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5156
@@ -3439,7 +3442,7 @@ module Attestation_rights = struct
            on the hypothesis that all predecessor blocks were baked at the \
            first round."
         ~query:attestation_rights_query
-        ~output:(list (encoding ~use_endorsement:true))
+        ~output:(list (encoding ~use_legacy_attestation_name:true))
         endorsing_path
   end
 
@@ -3567,11 +3570,11 @@ module Validators = struct
     let validators =
       RPC_service.get_service
         ~description:
-          "Retrieves the level, the endorsement slots and the public key hash \
-           of each delegate allowed to endorse a block.\n\
+          "Retrieves the level, the attestation slots and the public key hash \
+           of each delegate allowed to attest a block.\n\
            By default, it provides this information for the next level.\n\
            Parameter `level` can be used to specify the (valid) level(s) in \
-           the past or future at which the endorsement rights have to be \
+           the past or future at which the attestation rights have to be \
            returned. Parameter `delegate` can be used to restrict the results \
            results to the given delegates. Parameter `consensus_key` can be \
            used to restrict the results to the given consensus_keys.\n"
@@ -3580,7 +3583,7 @@ module Validators = struct
         path
   end
 
-  let add_endorsing_slots_at_level (ctxt, acc) level =
+  let add_attestation_slots_at_level (ctxt, acc) level =
     Baking.attesting_rights ctxt level >|=? fun (ctxt, rights) ->
     ( ctxt,
       Signature.Public_key_hash.Map.fold
@@ -3595,7 +3598,7 @@ module Validators = struct
           requested_levels ~default_level:(Level.current ctxt) ctxt [] q.levels
         in
         List.fold_left_es
-          add_endorsing_slots_at_level
+          add_attestation_slots_at_level
           (ctxt, [])
           (List.rev levels)
         >|=? fun (_ctxt, rights) ->
