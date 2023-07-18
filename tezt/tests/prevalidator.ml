@@ -198,7 +198,7 @@ module Revamped = struct
     Check.((mempool = mempool_after_empty_block) Mempool.typ ~error_msg) ;
 
     log_step 6 "Inject endorsement operations." ;
-    let* () = Client.endorse_for client ~protocol ~force:true in
+    let* () = Client.attest_for client ~protocol ~force:true in
     let* mempool_with_endorsement = Mempool.get_mempool client in
 
     log_step 7 "Check endorsement is validated." ;
@@ -1220,7 +1220,7 @@ module Revamped = struct
 
     log_step 3 "Endorse with bootstrap1." ;
     let* _ =
-      Client.endorse_for
+      Client.attest_for
         ~protocol
         ~key:[Constant.bootstrap1.alias]
         ~force:true
@@ -1229,7 +1229,7 @@ module Revamped = struct
 
     log_step 3 "Endorse with bootstrap2." ;
     let* _ =
-      Client.endorse_for
+      Client.attest_for
         ~protocol
         ~key:[Constant.bootstrap2.alias]
         ~force:true
@@ -2386,7 +2386,7 @@ let propagation_future_endorsement =
      bytes representing this endorsement, called future1 from now on." ;
   let* () = Node_event_level.bake_wait_log node_1 client_1 in
   let injection_waiter = wait_for_injection node_1 in
-  let* () = Client.endorse_for client_1 ~force:true ~protocol in
+  let* () = Client.attest_for client_1 ~force:true ~protocol in
   let* () = injection_waiter in
   let* bytes_future1, oph_future1 = get_endorsement_as_bytes client_1 in
   log_step
@@ -2396,7 +2396,7 @@ let propagation_future_endorsement =
      the hash and bytes representing this endorsement, called future2." ;
   let* () = Node_event_level.bake_wait_log node_1 client_1 in
   let injection_waiter2 = wait_for_injection node_1 in
-  let* () = Client.endorse_for client_1 ~force:true ~protocol in
+  let* () = Client.attest_for client_1 ~force:true ~protocol in
   let* () = injection_waiter2 in
   let* bytes_future2, oph_future2 = get_endorsement_as_bytes client_1 in
   log_step 5 "Inject both endorsements in node_2." ;

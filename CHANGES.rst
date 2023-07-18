@@ -230,6 +230,9 @@ Client
   ``double preattesation evidence``, ``lost endorsing rewards`` become ``lost
   attesting rewards``. (MR :gl:`!9232`)
 
+- Add ``attest for`` and ``preattest for`` commands. ``endorse for`` and
+  ``preendorse for`` are now deprecated. (MR :gl:`!9494`)
+
 Baker
 -----
 

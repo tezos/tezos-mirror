@@ -572,10 +572,11 @@ val spawn_bake_for :
   t ->
   Process.t
 
-(** Run [octez-client endorse for].
+(** Run [octez-client attest for]. Run [octez-client endorse for] for protocol
+    older than 018.
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
-val endorse_for :
+val attest_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string list ->
@@ -583,8 +584,8 @@ val endorse_for :
   t ->
   unit Lwt.t
 
-(** Same as [endorse_for], but do not wait for the process to exit. *)
-val spawn_endorse_for :
+(** Same as [attest_for], but do not wait for the process to exit. *)
+val spawn_attest_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string list ->
@@ -592,10 +593,11 @@ val spawn_endorse_for :
   t ->
   Process.t
 
-(** Run [octez-client preendorse for].
+(** Run [octez-client preattest for]. Run [octez-client preendorse for] for
+    protocol older than 018.
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
-val preendorse_for :
+val preattest_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string list ->
@@ -603,8 +605,8 @@ val preendorse_for :
   t ->
   unit Lwt.t
 
-(** Same as [preendorse_for], but do not wait for the process to exit. *)
-val spawn_preendorse_for :
+(** Same as [preattest_for], but do not wait for the process to exit. *)
+val spawn_preattest_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
   ?key:string list ->

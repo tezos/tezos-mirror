@@ -72,10 +72,10 @@ let endorsers =
   ]
 
 let endorse endpoint protocol client endorsers =
-  Client.endorse_for ~endpoint ~protocol ~key:endorsers ~force:true client
+  Client.attest_for ~endpoint ~protocol ~key:endorsers ~force:true client
 
 let preendorse endpoint protocol client preendorsers =
-  Client.preendorse_for ~endpoint ~protocol ~key:preendorsers ~force:true client
+  Client.preattest_for ~endpoint ~protocol ~key:preendorsers ~force:true client
 
 let test_bake_two =
   Protocol.register_test
@@ -249,7 +249,7 @@ let test_manual_bake =
       Constant.bootstrap4.alias;
     ]
   in
-  let* () = Client.preendorse_for ~key:endorsers ~force:true client in
+  let* () = Client.preattest_for ~protocol ~key:endorsers ~force:true client in
 
   let giver = "bootstrap1" in
   Log.info "Transfer from giver %s to recipient %s" giver recipient.alias ;
@@ -275,7 +275,7 @@ let test_manual_bake =
   Log.info "Transfer injected with operation hash %s" operation_hash ;
 
   Log.info "Endorse" ;
-  let* () = Client.endorse_for ~key:endorsers ~force:true client in
+  let* () = Client.attest_for ~protocol ~key:endorsers ~force:true client in
 
   Log.info "Test that %s is pending" operation_hash ;
   let* pending_ops =

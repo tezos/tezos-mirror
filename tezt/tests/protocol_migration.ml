@@ -198,9 +198,19 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
     let level_before = Node.get_level node0 in
     let* () = Client.propose_for ~key:[baker.alias] client0 in
     let* () =
-      Client.preendorse_for ~key:all_bootstrap_keys ~force:true client0
+      Client.preattest_for
+        ~protocol:migrate_to
+        ~key:all_bootstrap_keys
+        ~force:true
+        client0
     in
-    let* () = Client.endorse_for ~key:all_bootstrap_keys ~force:true client0 in
+    let* () =
+      Client.attest_for
+        ~protocol:migrate_to
+        ~key:all_bootstrap_keys
+        ~force:true
+        client0
+    in
     let* level_after = Node.wait_for_level node0 (level_before + 1) in
     Log.debug "Manually baked to level %d" level_after ;
     unit
@@ -562,14 +572,14 @@ let test_forked_migration_manual ?(migration_level = 4)
             ~force:true
         in
         let* () =
-          Client.preendorse_for
+          Client.preattest_for
             ~protocol:migrate_from
             ~key:all_bootstrap_keys
             client_2
             ~force:true
         in
         let* () =
-          Client.endorse_for
+          Client.attest_for
             ~key:all_bootstrap_keys
             client_2
             ~protocol:migrate_from

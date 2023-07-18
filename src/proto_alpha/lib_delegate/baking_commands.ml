@@ -120,13 +120,13 @@ let force_apply_switch_arg =
     ~doc:"Force the baker to not only validate but also apply operations."
     ()
 
-let endorsement_force_switch_arg =
+let attestation_force_switch_arg =
   Tezos_clic.switch
     ~long:"force"
     ~short:'f'
     ~doc:
       "Disable consistency, injection and double signature checks for \
-       (pre)endorsements."
+       (pre)attestations."
     ()
 
 let do_not_monitor_node_mempool_arg =
@@ -222,7 +222,7 @@ let sources_param =
     (Client_keys.Public_key_hash.source_param
        ~name:"baker"
        ~desc:
-         "name of the delegate owning the endorsement/baking right or name of \
+         "name of the delegate owning the attestation/baking right or name of \
           the consensus key signing on the delegate's behalf")
 
 let endpoint_arg =
@@ -398,16 +398,36 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           delegates);
     command
       ~group
-      ~desc:"Forge and inject an endorsement operation."
-      (args1 endorsement_force_switch_arg)
+      ~desc:"Forge and inject an attestation operation."
+      (args1 attestation_force_switch_arg)
+      (prefixes ["attest"; "for"] @@ sources_param)
+      (fun force pkhs cctxt ->
+        get_delegates cctxt pkhs >>=? fun delegates ->
+        Baking_lib.endorse ~force cctxt delegates);
+    command
+      ~group
+      ~desc:
+        "Deprecated, use **attest for** instead. Forge and inject an \
+         attestation operation."
+      (args1 attestation_force_switch_arg)
       (prefixes ["endorse"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         get_delegates cctxt pkhs >>=? fun delegates ->
         Baking_lib.endorse ~force cctxt delegates);
     command
       ~group
-      ~desc:"Forge and inject a preendorsement operation."
-      (args1 endorsement_force_switch_arg)
+      ~desc:"Forge and inject a preattestation operation."
+      (args1 attestation_force_switch_arg)
+      (prefixes ["preattest"; "for"] @@ sources_param)
+      (fun force pkhs cctxt ->
+        get_delegates cctxt pkhs >>=? fun delegates ->
+        Baking_lib.preendorse ~force cctxt delegates);
+    command
+      ~group
+      ~desc:
+        "Deprecated, use **preattest for** instead. Forge and inject a \
+         preattestation operation."
+      (args1 attestation_force_switch_arg)
       (prefixes ["preendorse"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         get_delegates cctxt pkhs >>=? fun delegates ->
