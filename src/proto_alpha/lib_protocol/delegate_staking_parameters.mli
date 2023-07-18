@@ -42,7 +42,7 @@ val of_delegate_for_cycle :
 val pending_updates :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  (Cycle_repr.t * Staking_parameters_repr.t) list Lwt.t
+  (Cycle_repr.t * Staking_parameters_repr.t) list tzresult Lwt.t
 
 val register_update :
   Raw_context.t ->

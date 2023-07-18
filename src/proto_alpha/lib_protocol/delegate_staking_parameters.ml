@@ -44,8 +44,8 @@ let raw_pending_updates ctxt delegate =
     (ctxt, Contract_repr.Implicit delegate)
 
 let pending_updates ctxt delegate =
-  let open Lwt_syntax in
-  let* updates = raw_pending_updates ctxt delegate in
+  let open Lwt_result_syntax in
+  let*! updates = raw_pending_updates ctxt delegate in
   let updates =
     List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
   in
