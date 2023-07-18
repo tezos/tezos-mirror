@@ -72,14 +72,16 @@ let register_update ctxt delegate t =
   return ctxt
 
 let activate ctxt ~new_cycle =
-  Storage.Pending_staking_parameters.fold
-    (ctxt, new_cycle)
-    ~order:`Undefined
-    ~init:ctxt
-    ~f:(fun delegate t ctxt ->
-      let open Lwt_syntax in
-      let* ctxt = Storage.Contract.Staking_parameters.add ctxt delegate t in
-      Storage.Pending_staking_parameters.remove (ctxt, new_cycle) delegate)
+  let open Lwt_syntax in
+  let* ctxt =
+    Storage.Pending_staking_parameters.fold
+      (ctxt, new_cycle)
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun delegate t ctxt ->
+        Storage.Contract.Staking_parameters.add ctxt delegate t)
+  in
+  Storage.Pending_staking_parameters.clear (ctxt, new_cycle)
 
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
