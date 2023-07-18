@@ -49,7 +49,7 @@ end
 
 module Block_round : Simple_single_data_storage with type value = Round_repr.t
 
-type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
 module Slashed_deposits_history : sig
   type slashed_percentage = int
@@ -114,22 +114,22 @@ module Contract : sig
        and type t := Raw_context.t
        and type local_context := local_context
 
-  (** If the value is not set, the delegate didn't miss any endorsing
+  (** If the value is not set, the delegate didn't miss any attesting
      opportunity.  If it is set, this value is a record of type
-     [missed_endorsements_info], where:
+     [missed_attestations_info], where:
    - [remaining_slots] is the difference between the maximum number of
      slots that can be missed and the number of missed slots;
      therefore, when the number is positive, it represents the number
      of slots that a delegate can still miss before forfeiting its
-     endorsing rewards for the current cycle; when the number is zero
+     attesting rewards for the current cycle; when the number is zero
      it means rewards are not lost, but no further slots can be
      missed anymore;
    - [missed_levels] represents the number of missed levels (for
-     endorsing). *)
-  module Missed_endorsements :
+     attesting). *)
+  module Missed_attestations :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = missed_endorsements_info
+       and type value = missed_attestations_info
        and type t := Raw_context.t
 
   (** The manager of a contract *)
@@ -687,7 +687,7 @@ module Ramp_up : sig
   type reward = {
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
-    endorsing_reward_per_slot : Tez_repr.t;
+    attesting_reward_per_slot : Tez_repr.t;
   }
 
   module Rewards :
@@ -789,10 +789,20 @@ module Tenderbake : sig
       with type t := Raw_context.t
        and type value = Raw_level_repr.t
 
-  (** [Endorsement_branch] stores a single value composed of the
+  (** [Attestation_branch] stores a single value composed of the
       grandparent hash and the predecessor's payload (computed with
       the grandparent hash) used to verify the validity of
-      endorsements. *)
+      attestations. *)
+  module Attestation_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
+
+  (** Similar to [Attestation_branch] but only used for the stitching from
+      Nairobi.
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/6082
+      This should be removed once in the next protocol. *)
   module Endorsement_branch :
     Single_data_storage
       with type value = Block_hash.t * Block_payload_hash.t

@@ -199,7 +199,7 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
             baking_reward_fixed_portion =
               constants.reward_weights.base_total_rewards_per_minute;
             baking_reward_bonus_per_slot = Tez_repr.zero;
-            endorsing_reward_per_slot = Tez_repr.zero;
+            attesting_reward_per_slot = Tez_repr.zero;
           }))
   >|=? fun ctxt -> (ctxt, balance_updates)
 

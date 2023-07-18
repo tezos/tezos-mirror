@@ -130,6 +130,13 @@ module Tenderbake = struct
       end)
       (Branch)
 
+  module Attestation_branch =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["attestation_branch"]
+      end)
+      (Branch)
+
   module Forbidden_delegates =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
@@ -140,10 +147,10 @@ end
 
 (** Contracts handling *)
 
-type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
+type missed_attestations_info = {remaining_slots : int; missed_levels : int}
 
-module Missed_endorsements_info = struct
-  type t = missed_endorsements_info
+module Missed_attestations_info = struct
+  type t = missed_attestations_info
 
   let encoding =
     let open Data_encoding in
@@ -263,13 +270,13 @@ module Contract = struct
       end)
       (Tez_repr)
 
-  module Missed_endorsements =
+  module Missed_attestations =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["missed_endorsements"]
+        let name = ["missed_attestations"]
       end)
-      (Missed_endorsements_info)
+      (Missed_attestations_info)
 
   module Manager =
     Indexed_context.Make_map
@@ -1100,7 +1107,7 @@ module Slashed_level = struct
         (for_double_attesting, for_double_baking))
       (fun (for_double_attesting, for_double_baking) ->
         {for_double_attesting; for_double_baking})
-      (obj2 (req "for_double_endorsing" bool) (req "for_double_baking" bool))
+      (obj2 (req "for_double_attestating" bool) (req "for_double_baking" bool))
 end
 
 module Cycle = struct
@@ -1560,7 +1567,7 @@ module Ramp_up = struct
   type reward = {
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
-    endorsing_reward_per_slot : Tez_repr.t;
+    attesting_reward_per_slot : Tez_repr.t;
   }
 
   module Rewards =
@@ -1579,23 +1586,23 @@ module Ramp_up = struct
               (fun {
                      baking_reward_fixed_portion;
                      baking_reward_bonus_per_slot;
-                     endorsing_reward_per_slot;
+                     attesting_reward_per_slot;
                    } ->
                 ( baking_reward_fixed_portion,
                   baking_reward_bonus_per_slot,
-                  endorsing_reward_per_slot ))
+                  attesting_reward_per_slot ))
               (fun ( baking_reward_fixed_portion,
                      baking_reward_bonus_per_slot,
-                     endorsing_reward_per_slot ) ->
+                     attesting_reward_per_slot ) ->
                 {
                   baking_reward_fixed_portion;
                   baking_reward_bonus_per_slot;
-                  endorsing_reward_per_slot;
+                  attesting_reward_per_slot;
                 })
               (obj3
                  (req "baking_reward_fixed_portion" Tez_repr.encoding)
                  (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                 (req "endorsing_reward_per_slot" Tez_repr.encoding)))
+                 (req "attesting_reward_per_slot" Tez_repr.encoding)))
       end)
 end
 
