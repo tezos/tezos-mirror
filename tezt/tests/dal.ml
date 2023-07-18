@@ -315,6 +315,22 @@ let wait_for_layer1_block_processing dal_node level =
   Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
+let publish_slot ?counter ?force ?source ?fee ?error ~index ~commitment ~proof
+    client =
+  (* We scale the fees to match the actual gas cost of publishing a slot header.
+     Doing this here allows to keep the diff small as gas cost for
+     publishing slot header is adjusted. *)
+  let fee = Option.map (fun x -> x * 13) fee in
+  Operation.Manager.(
+    inject
+      ?error
+      ?force
+      [
+        make ?source ?fee ?counter
+        @@ dal_publish_slot_header ~index ~commitment ~proof;
+      ]
+      client)
+
 let test_feature_flag _protocol _parameters _cryptobox node client
     _bootstrap_key =
   (* This test ensures the feature flag works:
@@ -353,11 +369,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
         client)
   in
   let* (`OpHash oph2) =
-    Operation.Manager.(
-      inject
-        ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~commitment ~proof]
-        client)
+    publish_slot ~force:true ~index:0 ~commitment ~proof client
   in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
@@ -413,18 +425,6 @@ let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
       else iter (offset + 1)
   in
   iter 1
-
-let publish_slot ?counter ?force ~source ?fee ?error ~index ~commitment ~proof
-    client =
-  Operation.Manager.(
-    inject
-      ?error
-      ?force
-      [
-        make ~source ?fee ?counter
-        @@ dal_publish_slot_header ~index ~commitment ~proof;
-      ]
-      client)
 
 let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof =
