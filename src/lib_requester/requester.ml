@@ -278,7 +278,7 @@ end = struct
             Table.replace
               state.pending
               key
-              {peers; next_request = now; delay = Request.initial_delay} ;
+              {peers; next_request = data.next_request; delay = data.delay} ;
             Events.(emit registering_request_replaced) (key, peer)
         | None ->
             let peers =
