@@ -156,16 +156,11 @@ let get_delegate_stake_from_staking_balance ctxt
     delegate staking_balance =
   let open Lwt_result_syntax in
   let delegate_contract = Contract_repr.Implicit delegate in
-  let* delegate_own_pseudotokens =
-    Staking_pseudotokens_storage.costaking_pseudotokens_balance
-      ctxt
-      delegate_contract
-  in
   let* delegate_own_frozen_deposits =
-    Staking_pseudotokens_storage.tez_of_frozen_deposits_pseudotokens
+    Staking_pseudotokens_storage.costaking_balance_as_tez
       ctxt
-      delegate
-      delegate_own_pseudotokens
+      ~delegate
+      ~contract:delegate_contract
   in
   let* {staking_over_baking_limit_millionth; _} =
     Delegate_staking_parameters.of_delegate ctxt delegate

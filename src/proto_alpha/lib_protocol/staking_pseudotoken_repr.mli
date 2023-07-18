@@ -25,20 +25,18 @@
 
 (** Pseudotoken used in staking.
     It represents a share of the total frozen deposits of a baker. *)
-type t
+include Compare.S
 
 val encoding : t Data_encoding.t
 
 val zero : t
 
-val of_int64_exn : int64 -> t
+val of_z_exn : Z.t -> t
 
-val to_int64 : t -> int64
+val to_z : t -> Z.t
 
-val ( = ) : t -> t -> bool
+val init_of_tez : Tez_repr.t -> t
 
 val ( +? ) : t -> t -> t tzresult
 
 val ( -? ) : t -> t -> t tzresult
-
-val min : t -> t -> t

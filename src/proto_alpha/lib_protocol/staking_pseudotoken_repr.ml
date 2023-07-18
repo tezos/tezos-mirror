@@ -30,3 +30,9 @@ include Tez_repr
 let of_int64_exn = of_mutez_exn
 
 let to_int64 = to_mutez
+
+let of_z_exn z = of_int64_exn (Z.to_int64 z)
+
+let to_z t = Z.of_int64 (to_int64 t)
+
+let init_of_tez tz = tz

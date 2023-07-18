@@ -131,78 +131,46 @@ let stake ctxt ~sender ~delegate amount =
   let* ctxt, finalize_balance_updates =
     finalize_unstake_and_check ~check_unfinalizable ctxt sender_contract
   in
-  let* ctxt, new_pseudotokens =
-    Staking_pseudotokens.credit_frozen_deposits_pseudotokens_for_tez_amount
-      ctxt
-      delegate
-      amount
+  let* ctxt =
+    Staking_pseudotokens.stake ctxt ~contract:sender_contract ~delegate amount
   in
-  let* ctxt, stake_balance_updates =
+  let+ ctxt, stake_balance_updates =
     Token.transfer
       ctxt
       (`Contract sender_contract)
       (`Frozen_deposits delegate)
       amount
   in
-  let* ctxt =
-    Staking_pseudotokens.credit_costaking_pseudotokens
-      ctxt
-      sender_contract
-      new_pseudotokens
-  in
-  return (ctxt, stake_balance_updates @ finalize_balance_updates)
+  (ctxt, stake_balance_updates @ finalize_balance_updates)
 
 let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   let open Lwt_result_syntax in
-  if Tez.(requested_amount = zero) then return (ctxt, [])
+  let* ctxt, tez_to_unstake =
+    Staking_pseudotokens.request_unstake
+      ctxt
+      ~contract:sender_contract
+      ~delegate
+      requested_amount
+  in
+  if Tez.(tez_to_unstake = zero) then return (ctxt, [])
   else
-    let* available_pseudotokens =
-      Staking_pseudotokens.costaking_pseudotokens_balance ctxt sender_contract
+    let current_cycle = (Level.current ctxt).cycle in
+    let* ctxt, balance_updates =
+      Token.transfer
+        ctxt
+        (`Frozen_deposits delegate)
+        (`Unstaked_frozen_deposits (delegate, current_cycle))
+        tez_to_unstake
     in
-    if Staking_pseudotokens.(available_pseudotokens = zero) then
-      return (ctxt, [])
-    else
-      let* requested_pseudotokens =
-        Staking_pseudotokens.frozen_deposits_pseudotokens_for_tez_amount
-          ctxt
-          delegate
-          requested_amount
-      in
-      let pseudotokens_to_unstake =
-        Staking_pseudotokens.min requested_pseudotokens available_pseudotokens
-      in
-      if Staking_pseudotokens.(pseudotokens_to_unstake = zero) then
-        return (ctxt, [])
-      else
-        let* ctxt, tez_to_unstake =
-          Staking_pseudotokens.debit_frozen_deposits_pseudotokens
-            ctxt
-            delegate
-            pseudotokens_to_unstake
-        in
-        let* ctxt =
-          Staking_pseudotokens.debit_costaking_pseudotokens
-            ctxt
-            sender_contract
-            pseudotokens_to_unstake
-        in
-        let current_cycle = (Level.current ctxt).cycle in
-        let* ctxt, balance_updates =
-          Token.transfer
-            ctxt
-            (`Frozen_deposits delegate)
-            (`Unstaked_frozen_deposits (delegate, current_cycle))
-            tez_to_unstake
-        in
-        let* ctxt, finalize_balance_updates =
-          finalize_unstake ctxt sender_contract
-        in
-        let+ ctxt =
-          Unstake_requests.add
-            ctxt
-            ~contract:sender_contract
-            ~delegate
-            current_cycle
-            tez_to_unstake
-        in
-        (ctxt, balance_updates @ finalize_balance_updates)
+    let* ctxt, finalize_balance_updates =
+      finalize_unstake ctxt sender_contract
+    in
+    let+ ctxt =
+      Unstake_requests.add
+        ctxt
+        ~contract:sender_contract
+        ~delegate
+        current_cycle
+        tez_to_unstake
+    in
+    (ctxt, balance_updates @ finalize_balance_updates)
