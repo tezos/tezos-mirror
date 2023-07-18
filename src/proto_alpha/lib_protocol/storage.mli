@@ -200,9 +200,9 @@ module Contract : sig
       into this one at cycle end. *)
   module Unstaked_frozen_deposits :
     Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Deposits_repr.t
-       and type t := Raw_context.t * Contract_repr.t
+      with type key = Contract_repr.t
+       and type value = Unstaked_frozen_deposits_repr.t
+       and type t := Raw_context.t
 
   (** The contract's unstake requests that haven't been finalized yet. *)
   module Unstake_requests :
