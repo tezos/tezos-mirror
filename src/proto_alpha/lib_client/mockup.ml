@@ -279,7 +279,7 @@ let genesis_block_hash =
   Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
 
-let endorsement_branch_data_encoding =
+let attestation_branch_data_encoding =
   let open Data_encoding in
   conv
     (fun (block_hash, block_payload_hash) -> (block_hash, block_payload_hash))
