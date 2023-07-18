@@ -385,13 +385,6 @@ module Make_indexed_carbonated_data_storage_INTERNAL
 
   include Make_encoder (V)
 
-  let is_empty i =
-    let open Lwt_syntax in
-    let* root = C.find_tree i [] in
-    match root with
-    | None -> return_true
-    | Some root -> return @@ C.Tree.is_empty root
-
   let data_key i = I.to_path i [data_name]
 
   let len_key i = I.to_path i [len_name]
@@ -434,6 +427,15 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     consume_mem_gas s key >>?= fun s ->
     C.mem s key >|= fun exists -> ok (C.project s, exists)
 
+  let is_empty s =
+    let root_key = [] in
+    consume_mem_gas s root_key >>?= fun s ->
+    C.find_tree s root_key >>= function
+    | None -> return @@ (C.project s, true)
+    | Some root ->
+        let is_empty = C.Tree.is_empty root in
+        return @@ (C.project s, is_empty)
+
   let get_unprojected s i =
     consume_read_gas C.get s i >>=? fun s ->
     C.get s (data_key i) >>=? fun b ->
@@ -475,6 +477,10 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     existing_size s i >>=? fun (prev_size, existed) ->
     consume_remove_gas remove s i >>=? fun s ->
     remove s (data_key i) >|=? fun t -> (C.project t, prev_size, existed)
+
+  let clear s =
+    C.consume_gas s (Storage_costs.write_access ~written_bytes:0) >>?= fun s ->
+    C.remove s [] >>= fun t -> return (C.project t)
 
   let remove_existing s i =
     existing_size s i >>=? fun (prev_size, _) ->
@@ -597,6 +603,10 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
   type elt = I.t
 
   let mem = M.mem
+
+  let is_empty = M.is_empty
+
+  let clear = M.clear
 
   let init s i = M.init s i ()
 
