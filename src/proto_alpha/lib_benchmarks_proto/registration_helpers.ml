@@ -28,27 +28,31 @@ let ns = Namespace.root
 
 let adjust_tags tags = Tags.common :: tags
 
-let register ?add_timer ((module Bench) : Benchmark.t) =
+type benchmark_type = Time | Alloc
+
+let register ?(benchmark_type = Time) ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct
     include Bench
 
     let tags = adjust_tags tags
   end in
-  Registration.register ?add_timer (module B)
+  Registration.register ~add_timer:(benchmark_type = Time) (module B)
 
-let register_simple ?add_timer (module Bench : Benchmark.Simple) =
+let register_simple ?(benchmark_type = Time) (module Bench : Benchmark.Simple) =
   let module B = struct
     include Bench
 
     let tags = adjust_tags tags
   end in
-  Registration.register_simple ?add_timer (module B)
+  Registration.register_simple ~add_timer:(benchmark_type = Time) (module B)
 
-let register_simple_with_num ?add_timer
+let register_simple_with_num ?(benchmark_type = Time)
     (module Bench : Benchmark.Simple_with_num) =
   let module B = struct
     include Bench
 
     let tags = adjust_tags tags
   end in
-  Registration.register_simple_with_num ?add_timer (module B)
+  Registration.register_simple_with_num
+    ~add_timer:(benchmark_type = Time)
+    (module B)

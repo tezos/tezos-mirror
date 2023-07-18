@@ -474,6 +474,20 @@ let ir_model instr_or_cont =
   let open Models in
   let name = name_of_instr_or_cont instr_or_cont in
   let m s = TimeModel s in
+  let m2 name (time, alloc) =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6072
+       Change naming convention.
+       The current naming convention is for backward compatibility.
+       When we finally switch to the time-allocation model,
+       "_synthesized" should be removed and the time model should be qualified with "_time"
+    *)
+    TimeAllocModel
+      {
+        name = ns (name ^ "_synthesized");
+        time = time name;
+        alloc = alloc (name ^ "_alloc");
+      }
+  in
   match instr_or_cont with
   | Instr_name instr -> (
       match instr with
@@ -570,7 +584,7 @@ let ir_model instr_or_cont =
       | N_IMap_map -> affine_model name |> m
       | N_IMap_iter -> affine_model name |> m
       | N_ISet_iter -> affine_model name |> m
-      | N_IHalt -> const1_model name |> m
+      | N_IHalt -> (const1_model, const1_model) |> m2 name
       | N_IApply -> lambda_model name |> m
       | N_ILambda_lam -> const1_model name |> m
       | N_ILambda_lamrec -> const1_model name |> m
@@ -605,13 +619,21 @@ module SynthesizeTimeAlloc : Model.Binary_operation = struct
   end
 end
 
-let pack_ir_model = function
+let pack_time_model = function
   | TimeModel m -> Model.Model m
+  | TimeAllocModel {time; _} -> Model.Model time
+
+let pack_alloc_model = function
+  | TimeModel _ -> assert false
+  | TimeAllocModel {alloc; _} -> Model.Model alloc
+
+let pack_time_alloc_model = function
+  | TimeModel _ -> assert false
   | TimeAllocModel {name; time; alloc} ->
       Model.Model
         (Model.synthesize
-           ~binop:(module SynthesizeTimeAlloc)
            ~name
+           ~binop:(module SynthesizeTimeAlloc)
            ~x_label:"time"
            ~x_model:time
            ~y_label:"alloc"
@@ -629,7 +651,7 @@ let amplification_loop_model =
 
 (* The following model stitches together the per-instruction models and
    adds a term corresponding to the amplification (if needed). *)
-let interpreter_model ?amplification sub_model =
+let interpreter_model ?amplification pack_model sub_model =
   Model.make_aggregated
     ~model:(fun trace ->
       let module Def (X : Costlang.S) = struct
@@ -649,7 +671,7 @@ let interpreter_model ?amplification sub_model =
           List.fold_left
             (fun (acc : X.size X.repr) instr_trace ->
               let name = instr_trace.Interpreter_workload.name in
-              let (Model.Model model) = pack_ir_model (ir_model name) in
+              let (Model.Model model) = pack_model (ir_model name) in
               let (module Applied_instr) =
                 Model.apply (model_with_conv name model) instr_trace
               in
@@ -659,8 +681,26 @@ let interpreter_model ?amplification sub_model =
             trace
       end in
       ((module Def) : Model.applied))
-    ~sub_models:[sub_model]
+    ~sub_models:[pack_model sub_model]
 
-let make_model ?amplification instr_name =
+type benchmark_type = Registration_helpers.benchmark_type = Time | Alloc
+
+let make_time_model ?amplification instr_name =
   let ir_model = ir_model instr_name in
-  [("interpreter", interpreter_model ?amplification (pack_ir_model ir_model))]
+  [("interpreter", interpreter_model ?amplification pack_time_model ir_model)]
+
+let make_alloc_model instr_name =
+  let ir_model = ir_model instr_name in
+  [("interpreter", interpreter_model pack_alloc_model ir_model)]
+
+let make_model ?amplification benchmark_type instr_name =
+  match benchmark_type with
+  | Time -> make_time_model ?amplification instr_name
+  | Alloc ->
+      (* amplification wouldn't make sense,
+         because the measurement resolution doesn't matter for the allocation *)
+      assert (amplification = None) ;
+      make_alloc_model instr_name
+
+let make_time_alloc_codegen_model instr_name =
+  pack_time_alloc_model (ir_model instr_name)
