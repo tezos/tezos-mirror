@@ -444,6 +444,46 @@ module Plompiler_Helpers = struct
       let module E2 = Test (LibResult) in
       E2.tests
     in
+
+    let print_regressions info_name (cs : LibCircuit.cs_result) =
+      let nb_constraints = Array.(concat cs.cs |> length) in
+      let max_rc, sum_rc =
+        let w_bounds =
+          List.map
+            (fun (_w, lw) -> List.fold_left (fun acc (_i, b) -> acc + b) 0 lw)
+            cs.range_checks
+        in
+        let max_rc = List.fold_left max 0 w_bounds in
+        let sum_rc = List.fold_left Int.add 0 w_bounds in
+        (max_rc, sum_rc)
+      in
+      let size_of_tables =
+        List.fold_left (fun acc t -> acc + Csir.Table.size t) 0 cs.tables
+      in
+      let circuit_size = max nb_constraints (max max_rc size_of_tables) in
+      let log2 x = if x = 0 then 0. else Float.log2 @@ Int.to_float x in
+
+      Printf.fprintf
+        !output_buffer
+        "%s:\n\
+         Constraints       : %d [%.2f]\n\
+         Range-Checks-Total: %d [%.2f]\n\
+         Range-Checks-Max  : %d [%.2f]\n\
+         Tables            : %d [%.2f]\n\
+         Circuit Size      : %d [%.2f]\n\n"
+        info_name
+        nb_constraints
+        (log2 nb_constraints)
+        sum_rc
+        (log2 sum_rc)
+        max_rc
+        (log2 max_rc)
+        size_of_tables
+        (log2 size_of_tables)
+        circuit_size
+        (log2 circuit_size)
+    in
+
     let run_one_test (circuit, info) (result, _) =
       let cs = LibCircuit.(get_cs (circuit ())) in
       let initial, _ = LibCircuit.(get_inputs (circuit ())) in
@@ -466,12 +506,7 @@ module Plompiler_Helpers = struct
              Printf.printf "CS:\n%s\n" (CS.to_string cs) ; *)
           if not info.valid then assert (not @@ CS.sat cs private_inputs)
           else (
-            Printf.fprintf
-              !output_buffer
-              "%s:\nConstraints: %d\n\n"
-              info.name
-              Array.(concat cs.cs |> length) ;
-
+            print_regressions info.name cs ;
             let res = LibResult.get_result (result ()) in
             let serialized_res = LibResult.serialize res in
             let out_size = Array.length serialized_res in
@@ -486,11 +521,8 @@ module Plompiler_Helpers = struct
             let cs, private_inputs =
               if optimize then (
                 let cs = LibCircuit.(get_cs ~optimize (circuit ())) in
-                Printf.fprintf
-                  !output_buffer
-                  "%s_optimized:\nConstraints: %d\n\n"
-                  info.name
-                  Array.(concat cs.cs |> length) ;
+                print_regressions (info.name ^ "_optimized") cs ;
+
                 let private_inputs = Solver.solve cs.solver initial in
                 assert (CS.sat cs private_inputs) ;
 
