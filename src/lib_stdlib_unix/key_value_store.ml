@@ -212,7 +212,7 @@ end = struct
         Lwt_mutex.with_lock mutex f
     | Some mutex -> Lwt_mutex.with_lock mutex f
 
-  let bind_dir_and_lock_file dirs spec index f =
+  let rec bind_dir_and_lock_file dirs spec index f =
     (* Precondition: the LRU and the table are in sync *)
     let open Lwt_syntax in
     let load_or_initialize () =
@@ -232,50 +232,31 @@ end = struct
 
          Same observation holds in the other direction if [erased_opt = Some erased].
       *)
-      match erased_opt with
-      | None ->
-          let handle = load_or_initialize () in
-          let accessed = File_table.create 3 in
-          let cached = File_table.create 3 in
-          let callback =
-            with_mutex accessed index (fun () -> Lwt.bind handle (f cached))
-          in
-          Table.replace
-            dirs.handles
-            spec.path
-            (Entry
-               {
-                 handle;
-                 accessed;
-                 cached;
-                 pending_callbacks = [Lwt.map ignore callback];
-               }) ;
-          callback
-      | Some removed ->
-          let p, resolver = Lwt.task () in
-          let accessed = File_table.create 3 in
-          let cached = File_table.create 3 in
-          let callback =
-            with_mutex accessed index (fun () -> Lwt.bind p (f cached))
-          in
-          Table.replace
-            dirs.handles
-            spec.path
-            (Entry
-               {
-                 handle = p;
-                 accessed;
-                 cached;
-                 pending_callbacks = [Lwt.map ignore callback];
-               }) ;
-          let* () = resolve_pending_and_close dirs removed in
-          let* () =
-            let+ handle = load_or_initialize () in
-            Lwt.wakeup resolver handle ;
-            ()
-          in
-          callback
+      let handle =
+        match erased_opt with
+        | None -> load_or_initialize ()
+        | Some removed ->
+            let* () = resolve_pending_and_close dirs removed in
+            load_or_initialize ()
+      in
+      let accessed = File_table.create 3 in
+      let cached = File_table.create 3 in
+      let callback =
+        with_mutex accessed index (fun () -> Lwt.bind handle (f cached))
+      in
+      Table.replace
+        dirs.handles
+        spec.path
+        (Entry
+           {
+             handle;
+             accessed;
+             cached;
+             pending_callbacks = [Lwt.map ignore callback];
+           }) ;
+      callback
     in
+
     match Table.find dirs.handles spec.path with
     | Some (Entry p) ->
         let promise =
@@ -286,7 +267,9 @@ end = struct
         promise
     | Some (Being_evicted await_eviction) ->
         let* () = await_eviction in
-        put_then_bind ()
+        (* We can't directly [put_and_bind] because several threads may be
+           waiting here. *)
+        bind_dir_and_lock_file dirs spec index f
     | None -> put_then_bind ()
 
   let write ?(override = false) dirs spec file data =
