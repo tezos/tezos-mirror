@@ -58,22 +58,7 @@ module Kzg_pack_impl = struct
   module PC = Kzg.Kzg_impl
   module BasePC = Aggregation.Polynomial_commitment.Make_impl (PC)
 
-  module Commitment = struct
-    include BasePC.Commitment
-
-    let recombine l = List.fold_left Pack.combine (List.hd l) (List.tl l)
-
-    let recombine_prover_aux l =
-      let cm = PC.Commitment.recombine (List.map fst l) in
-      let p_a = PC.Commitment.recombine_prover_aux (List.map snd l) in
-      (cm, p_a)
-
-    let empty = Pack.empty_commitment
-
-    let empty_prover_aux = (PC.Commitment.empty, PC.Commitment.empty_prover_aux)
-  end
-
-  include (BasePC : module type of BasePC with module Commitment := Commitment)
+  include (BasePC : module type of BasePC)
 
   type worker_msg = Scalar.t * string list list [@@deriving repr]
 

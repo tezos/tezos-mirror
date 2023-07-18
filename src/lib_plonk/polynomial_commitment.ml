@@ -38,6 +38,8 @@ module type Commitment_sig = sig
 
   type secret = Poly.t SMap.t
 
+  val commit_single : prover_public_parameters -> Poly.t -> G1.t
+
   (* [all_keys] is an optional argument that should only be used for
      partial commitments. It contains all the polynomial names that
      make up the full commitment.
@@ -55,6 +57,19 @@ module type Commitment_sig = sig
   val cardinal : t -> int
 
   val rename : (string -> string) -> t -> t
+
+  val recombine : t list -> t
+
+  val recombine_prover_aux : prover_aux list -> prover_aux
+
+  val empty : t
+
+  val empty_prover_aux : prover_aux
+
+  val of_list :
+    prover_public_parameters -> name:string -> G1.t list -> t * prover_aux
+
+  val to_map : t -> G1.t SMap.t
 end
 
 module type Public_parameters_sig = sig
@@ -158,19 +173,7 @@ module Kzg_impl = struct
 
     type prover_aux = unit [@@deriving repr]
 
-    let commit_single srs p =
-      let srs = Public_parameters.(srs.srs1) in
-      let poly_size = Poly.degree p + 1 in
-      let srs_size = Srs_g1.size srs in
-      if poly_size = 0 then G1.zero
-      else if poly_size > srs_size then
-        raise
-          (Failure
-             (Printf.sprintf
-                "Kzg.commit : Polynomial degree, %i, exceeds srs length, %i."
-                poly_size
-                srs_size))
-      else Srs_g1.pippenger srs p
+    let commit_single srs = commit1 Public_parameters.(srs.srs1)
 
     let commit ?all_keys:_ srs f_map =
       let cmt = SMap.map (commit_single srs) f_map in
@@ -181,6 +184,27 @@ module Kzg_impl = struct
 
     let rename f cmt =
       SMap.fold (fun key x acc -> SMap.add (f key) x acc) cmt SMap.empty
+
+    let recombine cmt_list =
+      List.fold_left
+        (SMap.union (fun _k x _ -> Some x))
+        (List.hd cmt_list)
+        (List.tl cmt_list)
+
+    let recombine_prover_aux _ = ()
+
+    let empty = SMap.empty
+
+    let empty_prover_aux = ()
+
+    let of_list _ ~name l =
+      let n = List.length l in
+      ( SMap.(
+          of_list
+            (List.mapi (fun i c -> (Aggregation.add_prefix ~n ~i "" name, c)) l)),
+        () )
+
+    let to_map cm = cm
   end
 
   (* polynomials to be committed *)
@@ -193,11 +217,6 @@ module Kzg_impl = struct
   type answer = Scalar.t SMap.t SMap.t [@@deriving repr]
 
   type transcript = Bytes.t
-
-  let pippenger ?(start = 0) ?len ps ss =
-    try G1.pippenger ~start ?len ps ss
-    with Invalid_argument s ->
-      raise (Invalid_argument (Printf.sprintf "KZG.pippenger : %s" s))
 
   type proof = G1.t SMap.t [@@deriving repr]
 
@@ -268,11 +287,15 @@ module Kzg_impl = struct
 
     let ws = SMap.values w_map in
     let left =
-      pippenger
+      pippenger1_with_affine_array
         (Array.of_list @@ (G1.one :: ws) @ cmts)
         (Array.of_list @@ (s :: w_left_exps) @ exponents)
     in
-    let right = pippenger (Array.of_list ws) (Array.of_list w_right_exps) in
+    let right =
+      pippenger1_with_affine_array
+        (Array.of_list ws)
+        (Array.of_list w_right_exps)
+    in
     Public_parameters.[(left, srs.encoding_1); (right, srs.encoding_x)]
     |> Pairing.pairing_check
 

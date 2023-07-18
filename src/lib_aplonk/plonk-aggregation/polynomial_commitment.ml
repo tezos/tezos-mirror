@@ -137,6 +137,31 @@ struct
     let cardinal = Pack.commitment_cardinal
 
     let rename _f cmt = cmt
+
+    let commit_single pp =
+      PC.Commitment.commit_single Public_parameters.(pp.pp_pc_prover)
+
+    let empty = Pack.empty_commitment
+
+    let empty_prover_aux = (PC.Commitment.empty, PC.Commitment.empty_prover_aux)
+
+    let recombine = function
+      | [] -> empty
+      | h :: t -> List.fold_left Pack.combine h t
+
+    let recombine_prover_aux l =
+      let cm = PC.Commitment.recombine (List.map fst l) in
+      let p_a = PC.Commitment.recombine_prover_aux (List.map snd l) in
+      (cm, p_a)
+
+    let of_list pp ~name l =
+      let pc_cm =
+        PC.Commitment.(of_list Public_parameters.(pp.pp_pc_prover) ~name l)
+      in
+      ( Pack.commit Public_parameters.(pp.pp_pack_prover) (Array.of_list l),
+        pc_cm )
+
+    let to_map _ = failwith "Not implemented & should not be used in verifier"
   end
 
   type proof = {

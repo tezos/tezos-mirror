@@ -1376,6 +1376,7 @@ let _octez_plonk_test_helpers_main =
       [
         "main";
         "test_circuit";
+        "test_cq";
         "test_evaluations";
         "test_main_protocol";
         "test_pack";

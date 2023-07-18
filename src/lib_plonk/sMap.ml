@@ -139,6 +139,10 @@ module StringMap = struct
     let prefix_map ?n ?i ?shift prefix str_map =
       fold (fun k -> add (add_prefix ?n ?i ?shift prefix k)) str_map empty
 
+    let of_list ?n ?shift prefix name l =
+      of_list
+      @@ List.mapi (fun i x -> (add_prefix ?n ~i ?shift prefix name, x)) l
+
     (* This function will merge the maps of the list, by prefixing each key with it’s index in the list, optionnally with a shift, with the index prefix prefixed with zero to we able to handle n elements with the same prefix size (with n either given by [shift] or by the length of [list_map]) ; if a [prefix] is given, it will be put before the index.
        *)
     let map_of_list_map ?(prefix = "") ?shift list_map =
@@ -264,6 +268,10 @@ module type S = sig
        all the keys of [map] with "0006~hello~"
     *)
     val prefix_map : ?n:int -> ?i:int -> ?shift:int -> string -> 'a t -> 'a t
+
+    (* [Aggregation.of_list ~n ~shift s name l] is the same as
+       [of_list @@ List.mapi (fun i x -> Aggregation.add_prefix ~n ~i ~shift s name, x) l] *)
+    val of_list : ?n:int -> ?shift:int -> string -> string -> 'a list -> 'a t
 
     (* "c1" -> {"a" ; "b"} ; "c2" -> {"a" ; "c"} becomes
        {"c1~a" ; "c1~b" ; "c2~a" ; "c2~c"} with the same values *)
