@@ -289,7 +289,9 @@ let may_patch_protocol ~user_activated_upgrades
       in
       return {validation_result with context}
 
-module Make (Proto : Registered_protocol.T) = struct
+module Make (Filter : Shell_plugin.FILTER) = struct
+  module Proto = Filter.Proto
+
   type 'operation_data preapplied_operation = {
     hash : Operation_hash.t;
     raw : Operation.t;
@@ -870,7 +872,10 @@ module Make (Proto : Registered_protocol.T) = struct
             in
             let open Lwt_result_syntax in
             let* validation_state =
-              Proto.validate_operation pv.validation_state op.hash operation
+              match Filter.Mempool.syntactic_check operation with
+              | `Ill_formed -> failwith "Ill-formed operation filtered"
+              | `Well_formed ->
+                  Proto.validate_operation pv.validation_state op.hash operation
             in
             let* application_state, receipt =
               Proto.apply_operation pv.application_state op.hash operation
@@ -1241,13 +1246,17 @@ module Make (Proto : Registered_protocol.T) = struct
         ~predecessor:predecessor_block_header.shell
         ~cache
     in
+
     let* state =
       List.fold_left_es
         (fun state ops ->
           List.fold_left_es
             (fun state (oph, op) ->
-              let* state = Proto.validate_operation state oph op in
-              return state)
+              match Filter.Mempool.syntactic_check op with
+              | `Ill_formed -> failwith "Ill-formed operation filtered"
+              | `Well_formed ->
+                  let* state = Proto.validate_operation state oph op in
+                  return state)
             state
             ops)
         state
@@ -1336,15 +1345,10 @@ let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
     block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Proto) =
-    match Registered_protocol.get pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+  let* (module Filter) =
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Proto) in
+  let module Block_validation = Make (Filter) in
   Block_validation.recompute_metadata
     chain_id
     ~predecessor_block_header
@@ -1383,15 +1387,10 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
   let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Proto) =
-    match Registered_protocol.get pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+  let* (module Filter) =
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Proto) in
+  let module Block_validation = Make (Filter) in
   Block_validation.precheck
     chain_id
     ~predecessor_block_header
@@ -1417,16 +1416,12 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
     } ~cache block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Proto) =
-    match Registered_protocol.get pred_protocol_hash with
-    | None ->
-        tzfail
-          (Unavailable_protocol
-             {block = block_hash; protocol = pred_protocol_hash})
-    | Some p -> return p
+  let* (module Filter) =
+    Shell_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let* () =
-    if should_precheck && Proto.(compare environment_version V7 >= 0) then
+    if should_precheck && Filter.Proto.(compare environment_version V7 >= 0)
+    then
       precheck
         ~chain_id
         ~predecessor_block_header
@@ -1438,7 +1433,7 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
         operations
     else return_unit
   in
-  let module Block_validation = Make (Proto) in
+  let module Block_validation = Make (Filter) in
   Block_validation.apply
     ?simulate
     ?cached_result
@@ -1505,24 +1500,16 @@ let preapply ~chain_id ~user_activated_upgrades
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
-  let* (module Proto) =
-    match Registered_protocol.get protocol with
-    | None ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1718 *)
-        (* This should not happen: it should be handled in the validator. *)
-        failwith
-          "Prevalidation: missing protocol '%a' for the current block."
-          Protocol_hash.pp_short
-          protocol
-    | Some protocol -> return protocol
+  let* (module Filter) =
+    Shell_plugin.find_filter ~block_hash:predecessor_hash protocol
   in
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)
-  let module Block_validation = Make (Proto) in
+  let module Block_validation = Make (Filter) in
   let* protocol_data =
     match
       Data_encoding.Binary.of_bytes_opt
-        Proto.block_header_data_encoding
+        Filter.Proto.block_header_data_encoding
         protocol_data
     with
     | None -> failwith "Invalid block header"

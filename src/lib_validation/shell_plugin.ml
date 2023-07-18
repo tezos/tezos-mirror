@@ -46,12 +46,17 @@ module type FILTER = sig
 
     val remove : filter_state:state -> Operation_hash.t -> state
 
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+
     val pre_filter :
       config ->
       filter_state:state ->
       Proto.operation ->
-      [ `Passed_prefilter of Prevalidator_pending_operations.priority
-      | Prevalidator_classification.error_classification ]
+      [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     val add_operation_and_enforce_mempool_bound :
@@ -62,9 +67,15 @@ module type FILTER = sig
       ( state
         * [ `No_replace
           | `Replace of
-            Operation_hash.t * Prevalidator_classification.error_classification
-          ],
-        Prevalidator_classification.error_classification )
+            Operation_hash.t
+            * [ `Branch_delayed of tztrace
+              | `Branch_refused of tztrace
+              | `Refused of tztrace
+              | `Outdated of tztrace ] ],
+        [ `Branch_delayed of tztrace
+        | `Branch_refused of tztrace
+        | `Refused of tztrace
+        | `Outdated of tztrace ] )
       result
       Lwt.t
 
@@ -97,6 +108,8 @@ module No_filter (Proto : Registered_protocol.T) :
     let remove ~filter_state _ = filter_state
 
     let flush _ ~head:_ = Lwt_result_syntax.return_unit
+
+    let syntactic_check _ = `Well_formed
 
     let pre_filter _ ~filter_state:_ _ =
       Lwt.return @@ `Passed_prefilter (`Low [])
@@ -166,4 +179,34 @@ let add_to_filter_table proto_hash filter =
 let register_filter (module Filter : FILTER) =
   add_to_filter_table Filter.Proto.hash (module Filter)
 
-let find_filter = Protocol_hash.Table.find filter_table
+let validator_filter_not_found =
+  Internal_event.Simple.declare_1
+    ~section:["block"; "validation"]
+    ~name:"protocol_filter_not_found"
+    ~msg:"no protocol filter found for protocol {protocol_hash}"
+    ~level:Warning
+    ~pp1:Protocol_hash.pp
+    ("protocol_hash", Protocol_hash.encoding)
+
+let find_filter ~block_hash protocol_hash =
+  let open Lwt_result_syntax in
+  match Protocol_hash.Table.find filter_table protocol_hash with
+  | Some filter -> return filter
+  | None -> (
+      match Registered_protocol.get protocol_hash with
+      | None ->
+          tzfail
+            (Block_validator_errors.Unavailable_protocol
+               {block = block_hash; protocol = protocol_hash})
+      | Some (module Proto : Registered_protocol.T) ->
+          let*! () =
+            match Proto.environment_version with
+            | V0 ->
+                (* This is normal for protocols Genesis and 000
+                   because they don't have a plugin. *)
+                Lwt.return_unit
+            | _ ->
+                Internal_event.Simple.(emit validator_filter_not_found)
+                  protocol_hash
+          in
+          return (module No_filter (Proto) : FILTER))

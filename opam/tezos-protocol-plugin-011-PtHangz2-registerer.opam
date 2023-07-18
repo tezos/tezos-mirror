@@ -13,7 +13,7 @@ depends: [
   "tezos-base"
   "tezos-embedded-protocol-011-PtHangz2"
   "tezos-protocol-plugin-011-PtHangz2"
-  "tezos-shell"
+  "tezos-validation"
 ]
 build: [
   ["rm" "-r" "vendors"]

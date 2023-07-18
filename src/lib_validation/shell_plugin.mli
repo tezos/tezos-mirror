@@ -58,6 +58,14 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Operation_hash.t -> state
 
+    (** Perform some syntactic checks on the operation.
+
+        To be used mostly as an exceptional mechanism to prevent
+        ill-formed operations to block block application.
+
+        Should be called before the {!pre_filter}, does not need a context. *)
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+
     (** [pre_filter config ~filter_state operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
@@ -73,8 +81,11 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       Proto.operation ->
-      [ `Passed_prefilter of Prevalidator_pending_operations.priority
-      | Prevalidator_classification.error_classification ]
+      [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
+      | `Branch_delayed of tztrace
+      | `Branch_refused of tztrace
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
       Lwt.t
 
     (** Add an operation to the filter {!state}.
@@ -104,9 +115,15 @@ module type FILTER = sig
       ( state
         * [ `No_replace
           | `Replace of
-            Operation_hash.t * Prevalidator_classification.error_classification
-          ],
-        Prevalidator_classification.error_classification )
+            Operation_hash.t
+            * [ `Branch_delayed of tztrace
+              | `Branch_refused of tztrace
+              | `Refused of tztrace
+              | `Outdated of tztrace ] ],
+        [ `Branch_delayed of tztrace
+        | `Branch_refused of tztrace
+        | `Refused of tztrace
+        | `Outdated of tztrace ] )
       result
       Lwt.t
 
@@ -159,8 +176,10 @@ val register_rpc : (module RPC) -> unit
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
 
-(** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Protocol_hash.t -> (module FILTER) option
+(** Looks for a protocol filter plug-in for a specific protocol. The
+    [block_hash] argument is used for the error message. *)
+val find_filter :
+  block_hash:Block_hash.t -> Protocol_hash.t -> (module FILTER) tzresult Lwt.t
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option
