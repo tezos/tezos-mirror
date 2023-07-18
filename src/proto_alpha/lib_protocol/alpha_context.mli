@@ -2996,6 +2996,8 @@ module Sc_rollup : sig
 
     val old_levels_messages : t -> history_proof
 
+    val history_proof_encoding : history_proof Data_encoding.t
+
     val equal_history_proof : history_proof -> history_proof -> bool
 
     val pp_history_proof : Format.formatter -> history_proof -> unit
