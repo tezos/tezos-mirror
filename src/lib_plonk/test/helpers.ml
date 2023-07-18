@@ -487,8 +487,11 @@ module Plompiler_Helpers = struct
     let run_one_test (circuit, info) (result, _) =
       let cs = LibCircuit.(get_cs (circuit ())) in
       let initial, _ = LibCircuit.(get_inputs (circuit ())) in
-      if info.flamegraph then
+      if info.flamegraph then (
         Plompiler.Utils.dump_label_traces (info.name ^ "_flamegraph") cs.cs ;
+        Plompiler.Utils.dump_label_range_checks_traces
+          (info.name ^ "_flamegraph_range_checks")
+          cs.range_checks_labels) ;
       let pi =
         try Solver.solve cs.solver initial |> fun x -> Some x with _ -> None
       in
