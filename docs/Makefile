@@ -75,7 +75,8 @@ manuals: \
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
 odoc: docexes
-	cd $$(pwd)/.. ; dune build @doc
+	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
+	  RESULT=$$?; (grep '^Error:' docs/odoc.log || true); exit $$RESULT
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
@@ -230,6 +231,6 @@ black:
 fmt: black
 
 clean:
-	@-rm -Rf "$(BUILDDIR)" linkcheck
+	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html alpha/octez-*.html
