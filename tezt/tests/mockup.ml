@@ -1246,7 +1246,8 @@ let test_create_mockup_config_show_init_roundtrip protocols =
     let convert =
       if protocol > Protocol.Nairobi then
         let delegation_over_baking_limit =
-          JSON.(protocol_constants |-> "delegation_over_baking_limit" |> as_int)
+          JSON.(
+            protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
         in
         let delegation_over_baking_limit_plus_1 =
           Int64.of_int (delegation_over_baking_limit + 1)

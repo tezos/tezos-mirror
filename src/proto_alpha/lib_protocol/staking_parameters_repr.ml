@@ -79,8 +79,8 @@ let encoding =
            ~staking_over_baking_limit_millionth
            ~baking_over_staking_edge_billionth))
     (obj2
-       (req "staking_over_baking_limit_millionth" int32)
-       (req "baking_over_staking_edge_billionth" int32))
+       (req "limit_of_staking_over_baking_millionth" int32)
+       (req "edge_of_baking_over_staking_billionth" int32))
 
 let make ~staking_over_baking_limit_millionth
     ~baking_over_staking_edge_billionth =
