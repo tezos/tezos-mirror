@@ -438,7 +438,7 @@ let acceptable ~drift ~op_earliest_ts ~now_timestamp =
       to the clock.
 
       This is a stricter than necessary filter as it will reject operations that
-      could be valid in the current timeframe if the proposal they endorse is
+      could be valid in the current timeframe if the proposal they attest is
       built over a predecessor of the current proposal that would be of lower
       round than the current one.
 
@@ -510,10 +510,10 @@ let pre_filter_far_future_consensus_ops filter_info config
   in
   match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
 
-(** A quasi infinite amount of "valid" (pre)endorsements could be
+(** A quasi infinite amount of "valid" (pre)attestations could be
       sent by a committee member, one for each possible round number.
 
-      This filter rejects (pre)endorsements that refer to a round
+      This filter rejects (pre)attestations that refer to a round
       that could not have been reached within the time span between
       the last head's timestamp and the current local clock.
 
