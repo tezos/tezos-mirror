@@ -46,11 +46,23 @@ let update_activity ctxt last_cycle =
           else return (ctxt, deactivated))
       >|=? fun (ctxt, deactivated) -> (ctxt, deactivated)
 
-(* Return a map from delegates (with active stake at some cycle
-   in the cycle window [from_cycle, to_cycle]) to the maximum
-   of the active stake in that window. Also
-   return the delegates that have fallen out of the sliding window. *)
-let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
+let update_initial_frozen_deposits ctxt ~new_cycle =
+  Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
+  let max_slashable_period = Constants_storage.max_slashing_period ctxt in
+  (* We want to be able to slash for at most [max_slashable_period] *)
+  (match Cycle_repr.(sub new_cycle (max_slashable_period - 1)) with
+  | None ->
+      Storage.Tenderbake.First_level_of_protocol.get ctxt
+      >>=? fun first_level_of_protocol ->
+      let cycle_eras = Raw_context.cycle_eras ctxt in
+      let level =
+        Level_repr.level_from_raw ~cycle_eras first_level_of_protocol
+      in
+      return level.cycle
+  | Some cycle -> return cycle)
+  >>=? fun from_cycle ->
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
   let cycles = Cycle_repr.(from_cycle ---> to_cycle) in
   (match Cycle_repr.pred from_cycle with
   | None -> return Signature.Public_key_hash.Set.empty
@@ -79,25 +91,6 @@ let max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle =
         active_stakes)
     cleared_cycle_delegates
     cycles
-
-let update_initial_frozen_deposits ctxt ~new_cycle =
-  Delegate_storage.reset_forbidden_delegates ctxt >>= fun ctxt ->
-  let max_slashable_period = Constants_storage.max_slashing_period ctxt in
-  (* We want to be able to slash for at most [max_slashable_period] *)
-  (match Cycle_repr.(sub new_cycle (max_slashable_period - 1)) with
-  | None ->
-      Storage.Tenderbake.First_level_of_protocol.get ctxt
-      >>=? fun first_level_of_protocol ->
-      let cycle_eras = Raw_context.cycle_eras ctxt in
-      let level =
-        Level_repr.level_from_raw ~cycle_eras first_level_of_protocol
-      in
-      return level.cycle
-  | Some cycle -> return cycle)
-  >>=? fun from_cycle ->
-  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
-  let to_cycle = Cycle_repr.(add new_cycle preserved_cycles) in
-  max_frozen_deposits_and_delegates_to_remove ctxt ~from_cycle ~to_cycle
   >>=? fun delegates_to_remove ->
   Stake_storage.get_selected_distribution ctxt new_cycle
   >>=? fun selection_for_new_cycle ->
