@@ -50,6 +50,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   let* r = protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) in
   match r with
   | Ok (_, Bootstrap) -> (
+      Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_received ;
       let* () = Events.(emit bootstrap_received) t.peer_id in
       if t.disable_peer_discovery then worker_loop t callback
       else
@@ -67,6 +68,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
         | Ok () -> worker_loop t callback
         | Error _ -> Error_monad.cancel_with_exceptions t.canceler)
   | Ok (_, Advertise points) ->
+      Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_received ;
       let* () = Events.(emit advertise_received) (t.peer_id, points) in
       let* () =
         if t.disable_peer_discovery then return_unit
@@ -78,6 +80,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       in
       worker_loop t callback
   | Ok (_, Swap_request (point, peer)) ->
+      Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_received ;
       let* () = Events.(emit swap_request_received) (t.peer_id, point, peer) in
       let request_info =
         P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
@@ -85,6 +88,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       let* () = callback.swap_request request_info point peer in
       worker_loop t callback
   | Ok (_, Swap_ack (point, peer)) ->
+      Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_received ;
       let* () = Events.(emit swap_ack_received) (t.peer_id, point, peer) in
       let request_info =
         P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
@@ -92,6 +96,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
       let* () = callback.swap_ack request_info point peer in
       worker_loop t callback
   | Ok (size, Message msg) ->
+      Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_received ;
       let request_info =
         P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
       in
@@ -116,12 +121,17 @@ let shutdown t =
       w
 
 let write_swap_ack t point peer_id =
-  P2p_socket.write_now t.conn (Swap_ack (point, peer_id))
+  let result = P2p_socket.write_now t.conn (Swap_ack (point, peer_id)) in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.swap_ack_sent ;
+  result
 
 let write_advertise t points =
   if t.disable_peer_discovery then
     Result_syntax.tzfail P2p_errors.Peer_discovery_disabled
-  else P2p_socket.write_now t.conn (Advertise points)
+  else
+    let result = P2p_socket.write_now t.conn (Advertise points) in
+    Prometheus.Counter.inc_one P2p_metrics.Messages.advertise_sent ;
+    result
 
 let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
     ~callback ~disable_peer_discovery negotiated_version =
@@ -184,7 +194,10 @@ let read t =
           (s, (P2p_socket.info t.conn).peer_id)
       in
       return_ok msg)
-    pipe_exn_handler
+    (fun e ->
+      Prometheus.Counter.inc_one
+        P2p_metrics.Messages.user_message_received_error ;
+      pipe_exn_handler e)
 
 let is_readable t =
   let open Lwt_result_syntax in
@@ -194,9 +207,15 @@ let is_readable t =
       return_unit)
     pipe_exn_handler
 
-let write t msg = P2p_socket.write t.conn (Message msg)
+let write t msg =
+  let result = P2p_socket.write t.conn (Message msg) in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
+  result
 
-let write_sync t msg = P2p_socket.write_sync t.conn (Message msg)
+let write_sync t msg =
+  let result = P2p_socket.write_sync t.conn (Message msg) in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.user_message_sent ;
+  result
 
 let encode t msg = P2p_socket.encode t.conn (Message msg)
 
@@ -206,13 +225,18 @@ let write_now t msg = P2p_socket.write_now t.conn (Message msg)
 
 let write_swap_request t point peer_id =
   t.last_sent_swap_request <- Some (Time.System.now (), peer_id) ;
-  P2p_socket.write_now t.conn (Swap_request (point, peer_id))
+  let result = P2p_socket.write_now t.conn (Swap_request (point, peer_id)) in
+  Prometheus.Counter.inc_one P2p_metrics.Messages.swap_request_sent ;
+  result
 
 let write_bootstrap t =
   if t.disable_peer_discovery then (
     Events.(emit__dont_wait__use_with_care peer_discovery_disabled) () ;
     Result_syntax.return_false)
-  else P2p_socket.write_now t.conn Bootstrap
+  else
+    let result = P2p_socket.write_now t.conn Bootstrap in
+    Prometheus.Counter.inc_one P2p_metrics.Messages.bootstrap_sent ;
+    result
 
 let stat t = P2p_socket.stat t.conn
 
