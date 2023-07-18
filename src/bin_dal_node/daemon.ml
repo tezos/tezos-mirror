@@ -422,6 +422,31 @@ let resolve peers =
        ~default_port:(Configuration_file.default.listen_addr |> snd))
     peers
 
+(* This function ensures the persistence of attestor profiles
+   to the configuration file at shutdown.
+
+   This is especially important for attestors as the pkh they track
+   is supplied by the baker through `PATCH /profile` API calls.
+   As these profiles are added dynamically at run time, they do not exist
+   in the initial configuration file. Therefore, in order to retain these
+   profiles between restarts, we store them to the configuration file at shutdown. *)
+let store_profiles_finalizer ctxt data_dir =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun _exit_status ->
+  let profiles =
+    Profile_manager.get_profiles (Node_context.get_profile_ctxt ctxt)
+  in
+  let* r = Configuration_file.load ~data_dir in
+  match r with
+  | Ok config -> (
+      let* r = Configuration_file.save {config with profiles} in
+      match r with
+      | Ok () -> return ()
+      | Error e -> Event.(emit failed_to_persist_profiles (profiles, e)))
+  | Error e ->
+      let* () = Event.(emit failed_to_persist_profiles (profiles, e)) in
+      return ()
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -482,6 +507,9 @@ let run ~data_dir configuration_override =
       cctxt
       metrics_server
   in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    store_profiles_finalizer ctxt data_dir
+  in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ;
   let* dal_config = fetch_dal_config cctxt in
@@ -501,4 +529,7 @@ let run ~data_dir configuration_override =
       [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
   in
   (* Start never-ending monitoring daemons *)
-  daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
+  let* () =
+    daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
+  in
+  return ()
