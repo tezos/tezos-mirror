@@ -61,6 +61,13 @@ fn compute<Host: Runtime>(
         if block_in_progress.would_overflow() {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/6094
             // there should be an upper bound on gasLimit
+
+            if host.reboot_left()? <= 1 {
+                // TODO: #5873
+                // this case needs to be handle properly
+                log!(host, Info, "Warning: maximum number of reboots reached, some transactions were lost");
+                return Ok(ComputationResult::Finished);
+            }
             return Ok(ComputationResult::RebootNeeded);
         }
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
@@ -1117,6 +1124,8 @@ mod tests {
             proposals: vec![blueprint(transactions)],
             kernel_upgrade: None,
         };
+
+        host.reboot_left().expect("should be some reboot left");
 
         produce(&mut host, queue).expect("Should have produced");
 
