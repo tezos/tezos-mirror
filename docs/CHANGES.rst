@@ -3,6 +3,24 @@
 Changelog
 '''''''''
 
+Version 17.2
+============
+
+Node
+----
+
+- Removed the warning ``no prevalidator filter found for protocol
+  ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im`` that was
+  emitted at node start-up, because it is normal for ``Genesis`` not
+  to have a prevalidator filter. The warning will still be issued if
+  no prevalidator filter is found later on for a different
+  protocol. (MR :gl:`!9261`)
+
+- Renamed ``no prevalidator filter found for protocol {protocol_hash}``
+  to ``no protocol filter found for protocol {protocol_hash}``.
+
+- Added a syntactic operation filter in the protocol's plugins.
+
 Version 17.1
 ============
 

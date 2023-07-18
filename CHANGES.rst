@@ -179,13 +179,6 @@ Node
   ``GET ../mempool/pending_operations``. ``applied`` argument of these RPCs is
   deprecated. (MR :gl:`!9143`)
 
-- Removed the warning ``no prevalidator filter found for protocol
-  ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im`` that was
-  emitted at node start-up, because it is normal for ``Genesis`` not
-  to have a prevalidator filter. The warning will still be issued if
-  no prevalidator filter is found later on for a different
-  protocol. (MR :gl:`!9261`)
-
 - Added version ``1`` to RPCs ``GET ../blocks/<block>``, and ``GET
   ../blocks/<blocks>/operations``. It can be used by calling the RPC with the
   parameter ``?version=1`` (default version is still ``0``). Version ``1``
@@ -212,8 +205,6 @@ Node
   ``0``). Version ``1`` of this RPC and ``GET ../blocks/<block>`` allow the RPC
   to output ``attesting rewards`` and ``lost attesting rewards`` kinds in the
   JSON result. (MR :gl:`!9253`)
-
-- Added a syntactic operation filter in the protocol's plugins.
 
 - Fixed a behavior where each time a new data was received from a
   peer, a new p2p request would be triggered instead of waiting for
