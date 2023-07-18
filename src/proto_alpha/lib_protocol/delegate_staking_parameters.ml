@@ -80,7 +80,6 @@ let activate ctxt ~new_cycle =
       let open Lwt_syntax in
       let* ctxt = Storage.Contract.Staking_parameters.add ctxt delegate t in
       Storage.Pending_staking_parameters.remove (ctxt, new_cycle) delegate)
-  >|= ok
 
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 

@@ -52,8 +52,7 @@ val register_update :
 
 (** Maintenance of staking parameters at the beginning of cycle [new_cycle].
     This function iterates on all registered delegates. *)
-val activate :
-  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+val activate : Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
 (** [pay_rewards ctxt ?active_stake source delegate] transfers the rewards to the
     [delegate] spendable balance and frozen balance.
