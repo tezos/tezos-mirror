@@ -1802,6 +1802,10 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let* () = check_profiles ~__LOC__ dal_node ~expected:[profile1] in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:[profile1; profile2] in
+  (* Test that the patched profiles are persisted after restart. *)
+  let* () = Dal_node.terminate dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
   check_profiles ~__LOC__ dal_node ~expected:[profile1; profile2]
 
 (* Check that result of the DAL node's
