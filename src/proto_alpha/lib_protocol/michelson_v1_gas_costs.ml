@@ -412,3 +412,51 @@ let cost_CHECK_PRINTABLE size =
 (* model N_IList_iter *)
 (* Inferred: 2.26028815324 *)
 let cost_N_IList_iter = S.safe_int 20
+
+(* model interpreter/N_ISet_mem *)
+(* Moved from Michelson_v1_gas *)
+let cost_N_ISet_mem size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let intercept = S.safe_int 115 in
+  intercept + (log2 size2 * size1)
+
+(* Moved from Michelson_v1_gas *)
+let cost_N_ISet_update size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let intercept = S.safe_int 130 in
+  (* The 2 factor reflects the update vs mem overhead as benchmarked
+     on non-structured data *)
+  intercept + (S.safe_int 2 * log2 size2 * size1)
+
+(* model N_IMap_mem *)
+(* Moved from Michelson_v1_gas *)
+let cost_N_IMap_mem size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let intercept = S.safe_int 80 in
+  intercept + (log2 size2 * size1)
+
+(* Moved from Michelson_v1_gas *)
+let cost_N_IMap_update size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let intercept = S.safe_int 80 in
+  (* The 2 factor reflects the update vs mem overhead as benchmarked
+     on non-structured data *)
+  intercept + (S.safe_int 2 * log2 size2 * size1)
+
+(* Moved from Michelson_v1_gas *)
+let cost_N_IMap_get_and_update size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let intercept = S.safe_int 80 in
+  (* The 3 factor reflects the update vs mem overhead as benchmarked
+     on non-structured data *)
+  intercept + (S.safe_int 3 * log2 size2 * size1)
