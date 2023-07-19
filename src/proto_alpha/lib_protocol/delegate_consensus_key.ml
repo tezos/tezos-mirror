@@ -223,22 +223,13 @@ let register_update ctxt delegate pk =
   return ctxt
 
 let activate ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  Storage.Delegates.fold
-    ctxt
-    ~order:`Undefined
-    ~init:(ok ctxt)
-    ~f:(fun delegate ctxt ->
-      let*? ctxt in
-      let delegate = Contract_repr.Implicit delegate in
-      let* update =
-        Storage.Pending_consensus_keys.find (ctxt, new_cycle) delegate
-      in
-      match update with
-      | None -> return ctxt
-      | Some pk ->
-          let*! ctxt = Storage.Contract.Consensus_key.add ctxt delegate pk in
-          let*! ctxt =
-            Storage.Pending_consensus_keys.remove (ctxt, new_cycle) delegate
-          in
-          return ctxt)
+  let open Lwt_syntax in
+  let* ctxt =
+    Storage.Pending_consensus_keys.fold
+      (ctxt, new_cycle)
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun delegate pk ctxt ->
+        Storage.Contract.Consensus_key.add ctxt delegate pk)
+  in
+  Storage.Pending_consensus_keys.clear (ctxt, new_cycle)

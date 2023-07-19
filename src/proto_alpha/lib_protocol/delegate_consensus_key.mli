@@ -93,7 +93,5 @@ val register_update :
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
-(** Activate consensus keys at the beginning of cycle [new_cycle].
-    This function iterates on all registered delegates. *)
-val activate :
-  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+(** Activate consensus keys at the beginning of cycle [new_cycle]. *)
+val activate : Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
