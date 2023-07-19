@@ -38,7 +38,7 @@ const create_player = function (wallet) {
         addr: wallet.getAddressString(),
         privateKey: wallet.getPrivateKeyString(),
         publicKey: wallet.getPublicKeyString(),
-        nonce: 1
+        nonce: 0
     }
 
 }

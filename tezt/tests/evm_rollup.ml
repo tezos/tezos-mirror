@@ -186,6 +186,7 @@ let send_and_wait_until_tx_mined ~sc_rollup_node ~node ~client
   in
   wait_for_application ~sc_rollup_node ~node ~client send ()
 
+(* sending more than ~300 tx could fail, because or curl *)
 let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
   let requests =
     List.map
@@ -2501,6 +2502,46 @@ let register_evm_migration ~protocols =
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols
 
+let test_reboot =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "reboot"; "loop"]
+    ~title:"Check that the kernel can handle too many txs for a single run"
+  @@ fun protocol ->
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  (* Retrieves all the messages and prepare them for the current rollup. *)
+  let txs =
+    read_file (kernel_inputs_path ^ "/100-loops")
+    |> String.trim |> String.split_on_char '\n'
+  in
+  let* requests, receipt =
+    send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
+  in
+  let* block_with_many_txs =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters =
+            `A
+              [`String (Format.sprintf "%#lx" receipt.blockNumber); `Bool false];
+        })
+  in
+  let block_with_many_txs =
+    block_with_many_txs |> Evm_proxy_server.extract_result |> Block.of_json
+  in
+  (match block_with_many_txs.Block.transactions with
+  | Block.Empty -> Test.fail "Expected a non empty block"
+  | Block.Full _ ->
+      Test.fail "Block is supposed to contain only transaction hashes"
+  | Block.Hash hashes ->
+      Check.((List.length hashes = List.length requests) int)
+        ~error_msg:"Expected %R transactions in the latest block, got %L") ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2542,7 +2583,8 @@ let register_evm_proxy_server ~protocols =
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
   test_rpc_sendRawTransaction_nonce_too_high protocols ;
-  test_rpc_sendRawTransaction_invalid_chain_id protocols
+  test_rpc_sendRawTransaction_invalid_chain_id protocols ;
+  test_reboot protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;

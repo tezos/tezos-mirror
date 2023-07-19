@@ -25,6 +25,7 @@ External message:
 
 # Inputs for the Proxy
 
+## 100-inputs-for-proxy
 The file `100-inputs-for-proxy` is a list of signed transactions generated with `signer.js`. It can be regenerated with the following command:
 ```
 npm install @ethereumjs/common @ethereumjs/tx
@@ -42,3 +43,9 @@ standard tooling. For example [Remix](https://remix.ethereum.org/) (online IDE)
 or other tools.
 
 The contracts source code can be found in `src/kernel_evm/solidity_examples`.
+
+# 100-loops
+The file `100-loops` has been produced by a scenario in `kernel_evm/benchmarks`
+```
+node src/kernel_evm/benchmarks/scripts/benchmarks/test_loop_new_actors.js
+```
