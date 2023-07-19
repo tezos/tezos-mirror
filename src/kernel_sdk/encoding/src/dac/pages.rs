@@ -43,9 +43,11 @@ pub(crate) const PAGE_TAG_SIZE: usize = 1;
 /// Prefix of 4-bytes to define how large contents/hash page is.
 pub(crate) const PAGE_SIZE_PREFIX_SIZE: usize = 4;
 
+/// Prefix of 5-bytes for page variant plus size.
+pub(crate) const PAGE_PREFIX_SIZE: usize = PAGE_TAG_SIZE + PAGE_SIZE_PREFIX_SIZE;
+
 /// Maximum content/hashes size that can fit in a page.
-pub(crate) const MAX_USABLE_PAGE_SIZE: usize =
-    MAX_PAGE_SIZE - (PAGE_TAG_SIZE + PAGE_SIZE_PREFIX_SIZE);
+pub(crate) const MAX_USABLE_PAGE_SIZE: usize = MAX_PAGE_SIZE - PAGE_PREFIX_SIZE;
 
 #[cfg(feature = "alloc")]
 pub use encoding::{prepare_preimages, Page, V0ContentPage, V0HashPage};
@@ -268,7 +270,7 @@ impl<'a> AsRef<[u8]> for V0SliceContentPage<'a> {
 #[derive(Debug)]
 pub struct V0SliceHashPage<'a> {
     // Guaranteed to be a multiple of PREIMAGE_HASH_SIZE
-    inner: &'a [u8],
+    pub(crate) inner: &'a [u8],
 }
 
 impl<'a> V0SliceHashPage<'a> {
@@ -304,6 +306,7 @@ impl<'a> V0SliceHashPage<'a> {
         })
     }
 }
+
 /// Fetches a page of data from file `hash` into `buffer` using [Runtime::reveal_preimage].
 /// Returns a tuple of the raw page and remaining buffer.
 pub fn fetch_page_raw<'a, Host: Runtime>(
@@ -321,7 +324,10 @@ pub fn fetch_page_raw<'a, Host: Runtime>(
 /// corresponds to a preimage that can be revealed via [Runtime::reveal_preimage]. The closure
 /// `save_content` is applied on each content page found.
 ///
-/// N.B `max_dac_levels`, should probably be kept under 4 (4 gives 7.9GB of data approximately)
+/// N.B `max_dac_levels`, should probably be kept under 3 (3 gives 59MB of data). You are likely,
+/// however, to run into tick-limit issues while doing so, depending on what `save_content` does.
+///
+/// Instead, it is recommended to use `DacCertificate::reveal_to_store` where possible.
 pub fn reveal_loop<Host: Runtime>(
     host: &mut Host,
     level: usize,
