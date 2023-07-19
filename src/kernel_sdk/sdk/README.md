@@ -1,4 +1,4 @@
-SDK for Tezos Smart Optimistic Rollups.
+SDK for Tezos Smart Rollups.
 
 To learn more about how Smart Rollups work in Tezos, see the
 [Smart Rollup Documentation](https://tezos.gitlab.io/alpha/smart_rollups.html).
@@ -78,7 +78,7 @@ rust-version = "1.66"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tezos-smart-rollup = "0.2.0"
+tezos-smart-rollup = "0.2.1"
 tezos_data_encoding = "0.5"
 tezos_crypto_rs = { version = "0.5", default-features = false }
 nom = "7.1"

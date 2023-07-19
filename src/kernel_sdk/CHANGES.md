@@ -4,6 +4,12 @@
 
 ### SDK
 
+### Installer client/kernel
+
+## Version 0.2.1
+
+### SDK
+
 - Add `Certificate::verify` to verify that a *DAC* certificate has been a signed by a number of
   committee members greater than a given threshold.
 - Add `Certificate::reveal_to_store` to reveal up to ~10MB of DAC payload to storage in one go.

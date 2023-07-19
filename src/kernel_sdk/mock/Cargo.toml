@@ -4,7 +4,7 @@
 
 [package]
 name = "tezos-smart-rollup-mock"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 authors = ["TriliTech <contact@trili.tech>"]
@@ -20,21 +20,19 @@ tezos_data_encoding = "0.5"
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
-version = "0.2.0"
+version = "0.2.1"
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
-version = "0.2.0"
-default-features = false
+version = "0.2.1"
 
 [dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.2.0"
-default-features = false
+version = "0.2.1"
 
 [dev-dependencies.tezos-smart-rollup-host]
 path = "../host"
-version = "0.2.0"
+version = "0.2.1"
 features = ["default"]
 
 [features]
