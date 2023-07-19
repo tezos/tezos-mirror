@@ -33,7 +33,7 @@
 
 (** [process_head node_ctxt head] performs the following operations:
     {ul
-      {li it reads the endorsements for headers published attestation_lag
+      {li it reads the attestations for headers published attestation_lag
       levels preceding [head] from the block metadata, determines which
       ones the rollup node will download, and stores the results in
       [Store.Dal_confirmed_slots].}
