@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 # SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 #
 # SPDX-License-Identifier: MIT
 
@@ -12,45 +13,31 @@ edition = '2021'
 [lib]
 crate-type = ["cdylib"]
 
-[dependencies.tezos-smart-rollup-core]
-path = "../../kernel_sdk/core"
-features = ["proto-nairobi"]
-
-[dependencies.tezos-smart-rollup-host]
-path = "../../kernel_sdk/host"
-features = ["proto-nairobi"]
-
-[dependencies.tezos-smart-rollup-panic-hook]
-path = "../../kernel_sdk/panic-hook"
-
-[dependencies.tezos-smart-rollup-entrypoint]
-path = "../../kernel_sdk/entrypoint"
-
-[dependencies.tezos-smart-rollup-encoding]
-path = "../../kernel_sdk/encoding"
-
-[dependencies.tezos-smart-rollup-installer-config]
-path = "../../kernel_sdk/installer-config"
- 
-[dev-dependencies.tezos-smart-rollup-mock]
-path = "../../kernel_sdk/mock"
-features = ["proto-nairobi"]
-
 [dependencies]
-thiserror = "1.0"
-anyhow = "1.0"
-tezos_ethereum = { path = "../ethereum" }
-tezos-evm-logging = { path = "../logging" }
-primitive-types = { version = "0.11.1", default-features = false }
-hex = "0.4"
-hex-literal = "0.4.1"
-num-traits = "0.2.8"
-evm-execution = { path = "../evm_execution" }
-rlp = "0.5.2"
-sha3 = { version = "0.10.6", default-features = false }
-libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context", "hmac"] }
-tezos_data_encoding = "0.5"
-tezos_crypto_rs = { version = "0.5", default-features = false }
+thiserror.workspace = true
+anyhow.workspace = true
+primitive-types.workspace = true
+hex.workspace = true
+hex-literal.workspace = true
+num-traits.workspace = true
+rlp.workspace = true
+sha3.workspace = true
+libsecp256k1.workspace = true
+tezos_data_encoding.workspace = true
+tezos_crypto_rs.workspace = true
+
+evm-execution.workspace = true
+tezos_ethereum.workspace = true
+tezos-evm-logging.workspace = true
+
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-panic-hook.workspace = true
+tezos-smart-rollup-entrypoint.workspace = true
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup-installer-config.workspace = true
+tezos-smart-rollup-mock.workspace = true
 
 [features]
 default = ["panic-hook"]

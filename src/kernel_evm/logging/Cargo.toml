@@ -7,8 +7,8 @@ name = "tezos-evm-logging"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies.tezos-smart-rollup-debug]
-path = "../../kernel_sdk/debug"
+[dependencies]
+tezos-smart-rollup-debug.workspace = true
 
 [features]
 default = ["alloc"]
