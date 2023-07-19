@@ -85,7 +85,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     {
       activated = true;
       use_mock_srs_for_testing = Some dal_parameters.cryptobox;
-      bootstrap_peers = [];
+      bootstrap_peers = dal_bootstrap_peers;
     }
   in
   Node.Config_file.update
@@ -120,7 +120,8 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
     ?attestation_threshold ?commitment_period ?challenge_window ?dal_enable
-    ?event_sections_levels ?node_arguments ?activation_timestamp f ~protocol =
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?dal_bootstrap_peers f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter
@@ -148,6 +149,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ?event_sections_levels
       ?node_arguments
       ?activation_timestamp
+      ?dal_bootstrap_peers
       ~parameters
       ~protocol
       ()
@@ -181,10 +183,31 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   let* () = Client.bake_for_and_wait tezos_client ~keys:[] in
   f rollup_address sc_rollup_node
 
-let with_dal_node tezos_node tezos_client f key =
+let make_dal_node ?peers ?attestor_profiles ?producer_profiles
+    ?bootstrap_profile tezos_node tezos_client =
   let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
-  let* () = Dal_node.init_config dal_node in
+  let* () =
+    Dal_node.init_config
+      ?peers
+      ?attestor_profiles
+      ?producer_profiles
+      ?bootstrap_profile
+      dal_node
+  in
   let* () = Dal_node.run dal_node ~wait_ready:true in
+  return dal_node
+
+let with_dal_node ?peers ?attestor_profiles ?producer_profiles
+    ?bootstrap_profile tezos_node tezos_client f key =
+  let* dal_node =
+    make_dal_node
+      ?peers
+      ?attestor_profiles
+      ?producer_profiles
+      ?bootstrap_profile
+      tezos_node
+      tezos_client
+  in
   f key dal_node
 
 (* Wrapper scenario functions that should be re-used as much as possible when
@@ -219,7 +242,8 @@ let scenario_with_layer1_node ?(tags = ["layer1"])
 let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
     ?minimal_block_delay ?delay_increment_per_round ?attestation_lag
     ?attestation_threshold ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?activation_timestamp variant scenario =
+    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile variant
+    scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
@@ -238,7 +262,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node node client @@ fun _key dal_node ->
+      with_dal_node ?bootstrap_profile node client @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
