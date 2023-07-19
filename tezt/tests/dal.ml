@@ -1789,21 +1789,31 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let profile1 = Attestor Constant.bootstrap1.public_key_hash in
   let profile2 = Attestor Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
-  let* () = check_profiles ~__LOC__ dal_node ~expected:[] in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:(Slot_operator []) in
   (* Adding [Attestor] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
   let* () = check_bad_attestor_pkh_encoding (Attestor "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
-  let* () = check_profiles ~__LOC__ dal_node ~expected:[profile1] in
+  let* () =
+    check_profiles ~__LOC__ dal_node ~expected:(Slot_operator [profile1])
+  in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
-  let* () = check_profiles ~__LOC__ dal_node ~expected:[profile1; profile2] in
+  let* () =
+    check_profiles
+      ~__LOC__
+      dal_node
+      ~expected:(Slot_operator [profile1; profile2])
+  in
   (* Test that the patched profiles are persisted after restart. *)
   let* () = Dal_node.terminate dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
-  check_profiles ~__LOC__ dal_node ~expected:[profile1; profile2]
+  check_profiles
+    ~__LOC__
+    dal_node
+    ~expected:(Slot_operator [profile1; profile2])
 
 (* Check that result of the DAL node's
    GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
@@ -3315,7 +3325,8 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
      the baker behavior changes in this respect, the constant may need
      adjusting. *)
   let* () = Lwt_unix.sleep 2.0 in
-  check_profiles ~__LOC__ dal_node ~expected:profiles
+  check_profiles ~__LOC__ dal_node ~expected:(Slot_operator profiles)
+
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
