@@ -572,9 +572,7 @@ end) : Internal_event.SINK with type t = t = struct
               current := {fd; day = today} ;
               return fd
           in
-          let* () =
-            Lwt_result.ok @@ Lwt_utils_unix.write_string output to_write
-          in
+          let*! () = Lwt_utils_unix.write_string output to_write in
           let*! () =
             if should_rotate_output then
               remove_older_files
@@ -588,21 +586,20 @@ end) : Internal_event.SINK with type t = t = struct
     return_unit
 
   let output_one now output section level to_write =
+    protect @@ fun () ->
     match output with
     | Static output ->
-        protect (fun () ->
-            Lwt_result.ok
-            @@ Lwt_mutex.with_lock write_mutex (fun () ->
-                   Lwt_utils_unix.write_string output to_write))
+        Lwt_result.ok
+        @@ Lwt_mutex.with_lock write_mutex (fun () ->
+               Lwt_utils_unix.write_string output to_write)
     | Syslog sys_logger ->
-        protect (fun () ->
-            Lwt_result.ok
-            @@ Lwt_mutex.with_lock write_mutex (fun () ->
-                   Syslog.syslog
-                     ~timestamp:(Ptime.to_float_s now)
-                     (overwrite_syslog_tag sys_logger section)
-                     level
-                     to_write))
+        Lwt_result.ok
+        @@ Lwt_mutex.with_lock write_mutex (fun () ->
+               Syslog.syslog
+                 ~timestamp:(Ptime.to_float_s now)
+                 (overwrite_syslog_tag sys_logger section)
+                 level
+                 to_write)
     | Rotating output -> output_one_with_rotation output now to_write
 
   let should_handle (type a) ?(section = Internal_event.Section.empty)
@@ -668,8 +665,8 @@ end) : Internal_event.SINK with type t = t = struct
         | `One_per_line ->
             Lwt.return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
-            let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
-            Lwt.return @@ Format.asprintf "%d:%s," (String.length bytes) bytes
+            let str = Ezjsonm.value_to_string ~minify:true (json ()) in
+            Lwt.return @@ Printf.sprintf "%d:%s," (String.length str) str
     in
     lwt_bad_citizen_hack :=
       (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
@@ -704,11 +701,10 @@ end) : Internal_event.SINK with type t = t = struct
     match K.kind with
     | `Path | `Syslog -> (
         match output with
-        | Syslog sys_logger -> Lwt_result.ok @@ Syslog.close sys_logger
-        | Rotating output ->
-            let*! () = Lwt_unix.close !(output.current).fd in
-            return_unit
-        | Static output -> Lwt_result.ok @@ Lwt_unix.close output)
+        | Syslog sys_logger ->
+            protect (fun () -> Lwt_result.ok @@ Syslog.close sys_logger)
+        | Rotating output -> Lwt_utils_unix.safe_close !(output.current).fd
+        | Static output -> Lwt_utils_unix.safe_close output)
     | `Stdout | `Stderr -> return_unit
 end
 
