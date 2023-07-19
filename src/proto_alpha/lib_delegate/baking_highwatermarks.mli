@@ -35,8 +35,6 @@ type error += Block_previously_attested of highwatermark
 
 type t
 
-val encoding : t Data_encoding.t
-
 val load :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
