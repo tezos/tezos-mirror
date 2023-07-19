@@ -24,12 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type staker = Stake_repr.staker =
+  | Single of Contract_repr.t * Signature.public_key_hash
+  | Shared of Signature.public_key_hash
+
 (** Places where tez can be found in the ledger's state. *)
 type balance =
   | Contract of Contract_repr.t
   | Block_fees
-  | Deposits of Signature.Public_key_hash.t
-  | Unstaked_deposits of Signature.Public_key_hash.t * Cycle_repr.t
+  | Deposits of staker
+  | Unstaked_deposits of staker * Cycle_repr.t
   | Nonce_revelation_rewards
   | Attesting_rewards
   | Baking_rewards

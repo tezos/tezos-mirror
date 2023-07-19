@@ -54,34 +54,36 @@ let balance ctxt delegate cycle =
   let+ frozen_deposits = get ctxt delegate cycle in
   frozen_deposits.current_amount
 
-let update_balance ~f ctxt contract cycle =
+let update_balance ~f ctxt delegate_contract cycle =
   let open Lwt_result_syntax in
-  let* unstaked_frozen_deposits = get_all ctxt contract in
+  let* unstaked_frozen_deposits = get_all ctxt delegate_contract in
   let*? unstaked_frozen_deposits =
     Unstaked_frozen_deposits_repr.update ~f cycle unstaked_frozen_deposits
   in
   let*! ctxt =
     Storage.Contract.Unstaked_frozen_deposits.add
       ctxt
-      contract
+      delegate_contract
       unstaked_frozen_deposits.t
   in
   return ctxt
 
-let credit_only_call_from_token ctxt delegate cycle amount =
+let credit_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let contract = Contract_repr.Implicit delegate in
+  let delegate = Stake_repr.staker_delegate staker in
+  let delegate_contract = Contract_repr.Implicit delegate in
   let f deposits = Deposits_repr.(deposits +? amount) in
   let* ctxt = Stake_storage.add_stake ctxt delegate amount in
-  update_balance ~f ctxt contract cycle
+  update_balance ~f ctxt delegate_contract cycle
 
-let spend_only_call_from_token ctxt delegate cycle amount =
+let spend_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let contract = Contract_repr.Implicit delegate in
+  let delegate = Stake_repr.staker_delegate staker in
+  let delegate_contract = Contract_repr.Implicit delegate in
   let f Deposits_repr.{initial_amount; current_amount} =
     let open Result_syntax in
     let+ current_amount = Tez_repr.(current_amount -? amount) in
     Deposits_repr.{initial_amount; current_amount}
   in
   let* ctxt = Stake_storage.remove_stake ctxt delegate amount in
-  update_balance ~f ctxt contract cycle
+  update_balance ~f ctxt delegate_contract cycle

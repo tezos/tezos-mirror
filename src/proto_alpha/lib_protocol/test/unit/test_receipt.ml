@@ -73,9 +73,15 @@ let test_encodings balance =
 let test_encodings () =
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
+  let pkh2, _pk, _sk = Signature.generate_key () in
+  let staker1 = Receipt.Shared pkh in
+  let staker2 = Receipt.Single (Contract.Implicit pkh, pkh) in
+  let staker3 = Receipt.Single (Contract.Implicit pkh2, pkh) in
   test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
-  test_encodings (Deposits pkh) >>=? fun () ->
+  test_encodings (Deposits staker1) >>=? fun () ->
+  test_encodings (Deposits staker2) >>=? fun () ->
+  test_encodings (Deposits staker3) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
   test_encodings Attesting_rewards >>=? fun () ->
   test_encodings Baking_rewards >>=? fun () ->

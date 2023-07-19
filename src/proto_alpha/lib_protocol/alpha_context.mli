@@ -2031,11 +2031,15 @@ end
 
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
+  type staker =
+    | Single of Contract.t * Signature.public_key_hash
+    | Shared of Signature.public_key_hash
+
   type balance =
     | Contract of Contract.t
     | Block_fees
-    | Deposits of public_key_hash
-    | Unstaked_deposits of public_key_hash * Cycle.t
+    | Deposits of staker
+    | Unstaked_deposits of staker * Cycle.t
     | Nonce_revelation_rewards
     | Attesting_rewards
     | Baking_rewards
@@ -4868,8 +4872,8 @@ module Token : sig
   type container =
     [ `Contract of Contract.t
     | `Collected_commitments of Blinded_public_key_hash.t
-    | `Frozen_deposits of public_key_hash
-    | `Unstaked_frozen_deposits of public_key_hash * Cycle.t
+    | `Frozen_deposits of Receipt.staker
+    | `Unstaked_frozen_deposits of Receipt.staker * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 
@@ -4894,9 +4898,10 @@ module Token : sig
     | `Sc_rollup_refutation_punishments
     | container ]
 
-  val allocated : context -> container -> (context * bool) tzresult Lwt.t
-
-  val balance : context -> container -> (context * Tez.t) tzresult Lwt.t
+  val balance :
+    context ->
+    [< `Block_fees | `Collected_commitments of Blinded_public_key_hash.t] ->
+    (context * Tez.t) tzresult Lwt.t
 
   val transfer_n :
     ?origin:Receipt.update_origin ->
@@ -4912,6 +4917,19 @@ module Token : sig
     [< receiver] ->
     Tez.t ->
     (context * Receipt.balance_updates) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val allocated : context -> container -> (context * bool) tzresult Lwt.t
+
+    type container_with_balance =
+      [ `Contract of Contract.t
+      | `Collected_commitments of Blinded_public_key_hash.t
+      | `Block_fees
+      | `Frozen_bonds of Contract.t * Bond_id.t ]
+
+    val balance :
+      context -> [< container_with_balance] -> (context * Tez.t) tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Unstake_requests_storage}. *)

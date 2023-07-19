@@ -166,6 +166,7 @@ let () =
   @@ def "script" ["loc"] Protocol.Alpha_context.Script.location_encoding ;
   register ~pp:Protocol.Alpha_context.Contract.pp
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
+  register @@ def "staker" [] Protocol.Stake_repr.staker_encoding ;
   register
   @@ def
        "receipt"

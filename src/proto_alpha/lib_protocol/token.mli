@@ -60,10 +60,11 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
     (** Pre-funded account waiting for the commited pkh and activation code to
         be revealed to unlock the funds *)
-  | `Frozen_deposits of Signature.Public_key_hash.t
-    (** Frozen tokens of a delegate for consensus security deposits *)
-  | `Unstaked_frozen_deposits of Signature.Public_key_hash.t * Cycle_repr.t
-    (** Frozen tokens of a delegate that have been unstaked at the given cycle. *)
+  | `Frozen_deposits of Stake_repr.staker
+    (** Frozen tokens of a staker for consensus security deposits. *)
+  | `Unstaked_frozen_deposits of Stake_repr.staker * Cycle_repr.t
+    (** Frozen tokens of a contract that have been unstaked at the
+        given cycle. *)
   | `Block_fees  (** Current block's fees collection *)
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t
     (** Frozen tokens of a contract for bond deposits (currently used by rollups) *)
@@ -103,20 +104,18 @@ type infinite_sink =
     containers are considered to have infinite capacity. *)
 type receiver = [infinite_sink | container]
 
-(** [allocated ctxt container] returns a new context because of possible access
-    to carbonated data, and a boolean that is [true] when
-    [balance ctxt container] is guaranteed not to fail, and [false] when
-    [balance ctxt container] may fail. *)
-val allocated :
-  Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
-
 (** [balance ctxt container] returns a new context because of an access to
     carbonated data, and the balance associated to the token holder.
     This function may fail if [allocated ctxt container] returns [false].
     Returns an error with the message "get_balance" if [container] refers to an
-    originated contract that is not allocated. *)
+    originated contract that is not allocated.
+
+    This function is only defined on the few cases for which it is
+    actually needed. *)
 val balance :
-  Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+  Raw_context.t ->
+  [< `Block_fees | `Collected_commitments of Blinded_public_key_hash.t] ->
+  (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
 (** [transfer_n ?origin ctxt givers receiver] transfers [amount] Tez from [giver] to
     [receiver] for each [(giver, amount)] pair in [givers], and returns a new
@@ -161,3 +160,28 @@ val transfer :
   [< receiver] ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [allocated ctxt container] returns a new context because of possible access
+    to carbonated data, and a boolean that is [true] when
+    [balance ctxt container] is guaranteed not to fail, and [false] when
+    [balance ctxt container] may fail. *)
+  val allocated :
+    Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
+
+  type container_with_balance =
+    [ `Contract of Contract_repr.t
+    | `Collected_commitments of Blinded_public_key_hash.t
+    | `Block_fees
+    | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
+
+  (** [balance ctxt container] returns a new context because of an access to
+    carbonated data, and the balance associated to the token holder.
+    This function may fail if [allocated ctxt container] returns [false].
+    Returns an error with the message "get_balance" if [container] refers to an
+    originated contract that is not allocated. *)
+  val balance :
+    Raw_context.t ->
+    [< container_with_balance] ->
+    (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+end

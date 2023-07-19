@@ -111,8 +111,8 @@ let assert_not_exist ~loc ~pp comp_lwt =
 
 let assert_balance_changed op ctxt ctxt' account amount =
   let open Lwt_result_wrap_syntax in
-  let*@ _, balance = Token.balance ctxt account in
-  let*@ _, balance' = Token.balance ctxt' account in
+  let*@ _, balance = Token.Internal_for_tests.balance ctxt account in
+  let*@ _, balance' = Token.Internal_for_tests.balance ctxt' account in
   let*@ balance_op_amount = op balance amount in
   equal_tez balance' ~loc:__LOC__ balance_op_amount
 
@@ -1312,8 +1312,8 @@ module Stake_storage_tests = struct
 
   let assert_balance_unchanged ctxt ctxt' account =
     let open Lwt_result_wrap_syntax in
-    let*@ _, balance = Token.balance ctxt account in
-    let*@ _, balance' = Token.balance ctxt' account in
+    let*@ _, balance = Token.Internal_for_tests.balance ctxt account in
+    let*@ _, balance' = Token.Internal_for_tests.balance ctxt' account in
     equal_tez ~loc:__LOC__ balance' balance
 
   let remove_staker_and_check_balances ctxt rollup staker =
