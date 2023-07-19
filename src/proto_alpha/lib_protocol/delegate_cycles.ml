@@ -164,8 +164,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
 let cycle_end ctxt last_cycle =
   Seed_storage.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed_nonces) ->
   let new_cycle = Cycle_repr.add last_cycle 1 in
-  (* TODO #5807: is this the right place?? *)
-  Delegate_staking_parameters.activate ctxt ~new_cycle >>= fun ctxt ->
   Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
   >>=? fun ctxt ->
   Delegate_consensus_key.activate ctxt ~new_cycle >>=? fun ctxt ->
@@ -178,6 +176,7 @@ let cycle_end ctxt last_cycle =
   update_initial_frozen_deposits ctxt ~new_cycle >>=? fun ctxt ->
   Stake_storage.clear_at_cycle_end ctxt ~new_cycle >>=? fun ctxt ->
   Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle >>=? fun ctxt ->
+  Delegate_staking_parameters.activate ctxt ~new_cycle >>= fun ctxt ->
   update_activity ctxt last_cycle >>=? fun (ctxt, deactivated_delegates) ->
   Adaptive_inflation_storage.update_stored_rewards_at_cycle_end ctxt ~new_cycle
   >>=? fun ctxt -> return (ctxt, balance_updates, deactivated_delegates)
