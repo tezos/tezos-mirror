@@ -14,7 +14,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 evm-execution.workspace = true
 tezos_ethereum.workspace = true
-nom = "6.1"
 thiserror.workspace = true
 hex.workspace = true
 rlp.workspace = true
@@ -28,7 +27,6 @@ tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-debug.workspace = true
 tezos-smart-rollup-encoding.workspace = true
 tezos-smart-rollup-entrypoint.workspace = true
-tezos-smart-rollup-installer-config.workspace = true
 tezos-smart-rollup-mock.workspace = true
 
 [features]

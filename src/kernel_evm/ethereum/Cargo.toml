@@ -9,7 +9,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-evm.workspace = true
 thiserror.workspace = true
 primitive-types.workspace = true
 rlp.workspace = true
