@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides middlewares that is used by the RPC servers to
-    forward unsupported RPCs to a full node. *)
+(** Worker that handles the RPC server spawned as an external process
+   by the node.
 
-(** A Resto middleware that transforms any callback to an other
-    that rewrites queries that the proxy server cannot
-    handle and forwards them to the full node at the given [Uri.t]. *)
-val proxy_server_query_forwarder :
-  ?ctx:Cohttp_lwt_unix.Net.ctx ->
-  Uri.t ->
-  RPC_server.callback ->
-  RPC_server.callback
+   This module defines an RPC process worker type [t] that is
+   responsible of dealing with the process' lifetime. *)
 
-(** A Resto middleware that transforms any server callback to an other
-    that handles RPC metrics *)
-val rpc_metrics_transform_callback :
-  update_metrics:
-    (string ->
-    string ->
-    (unit -> Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-    Cohttp_lwt_unix.Server.response_action Lwt.t) ->
-  unit Tezos_rpc.Directory.t ->
-  RPC_server.callback ->
-  RPC_server.callback
+(** Type of the RPC process worker*)
+type t
+
+(** [create ~comm_socket_path config internal_event_config] creates the
+    worker initial state. [comm_socket_path] is a socket path that
+    will be used to communicate with the node (note that the socket is
+    created automatically, but the cleaning of it is not
+    handled). [config] contains all the RPC server configuration (such
+    as ACLs, cors_headers, …). *)
+val create :
+  comm_socket_path:string -> Config_file.t -> Internal_event_config.t -> t
+
+(** Starts the external RPC process using fork+exec calls. It
+    implements a watch dog that is responsible of restarting the
+    process if it dies at some point. Additionally, if the process
+    fails to be restarted, it retries with an exponential back-off
+    until the restart is successful.
+    The promise is blocking until the RPC server is not fully
+    available to answer to PCs. *)
+val start : t -> unit tzresult Lwt.t
+
+(** Stops gracefully the RPC process worker*)
+val stop : t -> unit

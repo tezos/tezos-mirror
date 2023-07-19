@@ -17,6 +17,7 @@ depends: [
   "tezos-shell-services"
   "tezos-rpc-http"
   "tezos-rpc-http-server"
+  "octez-rpc-process"
   "tezos-p2p"
   "tezos-shell"
   "tezos-store"

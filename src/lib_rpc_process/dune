@@ -1,0 +1,24 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_rpc_process)
+ (public_name octez-rpc-process)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  octez-node-config
+  tezos-rpc-http
+  tezos-rpc-http-server
+  lwt.unix
+  lwt-exit
+  prometheus-app)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Octez_node_config
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server))

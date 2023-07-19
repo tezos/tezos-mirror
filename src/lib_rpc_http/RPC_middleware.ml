@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make_transform_callback forwarding_endpoint callback conn req body =
+let make_transform_callback ?ctx forwarding_endpoint callback conn req body =
   let open Lwt_syntax in
   let open Cohttp in
   (* Using a [Cohttp_lwt.Body.t] destructs it. As we may need it
@@ -62,6 +62,7 @@ let make_transform_callback forwarding_endpoint callback conn req body =
     in
     let* resp, body =
       Cohttp_lwt_unix.Client.call
+        ?ctx
         ~headers
         ~body:(Cohttp_lwt.Body.of_stream body_stream)
         (Request.meth req)
@@ -104,5 +105,5 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       (* Otherwise, the call must be done anyway. *)
       do_call ()
 
-let proxy_server_query_forwarder forwarding_endpoint =
-  make_transform_callback forwarding_endpoint
+let proxy_server_query_forwarder ?ctx forwarding_endpoint =
+  make_transform_callback ?ctx forwarding_endpoint
