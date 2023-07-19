@@ -548,11 +548,11 @@ end) : Internal_event.SINK with type t = t = struct
   let output_one_with_rotation {rights; base_path; current; days_kept} now
       to_write =
     let open Lwt_result_syntax in
-    let {day; fd} = !current in
-    let today = Ptime.to_date now in
-    let should_rotate_output = day <> today in
     let* () =
       Lwt_mutex.with_lock write_mutex (fun () ->
+          let {day; fd} = !current in
+          let today = Ptime.to_date now in
+          let should_rotate_output = day <> today in
           let* output =
             if not should_rotate_output then return fd
             else
@@ -572,12 +572,18 @@ end) : Internal_event.SINK with type t = t = struct
               current := {fd; day = today} ;
               return fd
           in
-          Lwt_result.ok @@ Lwt_utils_unix.write_string output to_write)
-    in
-    let*! () =
-      if should_rotate_output then
-        remove_older_files (Filename.dirname base_path) days_kept base_path
-      else Lwt.return_unit
+          let* () =
+            Lwt_result.ok @@ Lwt_utils_unix.write_string output to_write
+          in
+          let*! () =
+            if should_rotate_output then
+              remove_older_files
+                (Filename.dirname base_path)
+                days_kept
+                base_path
+            else Lwt.return_unit
+          in
+          return_unit)
     in
     return_unit
 
