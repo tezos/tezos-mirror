@@ -151,8 +151,7 @@ module Solver = struct
     let roots, others =
       List.partition
         (fun (node : Unsolved.t) ->
-          Fv_set.is_empty node.dependencies
-          && Fv_set.cardinal node.undecided_variables = 1)
+          Fv_set.cardinal node.undecided_variables = 1)
         unsolved_list
     in
     (* Set the roots as solved. *)
@@ -161,7 +160,7 @@ module Solver = struct
         (fun root ->
           Solved.
             {
-              dependencies = Fv_set.empty;
+              dependencies = root.Unsolved.dependencies;
               provides = root.Unsolved.undecided_variables;
               name = root.name;
             })
