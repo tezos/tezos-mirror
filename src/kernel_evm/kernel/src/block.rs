@@ -848,4 +848,47 @@ mod tests {
         assert_eq!(sender_balance, U256::from(10000000000000000000u64));
         assert_eq!(dest_balance, U256::from(0u64))
     }
+
+    #[test]
+    fn invalid_transaction_should_bump_nonce() {
+        let mut host = MockHost::default();
+        let evm_account_storage = init_account_storage().unwrap();
+
+        let caller =
+            address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
+
+        // Get the balance before the transaction, i.e. 0.
+        let caller_account = evm_account_storage
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+        let default_nonce = caller_account.nonce(&host).unwrap();
+        assert_eq!(default_nonce, U256::zero(), "default nonce should be 0");
+
+        // Prepare a invalid transaction, i.e. with not enough funds.
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let transaction = Transaction {
+            tx_hash,
+            content: Ethereum(dummy_eth_transaction_zero()),
+        };
+        let queue = Queue {
+            proposals: vec![Blueprint {
+                transactions: vec![transaction],
+            }],
+            kernel_upgrade: None,
+        };
+
+        // Apply the transaction
+        produce(&mut host, queue).expect("The block production failed.");
+        let receipt = read_transaction_receipt(&mut host, &tx_hash)
+            .expect("should have found receipt");
+        assert_eq!(
+            receipt.status,
+            TransactionStatus::Failure,
+            "transaction should have failed"
+        );
+
+        // Nonce should have been bumped
+        let nonce = caller_account.nonce(&host).unwrap();
+        assert_eq!(nonce, default_nonce + 1, "nonce should have been bumped");
+    }
 }
