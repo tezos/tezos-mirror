@@ -34,6 +34,9 @@
     - {!Storage.Stake.Total_active_stake}
 *)
 
+val get_full_staking_balance :
+  Raw_context.t -> Signature.public_key_hash -> Stake_repr.Full.t tzresult Lwt.t
+
 val remove_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
