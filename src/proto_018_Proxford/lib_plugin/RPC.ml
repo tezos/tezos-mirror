@@ -2385,6 +2385,17 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:Sc_rollup.Inbox.encoding
         RPC_path.(path_sc_rollups / "inbox")
+
+    let ticket_balance =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:
+          "Access the smart rollup's balance of ticket with specified \
+           ticketer, content type, and content."
+        ~query:RPC_query.empty
+        ~input:Ticket_token.unparsed_token_encoding
+        ~output:n
+        RPC_path.(path_sc_rollup / "ticket_balance")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2567,6 +2578,23 @@ module Sc_rollup = struct
             return_true
         | Ok _ | Error _ -> return_false)
 
+  let register_ticket_balance () =
+    Registration.register1
+      ~chunked:false
+      S.ticket_balance
+      (fun ctxt sc_rollup () Ticket_token.{ticketer; contents_type; contents} ->
+        let open Lwt_result_syntax in
+        let* ticket_hash, ctxt =
+          Ticket_balance_key.make
+            ctxt
+            ~owner:(Sc_rollup sc_rollup)
+            ~ticketer
+            ~contents_type:(Micheline.root contents_type)
+            ~contents:(Micheline.root contents)
+        in
+        let* amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
+        return @@ Option.value amount ~default:Z.zero)
+
   let register () =
     register_kind () ;
     register_inbox () ;
@@ -2584,7 +2612,8 @@ module Sc_rollup = struct
     register_timeout () ;
     register_timeout_reached () ;
     register_can_be_cemented () ;
-    register_initial_pvm_state_hash ()
+    register_initial_pvm_state_hash () ;
+    register_ticket_balance ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
@@ -2675,6 +2704,9 @@ module Sc_rollup = struct
       commitment_hash
       ()
       ()
+
+  let get_ticket_balance ctxt block sc_rollup key =
+    RPC_context.make_call1 S.ticket_balance ctxt block sc_rollup () key
 end
 
 module Dal = struct
