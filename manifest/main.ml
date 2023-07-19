@@ -5193,6 +5193,7 @@ end = struct
             ("test_gas_properties", true);
             ("test_sampler", N.(number >= 012));
             ("test_script_comparison", true);
+            ("test_script_roundtrip", N.(number >= 019));
             ("test_tez_repr", true);
             ("test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
             ("test_bitset", N.(number >= 013));

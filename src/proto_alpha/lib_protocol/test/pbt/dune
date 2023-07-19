@@ -47,6 +47,7 @@
   test_gas_properties
   test_sampler
   test_script_comparison
+  test_script_roundtrip
   test_tez_repr
   test_bitset
   test_sc_rollup_tick_repr
