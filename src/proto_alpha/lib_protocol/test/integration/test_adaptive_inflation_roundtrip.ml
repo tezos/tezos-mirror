@@ -31,7 +31,7 @@
     Subject:      Test staking stability under Adaptive Inflation.
 *)
 
-open Adaptive_inflation
+open Adaptive_inflation_helpers
 
 type error += Inconsistent_number_of_bootstrap_accounts
 
