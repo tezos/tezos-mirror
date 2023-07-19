@@ -40,6 +40,10 @@ let () =
     (function Failed_to_hash_node -> Some () | _ -> None)
     (fun () -> Failed_to_hash_node)
 
+(* Copied from Global_constants_costs.expand_no_constants_branch_cost.
+   Should be moved to ticket_costs.ml but not possible because of
+   a circular dependency
+*)
 let hash_bytes_cost bytes =
   let module S = Saturation_repr in
   let ( + ) = S.add in
