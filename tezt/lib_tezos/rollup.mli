@@ -39,6 +39,8 @@ module Dal : sig
 
     val parameter_file : Protocol.t -> string Lwt.t
 
+    val from_protocol_parameters : JSON.t -> t
+
     val from_client : Client.t -> t Lwt.t
   end
 

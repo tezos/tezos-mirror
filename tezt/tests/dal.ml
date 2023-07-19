@@ -386,10 +386,9 @@ let test_feature_flag _protocol _parameters _cryptobox node client
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let test_one_committee_per_epoch _protocol _parameters _cryptobox node client
+let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
     _bootstrap_key =
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let blocks_per_epoch = params.blocks_per_epoch in
+  let blocks_per_epoch = parameters.Rollup.Dal.Parameters.blocks_per_epoch in
   let* current_level =
     RPC.(call node @@ get_chain_block_helper_current_level ())
   in
@@ -1618,12 +1617,10 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
     ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
 
   Log.info "Step 6: attest only slots 1 and 2" ;
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let nb_slots = parameters.number_of_slots in
   let* () =
     repeat (attestation_lag - 1) (fun () -> Client.bake_for_and_wait client)
   in
-  let* _ops_hashes = dal_attestations ~nb_slots [2; 1] client in
+  let* _ops_hashes = dal_attestations ~nb_slots:number_of_slots [2; 1] client in
   let* () = Client.bake_for_and_wait client in
   let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level
@@ -2977,12 +2974,11 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
   let* () = Dal_node.kill dal_node2 in
   disconn_ev_in_node1
 
-let test_dal_node_join_topic _protocol _parameters _cryptobox _node client
+let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
     dal_node1 =
   let pkh1 = Constant.bootstrap1.public_key_hash in
   let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let num_slots = params.number_of_slots in
+  let num_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
   in
@@ -3013,15 +3009,14 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
 
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let num_slots = params.number_of_slots in
+  let num_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
   let account1 = Constant.bootstrap1 in
   let pkh1 = account1.public_key_hash in
   (* The two nodes join the same topics *)
   let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
   (* Posting a DAL message to DAL node and to L1 *)
-  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let crypto_params = parameters.cryptobox in
   let slot_index = 0 in
   let* slot_commitment =
     let slot_size = crypto_params.slot_size in
@@ -3198,8 +3193,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let num_slots = params.number_of_slots in
+  let num_slots = parameters.number_of_slots in
   let account1 = Constant.bootstrap1 in
   let pkh1 = account1.public_key_hash in
 
