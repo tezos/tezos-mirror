@@ -1039,6 +1039,24 @@ let get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitme
     ]
     Fun.id
 
+let post_chain_block_context_smart_rollups_smart_rollup_ticket_balance
+    ?(chain = "main") ?(block = "head") ~sc_rollup ~data () =
+  make
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "ticket_balance";
+    ]
+    ~data
+    JSON.as_int
+
 let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
   make
     GET
