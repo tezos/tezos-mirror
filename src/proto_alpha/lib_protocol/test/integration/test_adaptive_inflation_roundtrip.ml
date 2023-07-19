@@ -763,7 +763,7 @@ let ( --> ) a b = Concat (a, Action b)
 
 let ( ---> ) a b = Concat (a, b)
 
-let ( || ) a b = Branch (a, b)
+let ( |+ ) a b = Branch (a, b)
 
 let tests_of_scenarios :
     (string * (unit, t) scenarios) list -> unit Alcotest_lwt.test_case list =
@@ -771,7 +771,7 @@ let tests_of_scenarios :
   List.map (fun (s, x) -> Tag s ---> x --> End_test) scenarios |> function
   | [] -> []
   | a :: t ->
-      List.fold_left ( || ) a t |> unfold_scenarios |> List.map unfolded_to_test
+      List.fold_left ( |+ ) a t |> unfold_scenarios |> List.map unfolded_to_test
 
 (*****************************************************************************)
 
@@ -836,8 +836,8 @@ let init_scenario ?reward_per_block () =
    --> Begin_test (constants, ["delegate"], true)
    --> Set_delegate_params ("delegate", default_params)
    --> Stake ("delegate", Amount (Tez.of_mutez 1_800_000_000_000L))
-   ---> ((Tag "self stake" --> set_staker "delegate")
-        || Tag "external stake"
+   ---> (Tag "self stake" --> set_staker "delegate"
+        |+ Tag "external stake"
            ---> add_account_with_funds
                   "staker"
                   "delegate"
@@ -845,7 +845,7 @@ let init_scenario ?reward_per_block () =
            --> Set_delegate ("staker", "delegate")
            --> set_staker "staker")
    --> Do wait_ai_activation
-  || Tag "AI disactivated, self stake"
+  |+ Tag "AI disactivated, self stake"
      --> Begin_test (constants, ["delegate"], true)
      --> Set_delegate_params ("delegate", default_params)
      --> Stake ("delegate", Amount (Tez.of_mutez 1_800_000_000_000L))
@@ -855,16 +855,16 @@ let init_scenario ?reward_per_block () =
 let simple_roundtrip =
   noop
   --> Stake (with_staker, Half)
-  ---> ((Tag "no wait after stake" --> Noop)
-       || (Tag "wait after stake" ---> wait_n_cycles 2))
+  ---> (Tag "no wait after stake" --> Noop
+       |+ Tag "wait after stake" ---> wait_n_cycles 2)
   ---> (Tag "half unstake"
         --> Unstake (with_staker, Half)
         ---> (Tag "then half unstake" ---> wait_n_cycles 2
               --> Unstake (with_staker, Half)
-             || Tag "then unstake rest" ---> wait_n_cycles 2
+             |+ Tag "then unstake rest" ---> wait_n_cycles 2
                 --> Unstake (with_staker, All)
-             || Empty)
-       || (Tag "full unstake" --> Unstake (with_staker, All)))
+             |+ Empty)
+       |+ Tag "full unstake" --> Unstake (with_staker, All))
   ---> wait_n_cycles 8 --> Finalize_unstake with_staker --> Next_cycle
 
 let tests =
