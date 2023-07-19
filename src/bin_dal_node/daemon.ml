@@ -40,10 +40,7 @@ let resolve_plugin
   in
   return plugin_opt
 
-type error +=
-  | Cryptobox_initialisation_failed of string
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+type error += Cryptobox_initialisation_failed of string
 
 let () =
   register_error_kind
