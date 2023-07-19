@@ -469,6 +469,13 @@ module Consensus_keys :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
+(** The pending consensus key of a delegate at the given cycle *)
+module Pending_consensus_keys :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Contract_repr.t
+     and type value = Signature.public_key
+
 type slashed_level = {for_double_attesting : bool; for_double_baking : bool}
 
 (** [slashed_level] with all fields being [false]. *)
