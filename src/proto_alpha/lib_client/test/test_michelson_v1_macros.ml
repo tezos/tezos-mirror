@@ -57,7 +57,7 @@ let assert_expands
         ~pp
         (Michelson_v1_primitives.strings_of_prims expansion)
         (Micheline.strip_locations expanded) ;
-      ok ()
+      Ok ()
   | errors -> Error errors
 
 (****************************************************************************)
@@ -90,11 +90,12 @@ let assert_compare_macro prim_name compare_name =
     into   "COMPARE ; {EQ|NEQ|LT|GT|LE|GE}".
 *)
 let test_compare_marco_expansion () =
-  assert_compare_macro "CMPEQ" "EQ" >>? fun () ->
-  assert_compare_macro "CMPNEQ" "NEQ" >>? fun () ->
-  assert_compare_macro "CMPLT" "LT" >>? fun () ->
-  assert_compare_macro "CMPGT" "GT" >>? fun () ->
-  assert_compare_macro "CMPLE" "LE" >>? fun () ->
+  let open Result_syntax in
+  let* () = assert_compare_macro "CMPEQ" "EQ" in
+  let* () = assert_compare_macro "CMPNEQ" "NEQ" in
+  let* () = assert_compare_macro "CMPLT" "LT" in
+  let* () = assert_compare_macro "CMPGT" "GT" in
+  let* () = assert_compare_macro "CMPLE" "LE" in
   assert_compare_macro "CMPGE" "GE"
 
 let assert_if_macro prim_name compare_name =
@@ -111,11 +112,13 @@ let assert_if_macro prim_name compare_name =
     into   "{EQ|NEQ|LT|GT|LE|GE} ; IF"
 *)
 let test_if_compare_macros_expansion () =
-  assert_if_macro "IFEQ" "EQ" >>? fun () ->
-  assert_if_macro "IFNEQ" "NEQ" >>? fun () ->
-  assert_if_macro "IFLT" "LT" >>? fun () ->
-  assert_if_macro "IFGT" "GT" >>? fun () ->
-  assert_if_macro "IFLE" "LE" >>? fun () -> assert_if_macro "IFGE" "GE"
+  let open Result_syntax in
+  let* () = assert_if_macro "IFEQ" "EQ" in
+  let* () = assert_if_macro "IFNEQ" "NEQ" in
+  let* () = assert_if_macro "IFLT" "LT" in
+  let* () = assert_if_macro "IFGT" "GT" in
+  let* () = assert_if_macro "IFLE" "LE" in
+  assert_if_macro "IFGE" "GE"
 
 let assert_if_cmp_macros prim_name compare_name =
   assert_expands
@@ -132,11 +135,12 @@ let assert_if_cmp_macros prim_name compare_name =
     into   "{EQ|NEQ|LT|GT|LE|GE} ; IF"
 *)
 let test_if_cmp_macros_expansion () =
-  assert_if_cmp_macros "IFCMPEQ" "EQ" >>? fun () ->
-  assert_if_cmp_macros "IFCMPNEQ" "NEQ" >>? fun () ->
-  assert_if_cmp_macros "IFCMPLT" "LT" >>? fun () ->
-  assert_if_cmp_macros "IFCMPGT" "GT" >>? fun () ->
-  assert_if_cmp_macros "IFCMPLE" "LE" >>? fun () ->
+  let open Result_syntax in
+  let* () = assert_if_cmp_macros "IFCMPEQ" "EQ" in
+  let* () = assert_if_cmp_macros "IFCMPNEQ" "NEQ" in
+  let* () = assert_if_cmp_macros "IFCMPLT" "LT" in
+  let* () = assert_if_cmp_macros "IFCMPGT" "GT" in
+  let* () = assert_if_cmp_macros "IFCMPLE" "LE" in
   assert_if_cmp_macros "IFCMPGE" "GE"
 
 (****************************************************************************)
@@ -189,11 +193,12 @@ let assert_assert_if_compare prim_name compare_name =
     into   "{EQ|NEQ|LT|GT|LE|GE} ; IF {} {FAIL}"
 *)
 let test_assert_if () =
-  assert_assert_if_compare "ASSERT_EQ" "EQ" >>? fun () ->
-  assert_assert_if_compare "ASSERT_NEQ" "NEQ" >>? fun () ->
-  assert_assert_if_compare "ASSERT_LT" "LT" >>? fun () ->
-  assert_assert_if_compare "ASSERT_LE" "LE" >>? fun () ->
-  assert_assert_if_compare "ASSERT_GT" "GT" >>? fun () ->
+  let open Result_syntax in
+  let* () = assert_assert_if_compare "ASSERT_EQ" "EQ" in
+  let* () = assert_assert_if_compare "ASSERT_NEQ" "NEQ" in
+  let* () = assert_assert_if_compare "ASSERT_LT" "LT" in
+  let* () = assert_assert_if_compare "ASSERT_LE" "LE" in
+  let* () = assert_assert_if_compare "ASSERT_GT" "GT" in
   assert_assert_if_compare "ASSERT_GE" "GE"
 
 let assert_cmp_if prim_name compare_name =
@@ -215,11 +220,12 @@ let assert_cmp_if prim_name compare_name =
     into   "COMPARE ; {EQ|NEQ|LT|GT|LE|GE} ; IF {} {FAIL}"
 *)
 let test_assert_cmp_if () =
-  assert_cmp_if "ASSERT_CMPEQ" "EQ" >>? fun () ->
-  assert_cmp_if "ASSERT_CMPNEQ" "NEQ" >>? fun () ->
-  assert_cmp_if "ASSERT_CMPLT" "LT" >>? fun () ->
-  assert_cmp_if "ASSERT_CMPLE" "LE" >>? fun () ->
-  assert_cmp_if "ASSERT_CMPGT" "GT" >>? fun () ->
+  let open Result_syntax in
+  let* () = assert_cmp_if "ASSERT_CMPEQ" "EQ" in
+  let* () = assert_cmp_if "ASSERT_CMPNEQ" "NEQ" in
+  let* () = assert_cmp_if "ASSERT_CMPLT" "LT" in
+  let* () = assert_cmp_if "ASSERT_CMPLE" "LE" in
+  let* () = assert_cmp_if "ASSERT_CMPGT" "GT" in
   assert_cmp_if "ASSERT_CMPGE" "GE"
 
 (* The work of merge request !628
@@ -329,15 +335,18 @@ let test_assert_none () =
    Expand "DIIP" into "DIP 2".
 *)
 let test_diip () =
+  let open Result_syntax in
   let code = Seq (zero_loc, [Prim (zero_loc, "CAR", [], [])]) in
-  assert_expands
-    (Prim (zero_loc, "DIP", [code], []))
-    (Prim (zero_loc, "DIP", [code], []))
-  >>? fun () ->
-  assert_expands
-    (Prim (zero_loc, "DIIIIIIIIP", [code], []))
-    (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 8); code], []))
-  >>? fun () ->
+  let* () =
+    assert_expands
+      (Prim (zero_loc, "DIP", [code], []))
+      (Prim (zero_loc, "DIP", [code], []))
+  in
+  let* () =
+    assert_expands
+      (Prim (zero_loc, "DIIIIIIIIP", [code], []))
+      (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 8); code], []))
+  in
   assert_expands
     (Prim (zero_loc, "DIIP", [code], []))
     (Prim (zero_loc, "DIP", [Int (zero_loc, Z.of_int 2); code], []))
@@ -395,24 +404,32 @@ let test_duup () =
    Expand "CDAR" into "CDR ; CAR"
 *)
 let test_caddadr_expansion () =
+  let open Result_syntax in
   let car = Prim (zero_loc, "CAR", [], []) in
-  assert_expands (Prim (zero_loc, "CAR", [], [])) car >>? fun () ->
+  let* () = assert_expands (Prim (zero_loc, "CAR", [], [])) car in
   let cdr = Prim (zero_loc, "CDR", [], []) in
-  assert_expands (Prim (zero_loc, "CDR", [], [])) cdr >>? fun () ->
-  assert_expands (Prim (zero_loc, "CADR", [], [])) (Seq (zero_loc, [car; cdr]))
-  >>? fun () ->
+  let* () = assert_expands (Prim (zero_loc, "CDR", [], [])) cdr in
+  let* () =
+    assert_expands
+      (Prim (zero_loc, "CADR", [], []))
+      (Seq (zero_loc, [car; cdr]))
+  in
   assert_expands (Prim (zero_loc, "CDAR", [], [])) (Seq (zero_loc, [cdr; car]))
 
 let test_carn_cdrn_expansion () =
+  let open Result_syntax in
   let car n = Prim (zero_loc, "CAR", [Int (zero_loc, Z.of_int n)], []) in
   let cdr n = Prim (zero_loc, "CDR", [Int (zero_loc, Z.of_int n)], []) in
   let get n =
     Seq (zero_loc, [Prim (zero_loc, "GET", [Int (zero_loc, Z.of_int n)], [])])
   in
-  assert_expands (cdr 0) (get 0) >>? fun () ->
-  assert_expands (car 0) (get 1) >>? fun () ->
-  assert_expands (cdr 1) (get 2) >>? fun () ->
-  assert_expands (car 1) (get 3) >>? fun () -> assert_expands (cdr 2) (get 4)
+  let* () =
+    let* () = assert_expands (cdr 0) (get 0) in
+    let* () = assert_expands (car 0) (get 1) in
+    let* () = assert_expands (cdr 1) (get 2) in
+    assert_expands (car 1) (get 3)
+  in
+  assert_expands (cdr 2) (get 4)
 
 (* if_some *)
 
@@ -705,7 +722,7 @@ let assert_unexpansion original ex =
         ~pp
         unparse.Michelson_v1_parser.unexpanded
         (Micheline.strip_locations ex) ;
-      ok ()
+      Ok ()
   | _ :: _ -> Error errors
 
 (** Unexpanding "UNIT; FAILWITH"
@@ -760,11 +777,14 @@ let assert_unexpansion_assert_if_compare compare_name prim_name =
     yields      "ASSERT_{EQ|NEQ|LT|LE|GT|GE}"
 *)
 let test_unexpand_assert_if () =
-  assert_unexpansion_assert_if_compare "EQ" "ASSERT_EQ" >>? fun () ->
-  assert_unexpansion_assert_if_compare "NEQ" "ASSERT_NEQ" >>? fun () ->
-  assert_unexpansion_assert_if_compare "LT" "ASSERT_LT" >>? fun () ->
-  assert_unexpansion_assert_if_compare "LE" "ASSERT_LE" >>? fun () ->
-  assert_unexpansion_assert_if_compare "GT" "ASSERT_GT" >>? fun () ->
+  let open Result_syntax in
+  let* () =
+    let* () = assert_unexpansion_assert_if_compare "EQ" "ASSERT_EQ" in
+    let* () = assert_unexpansion_assert_if_compare "NEQ" "ASSERT_NEQ" in
+    let* () = assert_unexpansion_assert_if_compare "LT" "ASSERT_LT" in
+    let* () = assert_unexpansion_assert_if_compare "LE" "ASSERT_LE" in
+    assert_unexpansion_assert_if_compare "GT" "ASSERT_GT"
+  in
   assert_unexpansion_assert_if_compare "GE" "ASSERT_GE"
 
 let assert_unexpansion_assert_cmp_if_compare compare_name prim_name =
@@ -786,11 +806,12 @@ let assert_unexpansion_assert_cmp_if_compare compare_name prim_name =
     yields      "ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}"
 *)
 let test_unexpansion_assert_cmp_if () =
-  assert_unexpansion_assert_cmp_if_compare "EQ" "ASSERT_CMPEQ" >>? fun () ->
-  assert_unexpansion_assert_cmp_if_compare "NEQ" "ASSERT_CMPNEQ" >>? fun () ->
-  assert_unexpansion_assert_cmp_if_compare "LT" "ASSERT_CMPLT" >>? fun () ->
-  assert_unexpansion_assert_cmp_if_compare "LE" "ASSERT_CMPLE" >>? fun () ->
-  assert_unexpansion_assert_cmp_if_compare "GT" "ASSERT_CMPGT" >>? fun () ->
+  let open Result_syntax in
+  let* () = assert_unexpansion_assert_cmp_if_compare "EQ" "ASSERT_CMPEQ" in
+  let* () = assert_unexpansion_assert_cmp_if_compare "NEQ" "ASSERT_CMPNEQ" in
+  let* () = assert_unexpansion_assert_cmp_if_compare "LT" "ASSERT_CMPLT" in
+  let* () = assert_unexpansion_assert_cmp_if_compare "LE" "ASSERT_CMPLE" in
+  let* () = assert_unexpansion_assert_cmp_if_compare "GT" "ASSERT_CMPGT" in
   assert_unexpansion_assert_cmp_if_compare "GE" "ASSERT_CMPGE"
 
 (** Unexpanding "IF_NONE { FAIL } { RENAME @annot }"
@@ -910,28 +931,31 @@ let test_unexpand_duup () =
    Unexpanding "CDR; CAR" yields "CDAR"
 *)
 let test_unexpand_caddadr () =
+  let open Result_syntax in
   let car = Prim (zero_loc, "CAR", [], []) in
   let cdr = Prim (zero_loc, "CDR", [], []) in
-  assert_unexpansion (Seq (zero_loc, [car])) car >>? fun () ->
-  assert_unexpansion (Seq (zero_loc, [cdr])) cdr >>? fun () ->
-  assert_unexpansion
-    (Seq (zero_loc, [car; cdr]))
-    (Prim (zero_loc, "CADR", [], []))
-  >>? fun () ->
+  let* () = assert_unexpansion (Seq (zero_loc, [car])) car in
+  let* () = assert_unexpansion (Seq (zero_loc, [cdr])) cdr in
+  let* () =
+    assert_unexpansion
+      (Seq (zero_loc, [car; cdr]))
+      (Prim (zero_loc, "CADR", [], []))
+  in
   assert_unexpansion
     (Seq (zero_loc, [cdr; car]))
     (Prim (zero_loc, "CDAR", [], []))
 
 let test_unexpand_carn_cdrn () =
+  let open Result_syntax in
   let car n = Prim (zero_loc, "CAR", [Int (zero_loc, Z.of_int n)], []) in
   let cdr n = Prim (zero_loc, "CDR", [Int (zero_loc, Z.of_int n)], []) in
   let get n =
     Seq (zero_loc, [Prim (zero_loc, "GET", [Int (zero_loc, Z.of_int n)], [])])
   in
-  assert_unexpansion (get 0) (cdr 0) >>? fun () ->
-  assert_unexpansion (get 1) (car 0) >>? fun () ->
-  assert_unexpansion (get 2) (cdr 1) >>? fun () ->
-  assert_unexpansion (get 3) (car 1) >>? fun () ->
+  let* () = assert_unexpansion (get 0) (cdr 0) in
+  let* () = assert_unexpansion (get 1) (car 0) in
+  let* () = assert_unexpansion (get 2) (cdr 1) in
+  let* () = assert_unexpansion (get 3) (car 1) in
   assert_unexpansion (get 4) (cdr 2)
 
 (** Unexpanding "CDR; SWAP; PAIR"
@@ -1335,8 +1359,10 @@ let tests =
 
 let wrap (n, f) =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f () >>= function
-      | Ok () -> Lwt.return_unit
+      let open Lwt_syntax in
+      let* res = f () in
+      match res with
+      | Ok () -> return_unit
       | Error error ->
           Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 

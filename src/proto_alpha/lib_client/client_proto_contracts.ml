@@ -43,26 +43,35 @@ module Raw_contract_alias = Client_aliases.Alias (Contract_entity)
 
 module Originated_contract_alias = struct
   let find cctxt s =
-    Raw_contract_alias.find_opt cctxt s >>=? function
+    let open Lwt_result_syntax in
+    let* contract_opt = Raw_contract_alias.find_opt cctxt s in
+    match contract_opt with
     | Some (Contract.Originated v) -> return v
     | Some (Implicit _) -> failwith "contract %s is an implicit account" s
     | None -> failwith "no contract named %s" s
 
   let of_literal s =
-    Contract_entity.of_source s >>= function
+    let open Lwt_result_syntax in
+    let*! contract_opt = Contract_entity.of_source s in
+    match contract_opt with
     | Ok (Contract.Originated v) -> return v
     | Ok (Implicit _) -> failwith "contract %s is an implicit account" s
     | Error _ as err -> Lwt.return err
 
   let find_destination cctxt s =
+    let open Lwt_result_syntax in
     match String.split ~limit:1 ':' s with
     | ["alias"; alias] -> find cctxt alias
     | ["text"; text] -> of_literal text
     | _ -> (
-        of_literal s >>= function
+        let*! contract_hash_opt = of_literal s in
+        match contract_hash_opt with
         | Ok _ as ok_v -> Lwt.return ok_v
         | Error k_errs -> (
-            find cctxt s >|= function
+            let*! contract_hash_opt = find cctxt s in
+            Lwt.return
+            @@
+            match contract_hash_opt with
             | Ok _ as ok_v -> ok_v
             | Error c_errs -> Error (c_errs @ k_errs)))
 
@@ -98,21 +107,27 @@ end
 
 module Contract_alias = struct
   let find cctxt s =
-    Raw_contract_alias.find_opt cctxt s >>=? function
+    let open Lwt_result_syntax in
+    let* contract_opt = Raw_contract_alias.find_opt cctxt s in
+    match contract_opt with
     | Some v -> return v
     | None -> (
-        Client_keys.Public_key_hash.find_opt cctxt s >>=? function
+        let* pkh_opt = Client_keys.Public_key_hash.find_opt cctxt s in
+        match pkh_opt with
         | Some v -> return (Contract.Implicit v)
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
-    Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
+    let open Lwt_result_syntax in
+    let* v = Client_keys.Public_key_hash.find cctxt name in
     return (Contract.Implicit v)
 
   let rev_find cctxt (c : Contract.t) =
+    let open Lwt_result_syntax in
     match c with
     | Implicit hash -> (
-        Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
+        let* str_opt = Client_keys.Public_key_hash.rev_find cctxt hash in
+        match str_opt with
         | Some name -> return_some ("key:" ^ name)
         | None -> return_none)
     | Originated _ -> Raw_contract_alias.rev_find cctxt c
@@ -123,8 +138,9 @@ module Contract_alias = struct
     | _ -> find cctxt s
 
   let autocomplete cctxt =
-    Client_keys.Public_key_hash.autocomplete cctxt >>=? fun keys ->
-    Raw_contract_alias.autocomplete cctxt >>=? fun contracts ->
+    let open Lwt_result_syntax in
+    let* keys = Client_keys.Public_key_hash.autocomplete cctxt in
+    let* contracts = Raw_contract_alias.autocomplete cctxt in
     return (List.map (( ^ ) "key:") keys @ contracts)
 
   let alias_param ?(name = "name") ?(desc = "existing contract alias") next =
@@ -136,25 +152,29 @@ module Contract_alias = struct
     Tezos_clic.(param ~name ~desc (parameter ~autocomplete get_contract) next)
 
   let find_destination cctxt s =
+    let open Lwt_result_syntax in
     match String.split ~limit:1 ':' s with
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
-        Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+        let* v = Client_keys.Public_key_hash.find cctxt text in
         return (Contract.Implicit v)
     | ["text"; text] -> Contract_entity.of_source text
     | _ -> (
-        Contract_entity.of_source s >>= function
+        let*! contract_opt = Contract_entity.of_source s in
+        match contract_opt with
         | Ok v -> return v
         | Error c_errs -> (
-            find cctxt s >>= function
+            let*! contract_opt = find cctxt s in
+            match contract_opt with
             | Ok v -> return v
             | Error k_errs -> Lwt.return_error (c_errs @ k_errs)))
 
   let destination_parameter () =
+    let open Lwt_result_syntax in
     Tezos_clic.parameter
       ~autocomplete:(fun cctxt ->
-        autocomplete cctxt >>=? fun list1 ->
-        Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
+        let* list1 = autocomplete cctxt in
+        let* list2 = Client_keys.Public_key_hash.autocomplete cctxt in
         return (list1 @ list2))
       find_destination
 
@@ -183,24 +203,29 @@ module Contract_alias = struct
     Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 
   let name cctxt contract =
-    rev_find cctxt contract >>=? function
+    let open Lwt_result_syntax in
+    let* str_opt = rev_find cctxt contract in
+    match str_opt with
     | None -> return (Contract.to_b58check contract)
     | Some name -> return name
 end
 
 let list_contracts cctxt =
-  Raw_contract_alias.load cctxt >>=? fun raw_contracts ->
+  let open Lwt_result_syntax in
+  let* raw_contracts = Raw_contract_alias.load cctxt in
   let contracts = List.map (fun (n, v) -> ("", n, v)) raw_contracts in
-  Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
+  let* keys = Client_keys.Public_key_hash.load cctxt in
   (* List accounts (implicit contracts of identities) *)
-  List.map_es
-    (fun (n, v) ->
-      Raw_contract_alias.mem cctxt n >>=? fun mem ->
-      let p = if mem then "key:" else "" in
-      let v' = Contract.Implicit v in
-      return (p, n, v'))
-    keys
-  >>=? fun accounts -> return (contracts @ accounts)
+  let* accounts =
+    List.map_es
+      (fun (n, v) ->
+        let* mem = Raw_contract_alias.mem cctxt n in
+        let p = if mem then "key:" else "" in
+        let v' = Contract.Implicit v in
+        return (p, n, v'))
+      keys
+  in
+  return (contracts @ accounts)
 
 let get_delegate cctxt ~chain ~block source =
   Alpha_services.Contract.delegate_opt cctxt (chain, block) source

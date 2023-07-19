@@ -62,22 +62,29 @@ let rec manager_of_list = function
       Manager_list (Cons_manager (o, os))
 
 let join_fee fee operation =
+  let open Result_syntax in
   let (Manager_info c) = operation in
-  Limit.join ~where:__LOC__ Tez.equal fee c.fee >|? fun fee ->
-  Manager_info {c with fee}
+  let* fee = Limit.join ~where:__LOC__ Tez.equal fee c.fee in
+  return (Manager_info {c with fee})
 
 let set_fee fee (Manager_info c) = Manager_info {c with fee}
 
 let join_gas_limit gas_limit operation =
+  let open Result_syntax in
   let (Manager_info c) = operation in
-  Limit.join ~where:__LOC__ Gas.Arith.equal gas_limit c.gas_limit
-  >|? fun gas_limit -> Manager_info {c with gas_limit}
+  let* gas_limit =
+    Limit.join ~where:__LOC__ Gas.Arith.equal gas_limit c.gas_limit
+  in
+  return (Manager_info {c with gas_limit})
 
 let set_gas_limit gas_limit (Manager_info c) = Manager_info {c with gas_limit}
 
 let join_storage_limit storage_limit (Manager_info c) =
-  Limit.join ~where:__LOC__ Z.equal storage_limit c.storage_limit
-  >|? fun storage_limit -> Manager_info {c with storage_limit}
+  let open Result_syntax in
+  let* storage_limit =
+    Limit.join ~where:__LOC__ Z.equal storage_limit c.storage_limit
+  in
+  return (Manager_info {c with storage_limit})
 
 let set_storage_limit storage_limit (Manager_info c) =
   Manager_info {c with storage_limit}
@@ -85,39 +92,48 @@ let set_storage_limit storage_limit (Manager_info c) =
 let set_counter counter (Manager_info c) =
   match c.counter with
   | Some _ -> error_with "set_counter_annot: already set"
-  | None -> ok (Manager_info {c with counter = Some counter})
+  | None -> Ok (Manager_info {c with counter = Some counter})
 
 let set_source source (Manager_info c) =
   match c.source with
   | Some _ -> error_with "set_source_annot: already set"
-  | None -> ok (Manager_info {c with source = Some source})
+  | None -> Ok (Manager_info {c with source = Some source})
 
 let manager_from_annotated operation =
+  let open Result_syntax in
   let (Manager_info {source; fee; gas_limit; storage_limit; counter; operation})
       =
     operation
   in
-  Limit.get ~when_unknown:"unknown fee" fee >>? fun fee ->
-  Limit.get ~when_unknown:"unknown gas limit" gas_limit >>? fun gas_limit ->
-  Limit.get ~when_unknown:"unknown storage limit" storage_limit
-  >>? fun storage_limit ->
-  Option.fold
-    ~some:ok
-    ~none:(error_with "manager_from_annotated: source not set")
-    source
-  >>? fun source ->
-  Option.fold
-    ~some:ok
-    ~none:(error_with "manager_from_annotated: counter not set")
-    counter
-  >|? fun counter ->
-  Manager_operation {source; fee; counter; gas_limit; storage_limit; operation}
+  let* fee = Limit.get ~when_unknown:"unknown fee" fee in
+  let* gas_limit = Limit.get ~when_unknown:"unknown gas limit" gas_limit in
+  let* storage_limit =
+    Limit.get ~when_unknown:"unknown storage limit" storage_limit
+  in
+  let* source =
+    Option.fold
+      ~some:return
+      ~none:(error_with "manager_from_annotated: source not set")
+      source
+  in
+  let* counter =
+    Option.fold
+      ~some:return
+      ~none:(error_with "manager_from_annotated: counter not set")
+      counter
+  in
+  return
+  @@ Manager_operation
+       {source; fee; counter; gas_limit; storage_limit; operation}
 
 let rec manager_list_from_annotated :
     type kind. kind annotated_list -> kind Kind.manager contents_list tzresult =
+  let open Result_syntax in
   function
   | Single_manager operation ->
-      manager_from_annotated operation >|? fun op -> Single op
+      let* op = manager_from_annotated operation in
+      return (Single op)
   | Cons_manager (operation, rest) ->
-      manager_list_from_annotated rest >>? fun rest ->
-      manager_from_annotated operation >|? fun op -> Cons (op, rest)
+      let* rest = manager_list_from_annotated rest in
+      let* op = manager_from_annotated operation in
+      return (Cons (op, rest))

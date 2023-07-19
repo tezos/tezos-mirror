@@ -189,9 +189,8 @@ let json_parameter =
   Tezos_clic.map_parameter ~f:content_of_file_or_text json_with_origin_parameter
 
 let data_parameter =
-  let open Lwt_syntax in
   let from_text (_cctxt : #Client_context.full) input =
-    return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+    Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
   file_or_text_parameter ~from_text ()
@@ -337,10 +336,11 @@ let tez_format =
    are allowed."
 
 let tez_parameter param =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter (fun _ s ->
       match Tez.of_string s with
       | Some tez -> return tez
-      | None -> fail (Bad_tez_arg (param, s)))
+      | None -> tzfail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
   Tezos_clic.default_arg
@@ -365,11 +365,14 @@ let tez_param ~name ~desc next =
     next
 
 let non_negative_z_parameter =
+  let open Lwt_result_syntax in
   Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
       try
         let v = Z.of_string s in
-        error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
-        >>?= fun () -> return v
+        let*? () =
+          error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
+        in
+        return v
       with _ -> cctxt#error "Invalid number, must be a non negative number.")
 
 let non_negative_z_param ~name ~desc next =
@@ -521,12 +524,13 @@ let counter_arg =
     counter_parameter
 
 let max_priority_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"max-priority"
     ~placeholder:"slot"
     ~doc:"maximum allowed baking slot"
     (Tezos_clic.parameter (fun _ s ->
-         try return (int_of_string s) with _ -> fail (Bad_max_priority s)))
+         try return (int_of_string s) with _ -> tzfail (Bad_max_priority s)))
 
 let timelock_locked_value_arg =
   Tezos_clic.arg
@@ -543,6 +547,7 @@ let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let minimal_fees_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"minimal-fees"
     ~placeholder:"amount"
@@ -551,9 +556,10 @@ let minimal_fees_arg =
     (Tezos_clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
-         | None -> fail (Bad_minimal_fees s)))
+         | None -> tzfail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"minimal-nanotez-per-gas-unit"
     ~placeholder:"amount"
@@ -562,9 +568,10 @@ let minimal_nanotez_per_gas_unit_arg =
        nanotez)"
     ~default:(Q.to_string default_minimal_nanotez_per_gas_unit)
     (Tezos_clic.parameter (fun _ s ->
-         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> tzfail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
@@ -573,7 +580,7 @@ let minimal_nanotez_per_byte_arg =
       "exclude operations with fees per byte lower than this threshold (in \
        nanotez)"
     (Tezos_clic.parameter (fun _ s ->
-         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s) with _ -> tzfail (Bad_minimal_fees s)))
 
 let replace_by_fees_arg =
   Tezos_clic.switch
@@ -593,6 +600,7 @@ let successor_level_arg =
     ()
 
 let preserved_levels_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.default_arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
@@ -601,9 +609,9 @@ let preserved_levels_arg =
     (Tezos_clic.parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in
-           if preserved_cycles < 0 then fail (Bad_preserved_levels s)
+           if preserved_cycles < 0 then tzfail (Bad_preserved_levels s)
            else return preserved_cycles
-         with _ -> fail (Bad_preserved_levels s)))
+         with _ -> tzfail (Bad_preserved_levels s)))
 
 let no_print_source_flag =
   Tezos_clic.switch
