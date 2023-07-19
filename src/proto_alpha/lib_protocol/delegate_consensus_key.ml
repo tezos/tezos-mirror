@@ -143,18 +143,27 @@ let active_key ctxt delegate =
 
 let raw_pending_updates ctxt delegate =
   let open Lwt_result_syntax in
-  let*! pendings =
-    Storage.Contract.Pending_consensus_keys.bindings
-      (ctxt, Contract_repr.Implicit delegate)
+  let relevant_cycles =
+    let level = Raw_context.current_level ctxt in
+    let first_cycle = Cycle_repr.succ level.cycle in
+    let last_cycle =
+      let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+      Cycle_repr.add first_cycle preserved_cycles
+    in
+    Cycle_repr.(first_cycle ---> last_cycle)
   in
-  return pendings
+  let delegate = Contract_repr.Implicit delegate in
+  List.filter_map_es
+    (fun cycle ->
+      let* pending_for_cycle =
+        Storage.Pending_consensus_keys.find (ctxt, cycle) delegate
+      in
+      pending_for_cycle |> Option.map (fun pk -> (cycle, pk)) |> return)
+    relevant_cycles
 
 let pending_updates ctxt delegate =
   let open Lwt_result_syntax in
   let* updates = raw_pending_updates ctxt delegate in
-  let updates =
-    List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
-  in
   return
     (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk, pk)) updates)
 
@@ -206,9 +215,9 @@ let register_update ctxt delegate pk =
   in
   let*! ctxt = set_unused ctxt old_pkh in
   let*! ctxt =
-    Storage.Contract.Pending_consensus_keys.add
-      (ctxt, Contract_repr.Implicit delegate)
-      update_cycle
+    Storage.Pending_consensus_keys.add
+      (ctxt, update_cycle)
+      (Contract_repr.Implicit delegate)
       pk
   in
   return ctxt
@@ -223,15 +232,13 @@ let activate ctxt ~new_cycle =
       let*? ctxt in
       let delegate = Contract_repr.Implicit delegate in
       let* update =
-        Storage.Contract.Pending_consensus_keys.find (ctxt, delegate) new_cycle
+        Storage.Pending_consensus_keys.find (ctxt, new_cycle) delegate
       in
       match update with
       | None -> return ctxt
       | Some pk ->
           let*! ctxt = Storage.Contract.Consensus_key.add ctxt delegate pk in
           let*! ctxt =
-            Storage.Contract.Pending_consensus_keys.remove
-              (ctxt, delegate)
-              new_cycle
+            Storage.Pending_consensus_keys.remove (ctxt, new_cycle) delegate
           in
           return ctxt)
