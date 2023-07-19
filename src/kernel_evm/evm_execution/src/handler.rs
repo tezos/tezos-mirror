@@ -277,6 +277,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     /// Performs the actual contract creation for both transactions initiated
     /// by external accounts and contract creation initiated through contract
     /// execution.
+    ///
+    /// In the specific case where this function is called via the CREATE opcode,
+    /// it needs to bump the nonce. If it's a transaction initated by external
+    /// accounts, the nonce must be bumped by the caller.
     fn execute_create(
         &mut self,
         caller: H160,
@@ -284,6 +288,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         value: U256,
         initial_code: Vec<u8>,
         gas_limit: Option<u64>,
+        create_opcode: bool,
     ) -> Result<CreateOutcome, EthereumError> {
         debug_msg!(self.host, "Executing a contract create");
 
@@ -321,7 +326,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             return Err(error);
         }
 
-        self.increment_nonce(caller)?;
+        if create_opcode {
+            self.increment_nonce(caller)?
+        };
 
         let mut runtime = evm::Runtime::new(
             Rc::new(initial_code),
@@ -416,8 +423,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 }
             }
         }
-
-        self.increment_nonce(transaction_context.context.caller)?;
 
         if let Some(precompile_result) = self.precompiles.execute(
             self,
@@ -516,6 +521,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             value.unwrap_or(U256::zero()),
             input,
             gas_limit,
+            false,
         );
 
         self.end_initial_transaction(result)
@@ -530,8 +536,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(false)?;
-
-        self.increment_nonce(from)?;
 
         if let Err(err) = self.record_base_gas_cost() {
             return self.end_initial_transaction(Ok((
@@ -595,7 +599,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    fn increment_nonce(&mut self, address: H160) -> Result<(), EthereumError> {
+    pub fn increment_nonce(&mut self, address: H160) -> Result<(), EthereumError> {
         match account_path(&address) {
             Ok(path) => {
                 let mut account =
@@ -1196,7 +1200,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             ))
         } else {
             let result =
-                self.execute_create(caller, scheme, value, init_code, target_gas);
+                self.execute_create(caller, scheme, value, init_code, target_gas, true);
 
             self.end_inter_transaction(result, false)
         }
@@ -1899,8 +1903,14 @@ mod test {
 
         let expected_address = handler.create_address(create_scheme);
 
-        let result =
-            handler.execute_create(caller, create_scheme, value, init_code, gas_limit);
+        let result = handler.execute_create(
+            caller,
+            create_scheme,
+            value,
+            init_code,
+            gas_limit,
+            false,
+        );
 
         match result {
             Ok(result) => {

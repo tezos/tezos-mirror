@@ -140,7 +140,7 @@ where
     // TODO: check gas_limit vs caller balance. Make sure caller has
     // enough funds to pay for gas.
 
-    if let Some(address) = address {
+    let res = if let Some(address) = address {
         if call_data.is_empty() {
             // This is a transfer transaction
             handler.transfer(caller, address, value.unwrap_or(U256::zero()), gas_limit)
@@ -151,7 +151,11 @@ where
     } else {
         // This is a create-contract transaction
         handler.create_contract(caller, value, call_data, gas_limit)
-    }
+    };
+
+    handler.increment_nonce(caller)?;
+
+    res
 }
 
 #[cfg(test)]
