@@ -474,7 +474,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
     (ctxt, Tez_repr.min delegate_own_frozen_deposits requested_amount)
   else request_unstake ctxt ~delegator:contract ~delegate requested_amount
 
-let costaking_balance_as_tez ctxt ~delegator ~delegate =
+let staked_balance ctxt ~delegator ~delegate =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt ~delegate in
   let* delegator_balances =
@@ -489,7 +489,7 @@ let costaking_balance_as_tez ctxt ~delegator ~delegate =
       Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;
     return Tez_repr.zero)
 
-let costaking_balance_as_tez ctxt ~contract ~delegate =
+let staked_balance ctxt ~contract ~delegate =
   if Contract_repr.(contract = Implicit delegate) then
     get_own_frozen_deposits ctxt ~delegate
-  else costaking_balance_as_tez ctxt ~delegator:contract ~delegate
+  else staked_balance ctxt ~delegator:contract ~delegate

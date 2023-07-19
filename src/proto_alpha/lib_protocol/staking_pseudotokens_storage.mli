@@ -27,13 +27,15 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
-(** [costaking_balance_as_tez ctxt ~contract ~delegate] returns [contract]'s
-    current costaking balance converted into tez using [delegate] frozen
-    deposits tez/pseudotokens rate.
+(** [staked_balance ctxt ~contract ~delegate] returns [contract]'s
+    current staked tez.
+    For delegate, it is their own frozen deposits.
+    For delegators, their staking balance in pseudotokens is converted into tez
+    using [delegate] frozen deposits tez/pseudotokens rate.
     
     The given [delegate] should be [contract]'s delegate. Otherwise the given
     [Tez.t] amount will not make sense. *)
-val costaking_balance_as_tez :
+val staked_balance :
   Raw_context.t ->
   contract:Contract_repr.t ->
   delegate:Signature.Public_key_hash.t ->

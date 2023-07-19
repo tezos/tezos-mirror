@@ -4984,7 +4984,7 @@ end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
-  val costaking_balance_as_tez :
+  val staked_balance :
     context ->
     contract:Contract.t ->
     delegate:public_key_hash ->
