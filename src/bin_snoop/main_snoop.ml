@@ -220,7 +220,9 @@ and infer_cmd_full_auto local_model_name workload_data solver
        ~solver
        infer_opts
 
-and infer_for_measurements ~local_model_name measurements
+(* If [local_model_name] is specified, the inference is restricted only to
+   the models with [local_model_name]. *)
+and infer_for_measurements ?local_model_name measurements
     (solved_list :
       Dep_graph.Solver.Solved.t list (* sorted in the topological order *))
     ~solver (infer_opts : Cmdline.infer_parameters_options) =
@@ -242,7 +244,7 @@ and infer_for_measurements ~local_model_name measurements
     | _ -> Some (Report.create_empty ~name:"Report")
   in
   let scores_list = [] in
-  let map, scores_list, report =
+  let overrides_map, scores_list, report =
     List.fold_left
       (fun (overrides_map, scores_list, report) solved ->
         let measure =
@@ -252,40 +254,72 @@ and infer_for_measurements ~local_model_name measurements
                solved.Dep_graph.Solver.Solved.name
         in
         let (Measure.Measurement ((module Bench), m)) = measure in
-        (* Run inference of the models only bound by the local [local_model_name] *)
-        Option.fold
-          (Dep_graph.find_model_or_generic local_model_name Bench.models)
-          ~none:(overrides_map, scores_list, report)
-          ~some:(fun model ->
-            Format.eprintf
-              "Running inference for %a (local_model_name: %s)@."
-              Namespace.pp
-              solved.Dep_graph.Solver.Solved.name
-              local_model_name ;
-            Format.eprintf "  @[%a@]@." Dep_graph.Solver.Solved.pp solved ;
-            let overrides var = Free_variable.Map.find var overrides_map in
-            let problem =
-              Inference.make_problem
-                ~data:m.Measure.workload_data
-                ~model
-                ~overrides
-            in
-            if infer_opts.print_problem then (
-              Format.eprintf "Dumping problem to stdout as requested by user@." ;
-              Csv.export_stdout (Inference.problem_to_csv problem)) ;
-            let solution = Inference.solve_problem problem solver in
-            let report =
-              Option.map
-                (Report.add_section
-                   ~measure
-                   ~local_model_name
-                   ~problem
-                   ~solution
-                   ~overrides_map
-                   ~display_options
-                   ~short:true)
-                report
-            in
+
+        (* Filter [Bench.models] if [local_model_name] is specified *)
+        let models =
+          match local_model_name with
+          | None -> Bench.models
+          | Some local_model_name ->
+              List.filter
+                (fun (local_model_name', _) ->
+                  (* [builtin/Timer_latency] bound with ["*"] must be chosen
+                     in every case *)
+                  local_model_name' = "*"
+                  || local_model_name = local_model_name')
+                Bench.models
+        in
+
+        (* Run inference of [models]. Here we assume the inferences of the models
+           do not depend on each other *)
+        let solutions =
+          List.map
+            (fun (local_model_name, model) ->
+              Format.eprintf
+                "Running inference for %a (local_model_name: %s)@."
+                Namespace.pp
+                solved.Dep_graph.Solver.Solved.name
+                local_model_name ;
+              Format.eprintf "  @[%a@]@." Dep_graph.Solver.Solved.pp solved ;
+              let overrides var = Free_variable.Map.find var overrides_map in
+              let problem =
+                Inference.make_problem
+                  ~data:m.Measure.workload_data
+                  ~model
+                  ~overrides
+              in
+              if infer_opts.print_problem then (
+                Format.eprintf
+                  "Dumping problem to stdout as requested by user@." ;
+                Csv.export_stdout (Inference.problem_to_csv problem)) ;
+              let solution = Inference.solve_problem problem solver in
+              (local_model_name, problem, solution))
+            models
+        in
+
+        (* [solved.provides] must be all solved in [solutions] *)
+        Free_variable.Set.iter
+          (fun fv ->
+            if
+              not
+              @@ List.exists
+                   (fun (_, _, solution) ->
+                     List.mem_assoc
+                       ~equal:Free_variable.equal
+                       fv
+                       solution.Inference.mapping)
+                   solutions
+            then (
+              Format.eprintf
+                "Error: a provided free variable %a is not solved by the \
+                 inference.@."
+                Free_variable.pp
+                fv ;
+              exit 1))
+          solved.provides ;
+
+        List.fold_left
+          (fun (overrides_map, scores_list, report)
+               (local_model_name, problem, solution) ->
             let overrides_map =
               List.fold_left
                 (fun map (variable, solution) ->
@@ -325,35 +359,31 @@ and infer_for_measurements ~local_model_name measurements
                       solution ;
                     map))
                 overrides_map
-                solution.mapping
+                solution.Inference.mapping
             in
-            (* solved.provides should be really solved by the inference *)
-            Free_variable.Set.iter
-              (fun fv ->
-                if
-                  not
-                  @@ List.mem_assoc
-                       ~equal:Free_variable.equal
-                       fv
-                       solution.mapping
-                then
-                  Format.eprintf
-                    "@[<v2>Warning: a provided free variable %a is not solved \
-                     by the inference.@,\
-                     It is safe to proceed but it may be caused by a bug of \
-                     dependency analysis.@]@."
-                    Free_variable.pp
-                    fv)
-              solved.provides ;
+            let report =
+              Option.map
+                (Report.add_section
+                   ~measure
+                   ~local_model_name
+                   ~problem
+                   ~solution
+                   ~overrides_map
+                   ~display_options
+                   ~short:true)
+                report
+            in
             let scores_label = (local_model_name, Bench.name) in
             let scores_list = (scores_label, solution.scores) :: scores_list in
             perform_plot measure local_model_name problem solution infer_opts ;
             perform_csv_export scores_label solution infer_opts ;
-            (overrides_map, scores_list, report)))
+            (overrides_map, scores_list, report))
+          (overrides_map, scores_list, report)
+          solutions)
       (overrides_map, scores_list, report)
       solved_list
   in
-  let solution = Codegen.{map; scores_list} in
+  let solution = Codegen.{map = overrides_map; scores_list} in
   perform_save_solution solution infer_opts ;
   (match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
@@ -866,8 +896,7 @@ module Auto_build = struct
         in
         (providers, providers_map))
 
-  let infer ~outdir mkfilename local_model_name measurements solution infer_opts
-      =
+  let infer ~outdir mkfilename measurements solution infer_opts =
     let solver = "lasso" in
     let csv_export = mkfilename ".sol.csv" in
     (* If [csv_export] already exists, it must be removed first,
@@ -889,12 +918,7 @@ module Auto_build = struct
       }
     in
     let solution =
-      infer_for_measurements
-        ~local_model_name
-        measurements
-        solution
-        ~solver
-        infer_opts
+      infer_for_measurements measurements solution ~solver infer_opts
     in
     save_solutions_in_text
       (Some (mkfilename ".sol.txt"))
@@ -994,43 +1018,16 @@ module Auto_build = struct
       tbl
     in
 
-    (* Inference and codegen per each local model name *)
-    let local_model_names =
-      let open String.Set in
-      List.fold_left
-        (fun acc solved ->
-          let (module Bench : Benchmark.S) =
-            Registration.find_benchmark_exn solved.Dep_graph.Solver.Solved.name
-          in
-          union acc @@ of_list @@ List.map fst Bench.models)
-        empty
-        providers
-    in
+    (* Inference and codegen *)
     Pyinit.pyinit () ;
-    String.Set.iter
-      (function
-        | "*" -> ()
-        | local_model_name ->
-            let mkfilename ext =
-              Filename.concat
-                outdir
-                (Benchmark_helpers.filename_of_local_model_name
-                   local_model_name)
-              ^ ext
-            in
-            (* Infernece *)
-            let solution =
-              infer
-                ~outdir
-                mkfilename
-                local_model_name
-                measurements
-                providers
-                infer_parameters
-            in
-            (* Codegen *)
-            codegen mkfilename solution)
-      local_model_names
+
+    let mkfilename ext = Filename.concat outdir "auto_build" ^ ext in
+    (* Infernece *)
+    let solution =
+      infer ~outdir mkfilename measurements providers infer_parameters
+    in
+    (* Codegen *)
+    codegen mkfilename solution
 end
 
 (* -------------------------------------------------------------------------- *)
