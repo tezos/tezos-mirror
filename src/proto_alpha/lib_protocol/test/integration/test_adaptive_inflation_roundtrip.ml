@@ -136,10 +136,26 @@ let log_debug_balance account info =
     get_total_staked_and_balance account info
   in
   Log.debug
-    "Balance of %s:\n%a\nTez staked: %a\nTotal balance: %a"
+    "Balance of %s:\n%aTez staked: %a\nTotal balance: %a\n"
     account.name
     balance_pp
     account.balance
+    Tez.pp
+    total_staked
+    Tez.pp
+    total_balance ;
+  return_unit
+
+let log_debug_rpc_balance account block =
+  let open Lwt_result_syntax in
+  let* balance, total_staked, total_balance =
+    get_balance_breakdown (B block) account.contract
+  in
+  Log.debug
+    "RPC balance of %s:\n%aTez staked: %a\nTotal balance: %a\n"
+    account.name
+    balance_pp
+    balance
     Tez.pp
     total_staked
     Tez.pp
@@ -157,7 +173,7 @@ let log_debug_balance_update (account_before, info_before)
     get_total_staked_and_balance account_after info_after
   in
   Log.debug
-    "Balance update of %s:\n%a\nTez staked: %a -> %a\nTotal balance: %a -> %a"
+    "Balance update of %s:\n%aTez staked: %a -> %a\nTotal balance: %a -> %a\n"
     account_before.name
     balance_update_pp
     (account_before.balance, account_after.balance)
@@ -231,7 +247,7 @@ let check_all_balances (block, info) =
   let {accounts_info; total_supply; _} = info in
   let* () =
     String.Map.iter_es
-      (fun _name {balance; delegate; contract; _} ->
+      (fun _name ({balance; delegate; contract; _} as account) ->
         let pool_tez, pool_pseudo =
           match delegate with
           | None -> (Tez.zero, Q.one)
@@ -239,6 +255,7 @@ let check_all_balances (block, info) =
               let {balance = delegate_balance; _} = find_account string info in
               (delegate_balance.pool_tez, delegate_balance.pool_pseudo)
         in
+        let* () = log_debug_rpc_balance account block in
         assert_balance_breakdown
           ~loc:__LOC__
           (B block)
