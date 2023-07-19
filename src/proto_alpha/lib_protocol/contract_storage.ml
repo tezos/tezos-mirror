@@ -894,15 +894,15 @@ module For_RPC = struct
                 ctxt
                 unfinalizable
             in
-            let* sum_unfinalizable =
-              List.fold_left_es
-                (fun acc (_cycle, tz) -> Lwt.return Tez_repr.(acc +? tz))
+            let*? sum_unfinalizable =
+              List.fold_left_e
+                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
                 Tez_repr.zero
                 unfinalizable_requests
             in
-            let* sum_finalizable =
-              List.fold_left_es
-                (fun acc (_, _cycle, tz) -> Lwt.return Tez_repr.(acc +? tz))
+            let*? sum_finalizable =
+              List.fold_left_e
+                (fun acc (_, _cycle, tz) -> Tez_repr.(acc +? tz))
                 Tez_repr.zero
                 finalizable
             in
