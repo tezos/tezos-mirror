@@ -294,7 +294,8 @@ module Contract = struct
       end)
       (Signature.Public_key)
 
-  module Pending_consensus_keys =
+  (* TODO: remove this in P *)
+  module Pending_consensus_keys_up_to_Nairobi =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct

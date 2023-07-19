@@ -148,7 +148,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** The pending consensus key of a delegate *)
-  module Pending_consensus_keys :
+  module Pending_consensus_keys_up_to_Nairobi :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Signature.Public_key.t
