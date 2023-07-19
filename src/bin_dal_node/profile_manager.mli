@@ -31,21 +31,31 @@ type t
 (** The empty profile manager context. *)
 val empty : t
 
-(** Adds a profile to the dal [node_store]. If already present,
-    the store does not change. *)
-val add_profile :
+(** The bootstrap profile. *)
+val bootstrap_profile : t
+
+(** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
+    registers operator profiles (attestor or producer).
+    If the current profile is a bootstrap profile, it will return [None] as bootstrap
+    profiles are incompatible with operator profiles. *)
+val add_operator_profiles :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
-  Services.Types.profile ->
-  t
+  Services.Types.operator_profiles ->
+  t option
 
-(** [on_new_head c gs_worker committee] performs profile-related
+(** [on_new_head t proto_parameters gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
-val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> unit
+val on_new_head :
+  t ->
+  Dal_plugin.proto_parameters ->
+  Gossipsub.Worker.t ->
+  Committee_cache.committee ->
+  unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
-val get_profiles : t -> Services.Types.profile list
+val get_profiles : t -> Services.Types.profiles
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :

@@ -26,34 +26,57 @@
 module Slot_set = Set.Make (Int)
 module Pkh_set = Signature.Public_key_hash.Set
 
+(** The set of slots tracked by the slot producer profile and pkh tracked by the attestor.
+    Uses a set to remove duplicates in the profiles provided by the user. *)
+type operator_sets = {producers : Slot_set.t; attestors : Pkh_set.t}
+
 (** A profile context stores profile-specific data used by the daemon.  *)
-type t = {producers : Slot_set.t; attestors : Pkh_set.t}
+type t = Bootstrap | Operator of operator_sets
 
-let empty = {producers = Slot_set.empty; attestors = Pkh_set.empty}
+let empty = Operator {producers = Slot_set.empty; attestors = Pkh_set.empty}
 
-let init_attestor ctxt number_of_slots gs_worker pkh =
-  List.iter
-    (fun slot_index ->
-      Join Gossipsub.{slot_index; pkh} |> Gossipsub.Worker.(app_input gs_worker))
-    Utils.Infix.(0 -- (number_of_slots - 1)) ;
-  {ctxt with attestors = Pkh_set.add pkh ctxt.attestors}
+let bootstrap_profile = Bootstrap
 
-let init_producer ctxt slot_index =
-  {ctxt with producers = Slot_set.add slot_index ctxt.producers}
+let init_attestor operator_sets number_of_slots gs_worker pkh =
+  if Pkh_set.mem pkh operator_sets.attestors then operator_sets
+  else (
+    List.iter
+      (fun slot_index ->
+        Join Gossipsub.{slot_index; pkh}
+        |> Gossipsub.Worker.(app_input gs_worker))
+      Utils.Infix.(0 -- (number_of_slots - 1)) ;
+    {operator_sets with attestors = Pkh_set.add pkh operator_sets.attestors})
 
-let add_profile ctxt proto_parameters gs_worker profile =
-  let Dal_plugin.{number_of_slots; _} = proto_parameters in
-  let ctxt =
-    match profile with
-    | Services.Types.Attestor pkh ->
-        init_attestor ctxt number_of_slots gs_worker pkh
-    | Services.Types.Producer {slot_index} -> init_producer ctxt slot_index
-  in
-  ctxt
+let init_producer operator_sets slot_index =
+  {
+    operator_sets with
+    producers = Slot_set.add slot_index operator_sets.producers;
+  }
+
+let add_operator_profiles t proto_parameters gs_worker
+    (operator_profiles : Services.Types.operator_profiles) =
+  match t with
+  | Bootstrap -> None
+  | Operator operator_sets ->
+      let operator_sets =
+        List.fold_left
+          (fun operator_sets operator ->
+            match operator with
+            | Services.Types.Attestor pkh ->
+                init_attestor
+                  operator_sets
+                  proto_parameters.Dal_plugin.number_of_slots
+                  gs_worker
+                  pkh
+            | Producer {slot_index} -> init_producer operator_sets slot_index)
+          operator_sets
+          operator_profiles
+      in
+      Some (Operator operator_sets)
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
-let join_topics_for_producer gs_worker committee ctxt =
+let join_topics_for_producer gs_worker committee producers =
   Slot_set.iter
     (fun slot_index ->
       Signature.Public_key_hash.Map.iter
@@ -62,25 +85,45 @@ let join_topics_for_producer gs_worker committee ctxt =
           if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
             Join topic |> Gossipsub.Worker.(app_input gs_worker))
         committee)
-    ctxt.producers
+    producers
 
-let on_new_head ctxt gs_worker committee =
-  join_topics_for_producer gs_worker committee ctxt
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/5934
+   We need a mechanism to ease the tracking of newly added/removed topics.
+   Especially important for bootstrap nodes as the cross product can grow quite large. *)
+let join_topics_for_bootstrap proto_parameters gs_worker committee =
+  (* Join topics for all combinations of (all slots) * (all pkh in comittee) *)
+  for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots do
+    Signature.Public_key_hash.Map.iter
+      (fun pkh _shards ->
+        let topic = Gossipsub.{slot_index; pkh} in
+        if not (Gossipsub.Worker.is_subscribed gs_worker topic) then
+          Join topic |> Gossipsub.Worker.(app_input gs_worker))
+      committee
+  done
 
-let get_profiles ctxt =
-  let producer_profiles =
-    Slot_set.fold
-      (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
-      ctxt.producers
-      []
-  in
-  let attestor_profiles =
-    Pkh_set.fold
-      (fun pkh acc -> Services.Types.Attestor pkh :: acc)
-      ctxt.attestors
-      producer_profiles
-  in
-  attestor_profiles @ producer_profiles
+let on_new_head t proto_parameters gs_worker committee =
+  match t with
+  | Bootstrap -> join_topics_for_bootstrap proto_parameters gs_worker committee
+  | Operator {producers; attestors = _} ->
+      join_topics_for_producer gs_worker committee producers
+
+let get_profiles t =
+  match t with
+  | Bootstrap -> Services.Types.Bootstrap
+  | Operator {producers; attestors} ->
+      let producer_profiles =
+        Slot_set.fold
+          (fun slot_index acc -> Services.Types.Producer {slot_index} :: acc)
+          producers
+          []
+      in
+      let attestor_profiles =
+        Pkh_set.fold
+          (fun pkh acc -> Services.Types.Attestor pkh :: acc)
+          attestors
+          producer_profiles
+      in
+      Services.Types.Operator (attestor_profiles @ producer_profiles)
 
 let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
   let open Lwt_result_syntax in
