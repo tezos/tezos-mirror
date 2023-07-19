@@ -144,6 +144,7 @@
         "Contract_storage",
         "Token",
         "Fees_storage",
+        "Adaptive_inflation_costs",
         "Adaptive_inflation_storage",
         "Delegate_staking_parameters",
         "Delegate_consensus_key",
