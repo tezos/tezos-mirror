@@ -269,7 +269,8 @@ val polynomial_from_shards :
     - For any [p], let [shards = shards_from_polynomial p],
     for any subset S of shards of [polynomial_length / shard_length] elements,
     [polynomial_from_shards S = p].
-    Here, [polynomial_length] and [shard_length] are parameters declared in [t]. *)
+    Here, [polynomial_length] and [shard_length] are parameters declared in [t].
+    The shards in the returned sequence have increasing indexes. *)
 val shards_from_polynomial : t -> polynomial -> shard Seq.t
 
 (** A proof that a shard belongs to some commitment. *)
