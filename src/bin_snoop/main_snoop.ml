@@ -361,6 +361,29 @@ and infer_for_measurements ?local_model_name measurements
                 overrides_map
                 solution.Inference.mapping
             in
+            (* Lift up the intercept of memory allocation costs for overestimation *)
+            let overrides_map =
+              match List.rev (Namespace.to_list Bench.name) with
+              | "intercept" :: "alloc" :: basename :: rem
+              | "alloc" :: basename :: rem ->
+                  (* Generate intercept parameter name from the benchmark name *)
+                  let fv_intercept =
+                    let l = (basename ^ "_alloc_const") :: rem in
+                    Free_variable.of_namespace (Namespace.of_list (List.rev l))
+                  in
+                  Free_variable.Map.update
+                    fv_intercept
+                    (Option.map (fun intercept ->
+                         Format.eprintf
+                           "Updating intercept %a := %f + %f@."
+                           Free_variable.pp
+                           fv_intercept
+                           intercept
+                           solution.intercept_lift ;
+                         intercept +. solution.intercept_lift))
+                    overrides_map
+              | _ -> overrides_map
+            in
             let report =
               Option.map
                 (Report.add_section

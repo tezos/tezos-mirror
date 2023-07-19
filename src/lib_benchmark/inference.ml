@@ -88,6 +88,7 @@ let scores_to_csv_column (local_model_name, bench_name) scores =
 type solution = {
   mapping : (Free_variable.t * float) list;
   weights : matrix;
+  intercept_lift : float;
   scores : scores;
 }
 
@@ -442,7 +443,7 @@ let solve_problem : problem -> solver -> solution =
       let prediction = to_scipy predicted |> Scikit_matrix.to_numpy in
       let output = median_of_output measured in
       let scores = calculate_regression_scores ~output ~prediction in
-      {mapping = []; weights = empty_matrix; scores}
+      {mapping = []; weights = empty_matrix; intercept_lift = 0.0; scores}
   | Non_degenerate {input; output; nmap; _} ->
       let params, tvalues = calculate_benchmark_scores ~input ~output in
       let output = median_of_output output in
@@ -453,6 +454,15 @@ let solve_problem : problem -> solver -> solution =
         | NNLS -> nnls ~input ~output
       in
       let prediction = predict_output ~input ~weights in
+
+      (* The difference required to overestimate all measurements. *)
+      let intercept_lift =
+        let prediction = Scikit_matrix.of_numpy prediction |> of_scipy in
+        let output = vector_to_array (Matrix.col output 0) in
+        let prediction = vector_to_array (Matrix.col prediction 0) in
+        Array.map2 (fun o p -> o -. p) output prediction
+        |> Array.fold_left Float.max 0.0
+      in
 
       let regression_scores = calculate_regression_scores ~output ~prediction in
       let lines = Maths.row_dim weights in
@@ -496,4 +506,9 @@ let solve_problem : problem -> solver -> solution =
             nmap
             []
         in
-        {mapping; weights; scores = {regression_scores with tvalues}}
+        {
+          mapping;
+          weights;
+          intercept_lift;
+          scores = {regression_scores with tvalues};
+        }
