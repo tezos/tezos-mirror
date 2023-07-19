@@ -877,7 +877,7 @@ let test_send_tickets_to_sc_rollup =
     ~title:
       "Minting then sending tickets to smart-contract rollup should succeed \
        with appropriate ticket updates field in receipt."
-    ~tags:["client"; "michelson"]
+    ~tags:["client"; "michelson"; "sc_rollup"]
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* _node, client, sc_rollup =
@@ -913,7 +913,7 @@ let test_send_tickets_from_storage_to_sc_rollup =
     ~title:
       "Sending tickets from storage to smart-contract rollup should succeed \
        with appropriate ticket updates field in receipt."
-    ~tags:["client"; "michelson"]
+    ~tags:["client"; "michelson"; "sc_rollup"]
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* _node, client, sc_rollup =
