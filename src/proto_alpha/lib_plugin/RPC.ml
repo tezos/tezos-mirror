@@ -3444,7 +3444,7 @@ module Attestation_rights = struct
   end
 
   let attestation_rights_at_level ctxt level =
-    Baking.endorsing_rights_by_first_slot ctxt level >>=? fun (ctxt, rights) ->
+    Baking.attesting_rights_by_first_slot ctxt level >>=? fun (ctxt, rights) ->
     Round.get ctxt >>=? fun current_round ->
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
@@ -3581,7 +3581,7 @@ module Validators = struct
   end
 
   let add_endorsing_slots_at_level (ctxt, acc) level =
-    Baking.endorsing_rights ctxt level >|=? fun (ctxt, rights) ->
+    Baking.attesting_rights ctxt level >|=? fun (ctxt, rights) ->
     ( ctxt,
       Signature.Public_key_hash.Map.fold
         (fun _pkh {Baking.delegate; consensus_key; slots} acc ->

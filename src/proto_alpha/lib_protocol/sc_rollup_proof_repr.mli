@@ -222,7 +222,7 @@ module type PVM_with_context_and_state = sig
         a slot's {!val: Dal_slot_repr.commitment}. *)
     val dal_parameters : Dal_slot_repr.parameters
 
-    (** The lag between the time an endorsement is published on L1
+    (** The lag between the time an attestation is published on L1
         (its published_level) and the level it should be confirmed. *)
     val dal_attestation_lag : int
   end

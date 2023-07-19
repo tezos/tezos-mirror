@@ -116,14 +116,14 @@ val staking_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 (** [is_forbidden_delegate ctxt delegate] returns [true] if the given
-    [delegate] is forbidden to bake or endorse. This means that its
+    [delegate] is forbidden to bake or attest. This means that its
     current frozen deposit is equal to zero. Returns [false]
     otherwise. *)
 val is_forbidden_delegate : Raw_context.t -> Signature.Public_key_hash.t -> bool
 
 (** [forbid_delegate ctxt delegate] adds [delegate] to the set of
     forbidden delegates and stores the updated set, which prevents this
-    delegate from baking or endorsing. *)
+    delegate from baking or attesting. *)
 val forbid_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 

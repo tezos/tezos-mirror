@@ -85,10 +85,10 @@ module Raw_consensus = struct
       this delegate. *)
 
   type t = {
-    current_endorsement_power : int;
-        (** Number of endorsement slots recorded for the current block. *)
-    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t option;
-        (** Endorsements rights for the current block. Only an endorsement
+    current_attestation_power : int;
+        (** Number of attestation slots recorded for the current block. *)
+    allowed_attestations : (consensus_pk * int) Slot_repr.Map.t option;
+        (** Attestations rights for the current block. Only an attestation
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
             slot with its power. This is [None] only in mempool mode. *)
@@ -100,11 +100,11 @@ module Raw_consensus = struct
             application mode when there is no locked round (so the block
             cannot contain any preattestations). *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
-        (** Delegates that are not allowed to bake or endorse blocks; i.e.,
+        (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
             slashing. *)
-    endorsements_seen : Slot_repr.Set.t;
-        (** Record the endorsements already seen. Only initial slots are indexed. *)
+    attestations_seen : Slot_repr.Set.t;
+        (** Record the attestations already seen. Only initial slots are indexed. *)
     preattestations_seen : Slot_repr.Set.t;
         (** Record the preattestations already seen. Only initial slots
             are indexed. *)
@@ -113,30 +113,30 @@ module Raw_consensus = struct
     preattestations_quorum_round : Round_repr.t option;
         (** in block construction mode, record the round of preattestations
             included in a block. *)
-    endorsement_branch : (Block_hash.t * Block_payload_hash.t) option;
+    attestation_branch : (Block_hash.t * Block_payload_hash.t) option;
   }
 
   (** Invariant:
 
-      - [slot \in endorsements_seen => Int_map.mem slot allowed_endorsements]
+      - [slot \in attestations_seen => Int_map.mem slot allowed_attestations]
 
       - [slot \in preattestations_seen => Int_map.mem slot allowed_preattestations]
 
-      - [ |endorsements_seen| > 0 => |included endorsements| > 0]
+      - [ |attestations_seen| > 0 => |included attestations| > 0]
 
   *)
 
   let empty : t =
     {
-      current_endorsement_power = 0;
-      allowed_endorsements = Some Slot_repr.Map.empty;
+      current_attestation_power = 0;
+      allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
-      endorsements_seen = Slot_repr.Set.empty;
+      attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
       locked_round_evidence = None;
       preattestations_quorum_round = None;
-      endorsement_branch = None;
+      attestation_branch = None;
     }
 
   type error += Double_inclusion_of_consensus_operation
@@ -154,15 +154,15 @@ module Raw_consensus = struct
         | Double_inclusion_of_consensus_operation -> Some () | _ -> None)
       (fun () -> Double_inclusion_of_consensus_operation)
 
-  let record_endorsement t ~initial_slot ~power =
+  let record_attestation t ~initial_slot ~power =
     error_when
-      (Slot_repr.Set.mem initial_slot t.endorsements_seen)
+      (Slot_repr.Set.mem initial_slot t.attestations_seen)
       Double_inclusion_of_consensus_operation
     >|? fun () ->
     {
       t with
-      current_endorsement_power = t.current_endorsement_power + power;
-      endorsements_seen = Slot_repr.Set.add initial_slot t.endorsements_seen;
+      current_attestation_power = t.current_attestation_power + power;
+      attestations_seen = Slot_repr.Set.add initial_slot t.attestations_seen;
     }
 
   let record_preattestation ~initial_slot ~power round t =
@@ -206,16 +206,16 @@ module Raw_consensus = struct
         t
     | None -> {t with preattestations_quorum_round = Some round}
 
-  let initialize_with_endorsements_and_preattestations ~allowed_endorsements
+  let initialize_with_attestations_and_preattestations ~allowed_attestations
       ~allowed_preattestations t =
-    {t with allowed_endorsements; allowed_preattestations}
+    {t with allowed_attestations; allowed_preattestations}
 
   let locked_round_evidence t = t.locked_round_evidence
 
-  let endorsement_branch t = t.endorsement_branch
+  let attestation_branch t = t.attestation_branch
 
-  let set_endorsement_branch t endorsement_branch =
-    {t with endorsement_branch = Some endorsement_branch}
+  let set_attestation_branch t attestation_branch =
+    {t with attestation_branch = Some attestation_branch}
 end
 
 type dal_committee = {
@@ -1418,7 +1418,7 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_endorsements : t -> (consensus_pk * int) slot_map option
+  val allowed_attestations : t -> (consensus_pk * int) slot_map option
 
   val allowed_preattestations : t -> (consensus_pk * int) slot_map option
 
@@ -1426,15 +1426,15 @@ module type CONSENSUS = sig
 
   type error += Slot_map_not_found of {loc : string}
 
-  val current_endorsement_power : t -> int
+  val current_attestation_power : t -> int
 
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int) slot_map option ->
     t
 
-  val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
 
   val record_preattestation :
     t -> initial_slot:slot -> power:int -> round -> t tzresult
@@ -1443,7 +1443,7 @@ module type CONSENSUS = sig
 
   val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
 
-  val endorsements_seen : t -> slot_set
+  val attestations_seen : t -> slot_set
 
   val get_preattestations_quorum_round : t -> round option
 
@@ -1451,9 +1451,9 @@ module type CONSENSUS = sig
 
   val locked_round_evidence : t -> (round * int) option
 
-  val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+  val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
-  val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+  val attestation_branch : t -> (Block_hash.t * Block_payload_hash.t) option
 end
 
 module Consensus :
@@ -1471,8 +1471,8 @@ module Consensus :
     f ctxt.back.consensus >|? fun consensus ->
     {ctxt with back = {ctxt.back with consensus}}
 
-  let[@inline] allowed_endorsements ctxt =
-    ctxt.back.consensus.allowed_endorsements
+  let[@inline] allowed_attestations ctxt =
+    ctxt.back.consensus.allowed_attestations
 
   let[@inline] allowed_preattestations ctxt =
     ctxt.back.consensus.allowed_preattestations
@@ -1483,8 +1483,8 @@ module Consensus :
   let[@inline] set_forbidden_delegates ctxt delegates =
     update_consensus_with ctxt (Raw_consensus.set_forbidden_delegates delegates)
 
-  let[@inline] current_endorsement_power ctxt =
-    ctxt.back.consensus.current_endorsement_power
+  let[@inline] current_attestation_power ctxt =
+    ctxt.back.consensus.current_attestation_power
 
   let[@inline] get_preattestations_quorum_round ctxt =
     ctxt.back.consensus.preattestations_quorum_round
@@ -1492,12 +1492,12 @@ module Consensus :
   let[@inline] locked_round_evidence ctxt =
     Raw_consensus.locked_round_evidence ctxt.back.consensus
 
-  let[@inline] initialize_consensus_operation ctxt ~allowed_endorsements
+  let[@inline] initialize_consensus_operation ctxt ~allowed_attestations
       ~allowed_preattestations =
     update_consensus_with
       ctxt
-      (Raw_consensus.initialize_with_endorsements_and_preattestations
-         ~allowed_endorsements
+      (Raw_consensus.initialize_with_attestations_and_preattestations
+         ~allowed_attestations
          ~allowed_preattestations)
 
   let[@inline] record_preattestation ctxt ~initial_slot ~power round =
@@ -1505,27 +1505,27 @@ module Consensus :
       ctxt
       (Raw_consensus.record_preattestation ~initial_slot ~power round)
 
-  let[@inline] record_endorsement ctxt ~initial_slot ~power =
+  let[@inline] record_attestation ctxt ~initial_slot ~power =
     update_consensus_with_tzresult
       ctxt
-      (Raw_consensus.record_endorsement ~initial_slot ~power)
+      (Raw_consensus.record_attestation ~initial_slot ~power)
 
   let[@inline] forbid_delegate ctxt delegate =
     update_consensus_with ctxt (Raw_consensus.forbid_delegate delegate)
 
-  let[@inline] endorsements_seen ctxt = ctxt.back.consensus.endorsements_seen
+  let[@inline] attestations_seen ctxt = ctxt.back.consensus.attestations_seen
 
   let[@inline] set_preattestations_quorum_round ctxt round =
     update_consensus_with
       ctxt
       (Raw_consensus.set_preattestations_quorum_round round)
 
-  let[@inline] endorsement_branch ctxt =
-    Raw_consensus.endorsement_branch ctxt.back.consensus
+  let[@inline] attestation_branch ctxt =
+    Raw_consensus.attestation_branch ctxt.back.consensus
 
-  let[@inline] set_endorsement_branch ctxt branch =
+  let[@inline] set_attestation_branch ctxt branch =
     update_consensus_with ctxt (fun ctxt ->
-        Raw_consensus.set_endorsement_branch ctxt branch)
+        Raw_consensus.set_attestation_branch ctxt branch)
 
   type error += Slot_map_not_found of {loc : string}
 

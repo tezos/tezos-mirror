@@ -178,7 +178,7 @@ let test_participation_rpc () =
       in
       Assert.equal_tez
         ~loc:__LOC__
-        info.expected_endorsing_rewards
+        info.expected_attesting_rewards
         endorsing_rewards
       >>=? fun () ->
       bake_and_endorse_once (b_pred, b_crt) del1 del1 >>=? fun b ->

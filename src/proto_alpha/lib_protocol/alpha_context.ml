@@ -485,7 +485,7 @@ module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
   include Delegate_storage
-  include Delegate_missed_endorsements_storage
+  include Delegate_missed_attestations_storage
   include Delegate_slashed_deposits_storage
   include Delegate_cycles
 
@@ -563,15 +563,15 @@ module Migration = Migration_repr
 module Consensus = struct
   include Raw_context.Consensus
 
-  let load_endorsement_branch ctxt =
+  let load_attestation_branch ctxt =
     Storage.Tenderbake.Attestation_branch.find ctxt >>=? function
-    | Some endorsement_branch ->
-        Raw_context.Consensus.set_endorsement_branch ctxt endorsement_branch
+    | Some attestation_branch ->
+        Raw_context.Consensus.set_attestation_branch ctxt attestation_branch
         |> return
     | None -> return ctxt
 
-  let store_endorsement_branch ctxt branch =
-    let ctxt = set_endorsement_branch ctxt branch in
+  let store_attestation_branch ctxt branch =
+    let ctxt = set_attestation_branch ctxt branch in
     Storage.Tenderbake.Attestation_branch.add ctxt branch
 end
 
@@ -580,7 +580,7 @@ let prepare_first_block = Init_storage.prepare_first_block
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, balance_updates, origination_results) ->
-  Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
+  Consensus.load_attestation_branch ctxt >>=? fun ctxt ->
   Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
   Adaptive_inflation_storage.load_reward_coeff ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)

@@ -200,27 +200,27 @@ let participation_info_encoding =
            missed_slots;
            missed_levels;
            remaining_allowed_missed_slots;
-           expected_endorsing_rewards;
+           expected_attesting_rewards;
          } ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
         missed_levels,
         remaining_allowed_missed_slots,
-        expected_endorsing_rewards ))
+        expected_attesting_rewards ))
     (fun ( expected_cycle_activity,
            minimal_cycle_activity,
            missed_slots,
            missed_levels,
            remaining_allowed_missed_slots,
-           expected_endorsing_rewards ) ->
+           expected_attesting_rewards ) ->
       {
         expected_cycle_activity;
         minimal_cycle_activity;
         missed_slots;
         missed_levels;
         remaining_allowed_missed_slots;
-        expected_endorsing_rewards;
+        expected_attesting_rewards;
       })
     (obj6
        (req "expected_cycle_activity" int31)
@@ -228,7 +228,7 @@ let participation_info_encoding =
        (req "missed_slots" int31)
        (req "missed_levels" int31)
        (req "remaining_allowed_missed_slots" int31)
-       (req "expected_endorsing_rewards" Tez.encoding))
+       (req "expected_attesting_rewards" Tez.encoding))
 
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
@@ -432,15 +432,15 @@ module S = struct
          indicates, in the field 'expected_cycle_activity', the number of \
          slots the delegate is expected to have in the cycle based on its \
          active stake. The field 'minimal_cycle_activity' indicates the \
-         minimal endorsing slots in the cycle required to get endorsing \
+         minimal attesting slots in the cycle required to get attesting \
          rewards. It is computed based on 'expected_cycle_activity. The fields \
          'missed_slots' and 'missed_levels' indicate the number of missed \
-         endorsing slots and missed levels (for endorsing) in the cycle so \
-         far. 'missed_slots' indicates the number of missed endorsing slots in \
+         attesting slots and missed levels (for attesting) in the cycle so \
+         far. 'missed_slots' indicates the number of missed attesting slots in \
          the cycle so far. The field 'remaining_allowed_missed_slots' \
-         indicates the remaining amount of endorsing slots that can be missed \
+         indicates the remaining amount of attesting slots that can be missed \
          in the cycle before forfeiting the rewards. Finally, \
-         'expected_endorsing_rewards' indicates the endorsing rewards that \
+         'expected_attesting_rewards' indicates the attesting rewards that \
          will be distributed at the end of the cycle if activity at that point \
          will be greater than the minimal required; if the activity is already \
          known to be below the required minimum, then the rewards are zero."

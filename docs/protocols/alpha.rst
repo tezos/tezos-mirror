@@ -98,9 +98,10 @@ Breaking Changes
 
 - Operation ``Set_deposits_limit`` removed. (MR :gl:`!8831`)
 
-- Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement`` is
-  converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
-  ``percentage_of_frozen_deposits_slashed_per_double_endorsement``. (MR :gl:`!8753`)
+- Protocol parameter ``ratio_of_frozen_deposits_slashed_per_double_endorsement``
+  is converted from the ratio ``1/5`` into the percentage ``50%`` and renamed to
+  ``percentage_of_frozen_deposits_slashed_per_double_attestation``. (MRs
+  :gl:`!8753`, :gl:`!9440`)
 
 - Protocol parameter ``double_baking_punishment`` is converted from a fixed
   value of ``640tz`` into the percentage ``11%`` and renamed to
@@ -125,6 +126,11 @@ Breaking Changes
 
 - Field ``missed_endorsements`` from contract storage has been renamed into
   ``missed_attestations``. (MR :gl:`!9486`)
+
+- Fields ``preendorsements_seen``, ``endorsements_seen`` and
+  ``double_endorsing_evidences_seen`` from the mempool's ``operation_state``
+  encoding has been renamed ``preattestations_seen``, ``attestation_seen`` and
+  ``double_attesting_evidences_seen``. (MR :gl:`!9440`)
 
 RPC Changes
 -----------
@@ -154,6 +160,8 @@ RPC Changes
     based on its current stake (MR :gl:`!9350`)
 
 - Two new variants of the ``voting_power`` RPC (which returns the
+  ``expected_endorsing_rewards`` field from ``/participation`` RPC has been
+  renamed in ``expected_attesting_rewards``.
 
 Operation receipts
 ------------------

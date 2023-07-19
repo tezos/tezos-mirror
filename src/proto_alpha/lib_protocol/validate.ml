@@ -30,7 +30,7 @@ type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
   preattestation_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
-  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
+  attestation_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
 }
 
 let init_consensus_info ctxt (predecessor_level, predecessor_round) =
@@ -38,15 +38,15 @@ let init_consensus_info ctxt (predecessor_level, predecessor_round) =
     predecessor_level;
     predecessor_round;
     preattestation_slot_map = Consensus.allowed_preattestations ctxt;
-    endorsement_slot_map = Consensus.allowed_endorsements ctxt;
+    attestation_slot_map = Consensus.allowed_attestations ctxt;
   }
 
 (** Map used to detect consensus operation conflicts. Each delegate
-    may (pre)endorse at most once for each level and round, so two
-    endorsements (resp. two preattestations) conflict when they have
+    may (pre)attest at most once for each level and round, so two
+    attestations (resp. two preattestations) conflict when they have
     the same slot, level, and round.
 
-    Note that when validating a block, all endorsements (resp. all
+    Note that when validating a block, all attestations (resp. all
     preattestations) must have the same level and round anyway, so only
     the slot is relevant. Taking the level and round into account is
     useful in mempool mode, because we want to be able to accept and
@@ -63,7 +63,7 @@ end)
 
 type consensus_state = {
   preattestations_seen : Operation_hash.t Consensus_conflict_map.t;
-  endorsements_seen : Operation_hash.t Consensus_conflict_map.t;
+  attestations_seen : Operation_hash.t Consensus_conflict_map.t;
   dal_attestation_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
 }
 
@@ -83,13 +83,13 @@ let consensus_state_encoding =
   let open Data_encoding in
   def "consensus_state"
   @@ conv
-       (fun {preattestations_seen; endorsements_seen; dal_attestation_seen} ->
-         (preattestations_seen, endorsements_seen, dal_attestation_seen))
-       (fun (preattestations_seen, endorsements_seen, dal_attestation_seen) ->
-         {preattestations_seen; endorsements_seen; dal_attestation_seen})
+       (fun {preattestations_seen; attestations_seen; dal_attestation_seen} ->
+         (preattestations_seen, attestations_seen, dal_attestation_seen))
+       (fun (preattestations_seen, attestations_seen, dal_attestation_seen) ->
+         {preattestations_seen; attestations_seen; dal_attestation_seen})
        (obj3
-          (req "preendorsements_seen" consensus_conflict_map_encoding)
-          (req "endorsements_seen" consensus_conflict_map_encoding)
+          (req "preattestations_seen" consensus_conflict_map_encoding)
+          (req "attestations_seen" consensus_conflict_map_encoding)
           (req
              "dal_attestation_seen"
              (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
@@ -97,7 +97,7 @@ let consensus_state_encoding =
 let empty_consensus_state =
   {
     preattestations_seen = Consensus_conflict_map.empty;
-    endorsements_seen = Consensus_conflict_map.empty;
+    attestations_seen = Consensus_conflict_map.empty;
     dal_attestation_seen = Signature.Public_key_hash.Map.empty;
   }
 
@@ -229,7 +229,7 @@ let anonymous_state_encoding =
              "double_baking_evidences_seen"
              (Double_baking_evidence_map.encoding Operation_hash.encoding))
           (req
-             "double_endorsing_evidences_seen"
+             "double_attesting_evidences_seen"
              (Double_attesting_evidence_map.encoding Operation_hash.encoding))
           (req
              "seed_nonce_levels_seen"
@@ -372,7 +372,7 @@ type block_state = {
   recorded_operations_rev : Operation_hash.t list;
   last_op_validation_pass : int option;
   locked_round_evidence : (Round.t * int) option;
-  endorsement_power : int;
+  attestation_power : int;
 }
 
 type validation_state = {
@@ -418,13 +418,13 @@ let init_block_state vi =
     recorded_operations_rev = [];
     last_op_validation_pass = None;
     locked_round_evidence = None;
-    endorsement_power = 0;
+    attestation_power = 0;
   }
 
 let get_initial_ctxt {info; _} = info.ctxt
 
 (** Validation of consensus operations (validation pass [0]):
-    preattestation, endorsement, and dal_attestation. *)
+    preattestation, attestation, and dal_attestation. *)
 module Consensus = struct
   open Validate_errors.Consensus
 
@@ -520,7 +520,7 @@ module Consensus = struct
     let*? () = check_level kind vi.current_level.level level in
     (* We cannot check the exact round here in construction mode, because
        there is no preexisting fitness to provide the locked_round. We do
-       however check that all preendorments have the same round in
+       however check that all preattestations have the same round in
        [check_construction_preattestation_round_consistency] further below. *)
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
@@ -531,7 +531,7 @@ module Consensus = struct
     in
     return (consensus_key, voting_power)
 
-  (** Preattestation/endorsement checks for Mempool mode.
+  (** Preattestation/attestation checks for Mempool mode.
 
       We want this mode to be very permissive, to allow the mempool to
       accept and propagate consensus operations even if they point to a
@@ -552,8 +552,8 @@ module Consensus = struct
       three allowed levels. Checking the slot normalization is
       therefore the responsability of the baker when it selects
       the consensus operations to include in a new block. Moreover,
-      multiple endorsements pointing to the same block with different
-      slots can be punished by a double-(pre)endorsement operation.
+      multiple attestations pointing to the same block with different
+      slots can be punished by a double-(pre)attestation operation.
 
       Return the slot owner's consensus key and a fake voting power (the
       latter won't be used anyway in Mempool mode). *)
@@ -685,21 +685,21 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with preattestations_seen}}
 
-  (** Endorsement checks for all modes that involve a block:
+  (** Attestation checks for all modes that involve a block:
       Application, Partial_validation, and Construction.
 
       Return the slot owner's consensus key and voting power. *)
-  let check_block_endorsement vi consensus_info
+  let check_block_attestation vi consensus_info
       {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
-      match Consensus.endorsement_branch vi.ctxt with
+      match Consensus.attestation_branch vi.ctxt with
       | Some ((_branch : Block_hash.t), payload_hash) -> ok payload_hash
       | None ->
-          (* [Consensus.endorsement_branch] only returns [None] when the
+          (* [Consensus.attestation_branch] only returns [None] when the
              predecessor is the block that activates the first protocol
              of the Tenderbake family; this block should not be
-             endorsed. This can only happen in tests and test
+             attested. This can only happen in tests and test
              networks. *)
           error Unexpected_attestation_in_block
     in
@@ -708,14 +708,14 @@ module Consensus = struct
     let*? () = check_round kind consensus_info.predecessor_round round in
     let*? () = check_payload_hash kind expected_payload_hash bph in
     let*? consensus_key, voting_power =
-      get_delegate_details consensus_info.endorsement_slot_map kind slot
+      get_delegate_details consensus_info.attestation_slot_map kind slot
     in
     let* () =
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
     return (consensus_key, voting_power)
 
-  let check_endorsement vi ~check_signature
+  let check_attestation vi ~check_signature
       (operation : Kind.attestation operation) =
     let open Lwt_result_syntax in
     let*? consensus_info =
@@ -729,7 +729,7 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
-          check_block_endorsement vi consensus_info consensus_content
+          check_block_attestation vi consensus_info consensus_content
       | Mempool ->
           check_mempool_consensus
             vi
@@ -747,7 +747,7 @@ module Consensus = struct
     in
     return voting_power
 
-  let check_endorsement_conflict vs oph (operation : Kind.attestation operation)
+  let check_attestation_conflict vs oph (operation : Kind.attestation operation)
       =
     let (Single (Attestation {slot; level; round; _})) =
       operation.protocol_data.contents
@@ -755,53 +755,53 @@ module Consensus = struct
     match
       Consensus_conflict_map.find_opt
         (slot, level, round)
-        vs.consensus_state.endorsements_seen
+        vs.consensus_state.attestations_seen
     with
     | None -> ok_unit
     | Some existing ->
         Error (Operation_conflict {existing; new_operation = oph})
 
-  let wrap_endorsement_conflict = function
+  let wrap_attestation_conflict = function
     | Ok () -> ok_unit
     | Error conflict ->
         error
           Validate_errors.Consensus.(
             Conflicting_consensus_operation {kind = Attestation; conflict})
 
-  let add_endorsement vs oph (op : Kind.attestation operation) =
+  let add_attestation vs oph (op : Kind.attestation operation) =
     let (Single (Attestation {slot; level; round; _})) =
       op.protocol_data.contents
     in
-    let endorsements_seen =
+    let attestations_seen =
       Consensus_conflict_map.add
         (slot, level, round)
         oph
-        vs.consensus_state.endorsements_seen
+        vs.consensus_state.attestations_seen
     in
-    {vs with consensus_state = {vs.consensus_state with endorsements_seen}}
+    {vs with consensus_state = {vs.consensus_state with attestations_seen}}
 
-  let may_update_endorsement_power vi block_state voting_power =
+  let may_update_attestation_power vi block_state voting_power =
     match vi.mode with
     | Mempool -> (* The block_state is not relevant. *) block_state
     | Application _ | Partial_validation _ | Construction _ ->
         {
           block_state with
-          endorsement_power = block_state.endorsement_power + voting_power;
+          attestation_power = block_state.attestation_power + voting_power;
         }
 
   (* Hypothesis: this function will only be called in mempool mode *)
-  let remove_endorsement vs (operation : Kind.attestation operation) =
-    (* We do not remove the endorsement power because it is not
+  let remove_attestation vs (operation : Kind.attestation operation) =
+    (* We do not remove the attestation power because it is not
        relevant for the mempool mode. *)
     let (Single (Attestation {slot; level; round; _})) =
       operation.protocol_data.contents
     in
-    let endorsements_seen =
+    let attestations_seen =
       Consensus_conflict_map.remove
         (slot, level, round)
-        vs.consensus_state.endorsements_seen
+        vs.consensus_state.attestations_seen
     in
-    {vs with consensus_state = {vs.consensus_state with endorsements_seen}}
+    {vs with consensus_state = {vs.consensus_state with attestations_seen}}
 
   let check_dal_attestation vi (operation : Kind.dal_attestation operation) =
     (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
@@ -810,8 +810,8 @@ module Consensus = struct
        checked. Consequently, it is really important to ensure this
        operation cannot be included into a block when the feature flag
        is not set. This is done in order to avoid modifying the
-       endorsement encoding. However, once the DAL is ready, this
-       operation should be merged with an endorsement or at least
+       attestation encoding. However, once the DAL is ready, this
+       operation should be merged with an attestation or at least
        refined. *)
     let open Lwt_result_syntax in
     let (Single (Dal_attestation op)) = operation.protocol_data.contents in
@@ -923,16 +923,16 @@ module Consensus = struct
     let operation_state = add_preattestation operation_state oph operation in
     return {info; operation_state; block_state}
 
-  let validate_endorsement ~check_signature info operation_state block_state oph
+  let validate_attestation ~check_signature info operation_state block_state oph
       operation =
     let open Lwt_result_syntax in
-    let* power = check_endorsement info ~check_signature operation in
+    let* power = check_attestation info ~check_signature operation in
     let*? () =
-      check_endorsement_conflict operation_state oph operation
-      |> wrap_endorsement_conflict
+      check_attestation_conflict operation_state oph operation
+      |> wrap_attestation_conflict
     in
-    let block_state = may_update_endorsement_power info block_state power in
-    let operation_state = add_endorsement operation_state oph operation in
+    let block_state = may_update_attestation_power info block_state power in
+    let operation_state = add_attestation operation_state oph operation in
     return {info; operation_state; block_state}
 end
 
@@ -1350,7 +1350,7 @@ module Anonymous = struct
         let ordered_hashes = Operation_hash.(op1_hash < op2_hash) in
         let is_denunciation_consistent =
           same_levels && same_rounds
-          (* For the double (pre)endorsements to be punishable, they
+          (* For the double (pre)attestations to be punishable, they
              must point to the same block (same level and round), but
              also have at least a difference that is the delegate's
              fault: different payloads, different branches, or
@@ -2454,7 +2454,7 @@ let check_operation ?(check_signature = true) info (type kind)
       return_unit
   | Single (Attestation _) ->
       let* (_voting_power : int) =
-        Consensus.check_endorsement info ~check_signature operation
+        Consensus.check_attestation info ~check_signature operation
       in
       return_unit
   | Single (Dal_attestation _) -> Consensus.check_dal_attestation info operation
@@ -2509,7 +2509,7 @@ let check_operation_conflict (type kind) operation_conflict_state oph
         oph
         operation
   | Single (Attestation _) ->
-      Consensus.check_endorsement_conflict
+      Consensus.check_attestation_conflict
         operation_conflict_state
         oph
         operation
@@ -2572,7 +2572,7 @@ let add_valid_operation operation_conflict_state oph (type kind)
   | Single (Preattestation _) ->
       Consensus.add_preattestation operation_conflict_state oph operation
   | Single (Attestation _) ->
-      Consensus.add_endorsement operation_conflict_state oph operation
+      Consensus.add_attestation operation_conflict_state oph operation
   | Single (Dal_attestation _) ->
       Consensus.add_dal_attestation operation_conflict_state oph operation
   | Single (Proposals _) ->
@@ -2617,7 +2617,7 @@ let remove_operation operation_conflict_state (type kind)
   | Single (Preattestation _) ->
       Consensus.remove_preattestation operation_conflict_state operation
   | Single (Attestation _) ->
-      Consensus.remove_endorsement operation_conflict_state operation
+      Consensus.remove_attestation operation_conflict_state operation
   | Single (Dal_attestation _) ->
       Consensus.remove_dal_attestation operation_conflict_state operation
   | Single (Proposals _) ->
@@ -2709,7 +2709,7 @@ let validate_operation ?(check_signature = true)
             oph
             operation
       | Single (Attestation _) ->
-          Consensus.validate_endorsement
+          Consensus.validate_attestation
             ~check_signature
             info
             operation_state
@@ -2848,12 +2848,12 @@ let validate_operation ?(check_signature = true)
 
 open Validate_errors.Block
 
-let check_endorsement_power vi bs =
+let check_attestation_power vi bs =
   let open Lwt_result_syntax in
-  let* are_endorsements_required =
+  let* are_attestations_required =
     (* The migration block (whose level is [first_level_of_protocol])
-       is always considered final, and is not endorsed. Therefore, the
-       block at the next level does not need to contain endorsements.
+       is always considered final, and is not attested. Therefore, the
+       block at the next level does not need to contain attestations.
        (Note that the migration block itself is validated by the
        previous protocol, so the returned value for it does not matter.) *)
     let* first_level_of_protocol = First_level_of_protocol.get vi.ctxt in
@@ -2862,9 +2862,9 @@ let check_endorsement_power vi bs =
     in
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
-  if are_endorsements_required then
+  if are_attestations_required then
     let required = Constants.consensus_threshold vi.ctxt in
-    let provided = bs.endorsement_power in
+    let provided = bs.attestation_power in
     fail_unless
       Compare.Int.(provided >= required)
       (Not_enough_attestations {required; provided})
@@ -2933,7 +2933,7 @@ let finalize_block {info; block_state; _} =
   let open Lwt_result_syntax in
   match info.mode with
   | Application {round; locked_round; predecessor_hash; header_contents} ->
-      let* () = check_endorsement_power info block_state in
+      let* () = check_attestation_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
       let*? () = check_preattestation_round_and_power info block_state round in
       let*? () =
@@ -2941,12 +2941,12 @@ let finalize_block {info; block_state; _} =
       in
       return_unit
   | Partial_validation {round; locked_round; _} ->
-      let* () = check_endorsement_power info block_state in
+      let* () = check_attestation_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
       let*? () = check_preattestation_round_and_power info block_state round in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
-      let* () = check_endorsement_power info block_state in
+      let* () = check_attestation_power info block_state in
       let*? () = check_preattestation_round_and_power info block_state round in
       let*? () =
         match block_state.locked_round_evidence with

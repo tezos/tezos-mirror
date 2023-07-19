@@ -2053,10 +2053,10 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
       in
       return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
 
-let record_endorsement ctxt (mode : mode) (content : consensus_content) :
+let record_attestation ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.attestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let mk_endorsement_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
+  let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
     Single_result
       (Attestation_result
@@ -2070,25 +2070,25 @@ let record_endorsement ctxt (mode : mode) (content : consensus_content) :
   match mode with
   | Application _ | Full_construction _ ->
       let*? consensus_key, power =
-        find_in_slot_map content (Consensus.allowed_endorsements ctxt)
+        find_in_slot_map content (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
+        Consensus.record_attestation ctxt ~initial_slot:content.slot ~power
       in
-      return (ctxt, mk_endorsement_result consensus_key power)
+      return (ctxt, mk_attestation_result consensus_key power)
   | Partial_construction _ ->
-      (* In mempool mode, endorsements are allowed for various levels
-         and rounds. We do not record endorsements because we could get
-         false-positive conflicts for endorsements with the same slot
-         but different levels/rounds. We could record just endorsements
+      (* In mempool mode, attestations are allowed for various levels
+         and rounds. We do not record attestations because we could get
+         false-positive conflicts for attestations with the same slot
+         but different levels/rounds. We could record just attestations
          for the predecessor's level and round (the most usual
-         endorsements), but we don't need to, because there is no block
+         attestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt content.level in
         Stake_distribution.slot_owner ctxt level content.slot
       in
-      return (ctxt, mk_endorsement_result consensus_key 0 (* Fake power. *))
+      return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     ~gas_cost_for_sig_check fees_updated_contents_list =
@@ -2187,7 +2187,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Preattestation consensus_content) ->
       record_preattestation ctxt mode consensus_content
   | Single (Attestation consensus_content) ->
-      record_endorsement ctxt mode consensus_content
+      record_attestation ctxt mode consensus_content
   | Single (Dal_attestation op) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
@@ -2196,8 +2196,8 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          signature. Consequently, it is really important to ensure this
          operation cannot be included into a block when the feature flag
          is not set. This is done in order to avoid modifying the
-         endorsement encoding. However, once the DAL will be ready, this
-         operation should be merged with an endorsement or at least
+         attestation encoding. However, once the DAL will be ready, this
+         operation should be merged with an attestation or at least
          refined. *)
       Dal_apply.apply_attestation ctxt op >>?= fun ctxt ->
       return
@@ -2490,33 +2490,33 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-let are_endorsements_required ctxt ~level =
+let are_attestations_required ctxt ~level =
   First_level_of_protocol.get ctxt >|=? fun first_level ->
   (* NB: the first level is the level of the migration block. There
-     are no endorsements for this block. Therefore the block at the
-     next level cannot contain endorsements. *)
+     are no attestations for this block. Therefore the block at the
+     next level cannot contain attestations. *)
   let level_position_in_protocol = Raw_level.diff level first_level in
   Compare.Int32.(level_position_in_protocol > 1l)
 
-let record_endorsing_participation ctxt =
+let record_attesting_participation ctxt =
   let open Lwt_result_syntax in
   let*? validators =
-    match Consensus.allowed_endorsements ctxt with
+    match Consensus.allowed_attestations ctxt with
     | Some x -> ok x
     | None -> error (Consensus.Slot_map_not_found {loc = __LOC__})
   in
   Slot.Map.fold_es
     (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
       let participation =
-        if Slot.Set.mem initial_slot (Consensus.endorsements_seen ctxt) then
+        if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
           Delegate.Participated
         else Delegate.Didn't_participate
       in
-      Delegate.record_endorsing_participation
+      Delegate.record_attesting_participation
         ctxt
         ~delegate:consensus_pk.delegate
         ~participation
-        ~endorsing_power:power)
+        ~attesting_power:power)
     validators
     ctxt
 
@@ -2599,7 +2599,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       ~predecessor_round
       ~timestamp
   in
-  (* The endorsement/preattestation validation rules for construction are the
+  (* The attestation/preattestation validation rules for construction are the
      same as for application. *)
   let current_level = Level.current ctxt in
   let* ctxt, _slot, block_producer =
@@ -2699,9 +2699,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let attestation_power = Consensus.current_endorsement_power ctxt in
-  let* required_endorsements =
-    are_endorsements_required ctxt ~level:level.level
+  let attestation_power = Consensus.current_attestation_power ctxt in
+  let* required_attestations =
+    are_attestations_required ctxt ~level:level.level
   in
   let block_payload_hash =
     Block_payload.hash
@@ -2710,14 +2710,14 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       (non_consensus_operations ctxt)
   in
   (* from this point nothing should fail *)
-  (* We mark the endorsement branch as the grand parent branch when
+  (* We mark the attestation branch as the grand parent branch when
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
   let level = Level.current ctxt in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
-    Consensus.store_endorsement_branch
+    Consensus.store_attestation_branch
       ctxt
       (predecessor_hash, block_payload_hash)
   in
@@ -2730,8 +2730,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, reward_bonus =
-    if required_endorsements then
-      let* ctxt = record_endorsing_participation ctxt in
+    if required_attestations then
+      let* ctxt = record_attesting_participation ctxt in
       let*? rewards_bonus =
         Baking.bonus_baking_reward ctxt ~attestation_power
       in
@@ -2892,7 +2892,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
       (* Fake finalization to return a correct type, because there is no
          block to finalize in mempool mode. If this changes in the
          future, beware that consensus operations are not recorded by
-         {!record_preattestation} and {!record_endorsement} in this mode. *)
+         {!record_preattestation} and {!record_attestation} in this mode. *)
       let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
       let level_info = Level.current ctxt in
       let result = finalize ctxt predecessor_fitness in

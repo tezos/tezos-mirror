@@ -426,7 +426,7 @@ module History = struct
         A Dal proof is an algebraic datatype with two cases, where we basically
         prove that a Dal page is confirmed on L1 or not. Being 'not confirmed'
         here includes the case where the slot's header is not published and the
-        case where the slot's header is published, but the endorsers didn't
+        case where the slot's header is published, but the attesters didn't
         confirm the availability of its data.
 
         To produce a proof representation for a page (see function {!produce_proof_repr}
