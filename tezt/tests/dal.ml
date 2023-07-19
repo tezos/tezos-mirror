@@ -67,7 +67,7 @@ let redundancy_factor_param redundancy_factor =
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
-    ?(node_arguments = []) () =
+    ?(node_arguments = []) ?(dal_bootstrap_peers = []) () =
   (* Temporary setup to initialise the node. *)
   let base = Either.right (protocol, custom_constants) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -1813,31 +1813,23 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
   let profile1 = Attestor Constant.bootstrap1.public_key_hash in
   let profile2 = Attestor Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
-  let* () = check_profiles ~__LOC__ dal_node ~expected:(Slot_operator []) in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
   (* Adding [Attestor] profile with pkh that is not encoded as
      [Tezos_crypto.Signature.Public_key_hash.encoding] should fail. *)
   let* () = check_bad_attestor_pkh_encoding (Attestor "This is invalid PKH") in
   (* Test adding duplicate profiles stores profile only once *)
   let* () = patch_profile_rpc profile1 in
   let* () = patch_profile_rpc profile1 in
-  let* () =
-    check_profiles ~__LOC__ dal_node ~expected:(Slot_operator [profile1])
-  in
+  let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1]) in
   (* Test adding multiple profiles *)
   let* () = patch_profile_rpc profile2 in
   let* () =
-    check_profiles
-      ~__LOC__
-      dal_node
-      ~expected:(Slot_operator [profile1; profile2])
+    check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
   in
   (* Test that the patched profiles are persisted after restart. *)
   let* () = Dal_node.terminate dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
-  check_profiles
-    ~__LOC__
-    dal_node
-    ~expected:(Slot_operator [profile1; profile2])
+  check_profiles ~__LOC__ dal_node ~expected:(Operator [profile1; profile2])
 
 (* Check that result of the DAL node's
    GET /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices
@@ -3349,8 +3341,51 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
      the baker behavior changes in this respect, the constant may need
      adjusting. *)
   let* () = Lwt_unix.sleep 2.0 in
-  check_profiles ~__LOC__ dal_node ~expected:(Slot_operator profiles)
+  check_profiles ~__LOC__ dal_node ~expected:(Operator profiles)
 
+(** Tests that a peer can discover another peer via a bootstrap node.
+
+    There are three nodes in the test:
+    - dal_node1: The bootstrap node.
+    - dal_node2: An attestor for pkh of boostrap1.
+    - dal_node3: A slot producer for slot index 0.
+
+    [dal_node2] should connect to [dal_node1] at startup.
+    [dal_node3] should also connect to [dal_node1] at startup.
+    [dal_node2] and [dal_node3] should find each other via [dal_node1]. *)
+let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
+    client dal_node1 =
+  let* dal_node2 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~attestor_profiles:[Constant.bootstrap1.public_key_hash]
+      node
+      client
+  in
+  let* dal_node3 =
+    make_dal_node
+      ~peers:[Dal_node.listen_addr dal_node1]
+      ~producer_profiles:[0]
+      node
+      client
+  in
+  let check_conn_event_from_2_to_3 =
+    check_new_connection_event
+      ~main_node:dal_node2
+      ~other_node:dal_node3
+      ~is_outbound:false
+  in
+  let check_conn_event_from_3_to_2 =
+    check_new_connection_event
+      ~main_node:dal_node3
+      ~other_node:dal_node2
+      ~is_outbound:false
+  in
+  Log.info "Bake two times to finalize a block." ;
+  let* () = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait client in
+  Log.info "Wait for dal_node2 and dal_node3 to find each other." ;
+  Lwt.join [check_conn_event_from_2_to_3; check_conn_event_from_3_to_2]
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
@@ -3553,6 +3588,12 @@ let register ~protocols =
     "baker registers profiles with dal node"
     ~activation_timestamp:Now
     test_baker_registers_profiles
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["bootstrap"]
+    ~bootstrap_profile:true
+    "peer discovery via bootstrap node"
+    test_peer_discovery_via_bootstrap_node
     protocols ;
 
   (* Tests with all nodes *)
