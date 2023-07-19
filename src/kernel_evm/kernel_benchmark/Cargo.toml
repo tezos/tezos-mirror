@@ -12,15 +12,21 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-evm-execution.workspace = true
-tezos_ethereum.workspace = true
+
 thiserror.workspace = true
+
+primitive-types.workspace = true
+
 hex.workspace = true
 rlp.workspace = true
+
 sha3.workspace = true
 tezos_data_encoding.workspace = true
-primitive-types.workspace = true
+
 evm.workspace = true
+
+tezos_ethereum.workspace = true
+evm-execution.workspace = true
 
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
