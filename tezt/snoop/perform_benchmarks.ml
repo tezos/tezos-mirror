@@ -323,6 +323,10 @@ let perform_sapling_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Sapling] snoop) in
   perform_benchmarks patches snoop benches
 
+let perform_dal_benchmarks snoop =
+  let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Dal] snoop) in
+  perform_benchmarks [] snoop benches
+
 let main protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
@@ -338,4 +342,5 @@ let main protocol =
   let* () = perform_carbonated_map_benchmarks snoop protocol in
   let* () = perform_sc_rollup_benchmarks snoop protocol in
   let* () = perform_shell_micheline_benchmarks snoop in
+  let* () = perform_dal_benchmarks snoop in
   perform_sapling_benchmarks snoop
