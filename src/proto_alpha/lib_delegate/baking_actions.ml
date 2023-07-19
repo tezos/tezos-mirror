@@ -628,12 +628,9 @@ let get_dal_attestations state ~level =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
       let delegates =
-        SlotMap.bindings state.level_state.delegate_slots.own_delegate_slots
-        |> List.map (fun (_slot, (consensus_key_and_delegate, _slots)) ->
-               consensus_key_and_delegate)
-        |> List.sort_uniq compare
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4666
-           This sorting can be avoided. *)
+        List.map
+          (fun delegate_slot -> delegate_slot.consensus_key_and_delegate)
+          (Delegate_slots.own_delegates state.level_state.delegate_slots)
       in
       let signing_key delegate = (fst delegate).public_key_hash in
       List.fold_left_es
@@ -698,13 +695,7 @@ let prepare_waiting_for_quorum state =
     state.global_state.constants.parametric.consensus_threshold
   in
   let get_slot_voting_power ~slot =
-    match
-      SlotMap.find slot state.level_state.delegate_slots.all_delegate_slots
-    with
-    | Some {endorsing_power; first_slot} when Slot.equal slot first_slot ->
-        Some endorsing_power
-    | Some _ | None (* cannot happen if the map is correctly populated *) ->
-        None
+    Delegate_slots.voting_power state.level_state.delegate_slots ~slot
   in
   let latest_proposal = state.level_state.latest_proposal.block in
   (* assert (latest_proposal.block.round = state.round_state.current_round) ; *)

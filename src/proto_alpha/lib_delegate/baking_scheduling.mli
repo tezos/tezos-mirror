@@ -64,6 +64,10 @@ val wait_next_event :
 
 val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
 
+(** Returns the first round at the next level, at or after
+    [earliest_round], whose baking slot belongs to one of our own
+    delegates; also returns the corresponding delegate. Or returns
+    [None] if no such round exists. *)
 val first_potential_round_at_next_level :
   state ->
   earliest_round:Round.t ->

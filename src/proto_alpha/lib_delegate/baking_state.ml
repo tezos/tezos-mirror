@@ -227,23 +227,42 @@ let round_of_shell_header shell_header =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
-(** An endorsing slot consists of the public key hash of a delegate, a
-    list of slots (i.e., a list of position indexes in the slot map, in
-    other words the list of rounds when it will be the proposer), and
-    its endorsing power. *)
-type endorsing_slot = {first_slot : Slot.t; endorsing_power : int}
-
-(* FIXME: determine if the slot map should contain all slots or just
-   the first one *)
-(* We also use the delegate slots as proposal slots *)
-(* TODO: make sure that this is correct *)
-type delegate_slots = {
-  (* be careful not to duplicate endorsing slots with different slots
-     keys: always use the first slot in the slots list *)
-  own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
-  all_delegate_slots : endorsing_slot SlotMap.t;
-  all_slots_by_round : Slot.t array;
+type delegate_slot = {
+  consensus_key_and_delegate : consensus_key_and_delegate;
+  first_slot : Slot.t;
+  endorsing_power : int;
 }
+
+module Delegate_slots = struct
+  (* Note that we also use the delegate slots as proposal slots. *)
+  type t = {
+    own_delegates : delegate_slot list;
+    own_delegate_slots : delegate_slot SlotMap.t;
+        (* This map cannot have as keys just the first slot of delegates,
+           because it is used in [round_proposer] for which we need all slots,
+           as the round can be arbitrary. *)
+    all_delegate_voting_power : int SlotMap.t;
+        (* This is a map having as keys the first slot of all delegates, and as
+           values their endorsing power.
+           This map contains just the first slot for a delegate, because it is
+           only used in [slot_voting_power] which is about (pre)endorsements,
+           not proposals. Indeed, only (pre)endorsements that use the delegate's
+           first slot are valid for inclusion in a block and count toward the
+           (pre)quorum. Note that the baker might receive nominally valid
+           non-first-slot operations from the mempool because this check is
+           skipped in the mempool to increase its speed; the baker can and
+           should ignore such operations. *)
+  }
+
+  let own_delegates slots = slots.own_delegates
+
+  let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
+
+  let voting_power slots ~slot =
+    SlotMap.find slot slots.all_delegate_voting_power
+end
+
+type delegate_slots = Delegate_slots.t
 
 type proposal = {block : block_info; predecessor : block_info}
 
@@ -652,51 +671,64 @@ module DelegateSet = struct
     with Found d -> Some d
 end
 
-let cache_size_limit = 100
+let delegate_slots endorsing_rights delegates =
+  let own_delegates = DelegateSet.of_list delegates in
+  let own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
+    List.fold_left
+      (fun (own_list, own_map, all_map) slot ->
+        let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
+        let first_slot = Stdlib.List.hd slots in
+        let endorsing_power = List.length slots in
+        let all_map = SlotMap.add first_slot endorsing_power all_map in
+        let own_list, own_map =
+          match DelegateSet.find_pkh consensus_key own_delegates with
+          | Some consensus_key ->
+              let endorsing_slot =
+                {
+                  consensus_key_and_delegate = (consensus_key, delegate);
+                  first_slot;
+                  endorsing_power;
+                }
+              in
+              ( endorsing_slot :: own_list,
+                List.fold_left
+                  (fun own_map slot -> SlotMap.add slot endorsing_slot own_map)
+                  own_map
+                  slots )
+          | None -> (own_list, own_map)
+        in
+        (own_list, own_map, all_map))
+      ([], SlotMap.empty, SlotMap.empty)
+      endorsing_rights
+  in
+  Delegate_slots.
+    {
+      own_delegates = own_delegate_first_slots;
+      own_delegate_slots;
+      all_delegate_voting_power;
+    }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
-  let own_delegates = DelegateSet.of_list delegates in
   Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
   Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
   >>=? fun endorsing_rights ->
-  let own_delegate_slots, all_delegate_slots =
-    List.fold_left
-      (fun (own_map, all_map) slot ->
-        let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
-        let endorsing_slot =
-          {
-            endorsing_power = List.length slots;
-            first_slot = Stdlib.List.hd slots;
-          }
-        in
-        let all_map =
-          List.fold_left
-            (fun all_map slot -> SlotMap.add slot endorsing_slot all_map)
-            all_map
-            slots
-        in
-        let own_map =
-          match DelegateSet.find_pkh consensus_key own_delegates with
-          | Some consensus_key ->
-              List.fold_left
-                (fun own_map slot ->
-                  SlotMap.add
-                    slot
-                    ((consensus_key, delegate), endorsing_slot)
-                    own_map)
-                own_map
-                slots
-          | None -> own_map
-        in
-        (own_map, all_map))
-      (SlotMap.empty, SlotMap.empty)
-      endorsing_rights
+  delegate_slots endorsing_rights delegates |> return
+
+let round_proposer state ~level round =
+  let slots =
+    match level with
+    | `Current -> state.level_state.delegate_slots
+    | `Next -> state.level_state.next_level_delegate_slots
   in
-  let all_slots_by_round =
-    all_delegate_slots |> SlotMap.bindings |> List.split |> fst |> Array.of_list
+  let committee_size =
+    state.global_state.constants.parametric.consensus_committee_size
   in
-  return {own_delegate_slots; all_delegate_slots; all_slots_by_round}
+  Round.to_slot round ~committee_size |> function
+  | Error _ -> None
+  | Ok slot -> Delegate_slots.own_slot_owner slots ~slot
+
+let cache_size_limit = 100
 
 let create_cache () =
   let open Baking_cache in
@@ -801,8 +833,8 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt
-    (consensus_key_and_delegate, {first_slot; endorsing_power}) =
+let pp_delegate_slot fmt
+    {consensus_key_and_delegate; first_slot; endorsing_power} =
   Format.fprintf
     fmt
     "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attestation_power: %d"
@@ -812,7 +844,7 @@ let pp_endorsing_slot fmt
     consensus_key_and_delegate
     endorsing_power
 
-let pp_delegate_slots fmt {own_delegate_slots; _} =
+let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
   Format.fprintf
     fmt
     "@[<v>%a@]"
@@ -823,7 +855,7 @@ let pp_delegate_slots fmt {own_delegate_slots; _} =
             "slot: %a, %a"
             Slot.pp
             slot
-            pp_endorsing_slot
+            pp_delegate_slot
             endorsing_slot))
     (SlotMap.bindings own_delegate_slots)
 
