@@ -300,7 +300,7 @@ let mint_pseudotokens ctxt (contract_balances_before : contract_balances)
   let*! ctxt =
     Storage.Contract.Frozen_deposits_pseudotokens.add
       ctxt
-      contract_balances_before.contract
+      (Implicit contract_balances_before.delegate_balances.delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
   return ctxt
@@ -341,7 +341,7 @@ let burn_pseudotokens ctxt (contract_balances_before : contract_balances)
   let*! ctxt =
     Storage.Contract.Frozen_deposits_pseudotokens.add
       ctxt
-      contract_balances_before.contract
+      (Implicit contract_balances_before.delegate_balances.delegate)
       new_delegate_total_frozen_deposits_pseudotokens
   in
   return ctxt
