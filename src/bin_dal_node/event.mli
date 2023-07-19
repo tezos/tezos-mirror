@@ -41,6 +41,9 @@ val node_is_ready : unit t
 
 val data_dir_not_found : string t
 
+val failed_to_persist_profiles :
+  (Services.Types.profiles * Error_monad.tztrace) t
+
 val fetched_slot : (int * int) t
 
 val layer1_node_new_head : (Block_hash.t * int32) t
