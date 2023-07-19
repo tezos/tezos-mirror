@@ -63,11 +63,16 @@ let send_something ctx path body log_msg_prefix =
         Cohttp_lwt_unix.Client.post ~ctx:ctx.cohttp_ctx ~body ~headers uri
       in
       let*! out = Cohttp_lwt.Body.to_string out in
-      Lwt_io.printlf
-        "%s%s: %s"
-        log_msg_prefix
-        (Cohttp.Code.string_of_status resp.status)
-        out)
+      let*! () =
+        Lwt_io.printlf
+          "%s%s: %s"
+          log_msg_prefix
+          (Cohttp.Code.string_of_status resp.status)
+          out
+      in
+      if resp.status <> `OK then
+        Lwt.fail_with (Cohttp.Code.string_of_status resp.status)
+      else Lwt.return_unit)
     ctx.endpoints
 
 let send_rights ctx level rights =
