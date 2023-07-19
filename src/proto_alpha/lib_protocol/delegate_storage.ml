@@ -307,7 +307,7 @@ let drain ctxt ~delegate ~destination =
 
 module For_RPC = struct
   let full_balance ctxt delegate =
-    Staking_pseudotokens_storage.staked_balance
+    Staking_pseudotokens_storage.For_RPC.staked_balance
       ctxt
       ~delegate
       ~contract:(Contract_repr.Implicit delegate)

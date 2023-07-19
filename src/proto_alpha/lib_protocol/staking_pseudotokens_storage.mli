@@ -27,20 +27,6 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables. *)
 
-(** [staked_balance ctxt ~contract ~delegate] returns [contract]'s
-    current staked tez.
-    For delegate, it is their own frozen deposits.
-    For delegators, their staking balance in pseudotokens is converted into tez
-    using [delegate] frozen deposits tez/pseudotokens rate.
-    
-    The given [delegate] should be [contract]'s delegate. Otherwise the given
-    [Tez.t] amount will not make sense. *)
-val staked_balance :
-  Raw_context.t ->
-  contract:Contract_repr.t ->
-  delegate:Signature.Public_key_hash.t ->
-  Tez_repr.t tzresult Lwt.t
-
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s 
@@ -73,3 +59,19 @@ val request_unstake :
   delegate:Signature.Public_key_hash.t ->
   Tez_repr.t ->
   (Raw_context.t * Tez_repr.t) tzresult Lwt.t
+
+module For_RPC : sig
+  (** [staked_balance ctxt ~contract ~delegate] returns [contract]'s
+    current staked tez.
+    For delegate, it is their own frozen deposits.
+    For delegators, their staking balance in pseudotokens is converted into tez
+    using [delegate]'s costaked frozen deposits tez/pseudotokens rate.
+    
+    The given [delegate] should be [contract]'s delegate. Otherwise the given
+    [Tez.t] amount will not make sense. *)
+  val staked_balance :
+    Raw_context.t ->
+    contract:Contract_repr.t ->
+    delegate:Signature.Public_key_hash.t ->
+    Tez_repr.t tzresult Lwt.t
+end

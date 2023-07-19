@@ -474,22 +474,25 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
     (ctxt, Tez_repr.min delegate_own_frozen_deposits requested_amount)
   else request_unstake ctxt ~delegator:contract ~delegate requested_amount
 
-let staked_balance ctxt ~delegator ~delegate =
-  let open Lwt_result_syntax in
-  let* delegate_balances = get_delegate_balances ctxt ~delegate in
-  let* delegator_balances =
-    get_delegator_balances ctxt ~delegator ~delegate_balances
-  in
-  if
-    Staking_pseudotoken_repr.(
-      delegate_balances.frozen_deposits_pseudotokens <> zero)
-  then return @@ tez_of delegate_balances delegator_balances.pseudotoken_balance
-  else (
-    assert (
-      Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;
-    return Tez_repr.zero)
+module For_RPC = struct
+  let staked_balance ctxt ~delegator ~delegate =
+    let open Lwt_result_syntax in
+    let* delegate_balances = get_delegate_balances ctxt ~delegate in
+    let* delegator_balances =
+      get_delegator_balances ctxt ~delegator ~delegate_balances
+    in
+    if
+      Staking_pseudotoken_repr.(
+        delegate_balances.frozen_deposits_pseudotokens <> zero)
+    then
+      return @@ tez_of delegate_balances delegator_balances.pseudotoken_balance
+    else (
+      assert (
+        Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;
+      return Tez_repr.zero)
 
-let staked_balance ctxt ~contract ~delegate =
-  if Contract_repr.(contract = Implicit delegate) then
-    get_own_frozen_deposits ctxt ~delegate
-  else staked_balance ctxt ~delegator:contract ~delegate
+  let staked_balance ctxt ~contract ~delegate =
+    if Contract_repr.(contract = Implicit delegate) then
+      get_own_frozen_deposits ctxt ~delegate
+    else staked_balance ctxt ~delegator:contract ~delegate
+end

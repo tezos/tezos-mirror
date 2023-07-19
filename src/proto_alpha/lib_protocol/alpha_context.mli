@@ -4984,12 +4984,6 @@ end
 
 (** This module re-exports definitions from {!Staking_pseudotokens_storage}. *)
 module Staking_pseudotokens : sig
-  val staked_balance :
-    context ->
-    contract:Contract.t ->
-    delegate:public_key_hash ->
-    Tez.t tzresult Lwt.t
-
   val stake :
     context ->
     contract:Contract.t ->
@@ -5003,6 +4997,14 @@ module Staking_pseudotokens : sig
     delegate:public_key_hash ->
     Tez.t ->
     (context * Tez.t) tzresult Lwt.t
+
+  module For_RPC : sig
+    val staked_balance :
+      context ->
+      contract:Contract.t ->
+      delegate:public_key_hash ->
+      Tez.t tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Fees_storage}. *)
