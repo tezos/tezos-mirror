@@ -39,37 +39,22 @@ let find ctxt delegate =
     ctxt
     (Contract_repr.Implicit delegate)
 
-let raw_pending_updates ctxt delegate =
-  Storage.Contract.Pending_staking_parameters.bindings
-    (ctxt, Contract_repr.Implicit delegate)
-
 let pending_updates ctxt delegate =
-  let open Lwt_syntax in
-  let* updates = raw_pending_updates ctxt delegate in
-  let updates =
-    List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
-  in
-  return updates
-
-let raw_of_delegate_for_cycle ctxt delegate cycle =
-  let open Lwt_result_syntax in
-  let*! pendings = raw_pending_updates ctxt delegate in
-  let* active = of_delegate ctxt delegate in
-  let current_level = Raw_context.current_level ctxt in
-  let active_for_cycle =
-    List.fold_left
-      (fun (c1, active) (c2, update) ->
-        if Cycle_repr.(c1 < c2 && c2 <= cycle) then (c2, update)
-        else (c1, active))
-      (current_level.cycle, active)
-      pendings
-  in
-  return active_for_cycle
+  let contract = Contract_repr.Implicit delegate in
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let to_cycle = Cycle_repr.add current_cycle (preserved_cycles + 1) in
+  List.filter_map_es
+    (fun cycle ->
+      let open Lwt_result_syntax in
+      let+ param_opt =
+        Storage.Pending_staking_parameters.find (ctxt, cycle) contract
+      in
+      Option.map (fun param -> (cycle, param)) param_opt)
+    Cycle_repr.(current_cycle ---> to_cycle)
 
 let of_delegate_for_cycle ctxt delegate cycle =
-  let open Lwt_result_syntax in
-  let* _, t = raw_of_delegate_for_cycle ctxt delegate cycle in
-  return t
+  Storage.Pending_staking_parameters.get (ctxt, cycle) (Implicit delegate)
 
 let register_update ctxt delegate t =
   let open Lwt_result_syntax in
@@ -79,39 +64,24 @@ let register_update ctxt delegate t =
     Cycle_repr.add current_level.cycle (preserved_cycles + 1)
   in
   let*! ctxt =
-    Storage.Contract.Pending_staking_parameters.add
-      (ctxt, Contract_repr.Implicit delegate)
-      update_cycle
+    Storage.Pending_staking_parameters.add
+      (ctxt, update_cycle)
+      (Contract_repr.Implicit delegate)
       t
   in
   return ctxt
 
 let activate ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  Storage.Delegates.fold
-    ctxt
-    ~order:`Undefined
-    ~init:(ok ctxt)
-    ~f:(fun delegate ctxt ->
-      let*? ctxt in
-      let delegate = Contract_repr.Implicit delegate in
-      let* update =
-        Storage.Contract.Pending_staking_parameters.find
-          (ctxt, delegate)
-          new_cycle
-      in
-      match update with
-      | None -> return ctxt
-      | Some t ->
-          let*! ctxt =
-            Storage.Contract.Staking_parameters.add ctxt delegate t
-          in
-          let*! ctxt =
-            Storage.Contract.Pending_staking_parameters.remove
-              (ctxt, delegate)
-              new_cycle
-          in
-          return ctxt)
+  let open Lwt_syntax in
+  let* ctxt =
+    Storage.Pending_staking_parameters.fold
+      (ctxt, new_cycle)
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun delegate t ctxt ->
+        Storage.Contract.Staking_parameters.add ctxt delegate t)
+  in
+  Storage.Pending_staking_parameters.clear (ctxt, new_cycle)
 
 type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 

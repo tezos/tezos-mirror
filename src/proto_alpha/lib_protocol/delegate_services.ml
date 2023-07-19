@@ -623,10 +623,7 @@ let register () =
   register1 ~chunked:false S.active_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
-      let*! pending_updates =
-        Delegate.Staking_parameters.pending_updates ctxt pkh
-      in
-      return pending_updates)
+      Delegate.Staking_parameters.pending_updates ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =

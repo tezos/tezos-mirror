@@ -167,12 +167,6 @@ module Contract : sig
        and type value = Staking_parameters_repr.t
        and type t := Raw_context.t
 
-  module Pending_staking_parameters :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Staking_parameters_repr.t
-       and type t := Raw_context.t * Contract_repr.t
-
   (** All contracts (implicit and originated) that are delegated, if any  *)
   module Delegated :
     Data_set_storage
@@ -486,6 +480,12 @@ module Slashed_deposits :
     with type t := Raw_context.t * Cycle_repr.t
      and type key = Raw_level_repr.t * Signature.Public_key_hash.t
      and type value = slashed_level
+
+module Pending_staking_parameters :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Contract_repr.t
+     and type value = Staking_parameters_repr.t
 
 module Stake : sig
   (** The map of all the staking balances of all delegates, including
