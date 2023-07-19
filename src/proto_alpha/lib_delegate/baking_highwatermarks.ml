@@ -117,8 +117,8 @@ let highwatermark_delegate_map_encoding =
 
 type highwatermarks = {
   blocks : highwatermark DelegateMap.t;
-  preendorsements : highwatermark DelegateMap.t;
-  endorsements : highwatermark DelegateMap.t;
+  preattestations : highwatermark DelegateMap.t;
+  attestations : highwatermark DelegateMap.t;
 }
 
 type t = highwatermarks
@@ -126,10 +126,10 @@ type t = highwatermarks
 let encoding ~use_legacy_attestation_name =
   let open Data_encoding in
   conv
-    (fun {blocks; preendorsements; endorsements} ->
-      (blocks, preendorsements, endorsements))
-    (fun (blocks, preendorsements, endorsements) ->
-      {blocks; preendorsements; endorsements})
+    (fun {blocks; preattestations; attestations} ->
+      (blocks, preattestations, attestations))
+    (fun (blocks, preattestations, attestations) ->
+      {blocks; preattestations; attestations})
     (obj3
        (req "blocks" highwatermark_delegate_map_encoding)
        (req
@@ -162,8 +162,8 @@ let load_encoding =
 let empty =
   {
     blocks = DelegateMap.empty;
-    preendorsements = DelegateMap.empty;
-    endorsements = DelegateMap.empty;
+    preattestations = DelegateMap.empty;
+    attestations = DelegateMap.empty;
   }
 
 (* We do not lock these functions. The caller will be already locked. *)
@@ -195,15 +195,15 @@ let may_sign_block cctxt (location : [`Highwatermarks] Baking_files.location)
   let* all_highwatermarks = load cctxt location in
   return @@ may_sign all_highwatermarks.blocks ~delegate ~level ~round
 
-let may_sign_preendorsement cctxt location ~delegate ~level ~round =
+let may_sign_preattestation cctxt location ~delegate ~level ~round =
   let open Lwt_result_syntax in
   let* all_highwatermarks = load cctxt location in
-  return @@ may_sign all_highwatermarks.preendorsements ~delegate ~level ~round
+  return @@ may_sign all_highwatermarks.preattestations ~delegate ~level ~round
 
-let may_sign_endorsement cctxt location ~delegate ~level ~round =
+let may_sign_attestation cctxt location ~delegate ~level ~round =
   let open Lwt_result_syntax in
   let* all_highwatermarks = load cctxt location in
-  return @@ may_sign all_highwatermarks.endorsements ~delegate ~level ~round
+  return @@ may_sign all_highwatermarks.attestations ~delegate ~level ~round
 
 let record map ~delegate ~new_level ~new_round =
   DelegateMap.update
@@ -230,14 +230,14 @@ let record_block (cctxt : #Protocol_client_context.full) location ~delegate
   in
   save_highwatermarks cctxt filename {highwatermarks with blocks = new_blocks}
 
-let record_preendorsement (cctxt : #Protocol_client_context.full) location
+let record_preattestation (cctxt : #Protocol_client_context.full) location
     ~delegate ~level ~round =
   let open Lwt_result_syntax in
   let filename = Baking_files.filename location in
   let* highwatermarks = load cctxt location in
-  let new_preendorsements =
+  let new_preattestations =
     record
-      highwatermarks.preendorsements
+      highwatermarks.preattestations
       ~delegate
       ~new_level:level
       ~new_round:round
@@ -245,16 +245,16 @@ let record_preendorsement (cctxt : #Protocol_client_context.full) location
   save_highwatermarks
     cctxt
     filename
-    {highwatermarks with preendorsements = new_preendorsements}
+    {highwatermarks with preattestations = new_preattestations}
 
-let record_endorsement (cctxt : #Protocol_client_context.full) location
+let record_attestation (cctxt : #Protocol_client_context.full) location
     ~delegate ~level ~round =
   let open Lwt_result_syntax in
   let filename = Baking_files.filename location in
   let* highwatermarks = load cctxt location in
-  let new_endorsements =
+  let new_attestations =
     record
-      highwatermarks.endorsements
+      highwatermarks.attestations
       ~delegate
       ~new_level:level
       ~new_round:round
@@ -262,4 +262,4 @@ let record_endorsement (cctxt : #Protocol_client_context.full) location
   save_highwatermarks
     cctxt
     filename
-    {highwatermarks with endorsements = new_endorsements}
+    {highwatermarks with attestations = new_attestations}

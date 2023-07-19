@@ -450,7 +450,7 @@ let inject_preendorsements state ~preendorsements =
         let* may_sign =
           cctxt#with_lock (fun () ->
               let* may_sign =
-                Baking_highwatermarks.may_sign_preendorsement
+                Baking_highwatermarks.may_sign_preattestation
                   cctxt
                   block_location
                   ~delegate:consensus_key.public_key_hash
@@ -460,7 +460,7 @@ let inject_preendorsements state ~preendorsements =
               match may_sign with
               | true ->
                   let* () =
-                    Baking_highwatermarks.record_preendorsement
+                    Baking_highwatermarks.record_preattestation
                       cctxt
                       block_location
                       ~delegate:consensus_key.public_key_hash
@@ -547,7 +547,7 @@ let sign_endorsements state endorsements =
       let* may_sign =
         cctxt#with_lock (fun () ->
             let* may_sign =
-              Baking_highwatermarks.may_sign_endorsement
+              Baking_highwatermarks.may_sign_attestation
                 cctxt
                 block_location
                 ~delegate:consensus_key.public_key_hash
@@ -557,7 +557,7 @@ let sign_endorsements state endorsements =
             match may_sign with
             | true ->
                 let* () =
-                  Baking_highwatermarks.record_endorsement
+                  Baking_highwatermarks.record_attestation
                     cctxt
                     block_location
                     ~delegate:consensus_key.public_key_hash
