@@ -726,6 +726,17 @@ let credit_bond_only_call_from_token ctxt contract bond_id amount =
 let has_frozen_bonds ctxt contract =
   Storage.Contract.Total_frozen_bonds.mem ctxt contract >|= ok
 
+let has_frozen_deposits ctxt contract =
+  let open Lwt_result_syntax in
+  let* pseudo = Storage.Contract.Costaking_pseudotokens.find ctxt contract in
+  match pseudo with
+  | Some v when not Staking_pseudotoken_repr.(v = zero) -> return_true
+  | _ -> (
+      let* requests = Storage.Contract.Unstake_requests.find ctxt contract in
+      match requests with
+      | None | Some {delegate = _; requests = []} -> return_false
+      | Some _ -> return_true)
+
 let fold_on_bond_ids ctxt contract =
   Storage.Contract.fold_bond_ids (ctxt, contract)
 
@@ -734,7 +745,8 @@ let fold_on_bond_ids ctxt contract =
 let should_keep_empty_implicit_contract ctxt contract =
   let open Lwt_result_syntax in
   let* has_frozen_bonds = has_frozen_bonds ctxt contract in
-  if has_frozen_bonds then return_true
+  let* has_frozen_deposits = has_frozen_deposits ctxt contract in
+  if has_frozen_bonds || has_frozen_deposits then return_true
   else
     (* full balance of contract is zero. *)
     Contract_delegate_storage.find ctxt contract >>=? function
