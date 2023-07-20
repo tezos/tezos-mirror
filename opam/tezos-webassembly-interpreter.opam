@@ -11,7 +11,6 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "ppx_deriving"
-  "tezos-lwt-result-stdlib"
   "octez-libs"
   "zarith" { >= "1.12" & < "1.13" }
   "tezt" { with-test & >= "3.1.1" }

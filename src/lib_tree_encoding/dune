@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-context.sigs
-  tezos-lwt-result-stdlib
+  octez-libs.tezos-lwt-result-stdlib
   data-encoding)
  (flags
   (:standard)

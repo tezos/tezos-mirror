@@ -16,9 +16,9 @@ depends: [
   "zarith_stubs_js"
   "lwt" { >= "5.6.0" }
   "aches" { >= "1.0.0" }
+  "seqes" { >= "0.2" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
-  "tezos-lwt-result-stdlib"
   "hacl-star" { >= "0.7.1" & < "0.8" }
   "hacl-star-raw"
   "ctypes_stubs_js"

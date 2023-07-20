@@ -10,7 +10,7 @@
   lwt
   re
   octez-libs.tezos-error-monad
-  tezos-lwt-result-stdlib)
+  octez-libs.tezos-lwt-result-stdlib)
  (js_of_ocaml)
  (flags
   (:standard)

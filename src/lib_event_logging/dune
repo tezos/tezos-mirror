@@ -9,7 +9,7 @@
   octez-libs.tezos-stdlib
   data-encoding
   octez-libs.tezos-error-monad
-  tezos-lwt-result-stdlib
+  octez-libs.tezos-lwt-result-stdlib
   uri)
  (js_of_ocaml)
  (flags

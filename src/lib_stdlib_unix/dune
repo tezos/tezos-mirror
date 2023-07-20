@@ -8,7 +8,7 @@
  (libraries
   unix
   octez-libs.tezos-error-monad
-  tezos-lwt-result-stdlib
+  octez-libs.tezos-lwt-result-stdlib
   octez-libs.tezos-event-logging
   octez-libs.tezos-stdlib
   data-encoding

@@ -3,9 +3,9 @@
 
 (library
  (name traces)
- (public_name tezos-lwt-result-stdlib.examples.traces)
+ (public_name octez-libs.tezos-lwt-result-stdlib.examples.traces)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt
-  tezos-lwt-result-stdlib.bare.structs
-  tezos-lwt-result-stdlib.traced.sigs))
+  octez-libs.tezos-lwt-result-stdlib.bare.structs
+  octez-libs.tezos-lwt-result-stdlib.traced.sigs))

@@ -3,10 +3,10 @@
 
 (library
  (name bare_structs)
- (public_name tezos-lwt-result-stdlib.bare.structs)
+ (public_name octez-libs.tezos-lwt-result-stdlib.bare.structs)
  (instrumentation (backend bisect_ppx))
  (libraries
   seqes
   lwt
-  tezos-lwt-result-stdlib.bare.sigs)
+  octez-libs.tezos-lwt-result-stdlib.bare.sigs)
  (js_of_ocaml))
