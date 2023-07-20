@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::rlp_helpers::*;
+use crate::{
+    rlp_helpers::*,
+    tx_signature::{rlp_append_opt, rlp_decode_opt, TxSignature},
+};
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
@@ -191,7 +194,7 @@ impl TryFrom<&[u8]> for TransactionReceipt {
     }
 }
 
-/// Transaction receipt, https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash
+/// Transaction object, https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash
 /// There a lot of redundancy between a transaction object and a transaction
 /// receipt. In fact, transaction objects should not be stored in the kernel
 /// but rather in the EVM node. Duplicating the code instead of sharing fields
@@ -221,12 +224,8 @@ pub struct TransactionObject {
     pub index: u32,
     /// Value transferred in Wei.
     pub value: U256,
-    /// ECDSA recovery id
-    pub v: U256,
-    /// ECDSA signature r
-    pub r: H256,
-    /// ECDSA signature s
-    pub s: H256,
+    /// ECDSA signature
+    pub signature: Option<TxSignature>,
 }
 
 impl Decodable for TransactionObject {
@@ -246,9 +245,7 @@ impl Decodable for TransactionObject {
                 let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
                 let index: u32 = decode_field(&next(&mut it)?, "index")?;
                 let value: U256 = decode_field_u256_le(&next(&mut it)?, "value")?;
-                let v: U256 = decode_field_u256_le(&next(&mut it)?, "v")?;
-                let r: H256 = decode_field_h256(&next(&mut it)?, "r")?;
-                let s: H256 = decode_field_h256(&next(&mut it)?, "s")?;
+                let signature = rlp_decode_opt(&mut it)?;
                 Ok(Self {
                     block_hash,
                     block_number,
@@ -261,9 +258,7 @@ impl Decodable for TransactionObject {
                     to,
                     index,
                     value,
-                    v,
-                    r,
-                    s,
+                    signature,
                 })
             } else {
                 Err(DecoderError::RlpIncorrectListLen)
@@ -291,9 +286,7 @@ impl Encodable for TransactionObject {
         };
         stream.append(&self.index);
         append_u256_le(stream, self.value);
-        append_u256_le(stream, self.v);
-        stream.append(&self.r);
-        stream.append(&self.s);
+        rlp_append_opt(&self.signature, stream);
     }
 }
 
@@ -372,13 +365,21 @@ mod test {
             to: Some(address_of_str("3635353535353535353535353535353535353536")),
             index: 15u32,
             value: U256::from(0),
-            v: U256::from(1337),
-            r: H256::from_low_u64_be(0),
-            s: H256::from_low_u64_be(1),
+            signature: Some(
+                TxSignature::new(
+                    U256::from(1337),
+                    H256::from_low_u64_be(1),
+                    H256::from_low_u64_be(2),
+                )
+                .unwrap(),
+            ),
         };
         object_encoding_roundtrip(v.clone());
 
-        let v1 = TransactionObject { to: None, ..v };
+        let v1 = TransactionObject {
+            to: None,
+            ..v.clone()
+        };
         object_encoding_roundtrip(v1);
 
         let v2 = TransactionObject {

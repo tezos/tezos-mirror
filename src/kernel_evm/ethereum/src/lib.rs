@@ -7,4 +7,5 @@ pub mod eth_gen;
 pub mod rlp_helpers;
 pub mod transaction;
 pub mod tx_common;
+pub mod tx_signature;
 pub mod wei;

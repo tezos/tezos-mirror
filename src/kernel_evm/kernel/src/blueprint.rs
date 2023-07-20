@@ -77,7 +77,7 @@ pub fn fetch<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
-    use primitive_types::{H160, H256, U256};
+    use primitive_types::{H160, U256};
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
@@ -99,9 +99,7 @@ mod tests {
             to: address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
             value: U256::from(500000000u64),
             data: vec![],
-            v: U256::from(0),
-            r: H256::from_low_u64_be(0),
-            s: H256::from_low_u64_be(0),
+            signature: None,
         };
 
         let valid_transaction = Transaction {

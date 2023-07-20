@@ -702,7 +702,7 @@ mod test {
         .unwrap();
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
-        let transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
+        let transaction = EthereumTransactionCommon::from_rlp_hex(encoded).unwrap();
         let address = transaction.caller().unwrap();
         let expected_address_string: [u8; 20] =
             hex::decode("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
@@ -721,7 +721,8 @@ mod test {
                 .to_string();
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
-        let expected_transaction = EthereumTransactionCommon::from_rlp(encoded).unwrap();
+        let expected_transaction =
+            EthereumTransactionCommon::from_rlp_hex(encoded).unwrap();
 
         let transaction = expected_transaction.sign_transaction(string_sk).unwrap();
         assert_eq!(expected_transaction, transaction)
