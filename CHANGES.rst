@@ -223,6 +223,10 @@ Node
   message ``no validation plugin found for protocol
   <protocol_hash>``. (MR :gl:`!9583`)
 
+- Add RPC to get smart rollup's balance of ticket with specified ticketer, content type, and content:
+  ``POST chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/ticket_balance``
+  (MR :gl:`!9535`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
