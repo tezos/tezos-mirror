@@ -268,7 +268,9 @@ module Typechecking_data : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Typechecking_data)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Typechecking_data)
 
 module Unparsing_data : Benchmark.S = struct
   include Config
@@ -356,7 +358,9 @@ module Unparsing_data : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Unparsing_data)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Unparsing_data)
 
 module Typechecking_code : Benchmark.S = struct
   include Config
@@ -436,7 +440,9 @@ module Typechecking_code : Benchmark.S = struct
         List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Typechecking_code)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Typechecking_code)
 
 module Unparsing_code : Benchmark.S = struct
   include Config
@@ -526,7 +532,9 @@ module Unparsing_code : Benchmark.S = struct
     | None -> List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Unparsing_code)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Unparsing_code)
 
 let rec check_printable_ascii v i =
   if Compare.Int.(i < 0) then true

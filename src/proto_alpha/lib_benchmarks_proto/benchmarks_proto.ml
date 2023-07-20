@@ -88,6 +88,33 @@ module Registration = struct
             Bench.create_benchmark ~rng_state config)
     end in
     Registration_helpers.register (module B : Benchmark_base.S)
+
+  let register_simple_with_num ((module Bench) : Benchmark_base.simple_with_num)
+      =
+    let module B : Benchmark_base.Simple_with_num = struct
+      include Bench
+
+      let tags = Tags.common :: tags
+    end in
+    Registration.register_simple_with_num
+      (module B : Benchmark_base.Simple_with_num)
+
+  let register_as_simple_with_num (module B : Benchmark_base.S) =
+    let modules =
+      List.map
+        (fun (model_name, model) : (module Benchmark_base.Simple_with_num) ->
+          (module struct
+            include B
+
+            let name = Namespace.cons name model_name
+
+            let group = Benchmark_base.Group model_name
+
+            let model = model
+          end))
+        B.models
+    in
+    List.iter (fun x -> register_simple_with_num x) modules
 end
 
 module Model = struct
