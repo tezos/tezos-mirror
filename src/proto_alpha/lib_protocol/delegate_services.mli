@@ -69,6 +69,8 @@ type info = {
 
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
+val deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t
+
 val info_encoding : info Data_encoding.t
 
 val info :
