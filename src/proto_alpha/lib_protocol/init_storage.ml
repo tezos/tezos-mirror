@@ -103,6 +103,42 @@ let patch_script ctxt (address, hash, patched_code) =
         address ;
       return ctxt
 
+(** Converts {Storage.Stake.Staking_balance} from {Tez_repr} to
+    {Stake_repr.Full}.  Remove me in P. *)
+let migrate_staking_balance_for_o ctxt =
+  let open Lwt_result_syntax in
+  let convert ctxt delegate staking_balance =
+    let delegate_contract = Contract_repr.Implicit delegate in
+    let* {current_amount = own_frozen; initial_amount = _} =
+      Frozen_deposits_storage.get ctxt delegate_contract
+    in
+    let delegated =
+      Tez_repr.sub_opt staking_balance own_frozen
+      |> Option.value ~default:Tez_repr.zero
+    in
+    let costaked_frozen = Tez_repr.zero in
+    return (Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+  in
+  Storage.Stake.Staking_balance_up_to_Nairobi.fold
+    ctxt
+    ~order:`Undefined
+    ~init:(ok ctxt)
+    ~f:(fun delegate staking_balance ctxt ->
+      let*? ctxt in
+      let* stake = convert ctxt delegate staking_balance in
+      Storage.Stake.Staking_balance.update ctxt delegate stake)
+
+(** Clear staking balance snapshots to avoid storing legacy values.
+    This should do nothing if the migration happens at a cycle
+    boundary, which is usually the case.
+*)
+let clear_staking_balance_snapshots_for_o ctxt =
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    Storage.Stake.Staking_balance_up_to_Nairobi.Snapshot.clear ctxt
+  in
+  Storage.Stake.Last_snapshot.update ctxt 0
+
 (** Converts {Storage.Stake.Total_active_stake} and
     {Storage.Stake.Selected_distribution_for_cycle} from {Tez_repr} to
     {Stake_repr}.
@@ -250,6 +286,8 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         ctxt
         Signature.Public_key_hash.Set.empty
       >>=? fun ctxt ->
+      migrate_staking_balance_for_o ctxt >>=? fun ctxt ->
+      clear_staking_balance_snapshots_for_o ctxt >>=? fun ctxt ->
       migrate_stake_distribution_for_o ctxt >>=? fun ctxt ->
       initialize_total_supply_for_o chain_id ctxt >>= fun ctxt ->
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt

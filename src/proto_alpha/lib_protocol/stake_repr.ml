@@ -100,3 +100,32 @@ let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
   let* frozen = Tez_repr.(f1 +? f2) in
   let+ delegated = Tez_repr.(d1 +? d2) in
   {frozen; delegated}
+
+module Full = struct
+  type t = {
+    own_frozen : Tez_repr.t;
+    costaked_frozen : Tez_repr.t;
+    delegated : Tez_repr.t;
+  }
+
+  let make ~own_frozen ~costaked_frozen ~delegated =
+    {own_frozen; costaked_frozen; delegated}
+
+  let zero =
+    make
+      ~own_frozen:Tez_repr.zero
+      ~costaked_frozen:Tez_repr.zero
+      ~delegated:Tez_repr.zero
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {own_frozen; costaked_frozen; delegated} ->
+        (own_frozen, costaked_frozen, delegated))
+      (fun (own_frozen, costaked_frozen, delegated) ->
+        {own_frozen; costaked_frozen; delegated})
+      (obj3
+         (req "own_frozen" Tez_repr.encoding)
+         (req "costaked_frozen" Tez_repr.encoding)
+         (req "delegated" Tez_repr.encoding))
+end

@@ -34,15 +34,27 @@
     - {!Storage.Stake.Total_active_stake}
 *)
 
-val remove_stake :
+val remove_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val add_stake :
+val remove_frozen_stake :
+  Raw_context.t ->
+  Stake_repr.staker ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val add_delegated_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val add_frozen_stake :
+  Raw_context.t ->
+  Stake_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -51,9 +63,6 @@ val set_inactive :
 
 val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val get_staking_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
@@ -75,7 +84,7 @@ val fold :
 val fold_snapshot :
   Raw_context.t ->
   index:int ->
-  f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Signature.Public_key_hash.t * Stake_repr.Full.t -> 'a -> 'a tzresult Lwt.t) ->
   init:'a ->
   'a tzresult Lwt.t
 
@@ -95,9 +104,6 @@ val set_selected_distribution_for_cycle :
 
 val clear_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
-val get :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val fold_on_active_delegates_with_minimal_stake :
   Raw_context.t ->
@@ -126,14 +132,28 @@ val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val get_total_active_stake :
   Raw_context.t -> Cycle_repr.t -> Stake_repr.t tzresult Lwt.t
 
-(** [add_contract_stake ctxt contract amount] calls
-    [Stake_storage.add_stake ctxt delegate amount] if [contract] has a
-    [delegate]. Otherwise this function does nothing. *)
-val add_contract_stake :
+(** [add_contract_delegated_stake ctxt contract amount] calls
+    [Stake_storage.add_delegated_stake ctxt delegate amount] if
+    [contract] has a [delegate]. Otherwise this function does
+    nothing. *)
+val add_contract_delegated_stake :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [remove_contract_stake ctxt contract amount] calls
-    [Stake_storage.remove_stake ctxt delegate amount] if [contract] has a
-    [delegate]. Otherwise this function does nothing. *)
-val remove_contract_stake :
+(** [remove_contract_delegated_stake ctxt contract amount] calls
+    [Stake_storage.remove_delegated_stake ctxt delegate amount] if
+    [contract] has a [delegate]. Otherwise this function does
+    nothing. *)
+val remove_contract_delegated_stake :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+module For_RPC : sig
+  val get_staking_balance :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+end
+
+module Internal_for_tests : sig
+  (** Same as [get_staking_balance] but returns zero if the argument
+      is not an active delegate above minimal stake.  *)
+  val get :
+    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+end

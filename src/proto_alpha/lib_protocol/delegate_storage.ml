@@ -58,7 +58,7 @@ module Contract = struct
     Contract_delegate_storage.init ctxt contract delegate >>=? fun ctxt ->
     Contract_storage.get_balance_and_frozen_bonds ctxt contract
     >>=? fun balance_and_frozen_bonds ->
-    Stake_storage.add_stake ctxt delegate balance_and_frozen_bonds
+    Stake_storage.add_delegated_stake ctxt delegate balance_and_frozen_bonds
 
   type error +=
     | (* `Temporary *) Active_delegate
@@ -117,10 +117,15 @@ module Contract = struct
         Contract_storage.get_balance_and_frozen_bonds c contract
       in
       let* c =
-        Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+        Stake_storage.remove_contract_delegated_stake
+          c
+          contract
+          balance_and_frozen_bonds
       in
       let* c = Contract_delegate_storage.set c contract delegate in
-      let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+      let* c =
+        Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+      in
       let*! c = Storage.Delegates.add c delegate in
       let* c = Delegate_consensus_key.init c delegate pk in
       let* c = Stake_storage.set_active c delegate in
@@ -183,7 +188,10 @@ module Contract = struct
       Contract_storage.get_balance_and_frozen_bonds c contract
     in
     let* c =
-      Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+      Stake_storage.remove_contract_delegated_stake
+        c
+        contract
+        balance_and_frozen_bonds
     in
     match delegate with
     | None ->
@@ -197,7 +205,9 @@ module Contract = struct
             (Unregistered_delegate delegate)
         in
         let* c = Contract_delegate_storage.set c contract delegate in
-        let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+        let* c =
+          Stake_storage.add_delegated_stake c delegate balance_and_frozen_bonds
+        in
         return c
 
   let set c contract delegate =
@@ -218,11 +228,6 @@ let frozen_deposits ctxt delegate =
 let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
-
-let staking_balance ctxt delegate =
-  registered ctxt delegate >>= fun is_registered ->
-  if is_registered then Stake_storage.get_staking_balance ctxt delegate
-  else return Tez_repr.zero
 
 let is_forbidden_delegate ctxt delegate =
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
@@ -334,6 +339,12 @@ module For_RPC = struct
     Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
     >>=? fun balance_and_frozen_bonds ->
     Lwt.return Tez_repr.(all_frozen +? balance_and_frozen_bonds)
+
+  let staking_balance ctxt delegate =
+    registered ctxt delegate >>= fun is_registered ->
+    if is_registered then
+      Stake_storage.For_RPC.get_staking_balance ctxt delegate
+    else return Tez_repr.zero
 
   let delegated_balance ctxt delegate =
     staking_balance ctxt delegate >>=? fun staking_balance ->

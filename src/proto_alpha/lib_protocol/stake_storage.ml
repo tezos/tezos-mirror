@@ -65,64 +65,154 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
-let get_staking_balance = Storage.Stake.Staking_balance.get
-
 let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
   | None ->
-      let balance = Tez_repr.zero in
+      let balance = Stake_repr.Full.zero in
       Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
       return (balance, ctxt)
+
+let has_minimal_stake ctxt
+    {Stake_repr.Full.own_frozen; costaked_frozen; delegated} =
+  let open Result_syntax in
+  let open Tez_repr in
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
+  let sum =
+    let* frozen = own_frozen +? costaked_frozen in
+    frozen +? delegated
+  in
+  match sum with
+  | Error _sum_overflows ->
+      true (* If the sum overflows, we are definitly over the minimal stake. *)
+  | Ok staking_balance -> Tez_repr.(staking_balance >= minimal_stake)
 
 let update_stake ~f ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   f staking_balance_before >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
-  let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if Tez_repr.(staking_balance < staking_balance_before) then
-    if
-      (* Removing stake. The delegate may become inactive. *)
-      Tez_repr.(staking_balance_before >= minimal_stake)
-      && Tez_repr.(staking_balance < minimal_stake)
-    then
+  (* Since the staking balance has changed, the delegate might have
+     moved accross the minimal stake barrier. If so we may need to
+     update the set of active delegates with minimal stake. *)
+  let had_minimal_stake_before =
+    has_minimal_stake ctxt staking_balance_before
+  in
+  let has_minimal_stake_after = has_minimal_stake ctxt staking_balance in
+  match (had_minimal_stake_before, has_minimal_stake_after) with
+  | true, false ->
+      (* Decrease below the minimal stake. *)
       Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-      if inactive then return ctxt
+      if inactive then
+        (* The delegate is inactive so it wasn't in the set and we
+           don't need to update it. *)
+        return ctxt
       else
         Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
         >>= fun ctxt -> return ctxt
-    else
-      (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
-          - because it did not have the minimal required stake, in which case it
-            still does not have it;
-          - or because it did have the minimal required stake and still has it,
-            however it was (and is) inactive.
-      *)
-      return ctxt
-  else if
-    (* Adding stake. The delegate may become active. *)
-    Tez_repr.(staking_balance_before < minimal_stake)
-    && Tez_repr.(staking_balance >= minimal_stake)
-  then
-    Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if inactive then return ctxt
-    else
-      Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
-      >>= fun ctxt -> return ctxt
-  else
-    (* The delegate was not in Stake.Active_delegates_with_minimal_stake, either
-       - because it did not have the minimal required stake and still does not
-         have it;
-       - or because it did have the minimal required stake, in which case it
-         still has it, however it was (and still is) inactive.
-    *) return ctxt
+  | false, true ->
+      (* Increase above the minimal stake. *)
+      Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
+      if inactive then
+        (* The delegate is inactive so we don't need to add it to the
+           set. *)
+        return ctxt
+      else
+        Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
+        >>= fun ctxt -> return ctxt
+  | false, false | true, true -> return ctxt
 
-let remove_stake ctxt delegate amount =
-  update_stake ctxt delegate ~f:(fun stake -> Tez_repr.(stake -? amount))
+let remove_delegated_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ delegated = Tez_repr.(delegated -? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
 
-let add_stake ctxt delegate amount =
-  update_stake ctxt delegate ~f:(fun stake -> Tez_repr.(stake +? amount))
+let remove_own_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ own_frozen = Tez_repr.(own_frozen -? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let remove_costaked_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ costaked_frozen = Tez_repr.(costaked_frozen -? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let remove_shared_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      if Tez_repr.(costaked_frozen = zero) then
+        let+ own_frozen = Tez_repr.(own_frozen -? amount) in
+        Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated
+      else
+        let* total_frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+        let* own_part =
+          Tez_repr.mul_ratio
+            amount
+            ~num:(Tez_repr.to_mutez own_frozen)
+            ~den:(Tez_repr.to_mutez total_frozen)
+        in
+        let* own_frozen = Tez_repr.(own_frozen -? own_part) in
+        let* costaked_part = Tez_repr.(amount -? own_part) in
+        let+ costaked_frozen = Tez_repr.(costaked_frozen -? costaked_part) in
+        Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let remove_frozen_stake ctxt staker amount =
+  match staker with
+  | Stake_repr.Single (contract, delegate)
+    when Contract_repr.(contract = Implicit delegate) ->
+      remove_own_frozen_stake ctxt delegate amount
+  | Single (_costaker, delegate) ->
+      remove_costaked_frozen_stake ctxt delegate amount
+  | Shared delegate -> remove_shared_frozen_stake ctxt delegate amount
+
+let add_delegated_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ delegated = Tez_repr.(delegated +? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let add_own_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ own_frozen = Tez_repr.(own_frozen +? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let add_costaked_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      let+ costaked_frozen = Tez_repr.(costaked_frozen +? amount) in
+      Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let add_shared_frozen_stake ctxt delegate amount =
+  let open Result_syntax in
+  update_stake ctxt delegate ~f:(fun {own_frozen; costaked_frozen; delegated} ->
+      if Tez_repr.(costaked_frozen = zero) then
+        let+ own_frozen = Tez_repr.(own_frozen +? amount) in
+        Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated
+      else
+        let* total_frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+        let* own_part =
+          Tez_repr.mul_ratio
+            amount
+            ~num:(Tez_repr.to_mutez own_frozen)
+            ~den:(Tez_repr.to_mutez total_frozen)
+        in
+        let* own_frozen = Tez_repr.(own_frozen +? own_part) in
+        let* costaked_part = Tez_repr.(amount -? own_part) in
+        let+ costaked_frozen = Tez_repr.(costaked_frozen +? costaked_part) in
+        Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+
+let add_frozen_stake ctxt staker amount =
+  match staker with
+  | Stake_repr.Single (contract, delegate)
+    when Contract_repr.(contract = Implicit delegate) ->
+      add_own_frozen_stake ctxt delegate amount
+  | Single (_costaker, delegate) ->
+      add_costaked_frozen_stake ctxt delegate amount
+  | Shared delegate -> add_shared_frozen_stake ctxt delegate amount
 
 let set_inactive ctxt delegate =
   Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
@@ -134,8 +224,7 @@ let set_active ctxt delegate =
   if not inactive then return ctxt
   else
     get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
-    let minimal_stake = Constants_storage.minimal_stake ctxt in
-    if Tez_repr.(staking_balance >= minimal_stake) then
+    if has_minimal_stake ctxt staking_balance then
       Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
       >>= fun ctxt -> return ctxt
     else return ctxt
@@ -186,12 +275,6 @@ let clear_at_cycle_end ctxt ~new_cycle =
   | None -> return ctxt
   | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear
 
-let get ctxt delegate =
-  Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
-  >>= function
-  | true -> get_staking_balance ctxt delegate
-  | false -> return Tez_repr.zero
-
 let fold_on_active_delegates_with_minimal_stake =
   Storage.Stake.Active_delegates_with_minimal_stake.fold
 
@@ -215,12 +298,31 @@ let prepare_stake_distribution ctxt =
 
 let get_total_active_stake = Storage.Stake.Total_active_stake.get
 
-let remove_contract_stake ctxt contract amount =
+let remove_contract_delegated_stake ctxt contract amount =
   Contract_delegate_storage.find ctxt contract >>=? function
   | None -> return ctxt
-  | Some delegate -> remove_stake ctxt delegate amount
+  | Some delegate -> remove_delegated_stake ctxt delegate amount
 
-let add_contract_stake ctxt contract amount =
+let add_contract_delegated_stake ctxt contract amount =
   Contract_delegate_storage.find ctxt contract >>=? function
   | None -> return ctxt
-  | Some delegate -> add_stake ctxt delegate amount
+  | Some delegate -> add_delegated_stake ctxt delegate amount
+
+module For_RPC = struct
+  let get_staking_balance ctxt delegate =
+    let open Lwt_result_syntax in
+    let* {own_frozen; costaked_frozen; delegated} =
+      Storage.Stake.Staking_balance.get ctxt delegate
+    in
+    let*? frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+    let*? staking_balance = Tez_repr.(frozen +? delegated) in
+    return staking_balance
+end
+
+module Internal_for_tests = struct
+  let get ctxt delegate =
+    Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
+    >>= function
+    | true -> For_RPC.get_staking_balance ctxt delegate
+    | false -> return Tez_repr.zero
+end

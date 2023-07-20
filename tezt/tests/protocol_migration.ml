@@ -68,7 +68,8 @@ let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
-    ~migration_level ~migrate_from ~migrate_to () =
+    ~migration_level ~migrate_from ~migrate_to ~baked_blocks_after_migration ()
+    =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
@@ -118,13 +119,17 @@ let perform_protocol_migration ?node_name ?client_name ~blocks_per_cycle
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  let* () =
+    repeat baked_blocks_after_migration (fun () ->
+        Client.bake_for_and_wait client)
+  in
   return (client, node)
 
 (** Test all levels for one cycle, after the first cycle. *)
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
   let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let preserved_cycles = JSON.(get "preserved_cycles" parameters |> as_int) in
   for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
     Test.register
       ~__FILE__
@@ -137,6 +142,7 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
         ~migration_level
         ~migrate_from
         ~migrate_to
+        ~baked_blocks_after_migration:(2 * preserved_cycles * blocks_per_cycle)
         ()
     in
     unit
@@ -174,6 +180,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
       ~migration_level
       ~migrate_from
       ~migrate_to
+      ~baked_blocks_after_migration:5
       ()
   in
   let rolling_available = 60 in

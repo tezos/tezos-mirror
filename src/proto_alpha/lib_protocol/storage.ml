@@ -1282,6 +1282,16 @@ module Slashed_deposits = Cycle.Slashed_deposits
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct
+  module Staking_balance_up_to_Nairobi =
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["staking_balance"]
+         end))
+         (Int31_index)
+      (Public_key_hash_index)
+      (Tez_repr)
+
   module Staking_balance =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
@@ -1290,7 +1300,7 @@ module Stake = struct
          end))
          (Int31_index)
       (Public_key_hash_index)
-      (Tez_repr)
+      (Stake_repr.Full)
 
   module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage

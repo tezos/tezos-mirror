@@ -43,8 +43,8 @@ let wrap e = Lwt.return (Environment.wrap_tzresult e)
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
    (this is not true in general, but in these tests it is because they only deal
    with self-delegation. Also, check that [Delegate.staking_balance] coincides
-   with [Stake_storage.get] when the account is active and it has the minimal
-   required stake. *)
+   with [Stake_storage.Internal_for_tests.get] when the account is active and it
+   has the minimal required stake. *)
 let check_stake ~loc (b : Block.t) (account : Account.t) =
   Context.Delegate.staking_balance (B b) account.pkh >>=? fun staking_balance ->
   Context.Delegate.full_balance (B b) account.pkh >>=? fun full_balance ->
@@ -57,18 +57,20 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
     ~adaptive_inflation_enable:false
   >>= wrap
   >>=? fun ctxt ->
-  Stake_storage.get ctxt account.pkh >>= wrap >>=? fun stake ->
+  Stake_storage.Internal_for_tests.get ctxt account.pkh >>= wrap
+  >>=? fun stake ->
   Assert.equal_int64
     ~loc
     (Tez_repr.to_mutez stake)
     (Tez.to_mutez staking_balance)
 
-(** Check that [Stake_storage.get] returns 0 (following a deactivation). Note
-   that in case of deactivation [Delegate.staking_balance] does not necessarily
-   coincide with [Stake_storage.get] in that [Delegate.staking_balance] may be
-   positive (while [Stake_storage.get] returns 0 because the account is no
-   longer in [Active_delegate_with_minimal_stake] because of deactivation, see
-   [Stake_storage].) *)
+(** Check that [Stake_storage.Internal_for_tests.get] returns 0 (following a
+   deactivation). Note that in case of deactivation [Delegate.staking_balance]
+   does not necessarily coincide with [Stake_storage.Internal_for_tests.get] in
+   that [Delegate.staking_balance] may be positive
+   (while [Stake_storage.Internal_for_tests.get] returns 0 because the account
+   is no longer in [Active_delegate_with_minimal_stake] because of deactivation,
+   see [Stake_storage].) *)
 let check_no_stake ~loc (b : Block.t) (account : Account.t) =
   Raw_context.prepare
     b.context
@@ -78,8 +80,8 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
     ~adaptive_inflation_enable:false
   >>= wrap
   >>=? fun ctxt ->
-  Stake_storage.get ctxt account.pkh >>= wrap >>=? fun stake ->
-  Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L
+  Stake_storage.Internal_for_tests.get ctxt account.pkh >>= wrap
+  >>=? fun stake -> Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L
 
 (** Create a block with two initialized contracts/accounts. Assert
     that the first account has a staking balance that is equal to its
