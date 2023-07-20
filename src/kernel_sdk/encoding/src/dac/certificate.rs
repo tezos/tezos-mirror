@@ -16,8 +16,8 @@ use super::PreimageHash;
 use super::SlicePage;
 use super::SlicePageError;
 use super::V0SliceContentPage;
+use super::V0SliceHashPage;
 use super::MAX_PAGE_SIZE;
-use super::PAGE_PREFIX_SIZE;
 use tezos_crypto_rs::hash::{BlsSignature, PublicKeyBls};
 use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc::BinWriter;
@@ -167,27 +167,24 @@ impl Certificate {
         host: &mut Host,
         path: &impl Path,
     ) -> Result<usize, CertificateError> {
-        // Notes on implementation:
-        // We choose to nest loops in this implementation, for the following reasons:
-        // - avoiding unneccessary allocations (this uses ~10KB on the stack)
-        // - uses nested loops to eleminate recursive function calls, and allow correct tracking
-        //   of lifetimes w.r.t. buffer
-        // - consistency of tick usage: there is nothing within this function that can affect the ticks
-        //   consumed, apart from the structure of the DAC tree (up to the limit enforced by the size of
-        //   buffer). ie we can be confident that this function won't suddenly consume extra ticks, beyond
-        //   the limit of the size of the content.
+        const MAX_TOP_LEVEL_HASHES: usize = 20;
+
+        // We reveal the root_hash, followed by twenty top level hashes. Each of these
+        // hashes can reveal up to MAX_HASHES_PER_PAGE, which then all reveal to content
+        // pages.
         //
-        // In future, a more compact (but more expensive) function can be defined in terms of a stack, for
-        // revealing larger trees incrementally.
+        // Therefore, we can reveal up to:
+        //   [1 * MAX_TOP_LEVEL_HASHES * MAX_HASHES_PER_PAGE * MAX_PAGE_SIZE] bytes
+        // = [1 * 20                   * 123                 * 4091         ] bytes
+        // = [10063860                                                      ] bytes
+        const MAX_REVEALS: usize = 1
+            + MAX_TOP_LEVEL_HASHES
+            + V0SliceHashPage::MAX_HASHES_PER_PAGE * MAX_TOP_LEVEL_HASHES;
 
         host.store_delete_value(path)
             .map_err(|error| CertificateError::StorageError(path.to_string(), error))?;
 
-        const MAX_TOP_LEVEL_HASHES: usize = 20;
-        const TOP_LEVEL_HASHES_SIZE: usize = PREIMAGE_HASH_SIZE * MAX_TOP_LEVEL_HASHES;
-        const TOP_LEVEL_SIZE: usize = PAGE_PREFIX_SIZE + TOP_LEVEL_HASHES_SIZE;
-
-        let buffer = &mut [0u8; MAX_PAGE_SIZE * 2 + TOP_LEVEL_SIZE];
+        let buffer = &mut [0u8; MAX_PAGE_SIZE];
         let mut written = 0;
 
         let mut save = |host: &mut Host, content: V0SliceContentPage| {
@@ -202,42 +199,29 @@ impl Certificate {
 
         let Self::V0(V0Certificate { root_hash, .. }) = self;
 
-        // Top-level
-        let (page, buffer) = fetch_page(host, root_hash.as_ref(), buffer)?;
+        let mut revealed = 0;
+        let mut hashes = Vec::with_capacity(MAX_REVEALS);
+        hashes.push(*root_hash.as_ref());
 
-        let top_level = match page {
-            SlicePage::V0HashPage(hashes) => {
-                if hashes.inner.len() > TOP_LEVEL_HASHES_SIZE {
-                    return Err(CertificateError::PayloadTooLarge);
-                };
-                hashes
-            }
-            SlicePage::V0ContentPage(content) => return save(host, content),
-        };
+        while let Some(hash) = hashes.get(revealed) {
+            let (page, _) = fetch_page(host, hash, buffer)?;
+            revealed += 1;
 
-        // Mid-level
-        for hash in top_level.hashes() {
-            let (page, buffer) = fetch_page(host, hash, buffer)?;
+            match page {
+                SlicePage::V0HashPage(page) => {
+                    let num_allowed = MAX_REVEALS - hashes.len();
 
-            let mid_level = match page {
-                SlicePage::V0HashPage(hashes) => hashes,
-                SlicePage::V0ContentPage(content) => {
-                    save(host, content)?;
-                    continue;
+                    if page.inner.len() > num_allowed * PREIMAGE_HASH_SIZE {
+                        return Err(CertificateError::PayloadTooLarge);
+                    }
+
+                    for hash in page.hashes() {
+                        hashes.push(*hash);
+                    }
                 }
-            };
-
-            // Bottom layer (content)
-            for hash in mid_level.hashes() {
-                let (page, _buffer) = fetch_page(host, hash, buffer)?;
-                match page {
-                    SlicePage::V0HashPage(_) => {
-                        return Err(CertificateError::PayloadTooLarge)
-                    }
-                    SlicePage::V0ContentPage(content) => {
-                        save(host, content)?;
-                    }
-                };
+                SlicePage::V0ContentPage(page) => {
+                    save(host, page)?;
+                }
             }
         }
 
