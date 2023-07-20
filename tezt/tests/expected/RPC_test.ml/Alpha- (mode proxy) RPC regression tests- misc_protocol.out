@@ -14,8 +14,8 @@
   "cycles_per_voting_period": 8, "hard_gas_limit_per_operation": "1040000",
   "hard_gas_limit_per_block": "2600000",
   "proof_of_work_threshold": "4611686018427387903",
-  "minimal_stake": "6000000000", "vdf_difficulty": "50000",
-  "origination_size": 257,
+  "minimal_stake": "6000000000", "minimal_frozen_stake": "600000000",
+  "vdf_difficulty": "50000", "origination_size": 257,
   "reward_weights":
     { "base_total_rewards_per_minute": "85007812",
       "baking_reward_fixed_portion_weight": 5120,
