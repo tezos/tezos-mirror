@@ -23,18 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines a description format and interpretation of the programs
+    needed to populate the PlonK witness for a Plompiler circuit given the
+    initial inputs. *)
+
 open Lang_core
 module CS = Csir.CS
 open Linear_algebra.Make_VectorSpace(S)
 module Tables = Csir.Tables
 
+(** Index of a wire  *)
 type wire = W of int [@@ocaml.unboxed]
 
+(** Index of a row  *)
 type row = R of int [@@ocaml.unboxed]
 
+(** Input/output tag for generic lookups. *)
 type 'a tagged = Input of 'a | Output of 'a
 
+(** [untag t] unwraps a tagged value. *)
 val untag : 'a tagged -> 'a
+
+(** Descriptors for core gates. *)
 
 type arith_desc = {
   wires : row array;
@@ -147,7 +157,7 @@ type anemoi_custom_desc = {
   ky2 : S.t;
 }
 
-(* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+(** See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
 type mod_arith_desc = {
   (* parameters *)
   modulus : Z.t;
@@ -167,7 +177,7 @@ type mod_arith_desc = {
   ts : int list;
 }
 
-(* See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
+(** See [lib_plompiler/gadget_mod_arith.ml] for documentation on mod_arith *)
 type mod_arith_is_zero_desc = {
   modulus : Z.t;
   base : Z.t;
@@ -178,6 +188,9 @@ type mod_arith_is_zero_desc = {
 }
 [@@deriving repr]
 
+(** Solver description language.
+    Each core gate has a descriptor holding the data needed to compute
+    the part of the trace it determines. *)
 type solver_desc =
   | Arith of arith_desc
   | Pow5 of pow5_desc
@@ -200,13 +213,21 @@ type solver_desc =
   | Mod_IsZero of mod_arith_is_zero_desc
   | Updater of Optimizer.trace_info
 
+(** Collection of solver descriptors for a circuit. *)
 type solvers
 
+(** A solver is formed by solver descriptors together with meta-data
+    about the size of the initial inputs and final size of the witness.
+*)
 type t = {solvers : solvers; initial_size : int; final_size : int}
 [@@deriving repr]
 
+(** Empty solver. *)
 val empty_solver : t
 
+(** [append_solver sd s] sdds a solver descriptor [sd] to a solver [s]. *)
 val append_solver : solver_desc -> t -> t
 
+(** [solve s inital] computes the witness using solver [s] and
+    the [initial] inputs. *)
 val solve : t -> S.t array -> S.t array
