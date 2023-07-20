@@ -72,6 +72,10 @@ let minimal_stake c =
   let constants = Raw_context.constants c in
   constants.minimal_stake
 
+let minimal_frozen_stake c =
+  let constants = Raw_context.constants c in
+  constants.minimal_frozen_stake
+
 let vdf_difficulty c =
   let constants = Raw_context.constants c in
   constants.vdf_difficulty

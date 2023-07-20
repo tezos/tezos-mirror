@@ -875,6 +875,7 @@ module Constants : sig
       hard_gas_limit_per_block : Gas.Arith.integral;
       proof_of_work_threshold : int64;
       minimal_stake : Tez.t;
+      minimal_frozen_stake : Tez.t;
       vdf_difficulty : int64;
       origination_size : int;
       reward_weights : reward_weights;
@@ -944,6 +945,8 @@ module Constants : sig
   val proof_of_work_threshold : context -> int64
 
   val minimal_stake : context -> Tez.t
+
+  val minimal_frozen_stake : context -> Tez.t
 
   val vdf_difficulty : context -> int64
 

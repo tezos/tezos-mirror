@@ -148,6 +148,7 @@ type t = {
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   minimal_stake : Tez_repr.t;
+  minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
   reward_weights : reward_weights;

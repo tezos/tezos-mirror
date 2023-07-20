@@ -1060,6 +1060,12 @@ let prepare_first_block ~level ~timestamp ctxt =
       let delegation_over_baking_limit =
         (100 / c.frozen_deposits_percentage) - 1
       in
+      let minimal_frozen_stake =
+        Tez_repr.(
+          div_exn
+            (mul_exn c.minimal_stake (delegation_over_baking_limit + 1))
+            100)
+      in
       let constants =
         Constants_parametric_repr.
           {
@@ -1073,6 +1079,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
+            minimal_frozen_stake;
             vdf_difficulty = c.vdf_difficulty;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
