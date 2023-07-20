@@ -210,6 +210,10 @@ Node
   peer, a new p2p request would be triggered instead of waiting for
   the delayed retry. (MR :gl:`!9470`)
 
+- Renamed RPC server events: Added section ``rpc_server`` and changed
+  names from ``legacy_logging_event-rpc_http_event-<level>`` into
+  ``rpc_http_event_<level>``.
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
