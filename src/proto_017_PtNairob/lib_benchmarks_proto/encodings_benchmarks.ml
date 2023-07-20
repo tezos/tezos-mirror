@@ -197,7 +197,9 @@ module Encoding_micheline : Benchmark.S = struct
   let models = models (Namespace.basename name)
 end
 
-let () = Registration_helpers.register (module Encoding_micheline)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Encoding_micheline)
 
 module Decoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
@@ -271,7 +273,9 @@ module Decoding_micheline : Benchmark.S = struct
   let models = models (Namespace.basename name)
 end
 
-let () = Registration_helpers.register (module Decoding_micheline)
+let () =
+  Benchmarks_proto.Registration.register_as_simple_with_num
+    (module Decoding_micheline)
 
 module Timestamp = struct
   open Encodings
