@@ -174,7 +174,7 @@ module Type_size_benchmark : Benchmark.S = struct
       Base_samplers.sample_in_interval ~range:{min = 1; max = 1000} rng_state
     in
     let ex_ty =
-      Michelson_generation.Samplers.Random_type.m_type ~size rng_state
+      Michelson_generation.Samplers.Random_type.m_type ~size () rng_state
     in
     type_size_benchmark ex_ty
 end

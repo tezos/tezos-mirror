@@ -132,7 +132,7 @@ let rec sample nsamples acc =
     let* size =
       Base_samplers.(sample_in_interval ~range:{min = 1; max = 1000})
     in
-    let* (Ex_ty ty) = Sampler.Random_type.m_type ~size in
+    let* (Ex_ty ty) = Sampler.Random_type.m_type ~size () in
     let* acc = sample (nsamples - 1) acc in
     return (tnames_of_type ty acc)
 
