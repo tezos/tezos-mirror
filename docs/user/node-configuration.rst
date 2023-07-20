@@ -225,7 +225,7 @@ remote address.
 
 A common situation is when one wants to accept only safe RPC requests coming from
 remote hosts, but enable all RPCs for localhost (which is for instance necessary
-to perform baking and endorsing). Since all RPCs are available to localhost by
+to perform baking and attesting). Since all RPCs are available to localhost by
 default, it is sufficient to open another listening address::
 
   $ octez-node run --rpc-addr localhost --rpc-addr 0.0.0.0
@@ -267,7 +267,7 @@ take two main forms:
 Thus all costly or risky endpoints are blocked by default. This can be
 relaxed or tightened by modifying the configuration file. It's
 worth noting that this default policy among other things disallows baking and
-endorsing by bakers running on remote servers,
+attesting by bakers running on remote servers,
 because endpoints such as ``/injection/block`` are not open remotely.
 Rather than opening them remotely, the recommended practice for baking is to run a node locally listening to ``localhost``, with the default ACL policy.
 

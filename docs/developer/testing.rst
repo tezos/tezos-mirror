@@ -86,7 +86,7 @@ in more detail.
    "-- -- Michelson interpreter",":ref:`AT <alcotezt_section>`","","",":ref:`TZ <tezt_section>`",":ref:`TZ <tezt_section>`"
    "Client",":ref:`EXP <ppx_expect_section>`",":ref:`QC <property_based_test>`","",":ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "Networked nodes","--","",":ref:`TZ <tezt_section>`","", ""
-   "Endorser","","","",""
+   "Attester","","","",""
    "Baker","","","",""
 
 
@@ -162,7 +162,7 @@ Typical use cases:
 
 Example tests:
  - Testing baking (in :src:`tezt/tests/basic.ml`)
- - Testing double baking and double endorsement scenarios (in
+ - Testing double baking and double attestation scenarios (in
    :src:`tezt/tests/double_bake.ml`).
  - Testing absence of regressions in encodings (in :src:`tezt/tests/encoding.ml`)
 

@@ -75,12 +75,12 @@ When a delegator spends their tokens, the delegated balance of their delegate de
 Running a delegate
 ------------------
 
-A delegate is responsible for baking blocks, endorsing blocks and
+A delegate is responsible for baking blocks, attesting blocks and
 accusing other delegates in case they try to double bake or double
-endorse. A delegate is also responsible for taking part in the
+attest. A delegate is also responsible for taking part in the
 :doc:`governance process<../active/voting>`.
 
-Rights for baking and endorsing are randomly assigned
+Rights for baking and attesting are randomly assigned
 to delegates proportionally to their :ref:`active stake<active_stake>`,
 which usually is the same as their staking balance,
 that is, their own balance plus their delegated balance.
@@ -149,8 +149,8 @@ operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
-To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
-Alternatively, you may use the baking rights RPC and the endorsing rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
+To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and attesting slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
+Alternatively, you may use the baking rights RPC and the attesting rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/attesting slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 .. _baker_run:
 
@@ -163,7 +163,7 @@ all accounts whose secret keys are known.
 
 During its run, the baker bakes blocks (by selecting transactions from
 the mempool and arranging them in a new block) and emits consensus
-operations like endorsements. It does so whenever the associated
+operations like attestations. It does so whenever the associated
 accounts have the necessary rights.
 
 Let's launch the daemon pointing to the standard node directory and
@@ -181,8 +181,8 @@ Note that ``--liquidity-baking-toggle-vote`` must be placed
 
 .. warning::
 
-    **Remember that having two bakers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
-    If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
+    **Remember that having two bakers running connected to the same account could lead to double baking/attesting and the loss of all your bonds.**
+    If you are worried about the availability of your node when it is its turn to bake/attest, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
 However, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
@@ -190,7 +190,7 @@ However, it is safe (and actually necessary) to temporarily run two bakers just 
 
 .. note::
 
-   It is possible to bake and endorse using a dedicated :ref:`consensus_key` instead of the delegate's key.
+   It is possible to bake and attest using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
 Accuser
 ~~~~~~~
@@ -199,11 +199,11 @@ The accuser is a daemon that monitors all blocks received on all
 chains and looks for:
 
 * bakers who signed two blocks at the same level and the same round
-* bakers who injected more than one pre-endorsements or endorsement operation for the
+* bakers who injected more than one pre-attestations or attestation operation for the
   same level and round (more details :doc:`here <../active/consensus>`)
 
 Upon finding such irregularity, it will emit respectively a
-double-baking, double-pre-endorsing, or double-endorsing denunciation operation, which will
+double-baking, double-pre-attesting, or double-attesting denunciation operation, which will
 cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its security deposit.
 
 ::

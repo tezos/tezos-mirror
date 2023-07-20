@@ -163,7 +163,7 @@ protocol environment:
   any possible context from its future successors, but it might still
   be valid in an alternative branch. For example: a manager operation
   with a smaller counter than the one expected (a
-  *"counter-in-the-past"* error), an unexpected endorsement for the
+  *"counter-in-the-past"* error), an unexpected attestation for the
   current level, etc.
 
 - ``Permanent``: the operation is invalid in the current context, and
@@ -173,7 +173,7 @@ protocol environment:
 - ``Outdated``: the operation is *too old* to be included in a
   block. Furthermore, there might be still some value in the
   information provided by an ``Outdated`` operation. An example is the
-  case of an endorsement which was received *too late*, but that could
+  case of an attestation which was received *too late*, but that could
   still be used to form a consensus quorum.
 
 .. _partial_application_alpha:
@@ -198,7 +198,7 @@ proceeds to "partially apply" each block of this branch using the
 common ancestor's context.
 
 Indeed, by relying on the ancestor context, this mode can *only*
-assert the validity of consensus-related preconditions (endorsing
+assert the validity of consensus-related preconditions (attesting
 power, block fitness, etc.), as future consensus slots are known in
 advance -- how much in advance being specified by the
 ``<PRESERVED_CYCLES>`` protocol constant. Thus, the ``Partial
@@ -237,7 +237,7 @@ considered as invalid.
 The last step in the block validation process, known as "block
 finalization", aims to verify that the collected consensus operations
 constitute a sufficiently large :ref:`quorum<quorum_alpha>`. That is,
-it will verify that the total endorsing power present in the block is
+it will verify that the total attesting power present in the block is
 greater than the ``CONSENSUS_THRESHOLD`` constant.
 
 This sequence of three steps also yields a new context -- the

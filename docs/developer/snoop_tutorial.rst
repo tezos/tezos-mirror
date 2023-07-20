@@ -321,7 +321,7 @@ Developing a new feature in the protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When a feature is added in the protocol, it must account for the gas that bakers
-and endorsers will spend by running the feature. Here is a typical workflow:
+and attesters will spend by running the feature. Here is a typical workflow:
 
 - developers implement the feature;
 - they also implement the corresponding benchmarks (usually in
