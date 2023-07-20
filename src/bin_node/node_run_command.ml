@@ -564,25 +564,30 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
       node
   in
   let*? node in
-  let node_downer =
+  let log_node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-        let*! () = Event.(emit shutting_down_node) () in
-        Node.shutdown node)
+        Event.(emit shutting_down_node) ())
   in
   let* rpc = init_rpc config node in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:[node_downer]
+      ~after:[log_node_downer]
       (fun _ ->
         let*! () = Event.(emit shutting_down_rpc_server) () in
         List.iter_p RPC_server.shutdown rpc)
+  in
+  let node_downer =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:[rpc_downer]
+      (fun _ -> Node.shutdown node)
   in
   let*! () = Event.(emit node_is_ready) () in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:[rpc_downer]
+      ~after:[node_downer]
       (fun exit_status ->
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
