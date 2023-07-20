@@ -259,8 +259,8 @@ let constants_mainnet =
         launch_ema_threshold = 1_600_000_000l;
         adaptive_rewards_params =
           {
-            reward_ratio_min = Q.(5 // 1000);
-            reward_ratio_max = Q.(1 // 10);
+            reward_ratio_min = Q.(5 // 10000);
+            reward_ratio_max = Q.(1 // 20);
             max_bonus = 50_000_000_000_000L;
             growth_rate = 115_740_740L;
             center_dz = Q.(1 // 2);

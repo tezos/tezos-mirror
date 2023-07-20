@@ -60,8 +60,8 @@
   "edge_of_staking_over_delegation": 2,
   "adaptive_inflation_launch_ema_threshold": 1600000000,
   "adaptive_rewards_params":
-    { "reward_ratio_min": { "numerator": "1", "denominator": "200" },
-      "reward_ratio_max": { "numerator": "1", "denominator": "10" },
+    { "reward_ratio_min": { "numerator": "1", "denominator": "2000" },
+      "reward_ratio_max": { "numerator": "1", "denominator": "20" },
       "max_bonus": "50000000000000", "growth_rate": "115740740",
       "center_dz": { "numerator": "1", "denominator": "2" },
       "radius_dz": { "numerator": "1", "denominator": "50" } } }
