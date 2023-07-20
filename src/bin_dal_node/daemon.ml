@@ -171,7 +171,7 @@ module Handler = struct
                       (Node_context.get_gs_worker ctxt)
                       operator_profiles
                   with
-                  | None -> fail Errors.[Cannot_add_profiles_to_bootstrap_node]
+                  | None -> fail Errors.[Profile_incompatibility]
                   | Some pctxt -> return pctxt)
             in
             return @@ Node_context.set_profile_ctxt ctxt pctxt
