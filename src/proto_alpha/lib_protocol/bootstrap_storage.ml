@@ -83,7 +83,18 @@ let init_account (ctxt, balance_updates)
             Constants_storage.delegation_over_baking_limit ctxt
           in
           let amount_to_freeze =
-            Tez_repr.div_exn amount (delegation_over_baking_limit + 1)
+            let minimal_to_bake =
+              let minimal_stake = Constants_storage.minimal_stake ctxt in
+              let minimal_frozen_stake =
+                Constants_storage.minimal_frozen_stake ctxt
+              in
+              Tez_repr.max minimal_stake minimal_frozen_stake
+            in
+            let minimal_to_not_be_overdelegated =
+              Tez_repr.div_exn amount (delegation_over_baking_limit + 1)
+            in
+            Tez_repr.(
+              min amount (max minimal_to_bake minimal_to_not_be_overdelegated))
           in
           Token.transfer
             ~origin:Protocol_migration
