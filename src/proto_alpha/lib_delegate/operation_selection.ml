@@ -80,6 +80,7 @@ end)
    See {!Tezos_protocol_plugin_alpha.Plugin.Mempool.weight_manager_operation}. *)
 let prioritize_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte operation =
+  let open Result_syntax in
   let op = Operation_pool.Prioritized_operation.packed operation in
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
@@ -88,18 +89,19 @@ let prioritize_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
     (fun ((first_source, first_counter, total_fee, total_gas) as acc) ->
        function
       | Contents (Manager_operation {source; counter; fee; gas_limit; _}) ->
-          (Environment.wrap_tzresult @@ Tez.(total_fee +? fee))
-          >>? fun total_fee ->
+          let* total_fee =
+            Environment.wrap_tzresult @@ Tez.(total_fee +? fee)
+          in
           (* There is only one unique source per packed transaction *)
           let first_source = Option.value ~default:source first_source in
           (* We only care about the first counter *)
           let first_counter = Option.value ~default:counter first_counter in
-          ok
+          return
             ( Some first_source,
               Some first_counter,
               total_fee,
               Gas.Arith.add total_gas gas_limit )
-      | _ -> ok acc)
+      | _ -> return acc)
     (None, None, Tez.zero, Gas.Arith.zero)
     l
   |> function
@@ -171,13 +173,17 @@ type simulation_result = {
 }
 
 let validate_operation inc op =
-  Baking_simulator.add_operation inc op >>= function
+  let open Lwt_syntax in
+  let* result = Baking_simulator.add_operation inc op in
+  match result with
   | Error errs ->
-      Events.(emit invalid_operation_filtered) (Operation.hash_packed op, errs)
-      >>= fun () -> Lwt.return_none
+      let* () =
+        Events.(emit invalid_operation_filtered) (Operation.hash_packed op, errs)
+      in
+      return_none
   | Ok (resulting_state, None) ->
       (* No receipt if force_apply is not set *)
-      Lwt.return_some resulting_state
+      return_some resulting_state
   | Ok (resulting_state, Some receipt) -> (
       (* Check that the metadata are serializable/deserializable *)
       let encoding_result =
@@ -188,39 +194,47 @@ let validate_operation inc op =
       in
       match encoding_result with
       | None ->
-          Events.(emit cannot_serialize_operation_metadata)
-            (Operation.hash_packed op)
-          >>= fun () -> Lwt.return_none
-      | Some _b -> Lwt.return_some resulting_state)
+          let* () =
+            Events.(emit cannot_serialize_operation_metadata)
+              (Operation.hash_packed op)
+          in
+          return_none
+      | Some _b -> return_some resulting_state)
 
 let filter_valid_operations_up_to_quota inc (ops, quota) =
+  let open Lwt_syntax in
   let {Tezos_protocol_environment.max_size; max_op} = quota in
   let exception Full of (Baking_simulator.incremental * packed_operation list)
   in
   try
-    List.fold_left_s
-      (fun (inc, curr_size, nb_ops, acc) op ->
-        let op_size =
-          Data_encoding.Binary.length
-            Alpha_context.Operation.encoding_with_legacy_attestation_name
-            op
-        in
-        let new_size = curr_size + op_size in
-        if new_size > max_size then Lwt.return (inc, curr_size, nb_ops, acc)
-        else (
-          Option.iter
-            (fun max_op -> if max_op = nb_ops + 1 then raise (Full (inc, acc)))
-            max_op ;
-          validate_operation inc op >>= function
-          | None -> Lwt.return (inc, curr_size, nb_ops, acc)
-          | Some inc' -> Lwt.return (inc', new_size, nb_ops + 1, op :: acc)))
-      (inc, 0, 0, [])
-      ops
-    >>= fun (inc, _, _, l) -> Lwt.return (inc, List.rev l)
-  with Full (inc, l) -> Lwt.return (inc, List.rev l)
+    let* inc, _, _, l =
+      List.fold_left_s
+        (fun (inc, curr_size, nb_ops, acc) op ->
+          let op_size =
+            Data_encoding.Binary.length
+              Alpha_context.Operation.encoding_with_legacy_attestation_name
+              op
+          in
+          let new_size = curr_size + op_size in
+          if new_size > max_size then return (inc, curr_size, nb_ops, acc)
+          else (
+            Option.iter
+              (fun max_op ->
+                if max_op = nb_ops + 1 then raise (Full (inc, acc)))
+              max_op ;
+            let* inc'_opt = validate_operation inc op in
+            match inc'_opt with
+            | None -> return (inc, curr_size, nb_ops, acc)
+            | Some inc' -> return (inc', new_size, nb_ops + 1, op :: acc)))
+        (inc, 0, 0, [])
+        ops
+    in
+    return (inc, List.rev l)
+  with Full (inc, l) -> return (inc, List.rev l)
 
 let filter_operations_with_simulation initial_inc fees_config
     ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
+  let open Lwt_result_syntax in
   let {
     Baking_configuration.minimal_fees;
     minimal_nanotez_per_gas_unit;
@@ -228,18 +242,21 @@ let filter_operations_with_simulation initial_inc fees_config
   } =
     fees_config
   in
-  filter_valid_operations_up_to_quota
-    initial_inc
-    (Prioritized_operation_set.operations consensus, consensus_quota)
-  >>= fun (inc, consensus) ->
-  filter_valid_operations_up_to_quota
-    inc
-    (Prioritized_operation_set.operations votes, votes_quota)
-  >>= fun (inc, votes) ->
-  filter_valid_operations_up_to_quota
-    inc
-    (Prioritized_operation_set.operations anonymous, anonymous_quota)
-  >>= fun (inc, anonymous) ->
+  let*! inc, consensus =
+    filter_valid_operations_up_to_quota
+      initial_inc
+      (Prioritized_operation_set.operations consensus, consensus_quota)
+  in
+  let*! inc, votes =
+    filter_valid_operations_up_to_quota
+      inc
+      (Prioritized_operation_set.operations votes, votes_quota)
+  in
+  let*! inc, anonymous =
+    filter_valid_operations_up_to_quota
+      inc
+      (Prioritized_operation_set.operations anonymous, anonymous_quota)
+  in
   (* Sort the managers *)
   let prioritized_managers =
     prioritize_managers
@@ -249,12 +266,13 @@ let filter_operations_with_simulation initial_inc fees_config
       ~minimal_nanotez_per_byte
       managers
   in
-  filter_valid_operations_up_to_quota
-    inc
-    ( PrioritizedManagerSet.elements prioritized_managers
-      |> List.map (fun {op; _} -> Prioritized_operation.packed op),
-      managers_quota )
-  >>= fun (inc, managers) ->
+  let*! inc, managers =
+    filter_valid_operations_up_to_quota
+      inc
+      ( PrioritizedManagerSet.elements prioritized_managers
+        |> List.map (fun {op; _} -> Prioritized_operation.packed op),
+        managers_quota )
+  in
   let operations = [consensus; votes; anonymous; managers] in
   let operations_hash =
     Operation_list_list_hash.compute
@@ -264,7 +282,8 @@ let filter_operations_with_simulation initial_inc fees_config
          operations)
   in
   let inc = {inc with header = {inc.header with operations_hash}} in
-  Baking_simulator.finalize_construction inc >>=? function
+  let* result = Baking_simulator.finalize_construction inc in
+  match result with
   | Some (validation_result, block_header_metadata) ->
       return
         {
@@ -346,15 +365,19 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
 
 let filter_consensus_operations_only inc
     ({consensus; votes; anonymous; managers} as ordered_pool) =
-  filter_valid_operations_up_to_quota inc (consensus, consensus_quota)
-  >>= fun (incremental, filtered_consensus) ->
+  let open Lwt_result_syntax in
+  let*! incremental, filtered_consensus =
+    filter_valid_operations_up_to_quota inc (consensus, consensus_quota)
+  in
   let payload = Operation_pool.payload_of_ordered_pool ordered_pool in
-  List.fold_left_es
-    (fun inc op ->
-      Baking_simulator.add_operation inc op >>=? fun (inc, _) -> return inc)
-    incremental
-    (List.flatten [votes; anonymous; managers])
-  >>=? fun incremental ->
+  let* incremental =
+    List.fold_left_es
+      (fun inc op ->
+        let* inc, _ = Baking_simulator.add_operation inc op in
+        return inc)
+      incremental
+      (List.flatten [votes; anonymous; managers])
+  in
   let filtered_pool =
     Operation_pool.ordered_pool_of_payload
       ~consensus_operations:filtered_consensus

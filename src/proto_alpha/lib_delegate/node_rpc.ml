@@ -283,9 +283,11 @@ let monitor_heads cctxt ~chain ?cache () =
   return (stream, stopper)
 
 let await_protocol_activation cctxt ~chain () =
-  Monitor_services.heads cctxt ~next_protocols:[Protocol.hash] chain
-  >>=? fun (block_stream, stop) ->
-  Lwt_stream.get block_stream >>= fun _ ->
+  let open Lwt_result_syntax in
+  let* block_stream, stop =
+    Monitor_services.heads cctxt ~next_protocols:[Protocol.hash] chain
+  in
+  let*! _ = Lwt_stream.get block_stream in
   stop () ;
   return_unit
 

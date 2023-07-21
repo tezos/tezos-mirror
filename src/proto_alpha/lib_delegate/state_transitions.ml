@@ -35,13 +35,16 @@ type proposal_acceptance = Invalid | Outdated_proposal | Valid_proposal
 
 let is_acceptable_proposal_for_current_level state
     (proposal : Baking_state.proposal) =
+  let open Lwt_syntax in
   let current_round = state.round_state.current_round in
   if Round.(current_round < proposal.block.round) then
-    Events.(
-      emit unexpected_proposal_round (current_round, proposal.block.round))
-    >>= fun () -> Lwt.return Invalid
+    let* () =
+      Events.(
+        emit unexpected_proposal_round (current_round, proposal.block.round))
+    in
+    return Invalid
   else if Round.(current_round > proposal.block.round) then
-    Lwt.return Outdated_proposal
+    return Outdated_proposal
   else
     (* current_round = proposal.round *)
     let previous_proposal = state.level_state.latest_proposal in
@@ -53,11 +56,13 @@ let is_acceptable_proposal_for_current_level state
     then
       (* An existing proposal was found at the same round: the
          proposal is bad and should be punished by the accuser *)
-      Events.(
-        emit
-          proposal_for_round_already_seen
-          (proposal.block.hash, current_round, previous_proposal.block.hash))
-      >>= fun () -> Lwt.return Invalid
+      let* () =
+        Events.(
+          emit
+            proposal_for_round_already_seen
+            (proposal.block.hash, current_round, previous_proposal.block.hash))
+      in
+      return Invalid
     else
       (* current_round = proposal.block.round ∧
          proposal.block.round <> previous_proposal.block.round
@@ -66,7 +71,7 @@ let is_acceptable_proposal_for_current_level state
 
          The proposal has the expected round and the previous proposal
          is a predecessor therefore the proposal is valid *)
-      Lwt.return Valid_proposal
+      return Valid_proposal
 
 let make_consensus_list state proposal =
   let level =
@@ -91,7 +96,8 @@ let make_preattest_action state proposal =
   Inject_preattestations {preattestations}
 
 let update_proposal ~is_proposal_applied state proposal =
-  Events.(emit updating_latest_proposal proposal.block.hash) >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Events.(emit updating_latest_proposal proposal.block.hash) in
   let prev_proposal = state.level_state.latest_proposal in
   let is_latest_proposal_applied =
     (* mark as applied if it is indeed applied or if this specific proposal was
@@ -107,7 +113,7 @@ let update_proposal ~is_proposal_applied state proposal =
       latest_proposal = proposal;
     }
   in
-  Lwt.return {state with level_state = new_level_state}
+  return {state with level_state = new_level_state}
 
 let may_update_proposal ~is_proposal_applied state (proposal : proposal) =
   assert (
@@ -120,13 +126,13 @@ let may_update_proposal ~is_proposal_applied state (proposal : proposal) =
   else Lwt.return state
 
 let preattest state proposal =
+  let open Lwt_syntax in
   if Baking_state.is_first_block_in_protocol proposal then
     (* We do not preattest the first transition block *)
     let new_state = update_current_phase state Idle in
-    Lwt.return (new_state, Do_nothing)
+    return (new_state, Do_nothing)
   else
-    Events.(emit attempting_preattest_proposal proposal.block.hash)
-    >>= fun () ->
+    let* () = Events.(emit attempting_preattest_proposal proposal.block.hash) in
     let new_state =
       (* We await for the block to be applied before updating its
          locked values. *)
@@ -134,7 +140,7 @@ let preattest state proposal =
         update_current_phase state Awaiting_preattestations
       else update_current_phase state Awaiting_application
     in
-    Lwt.return (new_state, make_preattest_action state proposal)
+    return (new_state, make_preattest_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
@@ -213,6 +219,7 @@ let has_already_been_handled state new_proposal =
   && state.level_state.is_latest_proposal_applied
 
 let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
+  let open Lwt_syntax in
   let current_level = state.level_state.current_level in
   let new_proposal_level = new_proposal.block.shell.level in
   let current_proposal = state.level_state.latest_proposal in
@@ -228,8 +235,10 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
        should have a fitness that is greater than our current
        proposal and thus, its level should be at least the same as
        our current proposal's level. *)
-    Events.(emit baker_is_ahead_of_node (current_level, new_proposal_level))
-    >>= fun () -> do_nothing state
+    let* () =
+      Events.(emit baker_is_ahead_of_node (current_level, new_proposal_level))
+    in
+    do_nothing state
   else if Compare.Int32.(current_level = new_proposal_level) then
     if
       (* The received head is a new proposal for the current level:
@@ -237,16 +246,21 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
       Block_hash.(
         current_proposal.predecessor.hash <> new_proposal.predecessor.hash)
     then
-      Events.(
-        emit
-          new_proposal_is_on_another_branch
-          (current_proposal.predecessor.hash, new_proposal.predecessor.hash))
-      >>= fun () -> may_switch_branch ~is_proposal_applied state new_proposal
+      let* () =
+        Events.(
+          emit
+            new_proposal_is_on_another_branch
+            (current_proposal.predecessor.hash, new_proposal.predecessor.hash))
+      in
+      may_switch_branch ~is_proposal_applied state new_proposal
     else
-      is_acceptable_proposal_for_current_level state new_proposal >>= function
+      let* proposal_acceptance =
+        is_acceptable_proposal_for_current_level state new_proposal
+      in
+      match proposal_acceptance with
       | Invalid ->
           (* The proposal is invalid: we ignore it *)
-          Events.(emit skipping_invalid_proposal ()) >>= fun () ->
+          let* () = Events.(emit skipping_invalid_proposal ()) in
           do_nothing state
       | Outdated_proposal ->
           (* Check whether we need to update our attestable payload  *)
@@ -255,17 +269,20 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           in
           (* The proposal is outdated: we update to be able to extract
              its included attestations but we do not attest it *)
-          Events.(emit outdated_proposal new_proposal.block.hash) >>= fun () ->
-          may_update_proposal ~is_proposal_applied state new_proposal
-          >>= fun state -> do_nothing state
+          let* () = Events.(emit outdated_proposal new_proposal.block.hash) in
+          let* state =
+            may_update_proposal ~is_proposal_applied state new_proposal
+          in
+          do_nothing state
       | Valid_proposal -> (
           (* Valid_proposal => proposal.round = current_round *)
           (* Check whether we need to update our attestable payload  *)
           let new_state =
             may_update_attestable_payload_with_internal_pqc state new_proposal
           in
-          may_update_proposal ~is_proposal_applied new_state new_proposal
-          >>= fun new_state ->
+          let* new_state =
+            may_update_proposal ~is_proposal_applied new_state new_proposal
+          in
           (* The proposal is valid but maybe we already locked on a payload *)
           match new_state.level_state.locked_round with
           | Some locked_round -> (
@@ -291,7 +308,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                       let new_state =
                         update_current_phase new_state Awaiting_preattestations
                       in
-                      Lwt.return (new_state, Watch_proposal)
+                      return (new_state, Watch_proposal)
                     else do_nothing new_state)
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
@@ -303,7 +320,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
        - we received a block for a next level
        - we received our own block
          This is where we update our [level_state] (and our [round_state]) *)
-    Events.(emit new_head_with_increasing_level ()) >>= fun () ->
+    let* () = Events.(emit new_head_with_increasing_level ()) in
     let new_level = new_proposal.block.shell.level in
     let compute_new_state ~current_round ~delegate_slots
         ~next_level_delegate_slots =
@@ -334,11 +351,12 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let action =
       Update_to_level {new_level_proposal = new_proposal; compute_new_state}
     in
-    Lwt.return (state, action)
+    return (state, action)
 
 and may_switch_branch ~is_proposal_applied state new_proposal =
+  let open Lwt_syntax in
   let switch_branch state =
-    Events.(emit switching_branch ()) >>= fun () ->
+    let* () = Events.(emit switching_branch ()) in
     (* If we are on a different branch, we also need to update our
        [round_state] accordingly.
        The recursive call to [handle_proposal] cannot end up
@@ -353,31 +371,31 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
           (fun state -> handle_proposal ~is_proposal_applied state new_proposal);
       }
     in
-    update_proposal ~is_proposal_applied state new_proposal >>= fun new_state ->
+    let* new_state = update_proposal ~is_proposal_applied state new_proposal in
     (* TODO if the branch proposal is outdated, we should
        trigger an [End_of_round] to participate *)
-    Lwt.return (new_state, Synchronize_round round_update)
+    return (new_state, Synchronize_round round_update)
   in
   let current_attestable_payload = state.level_state.attestable_payload in
   match (current_attestable_payload, new_proposal.block.prequorum) with
   | None, Some _ | None, None ->
-      Events.(emit branch_proposal_has_better_fitness ()) >>= fun () ->
+      let* () = Events.(emit branch_proposal_has_better_fitness ()) in
       (* The new branch contains a PQC (and we do not) or a better
          fitness, we switch. *)
       switch_branch state
   | Some _, None ->
       (* We have a better PQC, we don't switch as we are able to
          propose a better chain if we stay on our current one. *)
-      Events.(emit branch_proposal_has_no_prequorum ()) >>= fun () ->
+      let* () = Events.(emit branch_proposal_has_no_prequorum ()) in
       do_nothing state
   | Some {prequorum = current_pqc; _}, Some new_pqc ->
       if Round.(current_pqc.round > new_pqc.round) then
-        Events.(emit branch_proposal_has_lower_prequorum ()) >>= fun () ->
+        let* () = Events.(emit branch_proposal_has_lower_prequorum ()) in
         (* The other's branch PQC is lower than ours, do not
            switch *)
         do_nothing state
       else if Round.(current_pqc.round < new_pqc.round) then
-        Events.(emit branch_proposal_has_better_prequorum ()) >>= fun () ->
+        let* () = Events.(emit branch_proposal_has_better_prequorum ()) in
         (* Their PQC is better than ours: we switch *)
         switch_branch state
       else
@@ -386,22 +404,25 @@ and may_switch_branch ~is_proposal_applied state new_proposal =
            the same level but not the same predecessor : it's
            impossible unless if there was some double-baking. This
            shouldn't happen but do nothing anyway. *)
-        Events.(emit branch_proposal_has_same_prequorum ()) >>= fun () ->
+        let* () = Events.(emit branch_proposal_has_same_prequorum ()) in
         do_nothing state
 
 let may_register_early_prequorum state ((candidate, _) as received_prequorum) =
+  let open Lwt_syntax in
   if
     Block_hash.(
       candidate.Operation_worker.hash
       <> state.level_state.latest_proposal.block.hash)
   then
-    Events.(
-      emit
-        unexpected_pqc_while_waiting_for_application
-        (candidate.hash, state.level_state.latest_proposal.block.hash))
-    >>= fun () -> do_nothing state
+    let* () =
+      Events.(
+        emit
+          unexpected_pqc_while_waiting_for_application
+          (candidate.hash, state.level_state.latest_proposal.block.hash))
+    in
+    do_nothing state
   else
-    Events.(emit pqc_while_waiting_for_application candidate.hash) >>= fun () ->
+    let* () = Events.(emit pqc_while_waiting_for_application candidate.hash) in
     let new_round_state =
       {state.round_state with delayed_prequorum = Some received_prequorum}
     in
@@ -413,6 +434,7 @@ let may_register_early_prequorum state ((candidate, _) as received_prequorum) =
     for [delegate] at round [round]. *)
 let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
+  let open Lwt_syntax in
   (* TODO check if there is a trace where we could not have updated the level *)
   (* The block to bake embeds the operations gathered by the
      worker. However, consensus operations that are not relevant for
@@ -471,7 +493,7 @@ let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
       (List.map Operation.pack dal_attestations)
   in
   let kind = Fresh operation_pool in
-  Events.(emit proposing_fresh_block (delegate, round)) >>= fun () ->
+  let* () = Events.(emit proposing_fresh_block (delegate, round)) in
   let force_apply =
     state.global_state.config.force_apply || Round.(round <> zero)
     (* This is used as a safety net by applying blocks on round > 0, in case
@@ -479,9 +501,10 @@ let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
   in
   let block_to_bake = {predecessor; round; delegate; kind; force_apply} in
   let updated_state = update_current_phase state Idle in
-  Lwt.return @@ Inject_block {block_to_bake; updated_state}
+  return @@ Inject_block {block_to_bake; updated_state}
 
 let propose_block_action state delegate round (proposal : proposal) =
+  let open Lwt_syntax in
   (* Possible cases:
      1. There was a proposal but the PQC was not reached.
      2. There was a proposal and the PQC was reached. We repropose the
@@ -489,7 +512,7 @@ let propose_block_action state delegate round (proposal : proposal) =
      may be older. *)
   match state.level_state.attestable_payload with
   | None ->
-      Events.(emit no_attestable_payload_fresh_block ()) >>= fun () ->
+      let* () = Events.(emit no_attestable_payload_fresh_block ()) in
       (* For case 1, we may re-inject with the same payload or a fresh
          one. We make the choice of baking a fresh one: the previous
          proposal may have been rejected because the block may have been
@@ -513,7 +536,7 @@ let propose_block_action state delegate round (proposal : proposal) =
         delegate
         round
   | Some {proposal; prequorum} ->
-      Events.(emit repropose_block proposal.block.payload_hash) >>= fun () ->
+      let* () = Events.(emit repropose_block proposal.block.payload_hash) in
       (* For case 2, we re-inject the same block as [attestable_round]
          but we may add some left-overs attestations. Therefore, the
          operations we need to include are:
@@ -577,9 +600,10 @@ let propose_block_action state delegate round (proposal : proposal) =
         {predecessor = proposal.predecessor; round; delegate; kind; force_apply}
       in
       let updated_state = update_current_phase state Idle in
-      Lwt.return @@ Inject_block {block_to_bake; updated_state}
+      return @@ Inject_block {block_to_bake; updated_state}
 
 let end_of_round state current_round =
+  let open Lwt_syntax in
   let new_round = Round.succ current_round in
   let new_round_state = {state.round_state with current_round = new_round} in
   let new_state = {state with round_state = new_round_state} in
@@ -588,11 +612,12 @@ let end_of_round state current_round =
     round_proposer new_state ~level:`Current new_state.round_state.current_round
   with
   | None ->
-      Events.(
-        emit
-          no_proposal_slot
-          (current_round, state.level_state.current_level, new_round))
-      >>= fun () ->
+      let* () =
+        Events.(
+          emit
+            no_proposal_slot
+            (current_round, state.level_state.current_level, new_round))
+      in
       (* We don't have any delegate that may propose a new block for
          this round -- We will wait for preattestations when the next
          level block arrive. Meanwhile, we are idle *)
@@ -605,23 +630,27 @@ let end_of_round state current_round =
            baker of the previous protocol do it.) *)
         do_nothing new_state
       else
-        Events.(
-          emit
-            proposal_slot
-            ( current_round,
-              state.level_state.current_level,
-              new_round,
-              consensus_key_and_delegate ))
-        >>= fun () ->
+        let* () =
+          Events.(
+            emit
+              proposal_slot
+              ( current_round,
+                state.level_state.current_level,
+                new_round,
+                consensus_key_and_delegate ))
+        in
         (* We have a delegate, we need to determine what to inject *)
-        propose_block_action
-          new_state
-          consensus_key_and_delegate
-          new_round
-          state.level_state.latest_proposal
-        >>= fun action -> Lwt.return (new_state, action)
+        let* action =
+          propose_block_action
+            new_state
+            consensus_key_and_delegate
+            new_round
+            state.level_state.latest_proposal
+        in
+        return (new_state, action)
 
 let time_to_bake_at_next_level state at_round =
+  let open Lwt_syntax in
   (* It is now time to update the state level *)
   (* We need to keep track for which block we have 2f+1 *attestations*, that is,
      which will become the new predecessor_block *)
@@ -643,14 +672,16 @@ let time_to_bake_at_next_level state at_round =
         {state.level_state with next_level_proposed_round = Some at_round}
       in
       let new_state = {state with level_state = new_level_state} in
-      propose_fresh_block_action
-        ~attestations
-        ~dal_attestations
-        ~predecessor:elected_block.proposal.block
-        new_state
-        consensus_key_and_delegate
-        at_round
-      >>= fun action -> Lwt.return (new_state, action)
+      let* action =
+        propose_fresh_block_action
+          ~attestations
+          ~dal_attestations
+          ~predecessor:elected_block.proposal.block
+          new_state
+          consensus_key_and_delegate
+          at_round
+      in
+      return (new_state, action)
 
 let update_locked_round state round payload_hash =
   let locked_round = Some {payload_hash; round} in
@@ -665,16 +696,19 @@ let make_attest_action state proposal =
 
 let prequorum_reached_when_awaiting_preattestations state candidate
     preattestations =
+  let open Lwt_syntax in
   let latest_proposal = state.level_state.latest_proposal in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
-    Events.(
-      emit
-        unexpected_prequorum_received
-        (candidate.hash, latest_proposal.block.hash))
-    >>= fun () -> do_nothing state
+    let* () =
+      Events.(
+        emit
+          unexpected_prequorum_received
+          (candidate.hash, latest_proposal.block.hash))
+    in
+    do_nothing state
   else if not state.level_state.is_latest_proposal_applied then
-    Events.(emit handling_prequorum_on_non_applied_proposal ()) >>= fun () ->
+    let* () = Events.(emit handling_prequorum_on_non_applied_proposal ()) in
     do_nothing state
   else
     let prequorum =
@@ -712,17 +746,20 @@ let prequorum_reached_when_awaiting_preattestations state candidate
         latest_proposal.block.payload_hash
     in
     let new_state = update_current_phase new_state Awaiting_attestations in
-    Lwt.return (new_state, make_attest_action new_state latest_proposal)
+    return (new_state, make_attest_action new_state latest_proposal)
 
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
+  let open Lwt_syntax in
   let latest_proposal = state.level_state.latest_proposal in
   if Block_hash.(candidate.Operation_worker.hash <> latest_proposal.block.hash)
   then
-    Events.(
-      emit
-        unexpected_quorum_received
-        (candidate.hash, latest_proposal.block.hash))
-    >>= fun () -> do_nothing state
+    let* () =
+      Events.(
+        emit
+          unexpected_quorum_received
+          (candidate.hash, latest_proposal.block.hash))
+    in
+    do_nothing state
   else
     let new_level_state =
       match state.level_state.elected_block with
@@ -786,8 +823,9 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
      [Prequorum_reached] *)
 let step (state : Baking_state.t) (event : Baking_state.event) :
     (Baking_state.t * Baking_actions.t) Lwt.t =
+  let open Lwt_syntax in
   let phase = state.round_state.current_phase in
-  Events.(emit step_current_phase (phase, event)) >>= fun () ->
+  let* () = Events.(emit step_current_phase (phase, event)) in
   match (phase, event) with
   (* Handle timeouts *)
   | _, Timeout (End_of_round {ending_round}) ->
@@ -799,56 +837,75 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
          going on and propose the next level block *)
       time_to_bake_at_next_level state at_round
   | Idle, New_head_proposal proposal ->
-      Events.(
-        emit
-          new_head
-          (proposal.block.hash, proposal.block.shell.level, proposal.block.round))
-      >>= fun () -> handle_proposal ~is_proposal_applied:true state proposal
-  | Awaiting_application, New_head_proposal proposal ->
-      if
-        Block_hash.(
-          state.level_state.latest_proposal.block.hash <> proposal.block.hash)
-      then
+      let* () =
         Events.(
           emit
             new_head
             ( proposal.block.hash,
               proposal.block.shell.level,
               proposal.block.round ))
-        >>= fun () ->
-        Events.(emit unexpected_new_head_while_waiting_for_application ())
-        >>= fun () -> handle_proposal ~is_proposal_applied:true state proposal
+      in
+      handle_proposal ~is_proposal_applied:true state proposal
+  | Awaiting_application, New_head_proposal proposal ->
+      if
+        Block_hash.(
+          state.level_state.latest_proposal.block.hash <> proposal.block.hash)
+      then
+        let* () =
+          Events.(
+            emit
+              new_head
+              ( proposal.block.hash,
+                proposal.block.shell.level,
+                proposal.block.round ))
+        in
+        let* () =
+          Events.(emit unexpected_new_head_while_waiting_for_application ())
+        in
+        handle_proposal ~is_proposal_applied:true state proposal
       else
-        Events.(emit applied_expected_proposal_received proposal.block.hash)
-        >>= fun () -> handle_expected_applied_proposal state
+        let* () =
+          Events.(emit applied_expected_proposal_received proposal.block.hash)
+        in
+        handle_expected_applied_proposal state
   | Awaiting_attestations, New_head_proposal proposal
   | Awaiting_preattestations, New_head_proposal proposal ->
-      Events.(
-        emit
-          new_head
-          (proposal.block.hash, proposal.block.shell.level, proposal.block.round))
-      >>= fun () ->
-      Events.(emit new_head_while_waiting_for_qc ()) >>= fun () ->
+      let* () =
+        Events.(
+          emit
+            new_head
+            ( proposal.block.hash,
+              proposal.block.shell.level,
+              proposal.block.round ))
+      in
+      let* () = Events.(emit new_head_while_waiting_for_qc ()) in
       handle_proposal ~is_proposal_applied:true state proposal
   | Idle, New_valid_proposal proposal ->
-      Events.(
-        emit
-          new_valid_proposal
-          (proposal.block.hash, proposal.block.shell.level, proposal.block.round))
-      >>= fun () -> handle_proposal ~is_proposal_applied:false state proposal
+      let* () =
+        Events.(
+          emit
+            new_valid_proposal
+            ( proposal.block.hash,
+              proposal.block.shell.level,
+              proposal.block.round ))
+      in
+      handle_proposal ~is_proposal_applied:false state proposal
   | Awaiting_application, New_valid_proposal proposal
   | Awaiting_attestations, New_valid_proposal proposal
   | Awaiting_preattestations, New_valid_proposal proposal ->
-      Events.(
-        emit
-          new_valid_proposal
-          (proposal.block.hash, proposal.block.shell.level, proposal.block.round))
-      >>= fun () ->
+      let* () =
+        Events.(
+          emit
+            new_valid_proposal
+            ( proposal.block.hash,
+              proposal.block.shell.level,
+              proposal.block.round ))
+      in
       if has_already_been_handled state proposal then
-        Events.(emit valid_proposal_received_after_application ()) >>= fun () ->
+        let* () = Events.(emit valid_proposal_received_after_application ()) in
         do_nothing state
       else
-        Events.(emit new_valid_proposal_while_waiting_for_qc ()) >>= fun () ->
+        let* () = Events.(emit new_valid_proposal_while_waiting_for_qc ()) in
         handle_proposal ~is_proposal_applied:false state proposal
   | Awaiting_application, Prequorum_reached (candidate, preattestation_qc) ->
       may_register_early_prequorum state (candidate, preattestation_qc)
