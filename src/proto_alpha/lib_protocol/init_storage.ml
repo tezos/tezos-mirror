@@ -210,18 +210,27 @@ let initialize_total_supply_for_o chain_id ctxt =
     Storage.Contract.Total_supply.add ctxt total_supply
 
 let migrate_pending_consensus_keys_for_o ctxt =
+  let open Lwt_result_syntax in
   Storage.Delegates.fold
     ctxt
     ~order:`Undefined
     ~init:ctxt
     ~f:(fun delegate ctxt ->
       let delegate = Contract_repr.Implicit delegate in
-      Storage.Contract.Pending_consensus_keys_up_to_Nairobi.fold
-        (ctxt, delegate)
-        ~order:`Undefined
-        ~init:ctxt
-        ~f:(fun cycle pk ctxt ->
-          Storage.Pending_consensus_keys.add (ctxt, cycle) delegate pk))
+      let*! pending_cks =
+        Storage.Contract.Pending_consensus_keys_up_to_Nairobi.bindings
+          (ctxt, delegate)
+      in
+      List.fold_left_s
+        (fun ctxt (cycle, pk) ->
+          let*! ctxt =
+            Storage.Pending_consensus_keys.add (ctxt, cycle) delegate pk
+          in
+          Storage.Contract.Pending_consensus_keys_up_to_Nairobi.remove
+            (ctxt, delegate)
+            cycle)
+        ctxt
+        pending_cks)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
