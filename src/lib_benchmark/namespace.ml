@@ -71,11 +71,22 @@ let cons (l : t) (a : string) : t =
   | [_] -> [a]
   | _ ->
       Format.eprintf "Namespace.cons error: string contains %c: %s@." sep a ;
-      exit 1
+      assert false
 
 let encoding = Data_encoding.(list string)
 
 let to_list l = root_name :: l
+
+let of_list l =
+  let l = match l with x :: xs when x = root_name -> xs | _ -> l in
+  match List.find (fun s -> String.contains s sep) l with
+  | None -> l
+  | Some a ->
+      Format.eprintf
+        "Namespace.of_list error: list contains \"%s\" that contains '%c'@."
+        a
+        sep ;
+      assert false
 
 let name_match (pattern : t) (name : t) =
   let l, leftovers = List.combine_with_leftovers pattern name in
