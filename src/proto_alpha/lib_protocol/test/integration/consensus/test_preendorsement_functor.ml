@@ -58,11 +58,11 @@ end = struct
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
     Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
-    Op.endorsement b1 >>=? fun endo ->
+    Op.attestation b1 >>=? fun endo ->
     bake b1 ~operations:[endo] >>=? fun b2 ->
     let endorsed_block = preendorsed_block genesis b1 b2 in
     get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
-    Op.preendorsement ?delegate ?slot ~round:preend_round endorsed_block
+    Op.preattestation ?delegate ?slot ~round:preend_round endorsed_block
     >>=? fun p ->
     let operations = endo :: (mk_ops @@ p) in
     bake

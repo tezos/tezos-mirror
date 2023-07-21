@@ -49,7 +49,7 @@ let bake_and_endorse_once (_b_pred, b_cur) baker endorser =
   | None -> assert false
   | Some (delegate, _slots) ->
       Block.get_round b_cur >>?= fun round ->
-      Op.endorsement ~round ~delegate b_cur >>=? fun endorsement ->
+      Op.attestation ~round ~delegate b_cur >>=? fun endorsement ->
       Block.bake ~policy:(By_account baker) ~operation:endorsement b_cur
 
 (** We test that:

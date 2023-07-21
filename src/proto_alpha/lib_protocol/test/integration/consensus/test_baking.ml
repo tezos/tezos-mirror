@@ -202,7 +202,7 @@ let test_rewards_block_and_payload_producer () =
      total endorsing power). *)
   let endorsers = List.take_n 5 endorsers in
   List.map_ep
-    (fun (endorser, _slots) -> Op.endorsement ~delegate:endorser b1)
+    (fun (endorser, _slots) -> Op.attestation ~delegate:endorser b1)
     endorsers
   >>=? fun endos ->
   let attesting_power =
@@ -246,7 +246,7 @@ let test_rewards_block_and_payload_producer () =
     endorsers
   >>=? fun preendorsers ->
   List.map_ep
-    (fun (endorser, _slots) -> Op.preendorsement ~delegate:endorser b2)
+    (fun (endorser, _slots) -> Op.preattestation ~delegate:endorser b2)
     preendorsers
   >>=? fun preendos ->
   Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->

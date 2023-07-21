@@ -109,7 +109,7 @@ let order_endorsements ~correct_order op1 op2 =
    [test_valid_double_endorsing_followed_by_double_baking] *)
 let double_endorsement ctxt ?(correct_order = true) op1 op2 =
   let e1, e2 = order_endorsements ~correct_order op1 op2 in
-  Op.double_endorsement ctxt e1 e2
+  Op.double_attestation ctxt e1 e2
 
 let test_valid_double_baking_followed_by_double_endorsing () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
@@ -126,8 +126,8 @@ let test_valid_double_baking_followed_by_double_endorsing () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
+  Op.raw_attestation ~delegate blk_a >>=? fun endorsement_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   >>=? fun blk_final ->
@@ -170,8 +170,8 @@ let test_valid_double_endorsing_followed_by_double_baking () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_endorsement ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_endorsement ~delegate blk_b >>=? fun endorsement_b ->
+  Op.raw_attestation ~delegate blk_a >>=? fun endorsement_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_a
   >>=? fun blk_with_de_evidence ->
@@ -227,7 +227,7 @@ let test_payload_producer_gets_evidence_rewards () =
   >>=? fun preendorsers ->
   List.map_ep
     (fun (endorser, _slots) ->
-      Op.preendorsement ~delegate:endorser b_with_evidence)
+      Op.preattestation ~delegate:endorser b_with_evidence)
     preendorsers
   >>=? fun preendos ->
   Block.bake

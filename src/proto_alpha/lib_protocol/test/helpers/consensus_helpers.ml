@@ -57,7 +57,7 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
   let* operation =
     match kind with
     | Preendorsement ->
-        Op.preendorsement
+        Op.preattestation
           ?delegate
           ?slot
           ?level
@@ -66,7 +66,7 @@ let test_consensus_operation ?delegate ?slot ?level ?round ?block_payload_hash
           ?branch
           endorsed_block
     | Endorsement ->
-        Op.endorsement
+        Op.attestation
           ?delegate
           ?slot
           ?level
@@ -164,8 +164,8 @@ let delegate_of_slot ?(different_slot = false) slot b =
 let test_consensus_op_for_next ~genesis ~kind ~next =
   let dorsement ~endorsed_block ~delegate =
     match kind with
-    | `Preendorsement -> Op.preendorsement ~delegate endorsed_block
-    | `Endorsement -> Op.endorsement ~delegate endorsed_block
+    | `Preendorsement -> Op.preattestation ~delegate endorsed_block
+    | `Endorsement -> Op.attestation ~delegate endorsed_block
   in
   Block.bake genesis >>=? fun b1 ->
   (match next with

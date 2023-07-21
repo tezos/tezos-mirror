@@ -313,7 +313,7 @@ let test_unrevealed () =
     let* endorsements =
       List.map_es
         (fun {Plugin.RPC.Validators.consensus_key; _} ->
-          Op.endorsement ~delegate:consensus_key b)
+          Op.attestation ~delegate:consensus_key b)
         slots
     in
     Block.bake ?policy ~operations:endorsements b

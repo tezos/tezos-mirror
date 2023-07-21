@@ -50,7 +50,7 @@ let init_genesis ?policy () =
 let test_preendorsement_with_arbitrary_branch () =
   Context.init1 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun blk ->
-  Op.preendorsement ~branch:Block_hash.zero blk >>=? fun operation ->
+  Op.preattestation ~branch:Block_hash.zero blk >>=? fun operation ->
   Incremental.begin_construction ~mempool_mode:true blk >>=? fun inc ->
   Incremental.validate_operation inc operation >>=? fun _inc -> return_unit
 
@@ -155,9 +155,9 @@ let test_duplicate_preendorsement () =
   init_genesis () >>=? fun (genesis, _) ->
   Block.bake genesis >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun inc ->
-  Op.preendorsement b >>=? fun operation ->
+  Op.preattestation b >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
-  Op.preendorsement b >>=? fun operation ->
+  Op.preattestation b >>=? fun operation ->
   Incremental.add_operation inc operation >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__

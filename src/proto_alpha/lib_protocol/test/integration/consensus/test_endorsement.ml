@@ -78,7 +78,7 @@ let test_non_zero_round () =
 let test_fitness_gap () =
   let open Lwt_result_syntax in
   let* _genesis, pred_b = init_genesis () in
-  let* operation = Op.endorsement pred_b in
+  let* operation = Op.attestation pred_b in
   let* b = Block.bake ~operation pred_b in
   let fitness =
     match Fitness.from_raw b.header.shell.fitness with
@@ -159,7 +159,7 @@ let test_negative_slot () =
   Context.get_attester (B b) >>=? fun (delegate, _slots) ->
   Lwt.catch
     (fun () ->
-      Op.endorsement
+      Op.attestation
         ~delegate
         ~slot:(Slot.of_int_do_not_use_except_for_parameters (-1))
         b
@@ -443,8 +443,8 @@ let assert_conflict_error ~loc res =
 let test_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
-  let* op = Op.endorsement b in
-  let* op_different_branch = Op.endorsement ~branch:Block_hash.zero b in
+  let* op = Op.attestation b in
+  let* op_different_branch = Op.attestation ~branch:Block_hash.zero b in
   (* Test in application and construction (aka baking) modes *)
   let assert_conflict loc baking_mode tested_op =
     Block.bake ~baking_mode ~operations:[op; tested_op] b
@@ -463,7 +463,7 @@ let test_conflict () =
   let* () = assert_mempool_conflict __LOC__ op in
   let* () = assert_mempool_conflict __LOC__ op_different_branch in
   let* op_different_payload_hash =
-    Op.endorsement ~block_payload_hash:Block_payload_hash.zero b
+    Op.attestation ~block_payload_hash:Block_payload_hash.zero b
   in
   let* () = assert_mempool_conflict __LOC__ op_different_payload_hash in
   return_unit
@@ -480,12 +480,12 @@ let test_grandparent_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, grandparent = init_genesis () in
   let* predecessor = Block.bake grandparent in
-  let* op = Op.endorsement grandparent in
+  let* op = Op.attestation grandparent in
   let* op_different_branch =
-    Op.endorsement ~branch:Block_hash.zero grandparent
+    Op.attestation ~branch:Block_hash.zero grandparent
   in
   let* op_different_payload_hash =
-    Op.endorsement ~block_payload_hash:Block_payload_hash.zero grandparent
+    Op.attestation ~block_payload_hash:Block_payload_hash.zero grandparent
   in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let* inc = Incremental.validate_operation inc op in
@@ -504,12 +504,12 @@ let test_future_level_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, predecessor = init_genesis () in
   let* future_block = Block.bake ~policy:(By_round 10) predecessor in
-  let* op = Op.endorsement future_block in
+  let* op = Op.attestation future_block in
   let* op_different_branch =
-    Op.endorsement ~branch:Block_hash.zero future_block
+    Op.attestation ~branch:Block_hash.zero future_block
   in
   let* op_different_payload_hash =
-    Op.endorsement ~block_payload_hash:Block_payload_hash.zero future_block
+    Op.attestation ~block_payload_hash:Block_payload_hash.zero future_block
   in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let* inc = Incremental.validate_operation inc op in
@@ -527,8 +527,8 @@ let test_future_level_conflict () =
 let test_no_conflict_with_preendorsement_mempool () =
   let open Lwt_result_syntax in
   let* _genesis, endorsed_block = init_genesis () in
-  let* op_endo = Op.endorsement endorsed_block in
-  let* op_preendo = Op.preendorsement endorsed_block in
+  let* op_endo = Op.attestation endorsed_block in
+  let* op_preendo = Op.preattestation endorsed_block in
   let* inc = Incremental.begin_construction ~mempool_mode:true endorsed_block in
   let* inc = Incremental.add_operation inc op_endo in
   let* inc = Incremental.add_operation inc op_preendo in
@@ -544,8 +544,8 @@ let test_no_conflict_with_preendorsement_block () =
   let open Lwt_result_syntax in
   let* _genesis, predecessor = init_genesis () in
   let* round0_block = Block.bake predecessor in
-  let* op_endo = Op.endorsement predecessor in
-  let* op_preendo = Op.preendorsement round0_block in
+  let* op_endo = Op.attestation predecessor in
+  let* op_preendo = Op.preattestation round0_block in
   let bake_both_ops baking_mode =
     Block.bake
       ~baking_mode
@@ -575,7 +575,7 @@ let test_no_conflict_various_levels_and_rounds () =
   let* alt_future = Block.bake ~policy:(By_round 10) alt_predecessor in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
   let add_endorsement inc endorsed_block =
-    let* (op : packed_operation) = Op.endorsement endorsed_block in
+    let* (op : packed_operation) = Op.attestation endorsed_block in
     let (Operation_data protocol_data) = op.protocol_data in
     let content =
       match protocol_data.contents with
@@ -623,7 +623,7 @@ let test_endorsement_threshold ~sufficient_threshold () =
         (sufficient_threshold && counter < consensus_threshold)
         || ((not sufficient_threshold) && new_counter < consensus_threshold)
       then
-        Op.endorsement ~round ~delegate b >>=? fun endo ->
+        Op.attestation ~round ~delegate b >>=? fun endo ->
         return (new_counter, endo :: endos)
       else return (counter, endos))
     (0, [])
