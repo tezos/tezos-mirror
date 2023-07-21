@@ -33,7 +33,7 @@
   test_delegation
   test_double_baking
   test_double_endorsement
-  test_double_preendorsement
+  test_double_preattestation
   test_attestation
   test_frozen_deposits
   test_helpers_rpcs

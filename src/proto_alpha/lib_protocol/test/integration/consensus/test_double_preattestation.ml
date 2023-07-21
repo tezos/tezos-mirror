@@ -25,10 +25,10 @@
 
 (** Testing
     -------
-    Component:  Protocol (double preendorsement) in Full_construction & Application modes
+    Component:  Protocol (double preattestation) in Full_construction & Application modes
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- --file test_double_preendorsement.ml
-    Subject:    These tests target different cases for double preendorsement *)
+                  -- --file test_double_preattestation.ml
+    Subject:    These tests target different cases for double preattestation *)
 
 open Protocol
 open Alpha_context
@@ -54,7 +54,7 @@ end = struct
 
   (** Helper function for illformed denunciations construction *)
 
-  let pick_endorsers ctxt =
+  let pick_attesters ctxt =
     let module V = Plugin.RPC.Validators in
     Context.get_attesters ctxt >>=? function
     | a :: b :: _ ->
@@ -68,8 +68,8 @@ end = struct
             true
         | _ -> false)
 
-  let malformed_double_preendorsement_denunciation
-      ?(include_endorsement = false) ?(block_round = 0)
+  let malformed_double_preattestation_denunciation
+      ?(include_attestation = false) ?(block_round = 0)
       ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preattestation ctxt p1 p2)
       ~loc () =
     Context.init_n ~consensus_threshold:0 10 ()
@@ -77,7 +77,7 @@ end = struct
     bake genesis >>=? fun b1 ->
     bake ~policy:(By_round 0) b1 >>=? fun b2_A ->
     Op.attestation b1 >>=? fun e ->
-    let operations = if include_endorsement then [e] else [] in
+    let operations = if include_attestation then [e] else [] in
     bake ~policy:(By_round block_round) ~operations b1 >>=? fun b2_B ->
     Op.raw_preattestation b2_A >>=? fun op1 ->
     Op.raw_preattestation b2_B >>=? fun op2 ->
@@ -119,7 +119,7 @@ end = struct
     Alcotest.fail (loc ^ ": Test should not succeed")
 
   let expected_success _loc baker pred bbad d1 d2 =
-    (* same preendorsers in case denunciation succeeds*)
+    (* same preattesters in case denunciation succeeds*)
     Assert.equal_pkh ~loc:__LOC__ d1 d2 >>=? fun () ->
     Context.get_constants (B pred) >>=? fun constants ->
     let p =
@@ -128,7 +128,7 @@ end = struct
     in
     (* let's bake the block on top of pred without denunciating d1 *)
     bake ~policy:(By_account baker) pred >>=? fun bgood ->
-    (* Checking what the endorser lost *)
+    (* Checking what the attester lost *)
     Context.Delegate.current_frozen_deposits (B pred) d1
     >>=? fun frozen_deposit ->
     Context.Delegate.full_balance (B bgood) d1 >>=? fun bal_good ->
@@ -146,19 +146,20 @@ end = struct
              .staking_over_baking_global_limit)
     in
     let denun_reward = Test_tez.(lost_deposit /! divider) in
-    (* if the baker is the endorser, he'll only loose half of the deposits *)
-    let expected_endo_loss =
+    (* if the baker is the attester, he'll only loose half of the deposits *)
+    let expected_attester_loss =
       if Signature.Public_key_hash.equal baker d1 then
         Test_tez.(lost_deposit -! denun_reward)
       else lost_deposit
     in
-    Assert.equal_tez ~loc:__LOC__ expected_endo_loss diff_end_bal >>=? fun () ->
+    Assert.equal_tez ~loc:__LOC__ expected_attester_loss diff_end_bal
+    >>=? fun () ->
     (* Checking what the baker earned (or lost) *)
     Context.Delegate.full_balance (B bgood) baker >>=? fun bal_good ->
     Context.Delegate.full_balance (B bbad) baker >>=? fun bal_bad ->
-    (* if baker = endorser, the baker's balance in the good case is better,
-       because half of his deposits are burnt in the bad (double-preendorsement)
-       situation. In case baker <> endorser, bal_bad of the baker gets half of
+    (* if baker = attester, the baker's balance in the good case is better,
+       because half of his deposits are burnt in the bad (double-preattestation)
+       situation. In case baker <> attester, bal_bad of the baker gets half of
        burnt deposit of d1, so it's higher
     *)
     let high, low =
@@ -167,11 +168,11 @@ end = struct
     in
     let diff_baker = Test_tez.(high -! low) in
     (* the baker has either earnt or lost (in case baker = d1) half of burnt
-       endorsement deposits *)
+       attestation deposits *)
     Assert.equal_tez ~loc:__LOC__ denun_reward diff_baker >>=? fun () ->
     return_unit
 
-  let order_preendorsements ~correct_order op1 op2 =
+  let order_preattestations ~correct_order op1 op2 =
     let oph1 = Operation.hash op1 in
     let oph2 = Operation.hash op2 in
     let c = Operation_hash.compare oph1 oph2 in
@@ -180,29 +181,29 @@ end = struct
     else (op1, op2)
 
   (** Helper function for denunciations inclusion *)
-  let generic_double_preendorsement_denunciation ~nb_blocks_before_double
+  let generic_double_preattestation_denunciation ~nb_blocks_before_double
       ~nb_blocks_before_denunciation
       ?(test_expected_ok = fun _loc _baker _pred _bbad _d1 _d2 -> return_unit)
       ?(test_expected_ko = fun _loc _res -> return_unit)
-      ?(pick_endorsers =
-        fun ctxt -> pick_endorsers ctxt >>=? fun (a, _b) -> return (a, a)) ~loc
+      ?(pick_attesters =
+        fun ctxt -> pick_attesters ctxt >>=? fun (a, _b) -> return (a, a)) ~loc
       () =
     Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
     let addr =
       match List.hd contracts with None -> assert false | Some e -> e
     in
-    (* bake `nb_blocks_before_double blocks` before double preendorsing *)
+    (* bake `nb_blocks_before_double blocks` before double preattesting *)
     bake_n nb_blocks_before_double genesis >>=? fun blk ->
-    (* producing two differents blocks and two preendorsements op1 and op2 *)
+    (* producing two differents blocks and two preattestations op1 and op2 *)
     Op.transaction (B genesis) addr addr Tez.one_mutez >>=? fun trans ->
     bake ~policy:(By_round 0) blk >>=? fun head_A ->
     bake ~policy:(By_round 0) blk ~operations:[trans] >>=? fun head_B ->
-    pick_endorsers (B head_A) >>=? fun ((d1, _slots1), (d2, _slots2)) ->
+    pick_attesters (B head_A) >>=? fun ((d1, _slots1), (d2, _slots2)) ->
     (* default: d1 = d2 *)
     Op.raw_preattestation ~delegate:d1 head_A >>=? fun op1 ->
     Op.raw_preattestation ~delegate:d2 head_B >>=? fun op2 ->
-    let op1, op2 = order_preendorsements ~correct_order:true op1 op2 in
-    (* bake `nb_blocks_before_denunciation` before double preend. denunciation *)
+    let op1, op2 = order_preattestations ~correct_order:true op1 op2 in
+    (* bake `nb_blocks_before_denunciation` before double preattestation denunciation *)
     bake_n nb_blocks_before_denunciation blk >>=? fun blk ->
     let op : Operation.packed = Op.double_preattestation (B blk) op1 op2 in
     Context.get_baker (B blk) ~round:Round.zero >>=? fun baker ->
@@ -224,46 +225,46 @@ end = struct
   (*                      Tests                                   *)
   (****************************************************************)
 
-  (** Preendorsing two blocks that are structurally equal is not punished *)
-  let malformed_double_preendorsement_denunciation_same_payload_hash_1 () =
-    malformed_double_preendorsement_denunciation ~loc:__LOC__ ()
+  (** Preattesting two blocks that are structurally equal is not punished *)
+  let malformed_double_preattestation_denunciation_same_payload_hash_1 () =
+    malformed_double_preattestation_denunciation ~loc:__LOC__ ()
 
-  (** Preendorsing two blocks that are structurally equal up to the endorsements
+  (** Preattesting two blocks that are structurally equal up to the attestations
     they include is not punished *)
-  let malformed_double_preendorsement_denunciation_same_payload_hash_2 () =
-    malformed_double_preendorsement_denunciation
-    (* including an endorsement in one of the blocks doesn't change its
+  let malformed_double_preattestation_denunciation_same_payload_hash_2 () =
+    malformed_double_preattestation_denunciation
+    (* including an attestation in one of the blocks doesn't change its
        payload hash *)
-      ~include_endorsement:true
+      ~include_attestation:true
       ~loc:__LOC__
       ()
 
   (** Denunciation evidence cannot have the same operations *)
-  let malformed_double_preendorsement_denunciation_same_preendorsement () =
-    malformed_double_preendorsement_denunciation
-    (* exactly the same preendorsement operation => illformed *)
+  let malformed_double_preattestation_denunciation_same_preattestation () =
+    malformed_double_preattestation_denunciation
+    (* exactly the same preattestation operation => illformed *)
       ~mk_evidence:(fun ctxt p1 _p2 -> Op.double_preattestation ctxt p1 p1)
       ~loc:__LOC__
       ()
 
-  (** Preendorsing two blocks with different rounds is not punished *)
-  let malformed_double_preendorsement_denunciation_different_rounds () =
-    malformed_double_preendorsement_denunciation ~loc:__LOC__ ~block_round:1 ()
+  (** Preattesting two blocks with different rounds is not punished *)
+  let malformed_double_preattestation_denunciation_different_rounds () =
+    malformed_double_preattestation_denunciation ~loc:__LOC__ ~block_round:1 ()
 
-  (** Preendorsing two blocks by two different validators is not punished *)
-  let malformed_double_preendorsement_denunciation_different_validators () =
-    generic_double_preendorsement_denunciation
+  (** Preattesting two blocks by two different validators is not punished *)
+  let malformed_double_preattestation_denunciation_different_validators () =
+    generic_double_preattestation_denunciation
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:2
       ~test_expected_ok:unexpected_success
       ~test_expected_ko:inconsistent_denunciation
-      ~pick_endorsers (* pick different endorsers *)
+      ~pick_attesters (* pick different attesters *)
       ~loc:__LOC__
       ()
 
   (** Attempt a denunciation of a double-pre in the first block after genesis *)
-  let double_preendorsement_just_after_upgrade () =
-    generic_double_preendorsement_denunciation
+  let double_preattestation_just_after_upgrade () =
+    generic_double_preattestation_denunciation
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:1
       ~test_expected_ok:expected_success
@@ -273,9 +274,9 @@ end = struct
 
   (** Denunciation of double-pre at level L is injected at level L' = max_slashing_period.
     The denunciation is outdated. *)
-  let double_preendorsement_denunciation_during_slashing_period () =
+  let double_preattestation_denunciation_during_slashing_period () =
     max_slashing_period () >>=? fun max_slashing_period ->
-    generic_double_preendorsement_denunciation
+    generic_double_preattestation_denunciation
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:(max_slashing_period / 2)
       ~test_expected_ok:expected_success
@@ -285,9 +286,9 @@ end = struct
 
   (** Denunciation of double-pre at level L is injected 1 block after unfreeze
       delay. Too late: denunciation is outdated. *)
-  let double_preendorsement_denunciation_after_slashing_period () =
+  let double_preattestation_denunciation_after_slashing_period () =
     max_slashing_period () >>=? fun max_slashing_period ->
-    generic_double_preendorsement_denunciation
+    generic_double_preattestation_denunciation
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:(max_slashing_period + 1)
       ~test_expected_ok:unexpected_success
@@ -295,8 +296,8 @@ end = struct
       ~loc:__LOC__
       ()
 
-  let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
-    let e1, e2 = order_preendorsements ~correct_order op1 op2 in
+  let double_preattestation ctxt ?(correct_order = true) op1 op2 =
+    let e1, e2 = order_preattestations ~correct_order op1 op2 in
     Op.double_preattestation ctxt e1 e2
 
   let block_fork b =
@@ -304,21 +305,21 @@ end = struct
     Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
     Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
 
-  (** Injecting a valid double preendorsement multiple time raises an error. *)
-  let test_two_double_preendorsement_evidences_leads_to_duplicate_denunciation
+  (** Injecting a valid double preattestation multiple time raises an error. *)
+  let test_two_double_preattestation_evidences_leads_to_duplicate_denunciation
       () =
     Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
     block_fork genesis >>=? fun (blk_1, blk_2) ->
     Block.bake blk_1 >>=? fun blk_a ->
     Block.bake blk_2 >>=? fun blk_b ->
     Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
-    Op.raw_preattestation blk_a >>=? fun preendorsement_a ->
-    Op.raw_preattestation blk_b >>=? fun preendorsement_b ->
+    Op.raw_preattestation blk_a >>=? fun preattestation_a ->
+    Op.raw_preattestation blk_b >>=? fun preattestation_b ->
     let operation =
-      double_preendorsement (B genesis) preendorsement_a preendorsement_b
+      double_preattestation (B genesis) preattestation_a preattestation_b
     in
     let operation2 =
-      double_preendorsement (B genesis) preendorsement_b preendorsement_a
+      double_preattestation (B genesis) preattestation_b preattestation_a
     in
     Context.get_bakers (B blk_a) >>=? fun bakers ->
     let baker = Context.get_first_different_baker delegate bakers in
@@ -347,42 +348,42 @@ end = struct
     [
       (* illformed denunciations *)
       my_tztest
-        "ko: malformed_double_preendorsement_denunciation_same_payload_hash_1"
+        "ko: malformed_double_preattestation_denunciation_same_payload_hash_1"
         `Quick
-        malformed_double_preendorsement_denunciation_same_payload_hash_1;
+        malformed_double_preattestation_denunciation_same_payload_hash_1;
       my_tztest
-        "ko: malformed_double_preendorsement_denunciation_same_payload_hash_2"
+        "ko: malformed_double_preattestation_denunciation_same_payload_hash_2"
         `Quick
-        malformed_double_preendorsement_denunciation_same_payload_hash_2;
+        malformed_double_preattestation_denunciation_same_payload_hash_2;
       my_tztest
-        "ko: malformed_double_preendorsement_denunciation_different_rounds"
+        "ko: malformed_double_preattestation_denunciation_different_rounds"
         `Quick
-        malformed_double_preendorsement_denunciation_different_rounds;
+        malformed_double_preattestation_denunciation_different_rounds;
       my_tztest
-        "ko: malformed_double_preendorsement_denunciation_same_preendorsement"
+        "ko: malformed_double_preattestation_denunciation_same_preattestation"
         `Quick
-        malformed_double_preendorsement_denunciation_same_preendorsement;
+        malformed_double_preattestation_denunciation_same_preattestation;
       my_tztest
-        "ko: malformed_double_preendorsement_denunciation_different_validators"
+        "ko: malformed_double_preattestation_denunciation_different_validators"
         `Quick
-        malformed_double_preendorsement_denunciation_different_validators;
+        malformed_double_preattestation_denunciation_different_validators;
       my_tztest
-        "double_preendorsement_just_after_upgrade"
+        "double_preattestation_just_after_upgrade"
         `Quick
-        double_preendorsement_just_after_upgrade;
+        double_preattestation_just_after_upgrade;
       (* tests for unfreeze *)
       my_tztest
-        "double_preendorsement_denunciation_during_slashing_period"
+        "double_preattestation_denunciation_during_slashing_period"
         `Quick
-        double_preendorsement_denunciation_during_slashing_period;
+        double_preattestation_denunciation_during_slashing_period;
       my_tztest
-        "double_preendorsement_denunciation_after_slashing_period"
+        "double_preattestation_denunciation_after_slashing_period"
         `Quick
-        double_preendorsement_denunciation_after_slashing_period;
+        double_preattestation_denunciation_after_slashing_period;
       my_tztest
-        "valid double preendorsement injected multiple times"
+        "valid double preattestation injected multiple times"
         `Quick
-        test_two_double_preendorsement_evidences_leads_to_duplicate_denunciation;
+        test_two_double_preattestation_evidences_leads_to_duplicate_denunciation;
     ]
 end
 
@@ -400,5 +401,5 @@ let tests =
   AppMode.tests @ ConstrMode.tests
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("double preendorsement", tests)]
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("double preattestation", tests)]
   |> Lwt_main.run
