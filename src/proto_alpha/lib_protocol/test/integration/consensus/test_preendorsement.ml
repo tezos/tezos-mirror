@@ -61,14 +61,14 @@ let test_consensus_operation_preendorsement_for_future_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~level
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
         when kind = Validate_errors.Consensus.Preattestation ->
           true
       | _ -> false)
-    Preendorsement
+    Preattestation
     Mempool
 
 (** Consensus operation for old level : apply a preendorsement with a level in the past *)
@@ -79,14 +79,14 @@ let test_consensus_operation_preendorsement_for_old_level () =
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~level
     ~error:(function
       | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
         when kind = Validate_errors.Consensus.Preattestation ->
           true
       | _ -> false)
-    Preendorsement
+    Preattestation
     Mempool
 
 (** Consensus operation for future round : apply a preendorsement with a round in the future *)
@@ -95,9 +95,9 @@ let test_consensus_operation_preendorsement_for_future_round () =
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~round
-    Preendorsement
+    Preattestation
     Mempool
 
 (** Consensus operation for old round : apply a preendorsement with a round in the past *)
@@ -106,9 +106,9 @@ let test_consensus_operation_preendorsement_for_old_round () =
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~round
-    Preendorsement
+    Preattestation
     Mempool
 
 (** Consensus operation on competing proposal : apply a preendorsement on a competing proposal *)
@@ -116,9 +116,9 @@ let test_consensus_operation_preendorsement_on_competing_proposal () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~block_payload_hash:Block_payload_hash.zero
-    Preendorsement
+    Preattestation
     Mempool
 
 (** Unexpected preendorsements in block : apply a preendorsement with an incorrect round *)
@@ -126,11 +126,11 @@ let test_unexpected_preendorsements_in_blocks () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~error:(function
       | Validate_errors.Consensus.Unexpected_preattestation_in_block -> true
       | _ -> false)
-    Preendorsement
+    Preattestation
     Application
 
 (** Round too high : apply a preendorsement with a too high round *)
@@ -141,13 +141,13 @@ let test_too_high_round () =
   Environment.wrap_tzresult (Round.of_int 1) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
-    ~endorsed_block:pred
+    ~attested_block:pred
     ~round
     ~level
     ~error:(function
       | Validate_errors.Consensus.Preattestation_round_too_high _ -> true
       | _ -> false)
-    Preendorsement
+    Preattestation
     Construction
 
 (** Duplicate preendorsement : apply a preendorsement that has already been applied. *)
@@ -169,7 +169,7 @@ let test_preendorsement_for_next_level () =
   init_genesis () >>=? fun (genesis, _) ->
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
-    ~kind:`Preendorsement
+    ~kind:`Preattestation
     ~next:`Level
 
 (** Preendorsement for next round *)
@@ -177,7 +177,7 @@ let test_preendorsement_for_next_round () =
   init_genesis () >>=? fun (genesis, _) ->
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
-    ~kind:`Preendorsement
+    ~kind:`Preattestation
     ~next:`Round
 
 let tests =
