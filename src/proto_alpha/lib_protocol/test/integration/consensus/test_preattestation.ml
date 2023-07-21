@@ -25,9 +25,9 @@
 
 (** Testing
     -------
-    Component:  Protocol (preendorsement)
+    Component:  Protocol (preattestation)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                 -- --file test_preendorsement.ml
+                 -- --file test_preattestation.ml
 *)
 
 open Protocol
@@ -45,17 +45,17 @@ let init_genesis ?policy () =
 (*                      Tests                                   *)
 (****************************************************************)
 
-(** Test that the preendorsement's branch does not affect its
+(** Test that the preattestation's branch does not affect its
     validity. *)
-let test_preendorsement_with_arbitrary_branch () =
+let test_preattestation_with_arbitrary_branch () =
   Context.init1 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun blk ->
   Op.preattestation ~branch:Block_hash.zero blk >>=? fun operation ->
   Incremental.begin_construction ~mempool_mode:true blk >>=? fun inc ->
   Incremental.validate_operation inc operation >>=? fun _inc -> return_unit
 
-(** Consensus operation for future level : apply a preendorsement with a level in the future *)
-let test_consensus_operation_preendorsement_for_future_level () =
+(** Consensus operation for future level : apply a preattestation with a level in the future *)
+let test_consensus_operation_preattestation_for_future_level () =
   init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 10) in
   let level = match raw_level with Ok l -> l | Error _ -> assert false in
@@ -71,8 +71,8 @@ let test_consensus_operation_preendorsement_for_future_level () =
     Preattestation
     Mempool
 
-(** Consensus operation for old level : apply a preendorsement with a level in the past *)
-let test_consensus_operation_preendorsement_for_old_level () =
+(** Consensus operation for old level : apply a preattestation with a level in the past *)
+let test_consensus_operation_preattestation_for_old_level () =
   init_genesis () >>=? fun (_genesis, grandparent) ->
   Block.bake grandparent >>=? fun pred ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 0) in
@@ -89,8 +89,8 @@ let test_consensus_operation_preendorsement_for_old_level () =
     Preattestation
     Mempool
 
-(** Consensus operation for future round : apply a preendorsement with a round in the future *)
-let test_consensus_operation_preendorsement_for_future_round () =
+(** Consensus operation for future round : apply a preattestation with a round in the future *)
+let test_consensus_operation_preattestation_for_future_round () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 21) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
@@ -100,8 +100,8 @@ let test_consensus_operation_preendorsement_for_future_round () =
     Preattestation
     Mempool
 
-(** Consensus operation for old round : apply a preendorsement with a round in the past *)
-let test_consensus_operation_preendorsement_for_old_round () =
+(** Consensus operation for old round : apply a preattestation with a round in the past *)
+let test_consensus_operation_preattestation_for_old_round () =
   init_genesis ~policy:(By_round 10) () >>=? fun (_genesis, pred) ->
   Environment.wrap_tzresult (Round.of_int 0) >>?= fun round ->
   Consensus_helpers.test_consensus_operation
@@ -111,8 +111,8 @@ let test_consensus_operation_preendorsement_for_old_round () =
     Preattestation
     Mempool
 
-(** Consensus operation on competing proposal : apply a preendorsement on a competing proposal *)
-let test_consensus_operation_preendorsement_on_competing_proposal () =
+(** Consensus operation on competing proposal : apply a preattestation on a competing proposal *)
+let test_consensus_operation_preattestation_on_competing_proposal () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -121,8 +121,8 @@ let test_consensus_operation_preendorsement_on_competing_proposal () =
     Preattestation
     Mempool
 
-(** Unexpected preendorsements in block : apply a preendorsement with an incorrect round *)
-let test_unexpected_preendorsements_in_blocks () =
+(** Unexpected preattestations in block : apply a preattestation with an incorrect round *)
+let test_unexpected_preattestations_in_blocks () =
   init_genesis () >>=? fun (_genesis, pred) ->
   Consensus_helpers.test_consensus_operation
     ~loc:__LOC__
@@ -133,7 +133,7 @@ let test_unexpected_preendorsements_in_blocks () =
     Preattestation
     Application
 
-(** Round too high : apply a preendorsement with a too high round *)
+(** Round too high : apply a preattestation with a too high round *)
 let test_too_high_round () =
   init_genesis () >>=? fun (_genesis, pred) ->
   let raw_level = Raw_level.of_int32 (Int32.of_int 2) in
@@ -150,8 +150,8 @@ let test_too_high_round () =
     Preattestation
     Construction
 
-(** Duplicate preendorsement : apply a preendorsement that has already been applied. *)
-let test_duplicate_preendorsement () =
+(** Duplicate preattestation : apply a preattestation that has already been applied. *)
+let test_duplicate_preattestation () =
   init_genesis () >>=? fun (genesis, _) ->
   Block.bake genesis >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun inc ->
@@ -164,16 +164,16 @@ let test_duplicate_preendorsement () =
     res
     "Double inclusion of consensus operation"
 
-(** Preendorsement for next level *)
-let test_preendorsement_for_next_level () =
+(** Preattestation for next level *)
+let test_preattestation_for_next_level () =
   init_genesis () >>=? fun (genesis, _) ->
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
     ~kind:`Preattestation
     ~next:`Level
 
-(** Preendorsement for next round *)
-let test_preendorsement_for_next_round () =
+(** Preattestation for next round *)
+let test_preattestation_for_next_round () =
   init_genesis () >>=? fun (genesis, _) ->
   Consensus_helpers.test_consensus_op_for_next
     ~genesis
@@ -194,48 +194,48 @@ let tests =
   AppMode.tests @ ConstrMode.tests
   @ [
       Tztest.tztest
-        "Preendorsement with arbitrary branch"
+        "Preattestation with arbitrary branch"
         `Quick
-        test_preendorsement_with_arbitrary_branch;
+        test_preattestation_with_arbitrary_branch;
       Tztest.tztest
-        "Preendorsement for future level"
+        "Preattestation for future level"
         `Quick
-        test_consensus_operation_preendorsement_for_future_level;
+        test_consensus_operation_preattestation_for_future_level;
       Tztest.tztest
-        "Preendorsement for old level"
+        "Preattestation for old level"
         `Quick
-        test_consensus_operation_preendorsement_for_old_level;
+        test_consensus_operation_preattestation_for_old_level;
       Tztest.tztest
-        "Preendorsement for future round"
+        "Preattestation for future round"
         `Quick
-        test_consensus_operation_preendorsement_for_future_round;
+        test_consensus_operation_preattestation_for_future_round;
       Tztest.tztest
-        "Preendorsement for old round"
+        "Preattestation for old round"
         `Quick
-        test_consensus_operation_preendorsement_for_old_round;
+        test_consensus_operation_preattestation_for_old_round;
       Tztest.tztest
-        "Preendorsement on competing proposal"
+        "Preattestation on competing proposal"
         `Quick
-        test_consensus_operation_preendorsement_on_competing_proposal;
+        test_consensus_operation_preattestation_on_competing_proposal;
       Tztest.tztest
-        "Unexpected preendorsements in blocks"
+        "Unexpected preattestations in blocks"
         `Quick
-        test_unexpected_preendorsements_in_blocks;
-      Tztest.tztest "Preendorsements round too high" `Quick test_too_high_round;
+        test_unexpected_preattestations_in_blocks;
+      Tztest.tztest "Preattestations round too high" `Quick test_too_high_round;
       Tztest.tztest
-        "Duplicate preendorsement"
+        "Duplicate preattestation"
         `Quick
-        test_duplicate_preendorsement;
+        test_duplicate_preattestation;
       Tztest.tztest
-        "Preendorsement for next level"
+        "Preattestation for next level"
         `Quick
-        test_preendorsement_for_next_level;
+        test_preattestation_for_next_level;
       Tztest.tztest
-        "Preendorsement for next round"
+        "Preattestation for next round"
         `Quick
-        test_preendorsement_for_next_round;
+        test_preattestation_for_next_round;
     ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("preendorsement", tests)]
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("preattestation", tests)]
   |> Lwt_main.run

@@ -39,7 +39,7 @@
   test_helpers_rpcs
   test_participation
   test_preattestation_functor
-  test_preendorsement
+  test_preattestation
   test_seed))
 
 (executable

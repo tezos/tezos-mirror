@@ -4832,7 +4832,8 @@ end = struct
             "test_participation";
             (if N.(number >= 018) then "test_preattestation_functor"
             else "test_preendorsement_functor");
-            "test_preendorsement";
+            (if N.(number >= 018) then "test_preattestation"
+            else "test_preendorsement");
             "test_seed";
           ]
           ~path:(path // "lib_protocol/test/integration/consensus")
