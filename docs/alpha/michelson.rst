@@ -887,7 +887,7 @@ A detailed description of the following instructions can be found in the `intera
 Operations on timelock
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OPEN_CHEST``: opens a timelocked chest given its key and the time. The
+- ``OPEN_CHEST``: Open a timelocked chest given its key and the time. The
   result is a byte option depending if the opening is correct or not. See
   :doc:`Timelock <timelock>` for more information.
 
