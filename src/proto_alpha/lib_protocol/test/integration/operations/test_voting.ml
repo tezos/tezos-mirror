@@ -931,6 +931,8 @@ let test_quorum_in_proposal has_quorum () =
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
   Block.bake ~policy ~operation:op2 b >>=? fun b ->
+  Adaptive_inflation_helpers.stake (B b) del1 bal >>=? fun stake ->
+  Block.bake ~policy ~operation:stake b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* make the proposal *)
   Op.proposals (B b) del1 [protos.(0)] >>=? fun operation ->
