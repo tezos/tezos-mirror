@@ -294,7 +294,7 @@ Raw Script-expression-ID-Hash: 0x0a6e0f781438d15aea8aeb41e8f00ea25bacc3d1efedfc6
 Ledger Blake2b hash: hiR4yro9kA38FKWeB8Ps8hzNyeqSoskUNGePRJQi4Uy
 Raw Sha256 hash: 0x30467dc415ef58a775a6aa618f515d856287ad20b56477a16c0cfdf0f2a2ed3c
 Raw Sha512 hash: 0x1b3f5993512659e0164d186381de64bd6a4c678cefd7ca756ec087769208fc62b4563df31cd4680707e3c43a5a8c7a4579ad5c34ae471a5731ebcbe0db2255ec
-Gas remaining: 1039673.839 units remaining
+Gas remaining: 1039919.839 units remaining
 
 ./octez-client --mode mockup hash data '"[PUBLIC_KEY]"' of type key
 Raw packed data: 0x050a000000210057b0e07666fe26167f92bffe667dc2ba2214a404f4fe5d1bb8ce01baef5663a5
@@ -303,7 +303,7 @@ Raw Script-expression-ID-Hash: 0x67aaee572e9d4e0673e66273b43e2300393ee44eb959843
 Ledger Blake2b hash: 7ygAaVU28qwNcCvg5stUKDPUikjnoMtDJM6FbNnrEmeT
 Raw Sha256 hash: 0x13830142ebb330c5f0177637a05894338307e1179b67c45d90eb2e98151175a9
 Raw Sha512 hash: 0x075b346f72fb69759345eff13f52ad51b9c5c138fc6155742c309910412e2efc9a33615a8d4a3e6724c15de7960807cd7e83185d24ab5c096f766916ac035982
-Gas remaining: 1039673.839 units remaining
+Gas remaining: 1039919.839 units remaining
 
 ./octez-client --mode mockup hash data '"[PUBLIC_KEY_HASH]"' of type key_hash
 Raw packed data: 0x050a000000150002298c03ed7d454a101eb7022bc95f7e5f41ac78
