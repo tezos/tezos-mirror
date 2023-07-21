@@ -27,11 +27,12 @@ open Protocol
 open Alpha_context
 open Validate_helpers
 
-type dbl_endorsement_state = {
+type dbl_attestation_state = {
   temporary : (Block.t * Block.t) option;
-  slashable_preend :
+  slashable_preattestations :
     (Kind.preattestation operation * Kind.preattestation operation) list;
-  slashable_end : (Kind.attestation operation * Kind.attestation operation) list;
+  slashable_attestations :
+    (Kind.attestation operation * Kind.attestation operation) list;
 }
 
 type state = {
@@ -45,7 +46,7 @@ type state = {
   protocol_hashes : Protocol_hash.t list;
   slashable_bakes : (block_header * block_header) list;
   vdf : bool;
-  dbl_endorsement : dbl_endorsement_state;
+  dbl_attestation : dbl_attestation_state;
   manager : Manager.infos;
 }
 
@@ -65,8 +66,12 @@ let init_manager_state bootstraps block =
   in
   {ctxt; accounts; flags = all_enabled}
 
-let init_dbl_endorsement_state =
-  {temporary = None; slashable_preend = []; slashable_end = []}
+let init_dbl_attestation_state =
+  {
+    temporary = None;
+    slashable_preattestations = [];
+    slashable_attestations = [];
+  }
 
 (** Initialize the state according to [state] initialisation
     for each operation kind.
@@ -90,7 +95,7 @@ let init_state block ~voters ~(bootstraps : Contract.t list) =
     protocol_hashes = [];
     slashable_bakes = [];
     vdf = false;
-    dbl_endorsement = init_dbl_endorsement_state;
+    dbl_attestation = init_dbl_attestation_state;
     manager = init_manager_state bootstraps block;
   }
 
@@ -319,10 +324,10 @@ let seed_nonce_descriptor =
    field of a double_evidence_state is used to transmit them to the
    next level in order to make the slashable operations. *)
 let register_temporary ba bb state : (Block.t * Block.t) option * state =
-  let pred_forks = state.dbl_endorsement.temporary in
+  let pred_forks = state.dbl_attestation.temporary in
   let temporary = Some (ba, bb) in
-  let dbl_endorsement = {state.dbl_endorsement with temporary} in
-  (pred_forks, {state with dbl_endorsement})
+  let dbl_attestation = {state.dbl_attestation with temporary} in
+  (pred_forks, {state with dbl_attestation})
 
 (** During the slashable period, at each level, two different heads
    for the same round are baked by the same baker. At the next level,
@@ -337,10 +342,10 @@ let register_temporary ba bb state : (Block.t * Block.t) option * state =
    and two preattestation, can be made by two distinct attestations. Each
    pair is ordered in operation_hash order. Consequently, each pair
    can appear in a denunciation operation and will be valid. *)
-let dbl_endorsement_prelude state =
+let dbl_attestation_prelude state =
   let open Lwt_result_syntax in
   let* head_A = Block.bake ~policy:(By_round 0) state.block in
-  let* addr = pick_addr_endorser (B state.block) in
+  let* addr = pick_addr_attester (B state.block) in
   let ctr = Contract.Implicit addr in
   let* operation = Op.transaction (B state.block) ctr ctr Tez.one_mutez in
   let* head_B = Block.bake ~policy:(By_round 0) state.block ~operation in
@@ -348,7 +353,7 @@ let dbl_endorsement_prelude state =
   match heads with
   | None -> return ([], state)
   | Some (b1, b2) ->
-      let* delegate1, delegate2 = pick_two_endorsers (B b1) in
+      let* delegate1, delegate2 = pick_two_attesters (B b1) in
       let* op1 = Op.raw_preattestation ~delegate:delegate1 b1 in
       let* op2 = Op.raw_preattestation ~delegate:delegate1 b2 in
       let op1, op2 =
@@ -358,8 +363,8 @@ let dbl_endorsement_prelude state =
         assert (comp <> 0) ;
         if comp < 0 then (op1, op2) else (op2, op1)
       in
-      let slashable_preend =
-        (op1, op2) :: state.dbl_endorsement.slashable_preend
+      let slashable_preattestations =
+        (op1, op2) :: state.dbl_attestation.slashable_preattestations
       in
       let* op3 = Op.raw_attestation ~delegate:delegate2 b1 in
       let* op4 = Op.raw_attestation ~delegate:delegate2 b2 in
@@ -370,18 +375,24 @@ let dbl_endorsement_prelude state =
         assert (comp <> 0) ;
         if comp < 0 then (op3, op4) else (op4, op3)
       in
-      let slashable_end = (op3, op4) :: state.dbl_endorsement.slashable_end in
-      let dbl_endorsement =
-        {state.dbl_endorsement with slashable_preend; slashable_end}
+      let slashable_attestations =
+        (op3, op4) :: state.dbl_attestation.slashable_attestations
       in
-      return ([], {state with dbl_endorsement})
+      let dbl_attestation =
+        {
+          state.dbl_attestation with
+          slashable_preattestations;
+          slashable_attestations;
+        }
+      in
+      return ([], {state with dbl_attestation})
 
 let double_consensus_descriptor =
   {
     parameters = Fun.id;
     required_cycle = (fun _params -> 2);
     required_block = (fun _ -> 0);
-    prelude = (From 2, dbl_endorsement_prelude);
+    prelude = (From 2, dbl_attestation_prelude);
     opt_prelude = None;
     candidates_generator =
       (fun state ->
@@ -393,10 +404,10 @@ let double_consensus_descriptor =
           Op.double_attestation (Context.B state.block) op1 op2
         in
         let candidates_pre =
-          List.map gen_dbl_pre state.dbl_endorsement.slashable_preend
+          List.map gen_dbl_pre state.dbl_attestation.slashable_preattestations
         in
         let candidates_end =
-          List.map gen_dbl_end state.dbl_endorsement.slashable_end
+          List.map gen_dbl_end state.dbl_attestation.slashable_attestations
         in
         return (candidates_pre @ candidates_end));
   }
@@ -433,7 +444,7 @@ let double_baking_descriptor =
             let* baker1, _baker2 =
               Context.get_first_different_bakers (B state.block)
             in
-            let* addr = pick_addr_endorser (B state.block) in
+            let* addr = pick_addr_attester (B state.block) in
             let ctr = Contract.Implicit addr in
             let* operation =
               Op.transaction (B state.block) ctr ctr Tez.one_mutez
@@ -567,7 +578,7 @@ let vdf_revelation_descriptor =
             return [Op.vdf_revelation (B state.block) solution]);
   }
 
-let preendorsement_descriptor =
+let preattestation_descriptor =
   {
     parameters = Fun.id;
     required_cycle = (fun _ -> 1);
@@ -592,7 +603,7 @@ let preendorsement_descriptor =
         List.filter_map_es gen state.delegates);
   }
 
-let endorsement_descriptor =
+let attestation_descriptor =
   {
     parameters = Fun.id;
     required_cycle = (fun _ -> 1);
@@ -819,8 +830,8 @@ let manager_descriptor max_batch_size nb_accounts =
   }
 
 type op_kind =
-  | KEndorsement
-  | KPreendorsement
+  | KAttestation
+  | KPreattestation
   | KDalattestation
   | KBallotExp
   | KBallotProm
@@ -836,8 +847,8 @@ type op_kind =
 let op_kind_of_packed_operation op =
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with
-  | Single (Preattestation _) -> KPreendorsement
-  | Single (Attestation _) -> KEndorsement
+  | Single (Preattestation _) -> KPreattestation
+  | Single (Attestation _) -> KAttestation
   | Single (Dal_attestation _) -> KDalattestation
   | Single (Seed_nonce_revelation _) -> KNonce
   | Single (Vdf_revelation _) -> KVdf
@@ -857,8 +868,8 @@ let pp_op_kind fmt kind =
     fmt
     (match kind with
     | KManager -> "manager"
-    | KEndorsement -> "endorsement"
-    | KPreendorsement -> "preendorsement"
+    | KAttestation -> "attestation"
+    | KPreattestation -> "preattestation"
     | KDalattestation -> "dal_attestation"
     | KBallotExp -> "ballot"
     | KBallotProm -> "ballot"
@@ -872,8 +883,8 @@ let pp_op_kind fmt kind =
 
 let descriptor_of ~nb_bootstrap ~max_batch_size = function
   | KManager -> manager_descriptor max_batch_size nb_bootstrap
-  | KEndorsement -> endorsement_descriptor
-  | KPreendorsement -> preendorsement_descriptor
+  | KAttestation -> attestation_descriptor
+  | KPreattestation -> preattestation_descriptor
   | KDalattestation -> dal_attestation_descriptor
   | KBallotExp -> ballot_exploration_descriptor
   | KBallotProm -> ballot_promotion_descriptor
@@ -899,8 +910,8 @@ let nonce_generation_kinds = [KNonce; KVdf]
 let non_exclusive_kinds =
   [
     KManager;
-    KEndorsement;
-    KPreendorsement;
+    KAttestation;
+    KPreattestation;
     KDalattestation;
     KActivate;
     KDbl_consensus;
