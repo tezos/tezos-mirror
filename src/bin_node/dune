@@ -16,7 +16,6 @@
   tezos-shell-services
   tezos-rpc-http
   tezos-rpc-http-server
-  octez-rpc-process
   tezos-p2p
   tezos-shell
   tezos-store
@@ -142,13 +141,11 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
-  -open Tezos_base_unix
   -open Octez_node_config
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
-  -open Octez_rpc_process
   -open Tezos_p2p
   -open Tezos_shell
   -open Tezos_store
