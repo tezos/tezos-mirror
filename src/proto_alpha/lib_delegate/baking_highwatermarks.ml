@@ -164,15 +164,18 @@ let may_sign highwatermarks ~delegate ~level ~round =
 
 let may_sign_block cctxt (location : [`Highwatermarks] Baking_files.location)
     ~delegate ~level ~round =
-  load cctxt location >>=? fun all_highwatermarks ->
+  let open Lwt_result_syntax in
+  let* all_highwatermarks = load cctxt location in
   return @@ may_sign all_highwatermarks.blocks ~delegate ~level ~round
 
 let may_sign_preendorsement cctxt location ~delegate ~level ~round =
-  load cctxt location >>=? fun all_highwatermarks ->
+  let open Lwt_result_syntax in
+  let* all_highwatermarks = load cctxt location in
   return @@ may_sign all_highwatermarks.preendorsements ~delegate ~level ~round
 
 let may_sign_endorsement cctxt location ~delegate ~level ~round =
-  load cctxt location >>=? fun all_highwatermarks ->
+  let open Lwt_result_syntax in
+  let* all_highwatermarks = load cctxt location in
   return @@ may_sign all_highwatermarks.endorsements ~delegate ~level ~round
 
 let record map ~delegate ~new_level ~new_round =
@@ -192,8 +195,9 @@ let record map ~delegate ~new_level ~new_round =
 
 let record_block (cctxt : #Protocol_client_context.full) location ~delegate
     ~level ~round =
+  let open Lwt_result_syntax in
   let filename = Baking_files.filename location in
-  load cctxt location >>=? fun highwatermarks ->
+  let* highwatermarks = load cctxt location in
   let new_blocks =
     record highwatermarks.blocks ~delegate ~new_level:level ~new_round:round
   in
@@ -201,8 +205,9 @@ let record_block (cctxt : #Protocol_client_context.full) location ~delegate
 
 let record_preendorsement (cctxt : #Protocol_client_context.full) location
     ~delegate ~level ~round =
+  let open Lwt_result_syntax in
   let filename = Baking_files.filename location in
-  load cctxt location >>=? fun highwatermarks ->
+  let* highwatermarks = load cctxt location in
   let new_preendorsements =
     record
       highwatermarks.preendorsements
@@ -217,8 +222,9 @@ let record_preendorsement (cctxt : #Protocol_client_context.full) location
 
 let record_endorsement (cctxt : #Protocol_client_context.full) location
     ~delegate ~level ~round =
+  let open Lwt_result_syntax in
   let filename = Baking_files.filename location in
-  load cctxt location >>=? fun highwatermarks ->
+  let* highwatermarks = load cctxt location in
   let new_endorsements =
     record
       highwatermarks.endorsements
