@@ -92,8 +92,8 @@ them will have (see the docs for `Mockup_simulator.run`):
   run ~config [(3, (module Default_hooks)); (2, (module Default_hooks))]
 ```
 
-Note that delegate selection affects both (pre-)endorsing and voting power.
-Delegates that do not have proposer slots will not be able to (pre-)endorse.
+Note that delegate selection affects both (pre-)attesting and voting power.
+Delegates that do not have proposer slots will not be able to (pre-)attest.
 Voting power of delegates who have proposer slots will be proportional to
 the number of slots they have.
 

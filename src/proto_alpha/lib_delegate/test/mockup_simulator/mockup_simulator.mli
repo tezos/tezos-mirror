@@ -226,11 +226,11 @@ val mempool_has_op_ref :
 (** Check if an operation is signed by the given delegate. *)
 val op_is_signed_by : public_key:Signature.public_key -> op_predicate
 
-(** Check that an operation is a preendorsement. *)
-val op_is_preendorsement : ?level:int32 -> ?round:int32 -> op_predicate
+(** Check that an operation is a preattestation. *)
+val op_is_preattestation : ?level:int32 -> ?round:int32 -> op_predicate
 
-(** Check that an operation is an endorsement. *)
-val op_is_endorsement : ?level:int32 -> ?round:int32 -> op_predicate
+(** Check that an operation is an attestation. *)
+val op_is_attestation : ?level:int32 -> ?round:int32 -> op_predicate
 
 (** Combine two predicates. *)
 val op_is_both : op_predicate -> op_predicate -> op_predicate

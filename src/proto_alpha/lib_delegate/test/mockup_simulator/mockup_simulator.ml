@@ -335,7 +335,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
          blocks from "normal" blocks by comparing the [proto_level] of
          the shell header and its predecessor. If the predecessor's
          one is different, it must mean that we are considering an
-         activation block and must not endorse. Here, we do a bit of
+         activation block and must not attest. Here, we do a bit of
          hacking in order to return a different proto_level for the
          predecessor of the genesis block which is considered as the
          current protocol activation block. To perfectly mimic what is
@@ -1368,7 +1368,7 @@ let op_is_signed_by ~public_key (op_hash : Operation_hash.t)
                signature
                unsigned_operation_bytes))
 
-let op_is_preendorsement ?level ?round (op_hash : Operation_hash.t)
+let op_is_preattestation ?level ?round (op_hash : Operation_hash.t)
     (op : Alpha_context.packed_operation) =
   match op.protocol_data with
   | Operation_data d -> (
@@ -1396,7 +1396,7 @@ let op_is_preendorsement ?level ?round (op_hash : Operation_hash.t)
           | _ -> return false)
       | _ -> failwith "unexpected contents in %a@." Operation_hash.pp op_hash)
 
-let op_is_endorsement ?level ?round (op_hash : Operation_hash.t)
+let op_is_attestation ?level ?round (op_hash : Operation_hash.t)
     (op : Alpha_context.packed_operation) =
   match op.protocol_data with
   | Operation_data d -> (
