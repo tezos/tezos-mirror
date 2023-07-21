@@ -58,7 +58,8 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.Cli.data_dir
       in
-      Lwt_main.run @@ Daemon.run ~data_dir (merge cli_options)
+      Lwt_main.run @@ Lwt_exit.wrap_and_exit
+      @@ Daemon.run ~data_dir (merge cli_options)
   | Config_init ->
       Lwt_main.run
       @@ Configuration_file.save (merge cli_options Configuration_file.default)

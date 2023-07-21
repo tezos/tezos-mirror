@@ -77,6 +77,15 @@ let data_dir_not_found =
     ~level:Warning
     ("path", Data_encoding.(string))
 
+let failed_to_persist_profiles =
+  declare_2
+    ~section
+    ~name:"failed_to_persist_profiles"
+    ~msg:"Failed to persist the profiles to the config file."
+    ~level:Error
+    ("profiles", Services.Types.profiles_encoding)
+    ("error", Error_monad.trace_encoding)
+
 let fetched_slot =
   declare_2
     ~section

@@ -137,24 +137,23 @@ module Profile_handlers = struct
   let patch_profiles ctxt () profiles =
     let open Lwt_result_syntax in
     let gs_worker = Node_context.get_gs_worker ctxt in
-    call_handler2 ctxt (fun store {proto_parameters; _} ->
-        let+ pctxt =
-          List.fold_left_es
+    call_handler2 ctxt (fun _store {proto_parameters; _} ->
+        let pctxt =
+          List.fold_left
             (fun profile_ctxt profile ->
               Profile_manager.add_profile
                 profile_ctxt
                 proto_parameters
-                store
                 gs_worker
                 profile)
             (Node_context.get_profile_ctxt ctxt)
             profiles
         in
-        Node_context.set_profile_ctxt ctxt pctxt)
+        return @@ Node_context.set_profile_ctxt ctxt pctxt)
 
   let get_profiles ctxt () () =
-    call_handler1 ctxt (fun store ->
-        Profile_manager.get_profiles store |> Errors.to_tzresult)
+    let open Lwt_result_syntax in
+    return @@ Profile_manager.get_profiles (Node_context.get_profile_ctxt ctxt)
 
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh

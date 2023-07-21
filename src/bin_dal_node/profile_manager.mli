@@ -36,19 +36,16 @@ val empty : t
 val add_profile :
   t ->
   Dal_plugin.proto_parameters ->
-  Store.node_store ->
   Gossipsub.Worker.t ->
   Services.Types.profile ->
-  t tzresult Lwt.t
+  t
 
 (** [on_new_head c gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
 val on_new_head : t -> Gossipsub.Worker.t -> Committee_cache.committee -> unit
 
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
-val get_profiles :
-  Store.node_store ->
-  (Services.Types.profile list, Errors.decoding) result Lwt.t
+val get_profiles : t -> Services.Types.profile list
 
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
