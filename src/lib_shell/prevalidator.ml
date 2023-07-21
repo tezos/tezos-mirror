@@ -319,19 +319,23 @@ module Make_s
     lock : Lwt_mutex.t;
   }
 
-  (* This function is in [Lwt] only for logging. *)
+  let is_fetching shell oph = Operation_hash.Set.mem oph shell.fetching
+
   let already_handled ~origin shell oph =
-    let open Lwt_syntax in
-    if Operation_hash.Set.mem oph shell.banned_operations then
-      let+ () = Events.(emit ban_operation_encountered) (origin, oph) in
-      true
+    if Operation_hash.Set.mem oph shell.banned_operations then (
+      (* In order to avoid data-races (for instance in
+         [may_fetch_operation]), this event is triggered
+         asynchronously which may lead to misordered events. *)
+      ignore
+        (Unit.catch_s (fun () ->
+             Events.(emit ban_operation_encountered) (origin, oph))) ;
+      true)
     else
-      Lwt.return
-        (Pending_ops.mem oph shell.pending
-        || Operation_hash.Set.mem oph shell.fetching
-        || Operation_hash.Set.mem oph shell.live_operations
-        || Classification.is_in_mempool oph shell.classification <> None
-        || Classification.is_known_unparsable oph shell.classification)
+      Pending_ops.mem oph shell.pending
+      || Operation_hash.Set.mem oph shell.fetching
+      || Operation_hash.Set.mem oph shell.live_operations
+      || Classification.is_in_mempool oph shell.classification <> None
+      || Classification.is_known_unparsable oph shell.classification
 
   let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     let open Lwt_syntax in
@@ -573,12 +577,10 @@ module Make_s
      happened, we can still fetch this operation in the future. *)
   let may_fetch_operation (shell : ('operation_data, _) types_state_shell) peer
       oph =
-    let open Lwt_syntax in
     let origin =
       match peer with Some peer -> Events.Peer peer | None -> Leftover
     in
-    let* already_handled = already_handled ~origin shell oph in
-    if not already_handled then
+    if not (already_handled ~origin shell oph) then
       ignore
         (Lwt.finalize
            (fun () ->
@@ -597,10 +599,7 @@ module Make_s
 
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
-      let* already_handled =
-        already_handled ~origin:Events.Arrived pv.shell oph
-      in
-      if already_handled then return_ok_unit
+      if already_handled ~origin:Events.Arrived pv.shell oph then return_ok_unit
       else
         match Parser.parse oph op with
         | Error _ ->
@@ -643,10 +642,7 @@ module Make_s
          But, this may change in the future
       *)
       let prio = `High in
-      let*! already_handled =
-        already_handled ~origin:Events.Injected pv.shell oph
-      in
-      if already_handled then
+      if already_handled ~origin:Events.Injected pv.shell oph then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
         return_unit
