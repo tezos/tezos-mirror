@@ -887,13 +887,9 @@ A detailed description of the following instructions can be found in the `intera
 Operations on timelock
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OPEN_CHEST``: Open a timelocked chest given its key and the time. The
-  result is a byte option depending if the opening is correct or not. See
-  :doc:`Timelock <timelock>` for more information.
+A detailed description of the following instruction can be found in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__.
 
-::
-
-   ::  chest_key : chest : nat : 'S -> or bytes bool : 'S
+- ``OPEN_CHEST``: Open a timelocked chest given its key and the time (`documentation <https://tezos.gitlab.io/michelson-reference/#instr-OPEN_CHEST>`__).
 
 
 Events
