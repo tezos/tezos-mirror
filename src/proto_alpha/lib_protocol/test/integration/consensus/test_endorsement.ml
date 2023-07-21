@@ -100,7 +100,7 @@ let test_fitness_gap () =
 (** Return a delegate and its second smallest slot for the level of [block]. *)
 let delegate_and_second_slot block =
   let open Lwt_result_syntax in
-  let* endorsers = Context.get_endorsers (B block) in
+  let* endorsers = Context.get_attesters (B block) in
   let delegate, slots =
     (* Find an endorser with more than 1 slot. *)
     WithExceptions.Option.get
@@ -156,7 +156,7 @@ let test_mempool_second_slot () =
 let test_negative_slot () =
   Context.init_n 5 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
-  Context.get_endorser (B b) >>=? fun (delegate, _slots) ->
+  Context.get_attester (B b) >>=? fun (delegate, _slots) ->
   Lwt.catch
     (fun () ->
       Op.endorsement
@@ -195,7 +195,7 @@ let test_not_smallest_slot () =
 
 let delegate_and_someone_elses_slot block =
   let open Lwt_result_syntax in
-  let* endorsers = Context.get_endorsers (B block) in
+  let* endorsers = Context.get_attesters (B block) in
   let delegate, other_delegate_slot =
     match endorsers with
     | [] | [_] -> assert false (* at least two delegates with rights *)
@@ -614,7 +614,7 @@ let test_endorsement_threshold ~sufficient_threshold () =
   Block.bake genesis >>=? fun b ->
   Context.get_constants (B b)
   >>=? fun {parametric = {consensus_threshold; _}; _} ->
-  Context.get_endorsers (B b) >>=? fun endorsers_list ->
+  Context.get_attesters (B b) >>=? fun endorsers_list ->
   Block.get_round b >>?= fun round ->
   List.fold_left_es
     (fun (counter, endos) {Plugin.RPC.Validators.delegate; slots; _} ->

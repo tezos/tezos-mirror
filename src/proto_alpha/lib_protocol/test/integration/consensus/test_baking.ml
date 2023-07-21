@@ -190,7 +190,7 @@ let test_rewards_block_and_payload_producer () =
   Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   get_contract_for_pkh contracts baker_b1 >>=? fun baker_b1_contract ->
   Block.bake ~policy:(By_round 0) genesis >>=? fun b1 ->
-  Context.get_endorsers (B b1) >>=? fun endorsers ->
+  Context.get_attesters (B b1) >>=? fun endorsers ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
@@ -205,7 +205,7 @@ let test_rewards_block_and_payload_producer () =
     (fun (endorser, _slots) -> Op.endorsement ~delegate:endorser b1)
     endorsers
   >>=? fun endos ->
-  let endorsing_power =
+  let attesting_power =
     List.fold_left
       (fun acc (_pkh, slots) -> acc + List.length slots)
       0
@@ -221,7 +221,7 @@ let test_rewards_block_and_payload_producer () =
   Context.Delegate.current_frozen_deposits (B b2) baker_b2
   >>=? fun frozen_deposit ->
   Context.get_baking_reward_fixed_portion (B b2) >>=? fun baking_reward ->
-  Context.get_bonus_reward (B b2) ~endorsing_power >>=? fun bonus_reward ->
+  Context.get_bonus_reward (B b2) ~attesting_power >>=? fun bonus_reward ->
   (if Signature.Public_key_hash.equal baker_b2 baker_b1 then
    Context.get_baking_reward_fixed_portion (B b1)
   else return Tez.zero)
@@ -239,7 +239,7 @@ let test_rewards_block_and_payload_producer () =
      correspond to a slot of [baker_b2] and it includes the PQC for [b2]. We
      check that the fixed baking reward goes to the payload producer [baker_b2],
      while the bonus goes to the the block producer (aka baker) [baker_b2']. *)
-  Context.get_endorsers (B b2) >>=? fun endorsers ->
+  Context.get_attesters (B b2) >>=? fun endorsers ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))

@@ -177,7 +177,7 @@ let test_not_tez_in_contract_to_pay_fee () =
 let register_contract_get_endorser () =
   Context.init1 () >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun inc ->
-  Context.get_endorser (I inc) >|=? fun (account_endorser, _slots) ->
+  Context.get_attester (I inc) >|=? fun (account_endorser, _slots) ->
   (inc, contract, account_endorser)
 
 (* Create multiple originated contracts and ask contract to pay the fee. *)

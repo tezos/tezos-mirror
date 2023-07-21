@@ -56,7 +56,7 @@ end = struct
 
   let pick_endorsers ctxt =
     let module V = Plugin.RPC.Validators in
-    Context.get_endorsers ctxt >>=? function
+    Context.get_attesters ctxt >>=? function
     | a :: b :: _ ->
         return ((a.V.delegate, a.V.slots), (b.V.delegate, b.V.slots))
     | _ -> assert false
@@ -311,7 +311,7 @@ end = struct
     block_fork genesis >>=? fun (blk_1, blk_2) ->
     Block.bake blk_1 >>=? fun blk_a ->
     Block.bake blk_2 >>=? fun blk_b ->
-    Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+    Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
     Op.raw_preendorsement blk_a >>=? fun preendorsement_a ->
     Op.raw_preendorsement blk_b >>=? fun preendorsement_b ->
     let operation =

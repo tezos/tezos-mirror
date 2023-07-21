@@ -121,7 +121,7 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~policy:(By_account baker2) ~operation blk_a
   >>=? fun blk_with_db_evidence ->
-  Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
+  Context.get_first_different_attesters (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
@@ -165,7 +165,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   >>=? fun frozen_deposits_before ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
+  Context.get_first_different_attesters (B blk_a) >>=? fun (e1, e2) ->
   let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
@@ -219,7 +219,7 @@ let test_payload_producer_gets_evidence_rewards () =
   double_baking (B b1) b1.header b2.header |> fun db_evidence ->
   Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   >>=? fun b_with_evidence ->
-  Context.get_endorsers (B b_with_evidence) >>=? fun endorsers ->
+  Context.get_attesters (B b_with_evidence) >>=? fun endorsers ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))

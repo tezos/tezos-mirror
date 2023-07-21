@@ -85,7 +85,7 @@ let test_valid_double_endorsement_evidence () =
        are identical. *)
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+  Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
   Op.raw_endorsement blk_a >>=? fun endorsement_a ->
   Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
@@ -141,7 +141,7 @@ let test_valid_double_endorsement_evidence () =
 let test_different_branch () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun blk ->
-  Context.get_endorser (B blk) >>=? fun (endorser, _slots) ->
+  Context.get_attester (B blk) >>=? fun (endorser, _slots) ->
   Op.raw_endorsement ~delegate:endorser blk >>=? fun endorsement_a ->
   Op.raw_endorsement ~branch:Block_hash.zero ~delegate:endorser blk
   >>=? fun endorsement_b ->
@@ -162,7 +162,7 @@ let test_different_slots () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init2 ~consensus_threshold:0 () in
   let* blk = Block.bake genesis in
-  let* endorsers = Context.get_endorsers (B blk) in
+  let* endorsers = Context.get_attesters (B blk) in
   let delegate, slot1, slot2 =
     (* Find an endorser with more than 1 slot. *)
     WithExceptions.Option.get
@@ -191,7 +191,7 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+  Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
   Op.raw_endorsement blk_a >>=? fun endorsement_a ->
   Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
@@ -308,7 +308,7 @@ let test_different_delegates () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_first_different_endorsers (B blk_b)
+  Context.get_first_different_attesters (B blk_b)
   >>=? fun (endorser_a, endorser_b) ->
   Op.raw_endorsement ~delegate:endorser_a.delegate blk_a >>=? fun e_a ->
   Op.raw_endorsement ~delegate:endorser_b.delegate blk_b >>=? fun e_b ->
@@ -328,10 +328,10 @@ let test_wrong_delegate () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (endorser_a, _a_slots) ->
+  Context.get_attester (B blk_a) >>=? fun (endorser_a, _a_slots) ->
   Op.raw_endorsement ~delegate:endorser_a blk_a >>=? fun endorsement_a ->
-  Context.get_endorser_n (B blk_b) 0 >>=? fun (endorser0, _slots0) ->
-  Context.get_endorser_n (B blk_b) 1 >>=? fun (endorser1, _slots1) ->
+  Context.get_attester_n (B blk_b) 0 >>=? fun (endorser0, _slots0) ->
+  Context.get_attester_n (B blk_b) 1 >>=? fun (endorser1, _slots1) ->
   let endorser_b =
     if Signature.Public_key_hash.equal endorser_a endorser0 then endorser1
     else endorser0
@@ -348,7 +348,7 @@ let test_wrong_delegate () =
 let test_freeze_more_with_low_balance =
   let get_endorsing_slots_for_account ctxt account =
     (* Get the slots of the given account in the given context. *)
-    Context.get_endorsers ctxt >>=? function
+    Context.get_attesters ctxt >>=? function
     | [d1; d2] ->
         return
           (if Signature.Public_key_hash.equal account d1.delegate then d1
@@ -378,7 +378,7 @@ let test_freeze_more_with_low_balance =
     Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
   in
   let check_unique_endorser b account2 =
-    Context.get_endorsers (B b) >>=? function
+    Context.get_attesters (B b) >>=? function
     | [{delegate; _}] when Signature.Public_key_hash.equal account2 delegate ->
         return_unit
     | _ -> failwith "We are supposed to only have account2 as endorser."
@@ -488,7 +488,7 @@ let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
-  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+  Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
   Op.raw_endorsement blk_a >>=? fun endorsement_a ->
   Op.raw_endorsement blk_b >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in

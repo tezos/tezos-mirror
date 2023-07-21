@@ -36,39 +36,39 @@ val pred_branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-(** Given a context, returns the list of endorsers charactized by
+(** Given a context, returns the list of attesters charactized by
     the [level], the public key hash of the [delegate], its [consensus_key]
     and its assigned [slots].
     see {! Plugin.RPC.Validator.t}. *)
-val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
+val get_attesters : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
-(** Return the two first elements of the list returns by [get_endorsers]. *)
-val get_first_different_endorsers :
+(** Return the two first elements of the list returns by [get_attesters]. *)
+val get_first_different_attesters :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
 (** Return the first element [delegate,slot] of the list returns by
-    [get_endorsers], where [delegate] is the [consensus key] when
+    [get_attesters], where [delegate] is the [consensus key] when
     is set. *)
-val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
+val get_attester : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 (** Given a [delegate], and a context [ctxt], if [delegate] is in
-    [get_endorsers ctxt] returns the [slots] of [delegate] otherwise
+    [get_attesters ctxt] returns the [slots] of [delegate] otherwise
     return [None]. *)
-val get_endorser_slot :
+val get_attester_slot :
   t -> public_key_hash -> Slot.t list option tzresult Lwt.t
 
-(** Return the [n]th element of the list returns by [get_endorsers]. *)
-val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
+(** Return the [n]th element of the list returns by [get_attesters]. *)
+val get_attester_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
-(** Counts the number of endorsing slots that the given delegate has
+(** Counts the number of attesting slots that the given delegate has
     in the requested level. If ommited, [level] defaults to the next
     level. *)
-val get_endorsing_power_for_delegate :
+val get_attesting_power_for_delegate :
   t -> ?level:Raw_level.t -> public_key_hash -> int tzresult Lwt.t
 
-(** Sums the result of [get_endorsing_power_for_delegate] over a list
+(** Sums the result of [get_attesting_power_for_delegate] over a list
     of levels. *)
-val get_cumulated_endorsing_power_for_delegate :
+val get_cumulated_attesting_power_for_delegate :
   t -> levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
 
 val get_current_voting_power :
@@ -113,10 +113,10 @@ val default_test_constants : Constants.Parametric.t
 
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
-val get_bonus_reward : t -> endorsing_power:int -> Tez.t tzresult Lwt.t
+val get_bonus_reward : t -> attesting_power:int -> Tez.t tzresult Lwt.t
 
-val get_endorsing_reward :
-  t -> expected_endorsing_power:int -> Tez.t tzresult Lwt.t
+val get_attesting_reward :
+  t -> expected_attesting_power:int -> Tez.t tzresult Lwt.t
 
 val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 

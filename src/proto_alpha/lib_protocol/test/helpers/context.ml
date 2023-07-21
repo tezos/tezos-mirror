@@ -121,35 +121,35 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
-let get_endorsers ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
+let get_attesters ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
 
-let get_first_different_endorsers ctxt =
-  get_endorsers ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
+let get_first_different_attesters ctxt =
+  get_attesters ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
 
-let get_endorser ctxt =
-  get_endorsers ctxt >|=? fun endorsers ->
-  let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
-  (endorser.consensus_key, endorser.slots)
+let get_attester ctxt =
+  get_attesters ctxt >|=? fun attesters ->
+  let attester = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd attesters in
+  (attester.consensus_key, attester.slots)
 
-let get_endorser_slot ctxt pkh =
-  get_endorsers ctxt >|=? fun endorsers ->
+let get_attester_slot ctxt pkh =
+  get_attesters ctxt >|=? fun attesters ->
   List.find_map
     (function
       | {Plugin.RPC.Validators.consensus_key; slots; _} ->
           if Signature.Public_key_hash.(consensus_key = pkh) then Some slots
           else None)
-    endorsers
+    attesters
 
-let get_endorser_n ctxt n =
-  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun endorsers ->
-  let endorser =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth endorsers n
+let get_attester_n ctxt n =
+  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun attesters ->
+  let attester =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
-  (endorser.consensus_key, endorser.slots)
+  (attester.consensus_key, attester.slots)
 
-let get_endorsing_power_for_delegate ctxt ?level pkh =
+let get_attesting_power_for_delegate ctxt ?level pkh =
   let levels = Option.map (fun level -> [level]) level in
-  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun endorsers ->
+  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun attesters ->
   let rec find_slots_for_delegate = function
     | [] -> return 0
     | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
@@ -157,13 +157,13 @@ let get_endorsing_power_for_delegate ctxt ?level pkh =
           return (List.length slots)
         else find_slots_for_delegate t
   in
-  find_slots_for_delegate endorsers
+  find_slots_for_delegate attesters
 
-let get_cumulated_endorsing_power_for_delegate ctxt ~levels pkh =
+let get_cumulated_attesting_power_for_delegate ctxt ~levels pkh =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun accu level ->
-      let+ power = get_endorsing_power_for_delegate ctxt ~level pkh in
+      let+ power = get_attesting_power_for_delegate ctxt ~level pkh in
       accu + power)
     0
     levels
@@ -223,7 +223,7 @@ let get_baking_reward_fixed_portion ctxt =
        csts
        ~reward_kind:Baking_reward_fixed_portion)
 
-let get_bonus_reward ctxt ~endorsing_power =
+let get_bonus_reward ctxt ~attesting_power =
   get_constants ctxt
   >>=? fun {Constants.parametric = {consensus_threshold; _} as csts; _} ->
   let baking_reward_bonus_per_slot =
@@ -231,19 +231,19 @@ let get_bonus_reward ctxt ~endorsing_power =
       csts
       ~reward_kind:Baking_reward_bonus_per_slot
   in
-  let multiplier = max 0 (endorsing_power - consensus_threshold) in
+  let multiplier = max 0 (attesting_power - consensus_threshold) in
   return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
-let get_endorsing_reward ctxt ~expected_endorsing_power =
+let get_attesting_reward ctxt ~expected_attesting_power =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->
-  let endorsing_reward_per_slot =
+  let attesting_reward_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
       ~reward_kind:Attesting_reward_per_slot
   in
   Lwt.return
     (Environment.wrap_tzresult
-       Tez.(endorsing_reward_per_slot *? Int64.of_int expected_endorsing_power))
+       Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power))
 
 let get_liquidity_baking_subsidy ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->

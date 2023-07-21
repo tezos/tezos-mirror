@@ -142,13 +142,13 @@ let test_consensus_operation_all_modes ?delegate ?slot ?level ?round
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in
-  Context.get_endorsers b >|=? function
+  Context.get_attesters b >|=? function
   | {V.consensus_key; slots = s :: _; _} :: _ -> (consensus_key, s)
   | _ -> assert false
 
 let delegate_of_slot ?(different_slot = false) slot b =
   let module V = Plugin.RPC.Validators in
-  Context.get_endorsers b >|=? fun endorsers ->
+  Context.get_attesters b >|=? fun endorsers ->
   List.find_map
     (function
       | {V.consensus_key; slots = s :: _; _}

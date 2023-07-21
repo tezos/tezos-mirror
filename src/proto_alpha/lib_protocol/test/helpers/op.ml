@@ -64,9 +64,9 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   in
   let* delegate_pkh, slots =
     match delegate with
-    | None -> Context.get_endorser (B endorsed_block)
+    | None -> Context.get_attester (B endorsed_block)
     | Some del -> (
-        let* slots = Context.get_endorser_slot (B endorsed_block) del in
+        let* slots = Context.get_attester_slot (B endorsed_block) del in
         match slots with
         | None -> return (del, [])
         | Some slots -> return (del, slots))

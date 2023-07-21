@@ -578,7 +578,7 @@ let preendorsement_descriptor =
       (fun state ->
         let open Lwt_result_syntax in
         let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
+          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
           match slots_opt with
           | None -> return_none
@@ -603,7 +603,7 @@ let endorsement_descriptor =
       (fun state ->
         let open Lwt_result_syntax in
         let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
+          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
           match slots_opt with
           | None -> return_none
