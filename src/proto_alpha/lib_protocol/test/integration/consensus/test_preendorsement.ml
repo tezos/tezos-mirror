@@ -181,12 +181,12 @@ let test_preendorsement_for_next_round () =
     ~next:`Round
 
 let tests =
-  let module AppMode = Test_preendorsement_functor.BakeWithMode (struct
+  let module AppMode = Test_preattestation_functor.BakeWithMode (struct
     let name = "AppMode"
 
     let baking_mode = Block.Application
   end) in
-  let module ConstrMode = Test_preendorsement_functor.BakeWithMode (struct
+  let module ConstrMode = Test_preattestation_functor.BakeWithMode (struct
     let name = "ConstrMode"
 
     let baking_mode = Block.Baking

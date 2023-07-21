@@ -38,7 +38,7 @@
   test_frozen_deposits
   test_helpers_rpcs
   test_participation
-  test_preendorsement_functor
+  test_preattestation_functor
   test_preendorsement
   test_seed))
 

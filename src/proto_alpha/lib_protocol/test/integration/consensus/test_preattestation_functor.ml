@@ -25,8 +25,8 @@
 
 (** Testing
     -------
-    Component:  Protocol (preendorsement) in Full_construction & Application modes
-    Subject:    preendorsement inclusion in a block
+    Component:  Protocol (preattestation) in Full_construction & Application modes
+    Subject:    preattestation inclusion in a block
 *)
 
 open Protocol
@@ -48,23 +48,23 @@ end = struct
 
   let bake = Block.bake ~baking_mode:Mode.baking_mode
 
-  let aux_simple_preendorsement_inclusion ?(payload_round = Some Round.zero)
+  let aux_simple_preattestation_inclusion ?(payload_round = Some Round.zero)
       ?(locked_round = Some Round.zero) ?(block_round = 1)
-      ?(preend_round = Round.zero)
-      ?(preendorsed_block = fun _predpred _pred curr -> curr)
+      ?(preattestation_round = Round.zero)
+      ?(preattested_block = fun _predpred _pred curr -> curr)
       ?(mk_ops = fun op -> [op])
       ?(get_delegate_and_slot =
         fun _predpred _pred _curr -> return (None, None))
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
     Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
-    Op.attestation b1 >>=? fun endo ->
-    bake b1 ~operations:[endo] >>=? fun b2 ->
-    let endorsed_block = preendorsed_block genesis b1 b2 in
+    Op.attestation b1 >>=? fun attestation ->
+    bake b1 ~operations:[attestation] >>=? fun b2 ->
+    let attested_block = preattested_block genesis b1 b2 in
     get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
-    Op.preattestation ?delegate ?slot ~round:preend_round endorsed_block
+    Op.preattestation ?delegate ?slot ~round:preattestation_round attested_block
     >>=? fun p ->
-    let operations = endo :: (mk_ops @@ p) in
+    let operations = attestation :: (mk_ops @@ p) in
     bake
       ~payload_round
       ~locked_round
@@ -84,12 +84,12 @@ end = struct
 
   (** OK: bake a block "_b2_1" at round 1, containing a PQC and a locked
     round of round 0 *)
-  let include_preendorsement_in_block_with_locked_round () =
-    aux_simple_preendorsement_inclusion ~loc:__LOC__ ()
+  let include_preattestation_in_block_with_locked_round () =
+    aux_simple_preattestation_inclusion ~loc:__LOC__ ()
 
-  (** KO: The same preendorsement injected twice in the PQC *)
-  let duplicate_preendorsement_in_pqc () =
-    aux_simple_preendorsement_inclusion (* inject the op twice *)
+  (** KO: The same preattestation injected twice in the PQC *)
+  let duplicate_preattestation_in_pqc () =
+    aux_simple_preattestation_inclusion (* inject the op twice *)
       ~mk_ops:(fun op -> [op; op])
       ~loc:__LOC__
       ~post_process:
@@ -104,7 +104,7 @@ end = struct
   (** KO: locked round declared in the block is not smaller than
     that block's round *)
   let locked_round_not_before_block_round () =
-    aux_simple_preendorsement_inclusion
+    aux_simple_preattestation_inclusion
     (* default locked_round = 0 < block_round = 1 for this aux function *)
       ~block_round:0
       ~loc:__LOC__
@@ -116,7 +116,7 @@ end = struct
       ()
 
   (** KO: because we announce a locked_round, but we don't provide the
-    preendorsement quorum certificate in the operations *)
+    preattestation quorum certificate in the operations *)
   let with_locked_round_in_block_but_without_any_pqc () =
     (* This test only fails in Application mode. If full_construction mode, the
        given locked_round is not used / checked. Moreover, the test succeed in
@@ -127,18 +127,18 @@ end = struct
         Error (function Fitness_repr.Wrong_fitness -> true | _ -> false)
       else Ok (fun _ -> return_unit)
     in
-    aux_simple_preendorsement_inclusion
+    aux_simple_preattestation_inclusion
     (* with declared locked_round but without a PQC in the ops *)
       ~mk_ops:(fun _p -> [])
       ~loc:__LOC__
       ~post_process
       ()
 
-  (** KO: The preendorsed block is the pred one, not the current one *)
-  let preendorsement_has_wrong_level () =
-    aux_simple_preendorsement_inclusion
-    (* preendorsement should be for _curr block to be valid *)
-      ~preendorsed_block:(fun _predpred pred _curr -> pred)
+  (** KO: The preattested block is the pred one, not the current one *)
+  let preattestation_has_wrong_level () =
+    aux_simple_preattestation_inclusion
+    (* preattestation should be for _curr block to be valid *)
+      ~preattested_block:(fun _predpred pred _curr -> pred)
       ~loc:__LOC__
       ~post_process:
         (Error
@@ -150,28 +150,28 @@ end = struct
            | _ -> false))
       ()
 
-  (** OK: explicit the correct endorser and preendorsing slot in the test *)
-  let preendorsement_in_block_with_good_slot () =
-    aux_simple_preendorsement_inclusion
+  (** OK: explicit the correct attester and preattesting slot in the test *)
+  let preattestation_in_block_with_good_slot () =
+    aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_attesters (B curr) >>=? function
         | {V.delegate; slots = s :: _; _} :: _ -> return (Some delegate, Some s)
         | _ -> assert false
-        (* there is at least one endorser with a slot *))
+        (* there is at least one attester with a slot *))
       ~loc:__LOC__
       ()
 
-  (** KO: the used slot for injecting the endorsement is not the canonical one *)
-  let preendorsement_in_block_with_wrong_slot () =
-    aux_simple_preendorsement_inclusion
+  (** KO: the used slot for injecting the attestation is not the canonical one *)
+  let preattestation_in_block_with_wrong_slot () =
+    aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_attesters (B curr) >>=? function
         | {V.delegate; V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
             return (Some delegate, Some non_canonical_slot)
         | _ -> assert false
-        (* there is at least one endorser with a slot *))
+        (* there is at least one attester with a slot *))
       ~loc:__LOC__
       ~post_process:
         (Error
@@ -184,8 +184,8 @@ end = struct
       ()
 
   (** KO: the delegate tries to injects with a canonical slot of another delegate *)
-  let preendorsement_in_block_with_wrong_signature () =
-    aux_simple_preendorsement_inclusion
+  let preattestation_in_block_with_wrong_signature () =
+    aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
         Context.get_attesters (B curr) >>=? function
@@ -193,7 +193,7 @@ end = struct
             (* the canonical slot s is not owned by the delegate "delegate" !*)
             return (Some delegate, Some s)
         | _ -> assert false
-        (* there is at least one endorser with a slot *))
+        (* there is at least one attester with a slot *))
       ~loc:__LOC__
       ~post_process:
         (Error
@@ -217,8 +217,8 @@ end = struct
           | _ -> false)
       else Ok (fun _ -> return_unit)
     in
-    aux_simple_preendorsement_inclusion
-      ~preend_round:Round.zero
+    aux_simple_preattestation_inclusion
+      ~preattestation_round:Round.zero
       ~locked_round:(Some (Round.succ Round.zero))
       ~block_round:2
       ~loc:__LOC__
@@ -231,13 +231,13 @@ end = struct
   let tests =
     [
       my_tztest
-        "ok: include_preendorsement_in_block_with_locked_round"
+        "ok: include_preattestation_in_block_with_locked_round"
         `Quick
-        include_preendorsement_in_block_with_locked_round;
+        include_preattestation_in_block_with_locked_round;
       my_tztest
-        "ko: duplicate_preendorsement_in_pqc"
+        "ko: duplicate_preattestation_in_pqc"
         `Quick
-        duplicate_preendorsement_in_pqc;
+        duplicate_preattestation_in_pqc;
       my_tztest
         "ko:locked_round_not_before_block_round"
         `Quick
@@ -247,21 +247,21 @@ end = struct
         `Quick
         with_locked_round_in_block_but_without_any_pqc;
       my_tztest
-        "ko: preendorsement_has_wrong_level"
+        "ko: preattestation_has_wrong_level"
         `Quick
-        preendorsement_has_wrong_level;
+        preattestation_has_wrong_level;
       my_tztest
-        "ok: preendorsement_in_block_with_good_slot"
+        "ok: preattestation_in_block_with_good_slot"
         `Quick
-        preendorsement_in_block_with_good_slot;
+        preattestation_in_block_with_good_slot;
       my_tztest
-        "ko: preendorsement_in_block_with_wrong_slot"
+        "ko: preattestation_in_block_with_wrong_slot"
         `Quick
-        preendorsement_in_block_with_wrong_slot;
+        preattestation_in_block_with_wrong_slot;
       my_tztest
-        "ko: preendorsement_in_block_with_wrong_signature"
+        "ko: preattestation_in_block_with_wrong_signature"
         `Quick
-        preendorsement_in_block_with_wrong_signature;
+        preattestation_in_block_with_wrong_signature;
       my_tztest
         "ko: locked_round_is_higher_than_pqc_round"
         `Quick

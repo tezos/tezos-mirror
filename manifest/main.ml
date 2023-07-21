@@ -4830,7 +4830,8 @@ end = struct
             "test_frozen_deposits";
             "test_helpers_rpcs";
             "test_participation";
-            "test_preendorsement_functor";
+            (if N.(number >= 018) then "test_preattestation_functor"
+            else "test_preendorsement_functor");
             "test_preendorsement";
             "test_seed";
           ]
