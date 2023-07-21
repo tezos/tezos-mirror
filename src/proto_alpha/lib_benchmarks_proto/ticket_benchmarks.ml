@@ -214,7 +214,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     in
     let workload = {nodes} in
     let closure () = ignore (Ticket_scanner.type_has_tickets ctxt ty) in
-    ok (Generator.Plain {workload; closure})
+    return (Generator.Plain {workload; closure})
 
   let create_benchmark ~rng_state config =
     match make_bench_helper rng_state config () with
@@ -276,7 +276,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
                  has_tickets
                  boxed_ticket_list))
        in
-       ok (Generator.Plain {workload; closure})
+       return (Generator.Plain {workload; closure})
 
   let create_benchmark ~rng_state config =
     match make_bench_helper rng_state config () with

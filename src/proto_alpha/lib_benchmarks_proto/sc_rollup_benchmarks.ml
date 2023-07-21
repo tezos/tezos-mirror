@@ -71,8 +71,8 @@ module Pvm_state_generator = struct
       match Context.Tree.kinded_key tree with
       | Some k ->
           let* p = Context.produce_tree_proof index k step in
-          return (Some p)
-      | None -> return None
+          return_some p
+      | None -> return_none
 
     let kinded_hash_to_state_hash = function
       | `Value hash | `Node hash ->
