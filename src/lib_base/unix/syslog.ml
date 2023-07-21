@@ -169,9 +169,9 @@ let open_fd path =
   | Unix.S_SOCK ->
       let logaddr = Unix.ADDR_UNIX path in
       let fd =
-        try Lwt_unix.socket Unix.PF_UNIX SOCK_DGRAM 0
+        try Lwt_unix.socket ~cloexec:true Unix.PF_UNIX SOCK_DGRAM 0
         with Unix.Unix_error (Unix.EPROTOTYPE, _, _) ->
-          Lwt_unix.socket Unix.PF_UNIX SOCK_STREAM 0
+          Lwt_unix.socket ~cloexec:true Unix.PF_UNIX SOCK_STREAM 0
       in
       let* () =
         Lwt.catch
@@ -188,7 +188,7 @@ let open_fd path =
             | exn -> raise exn)
       in
       Lwt.return fd
-  | Unix.S_FIFO -> Lwt_unix.openfile path [Unix.O_WRONLY] 0o666
+  | Unix.S_FIFO -> Lwt_unix.openfile path [Unix.O_WRONLY; O_CLOEXEC] 0o666
   | _ -> raise (Syslog_error "invalid log path, not a socket or pipe")
 
 (* Write the whole contents of a string on the given file

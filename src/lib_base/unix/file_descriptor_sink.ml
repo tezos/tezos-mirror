@@ -480,7 +480,7 @@ end) : Internal_event.SINK with type t = t = struct
               Lwt_result.ok
               @@ Lwt_unix.(
                    let flags =
-                     [O_WRONLY; O_CREAT]
+                     [O_WRONLY; O_CREAT; O_CLOEXEC]
                      @ if fresh then [O_TRUNC] else [O_APPEND]
                    in
                    let*! fd = openfile fixed_path flags rights in
@@ -566,7 +566,7 @@ end) : Internal_event.SINK with type t = t = struct
                 protect (fun () ->
                     Lwt_result.ok
                     @@ Lwt_unix.(
-                         let flags = [O_WRONLY; O_CREAT; O_APPEND] in
+                         let flags = [O_WRONLY; O_CREAT; O_APPEND; O_CLOEXEC] in
                          openfile path flags rights))
               in
               current := {fd; day = today} ;
