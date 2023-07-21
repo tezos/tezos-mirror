@@ -221,9 +221,12 @@ let block_info_encoding =
        (req "payload" Operation_pool.payload_encoding))
 
 let round_of_shell_header shell_header =
-  Environment.wrap_tzresult
-  @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
-  >>? fun fitness -> ok (Fitness.round fitness)
+  let open Result_syntax in
+  let* fitness =
+    Environment.wrap_tzresult
+    @@ Fitness.from_raw shell_header.Tezos_base.Block_header.fitness
+  in
+  return (Fitness.round fitness)
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
@@ -506,6 +509,7 @@ let state_data_encoding =
        (req "attestable_payload" (option attestable_payload_encoding)))
 
 let record_state (state : state) =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let location =
     Baking_files.resolve_location ~chain_id:state.global_state.chain_id `State
@@ -524,14 +528,16 @@ let record_state (state : state) =
       {level_data; locked_round_data; attestable_payload_data}
   in
   let filename_tmp = filename ^ "_tmp" in
-  Lwt_io.with_file
-    ~flags:[Unix.O_CREAT; O_WRONLY; O_TRUNC; O_CLOEXEC; O_SYNC]
-    ~mode:Output
-    filename_tmp
-    (fun channel ->
-      Lwt_io.write_from_exactly channel bytes 0 (Bytes.length bytes))
-  >>= fun () ->
-  Lwt_unix.rename filename_tmp filename >>= fun () -> return_unit
+  let*! () =
+    Lwt_io.with_file
+      ~flags:[Unix.O_CREAT; O_WRONLY; O_TRUNC; O_CLOEXEC; O_SYNC]
+      ~mode:Output
+      filename_tmp
+      (fun channel ->
+        Lwt_io.write_from_exactly channel bytes 0 (Bytes.length bytes))
+  in
+  let*! () = Lwt_unix.rename filename_tmp filename in
+  return_unit
 
 type error += Broken_locked_values_invariant
 
@@ -551,6 +557,7 @@ let () =
     (fun () -> Broken_locked_values_invariant)
 
 let may_record_new_state ~previous_state ~new_state =
+  let open Lwt_result_syntax in
   let {
     current_level = previous_current_level;
     locked_round = previous_locked_round;
@@ -593,8 +600,9 @@ let may_record_new_state ~previous_state ~new_state =
          is_new_locked_round_consistent && is_new_attestable_payload_consistent
        else true
   in
-  fail_unless is_new_state_consistent Broken_locked_values_invariant
-  >>=? fun () ->
+  let* () =
+    fail_unless is_new_state_consistent Broken_locked_values_invariant
+  in
   let has_not_changed =
     previous_state.level_state.current_level
     == new_state.level_state.current_level
@@ -606,11 +614,13 @@ let may_record_new_state ~previous_state ~new_state =
   if has_not_changed then return_unit else record_state new_state
 
 let load_attestable_data cctxt location =
+  let open Lwt_result_syntax in
   protect (fun () ->
       let filename =
         Filename.Infix.(cctxt#get_base_dir // Baking_files.filename location)
       in
-      Lwt_unix.file_exists filename >>= function
+      let*! exists = Lwt_unix.file_exists filename in
+      match exists with
       | false -> return_none
       | true ->
           Lwt_io.with_file
@@ -618,23 +628,25 @@ let load_attestable_data cctxt location =
             ~mode:Input
             filename
             (fun channel ->
-              Lwt_io.read channel >>= fun str ->
+              let*! str = Lwt_io.read channel in
               match
                 Data_encoding.Binary.of_string_opt state_data_encoding str
               with
               | Some state_data -> return_some state_data
               | None ->
                   (* The stored state format is incompatible: discard it. *)
-                  Events.(emit incompatible_stored_state ()) >>= fun () ->
+                  let*! () = Events.(emit incompatible_stored_state ()) in
                   return_none))
 
 let may_load_attestable_data state =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let location = Baking_files.resolve_location ~chain_id `State in
   protect ~on_error:(fun _ -> return state) @@ fun () ->
   cctxt#with_lock @@ fun () ->
-  load_attestable_data cctxt location >>=? function
+  let* attestable_data_opt = load_attestable_data cctxt location in
+  match attestable_data_opt with
   | None -> return state
   | Some {level_data; locked_round_data; attestable_payload_data} ->
       if Compare.Int32.(state.level_state.current_level = level_data) then
@@ -710,9 +722,11 @@ let delegate_slots attesting_rights delegates =
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
-  Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
-  Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
-  >>=? fun attesting_rights ->
+  let open Lwt_result_syntax in
+  let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
+  let* attesting_rights =
+    Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
+  in
   delegate_slots attesting_rights delegates |> return
 
 let round_proposer state ~level round =

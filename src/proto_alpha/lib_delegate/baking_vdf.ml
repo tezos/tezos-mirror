@@ -482,8 +482,10 @@ let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     let*! b =
       Lwt.choose
         [
-          (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
-          (Lwt_stream.get state.block_stream >|= fun e -> `Block e);
+          (let*! _ = Lwt_exit.clean_up_starts in
+           Lwt.return `Termination);
+          (let*! e = Lwt_stream.get state.block_stream in
+           Lwt.return (`Block e));
         ]
     in
     match b with

@@ -60,29 +60,37 @@ type incremental = {
 }
 
 let load_context ~context_path =
+  let open Lwt_result_syntax in
   protect (fun () ->
-      Context.init ~readonly:true context_path >>= fun index ->
+      let*! index = Context.init ~readonly:true context_path in
       return (Abstract_context_index.abstract index))
 
 let check_context_consistency (abstract_index : Abstract_context_index.t)
     context_hash =
+  let open Lwt_result_syntax in
   protect (fun () ->
       (* Hypothesis : the version key exists *)
       let version_key = ["version"] in
-      abstract_index.checkout_fun context_hash >>= function
-      | None -> fail Failed_to_checkout_context
+      let*! context_opt = abstract_index.checkout_fun context_hash in
+      match context_opt with
+      | None -> tzfail Failed_to_checkout_context
       | Some context -> (
-          Context_ops.mem context version_key >>= function
+          let*! result = Context_ops.mem context version_key in
+          match result with
           | true -> return_unit
-          | false -> fail Invalid_context))
+          | false -> tzfail Invalid_context))
 
 let begin_construction ~timestamp ~protocol_data ~force_apply
     ~pred_resulting_context_hash (abstract_index : Abstract_context_index.t)
     pred_block chain_id =
+  let open Lwt_result_syntax in
   protect (fun () ->
       let {Baking_state.shell = pred_shell; hash = pred_hash; _} = pred_block in
-      abstract_index.checkout_fun pred_resulting_context_hash >>= function
-      | None -> fail Failed_to_checkout_context
+      let*! context_opt =
+        abstract_index.checkout_fun pred_resulting_context_hash
+      in
+      match context_opt with
+      | None -> tzfail Failed_to_checkout_context
       | Some context ->
           let header : Tezos_base.Block_header.shell_header =
             Tezos_base.Block_header.
@@ -106,23 +114,27 @@ let begin_construction ~timestamp ~protocol_data ~force_apply
                 block_header_data = protocol_data;
               }
           in
-          Lifted_protocol.begin_validation
-            context
-            chain_id
-            mode
-            ~predecessor:pred_shell
-            ~cache:`Lazy
-          >>=? fun validation_state ->
-          (if force_apply then
-           Lifted_protocol.begin_application
-             context
-             chain_id
-             mode
-             ~predecessor:pred_shell
-             ~cache:`Lazy
-           >>=? return_some
-          else return_none)
-          >>=? fun application_state ->
+          let* validation_state =
+            Lifted_protocol.begin_validation
+              context
+              chain_id
+              mode
+              ~predecessor:pred_shell
+              ~cache:`Lazy
+          in
+          let* application_state =
+            if force_apply then
+              let* application_state =
+                Lifted_protocol.begin_application
+                  context
+                  chain_id
+                  mode
+                  ~predecessor:pred_shell
+                  ~cache:`Lazy
+              in
+              return_some application_state
+            else return_none
+          in
           let state = (validation_state, application_state) in
           return
             {
@@ -140,6 +152,7 @@ let ( let** ) x k =
   k x
 
 let add_operation st (op : Operation.packed) =
+  let open Lwt_result_syntax in
   protect (fun () ->
       let validation_state, application_state = st.state in
       let oph = Operation.hash_packed op in
@@ -157,8 +170,9 @@ let add_operation st (op : Operation.packed) =
       let** application_state, receipt =
         match application_state with
         | Some application_state ->
-            Protocol.apply_operation application_state oph op
-            >>=? fun (application_state, receipt) ->
+            let* application_state, receipt =
+              Protocol.apply_operation application_state oph op
+            in
             return (Some application_state, Some receipt)
         | None -> return (None, None)
       in
@@ -166,14 +180,17 @@ let add_operation st (op : Operation.packed) =
       return ({st with state; rev_operations = op :: st.rev_operations}, receipt))
 
 let finalize_construction inc =
+  let open Lwt_result_syntax in
   protect (fun () ->
       let validation_state, application_state = inc.state in
       let** () = Protocol.finalize_validation validation_state in
       let** result =
         match application_state with
         | Some application_state ->
-            Protocol.finalize_application application_state (Some inc.header)
-            >>=? return_some
+            let* result =
+              Protocol.finalize_application application_state (Some inc.header)
+            in
+            return_some result
         | None -> return_none
       in
       return result)
