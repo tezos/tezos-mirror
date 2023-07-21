@@ -25,11 +25,11 @@
 
 (** Testing
     -------
-    Component:  Protocol (endorsement)
+    Component:  Protocol (attestation)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
-                  -- --file test_endorsement.ml
-    Subject:    Endorsing a block adds an extra layer of confidence
-                to the Tezos' PoS algorithm. The block endorsing
+                  -- --file test_attestation.ml
+    Subject:    Attesting a block adds an extra layer of confidence
+                to the Tezos' PoS algorithm. The block attesting
                 operation must be included in the following block.
 *)
 
@@ -42,8 +42,8 @@ let init_genesis ?policy () =
 
 (** {1 Positive tests} *)
 
-(** Correct endorsement from the slot 0 endorser. *)
-let test_simple_endorsement () =
+(** Correct attestation from the slot 0 attester. *)
+let test_simple_attestation () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block = init_genesis () in
   Consensus_helpers.test_consensus_operation_all_modes
@@ -51,7 +51,7 @@ let test_simple_endorsement () =
     ~attested_block
     Attestation
 
-(** Test that the endorsement's branch does not affect its
+(** Test that the attestation's branch does not affect its
     validity. *)
 let test_arbitrary_branch () =
   let open Lwt_result_syntax in
@@ -62,8 +62,8 @@ let test_arbitrary_branch () =
     ~branch:Block_hash.zero
     Attestation
 
-(** Correct endorsement with a level and a round that are both
-    different from {!test_simple_endorsement}. *)
+(** Correct attestation with a level and a round that are both
+    different from {!test_simple_attestation}. *)
 let test_non_zero_round () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
@@ -100,16 +100,16 @@ let test_fitness_gap () =
 (** Return a delegate and its second smallest slot for the level of [block]. *)
 let delegate_and_second_slot block =
   let open Lwt_result_syntax in
-  let* endorsers = Context.get_attesters (B block) in
+  let* attesters = Context.get_attesters (B block) in
   let delegate, slots =
-    (* Find an endorser with more than 1 slot. *)
+    (* Find an attester with more than 1 slot. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
          (fun {RPC.Validators.delegate; slots; _} ->
            if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
            else None)
-         endorsers)
+         attesters)
   in
   (* Check that the slots are sorted and have no duplicates. *)
   let rec check_sorted = function
@@ -122,10 +122,10 @@ let delegate_and_second_slot block =
   in
   return (delegate, slot)
 
-(** Test that the mempool accepts endorsements with a non-normalized
+(** Test that the mempool accepts attestations with a non-normalized
     slot (that is, a slot that belongs to the delegate but is not the
     delegate's smallest slot) at all three allowed levels for
-    endorsements (and various rounds). *)
+    attestations (and various rounds). *)
 let test_mempool_second_slot () =
   let open Lwt_result_syntax in
   let* _genesis, grandparent = init_genesis () in
@@ -152,7 +152,7 @@ let test_mempool_second_slot () =
 
 (** {2 Wrong slot} *)
 
-(** Apply an endorsement with a negative slot. *)
+(** Apply an attestation with a negative slot. *)
 let test_negative_slot () =
   Context.init_n 5 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
@@ -168,7 +168,7 @@ let test_negative_slot () =
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
 
-(** Endorsement with a non-normalized slot (that is, a slot that
+(** Attestation with a non-normalized slot (that is, a slot that
     belongs to the delegate but is not the delegate's smallest slot).
     It should fail in application and construction modes, but be
     accepted in mempool mode. *)
@@ -195,16 +195,16 @@ let test_not_smallest_slot () =
 
 let delegate_and_someone_elses_slot block =
   let open Lwt_result_syntax in
-  let* endorsers = Context.get_attesters (B block) in
+  let* attesters = Context.get_attesters (B block) in
   let delegate, other_delegate_slot =
-    match endorsers with
+    match attesters with
     | [] | [_] -> assert false (* at least two delegates with rights *)
     | {delegate; _} :: {slots; _} :: _ ->
         (delegate, WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
   in
   return (delegate, other_delegate_slot)
 
-(** Endorsement with a slot that does not belong to the delegate. *)
+(** Attestation with a slot that does not belong to the delegate. *)
 let test_not_own_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
@@ -218,7 +218,7 @@ let test_not_own_slot () =
       | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
     Attestation
 
-(** In mempool mode, also test endorsements with a slot that does not
+(** In mempool mode, also test attestations with a slot that does not
     belong to the delegate for various allowed levels and rounds. *)
 let test_mempool_not_own_slot () =
   let open Lwt_result_syntax in
@@ -249,12 +249,12 @@ let error_old_level = function
       true
   | _ -> false
 
-(** Endorsement that is one level too old, aka grandparent endorsement
-    (the endorsement is expected to point to the level of the
-    predecessor of the block/mempool containing the endorsement, but
+(** Attestation that is one level too old, aka grandparent attestation
+    (the attestation is expected to point to the level of the
+    predecessor of the block/mempool containing the attestation, but
     instead it points to the grandparent's level).
 
-    This endorsement should fail in a block (application or
+    This attestation should fail in a block (application or
     construction), but be accepted in mempool mode. *)
 let test_one_level_too_old () =
   let open Lwt_result_syntax in
@@ -269,7 +269,7 @@ let test_one_level_too_old () =
     ?mempool_error:None
     Attestation
 
-(** Endorsement that is two levels too old (pointing to the
+(** Attestation that is two levels too old (pointing to the
     great-grandparent instead of the predecessor). It should fail in
     all modes. *)
 let test_two_levels_too_old () =
@@ -290,8 +290,8 @@ let error_future_level = function
       true
   | _ -> false
 
-(** Endorsement that is one level in the future (pointing to the same
-    level as the block/mempool containing the endorsement instead of
+(** Attestation that is one level in the future (pointing to the same
+    level as the block/mempool containing the attestation instead of
     its predecessor/head). It should fail in a block (application or
     construction) but succeed in a mempool. *)
 let test_one_level_in_the_future () =
@@ -307,7 +307,7 @@ let test_one_level_in_the_future () =
     ?mempool_error:None
     Attestation
 
-(** Endorsement that is two levels in the future. It should fail in
+(** Attestation that is two levels in the future. It should fail in
     all modes. *)
 let test_two_levels_future () =
   let open Lwt_result_syntax in
@@ -329,7 +329,7 @@ let error_old_round = function
       true
   | _ -> false
 
-(** Endorsement that is one round too old. It should fail in a block
+(** Attestation that is one round too old. It should fail in a block
     (application or construction) but succeed in a mempool. *)
 let test_one_round_too_old () =
   let open Lwt_result_syntax in
@@ -345,7 +345,7 @@ let test_one_round_too_old () =
     ?mempool_error:None
     Attestation
 
-(** Endorsement that is many rounds too old. It should fail in a block
+(** Attestation that is many rounds too old. It should fail in a block
     (application or construction) but succeed in a mempool. *)
 let test_many_rounds_too_old () =
   let open Lwt_result_syntax in
@@ -367,7 +367,7 @@ let error_future_round = function
       true
   | _ -> false
 
-(** Endorsement that is one round in the future. It should fail in a
+(** Attestation that is one round in the future. It should fail in a
     block (application or construction) but succeed in a mempool. *)
 let test_one_round_in_the_future () =
   let open Lwt_result_syntax in
@@ -383,7 +383,7 @@ let test_one_round_in_the_future () =
     ?mempool_error:None
     Attestation
 
-(** Endorsement that is many rounds in the future. It should fail in a
+(** Attestation that is many rounds in the future. It should fail in a
     block (application or construction) but succeed in a mempool. *)
 let test_many_rounds_future () =
   let open Lwt_result_syntax in
@@ -401,7 +401,7 @@ let test_many_rounds_future () =
 
 (** {2 Wrong payload hash} *)
 
-(** Endorsement with an incorrect payload hash. It should fail in a
+(** Attestation with an incorrect payload hash. It should fail in a
     block (application or construction) but succeed in a mempool. *)
 let test_wrong_payload_hash () =
   let open Lwt_result_syntax in
@@ -433,13 +433,13 @@ let assert_conflict_error ~loc res =
           true
       | _ -> false)
 
-(** Test that endorsements conflict with:
-    - an identical endorsement, and
-    - an endorsement on the same block with a different branch.
+(** Test that attestations conflict with:
+    - an identical attestation, and
+    - an attestation on the same block with a different branch.
 
-    In mempool mode, also test that they conflict with an endorsement
+    In mempool mode, also test that they conflict with an attestation
     on the same level and round but with a different payload hash
-    (such an endorsement is invalid in application and construction modes). *)
+    (such an attestation is invalid in application and construction modes). *)
 let test_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
@@ -468,13 +468,13 @@ let test_conflict () =
   let* () = assert_mempool_conflict __LOC__ op_different_payload_hash in
   return_unit
 
-(** In mempool mode, test that grandparent endorsements conflict with:
-    - an identical endorsement,
-    - an endorsement on the same block with a different branch, and
-    - an endorsement on the same block with a different payload hash.
+(** In mempool mode, test that grandparent attestations conflict with:
+    - an identical attestation,
+    - an attestation on the same block with a different branch, and
+    - an attestation on the same block with a different payload hash.
 
     This test would make no sense in application or construction modes,
-    since grandparent endorsements fail anyway (as can be observed in
+    since grandparent attestations fail anyway (as can be observed in
     {!test_one_level_too_old}). *)
 let test_grandparent_conflict () =
   let open Lwt_result_syntax in
@@ -497,9 +497,9 @@ let test_grandparent_conflict () =
   let* () = assert_conflict __LOC__ op_different_payload_hash in
   return_unit
 
-(** In mempool mode, test that endorsements with the same future level
+(** In mempool mode, test that attestations with the same future level
     and same non-zero round conflict. This is not tested in application
-    and construction modes since such endorsements would be invalid. *)
+    and construction modes since such attestations would be invalid. *)
 let test_future_level_conflict () =
   let open Lwt_result_syntax in
   let* _genesis, predecessor = init_genesis () in
@@ -522,37 +522,37 @@ let test_future_level_conflict () =
   return_unit
 
 (** In mempool mode, test that there is no conflict between an
-    endorsement and a preendorsement for the same slot (here the first
+    attestation and a preattestation for the same slot (here the first
     slot), same level, and same round. *)
-let test_no_conflict_with_preendorsement_mempool () =
+let test_no_conflict_with_preattestation_mempool () =
   let open Lwt_result_syntax in
-  let* _genesis, endorsed_block = init_genesis () in
-  let* op_endo = Op.attestation endorsed_block in
-  let* op_preendo = Op.preattestation endorsed_block in
-  let* inc = Incremental.begin_construction ~mempool_mode:true endorsed_block in
-  let* inc = Incremental.add_operation inc op_endo in
-  let* inc = Incremental.add_operation inc op_preendo in
+  let* _genesis, attested_block = init_genesis () in
+  let* op_attestation = Op.attestation attested_block in
+  let* op_preattestation = Op.preattestation attested_block in
+  let* inc = Incremental.begin_construction ~mempool_mode:true attested_block in
+  let* inc = Incremental.add_operation inc op_attestation in
+  let* inc = Incremental.add_operation inc op_preattestation in
   let* _inc = Incremental.finalize_block inc in
   return_unit
 
 (** In application and construction (aka baking) modes, test that
-    there is no conflict between an endorsement and a preendorsement
+    there is no conflict between an attestation and a preattestation
     for the same slot (here the first slot). Note that the operations
     don't have the same level because the required levels for them to
     be valid are different. *)
-let test_no_conflict_with_preendorsement_block () =
+let test_no_conflict_with_preattestation_block () =
   let open Lwt_result_syntax in
   let* _genesis, predecessor = init_genesis () in
   let* round0_block = Block.bake predecessor in
-  let* op_endo = Op.attestation predecessor in
-  let* op_preendo = Op.preattestation round0_block in
+  let* op_attestation = Op.attestation predecessor in
+  let* op_preattestation = Op.preattestation round0_block in
   let bake_both_ops baking_mode =
     Block.bake
       ~baking_mode
       ~payload_round:(Some Round.zero)
       ~locked_round:(Some Round.zero)
       ~policy:(By_round 1)
-      ~operations:[op_endo; op_preendo]
+      ~operations:[op_attestation; op_preattestation]
       predecessor
   in
   let* (_ : Block.t) = bake_both_ops Application in
@@ -560,11 +560,11 @@ let test_no_conflict_with_preendorsement_block () =
   return_unit
 
 (** In mempool mode, test that there is no conflict between
-    endorsements for the same slot (here the first slot) with various
+    attestations for the same slot (here the first slot) with various
     allowed levels and rounds.
 
     There are no similar tests in application and construction modes
-    because valid endorsements always have the same level and round. *)
+    because valid attestations always have the same level and round. *)
 let test_no_conflict_various_levels_and_rounds () =
   let open Lwt_result_syntax in
   let* genesis, grandparent = init_genesis () in
@@ -574,8 +574,8 @@ let test_no_conflict_various_levels_and_rounds () =
   let* alt_predecessor = Block.bake ~policy:(By_round 1) grandparent in
   let* alt_future = Block.bake ~policy:(By_round 10) alt_predecessor in
   let* inc = Incremental.begin_construction ~mempool_mode:true predecessor in
-  let add_endorsement inc endorsed_block =
-    let* (op : packed_operation) = Op.attestation endorsed_block in
+  let add_attestation inc attested_block =
+    let* (op : packed_operation) = Op.attestation attested_block in
     let (Operation_data protocol_data) = op.protocol_data in
     let content =
       match protocol_data.contents with
@@ -588,12 +588,12 @@ let test_no_conflict_various_levels_and_rounds () =
       (Round.to_int32 content.round) ;
     Incremental.add_operation inc op
   in
-  let* inc = add_endorsement inc grandparent in
-  let* inc = add_endorsement inc predecessor in
-  let* inc = add_endorsement inc future_block in
-  let* inc = add_endorsement inc alt_grandparent in
-  let* inc = add_endorsement inc alt_predecessor in
-  let* inc = add_endorsement inc alt_future in
+  let* inc = add_attestation inc grandparent in
+  let* inc = add_attestation inc predecessor in
+  let* inc = add_attestation inc future_block in
+  let* inc = add_attestation inc alt_grandparent in
+  let* inc = add_attestation inc alt_predecessor in
+  let* inc = add_attestation inc alt_future in
   let* _inc = Incremental.finalize_block inc in
   return_unit
 
@@ -602,34 +602,34 @@ let test_no_conflict_various_levels_and_rounds () =
     Both positive and negative tests. *)
 
 (** Check that:
-    - a block with not enough endorsement cannot be baked;
-    - a block with enough endorsement is baked. *)
-let test_endorsement_threshold ~sufficient_threshold () =
+    - a block with not enough attestation cannot be baked;
+    - a block with enough attestation is baked. *)
+let test_attestation_threshold ~sufficient_threshold () =
   (* We choose a relative large number of accounts so that the probability that
      any delegate has [consensus_threshold] slots is low and most delegates have
      about 1 slot so we can get closer to the limit of [consensus_threshold]: we
-     check that a block with endorsing power [consensus_threshold - 1] won't be
+     check that a block with attesting power [consensus_threshold - 1] won't be
      baked. *)
   Context.init_n 10 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
   Context.get_constants (B b)
   >>=? fun {parametric = {consensus_threshold; _}; _} ->
-  Context.get_attesters (B b) >>=? fun endorsers_list ->
+  Context.get_attesters (B b) >>=? fun attesters_list ->
   Block.get_round b >>?= fun round ->
   List.fold_left_es
-    (fun (counter, endos) {Plugin.RPC.Validators.delegate; slots; _} ->
+    (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->
       let new_counter = counter + List.length slots in
       if
         (sufficient_threshold && counter < consensus_threshold)
         || ((not sufficient_threshold) && new_counter < consensus_threshold)
       then
-        Op.attestation ~round ~delegate b >>=? fun endo ->
-        return (new_counter, endo :: endos)
-      else return (counter, endos))
+        Op.attestation ~round ~delegate b >>=? fun attestation ->
+        return (new_counter, attestation :: attestations)
+      else return (counter, attestations))
     (0, [])
-    endorsers_list
-  >>=? fun (_, endos) ->
-  Block.bake ~operations:endos b >>= fun b ->
+    attesters_list
+  >>=? fun (_, attestations) ->
+  Block.bake ~operations:attestations b >>= fun b ->
   if sufficient_threshold then return_unit
   else
     Assert.proto_error ~loc:__LOC__ b (function
@@ -639,14 +639,14 @@ let test_endorsement_threshold ~sufficient_threshold () =
 let tests =
   [
     (* Positive tests *)
-    Tztest.tztest "Simple endorsement" `Quick test_simple_endorsement;
+    Tztest.tztest "Simple attestation" `Quick test_simple_attestation;
     Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
     Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
     Tztest.tztest "Mempool: non-smallest slot" `Quick test_mempool_second_slot;
     (* Negative tests *)
     (* Wrong slot *)
-    Tztest.tztest "Endorsement with slot -1" `Quick test_negative_slot;
+    Tztest.tztest "Attestation with slot -1" `Quick test_negative_slot;
     Tztest.tztest "Non-normalized slot" `Quick test_not_smallest_slot;
     Tztest.tztest "Not own slot" `Quick test_not_own_slot;
     Tztest.tztest "Mempool: not own slot" `Quick test_mempool_not_own_slot;
@@ -667,28 +667,28 @@ let tests =
     Tztest.tztest "Grandparent conflict" `Quick test_grandparent_conflict;
     Tztest.tztest "Future level conflict" `Quick test_future_level_conflict;
     Tztest.tztest
-      "No conflict with preendorsement (mempool)"
+      "No conflict with preattestation (mempool)"
       `Quick
-      test_no_conflict_with_preendorsement_mempool;
+      test_no_conflict_with_preattestation_mempool;
     Tztest.tztest
-      "No conflict with preendorsement (block)"
+      "No conflict with preattestation (block)"
       `Quick
-      test_no_conflict_with_preendorsement_block;
+      test_no_conflict_with_preattestation_block;
     Tztest.tztest
       "No conflict with various levels and rounds"
       `Quick
       test_no_conflict_various_levels_and_rounds;
     (* Consensus threshold tests (one positive and one negative) *)
     Tztest.tztest
-      "sufficient endorsement threshold"
+      "sufficient attestation threshold"
       `Quick
-      (test_endorsement_threshold ~sufficient_threshold:true);
+      (test_attestation_threshold ~sufficient_threshold:true);
     Tztest.tztest
-      "insufficient endorsement threshold"
+      "insufficient attestation threshold"
       `Quick
-      (test_endorsement_threshold ~sufficient_threshold:false);
+      (test_attestation_threshold ~sufficient_threshold:false);
   ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("endorsement", tests)]
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("attestation", tests)]
   |> Lwt_main.run
