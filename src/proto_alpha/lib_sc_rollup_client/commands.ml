@@ -46,15 +46,18 @@ let block_arg =
        ~autocomplete:(fun _ -> return possible_block_ids))
 
 let get_sc_rollup_addresses_command () =
+  let open Lwt_result_syntax in
   Tezos_clic.command
     ~desc:"Retrieve the smart rollup address the node is interacting with."
     Tezos_clic.no_options
     (Tezos_clic.fixed ["get"; "smart"; "rollup"; "address"])
     (fun () (cctxt : #Configuration.sc_client_context) ->
-      RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
-      cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
+      let* addr = RPC.get_sc_rollup_addresses_command cctxt in
+      let*! () = cctxt#message "@[%a@]" Sc_rollup.Address.pp addr in
+      return_unit)
 
 let get_state_value_command () =
+  let open Lwt_result_syntax in
   Tezos_clic.command
     ~desc:"Observe a key in the PVM state."
     (Tezos_clic.args1 block_arg)
@@ -62,8 +65,9 @@ let get_state_value_command () =
     @@ Tezos_clic.string ~name:"key" ~desc:"The key of the state value"
     @@ Tezos_clic.stop)
     (fun block key (cctxt : #Configuration.sc_client_context) ->
-      RPC.get_state_value_command cctxt block key >>=? fun bytes ->
-      cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
+      let* bytes = RPC.get_state_value_command cctxt block key in
+      let*! () = cctxt#message "@[%S@]" (String.of_bytes bytes) in
+      return_unit)
 
 (** [display_answer cctxt answer] prints an RPC answer. *)
 let display_answer (cctxt : #Configuration.sc_client_context) :
@@ -199,6 +203,7 @@ let outbox_message_parameter =
       | Error reason -> cctxt#error "Invalid transaction json: %s" reason)
 
 let get_output_proof () =
+  let open Lwt_result_syntax in
   Tezos_clic.command
     ~desc:"Ask the rollup node for an output proof."
     Tezos_clic.no_options
@@ -217,7 +222,6 @@ let get_output_proof () =
          outbox_message_parameter
     @@ Tezos_clic.stop)
     (fun () index level message (cctxt : #Configuration.sc_client_context) ->
-      let open Lwt_result_syntax in
       let output =
         Protocol.Alpha_context.Sc_rollup.
           {
@@ -226,16 +230,19 @@ let get_output_proof () =
             message;
           }
       in
-      RPC.get_outbox_proof cctxt output >>=? fun (commitment_hash, proof) ->
-      cctxt#message
-        {|@[{ "proof" : "0x%a", "commitment_hash" : "%a"@]}|}
-        Hex.pp
-        (Hex.of_string proof)
-        Protocol.Alpha_context.Sc_rollup.Commitment.Hash.pp
-        commitment_hash
-      >>= fun () -> return_unit)
+      let* commitment_hash, proof = RPC.get_outbox_proof cctxt output in
+      let*! () =
+        cctxt#message
+          {|@[{ "proof" : "0x%a", "commitment_hash" : "%a"@]}|}
+          Hex.pp
+          (Hex.of_string proof)
+          Protocol.Alpha_context.Sc_rollup.Commitment.Hash.pp
+          commitment_hash
+      in
+      return_unit)
 
 let get_output_message_encoding () =
+  let open Lwt_result_syntax in
   Tezos_clic.command
     ~desc:"Get output message encoding."
     Tezos_clic.no_options
@@ -246,15 +253,16 @@ let get_output_message_encoding () =
          outbox_message_parameter
     @@ Tezos_clic.stop)
     (fun () message (cctxt : #Configuration.sc_client_context) ->
-      let open Lwt_result_syntax in
       let open Protocol.Alpha_context.Sc_rollup.Outbox.Message in
       let encoded_message = serialize message in
-      (match encoded_message with
-      | Ok encoded_message ->
-          let encoded_message = unsafe_to_string encoded_message in
-          cctxt#message "%a" Hex.pp (Hex.of_string encoded_message)
-      | Error _ -> cctxt#message "Error while encoding outbox message.")
-      >>= fun () -> return_unit)
+      let*! () =
+        match encoded_message with
+        | Ok encoded_message ->
+            let encoded_message = unsafe_to_string encoded_message in
+            cctxt#message "%a" Hex.pp (Hex.of_string encoded_message)
+        | Error _ -> cctxt#message "Error while encoding outbox message."
+      in
+      return_unit)
 
 let call ?body meth raw_url (cctxt : #Configuration.sc_client_context) =
   let open Lwt_result_syntax in
