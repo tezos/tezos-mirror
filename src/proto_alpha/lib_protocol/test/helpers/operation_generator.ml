@@ -49,14 +49,14 @@ let all_passes = [`PConsensus; `PAnonymous; `PVote; `PManager]
 
 let all_non_manager_passes = [`PConsensus; `PAnonymous; `PVote]
 
-let consensus_kinds = [`KPreendorsement; `KEndorsement; `KDal_attestation]
+let consensus_kinds = [`KPreattestation; `KAttestation; `KDal_attestation]
 
 let anonymous_kinds =
   [
     `KSeed_nonce_revelation;
     `KVdf_revelation;
-    `KDouble_endorsement;
-    `KDouble_preendorsement;
+    `KDouble_attestation;
+    `KDouble_preattestation;
     `KDouble_baking;
     `KActivate_account;
   ]
@@ -95,13 +95,13 @@ let pp_kind fmt k =
     fmt
     "%s"
     (match k with
-    | `KPreendorsement -> "KPreendorsement"
-    | `KEndorsement -> "KEndorsement"
+    | `KPreattestation -> "KPreattestation"
+    | `KAttestation -> "KAttestation"
     | `KDal_attestation -> "KDal_attestation"
     | `KSeed_nonce_revelation -> "KSeed_nonce_revelation"
     | `KVdf_revelation -> "KVdf_revelation"
-    | `KDouble_endorsement -> "KDouble_endorsement"
-    | `KDouble_preendorsement -> "KDouble_preendorsement"
+    | `KDouble_attestation -> "KDouble_attestation"
+    | `KDouble_preattestation -> "KDouble_preattestation"
     | `KDouble_baking -> "KDouble_baking"
     | `KActivate_account -> "KActivate_account"
     | `KProposals -> "KProposals"
@@ -377,12 +377,12 @@ let generate_operation gen_op =
   let+ op = generate_op gen_op in
   Operation.pack op
 
-let generate_preendorsement =
+let generate_preattestation =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
   Preattestation cc
 
-let generate_endorsement =
+let generate_attestation =
   let open QCheck2.Gen in
   let+ cc = generate_consensus_content in
   Attestation cc
@@ -405,16 +405,16 @@ let generate_seed_nonce_revelation =
   let+ nonce = random_nonce in
   Seed_nonce_revelation {level; nonce}
 
-let generate_double_preendorsement =
+let generate_double_preattestation =
   let open QCheck2.Gen in
-  let* op1 = generate_op generate_preendorsement in
-  let+ op2 = generate_op generate_preendorsement in
+  let* op1 = generate_op generate_preattestation in
+  let+ op2 = generate_op generate_preattestation in
   Double_preattestation_evidence {op1; op2}
 
-let generate_double_endorsement =
+let generate_double_attestation =
   let open QCheck2.Gen in
-  let* op1 = generate_op generate_endorsement in
-  let+ op2 = generate_op generate_endorsement in
+  let* op1 = generate_op generate_attestation in
+  let+ op2 = generate_op generate_attestation in
   Double_attestation_evidence {op1; op2}
 
 let generate_double_baking =
@@ -631,13 +631,13 @@ let generate_non_manager_operation =
   let* pass = oneofl all_non_manager_passes in
   let* kind = oneofl (pass_to_operation_kinds pass) in
   match kind with
-  | `KPreendorsement -> generate_operation generate_preendorsement
-  | `KEndorsement -> generate_operation generate_endorsement
+  | `KPreattestation -> generate_operation generate_preattestation
+  | `KAttestation -> generate_operation generate_attestation
   | `KDal_attestation -> generate_operation generate_dal_attestation
   | `KSeed_nonce_revelation -> generate_operation generate_seed_nonce_revelation
   | `KVdf_revelation -> generate_operation generate_vdf_revelation
-  | `KDouble_endorsement -> generate_operation generate_double_endorsement
-  | `KDouble_preendorsement -> generate_operation generate_double_preendorsement
+  | `KDouble_attestation -> generate_operation generate_double_attestation
+  | `KDouble_preattestation -> generate_operation generate_double_preattestation
   | `KDouble_baking -> generate_operation generate_double_baking
   | `KActivate_account -> generate_operation generate_activate_account
   | `KProposals -> generate_operation generate_proposals
@@ -705,15 +705,15 @@ let generate_operation =
   let* kind = oneofl (pass_to_operation_kinds pass) in
   let+ packed_operation =
     match kind with
-    | `KPreendorsement -> generate_operation generate_preendorsement
-    | `KEndorsement -> generate_operation generate_endorsement
+    | `KPreattestation -> generate_operation generate_preattestation
+    | `KAttestation -> generate_operation generate_attestation
     | `KDal_attestation -> generate_operation generate_dal_attestation
     | `KSeed_nonce_revelation ->
         generate_operation generate_seed_nonce_revelation
     | `KVdf_revelation -> generate_operation generate_vdf_revelation
-    | `KDouble_endorsement -> generate_operation generate_double_endorsement
-    | `KDouble_preendorsement ->
-        generate_operation generate_double_preendorsement
+    | `KDouble_attestation -> generate_operation generate_double_attestation
+    | `KDouble_preattestation ->
+        generate_operation generate_double_preattestation
     | `KDouble_baking -> generate_operation generate_double_baking
     | `KActivate_account -> generate_operation generate_activate_account
     | `KProposals -> generate_operation generate_proposals
