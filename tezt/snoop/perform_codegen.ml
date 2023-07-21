@@ -48,7 +48,7 @@ let prepare_fp_json inference_root =
   Base.write_file
     fn
     ~contents:
-      {|{ "precision": 3,
+      {|{ "precision": 4,
       "max_relative_error": 0.5,
       "cast_mode": "Round",
       "inverse_scaling": 3,

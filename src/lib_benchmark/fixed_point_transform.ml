@@ -53,7 +53,7 @@ exception Fixed_point_transform_error of fixed_point_transform_error
 
 let default_options =
   {
-    precision = 3;
+    precision = 4;
     max_relative_error = 0.1;
     cast_mode = Round;
     inverse_scaling = 3;
