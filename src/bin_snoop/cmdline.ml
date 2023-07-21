@@ -117,10 +117,15 @@ type command =
   | Codegen_check_definitions of {files : string list}
   | Solution_print of string list
   | Auto_build of {
-      bench_names : Namespace.t list;
+      targets : auto_build_targets;
       auto_build_options : auto_build_options;
     }
   | No_command
+
+and auto_build_targets =
+  | Benchmarks of Benchmark.t list
+  | Models of Model.packed_model list
+  | Parameters of Free_variable.t list
 
 (* -------------------------------------------------------------------------- *)
 (* Encodings *)

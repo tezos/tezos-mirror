@@ -825,7 +825,7 @@ module Codegen_check_definitions_cmd = struct
 end
 
 module Auto_build_cmd = struct
-  let auto_build_handler
+  let build_options
       ( destination_directory,
         nsamples,
         bench_number,
@@ -834,18 +834,7 @@ module Auto_build_cmd = struct
         override_files,
         full_plot_verbosity,
         plot_raw_workload,
-        empirical_plot ) bench_names () =
-    let bench_names =
-      let all_benchmarks = Registration.all_benchmarks () in
-      List.map
-        (fun s ->
-          let n = Namespace.of_string s in
-          if not @@ List.mem_assoc ~equal:Namespace.equal n all_benchmarks then (
-            Format.eprintf "Benchmark %a does not exist.@." Namespace.pp n ;
-            exit 1) ;
-          n)
-        bench_names
-    in
+        empirical_plot ) =
     let infer_parameters =
       let open Infer_cmd in
       default_infer_parameters_options
@@ -864,11 +853,23 @@ module Auto_build_cmd = struct
         bench_number = Option.value bench_number ~default:opts.bench_number;
       }
     in
-    let auto_build_options =
-      {destination_directory; infer_parameters; measure_options}
+    {destination_directory; infer_parameters; measure_options}
+
+  let handler opts bench_names () =
+    let auto_build_options = build_options opts in
+    let benchmarks =
+      List.map
+        (fun s ->
+          let n = Namespace.of_string s in
+          match Registration.find_benchmark n with
+          | None ->
+              Format.eprintf "Benchmark %a does not exist.@." Namespace.pp n ;
+              exit 1
+          | Some benchmark -> benchmark)
+        bench_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {bench_names; auto_build_options}) ;
+      Some (Auto_build {targets = Benchmarks benchmarks; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -904,7 +905,77 @@ module Auto_build_cmd = struct
          benchmarks"
       options
       params
-      auto_build_handler
+      handler
+end
+
+module Auto_build_for_models_cmd = struct
+  let handler opts model_names () =
+    let auto_build_options = Auto_build_cmd.build_options opts in
+    let models =
+      List.map
+        (fun s ->
+          let n = Namespace.of_string s in
+          match Registration.find_model n with
+          | Some {model; _} -> model
+          | None ->
+              Format.eprintf "Model %a does not exist.@." Namespace.pp n ;
+              exit 1)
+        model_names
+    in
+    commandline_outcome_ref :=
+      Some (Auto_build {targets = Models models; auto_build_options}) ;
+    Lwt.return_ok ()
+
+  let params =
+    Tezos_clic.(
+      prefixes ["generate"; "code"; "for"; "models"]
+      @@ seq_of_param
+      @@ Benchmark_cmd.benchmark_param ())
+
+  let command =
+    Tezos_clic.command
+      ~group:Codegen_cmd.group
+      ~desc:
+        "Auto-perform the benchmarks, inference and codegen for the given \
+         models"
+      Auto_build_cmd.options
+      params
+      handler
+end
+
+module Auto_build_for_parameters_cmd = struct
+  let handler opts parameter_names () =
+    let auto_build_options = Auto_build_cmd.build_options opts in
+    let parameters =
+      List.map
+        (fun s ->
+          let v = Free_variable.of_string s in
+          match Registration.find_parameter v with
+          | None | Some [] ->
+              Format.eprintf "Parameter %a does not exist.@." Free_variable.pp v ;
+              exit 1
+          | Some _ -> v)
+        parameter_names
+    in
+    commandline_outcome_ref :=
+      Some (Auto_build {targets = Parameters parameters; auto_build_options}) ;
+    Lwt.return_ok ()
+
+  let params =
+    Tezos_clic.(
+      prefixes ["generate"; "code"; "for"; "parameters"]
+      @@ seq_of_param
+      @@ Benchmark_cmd.benchmark_param ())
+
+  let command =
+    Tezos_clic.command
+      ~group:Codegen_cmd.group
+      ~desc:
+        "Auto-perform the benchmarks, inference and codegen for the given \
+         parameters"
+      Auto_build_cmd.options
+      params
+      handler
 end
 
 module List_cmd = struct
@@ -1638,6 +1709,8 @@ let all_commands =
     Generate_config_cmd.command;
     Solution_print_cmd.command;
     Auto_build_cmd.command;
+    Auto_build_for_models_cmd.command;
+    Auto_build_for_parameters_cmd.command;
   ]
   @ List_cmd.commands @ Config_cmd.commands @ Workload_cmd.commands
   @ Display_info_cmd.commands

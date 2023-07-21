@@ -950,7 +950,7 @@ module Auto_build = struct
       codegen_options
       ~exclusions:String.Set.empty
 
-  let cmd bench_names
+  let cmd targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
     let exitf status fmt =
       Format.kasprintf
@@ -968,28 +968,24 @@ module Auto_build = struct
 
     let state_tbl = init_state_tbl () in
 
-    let unknowns =
-      List.filter
-        (fun bench_name -> Registration.find_benchmark bench_name = None)
-        bench_names
-    in
-    if unknowns <> [] then
-      exitf
-        1
-        "@[<2>Error: unknown benchmark name(s):@ @[%a@]@]@."
-        Format.(
-          pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf " ") Namespace.pp)
-        unknowns ;
-
     (* Benchmark dependency analysis *)
     Format.eprintf "Analyzing the global benchmark dependency...@." ;
     let free_variables_to_infer =
-      let benches = List.map Registration.find_benchmark_exn bench_names in
-      List.fold_left
-        (fun acc bench ->
-          Free_variable.Set.union acc @@ Benchmark.get_free_variable_set bench)
-        Free_variable.Set.empty
-        benches
+      match targets with
+      | Cmdline.Benchmarks benches ->
+          List.fold_left
+            (fun acc bench ->
+              Free_variable.Set.union acc
+              @@ Benchmark.get_free_variable_set bench)
+            Free_variable.Set.empty
+            benches
+      | Models models ->
+          List.fold_left
+            (fun acc (Model.Model model) ->
+              Free_variable.Set.union acc @@ Model.get_free_variable_set model)
+            Free_variable.Set.empty
+            models
+      | Parameters parameters -> Free_variable.Set.of_list parameters
     in
     let providers, providers_map =
       analyze_dependency
@@ -1060,5 +1056,5 @@ let () =
           codegen_for_solutions_cmd solutions codegen_options ~exclusions
       | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd None solutions
-      | Auto_build {bench_names; auto_build_options} ->
-          Auto_build.cmd bench_names auto_build_options)
+      | Auto_build {targets; auto_build_options} ->
+          Auto_build.cmd targets auto_build_options)
