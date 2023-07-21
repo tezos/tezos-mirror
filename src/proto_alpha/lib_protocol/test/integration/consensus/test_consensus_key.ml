@@ -208,7 +208,7 @@ let test_tz4_consensus_key () =
   Incremental.validate_operation ~expect_failure inc operation
   >>=? fun (_i : Incremental.t) -> return_unit
 
-let test_endorsement_with_consensus_key () =
+let test_attestation_with_consensus_key () =
   Context.init_with_constants1 constants >>=? fun (genesis, contracts) ->
   let account1_pkh = Context.Contract.pkh contracts in
   let consensus_account = Account.new_account () in
@@ -220,14 +220,14 @@ let test_endorsement_with_consensus_key () =
   update_consensus_key blk' delegate consensus_pk >>=? fun b_pre ->
   Block.bake b_pre >>=? fun b ->
   let slot = Slot.of_int_do_not_use_except_for_parameters 0 in
-  Op.attestation ~delegate:account1_pkh ~slot b >>=? fun endorsement ->
-  Block.bake ~operation:endorsement b >>= fun res ->
+  Op.attestation ~delegate:account1_pkh ~slot b >>=? fun attestation ->
+  Block.bake ~operation:attestation b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
       | Operation.Invalid_signature -> true
       | _ -> false)
   >>=? fun () ->
-  Op.attestation ~delegate:consensus_pkh ~slot b >>=? fun endorsement ->
-  Block.bake ~operation:endorsement b >>=? fun (_good_block : Block.t) ->
+  Op.attestation ~delegate:consensus_pkh ~slot b >>=? fun attestation ->
+  Block.bake ~operation:attestation b >>=? fun (_good_block : Block.t) ->
   return_unit
 
 let tests =
@@ -298,7 +298,7 @@ let tests =
         `Quick
         (test_drain_empty_delegate ~exclude_ck:false);
       tztest "tz4 consensus key" `Quick test_tz4_consensus_key;
-      tztest "endorsement with ck" `Quick test_endorsement_with_consensus_key;
+      tztest "attestation with ck" `Quick test_attestation_with_consensus_key;
     ]
 
 let () =
