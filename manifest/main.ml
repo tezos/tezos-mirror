@@ -4824,7 +4824,8 @@ end = struct
             "test_deactivation";
             "test_delegation";
             "test_double_baking";
-            "test_double_endorsement";
+            (if N.(number >= 018) then "test_double_attestation"
+            else "test_double_endorsement");
             (if N.(number >= 018) then "test_double_preattestation"
             else "test_double_preendorsement");
             (if N.(number >= 018) then "test_attestation"
