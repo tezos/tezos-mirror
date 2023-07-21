@@ -318,7 +318,7 @@ let may_patch_protocol ~user_activated_upgrades
       in
       return {validation_result with context}
 
-module Make (Filter : Shell_plugin.FILTER) = struct
+module Make (Filter : Protocol_plugin.FILTER) = struct
   module Proto = Filter.Proto
 
   type 'operation_data preapplied_operation = {
@@ -1383,7 +1383,7 @@ let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+    Protocol_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let module Block_validation = Make (Filter) in
   Block_validation.recompute_metadata
@@ -1425,7 +1425,7 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+    Protocol_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let module Block_validation = Make (Filter) in
   Block_validation.precheck
@@ -1454,7 +1454,7 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+    Protocol_plugin.find_filter ~block_hash pred_protocol_hash
   in
   let* () =
     if should_precheck && Filter.Proto.(compare environment_version V7 >= 0)
@@ -1538,7 +1538,7 @@ let preapply ~chain_id ~user_activated_upgrades
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
   let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash:predecessor_hash protocol
+    Protocol_plugin.find_filter ~block_hash:predecessor_hash protocol
   in
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)

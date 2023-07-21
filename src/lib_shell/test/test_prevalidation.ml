@@ -120,10 +120,11 @@ module Mock_protocol :
 end
 
 module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
-  Shell_plugin.FILTER
+  Protocol_plugin.FILTER
     with type Proto.operation_data = Proto.operation_data
      and type Proto.operation = Proto.operation
-     and type Proto.Mempool.t = Proto.Mempool.t = Shell_plugin.No_filter (struct
+     and type Proto.Mempool.t = Proto.Mempool.t =
+Protocol_plugin.No_filter (struct
   let hash = Protocol_hash.zero
 
   include Proto

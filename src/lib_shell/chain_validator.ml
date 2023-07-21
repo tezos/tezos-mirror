@@ -358,7 +358,9 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
       Store.Block.protocol_hash parameters.chain_store block
     in
     let* filter =
-      Shell_plugin.find_filter ~block_hash:(Store.Block.hash block) new_protocol
+      Protocol_plugin.find_filter
+        ~block_hash:(Store.Block.hash block)
+        new_protocol
     in
     Prevalidator.create parameters.prevalidator_limits filter chain_db
   in
@@ -629,7 +631,7 @@ let collect_proto ~metrics (chain_store, block) =
              does not exist *)
           let* (module Metrics_plugin) =
             let* protocol = Store.Block.protocol_hash_exn chain_store block in
-            Shell_plugin.safe_find_metrics protocol
+            Protocol_plugin.safe_find_metrics protocol
           in
           let fitness = Store.Block.fitness block in
           let* () =

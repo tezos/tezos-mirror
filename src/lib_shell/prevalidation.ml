@@ -103,7 +103,7 @@ end
 
 module MakeAbstract
     (Chain_store : CHAIN_STORE)
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Protocol_plugin.FILTER)
     (Bounding : Prevalidator_bounding.T
                   with type protocol_operation = Filter.Proto.operation) :
   T
@@ -400,7 +400,7 @@ module Production_chain_store :
   let chain_id = Store.Chain.chain_id
 end
 
-module Make (Filter : Shell_plugin.FILTER) :
+module Make (Filter : Protocol_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
      and type chain_store = Store.chain_store =

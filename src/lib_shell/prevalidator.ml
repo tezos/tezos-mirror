@@ -297,7 +297,7 @@ end
     this functor doesn't assume a specific chain store implementation,
     which is the crux for having it easily unit-testable. *)
 module Make_s
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Protocol_plugin.FILTER)
     (Prevalidation_t : Prevalidation.T
                          with type protocol_operation = Filter.Proto.operation) :
   S
@@ -893,7 +893,7 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
     Note that, because this functor [include]s {!Make_s}, it is a
     strict extension of [Make_s]. *)
 module Make
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Protocol_plugin.FILTER)
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type protocol_operation = Filter.Proto.operation
@@ -1443,7 +1443,7 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) =
+let make limits chain_db chain_id (module Filter : Protocol_plugin.FILTER) =
   let module Prevalidation_t = Prevalidation.Make (Filter) in
   let module Prevalidator =
     Make
@@ -1474,7 +1474,7 @@ type t = (module T)
 let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
 
-let create limits (module Filter : Shell_plugin.FILTER) chain_db =
+let create limits (module Filter : Protocol_plugin.FILTER) chain_db =
   let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let chain_id = Store.Chain.chain_id chain_store in

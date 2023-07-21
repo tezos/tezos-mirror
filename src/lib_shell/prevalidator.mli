@@ -63,7 +63,7 @@ type t
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   Shell_limits.prevalidator_limits ->
-  (module Shell_plugin.FILTER) ->
+  (module Protocol_plugin.FILTER) ->
   Distributed_db.chain_db ->
   t tzresult Lwt.t
 

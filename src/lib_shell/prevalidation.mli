@@ -85,7 +85,7 @@ module type T = sig
   (** Light preliminary checks that should be performed on arrival of
       an operation and after a flush of the prevalidator.
 
-      See [Shell_plugin.FILTER.Mempool.pre_filter]. *)
+      See [Protocol_plugin.FILTER.Mempool.pre_filter]. *)
   val pre_filter :
     t ->
     config ->
@@ -153,7 +153,7 @@ module type T = sig
 end
 
 (** How-to obtain an instance of this module's main module type: {!T} *)
-module Make : functor (Filter : Shell_plugin.FILTER) ->
+module Make : functor (Filter : Protocol_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
      and type chain_store = Store.chain_store
@@ -182,7 +182,7 @@ module Internal_for_tests : sig
       for mocking purposes. *)
   module Make : functor
     (Chain_store : CHAIN_STORE)
-    (Filter : Shell_plugin.FILTER)
+    (Filter : Protocol_plugin.FILTER)
     (Bounding : Prevalidator_bounding.T
                   with type protocol_operation = Filter.Proto.operation)
     ->
