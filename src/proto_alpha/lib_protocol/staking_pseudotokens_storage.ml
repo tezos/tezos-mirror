@@ -152,9 +152,9 @@ type contract_balances = {
 
 (** {0} Functions reading from the storage *)
 
-(** [get_frozen_deposits_tez ctxt delegate] returns the sum of frozen
+(** [get_frozen_deposits_tez ctxt ~delegate] returns the sum of frozen
     deposits, in tez, of the delegate's costakers. *)
-let get_frozen_deposits_tez ctxt delegate =
+let get_frozen_deposits_tez ctxt ~delegate =
   let open Lwt_result_syntax in
   let+ {costaked_frozen; delegated = _; own_frozen = _} =
     Stake_storage.get_full_staking_balance ctxt delegate
@@ -168,7 +168,7 @@ let get_own_frozen_deposits ctxt ~delegate =
   in
   own_frozen
 
-(** [get_frozen_deposits_pseudotokens ctxt delegate] returns the total
+(** [get_frozen_deposits_pseudotokens ctxt ~delegate] returns the total
     number of pseudotokens in circulation for the given
     [delegate]. This should, by invariant 3 be the sum of the
     costaking balance (in pseudotokens) of all its delegators.
@@ -176,7 +176,7 @@ let get_own_frozen_deposits ctxt ~delegate =
     To preserve invariant 1, this should be the only function of this
     module reading from the
     {!Storage.Contract.Frozen_deposits_pseudotokens} table. *)
-let get_frozen_deposits_pseudotokens ctxt delegate =
+let get_frozen_deposits_pseudotokens ctxt ~delegate =
   let open Lwt_result_syntax in
   let+ frozen_deposits_pseudotokens_opt =
     Storage.Contract.Frozen_deposits_pseudotokens.find ctxt (Implicit delegate)
@@ -201,19 +201,19 @@ let costaking_pseudotokens_balance ctxt contract =
   in
   Option.value ~default:Staking_pseudotoken_repr.zero costaking_pseudotokens_opt
 
-(** [get_delegate_balances ctxt delegate] records the costaked frozen deposits
+(** [get_delegate_balances ctxt ~delegate] records the costaked frozen deposits
     in tez and pseudotokens of a given delegate.
 
     Postcondition:
       delegate = result.delegate /\
-      get_frozen_deposits_tez ctxt delegate = return result.frozen_deposits_tez /\
-      get_frozen_deposits_pseudotokens ctxt delegate = return result.frozen_deposits_pseudotokens
+      get_frozen_deposits_tez ctxt ~delegate = return result.frozen_deposits_tez /\
+      get_frozen_deposits_pseudotokens ctxt ~delegate = return result.frozen_deposits_pseudotokens
 *)
-let get_delegate_balances ctxt delegate =
+let get_delegate_balances ctxt ~delegate =
   let open Lwt_result_syntax in
-  let* frozen_deposits_tez = get_frozen_deposits_tez ctxt delegate in
+  let* frozen_deposits_tez = get_frozen_deposits_tez ctxt ~delegate in
   let+ frozen_deposits_pseudotokens =
-    get_frozen_deposits_pseudotokens ctxt delegate
+    get_frozen_deposits_pseudotokens ctxt ~delegate
   in
   {delegate; frozen_deposits_tez; frozen_deposits_pseudotokens}
 
@@ -225,7 +225,7 @@ let get_delegate_balances ctxt delegate =
     Precondition:
       unchecked: [contract != delegate_balance.delegate] /\
       unchecked: [contract] delegates to [delegate_balance.delegate]
-      unchecked: get_delegate_balances ctxt delegate = return delegate_balances
+      unchecked: get_delegate_balances ctxt ~delegate = return delegate_balances
     Postcondition:
       result.contract = contract /\
       result.delegate_balances = delegate_balances /\
@@ -397,7 +397,7 @@ let compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount =
 
 let stake ctxt ~delegator ~delegate tez_amount =
   let open Lwt_result_syntax in
-  let* delegate_balances = get_delegate_balances ctxt delegate in
+  let* delegate_balances = get_delegate_balances ctxt ~delegate in
   let*? pseudotokens_to_credit =
     compute_pseudotoken_credit_for_tez_amount delegate_balances tez_amount
   in
@@ -417,7 +417,7 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
   let open Lwt_result_syntax in
   if Tez_repr.(requested_amount = zero) then return (ctxt, Tez_repr.zero)
   else
-    let* delegate_balances = get_delegate_balances ctxt delegate in
+    let* delegate_balances = get_delegate_balances ctxt ~delegate in
     if Tez_repr.(delegate_balances.frozen_deposits_tez = zero) then
       return (ctxt, Tez_repr.zero)
     else
@@ -489,7 +489,7 @@ let request_unstake ctxt ~contract ~delegate requested_amount =
 
 let costaking_balance_as_tez ctxt ~delegator ~delegate =
   let open Lwt_result_syntax in
-  let* delegate_balances = get_delegate_balances ctxt delegate in
+  let* delegate_balances = get_delegate_balances ctxt ~delegate in
   let* contract_balances =
     get_contract_balances ctxt ~contract:delegator ~delegate_balances
   in

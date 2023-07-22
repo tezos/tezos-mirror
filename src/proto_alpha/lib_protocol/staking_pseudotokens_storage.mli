@@ -42,7 +42,7 @@ val costaking_balance_as_tez :
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
     costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s 
-    costaked frozen deposits pseudotokens/tez rate. 
+    costaked frozen deposits pseudotokens/tez rate.
     
     This function must be called on "stake" **before** transferring tez to
     [delegate]'s frozen deposits. 
