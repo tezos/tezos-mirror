@@ -422,20 +422,10 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
     let* delegator_balances =
       get_delegator_balances ctxt ~delegator ~delegate_balances
     in
-    if
+    assert (
       Staking_pseudotoken_repr.(
-        delegate_balances.frozen_deposits_pseudotokens = zero)
-    then (
-      (* [delegate] must be non-costaked and have their pseudotokens
-         non-initialized.
-         Either the request is from a delegator with zero costake (hence
-         nothing to unstake) or from the delegate themself and there is no
-         need to initialize their pseudotokens. *)
-      assert (
-        Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)) ;
-      return (ctxt, Tez_repr.zero))
-    else if
-      Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)
+        delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
+    if Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)
     then return (ctxt, Tez_repr.zero)
     else
       let pseudotokens_to_unstake, tez_to_unstake =
