@@ -133,16 +133,14 @@ type contract_balances = {
 (** {0} Functions reading from the storage *)
 
 (** [get_frozen_deposits_tez ctxt delegate] returns the sum of frozen
-    deposits, in tez, of the delegate and its costakers.
-
-    Note that [Frozen_deposits_storage.get] is expected to default to
-    [0] when the key is missing. *)
+    deposits, in tez, of the delegate and its costakers. *)
 let get_frozen_deposits_tez ctxt delegate =
   let open Lwt_result_syntax in
-  let+ {current_amount; initial_amount = _} =
-    Frozen_deposits_storage.get ctxt (Implicit delegate)
+  let* {own_frozen; costaked_frozen; delegated = _ } =
+    Stake_storage.get_full_staking_balance ctxt delegate
   in
-  current_amount
+  let*? total_frozen = Tez_repr.(own_frozen +? costaked_frozen) in
+  return total_frozen
 
 (** [get_frozen_deposits_pseudotokens ctxt delegate] returns the total
     number of pseudotokens in circulation for the given
