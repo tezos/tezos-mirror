@@ -29,21 +29,45 @@
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
     {!Storage.Contract.Costaking_pseudotokens} tables.
 
+    {1} Terminology
+
+    Evenso a registered delegate is always technically in a delegation
+    relation with itself, in this module, when we use the word
+    "delegator", we always mean a delegator different from the
+    delegate itself. The word "costaker" means for a delegator who
+    participates in staking. The word "staker" means any participant
+    in staking, either a delegate or a costaker. In this module, we
+    use the word "contract" to mean either a delegate or a delegator.
+
+    {1} Full staking balance of a delegate
+
+    For each delegate, the {!Stake_storage} module is responsible to
+    track three tez quantities which can be requested with the
+    {!Stake_storage.get_full_staking_balance} function: [own_frozen]
+    is the frozen deposits of the delegate, [costaked_frozen] is the
+    sum of all frozen deposits of its costakers, and [delegate] is the
+    sum of all tez delegated to the delegate (some of which may belong
+    to the delegate itself). This module is in charge of tracking the
+    frozen deposits of each staker. Since we already have access to
+    their sum ([own_frozen + costaked_frozen]) we only need to track
+    the proportion of this sum owned by each staker.
 
     {1} Pseudo-tokens
 
-    These tables are used to keep track of the distribution of frozen
-    deposits between a delegate and its costakers. The amounts stored
-    in these tables don't have a fixed value in tez, they represent
-    shares of the frozen deposits called pseudotokens. Pseudotokens
-    are minted when the delegate or a costaker increases its share
-    using the stake pseudo-operation; they are burnt when the delegate
-    or a costaker decreases its share using the request-unstake
-    pseudo-operation. Events which modify uniformly the stake of all
-    costakers (reward distribution and slashing) don't lead to minting
-    nor burning any pseudotokens; that's the main motivation for using
-    these pseudotokens: thanks to them we never need to iterate over
-    the costakers (whose number is unbounded).
+    The {!Storage.Contract.Frozen_deposits_pseudotokens} and
+    {!Storage.Contract.Costaking_pseudotokens} tables are used to keep
+    track of this proportion. The amounts stored in these tables don't
+    have a fixed value in tez, they can be seen as shares of the total
+    frozen deposits of a delegate and its costakers, we call them
+    pseudotokens. Pseudotokens are minted when a staker increases its
+    share using the stake pseudo-operation; they are burnt when a
+    staker decreases its share using the request-unstake
+    pseudo-operation. Events which modify uniformly the frozen
+    deposits of a delegate and all its costakers (reward distribution
+    and slashing) don't lead to minting nor burning any pseudotokens;
+    that's the main motivation for using these pseudotokens: thanks to
+    them we never need to iterate over the costakers of a delegate
+    (whose number is unbounded).
 
 
     {1} Conversion rate:
@@ -59,19 +83,18 @@
     use one as the conversion rate when the total number of
     pseudotokens is null, which can happen in two situations:
 
-    - the first time a baker modifies its staking balance since the
+    - the first time a delegate modifies its staking balance since the
     migration which created the pseudotoken tables, and
 
-    - when a baker empties its frozen deposits and later receives
+    - when a delegate empties its frozen deposits and later receives
     rewards.
 
 
     {2} Implementation:
 
     The {!Storage.Contract.Costaking_pseudotokens} table stores for
-    each staker (delegate or costaker) its {i staking balance
-    pseudotokens} which is the number of pseudotokens owned by the
-    staker.
+    each staker its {i staking balance pseudotokens} which is the
+    number of pseudotokens owned by the staker.
 
     The {!Storage.Contract.Frozen_deposits_pseudotokens} table stores
     for each delegate the {i frozen deposits pseudotokens} of the
@@ -104,8 +127,8 @@
     balance pseudotokens
 
       For a given delegate, their frozen deposits pseudotokens equal
-      the sum of all costaking pseudotokens of their delegators
-      (including the delegate itself).
+      their own costaking pseudotokens plus the sum of all costaking
+      pseudotokens of their delegators.
 *)
 
 (** When a delegate gets totally slashed, the value of its
