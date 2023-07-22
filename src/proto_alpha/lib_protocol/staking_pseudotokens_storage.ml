@@ -185,14 +185,14 @@ let get_frozen_deposits_pseudotokens ctxt ~delegate =
     frozen_deposits_pseudotokens_opt
     ~default:Staking_pseudotoken_repr.zero
 
-(** [costaking_pseudotokens_balance ctxt delegator] returns
+(** [costaking_pseudotokens_balance ctxt ~delegator] returns
     [delegator]'s current costaking balance in pseudotokens.
 
     To preserve invariant 2, this should be the only function of this
     module reading from the {!Storage.Contract.Costaking_pseudotokens}
     table.
 *)
-let costaking_pseudotokens_balance ctxt delegator =
+let costaking_pseudotokens_balance ctxt ~delegator =
   let open Lwt_result_syntax in
   let+ costaking_pseudotokens_opt =
     Storage.Contract.Costaking_pseudotokens.find ctxt delegator
@@ -227,11 +227,11 @@ let get_delegate_balances ctxt ~delegate =
     Postcondition:
       result.delegator = delegator /\
       result.delegate_balances = delegate_balances /\
-      costaking_pseudotokens_balance ctxt delegator = return result.pseudotoken_balance
+      costaking_pseudotokens_balance ctxt ~delegator = return result.pseudotoken_balance
 *)
 let get_delegator_balances ctxt ~delegator ~delegate_balances =
   let open Lwt_result_syntax in
-  let+ pseudotoken_balance = costaking_pseudotokens_balance ctxt delegator in
+  let+ pseudotoken_balance = costaking_pseudotokens_balance ctxt ~delegator in
   {delegator; pseudotoken_balance; delegate_balances}
 
 (** [mint_pseudotokens ctxt delegator_balances_before
