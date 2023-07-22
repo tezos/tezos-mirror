@@ -195,7 +195,7 @@ let get_delegate_balances ctxt delegate =
   {delegate; frozen_deposits_tez; frozen_deposits_pseudotokens}
 
 (** [get_contract_balances ctxt ~contract ~delegate_balances] enriches
-    the ~delegate_balance with [contract]'s pseudotoken balance.
+    the [delegate_balances] with [contract]'s pseudotoken balance.
 
     Precondition:
       unchecked: [contract] delegates to [delegate_balance.delegate]
