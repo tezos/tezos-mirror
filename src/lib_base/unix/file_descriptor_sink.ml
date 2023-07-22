@@ -48,10 +48,6 @@ type t = {
       `Pp_RFC5424
     | `Pp_short ];
   colors : bool;
-  (* Hopefully temporary hack to handle event which are emitted with
-     the non-cooperative log functions in `Legacy_logging`: *)
-  lwt_bad_citizen_hack :
-    (string * Internal_event.Level.t * Internal_event.Section.t) list ref;
   filter :
     [ `Level_at_least of Internal_event.Level.t
     | `Per_section_prefix of
@@ -514,7 +510,7 @@ end) : Internal_event.SINK with type t = t = struct
       | `Stdout -> return (Static Lwt_unix.stdout)
       | `Stderr -> return (Static Lwt_unix.stderr)
     in
-    let t = {output; lwt_bad_citizen_hack = ref []; filter; format; colors} in
+    let t = {output; filter; format; colors} in
     return t
 
   let write_mutex = Lwt_mutex.create ()
@@ -635,7 +631,7 @@ end) : Internal_event.SINK with type t = t = struct
         return (is_a_tty && Sys.getenv_opt "TERM" <> Some "dumb")
     | Syslog _ | Rotating _ -> return_false
 
-  let handle (type a) {output; lwt_bad_citizen_hack; format; colors; _} m
+  let handle (type a) {output; format; colors; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
@@ -668,36 +664,17 @@ end) : Internal_event.SINK with type t = t = struct
             let str = Ezjsonm.value_to_string ~minify:true (json ()) in
             Lwt.return @@ Printf.sprintf "%d:%s," (String.length str) str
     in
-    lwt_bad_citizen_hack :=
-      (to_write, M.level, section) :: !lwt_bad_citizen_hack ;
     let*! r = output_one now output section M.level to_write in
-    let () =
-      match !lwt_bad_citizen_hack with
-      | [] -> ()
-      | _h :: t -> lwt_bad_citizen_hack := t
-    in
     match r with
     | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
         (* The file descriptor was closed before the event arrived,
            ignore it. *)
         return_unit
     | Error _ as err -> Lwt.return err
-    | Ok () ->
-        lwt_bad_citizen_hack :=
-          List.filter
-            (fun (m, _lvl, _section) -> m = to_write)
-            !lwt_bad_citizen_hack ;
-        return_unit
+    | Ok () -> return_unit
 
-  let close {lwt_bad_citizen_hack; output; _} =
+  let close {output; _} =
     let open Lwt_result_syntax in
-    let* () =
-      List.iter_es
-        (fun (event_string, level, section) ->
-          let now = Ptime_clock.now () in
-          output_one now output section level event_string)
-        !lwt_bad_citizen_hack
-    in
     match K.kind with
     | `Path | `Syslog -> (
         match output with

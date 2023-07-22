@@ -34,10 +34,6 @@
 
 open P2p_test_utils
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "test.p2p.socket"
-end)
-
 let tzassert b pos =
   let open Lwt_result_syntax in
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
@@ -71,14 +67,14 @@ let is_connection_closed = function
   | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) -> true
   | Ok _ -> false
   | Error err ->
-      log_notice "Error: %a" pp_print_trace err ;
+      Tezt.Log.info "Error: %a" pp_print_trace err ;
       false
 
 let is_decoding_error = function
   | Error (Tezos_p2p_services.P2p_errors.Decoding_error _ :: _) -> true
   | Ok _ -> false
   | Error err ->
-      log_notice "Error: %a" pp_print_trace err ;
+      Tezt.Log.info "Error: %a" pp_print_trace err ;
       false
 
 (** Writing then reading through the same pipe a chunk of message [msg]
@@ -263,7 +259,7 @@ module Nacked = struct
     | Error (Tezos_p2p_services.P2p_errors.Rejected_by_nack _ :: _) -> true
     | Ok _ -> false
     | Error err ->
-        log_notice "Error: %a" pp_print_trace err ;
+        Tezt.Log.info "Error: %a" pp_print_trace err ;
         false
 
   let encoding = Data_encoding.bytes
@@ -374,7 +370,7 @@ module Oversized_message = struct
   let rec rand_gen () =
     try Tezos_crypto.Rand.generate (1 lsl 17)
     with _ ->
-      log_error "Not enough entropy, retrying to generate random data" ;
+      Tezt.Log.error "Not enough entropy, retrying to generate random data" ;
       rand_gen ()
 
   let simple_msg = rand_gen ()

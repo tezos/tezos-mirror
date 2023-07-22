@@ -2302,6 +2302,7 @@ let _octez_p2p_tests =
         octez_p2p_test_common |> open_;
         octez_p2p_services |> open_;
         tezt_tezos;
+        tezt_lib;
         alcotezt;
         astring;
       ]

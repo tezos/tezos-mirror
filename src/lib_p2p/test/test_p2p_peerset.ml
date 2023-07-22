@@ -36,10 +36,6 @@
     boiler-plate code. *)
 open P2p_acl.Internal_for_tests
 
-include Internal_event.Legacy_logging.Make (struct
-  let name = "test-p2p-banned_peerset"
-end)
-
 let assert_equal_bool ~msg a b = if a <> b then Alcotest.fail msg
 
 let a s = P2p_peer.Id.hash_string [s]

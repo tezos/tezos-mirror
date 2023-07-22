@@ -675,7 +675,7 @@ struct
       canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
-  module Logging = Internal_event.Legacy_logging.Make (Param)
+  module Logging = Legacy_logging
 
   module Updater = struct
     type nonrec validation_result = validation_result = {

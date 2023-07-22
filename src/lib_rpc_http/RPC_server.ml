@@ -29,9 +29,55 @@ type cors = Resto_cohttp.Cors.t = {
   allowed_origins : string list;
 }
 
-module RPC_logging = Internal_event.Legacy_logging.Make (struct
-  let name = "rpc_http_event"
-end)
+module RPC_logging = struct
+  open Internal_event
+  open Internal_event.Simple
+
+  let rpc_http_event name level =
+    declare_1
+      ~section:["rpc_server"]
+      ~name
+      ~msg:"{msg}"
+      ~level
+      ~pp1:Format.pp_print_text
+      ("msg", Data_encoding.string)
+
+  let rpc_http_event_debug = rpc_http_event "rpc_http_event_debug" Debug
+
+  let rpc_http_event_info = rpc_http_event "rpc_http_event_info" Info
+
+  let rpc_http_event_notice = rpc_http_event "rpc_http_event_notice" Notice
+
+  let rpc_http_event_warning = rpc_http_event "rpc_http_event_warning" Warning
+
+  let rpc_http_event_error = rpc_http_event "rpc_http_event_error" Error
+
+  let emit_async event fmt =
+    Format.kasprintf (fun message -> Lwt.ignore_result (emit event message)) fmt
+
+  let emit_lwt event fmt =
+    Format.kasprintf (fun message -> emit event message) fmt
+
+  let debug f = emit_async rpc_http_event_debug f
+
+  let log_info f = emit_async rpc_http_event_info f
+
+  let log_notice f = emit_async rpc_http_event_notice f
+
+  let warn f = emit_async rpc_http_event_warning f
+
+  let log_error f = emit_async rpc_http_event_error f
+
+  let lwt_debug f = emit_lwt rpc_http_event_debug f
+
+  let lwt_log_info f = emit_lwt rpc_http_event_info f
+
+  let lwt_log_notice f = emit_lwt rpc_http_event_notice f
+
+  let lwt_warn f = emit_lwt rpc_http_event_warning f
+
+  let lwt_log_error f = emit_lwt rpc_http_event_error f
+end
 
 include Resto_cohttp_server.Server.Make (Tezos_rpc.Encoding) (RPC_logging)
 
