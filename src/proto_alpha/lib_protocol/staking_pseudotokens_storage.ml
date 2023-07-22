@@ -204,7 +204,7 @@ let get_delegate_balances ctxt delegate =
     Postcondition:
       result.contract = contract /\
       result.delegate_balances = delegate_balances /\
-      costaking_pseudotoken_balance ctxt contract = return result.pseudotoken_balance
+      costaking_pseudotokens_balance ctxt contract = return result.pseudotoken_balance
 *)
 let get_contract_balances ctxt ~contract ~delegate_balances =
   let open Lwt_result_syntax in
