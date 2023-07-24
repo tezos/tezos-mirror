@@ -206,13 +206,13 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
       let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
       Store.Shards.read_all node_store.shard_store commitment ~number_of_shards
       |> Seq_s.iter_ep (function
-             | _, Error [Stored_data.Missing_stored_data s] ->
+             | _, _, Error [Stored_data.Missing_stored_data s] ->
                  let*! () =
                    Event.(
                      emit loading_shard_data_failed ("Missing stored data " ^ s))
                  in
                  return_unit
-             | _, Error err ->
+             | _, _, Error err ->
                  let*! () =
                    Event.(
                      emit
@@ -220,7 +220,7 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
                        (Format.asprintf "%a" pp_print_trace err))
                  in
                  return_unit
-             | (commitment, shard_index), Ok share -> (
+             | commitment, shard_index, Ok share -> (
                  match
                    ( attestor_of_shard shard_index,
                      get_opt shard_proofs shard_index )
