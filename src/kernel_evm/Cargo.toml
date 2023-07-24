@@ -8,5 +8,6 @@ members = [
   "ethereum",
   "kernel",
   "evm_execution",
-  "kernel_benchmark"
+  "kernel_benchmark",
+  "logging"
 ]
