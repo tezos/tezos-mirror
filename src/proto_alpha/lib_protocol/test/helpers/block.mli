@@ -141,6 +141,7 @@ val genesis :
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
+  ?dal:Constants.Parametric.dal ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
@@ -348,6 +349,7 @@ val prepare_initial_context_params :
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
+  ?dal:Constants.Parametric.dal ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

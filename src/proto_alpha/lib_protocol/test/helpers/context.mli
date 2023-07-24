@@ -307,6 +307,7 @@ type 'accounts init :=
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
+  ?dal:Constants.Parametric.dal ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

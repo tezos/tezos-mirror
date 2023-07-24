@@ -707,7 +707,7 @@ end)
         let open TzPervasives in
         let result =
           Lwt_main.run
-            ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+            ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
               let big_map = Script_big_map.empty key_ty elt_ty in
               (* Cannot have big maps under big maps *)
               option_t (-1) elt_ty |> Environment.wrap_tzresult

@@ -80,6 +80,7 @@
 
         "Dal_errors_repr",
         "Dal_operations_repr",
+        "Dal_costs_generated",
 
         "Zk_rollup_scalar",
         "Zk_rollup_repr",

@@ -387,7 +387,7 @@ let make_benchmark :
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
       check () ;
-      match Lwt_main.run (Execution_context.make ~rng_state) with
+      match Lwt_main.run (Execution_context.make ~rng_state ()) with
       | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
           let kinstr_and_stack_sampler =
@@ -709,7 +709,7 @@ let make_continuation_benchmark :
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
       check () ;
-      match Lwt_main.run (Execution_context.make ~rng_state) with
+      match Lwt_main.run (Execution_context.make ~rng_state ()) with
       | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
           let cont_and_stack_sampler =
@@ -906,7 +906,7 @@ module Registration_section = struct
       | Ex_stack (stack_ty, stack) ->
           raise_if_error
             (Lwt_main.run
-               ( Execution_context.make ~rng_state
+               ( Execution_context.make ~rng_state ()
                >>=? fun (ctxt, _step_constants) ->
                  Script_ir_translator.parse_instr
                    Script_tc_context.data
@@ -1648,7 +1648,7 @@ module Registration_section = struct
       let big_map =
         raise_if_error
           (Lwt_main.run
-             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+             ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
                let big_map = Script_big_map.empty int unit_t in
                Script_map.fold
                  (fun k v acc ->
@@ -2866,7 +2866,7 @@ module Registration_section = struct
           let b =
             raise_if_error
               (Lwt_main.run
-                 ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+                 ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
                    Script_ir_translator.pack_data ctxt unit ()
                    >|= Environment.wrap_tzresult
                    >>=? fun (bytes, _) -> return bytes ))
@@ -3049,7 +3049,7 @@ module Registration_section = struct
                bootstrap account match and that the transactions can be replayed. *)
           let result =
             Lwt_main.run
-              ( Execution_context.make ~rng_state:sapling_forge_rng_state
+              ( Execution_context.make ~rng_state:sapling_forge_rng_state ()
               >>=? fun (ctxt, step_constants) ->
                 (* Prepare a sapling state able to replay the transition. *)
                 Sapling_generation.prepare_seeded_state sapling_transition ctxt

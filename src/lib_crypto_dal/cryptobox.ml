@@ -649,7 +649,7 @@ module Inner = struct
     let shard_length = erasure_encoded_polynomial_length / number_of_shards in
     let* raw =
       match !initialisation_parameters with
-      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
+      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialised.")
       | Some srs -> return srs
     in
     let* () =

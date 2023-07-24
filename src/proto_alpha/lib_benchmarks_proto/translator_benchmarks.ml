@@ -211,7 +211,7 @@ module Typechecking_data : Benchmark.S = struct
   let typechecking_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
@@ -287,7 +287,7 @@ module Unparsing_data : Benchmark.S = struct
   let unparsing_data_benchmark rng_state (node : Protocol.Script_repr.expr)
       (michelson_type : Protocol.Script_repr.expr) =
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
@@ -370,7 +370,7 @@ module Typechecking_code : Benchmark.S = struct
   let typechecking_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_stack_ty =
           Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
@@ -450,7 +450,7 @@ module Unparsing_code : Benchmark.S = struct
   let unparsing_code_benchmark rng_state (node : Protocol.Script_repr.expr)
       (stack : Script_repr.expr list) =
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ex_stack_ty =
           Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
@@ -593,7 +593,7 @@ module Ty_eq : Benchmark.S = struct
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     Lwt_main.run
-      ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
+      ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
         let ctxt = Gas_helpers.set_limit ctxt in
         match ty with
         | Ex_ty ty ->
@@ -727,7 +727,7 @@ module Parse_type_benchmark : Benchmark.S = struct
   let group = Benchmark.Group "size_translator_model"
 
   let create_benchmark ~rng_state config =
-    ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
+    ( Lwt_main.run (Execution_context.make ~rng_state ()) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
       let ty = dummy_type_generator size in
@@ -775,7 +775,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let group = Benchmark.Group "size_translator_model"
 
   let create_benchmark ~rng_state config =
-    ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
+    ( Lwt_main.run (Execution_context.make ~rng_state ()) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let size = Random.State.int rng_state config.max_size in
       let ty = dummy_type_generator size in
