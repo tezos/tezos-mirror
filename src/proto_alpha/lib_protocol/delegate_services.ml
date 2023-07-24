@@ -305,7 +305,9 @@ module S = struct
   let current_frozen_deposits =
     RPC_service.get_service
       ~description:
-        "Returns the current amount of the frozen deposits (in mutez)."
+        "Returns the current amount of the frozen deposits (in mutez). That is \
+         the frozen deposits at beginning of cycle plus rewards minus unstaked \
+         and slashing. It doesn't count unstaked frozen deposits."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "current_frozen_deposits")
@@ -313,10 +315,9 @@ module S = struct
   let frozen_deposits =
     RPC_service.get_service
       ~description:
-        "Returns the initial amount (that is, at the beginning of a cycle) of \
-         the frozen deposits (in mutez). This amount is the same as the \
-         current amount of the frozen deposits, unless the delegate has been \
-         punished."
+        "Returns the amount of the frozen deposits (in mutez) at the beginning \
+         of the current cycle. It doesn't count frozen deposits unstaked \
+         before the current cycle."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
