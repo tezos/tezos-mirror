@@ -186,9 +186,11 @@ let initialize_total_supply_for_o chain_id ctxt =
   let open Lwt_syntax in
   if Chain_id.equal Constants_repr.mainnet_id chain_id then
     (* We only estimate the total supply in mainnet *)
+    (* around 967_000_000 tz (current estimated supply)
+       + 43_000_000 tz (yearly issuance) * 70 (days from activation) / 365 *)
     Storage.Contract.Total_supply.add
       ctxt
-      (Tez_repr.of_mutez_exn 940_000_000_000_000L)
+      (Tez_repr.of_mutez_exn 975_000_000_000_000L)
   else
     (* If not on mainnet, iterate over all accounts and get an accurate total supply *)
     let* total_supply =
