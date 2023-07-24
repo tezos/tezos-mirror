@@ -65,6 +65,11 @@ module Selected_distribution_for_cycle = struct
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
+let get_full_staking_balance ctxt delegate =
+  let open Lwt_result_syntax in
+  let+ staking_balance_opt = Storage.Stake.Staking_balance.find ctxt delegate in
+  Option.value staking_balance_opt ~default:Stake_repr.Full.zero
+
 let get_initialized_stake ctxt delegate =
   Storage.Stake.Staking_balance.find ctxt delegate >>=? function
   | Some staking_balance -> return (staking_balance, ctxt)
