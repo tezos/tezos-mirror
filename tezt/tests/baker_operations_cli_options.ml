@@ -197,7 +197,7 @@ let all_empty block =
   |> List.for_all @@ fun l ->
      l |> as_list |> function [] -> true | _ -> false
 
-let only_has_endorsements block =
+let only_has_consensus block =
   let open JSON in
   List.for_all
     Fun.id
@@ -214,10 +214,10 @@ let check_block_all_empty ~__LOC__ client =
     ~error_msg:"Expected an empty operation list." ;
   unit
 
-let check_block_only_has_endorsements ?block ~__LOC__ client =
+let check_block_only_has_consensus ?block ~__LOC__ client =
   let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
   Check.is_true
-    (only_has_endorsements head)
+    (only_has_consensus head)
     ~__LOC__
     ~error_msg:"Expected an empty operation list." ;
   unit
@@ -431,7 +431,7 @@ let test_baker_external_operations =
   let level_succ = level + 1 in
   let* (_ : int) = Node.wait_for_level node level_succ in
   let* () =
-    check_block_only_has_endorsements
+    check_block_only_has_consensus
       ~__LOC__
       ~block:(string_of_int level_succ)
       client

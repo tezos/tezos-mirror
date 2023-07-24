@@ -118,7 +118,7 @@ let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   assert (length_of_first_error_message = 1 lsl exponent) ;
   unit
 
-let get_endorsement client =
+let get_attestation client =
   let* _ =
     RPC.Client.call client
     @@ RPC.get_chain_block_operations_validation_pass
@@ -341,8 +341,8 @@ let check_metadata_query_string =
   let* () = metadata_is_available ~metadata_query_string:Always client 14 in
   (* The metadata should not be returned even if stored. *)
   let* () = metadata_is_pruned client in
-  (* Check that endorsements can still be queried. *)
-  let* () = get_endorsement client in
+  (* Check that attestations can still be queried. *)
+  let* () = get_attestation client in
   unit
 
 let register ~protocols =

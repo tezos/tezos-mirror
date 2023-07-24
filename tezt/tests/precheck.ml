@@ -133,7 +133,7 @@ let forge_block ?client node ~key ~with_op =
   in
   let* () =
     (* We want an empty block, in tenderbake, we can simply propose
-       so that there is no endorsement operations. *)
+       so that there is no attestation operations. *)
     Client.propose_for ~key:[key] ~force:true client2
   in
   let* shell =
