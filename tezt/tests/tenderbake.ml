@@ -39,7 +39,7 @@ let transfer_data =
 let baker = Constant.bootstrap5.alias
 
 let default_overrides =
-  [(* ensure that blocks must be endorsed *) (["consensus_threshold"], `Int 6)]
+  [(* ensure that blocks must be attested *) (["consensus_threshold"], `Int 6)]
 
 let init ?(overrides = default_overrides) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
@@ -62,7 +62,7 @@ let init ?(overrides = default_overrides) protocol =
 
 let bootstrap_accounts = List.tl Constant.all_secret_keys
 
-let endorsers =
+let attesters =
   [
     Constant.bootstrap1.alias;
     Constant.bootstrap2.alias;
@@ -71,11 +71,11 @@ let endorsers =
     Constant.bootstrap5.alias;
   ]
 
-let endorse endpoint protocol client endorsers =
-  Client.attest_for ~endpoint ~protocol ~key:endorsers ~force:true client
+let attest endpoint protocol client attesters =
+  Client.attest_for ~endpoint ~protocol ~key:attesters ~force:true client
 
-let preendorse endpoint protocol client preendorsers =
-  Client.preattest_for ~endpoint ~protocol ~key:preendorsers ~force:true client
+let preattest endpoint protocol client preattesters =
+  Client.preattest_for ~endpoint ~protocol ~key:preattesters ~force:true client
 
 let test_bake_two =
   Protocol.register_test
@@ -112,12 +112,12 @@ let test_low_level_commands =
   Protocol.register_test
     ~__FILE__
     ~title:"Tenderbake low level commands"
-    ~tags:["propose"; "endorse"; "preendorse"; "tenderbake"; "low_level"]
+    ~tags:["propose"; "attest"; "preattest"; "tenderbake"; "low_level"]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
-  Log.info "Doing a propose -> preendorse -> endorse cycle" ;
-  let proposer = endorsers in
-  let preendorsers = endorsers in
+  Log.info "Doing a propose -> preattest -> attest cycle" ;
+  let proposer = attesters in
+  let preattesters = attesters in
   let* () =
     Client.transfer
       ~amount:(Tez.of_int 3)
@@ -126,8 +126,8 @@ let test_low_level_commands =
       client
   in
   let* () = Client.propose_for client ~protocol ~endpoint ~key:proposer in
-  let* () = preendorse endpoint protocol client preendorsers in
-  let* () = endorse endpoint protocol client endorsers in
+  let* () = preattest endpoint protocol client preattesters in
+  let* () = attest endpoint protocol client attesters in
   let* () =
     Client.transfer
       ~amount:(Tez.of_int 2)
@@ -136,8 +136,8 @@ let test_low_level_commands =
       client
   in
   let* () = Client.propose_for client ~protocol ~endpoint ~key:proposer in
-  let* () = preendorse endpoint protocol client preendorsers in
-  let* () = endorse endpoint protocol client endorsers in
+  let* () = preattest endpoint protocol client preattesters in
+  let* () = attest endpoint protocol client attesters in
   let* () = Client.propose_for client ~protocol ~endpoint ~key:proposer in
   Lwt.return_unit
 
@@ -180,7 +180,7 @@ let find_bootstrap_account_not_in unwanted =
         (String.concat ", "
         @@ List.map (fun Account.{alias; _} -> alias) unwanted)
 
-(* Run one node, and bake, preendorse, and endorse using the
+(* Run one node, and bake, preattest, and attest using the
    client commands. *)
 let test_manual_bake =
   let minimal_block_delay = 1 in
@@ -188,7 +188,7 @@ let test_manual_bake =
     ~__FILE__
     ~title:"Tenderbake manual bake"
     ~tags:
-      ["propose"; "endorse"; "preendorse"; "tenderbake"; "low_level"; "manual"]
+      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "manual"]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
     init
@@ -240,8 +240,8 @@ let test_manual_bake =
   Log.info "Wait for level 2" ;
   let* (_ : int) = Node.wait_for_level node 2 in
 
-  Log.info "Preendorse" ;
-  let endorsers =
+  Log.info "Preattest" ;
+  let attesters =
     [
       Constant.bootstrap1.alias;
       Constant.bootstrap2.alias;
@@ -249,7 +249,7 @@ let test_manual_bake =
       Constant.bootstrap4.alias;
     ]
   in
-  let* () = Client.preattest_for ~protocol ~key:endorsers ~force:true client in
+  let* () = Client.preattest_for ~protocol ~key:attesters ~force:true client in
 
   let giver = "bootstrap1" in
   Log.info "Transfer from giver %s to recipient %s" giver recipient.alias ;
@@ -274,8 +274,8 @@ let test_manual_bake =
   in
   Log.info "Transfer injected with operation hash %s" operation_hash ;
 
-  Log.info "Endorse" ;
-  let* () = Client.attest_for ~protocol ~key:endorsers ~force:true client in
+  Log.info "Attest" ;
+  let* () = Client.attest_for ~protocol ~key:attesters ~force:true client in
 
   Log.info "Test that %s is pending" operation_hash ;
   let* pending_ops =
@@ -330,7 +330,7 @@ let test_manual_bake_null_threshold =
     ~__FILE__
     ~title:"Tenderbake manual bake null threshold"
     ~tags:
-      ["propose"; "endorse"; "preendorse"; "tenderbake"; "low_level"; "manual"]
+      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "manual"]
   @@ fun protocol ->
   let* _proto_hash, _endpoint, client, node =
     init
@@ -407,19 +407,12 @@ let test_repropose =
     ~__FILE__
     ~title:"Tenderbake low level repropose"
     ~tags:
-      [
-        "propose";
-        "endorse";
-        "preendorse";
-        "tenderbake";
-        "low_level";
-        "repropose";
-      ]
+      ["propose"; "attest"; "preattest"; "tenderbake"; "low_level"; "repropose"]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, _node = init protocol in
-  Log.info "Doing a propose -> preendorse -> endorse cycle" ;
-  let proposer = endorsers in
-  let preendorsers = endorsers in
+  Log.info "Doing a propose -> preattest -> attest cycle" ;
+  let proposer = attesters in
+  let preattesters = attesters in
   let* () =
     Client.transfer
       ~amount:(Tez.of_int 3)
@@ -428,8 +421,8 @@ let test_repropose =
       client
   in
   let* () = Client.propose_for client ~protocol ~endpoint ~key:proposer in
-  let* () = preendorse endpoint protocol client preendorsers in
-  let* () = endorse endpoint protocol client endorsers in
+  let* () = preattest endpoint protocol client preattesters in
+  let* () = attest endpoint protocol client attesters in
   let* () =
     Client.transfer
       ~amount:(Tez.of_int 2)
