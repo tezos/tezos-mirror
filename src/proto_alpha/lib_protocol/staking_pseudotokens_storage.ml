@@ -31,7 +31,7 @@
 
     {1} Terminology
 
-    Evenso a registered delegate is always technically in a delegation
+    Even so a registered delegate is always technically in a delegation
     relation with itself, in this module, when we use the word
     "delegator", we always mean a delegator different from the
     delegate itself. The word "costaker" means for a delegator who
@@ -136,7 +136,7 @@
 type error += Cannot_stake_on_fully_slashed_delegate
 
 (** These two types are not exported, they are views to the portions
-    of the storage which are relevent in this module when a delegate
+    of the storage which are relevant in this module when a delegate
     or a staker are considered. *)
 type delegate_balances = {
   delegate : Signature.public_key_hash;
