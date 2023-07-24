@@ -480,6 +480,18 @@ let stdout_or_file fn f =
       Fun.protect ~finally:(fun () -> close_out oc) @@ fun () ->
       f (Format.formatter_of_out_channel oc)
 
+let code_transform codegen_options =
+  let open Costlang in
+  let fp : transform =
+    match codegen_options.Cmdline.transform with
+    | None -> (module Identity)
+    | Some options ->
+        (module Fixed_point_transform.Apply (struct
+          let options = options
+        end))
+  in
+  compose fp (compose (module Beta_normalize) (module Fold_constants))
+
 let codegen_cmd solution_fn model_name codegen_options =
   let sol = Codegen.load_solution solution_fn in
   match Registration.find_model model_name with
@@ -487,16 +499,7 @@ let codegen_cmd solution_fn model_name codegen_options =
       Format.eprintf "Model %a not found, exiting@." Namespace.pp model_name ;
       exit 1
   | Some {Registration.model; _} ->
-      let transform =
-        match codegen_options.Cmdline.transform with
-        | None -> ((module Costlang.Identity) : Costlang.transform)
-        | Some options ->
-            let module P = struct
-              let options = options
-            end in
-            let module Transform = Fixed_point_transform.Apply (P) in
-            ((module Transform) : Costlang.transform)
-      in
+      let transform = code_transform codegen_options in
       let code =
         match Codegen.codegen model sol transform model_name with
         | exception e ->
@@ -516,16 +519,7 @@ let generate_code_for_models sol models codegen_options ~exclusions =
   let models =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
-  let transform =
-    match codegen_options.Cmdline.transform with
-    | None -> ((module Costlang.Identity) : Costlang.transform)
-    | Some options ->
-        let module P = struct
-          let options = options
-        end in
-        let module Transform = Fixed_point_transform.Apply (P) in
-        ((module Transform) : Costlang.transform)
-  in
+  let transform = code_transform codegen_options in
   Codegen.codegen_models models sol transform ~exclusions
 
 let save_code_list_as_a_module save_to code_list =

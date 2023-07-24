@@ -140,34 +140,58 @@ let detach_funcs =
   in
   aux []
 
-let rec restore_funcs (acc, expr) =
+let rec restore_funcs ~used_vars (acc, expr) =
   let open Ast_helper in
   match acc with
   | arg :: acc ->
+      let arg =
+        if List.mem ~equal:String.equal arg used_vars then arg else "_" ^ arg
+      in
       let expr = Exp.fun_ Nolabel None (Codegen_helpers.pvar arg) expr in
-      restore_funcs (acc, expr)
+      restore_funcs ~used_vars (acc, expr)
   | [] -> expr
 
+(* let name size1 size2 ... =
+     let open S.Syntax in
+     let size1 = S.safe_int size1 in
+     let size2 = S.safe_int size2 in
+     ...
+     expr
+*)
 let generate_let_binding =
   let open Ast_helper in
   let open Codegen_helpers in
   let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr in
   fun name expr ->
     let args, expr = detach_funcs expr in
+    let used_vars =
+      let vs = ref [] in
+      let super = Ast_iterator.default_iterator in
+      let f_expr (i : Ast_iterator.iterator) e =
+        match e.Parsetree.pexp_desc with
+        | Pexp_ident {txt = Longident.Lident v; _} -> vs := v :: !vs
+        | _ -> super.expr i e
+      in
+      let i = {super with expr = f_expr} in
+      i.expr i expr ;
+      !vs
+    in
     let expr =
       List.fold_left
         (fun e arg ->
-          let var = ident arg in
-          let patt = pvar arg in
-          Exp.let_
-            Nonrecursive
-            [Vb.mk patt (call (saturated "safe_int") [var])]
-            e)
+          if List.mem ~equal:String.equal arg used_vars then
+            let var = ident arg in
+            let patt = pvar arg in
+            Exp.let_
+              Nonrecursive
+              [Vb.mk patt (call (saturated "safe_int") [var])]
+              e
+          else e)
         expr
         args
     in
     let expr = let_open_in "S.Syntax" expr in
-    let expr = restore_funcs (args, expr) in
+    let expr = restore_funcs ~used_vars (args, expr) in
     Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
 
 (* ------------------------------------------------------------------------- *)
