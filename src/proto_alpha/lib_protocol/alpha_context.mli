@@ -3282,7 +3282,7 @@ module Sc_rollup : sig
 
       val state_of_output_proof : output_proof -> State_hash.t
 
-      val verify_output_proof : output_proof -> bool Lwt.t
+      val verify_output_proof : output_proof -> output tzresult Lwt.t
 
       val produce_output_proof :
         context -> state -> output -> (output_proof, error) result Lwt.t

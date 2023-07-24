@@ -30,6 +30,8 @@ type error += WASM_proof_production_failed
 
 type error += WASM_output_proof_production_failed
 
+type error += WASM_output_proof_verification_failed
+
 type error += WASM_invalid_claim_about_outbox
 
 type error += WASM_invalid_dissection_distribution
@@ -56,6 +58,16 @@ let () =
     unit
     (function WASM_output_proof_production_failed -> Some () | _ -> None)
     (fun () -> WASM_output_proof_production_failed) ;
+  let msg = "Output proof verification failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_wasm_output_proof_verification_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_output_proof_verification_failed -> Some () | _ -> None)
+    (fun () -> WASM_output_proof_verification_failed) ;
   let msg = "Proof production failed" in
   register_error_kind
     `Permanent
@@ -480,48 +492,65 @@ module V2_0_0 = struct
 
     let state_of_output_proof s = proof_start_state s.output_proof
 
-    let has_output : PS.output -> bool Monad.t = function
-      | {outbox_level; message_index; message} -> (
-          let open Monad.Syntax in
-          let* s = get in
-          let* result =
-            lift
-              (WASM_machine.get_output
-                 {
-                   outbox_level =
-                     Raw_level_repr.to_int32_non_negative outbox_level;
-                   message_index;
-                 }
-                 s)
-          in
-          let message_encoded =
-            Data_encoding.Binary.to_string_exn
-              Sc_rollup_outbox_message_repr.encoding
-              message
-          in
-          return
-          @@
-          match result with
-          | Some result -> Compare.String.(result = message_encoded)
-          | None -> false)
+    let get_output : PS.output -> Sc_rollup_outbox_message_repr.t option Monad.t
+        =
+     fun {outbox_level; message_index; message} ->
+      let open Monad.Syntax in
+      let* s = get in
+      let* result =
+        lift
+          (WASM_machine.get_output
+             {
+               outbox_level = Raw_level_repr.to_int32_non_negative outbox_level;
+               message_index;
+             }
+             s)
+      in
+      let message_encoded =
+        Data_encoding.Binary.to_string_exn
+          Sc_rollup_outbox_message_repr.encoding
+          message
+      in
+      return
+      @@ Option.bind result (fun result ->
+             if Compare.String.(result = message_encoded) then Some message
+             else None)
 
     let verify_output_proof p =
-      let open Lwt_syntax in
-      let transition = run @@ has_output p.output_proof_output in
-      let* result = Context.verify_proof p.output_proof transition in
-      match result with None -> return false | Some _ -> return true
+      let open Lwt_result_syntax in
+      let transition = run @@ get_output p.output_proof_output in
+      let*! result = Context.verify_proof p.output_proof transition in
+      match result with
+      | Some (_state, Some message) ->
+          return
+            Sc_rollup_PVM_sig.
+              {
+                outbox_level = p.output_proof_output.outbox_level;
+                message_index = p.output_proof_output.message_index;
+                message;
+              }
+      | _ -> tzfail WASM_output_proof_verification_failed
 
     let produce_output_proof context state output_proof_output =
       let open Lwt_result_syntax in
       let*! result =
         Context.produce_proof context state
         @@ run
-        @@ has_output output_proof_output
+        @@ get_output output_proof_output
       in
       match result with
-      | Some (output_proof, true) -> return {output_proof; output_proof_output}
-      | Some (_, false) -> fail WASM_invalid_claim_about_outbox
-      | None -> fail WASM_output_proof_production_failed
+      | Some (output_proof, Some message) ->
+          return
+            {
+              output_proof;
+              output_proof_output =
+                {
+                  outbox_level = output_proof_output.outbox_level;
+                  message_index = output_proof_output.message_index;
+                  message;
+                };
+            }
+      | _ -> fail WASM_output_proof_production_failed
 
     let check_sections_number ~default_number_of_sections ~number_of_sections
         ~dist =
