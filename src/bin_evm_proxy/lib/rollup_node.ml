@@ -56,10 +56,10 @@ let make_evm_inbox_transactions tx_raw =
     max_input_size - smart_rollup_address_size - transaction_tag_size
     - Ethereum_types.transaction_hash_size
   in
-  let tx_hash = Tx_hash.hash_to_string tx_raw in
+  let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
   if String.length tx_raw <= maximum_size then
     (* Simple transaction, fits in a single input. *)
-    let tx_hash = Tx_hash.hash_to_string tx_raw in
+    let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
     let tx = Simple (tx_hash ^ tx_raw) in
     return (tx_hash, [tx])
   else
