@@ -50,6 +50,7 @@ type tag =
   | Apply
   | Example
   | Micheline
+  | Dal
 
 type michelson_term_kind = Data | Code
 
@@ -362,6 +363,7 @@ let string_of_tag (tag : tag) =
   | Apply -> "apply"
   | Example -> "example"
   | Micheline -> "micheline"
+  | Dal -> "dal"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in

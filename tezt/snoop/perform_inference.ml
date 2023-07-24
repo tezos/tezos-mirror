@@ -52,6 +52,7 @@ let local_model_names =
     "strip_annotations_model";
     "micheline/strip_locations_micheline/model";
     "apply_diff";
+    "publish_slot_header";
   ]
 
 let cleanup local_model_name =

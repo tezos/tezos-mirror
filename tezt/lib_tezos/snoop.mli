@@ -143,6 +143,7 @@ type tag =
   | Apply
   | Example
   | Micheline
+  | Dal
 
 type list_mode = All | Any | Exactly
 
