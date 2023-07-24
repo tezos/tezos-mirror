@@ -197,22 +197,22 @@ module Revamped = struct
     in
     Check.((mempool = mempool_after_empty_block) Mempool.typ ~error_msg) ;
 
-    log_step 6 "Inject endorsement operations." ;
+    log_step 6 "Inject attestation operations." ;
     let* () = Client.attest_for client ~protocol ~force:true in
-    let* mempool_with_endorsement = Mempool.get_mempool client in
+    let* mempool_with_attestation = Mempool.get_mempool client in
 
-    log_step 7 "Check endorsement is validated." ;
+    log_step 7 "Check attestation is validated." ;
     let mempool_diff =
-      Mempool.symmetric_diff mempool_after_empty_block mempool_with_endorsement
+      Mempool.symmetric_diff mempool_after_empty_block mempool_with_attestation
     in
-    (* [mempool_diff] should contain only the validated endorsement. *)
+    (* [mempool_diff] should contain only the validated attestation. *)
     let mempool_expected =
       let open Mempool in
       try {empty with validated = [List.hd mempool_diff.validated]}
       with Not_found ->
         {empty with validated = ["<validated field was empty>"]}
     in
-    let error_msg = "endorsement is not validated: expected %L, got %R" in
+    let error_msg = "attestation is not validated: expected %L, got %R" in
     Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
 
     log_step 8 "Bake with an empty mempool twice." ;
@@ -225,11 +225,11 @@ module Revamped = struct
     in
     let* last_mempool = Mempool.get_mempool client in
 
-    log_step 9 "Check endorsement is classified 'Outdated'." ;
+    log_step 9 "Check attestation is classified 'Outdated'." ;
     let error_msg = "one validated operation was lost: expected %L, got %R" in
-    Check.((mempool_with_endorsement = last_mempool) Mempool.typ ~error_msg) ;
+    Check.((mempool_with_attestation = last_mempool) Mempool.typ ~error_msg) ;
     let error_msg =
-      "endorsement is not classified as 'outdated': length expected %L, got %R"
+      "attestation is not classified as 'outdated': length expected %L, got %R"
     in
     Check.(
       (List.compare_length_with last_mempool.outdated 1 = 0) int ~error_msg) ;
@@ -374,12 +374,12 @@ module Revamped = struct
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
 
     (* TODO: this test should be adapt once the [bake for] command will have
-       an option to not automatically add an endorsement to a block that is
+       an option to not automatically add an attestation to a block that is
        being bake. Only one operation will be reclassified after that. *)
     log_step
       13
       "Check that %s is set to be reclassified on new branch as well as the \
-       endorsement from the head increment on node1."
+       attestation from the head increment on node1."
       oph2 ;
     let* pending = bake_waiter1 in
     let error_msg =
@@ -390,7 +390,7 @@ module Revamped = struct
     log_step
       14
       "Check that the mempool of node1 still contains %s as branch_refused \
-       operation and that the endorsement from the head increment block is now \
+       operation and that the attestation from the head increment block is now \
        outdated."
       oph2 ;
     let* mempool = Mempool.get_mempool client1 in
@@ -1215,10 +1215,10 @@ module Revamped = struct
     let* client = Client.init ~endpoint:(Node node) () in
     let* () = Client.activate_protocol_and_wait ~protocol client in
 
-    log_step 2 "Bake an empty block to be able to endorse it." ;
+    log_step 2 "Bake an empty block to be able to attest it." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
 
-    log_step 3 "Endorse with bootstrap1." ;
+    log_step 3 "Attest with bootstrap1." ;
     let* _ =
       Client.attest_for
         ~protocol
@@ -1227,7 +1227,7 @@ module Revamped = struct
         client
     in
 
-    log_step 3 "Endorse with bootstrap2." ;
+    log_step 3 "Attest with bootstrap2." ;
     let* _ =
       Client.attest_for
         ~protocol
@@ -1236,7 +1236,7 @@ module Revamped = struct
         client
     in
 
-    log_step 4 "Check that both endorsements are in the validated mempool." ;
+    log_step 4 "Check that both attestations are in the validated mempool." ;
     let* mempool = Mempool.get_mempool client in
     Check.(
       (2 = List.length mempool.validated)
@@ -1244,11 +1244,11 @@ module Revamped = struct
         ~error_msg:
           "number of mempool validated operations expected to be %L, got %R") ;
 
-    log_step 5 "Bake two empty block to force endorsements to be outdated." ;
+    log_step 5 "Bake two empty block to force attestations to be outdated." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
 
-    log_step 4 "Check that only one endorsement is in the outdated mempool." ;
+    log_step 4 "Check that only one attestation is in the outdated mempool." ;
     let* mempool = Mempool.get_mempool client in
     Check.(
       (max_refused_operations = List.length mempool.outdated)
@@ -2061,13 +2061,13 @@ module Revamped = struct
     in
     unit
 
-  (** This test checks that future endorsements are correctly propagated, either
+  (** This test checks that future attestations are correctly propagated, either
       immediately or when the head is sufficiently incremented. *)
-  let propagation_future_endorsement =
+  let propagation_future_attestation =
     Protocol.register_test
       ~__FILE__
-      ~title:"Ensure that future endorsements are propagated"
-      ~tags:["endorsement"; "mempool"; "branch_delayed"]
+      ~title:"Ensure that future attestations are propagated"
+      ~tags:["attestation"; "mempool"; "branch_delayed"]
       ~supports:Protocol.(From_protocol (number Nairobi))
     @@ fun protocol ->
     log_step 1 "Initialize 3 nodes, connect them, and activate the protocol." ;
@@ -2134,9 +2134,9 @@ module Revamped = struct
 
     log_step
       3
-      "Bake a block on node_1 then inject an endorsement, which is one level \
+      "Bake a block on node_1 then inject an attestation, which is one level \
        in the future from the perspective of nodes 2 and 3. Retrieve the hash \
-       and bytes representing this endorsement, called future1 from now on." ;
+       and bytes representing this attestation, called future1 from now on." ;
     let* () = Client.bake_for_and_wait ~node:node_1 client_1 in
     let injection_waiter = Node.wait_for_request ~request:`Inject node_1 in
     let* () = Client.attest_for client_1 ~force:true ~protocol in
@@ -2147,9 +2147,9 @@ module Revamped = struct
 
     log_step
       4
-      "Bake another block on node_1 then inject another endorsement, which is \
+      "Bake another block on node_1 then inject another attestation, which is \
        two levels in the future from the perspective of nodes 2 and 3. \
-       Retrieve the hash and bytes representing this endorsement, called \
+       Retrieve the hash and bytes representing this attestation, called \
        future2." ;
     let* () = Node_event_level.bake_wait_log node_1 client_1 in
 
@@ -2160,7 +2160,7 @@ module Revamped = struct
       retrieve_attestation client_1
     in
 
-    log_step 5 "Inject both endorsements in node_2." ;
+    log_step 5 "Inject both attestations in node_2." ;
     let* _ =
       Operation.Consensus.inject
         ~force:true
@@ -2186,7 +2186,7 @@ module Revamped = struct
 
     log_step
       7
-      "Check that both endorsements are in the mempool of node_2: future1 is \
+      "Check that both attestations are in the mempool of node_2: future1 is \
        validated; future2 is branch_delayed." ;
     let* () =
       check_mempool
@@ -3790,7 +3790,7 @@ let register ~protocols =
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   Revamped.mempool_disabled protocols ;
-  Revamped.propagation_future_endorsement protocols ;
+  Revamped.propagation_future_attestation protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_applied protocols ;
