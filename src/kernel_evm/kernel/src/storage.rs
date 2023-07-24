@@ -5,11 +5,10 @@
 
 use crate::indexable_storage::IndexableStorage;
 use evm_execution::account_storage::EthereumAccount;
-use hex::ToHex;
 use libsecp256k1::PublicKey;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
-use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
@@ -305,17 +304,17 @@ pub fn store_current_block<Host: Runtime>(
 ) -> Result<(), Error> {
     match store_current_block_nodebug(host, block) {
         Ok(()) => {
-            debug_msg!(
+            log!(
                 host,
-                "Storing block {} at number {} containing {} transaction(s).\n",
-                block.hash.as_bytes().encode_hex::<String>(),
+                Debug,
+                "Storing block {} containing {} transaction(s).",
                 block.number,
                 block.transactions.len()
             );
             Ok(())
         }
         Err(e) => {
-            debug_msg!(host, "Block storing failed: {:?}\n", e);
+            log!(host, Error, "Block storing failed: {:?}", e);
             Err(e)
         }
     }

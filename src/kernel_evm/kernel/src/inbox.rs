@@ -7,8 +7,8 @@ use primitive_types::{H160, U256};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
+use tezos_evm_logging::log;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::block_in_progress::BlockInProgress;
@@ -192,9 +192,10 @@ pub fn read_inbox<Host: Runtime>(
             InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
                 match handle_kernel_upgrade(host, smart_rollup_address, &kernel_upgrade) {
                     Ok(()) => res.kernel_upgrade = Some(kernel_upgrade),
-                    Err(e) => debug_msg!(
+                    Err(e) => log!(
                         host,
-                        "Error while processing the kernel upgrade: {:?}\n",
+                        Error,
+                        "Error while processing the kernel upgrade: {:?}",
                         e
                     ),
                 }

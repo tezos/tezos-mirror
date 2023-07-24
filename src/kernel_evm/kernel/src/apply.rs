@@ -13,7 +13,8 @@ use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_smart_rollup_debug::{debug_msg, Runtime};
+use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::error::Error;
 use crate::inbox::{Deposit, Transaction, TransactionContent};
@@ -199,9 +200,10 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let caller = match transaction.caller() {
         Ok(caller) => caller,
         Err(err) => {
-            debug_msg!(
+            log!(
                 host,
-                "{} ignored because of {:?}\n",
+                Info,
+                "{} ignored because of {:?}",
                 hex::encode(transaction_hash),
                 err
             );

@@ -12,14 +12,15 @@ use tezos_ethereum::{
     signatures::EthereumTransactionCommon, transaction::TransactionHash,
     wei::eth_from_mutez,
 };
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_debug::{debug_msg, Runtime};
 use tezos_smart_rollup_encoding::{
     contract::Contract,
     inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer},
     michelson::{ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonPair},
 };
 use tezos_smart_rollup_host::input::Message;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 /// On an option, either the value, or if `None`, interrupt and return the
 /// default value of the return type instead.
@@ -204,9 +205,10 @@ impl InputResult {
         ticketer: &ContractKt1Hash,
     ) -> Self {
         if transfer.destination.hash().0 != smart_rollup_address {
-            debug_msg!(
+            log!(
                 host,
-                "Deposit ignored because of different smart rollup address\n"
+                Info,
+                "Deposit ignored because of different smart rollup address"
             );
             return InputResult::Unparsable;
         }
@@ -216,7 +218,7 @@ impl InputResult {
         match &ticket.creator().0 {
             Contract::Originated(kt1) if kt1 == ticketer => (),
             _ => {
-                debug_msg!(host, "Deposit ignored because of different ticketer\n");
+                log!(host, Info, "Deposit ignored because of different ticketer");
                 return InputResult::Unparsable;
             }
         };
@@ -238,9 +240,10 @@ impl InputResult {
         // EVM address
         let receiver_bytes: Vec<u8> = transfer.payload.0 .0 .0;
         if receiver_bytes.len() != std::mem::size_of::<H160>() {
-            debug_msg!(
+            log!(
                 host,
-                "Deposit ignored because of invalid receiver address\n"
+                Info,
+                "Deposit ignored because of invalid receiver address"
             );
             return InputResult::Unparsable;
         }
@@ -251,9 +254,10 @@ impl InputResult {
             gas_price,
             receiver,
         };
-        debug_msg!(
+        log!(
             host,
-            "Deposit of {} to {} with gas price {}\n",
+            Info,
+            "Deposit of {} to {} with gas price {}",
             amount,
             receiver,
             gas_price
