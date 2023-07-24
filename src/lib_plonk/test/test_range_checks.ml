@@ -1,5 +1,5 @@
 open Plonk
-open Bls
+open Kzg.Bls
 
 let one = Scalar.one
 

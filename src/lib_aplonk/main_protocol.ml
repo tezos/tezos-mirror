@@ -29,7 +29,7 @@
    part of verification checks on scalar values to the prover, who will produce
    a PlonK proof that the checks pass correctly. *)
 
-open Plonk.Bls
+open Kzg.Bls
 module SMap = Plonk.SMap
 
 module Make_impl

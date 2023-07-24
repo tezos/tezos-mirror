@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Plonk
-open Bls
+open Kzg.Bls
 open Utils
 
 module type S = sig
@@ -54,7 +54,7 @@ module type S = sig
 end
 
 module Make_impl
-    (PC : Polynomial_commitment.S with type Commitment.t = Bls.G1.t SMap.t) =
+    (PC : Polynomial_commitment.S with type Commitment.t = Kzg.Bls.G1.t SMap.t) =
 struct
   type secret = PC.secret
 
@@ -307,7 +307,7 @@ struct
 end
 
 module Make : functor
-  (PC : Polynomial_commitment.S with type Commitment.t = Bls.G1.t SMap.t)
+  (PC : Polynomial_commitment.S with type Commitment.t = Kzg.Bls.G1.t SMap.t)
   -> S =
   Make_impl
 

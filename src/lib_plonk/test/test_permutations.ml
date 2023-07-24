@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Plonk
-open Bls
+open Kzg.Bls
 
 let create_random_permutation n =
   (* This function does not sample permutations uniformly at random,

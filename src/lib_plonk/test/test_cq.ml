@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 module PC = Plonk.Polynomial_commitment
 
 let ( !! ) = Plonk_test.Cases.( !! )
@@ -86,7 +86,7 @@ let test_wrong_proof () =
         Cq.(prv.pc)
         (Plonk.SMap.map
            (fun f ->
-             Plonk.Bls.(
+             Kzg.Bls.(
                Evaluations.(
                  interpolation_fft
                    (Domain.build wire_size)

@@ -25,6 +25,7 @@
 
 open Error_monad
 include Cryptobox_intf
+open Kzg.Bls
 module Base58 = Tezos_crypto.Base58
 module Srs_g1 = Octez_bls12_381_polynomial.Srs.Srs_g1
 module Srs_g2 = Octez_bls12_381_polynomial.Srs.Srs_g2
@@ -710,7 +711,7 @@ module Inner = struct
      Runtime is [O(n log n)] where [n = Domains.length d]. *)
   let polynomials_product d ps =
     let evaluations = List.map (fft d) ps in
-    ifft_inplace d (Evaluations.mul_c ~evaluations ())
+    ifft_inplace d (Evals.mul_c ~evaluations ())
 
   (* We encode by pages of [page_size] bytes each. The pages
      are arranged in cosets to produce batched KZG proofs
@@ -805,7 +806,7 @@ module Inner = struct
       Ok
         (ifft_inplace
            t.max_polynomial_length
-           (Evaluations.of_array (t.max_polynomial_length - 1, coefficients)))
+           (Evals.of_array (t.max_polynomial_length - 1, coefficients)))
 
   (* [polynomial_to_slot] is the left-inverse function of
      [polynomial_from_slot]. *)
@@ -819,12 +820,12 @@ module Inner = struct
     for page = 0 to t.pages_per_slot - 1 do
       for elt = 0 to t.page_length - 2 do
         let idx = (elt * t.pages_per_slot) + page in
-        let coeff = Scalar.to_bytes (Evaluations.get evaluations idx) in
+        let coeff = Scalar.to_bytes (Evals.get evaluations idx) in
         Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
         offset := !offset + scalar_bytes_amount
       done ;
       let idx = ((t.page_length - 1) * t.pages_per_slot) + page in
-      let coeff = Scalar.to_bytes (Evaluations.get evaluations idx) in
+      let coeff = Scalar.to_bytes (Evals.get evaluations idx) in
       Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
       offset := !offset + t.remaining_bytes
     done ;
@@ -836,8 +837,7 @@ module Inner = struct
 
      This can be achieved with an n-points discrete Fourier transform
      supported by the [Scalar] field in time O(n log n). *)
-  let encode t p =
-    Evaluations.to_array (fft t.erasure_encoded_polynomial_length p)
+  let encode t p = Evals.to_array (fft t.erasure_encoded_polynomial_length p)
 
   (* The shards are arranged in cosets to produce batches of KZG proofs
      for the shards efficiently.
@@ -1086,7 +1086,7 @@ module Inner = struct
               let x_i =
                 Domains.get t.domain_erasure_encoded_polynomial_length i
               in
-              let tmp = Evaluations.get eval_a' i in
+              let tmp = Evals.get eval_a' i in
               Scalar.mul_inplace tmp tmp x_i ;
               (* The call below never fails, so we don't
                  catch exceptions.
@@ -1099,7 +1099,7 @@ module Inner = struct
               n_poly.(i) <- tmp
             done)
           shards ;
-        Evaluations.of_array (t.erasure_encoded_polynomial_length - 1, n_poly)
+        Evals.of_array (t.erasure_encoded_polynomial_length - 1, n_poly)
       in
       let n_poly = compute_n t eval_a' shards in
 

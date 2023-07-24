@@ -41,7 +41,7 @@ let list_tests () =
     21 * 21 = fold_left3 (fun acc a b c -> acc + (a * b * c)) 0 rng6 rng6 rng6)
 
 module Fr_generation = struct
-  module Scalar = Plonk.Bls.Scalar
+  module Scalar = Kzg.Bls.Scalar
   module Fr_generation = Plonk.Utils.Fr_generation
   module Scalar_set = Set.Make (Scalar)
 

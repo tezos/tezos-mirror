@@ -35,16 +35,16 @@ module type Aggregator = sig
   type verifier_public_parameters [@@deriving repr]
 
   (* Data to be aggregated *)
-  type data = Bls.G1.t
+  type data = Kzg.Bls.G1.t
 
   (* Commitment to the data *)
-  type commitment = {cmt_t : Bls.GT.t; cmt_len : int} [@@deriving repr]
+  type commitment = {cmt_t : Kzg.Bls.GT.t; cmt_len : int} [@@deriving repr]
 
   (* Randomness used to pack the data, usually derived from a commitment to it *)
-  type randomness = Bls.Scalar.t
+  type randomness = Kzg.Bls.Scalar.t
 
   (* Packed/aggregated data *)
-  type packed = Bls.G1.t [@@deriving repr]
+  type packed = Kzg.Bls.G1.t [@@deriving repr]
 
   (* Proof that the data was correctly aggregated *)
   type proof [@@deriving repr]
@@ -106,7 +106,7 @@ module type Aggregator = sig
 end
 
 module Pack_impl = struct
-  open Bls
+  open Kzg.Bls
 
   type scalar = Scalar.t
 

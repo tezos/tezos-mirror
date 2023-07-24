@@ -22,7 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Plonk.Bls
+open Kzg.Bls
+open Plonk.Identities
 module SMap = Plonk.SMap
 
 let powers = Plonk.Utils.Fr_generation.powers

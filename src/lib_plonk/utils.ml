@@ -134,32 +134,35 @@ let pad_answers nb_max_proofs nb_rc_wires nb_proofs
 
 module Fr_generation : sig
   (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
-  val powers : int -> Bls.Scalar.t -> Bls.Scalar.t array
+  val powers : int -> Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t array
 
   (* [batch x l] adds the elements of l scaled by ascending powers of x *)
-  val batch : Bls.Scalar.t -> Bls.Scalar.t list -> Bls.Scalar.t
+  val batch : Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t list -> Kzg.Bls.Scalar.t
 
   (* quadratic non-residues for Sid *)
-  val build_quadratic_non_residues : int -> Bls.Scalar.t array
+  val build_quadratic_non_residues : int -> Kzg.Bls.Scalar.t array
 
   (* generate several scalars based on seed transcript *)
-  val random_fr_list : Bytes.t -> int -> Bls.Scalar.t list * Bytes.t
+  val random_fr_list : Bytes.t -> int -> Kzg.Bls.Scalar.t list * Bytes.t
 
   (* generate a single scalars based on seed transcript *)
-  val random_fr : Bytes.t -> Bls.Scalar.t * Bytes.t
+  val random_fr : Bytes.t -> Kzg.Bls.Scalar.t * Bytes.t
 
   (* Evaluates L1 on x, where L1 is the minimal (monic) polynomial that
      satisfies L1(generator) = 1 and L1(generator^i) = 0
      for all i = 2, ..., domain_size. *)
   val evaluate_l1 :
-    domain_size:int -> generator:Bls.Scalar.t -> Bls.Scalar.t -> Bls.Scalar.t
+    domain_size:int ->
+    generator:Kzg.Bls.Scalar.t ->
+    Kzg.Bls.Scalar.t ->
+    Kzg.Bls.Scalar.t
 
   (* Evaluates Ln_p_1 on x, where Ln_p_1 is the minimal (monic) polynomial that
      satisfies Ln_p_1(1) = 1 and Ln_p_1(generator^i) = 0
      for all i = 1, ..., domain_size. *)
-  val evaluate_l0 : domain_size:int -> Bls.Scalar.t -> Bls.Scalar.t
+  val evaluate_l0 : domain_size:int -> Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t
 end = struct
-  open Bls
+  open Kzg.Bls
 
   let powers d x = Array.build Scalar.one Scalar.(mul x) d
 

@@ -87,7 +87,7 @@
   The {e prover_public_parameters}'s size is linear in the size of the circuit.
   *)
 
-open Bls
+open Kzg.Bls
 open Utils
 open Identities
 include Main_protocol_intf

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 open Plonk.Utils
 open Plonk.Identities
 module SMap = Plonk.SMap

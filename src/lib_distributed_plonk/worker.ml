@@ -98,7 +98,7 @@ module Make (Main : Distribution.Main_protocol.S) : S = struct
         Prover.build_gates_plook_rc1_identities
           ~shifts_map
           pp
-          {beta; gamma; delta = Bls.Scalar.zero}
+          {beta; gamma; delta = Kzg.Bls.Scalar.zero}
           inputs_map
       in
       let evaluated_ids = identities evaluations in

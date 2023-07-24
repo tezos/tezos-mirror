@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 
 module Internal = struct
   open Plonk.Plookup_gate.Plookup_gate_impl (Plonk.Polynomial_protocol)

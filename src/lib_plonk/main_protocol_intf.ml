@@ -22,7 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Bls
+open Kzg.Bls
 
 module type S = sig
   (** Raised by the prover when the provided inputs are not a satisfying

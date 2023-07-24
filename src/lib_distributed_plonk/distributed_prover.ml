@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
+open Kzg.Bls
 open Utils
 open Identities
 open Communication

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
+open Kzg.Bls
 open Utils
 
 (* Implements a batched version of the KZG10 scheme, described in Section 3 of

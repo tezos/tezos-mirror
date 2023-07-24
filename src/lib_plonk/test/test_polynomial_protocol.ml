@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 open Plonk.Identities
 
 module External (PP : Plonk.Polynomial_protocol.S) = struct

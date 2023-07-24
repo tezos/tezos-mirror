@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 open Plompiler
-open Plonk.Bls
+open Kzg.Bls
+open Plonk.Identities
 module L = LibCircuit
 module PP = Plonk.Polynomial_protocol.Make (Aggregation.Polynomial_commitment)
 module Main = Plonk.Main_protocol.Make (PP)

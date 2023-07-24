@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Plonk.Bls
+open Kzg.Bls
 open Plonk.Utils
 module SMap = Plonk.SMap
 
 module type Super_PC_sig = sig
-  include Kzg.PC_for_distribution_sig
+  include Polynomial_commitment.PC_for_distribution_sig
 
   type prover_aux = {r : Scalar.t; s_list : Scalar.t SMap.t list}
 
@@ -55,7 +55,7 @@ end
     types and functions used in by Distributed_prover  *)
 module Kzg_pack_impl = struct
   module Pack = Aggregation.Pack
-  module PC = Kzg.Kzg_impl
+  module PC = Polynomial_commitment.Kzg_impl
   module BasePC = Aggregation.Polynomial_commitment.Make_impl (PC)
 
   include (BasePC : module type of BasePC)

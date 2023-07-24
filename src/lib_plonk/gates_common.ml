@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Bls
+open Kzg.Bls
 open Identities
 module L = Plompiler.LibCircuit
 

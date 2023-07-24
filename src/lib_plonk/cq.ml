@@ -38,7 +38,7 @@
           - integrate to aPlonK
 *)
 
-open Bls
+open Kzg.Bls
 open Identities
 
 module type Cq_sig = sig

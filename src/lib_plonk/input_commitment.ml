@@ -1,4 +1,5 @@
-open Bls
+open Kzg.Bls
+open Identities
 
 module type S = sig
   module Commitment :

@@ -39,7 +39,7 @@
      - integration to aPlonK
 *)
 
-open Bls
+open Kzg.Bls
 open Utils
 open Identities
 module L = Plompiler.LibCircuit

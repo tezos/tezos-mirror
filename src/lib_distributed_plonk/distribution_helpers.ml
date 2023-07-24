@@ -30,8 +30,7 @@ let nb_proofs = 12
 
 let circuit_size = 4
 
-module Scalar = Plonk.Bls.Scalar
-(* open Helpers *)
+module Scalar = Kzg.Bls.Scalar
 
 module Port : sig
   val make : unit -> int
