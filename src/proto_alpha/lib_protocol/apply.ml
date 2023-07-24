@@ -227,7 +227,7 @@ let () =
   in
   register_error_kind
     `Permanent
-    ~id:"operations.stake_modification_wiht_no_delegate_set"
+    ~id:"operations.stake_modification_with_no_delegate_set"
     ~title:"(Un)staking without any delegate set"
     ~description:stake_modification_without_delegate_description
     ~pp:(fun ppf () ->
