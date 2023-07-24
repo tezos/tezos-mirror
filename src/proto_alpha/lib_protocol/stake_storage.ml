@@ -92,7 +92,7 @@ let has_minimal_stake ctxt
   &&
   match sum with
   | Error _sum_overflows ->
-      true (* If the sum overflows, we are definitly over the minimal stake. *)
+      true (* If the sum overflows, we are definitely over the minimal stake. *)
   | Ok staking_balance -> Tez_repr.(staking_balance >= minimal_stake)
 
 let update_stake ~f ctxt delegate =
@@ -101,7 +101,7 @@ let update_stake ~f ctxt delegate =
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
   (* Since the staking balance has changed, the delegate might have
-     moved accross the minimal stake barrier. If so we may need to
+     moved across the minimal stake barrier. If so we may need to
      update the set of active delegates with minimal stake. *)
   let had_minimal_stake_before =
     has_minimal_stake ctxt staking_balance_before
