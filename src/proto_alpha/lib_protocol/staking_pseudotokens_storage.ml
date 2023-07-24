@@ -422,12 +422,12 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
     let* delegator_balances =
       get_delegator_balances ctxt ~delegator ~delegate_balances
     in
-    assert (
-      Staking_pseudotoken_repr.(
-        delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
     if Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)
     then return (ctxt, Tez_repr.zero)
-    else
+    else (
+      assert (
+        Staking_pseudotoken_repr.(
+          delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
       let pseudotokens_to_unstake, tez_to_unstake =
         if
           Tez_repr.(
@@ -462,7 +462,7 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       let+ ctxt =
         burn_pseudotokens ctxt delegator_balances pseudotokens_to_unstake
       in
-      (ctxt, tez_to_unstake)
+      (ctxt, tez_to_unstake))
 
 let request_unstake ctxt ~contract ~delegate requested_amount =
   let open Lwt_result_syntax in
