@@ -24,14 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a protocol-specific mempool filter plugin.
+(** Type of a protocol accompanied with its main plugin (aka the
+    validation & mempool plugin).
 
     Implementations for such a plugin can be found in
     [src/proto_xxx/lib_plugin/mempool.ml]. *)
-module type FILTER = sig
-  module Proto : Registered_protocol.T
+module type T = sig
+  include Registered_protocol.T
 
-  module Mempool : sig
+  module Plugin : sig
     type config
 
     val config_encoding : config Data_encoding.t
@@ -68,7 +69,7 @@ module type FILTER = sig
         ill-formed operations to block block application.
 
         Should be called before the {!pre_filter}, does not need a context. *)
-    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : operation -> [`Well_formed | `Ill_formed]
 
     (** Perform some light preliminary checks on the operation.
 
@@ -82,7 +83,7 @@ module type FILTER = sig
     val pre_filter :
       info ->
       config ->
-      Proto.operation ->
+      operation ->
       [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
@@ -90,15 +91,15 @@ module type FILTER = sig
       | `Outdated of tztrace ]
       Lwt.t
 
-    (** Return a conflict handler for [Proto.Mempool.add_operation].
+    (** Return a conflict handler for {!Mempool.add_operation}.
 
-        See the documentation of type [Mempool.conflict_handler] in
+        See the documentation of type {!Mempool.conflict_handler} in
         e.g. [lib_protocol_environment/sigs/v8/updater.mli].
 
         Precondition: both operations must be individually valid
         (required by the protocol's operation comparison on which the
         implementation of this function relies). *)
-    val conflict_handler : config -> Proto.Mempool.conflict_handler
+    val conflict_handler : config -> Mempool.conflict_handler
 
     (** The purpose of this module is to provide the
         [fee_needed_to_replace_by_fee] function. For this function to
@@ -115,13 +116,10 @@ module type FILTER = sig
       (** Removes all the [replacements] from the state then adds
           [new_operation]. *)
       val update :
-        t ->
-        new_operation:Proto.operation ->
-        replacements:Proto.operation list ->
-        t
+        t -> new_operation:operation -> replacements:operation list -> t
 
       (** This function should be called when
-          [Proto.Mempool.add_operation] has returned [Unchanged]. This
+          {!Mempool.add_operation} has returned [Unchanged]. This
           means that the [candidate_op] has been rejected because there
           was a conflict with an pre-existing operation and the
           {!val-conflict_handler} has returned [`Keep]. This function
@@ -130,12 +128,12 @@ module type FILTER = sig
           [`Replace] instead. If no such fee exists, then the function
           returns [None]. *)
       val fee_needed_to_replace_by_fee :
-        config -> candidate_op:Proto.operation -> conflict_map:t -> int64 option
+        config -> candidate_op:operation -> conflict_map:t -> int64 option
     end
 
     (** Compute the minimal fee (expressed in mutez) that [candidate_op]
         would need to have in order to be strictly greater than
-        [op_to_overtake] according to {!Proto.compare_operations}.
+        [op_to_overtake] according to {!compare_operations}.
 
         Return [None] when at least one operation is not a manager operation.
 
@@ -144,9 +142,7 @@ module type FILTER = sig
         note that this cannot happen when both manager operations have
         been successfully validated by the protocol. *)
     val fee_needed_to_overtake :
-      op_to_overtake:Proto.operation ->
-      candidate_op:Proto.operation ->
-      int64 option
+      op_to_overtake:operation -> candidate_op:operation -> int64 option
   end
 end
 
@@ -158,9 +154,15 @@ module type RPC = sig
     Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
 end
 
-(** Dummy filter that does nothing *)
-module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto
+(** To use when no registered plugin is found. This module is
+    functional; it just misses on the smarter logic that a plugin can
+    add on top of the protocol. *)
+module No_plugin (Proto : Registered_protocol.T) :
+  T
+    with type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type Mempool.t = Proto.Mempool.t
+     and type Plugin.info = unit
 
 (** This is a protocol specific module that is used to collect all the
    * protocol-specific metrics. This module
@@ -181,9 +183,9 @@ module Undefined_metrics_plugin (P : sig
   val hash : Protocol_hash.t
 end) : METRICS
 
-(** Register a mempool filter plugin for a specific protocol
+(** Register a validation plugin for a specific protocol
     (according to its [Proto.hash]). *)
-val register_filter : (module FILTER) -> unit
+val register_validation_plugin : (module T) -> unit
 
 (** Registers a RPC plug-in for a specific protocol *)
 val register_rpc : (module RPC) -> unit
@@ -191,10 +193,20 @@ val register_rpc : (module RPC) -> unit
 (** Register a metrics plugin module *)
 val register_metrics : (module METRICS) -> unit
 
-(** Looks for a protocol filter plug-in for a specific protocol. The
-    [block_hash] argument is used for the error message. *)
-val find_filter :
-  block_hash:Block_hash.t -> Protocol_hash.t -> (module FILTER) tzresult Lwt.t
+(** Retrieves the registered protocol with the provided hash and wraps it
+    together with its validation plugin.
+
+    If no validation plugin has been registered for the protocol, then
+    uses {!No_plugin} which is functional, but not as smart as a
+    protocol-specific plugin.
+
+    Returns the error [Block_validator_errors.Unavailable_protocol]
+    when there is no registered protocol with the given hash.
+
+    The [block_hash] argument is only used as additional information
+    for the potential aforementioned error. *)
+val proto_with_validation_plugin :
+  block_hash:Block_hash.t -> Protocol_hash.t -> (module T) tzresult Lwt.t
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option

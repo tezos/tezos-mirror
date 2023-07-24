@@ -119,12 +119,11 @@ module Mock_protocol :
   end
 end
 
-module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
-  Protocol_plugin.FILTER
-    with type Proto.operation_data = Proto.operation_data
-     and type Proto.operation = Proto.operation
-     and type Proto.Mempool.t = Proto.Mempool.t =
-Protocol_plugin.No_filter (struct
+module Wrap_protocol (Proto : Tezos_protocol_environment.PROTOCOL) :
+  Protocol_plugin.T
+    with type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type Mempool.t = Proto.Mempool.t = Protocol_plugin.No_plugin (struct
   let hash = Protocol_hash.zero
 
   include Proto
@@ -159,8 +158,8 @@ let () =
   @@ fun ctxt ->
   let open Lwt_result_syntax in
   let (module Chain_store) = make_chain_store ctxt in
-  let module Filter = MakeFilter (Mock_protocol) in
-  let module P = MakePrevalidation (Chain_store) (Filter) (Mock_bounding) in
+  let module Proto = Wrap_protocol (Mock_protocol) in
+  let module P = MakePrevalidation (Chain_store) (Proto) (Mock_bounding) in
   let timestamp : Time.Protocol.t = now () in
   let head = Init.genesis_block ~timestamp ctxt in
   let* _ = P.create chain_store ~head ~timestamp in
@@ -417,7 +416,7 @@ module Toy_proto :
   end
 end
 
-module Toy_filter = MakeFilter (Toy_proto)
+module Toy_filter = Wrap_protocol (Toy_proto)
 
 type bounding_outcome =
   | B_success of int

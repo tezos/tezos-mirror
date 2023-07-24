@@ -103,26 +103,24 @@ end
 
 module MakeAbstract
     (Chain_store : CHAIN_STORE)
-    (Filter : Protocol_plugin.FILTER)
+    (Proto : Protocol_plugin.T)
     (Bounding : Prevalidator_bounding.T
-                  with type protocol_operation = Filter.Proto.operation) :
+                  with type protocol_operation = Proto.operation) :
   T
-    with type protocol_operation = Filter.Proto.operation
+    with type protocol_operation = Proto.operation
      and type chain_store = Chain_store.chain_store
-     and type Internal_for_tests.mempool = Filter.Proto.Mempool.t
+     and type Internal_for_tests.mempool = Proto.Mempool.t
      and type Internal_for_tests.bounding_state = Bounding.state = struct
-  module Proto = Filter.Proto
-
   type protocol_operation = Proto.operation
 
-  type config = Filter.Mempool.config * Prevalidator_bounding.config
+  type config = Proto.Plugin.config * Prevalidator_bounding.config
 
   let default_config =
-    (Filter.Mempool.default_config, Prevalidator_bounding.default_config)
+    (Proto.Plugin.default_config, Prevalidator_bounding.default_config)
 
   let config_encoding =
     Data_encoding.merge_objs
-      Filter.Mempool.config_encoding
+      Proto.Plugin.config_encoding
       Prevalidator_bounding.config_encoding
 
   type chain_store = Chain_store.chain_store
@@ -137,11 +135,11 @@ module MakeAbstract
     bounding_state : Bounding.state;
         (** Representation of currently valid operations used to enforce
             mempool bounds. *)
-    plugin_info : Filter.Mempool.info;
-        (** Static information needed by [Filter.Mempool.pre_filter]. *)
-    conflict_map : Filter.Mempool.Conflict_map.t;
+    plugin_info : Proto.Plugin.info;
+        (** Static information needed by [Proto.Plugin.pre_filter]. *)
+    conflict_map : Proto.Plugin.Conflict_map.t;
         (** State needed by
-            [Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee] in
+            [Proto.Plugin.Conflict_map.fee_needed_to_replace_by_fee] in
             order to provide the [needed_fee_in_mutez] field of the
             [Operation_conflict] error (see the [translate_proto_add_result]
             function below). *)
@@ -164,11 +162,11 @@ module MakeAbstract
     in
     let* plugin_info =
       match old_state with
-      | None -> Filter.Mempool.init context ~head
-      | Some old_state -> Filter.Mempool.flush old_state.plugin_info ~head
+      | None -> Proto.Plugin.init context ~head
+      | Some old_state -> Proto.Plugin.flush old_state.plugin_info ~head
     in
     let bounding_state = Bounding.empty in
-    let conflict_map = Filter.Mempool.Conflict_map.empty in
+    let conflict_map = Proto.Plugin.Conflict_map.empty in
     return {validation_info; mempool; bounding_state; plugin_info; conflict_map}
 
   let create chain_store ~head ~timestamp =
@@ -178,14 +176,14 @@ module MakeAbstract
     create_aux ~old_state chain_store head timestamp
 
   let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
-    match Filter.Mempool.syntactic_check op.protocol with
+    match Proto.Plugin.syntactic_check op.protocol with
     | `Ill_formed ->
         Lwt.return
           (`Refused
             (Error_monad.TzTrace.make
                (Error_monad.error_of_fmt "Ill-formed operation filtered")))
     | `Well_formed ->
-        Filter.Mempool.pre_filter state.plugin_info filter_config op.protocol
+        Proto.Plugin.pre_filter state.plugin_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 
@@ -242,7 +240,7 @@ module MakeAbstract
            the old operation, if such a fee exists; otherwise the error
            should contain [None]. *)
         let needed_fee_in_mutez =
-          Filter.Mempool.Conflict_map.fee_needed_to_replace_by_fee
+          Proto.Plugin.Conflict_map.fee_needed_to_replace_by_fee
             filter_config
             ~candidate_op:op.protocol
             ~conflict_map
@@ -262,7 +260,7 @@ module MakeAbstract
         (fun op_to_overtake ->
           let needed_fee_in_mutez =
             Option.bind op_to_overtake (fun op_to_overtake ->
-                Filter.Mempool.fee_needed_to_overtake
+                Proto.Plugin.fee_needed_to_overtake
                   ~op_to_overtake:op_to_overtake.protocol
                   ~candidate_op:op.protocol)
           in
@@ -297,7 +295,7 @@ module MakeAbstract
             Operation_hash.Map.find oph ops)
           replacements
     in
-    Filter.Mempool.Conflict_map.update
+    Proto.Plugin.Conflict_map.update
       conflict_map
       ~new_operation:op.protocol
       ~replacements
@@ -305,7 +303,7 @@ module MakeAbstract
   (* Implements [add_operation] but inside the [tzresult] monad. *)
   let add_operation_result state (filter_config, bounding_config) op =
     let open Lwt_result_syntax in
-    let conflict_handler = Filter.Mempool.conflict_handler filter_config in
+    let conflict_handler = Proto.Plugin.conflict_handler filter_config in
     let* mempool, proto_add_result =
       proto_add_operation ~conflict_handler state op
     in
@@ -400,12 +398,12 @@ module Production_chain_store :
   let chain_id = Store.Chain.chain_id
 end
 
-module Make (Filter : Protocol_plugin.FILTER) :
+module Make (Proto : Protocol_plugin.T) :
   T
-    with type protocol_operation = Filter.Proto.operation
+    with type protocol_operation = Proto.operation
      and type chain_store = Store.chain_store =
-  MakeAbstract (Production_chain_store) (Filter)
-    (Prevalidator_bounding.Make (Filter.Proto))
+  MakeAbstract (Production_chain_store) (Proto)
+    (Prevalidator_bounding.Make (Proto))
 
 module Internal_for_tests = struct
   module type CHAIN_STORE = CHAIN_STORE

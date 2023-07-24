@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Filter = struct
-  module Proto = Registerer.Registered
-  module Mempool = Plugin.Mempool
+module Validation = struct
+  include Registerer.Registered
+  module Plugin = Plugin.Mempool
 end
 
 module RPC = struct
@@ -39,7 +39,7 @@ module Metrics = struct
   let hash = Registerer.Registered.hash
 end
 
-let () = Protocol_plugin.register_filter (module Filter)
+let () = Protocol_plugin.register_validation_plugin (module Validation)
 
 let () = Protocol_plugin.register_rpc (module RPC)
 
