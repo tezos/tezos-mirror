@@ -317,7 +317,7 @@ let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
   let* ctxt, balance_updates =
     match sender with
     | Originated _ ->
-        (* Originated contracts have no costake (yet). *)
+        (* Originated contracts have no stake (yet). *)
         return (ctxt, [])
     | Implicit sender_pkh -> (
         let* sender_delegate_status =
