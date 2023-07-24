@@ -1,0 +1,12 @@
+include:
+  # Stage: build
+  - .gitlab/ci/jobs/build/static_x86_64_release.yml
+  - .gitlab/ci/jobs/build/static_arm64_release.yml
+  - .gitlab/ci/jobs/build/docker_amd64_test.yml
+  - .gitlab/ci/jobs/build/docker_arm64_test.yml
+
+  # Stage: prepare
+  - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_test.yml
+
+  # Stage: publish
+  - .gitlab/ci/jobs/publish/gitlab:publish.yml
