@@ -141,36 +141,43 @@ let active_key ctxt delegate =
   let* pk = active_pubkey ctxt delegate in
   return (pkh pk)
 
-let raw_pending_updates ctxt delegate =
+let raw_pending_updates ctxt ?up_to_cycle delegate =
   let open Lwt_result_syntax in
-  let*! pendings =
-    Storage.Contract.Pending_consensus_keys.bindings
-      (ctxt, Contract_repr.Implicit delegate)
+  let relevant_cycles =
+    let level = Raw_context.current_level ctxt in
+    let first_cycle = Cycle_repr.succ level.cycle in
+    let last_cycle =
+      match up_to_cycle with
+      | None ->
+          let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+          Cycle_repr.add first_cycle preserved_cycles
+      | Some cycle -> cycle
+    in
+    Cycle_repr.(first_cycle ---> last_cycle)
   in
-  return pendings
+  let delegate = Contract_repr.Implicit delegate in
+  List.filter_map_es
+    (fun cycle ->
+      let* pending_for_cycle =
+        Storage.Pending_consensus_keys.find (ctxt, cycle) delegate
+      in
+      pending_for_cycle |> Option.map (fun pk -> (cycle, pk)) |> return)
+    relevant_cycles
 
 let pending_updates ctxt delegate =
   let open Lwt_result_syntax in
   let* updates = raw_pending_updates ctxt delegate in
-  let updates =
-    List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
-  in
   return
     (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk, pk)) updates)
 
 let raw_active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
-  let* pendings = raw_pending_updates ctxt delegate in
+  let* pendings = raw_pending_updates ctxt ~up_to_cycle:cycle delegate in
   let* active = active_pubkey ctxt delegate in
-  let current_level = Raw_context.current_level ctxt in
-  let active_for_cycle =
-    List.fold_left
-      (fun (c1, active) (c2, pk) ->
-        if Cycle_repr.(c1 < c2 && c2 <= cycle) then (c2, pk) else (c1, active))
-      (current_level.cycle, active.consensus_pk)
-      pendings
-  in
-  return active_for_cycle
+  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  match List.hd (List.rev pendings) with
+  | None -> return (current_cycle, active.consensus_pk)
+  | Some (cycle, pk) -> return (cycle, pk)
 
 let active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
@@ -206,32 +213,21 @@ let register_update ctxt delegate pk =
   in
   let*! ctxt = set_unused ctxt old_pkh in
   let*! ctxt =
-    Storage.Contract.Pending_consensus_keys.add
-      (ctxt, Contract_repr.Implicit delegate)
-      update_cycle
+    Storage.Pending_consensus_keys.add
+      (ctxt, update_cycle)
+      (Contract_repr.Implicit delegate)
       pk
   in
   return ctxt
 
 let activate ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  Storage.Delegates.fold
-    ctxt
-    ~order:`Undefined
-    ~init:(ok ctxt)
-    ~f:(fun delegate ctxt ->
-      let*? ctxt in
-      let delegate = Contract_repr.Implicit delegate in
-      let* update =
-        Storage.Contract.Pending_consensus_keys.find (ctxt, delegate) new_cycle
-      in
-      match update with
-      | None -> return ctxt
-      | Some pk ->
-          let*! ctxt = Storage.Contract.Consensus_key.add ctxt delegate pk in
-          let*! ctxt =
-            Storage.Contract.Pending_consensus_keys.remove
-              (ctxt, delegate)
-              new_cycle
-          in
-          return ctxt)
+  let open Lwt_syntax in
+  let* ctxt =
+    Storage.Pending_consensus_keys.fold
+      (ctxt, new_cycle)
+      ~order:`Undefined
+      ~init:ctxt
+      ~f:(fun delegate pk ctxt ->
+        Storage.Contract.Consensus_key.add ctxt delegate pk)
+  in
+  Storage.Pending_consensus_keys.clear (ctxt, new_cycle)

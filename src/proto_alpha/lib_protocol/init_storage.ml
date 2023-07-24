@@ -209,6 +209,29 @@ let initialize_total_supply_for_o chain_id ctxt =
     in
     Storage.Contract.Total_supply.add ctxt total_supply
 
+let migrate_pending_consensus_keys_for_o ctxt =
+  let open Lwt_result_syntax in
+  Storage.Delegates.fold
+    ctxt
+    ~order:`Undefined
+    ~init:ctxt
+    ~f:(fun delegate ctxt ->
+      let delegate = Contract_repr.Implicit delegate in
+      let*! pending_cks =
+        Storage.Contract.Pending_consensus_keys_up_to_Nairobi.bindings
+          (ctxt, delegate)
+      in
+      List.fold_left_s
+        (fun ctxt (cycle, pk) ->
+          let*! ctxt =
+            Storage.Pending_consensus_keys.add (ctxt, cycle) delegate pk
+          in
+          Storage.Contract.Pending_consensus_keys_up_to_Nairobi.remove
+            (ctxt, delegate)
+            cycle)
+        ctxt
+        pending_cks)
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
@@ -295,6 +318,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
       >>= fun ctxt ->
       Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
+      migrate_pending_consensus_keys_for_o ctxt >>= fun ctxt ->
       (* Migration of refutation games needs to be kept for each protocol. *)
       Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
       >>=? fun ctxt -> return (ctxt, []))

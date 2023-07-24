@@ -294,7 +294,8 @@ module Contract = struct
       end)
       (Signature.Public_key)
 
-  module Pending_consensus_keys =
+  (* TODO: remove this in P *)
+  module Pending_consensus_keys_up_to_Nairobi =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
@@ -1268,6 +1269,15 @@ module Cycle = struct
         let encoding = Seed_repr.seed_encoding
       end)
 
+  module Pending_consensus_keys =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_consensus_keys"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Signature.Public_key)
+
   module Pending_staking_parameters =
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -1279,6 +1289,7 @@ module Cycle = struct
 end
 
 module Slashed_deposits = Cycle.Slashed_deposits
+module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
 module Stake = struct
