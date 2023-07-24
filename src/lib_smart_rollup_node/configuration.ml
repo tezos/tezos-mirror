@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -851,6 +852,18 @@ module Cli = struct
       ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
       ~log_kernel_debug =
     let open Lwt_result_syntax in
+    let open Filename.Infix in
+    (* Check if the data directory of the smart rollup node is not the one of Octez node *)
+    let* () =
+      let*! identity_file_in_data_dir_exists =
+        Lwt_unix.file_exists (data_dir // "identity.json")
+      in
+      if identity_file_in_data_dir_exists then
+        failwith
+          "Invalid data directory. This is a data directory for an Octez node, \
+           please choose a different directory for the smart rollup node data."
+      else return_unit
+    in
     let config_file = config_filename ~data_dir in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
