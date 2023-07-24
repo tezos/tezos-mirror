@@ -42,7 +42,7 @@ type error +=
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
-  | Staking_for_nondelegate_while_costaking_disabled
+  | Staking_for_delegator_while_costaking_disabled
   | Staking_to_delegate_that_refuses_costaking
   | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
@@ -205,23 +205,23 @@ let () =
     Data_encoding.unit
     (function Invalid_self_transaction_destination -> Some () | _ -> None)
     (fun () -> Invalid_self_transaction_destination) ;
-  let staking_for_nondelegate_while_costaking_disabled_description =
+  let staking_for_delegator_while_costaking_disabled_description =
     "As long as co-staking is not enabled, staking operations are only allowed \
      from delegates."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.staking_for_nondelegate_while_costaking_disabled"
-    ~title:"Staking for a non-delegate while co-staking is disabled"
-    ~description:staking_for_nondelegate_while_costaking_disabled_description
+    ~id:"operations.staking_for_delegator_while_costaking_disabled"
+    ~title:"Staking for a delegator while co-staking is disabled"
+    ~description:staking_for_delegator_while_costaking_disabled_description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        staking_for_nondelegate_while_costaking_disabled_description)
+        staking_for_delegator_while_costaking_disabled_description)
     Data_encoding.unit
     (function
-      | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
-    (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+      | Staking_for_delegator_while_costaking_disabled -> Some () | _ -> None)
+    (fun () -> Staking_for_delegator_while_costaking_disabled) ;
   let stake_modification_without_delegate_description =
     "(Un)Stake operations are only allowed when delegate is set."
   in
@@ -387,7 +387,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         || Constants.adaptive_inflation_enable ctxt
       in
       let*? () =
-        error_unless allowed Staking_for_nondelegate_while_costaking_disabled
+        error_unless allowed Staking_for_delegator_while_costaking_disabled
       in
       let* {staking_over_baking_limit_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
