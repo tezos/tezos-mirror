@@ -68,10 +68,10 @@ val flush :
 
 (** Perform some syntactic checks on the operation.
 
-        To be used mostly as an exceptional mechanism to prevent
-        ill-formed operations to block block application.
+    To be used mostly as an exceptional mechanism to prevent
+    ill-formed operations to block block application.
 
-        Should be called before the {!pre_filter}, does not need a context. *)
+    Should be called before the {!pre_filter}, does not need a context. *)
 val syntactic_check :
   Protocol.Alpha_context.packed_operation -> [`Well_formed | `Ill_formed]
 

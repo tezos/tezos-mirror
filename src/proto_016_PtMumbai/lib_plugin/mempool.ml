@@ -508,8 +508,6 @@ let pre_filter_far_future_consensus_ops filter_info config
   in
   match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
 
-let syntactic_check _ = `Well_formed
-
 (** A quasi infinite amount of "valid" (pre)endorsements could be
       sent by a committee member, one for each possible round number.
 
@@ -556,6 +554,8 @@ let pre_filter filter_info config
       Lwt.return @@ `Passed_prefilter other_prio
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
+
+let syntactic_check _ = `Well_formed
 
 let is_manager_operation op =
   match Operation.acceptable_pass op with
