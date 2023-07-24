@@ -13,11 +13,12 @@ use storage::{
     store_kernel_upgrade_nonce,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
+
+use tezos_evm_logging::{log, Level::*};
 
 use crate::inbox::KernelUpgrade;
 use crate::safe_storage::{SafeStorage, TMP_PATH};
@@ -68,10 +69,11 @@ pub fn stage_one<Host: Runtime>(
     ticketer: Option<ContractKt1Hash>,
 ) -> Result<Queue, Error> {
     match &ticketer {
-        Some(ref ticketer) => debug_msg!(host, "Ticketer is {}\n", ticketer),
-        None => debug_msg!(
+        Some(ref ticketer) => log!(host, Info, "Ticketer is {}.", ticketer),
+        None => log!(
             host,
-            "Ticketer not specified, the kernel ignores internal transfers"
+            Info,
+            "Ticketer not specified, the kernel ignores internal transfers."
         ),
     }
     // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
@@ -79,9 +81,10 @@ pub fn stage_one<Host: Runtime>(
     let queue = fetch(host, smart_rollup_address, chain_id, ticketer)?;
 
     for (i, blueprint) in queue.proposals.iter().enumerate() {
-        debug_msg!(
+        log!(
             host,
-            "Blueprint {} contains {} transactions.\n",
+            Info,
+            "Blueprint {} contains {} transactions.",
             i,
             blueprint.transactions.len()
         );
@@ -99,11 +102,12 @@ fn produce_and_upgrade<Host: Runtime>(
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
     if let Err(e) = block::produce(host, queue) {
-        debug_msg!(
-                host,
-                "Error {:?} happened during block production but a kernel upgrade was detected.\n",
-                e
-            );
+        log!(
+            host,
+            Error,
+            "{:?} happened during block production but a kernel upgrade was detected.",
+            e
+        );
     }
     let upgrade_status = upgrade_kernel(host, kernel_upgrade.preimage_hash)
         .context("Failed to upgrade kernel");
@@ -119,7 +123,7 @@ pub fn stage_two<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
 ) -> Result<(), anyhow::Error> {
-    debug_msg!(host, "Stage two\n");
+    log!(host, Info, "Entering stage two.");
     let kernel_upgrade = queue.kernel_upgrade.clone();
     if let Some(kernel_upgrade) = kernel_upgrade {
         produce_and_upgrade(host, queue, kernel_upgrade)
@@ -210,10 +214,11 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         }
         Err(e) => {
             log_error(host.0, &e).expect("The kernel failed to write the error");
-            debug_msg!(host, "The kernel produced an error: {:?}\n", e);
-            debug_msg!(
+            log!(host, Error, "The kernel produced an error: {:?}", e);
+            log!(
                 host,
-                "The temporarily modified durable storage is discarded\n"
+                Error,
+                "The temporarily modified durable storage is discarded"
             );
 
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5766

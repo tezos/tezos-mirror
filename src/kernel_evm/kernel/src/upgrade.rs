@@ -9,8 +9,8 @@ use crate::error::UpgradeProcessError;
 use crate::parsing::{SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE};
 use libsecp256k1::{Message, PublicKey, Signature};
 use sha3::{Digest, Keccak256};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
@@ -45,14 +45,14 @@ pub fn upgrade_kernel<Host: Runtime>(
     host: &mut Host,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
 ) -> Result<(), Error> {
-    debug_msg!(host, "Kernel upgrade initialisation.\n");
+    log!(host, Info, "Kernel upgrade initialisation.");
 
     let config = upgrade_reveal_flow(root_hash);
     config
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    debug_msg!(host, "Kernel is ready to be upgraded.\n");
+    log!(host, Info, "Kernel is ready to be upgraded.");
     Ok(())
 }
 

@@ -16,7 +16,8 @@ use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
-use tezos_smart_rollup_debug::{debug_msg, Runtime};
+use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_host::runtime::Runtime;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -236,10 +237,10 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
 }
 
 pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    debug_msg!(host, "Starting simulation mode ");
+    log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     let outcome = simulation.run(host)?;
-    debug_msg!(host, "outcome={:?} ", outcome);
+    log!(host, Debug, "outcome={:?} ", outcome);
     storage::store_simulation_status(host, outcome.is_success)?;
     storage::store_simulation_gas(host, outcome.gas_used)?;
     storage::store_simulation_result(host, outcome.result)

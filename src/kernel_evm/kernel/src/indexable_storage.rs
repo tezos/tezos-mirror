@@ -87,6 +87,8 @@ impl IndexableStorage {
 pub mod internal_for_tests {
     use super::*;
 
+    use tezos_evm_logging::{log, Level::Error};
+
     /// `length` returns the number of keys in the storage. If `/length` does
     /// not exists, the storage is considered as empty and returns '0'.
     pub fn length<Host: Runtime>(
@@ -105,11 +107,7 @@ pub mod internal_for_tests {
                 // bounds since the value has never been allocated before
             ) => Ok(0_u64),
             Err(e) => {
-                tezos_smart_rollup_debug::debug_msg!(
-                    host,
-                    "Error in indexable storage: {}\n",
-                    e
-                );
+                log!(host, Error, "Error in indexable storage: {}", e);
                 Err(e.into())
             }
         }
