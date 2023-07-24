@@ -104,13 +104,13 @@ let load_reward_coeff ctxt ~cycle =
   return ctxt
 
 let compute_reward_coeff_ratio =
-  let q_400 = Q.of_int 400 in
+  let q_1600 = Q.of_int 1600 in
   fun ~stake_ratio ~bonus ~reward_ratio_max ~reward_ratio_min ->
     let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
-    let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_400) in
-    let f = Q.inv inv_f (* f = 1/400 * (1/x)^2 = yearly inflation rate *) in
+    let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
+    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly inflation rate *) in
     let f = Q.add f q_bonus in
-    (* f is truncated so that 0.5% <= f <= 10% *)
+    (* f is truncated so that 0.05% <= f <= 5% *)
     let f = Q.(min f reward_ratio_max) in
     let f = Q.(max f reward_ratio_min) in
     f
