@@ -41,28 +41,26 @@ module type FILTER = sig
     (** Static internal information needed by {!pre_filter}.
 
         It depends on the [head] block upon which a mempool is built. *)
-    type filter_info
+    type info
 
-    (** Create a {!filter_info} based on the [head] block.
+    (** Create an {!info} based on the [head] block.
 
         Should be called only once when a new prevalidator is started
-        for a new protocol. Subsequent {!filter_info}s should be
+        for a new protocol. Subsequent {!info}s should be
         created using {!flush}. *)
     val init :
       Tezos_protocol_environment.Context.t ->
       head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info tzresult Lwt.t
 
-    (** Create a new {!filter_info} based on the [head] block.
+    (** Create a new {!info} based on the [head] block.
 
-        Parts of the old {!filter_info} (which may have been built on
+        Parts of the old {!info} (which may have been built on
         a different block) are recycled, so that this function is more
         efficient than {!init} and does not need a
         {!Tezos_protocol_environment.Context.t} argument. *)
     val flush :
-      filter_info ->
-      head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info -> head:Tezos_base.Block_header.shell_header -> info tzresult Lwt.t
 
     (** Perform some syntactic checks on the operation.
 
@@ -82,7 +80,7 @@ module type FILTER = sig
         Should be called on arrival of an operation and after a flush
         of the prevalidator. *)
     val pre_filter :
-      filter_info ->
+      info ->
       config ->
       Proto.operation ->
       [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]

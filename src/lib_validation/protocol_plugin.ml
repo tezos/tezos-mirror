@@ -34,22 +34,20 @@ module type FILTER = sig
 
     val default_config : config
 
-    type filter_info
+    type info
 
     val init :
       Tezos_protocol_environment.Context.t ->
       head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info tzresult Lwt.t
 
     val flush :
-      filter_info ->
-      head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info -> head:Tezos_base.Block_header.shell_header -> info tzresult Lwt.t
 
     val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
 
     val pre_filter :
-      filter_info ->
+      info ->
       config ->
       Proto.operation ->
       [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
@@ -91,7 +89,7 @@ module type RPC = sig
 end
 
 module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto and type Mempool.filter_info = unit = struct
+  FILTER with module Proto = Proto and type Mempool.info = unit = struct
   module Proto = Proto
 
   module Mempool = struct
@@ -101,7 +99,7 @@ module No_filter (Proto : Registered_protocol.T) :
 
     let default_config = ()
 
-    type filter_info = unit
+    type info = unit
 
     let init _ ~head:_ = Lwt_result_syntax.return_unit
 

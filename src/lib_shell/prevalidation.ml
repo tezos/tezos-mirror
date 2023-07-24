@@ -137,7 +137,7 @@ module MakeAbstract
     bounding_state : Bounding.state;
         (** Representation of currently valid operations used to enforce
             mempool bounds. *)
-    filter_info : Filter.Mempool.filter_info;
+    plugin_info : Filter.Mempool.info;
         (** Static information needed by [Filter.Mempool.pre_filter]. *)
     conflict_map : Filter.Mempool.Conflict_map.t;
         (** State needed by
@@ -162,14 +162,14 @@ module MakeAbstract
     let* validation_info, mempool =
       Proto.Mempool.init context chain_id ~head_hash ~head ~cache:`Lazy
     in
-    let* filter_info =
+    let* plugin_info =
       match old_state with
       | None -> Filter.Mempool.init context ~head
-      | Some old_state -> Filter.Mempool.flush old_state.filter_info ~head
+      | Some old_state -> Filter.Mempool.flush old_state.plugin_info ~head
     in
     let bounding_state = Bounding.empty in
     let conflict_map = Filter.Mempool.Conflict_map.empty in
-    return {validation_info; mempool; bounding_state; filter_info; conflict_map}
+    return {validation_info; mempool; bounding_state; plugin_info; conflict_map}
 
   let create chain_store ~head ~timestamp =
     create_aux chain_store head timestamp
@@ -185,7 +185,7 @@ module MakeAbstract
             (Error_monad.TzTrace.make
                (Error_monad.error_of_fmt "Ill-formed operation filtered")))
     | `Well_formed ->
-        Filter.Mempool.pre_filter state.filter_info filter_config op.protocol
+        Filter.Mempool.pre_filter state.plugin_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 
