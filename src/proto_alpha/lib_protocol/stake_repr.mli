@@ -29,7 +29,7 @@
    over baking limit. *)
 type staker =
   | Single of Contract_repr.t * Signature.public_key_hash
-    (* A signle staker, either the delegate itself or one of its
+    (* A single staker, either the delegate itself or one of its
        costaker. *)
   | Shared of Signature.public_key_hash
 (* The delegate and all its costakers simultaneously. *)
