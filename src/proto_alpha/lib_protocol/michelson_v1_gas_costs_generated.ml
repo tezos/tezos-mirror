@@ -134,14 +134,13 @@ let cost_N_ICheck_signature_bls size =
   let v0 = S.safe_int size in
   S.safe_int 1_570_000 + (v0 lsl 1) + v0
 
-(* model N_IComb *)
-(* Approximating 25.816900 + 3.531001 * (x - 2) term *)
-(* Note: size >= 2, so the cost is never 0 *)
+(* model interpreter/N_IComb *)
+(* fun size -> (37.081349025 + (3.44618694899 * (sat_sub size 2))) *)
 let cost_N_IComb size =
-  let open S_syntax in
+  let open S.Syntax in
   let size = S.safe_int size in
   let v0 = S.sub size (S.safe_int 2) in
-  S.safe_int 30 + (S.safe_int 3 * v0) + (v0 lsr 1) + (v0 lsr 5)
+  S.safe_int 40 + ((v0 lsl 1) + v0 + (v0 lsr 2))
 
 (* model N_IComb_get *)
 (* Approximating 19.706849 + 0.573180 x term *)
@@ -431,13 +430,17 @@ let cost_N_INow = S.safe_int 10
 (* model N_IMin_block_time *)
 let cost_N_IMin_block_time = S.safe_int 20
 
-(* model N_IOpen_chest *)
-(* 612000 + chest * 19 + time * 19050 *)
-let cost_N_IOpen_chest time chest =
-  let open S_syntax in
-  let v0 = S.safe_int chest in
-  let v1 = S.safe_int time in
-  S.safe_int 612_000 + (S.safe_int 19 * v0) + (S.safe_int 19050 * v1)
+(* model interpreter/N_IOpen_chest *)
+(* fun size1 -> fun size2 -> ((918749.248016 + (23436.2329559 * (sat_sub size1 1))) + (3.41378840964 * size2)) *)
+let cost_N_IOpen_chest size1 size2 =
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let v1 = S.sub size1 (S.safe_int 1) in
+  let v0 = size2 in
+  S.safe_int 919_000
+  + ((v1 lsl 14) + (v1 lsl 12) + (v1 lsl 11))
+  + ((v0 lsl 1) + v0 + (v0 lsr 2))
 
 (* model N_IOr *)
 let cost_N_IOr = S.safe_int 10
@@ -692,15 +695,17 @@ let cost_DECODING_SIGNATURE_secp256k1 = S.safe_int 35
 (* model DECODING_SIGNATURE_bls *)
 let cost_DECODING_SIGNATURE_bls = S.safe_int 40
 
-(* model DECODING_Chest_key *)
-let cost_DECODING_Chest_key = S.safe_int 5900
+(* model encoding/DECODING_Chest_key *)
+(* 9533.99333333 *)
+let cost_DECODING_Chest_key = S.safe_int 9_550
 
-(* model DECODING_Chest *)
-(* Approximating 0.039349 x term *)
-let cost_DECODING_Chest bytes =
-  let open S_syntax in
-  let v0 = S.safe_int bytes in
-  S.safe_int 7400 + (v0 lsr 5) + (v0 lsr 7)
+(* model encoding/DECODING_Chest *)
+(* fun size -> (3716.96813775 + (0.0351381245856 * size)) *)
+let cost_DECODING_Chest size =
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  S.safe_int 3_750 + (v0 lsr 5)
 
 (* model ENCODING_CHAIN_ID *)
 let cost_ENCODING_CHAIN_ID = S.safe_int 50
@@ -741,15 +746,17 @@ let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 (* model ENCODING_SIGNATURE_bls *)
 let cost_ENCODING_SIGNATURE_bls = S.safe_int 55
 
-(* model ENCODING_Chest_key *)
-let cost_ENCODING_Chest_key = S.safe_int 10_000
+(* model encoding/ENCODING_Chest_key *)
+(* 15889.24 *)
+let cost_ENCODING_Chest_key = S.safe_int 15_900
 
-(* model ENCODING_Chest *)
-(* Approximating 0.120086 x term *)
-let cost_ENCODING_Chest plaintext_size =
-  let open S_syntax in
-  let v0 = S.safe_int plaintext_size in
-  S.safe_int 12_200 + (v0 lsr 3)
+(* model encoding/ENCODING_Chest *)
+(* fun size -> (6214.48567244 + (0.0998268693444 * size)) *)
+let cost_ENCODING_Chest size =
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  S.safe_int 6_250 + ((v0 lsr 4) + (v0 lsr 5))
 
 (* model TIMESTAMP_READABLE_DECODING *)
 (* Approximating 0.045400 x term *)
