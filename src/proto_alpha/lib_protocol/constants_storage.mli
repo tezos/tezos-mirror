@@ -54,6 +54,8 @@ val proof_of_work_threshold : Raw_context.t -> int64
 
 val minimal_stake : Raw_context.t -> Tez_repr.t
 
+val minimal_frozen_stake : Raw_context.t -> Tez_repr.t
+
 val vdf_difficulty : Raw_context.t -> int64
 
 val origination_size : Raw_context.t -> int

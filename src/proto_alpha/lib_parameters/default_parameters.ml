@@ -128,6 +128,7 @@ let constants_mainnet =
        the block production's overhead is not too important. *)
     proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L);
     minimal_stake = Tez.(mul_exn one 6_000);
+    minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
           - 8000 ~= 512 * 15 that is nonce_revelation_threshold * block time

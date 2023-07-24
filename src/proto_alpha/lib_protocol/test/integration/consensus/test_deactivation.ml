@@ -325,6 +325,8 @@ let test_delegation () =
   check_no_stake ~loc:__LOC__ b m3 >>=? fun () ->
   Op.delegation ~force_reveal:true (B b) a3 (Some m3.pkh) >>=? fun delegation ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation >>=? fun b ->
+  Adaptive_inflation_helpers.stake (B b) a3 minimal_stake >>=? fun stake ->
+  Block.bake ~policy:(By_account m2.pkh) b ~operation:stake >>=? fun b ->
   Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with
   | None -> assert false

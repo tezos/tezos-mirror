@@ -170,6 +170,7 @@ type t = {
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   minimal_stake : Tez_repr.t;
+  minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
   reward_weights : reward_weights;
@@ -461,7 +462,8 @@ let encoding =
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
           c.minimal_stake ),
-        ( ( c.vdf_difficulty,
+        ( ( c.minimal_frozen_stake,
+            c.vdf_difficulty,
             c.origination_size,
             c.reward_weights,
             c.cost_per_byte,
@@ -497,7 +499,8 @@ let encoding =
              hard_gas_limit_per_block,
              proof_of_work_threshold,
              minimal_stake ),
-           ( ( vdf_difficulty,
+           ( ( minimal_frozen_stake,
+               vdf_difficulty,
                origination_size,
                reward_weights,
                cost_per_byte,
@@ -534,6 +537,7 @@ let encoding =
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         minimal_stake;
+        minimal_frozen_stake;
         vdf_difficulty;
         origination_size;
         reward_weights;
@@ -580,7 +584,8 @@ let encoding =
           (req "proof_of_work_threshold" int64)
           (req "minimal_stake" Tez_repr.encoding))
        (merge_objs
-          (obj6
+          (obj7
+             (req "minimal_frozen_stake" Tez_repr.encoding)
              (req "vdf_difficulty" int64)
              (req "origination_size" int31)
              (req "reward_weights" reward_weights_encoding)

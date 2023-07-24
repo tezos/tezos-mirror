@@ -856,7 +856,8 @@ let test_supermajority_in_proposal there_is_a_winner () =
     10
     ()
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b) >>=? fun {parametric = {minimal_stake; _}; _} ->
+  Context.get_constants (B b)
+  >>=? fun {parametric = {minimal_stake; minimal_frozen_stake; _}; _} ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   let del3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 2 in
@@ -887,7 +888,13 @@ let test_supermajority_in_proposal there_is_a_winner () =
     del3
     bal3
   >>=? fun op3 ->
-  Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
+  Adaptive_inflation_helpers.stake (B b) del1 minimal_frozen_stake
+  >>=? fun op4 ->
+  Adaptive_inflation_helpers.stake (B b) del2 minimal_frozen_stake
+  >>=? fun op5 ->
+  Adaptive_inflation_helpers.stake (B b) del3 minimal_frozen_stake
+  >>=? fun op6 ->
+  Block.bake ~policy ~operations:[op1; op2; op3; op4; op5; op6] b >>=? fun b ->
   bake_until_first_block_of_next_period ~policy b >>=? fun b ->
   (* make the proposals *)
   Op.proposals (B b) del1 [protos.(0)] >>=? fun ops1 ->
@@ -924,6 +931,8 @@ let test_quorum_in_proposal has_quorum () =
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
   Block.bake ~policy ~operation:op2 b >>=? fun b ->
+  Adaptive_inflation_helpers.stake (B b) del1 bal >>=? fun stake ->
+  Block.bake ~policy ~operation:stake b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* make the proposal *)
   Op.proposals (B b) del1 [protos.(0)] >>=? fun operation ->
