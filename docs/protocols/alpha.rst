@@ -66,7 +66,7 @@ Adaptive Issuance (ongoing)
 
 - Introduce feature flag for Adaptive Issuance. (MR :gl:`!8566`)
 
-- Add parameter ``staking_over_baking_limit`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
+- Add parameter ``limit_of_staking_over_baking`` as the limit of co-staked tokens over the baked tokens for a given baker. (MR :gl:`!8744`)
 
 When the feature flag is enabled, the following extra changes happen:
 
@@ -77,7 +77,7 @@ When the feature flag is enabled, the following extra changes happen:
 
 - Multiplicative coefficient (with a dynamic part) applied to reward values. (MRs :gl:`!8860`, :gl:`!8861`)
 
-- Denunciation rewards computation updated to depend on ``staking_over_baking_limit``. (MR :gl:`!8939`)
+- Denunciation rewards computation updated to depend on ``limit_of_staking_over_baking``. (MR :gl:`!8939`)
 
 - EMA and launch cycle. (MRs :gl:`!8967`, :gl:`!9002`, :gl:`!9025`, :gl:`!9058`)
 
@@ -111,7 +111,7 @@ Breaking Changes
   must be at most 9. Until now, this was ensured by a protocol parameter named
   ``frozen_deposits_percentage`` (whose value is 10%) representing the minimal percentage
   of frozen deposit. We convert it from a percentage to a factor named
-  ``delegation_over_baking_limit`` whose value is 9. (MR :gl:`!8884`)
+  ``limit_of_delegation_over_baking`` whose value is 9. (MR :gl:`!8884`)
 
 - The frozen deposits are not computed automatically from the baker's total stake
   (own tokens and delegated ones). Hence there are no automatic transfers of the

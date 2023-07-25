@@ -289,7 +289,7 @@ commands. The following was generated:
             "denominator": 3
         },
         "max_slashing_period": 2,
-        "delegation_over_baking_limit": 19,
+        "limit_of_delegation_over_baking": 19,
         "percentage_of_frozen_deposits_slashed_per_double_baking": 10,
         "percentage_of_frozen_deposits_slashed_per_double_attestation": 50,
         "cache_script_size": 100000000,
@@ -328,8 +328,8 @@ commands. The following was generated:
         "zk_rollup_origination_size": 4000,
         "zk_rollup_min_pending_to_process": 10,
         "zk_rollup_max_ticket_payload_size": 2048,
-        "staking_over_baking_global_limit": 5,
-        "staking_over_delegation_edge": 2,
+        "global_limit_of_staking_over_baking": 5,
+        "edge_of_staking_over_delegation": 2,
         "adaptive_issuance_launch_ema_threshold": 1600000000,
         "adaptive_rewards_params": {
             "reward_ratio_min": { "numerator": "1", "denominator": "200" },
