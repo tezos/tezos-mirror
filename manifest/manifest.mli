@@ -465,6 +465,10 @@ module Npm : sig
   (** Npm package description *)
   type t
 
+  (** Version of the package if it comes form an NPM registry, or a path to a
+      local NPM package or JavaScript file. *)
+  type version_or_path = Version of Version.constraints | Path of string
+
   (** Make a npm package.
 
     Usage: [Npm.make package_name version]
@@ -472,7 +476,7 @@ module Npm : sig
   - [package_name] is the name of the npm package.
   - [version]: version constraint used by npm when installing dependencies.
   *)
-  val make : string -> Version.constraints -> t
+  val make : string -> version_or_path -> t
 end
 
 module Flags : sig
@@ -652,6 +656,8 @@ type bisect_ppx = No | Yes | With_sigterm
     - [flags]: specifies a [(flags ...)] stanza.
       Those flags are passed to the OCaml compiler when compiling and linking OCaml units.
 
+    - [foreign_archives]: specifies a [(foreign_archives)] stanza for the [dune] target.
+
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
     - [implements]: specifies an [(implements)] stanza for the [dune] target.
@@ -783,6 +789,7 @@ type 'a maker =
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
+  ?foreign_archives:string list ->
   ?foreign_stubs:Dune.foreign_stubs ->
   ?ctypes:Ctypes.t ->
   ?implements:target ->

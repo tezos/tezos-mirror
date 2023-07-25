@@ -198,9 +198,10 @@ module Dune = struct
       ?library_flags ?link_flags ?(inline_tests = false) ?(optional = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
-      ?modules ?modules_without_implementation ?modes ?foreign_stubs
-      ?c_library_flags ?(ctypes = E) ?(private_modules = Stdlib.List.[])
-      ?js_of_ocaml (names : string list) =
+      ?modules ?modules_without_implementation ?modes
+      ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
+      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
+      (names : string list) =
     [
       V
         [
@@ -275,6 +276,9 @@ module Dune = struct
           (match private_modules with
           | [] -> E
           | _ -> S "private_modules" :: of_atom_list private_modules);
+          (match foreign_archives with
+          | [] -> E
+          | _ -> S "foreign_archives" :: of_atom_list foreign_archives);
           ( opt foreign_stubs @@ fun x ->
             [
               S "foreign_stubs";
@@ -492,9 +496,11 @@ module Version = struct
 end
 
 module Npm = struct
-  type t = {package : string; version : Version.constraints}
+  type version_or_path = Version of Version.constraints | Path of string
 
-  let make package version = {package; version}
+  type t = {package : string; version_or_path : version_or_path}
+
+  let make package version_or_path = {package; version_or_path}
 
   let node_preload t =
     match String.index_opt t.package '/' with
@@ -1054,6 +1060,7 @@ module Target = struct
     tests_deps : t option list;
     dune : Dune.s_expr;
     flags : Flags.t option;
+    foreign_archives : string list option;
     foreign_stubs : Dune.foreign_stubs option;
     implements : t option;
     inline_tests : bool;
@@ -1224,6 +1231,7 @@ module Target = struct
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
+    ?foreign_archives:string list ->
     ?foreign_stubs:Dune.foreign_stubs ->
     ?ctypes:Ctypes.t ->
     ?implements:t option ->
@@ -1314,10 +1322,10 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
-      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags ?foreign_stubs
-      ?ctypes ?implements ?inline_tests ?js_compatible ?js_of_ocaml
-      ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
+      ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
+      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
       ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
       ?opam_homepage ?(opam_with_test = Always) ?(optional = false)
       ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
@@ -1628,6 +1636,7 @@ module Target = struct
         deps;
         dune;
         flags;
+        foreign_archives;
         foreign_stubs;
         implements;
         inline_tests;
@@ -2308,6 +2317,7 @@ let generate_dune (internal : Target.internal) =
       ?modules
       ?modules_without_implementation
       ?modes:internal.modes
+      ?foreign_archives:internal.foreign_archives
       ?foreign_stubs:internal.foreign_stubs
       ?c_library_flags:internal.c_library_flags
       ?ctypes
@@ -3016,12 +3026,15 @@ let generate_package_json_file () =
           b
   in
   let pp_dep fmt (npm : Npm.t) =
-    Format.fprintf
-      fmt
-      {|    "%s": "%a"|}
-      npm.package
-      (pp_version_constraint ~in_and:false)
-      npm.version
+    match npm.version_or_path with
+    | Version version ->
+        Format.fprintf
+          fmt
+          {|    "%s": "%a"|}
+          npm.package
+          (pp_version_constraint ~in_and:false)
+          version
+    | Path path -> Format.fprintf fmt {|    "%s": "file:%s"|} npm.package path
   in
   write "package.json" @@ fun fmt ->
   Format.fprintf

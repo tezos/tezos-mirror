@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  generate_pairing_vectors
+  generate_miller_loop_vectors
+  generate_final_exponentiation_vectors
+  generate_g1_test_vectors
+  generate_g2_test_vectors
+  generate_fr_test_vectors
+  generate_hash_to_curve_vectors)
+ (libraries
+  hex
+  bls12-381)
+ (modules
+  generate_pairing_vectors
+  generate_miller_loop_vectors
+  generate_final_exponentiation_vectors
+  generate_g1_test_vectors
+  generate_g2_test_vectors
+  generate_fr_test_vectors
+  generate_hash_to_curve_vectors))

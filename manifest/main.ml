@@ -83,14 +83,6 @@ let bigstringaf =
 
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
-let bls12_381 =
-  let version = V.(at_least "6.1.0" && less_than "6.2.0") in
-  external_lib
-    ~js_compatible:true
-    ~npm_deps:[Npm.make "@nomadic-labs/ocaml-bls12-381" version]
-    "bls12-381"
-    version
-
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
@@ -151,7 +143,8 @@ let fmt_tty = external_sublib fmt "fmt.tty"
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~npm_deps:[Npm.make "hacl-wasm" V.(at_least "1.4.0" && less_than "1.5.0")]
+    ~npm_deps:
+      [Npm.make "hacl-wasm" (Version V.(at_least "1.4.0" && less_than "1.5.0"))]
     "hacl-star"
     V.(at_least "0.7.1" && less_than "0.8")
 
@@ -306,7 +299,7 @@ let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
 let secp256k1_internal =
   let version = V.(at_least "0.4.0") in
   external_lib
-    ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" version]
+    ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" (Version version)]
     ~js_compatible:true
     "secp256k1-internal"
     version
@@ -843,6 +836,221 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
+let bls12_381 =
+  public_lib
+    "bls12-381"
+    ~path:"src/lib_bls12_381"
+    ~synopsis:
+      "Implementation of the BLS12-381 curve (wrapper for the Blst library)"
+    ~modules:
+      [
+        "bls12_381";
+        "ff_sig";
+        "fr";
+        "fq12";
+        "g1";
+        "g2";
+        "gt";
+        "pairing";
+        "fq";
+        "fq2";
+      ]
+    ~private_modules:["fq"; "fq2"]
+    ~linkall:true
+    ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
+    ~deps:[integers; integers_stubs_js; zarith; zarith_stubs_js; hex]
+    ~js_compatible:true
+    ~js_of_ocaml:
+      Dune.
+        [
+          [
+            S "javascript_files";
+            S "runtime_helper.js";
+            S "blst_bindings_stubs.js";
+          ];
+        ]
+    ~npm_deps:[Npm.make "ocaml-bls12-381" (Path "src/lib_bls12_381/blst.js")]
+    ~foreign_archives:["blst"]
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = ["-Wall"; "-Wextra"; ":standard"];
+        names = ["blst_wrapper"; "blst_bindings_stubs"];
+      }
+    ~dune:
+      Dune.
+        [
+          [S "copy_files"; S "libblst/bindings/blst.h"];
+          [S "copy_files"; S "libblst/bindings/blst_extended.h"];
+          [S "copy_files"; S "libblst/bindings/blst_aux.h"];
+          [S "data_only_dirs"; S "libblst"];
+          [
+            S "rule";
+            [
+              S "deps";
+              [S "source_tree"; S "libblst"];
+              S "build_blst.sh";
+              S "blst_extended.c";
+              S "blst_extended.h";
+            ];
+            [S "targets"; S "libblst.a"; S "dllblst.so"; S "c_flags_blst.sexp"];
+            [
+              S "action";
+              [
+                S "no-infer";
+                [
+                  S "progn";
+                  [
+                    S "run";
+                    S "cp";
+                    S "blst_extended.c";
+                    S "libblst/src/blst_extended.c";
+                  ];
+                  [
+                    S "run";
+                    S "cp";
+                    S "blst_extended.h";
+                    S "libblst/bindings/blst_extended.h";
+                  ];
+                  [S "run"; S "sh"; S "build_blst.sh"];
+                  [S "run"; S "cp"; S "libblst/libblst.a"; S "libblst.a"];
+                  [
+                    S "ignore-stderr";
+                    [
+                      S "with-accepted-exit-codes";
+                      [S "or"; S "0"; S "1"];
+                      [S "run"; S "cp"; S "libblst/libblst.so"; S "dllblst.so"];
+                    ];
+                  ];
+                  [
+                    S "ignore-stderr";
+                    [
+                      S "with-accepted-exit-codes";
+                      [S "or"; S "0"; S "1"];
+                      [
+                        S "run";
+                        S "cp";
+                        S "libblst/libblst.dylib";
+                        S "dllblst.so";
+                      ];
+                    ];
+                  ];
+                ];
+              ];
+            ];
+          ];
+          [
+            S "rule";
+            [S "mode"; S "fallback"];
+            [
+              S "deps";
+              [S "source_tree"; S "libblst"];
+              S "needed-wasm-names";
+              S "blst_extended.c";
+              [S "glob_files"; S "*.h"];
+            ];
+            [S "targets"; S "blst.wasm"; S "blst.js"];
+            [
+              S "action";
+              [
+                S "progn";
+                [S "run"; S "cp"; S "-f"; S "blst_extended.c"; S "libblst/src/"];
+                [
+                  S "run";
+                  S "emcc";
+                  S "-Os";
+                  G [S "-o"; S "blst.js"];
+                  G [S "-I"; S "libblst/src/"];
+                  S "libblst/src/server.c";
+                  S "%{dep:blst_wrapper.c}";
+                  S "-DENABLE_EMSCRIPTEN_STUBS";
+                  S "-DENABLE_MODULE_RECOVERY";
+                  G [S "-s"; S "ALLOW_MEMORY_GROWTH=1"];
+                  G [S "-s"; S "WASM=1"];
+                  G [S "-s"; S "MALLOC=emmalloc"];
+                  G [S "-s"; S "EXPORT_ES6=0"];
+                  G [S "-s"; S "FILESYSTEM=0"];
+                  G [S "-s"; S "MODULARIZE=1"];
+                  G [S "-s"; S "EXPORT_NAME='_BLS12381'"];
+                  G [S "-s"; S "EXPORTED_FUNCTIONS=@needed-wasm-names"];
+                  S "--no-entry";
+                ];
+              ];
+            ];
+          ];
+          [
+            S "executable";
+            [S "name"; S "gen_wasm_needed_names"];
+            [S "modules"; S "gen_wasm_needed_names"];
+            [S "libraries"; S "re"];
+          ];
+          targets_rule
+            ["needed-wasm-names"]
+            ~promote:true
+            ~action:
+              [
+                S "with-outputs-to";
+                S "%{targets}";
+                [S "run"; S "./gen_wasm_needed_names.exe"; S "%{files}"];
+              ]
+            ~deps:[[S ":files"; S "blst_bindings_stubs.js"]];
+          [
+            S "install";
+            [
+              S "files";
+              S "libblst/bindings/blst.h";
+              S "libblst/bindings/blst_aux.h";
+              S "blst_extended.h";
+              S "blst_misc.h";
+              S "caml_bls12_381_stubs.h";
+            ];
+            [S "section"; S "lib"];
+            [S "package"; S "bls12-381"];
+          ];
+        ]
+
+let _bls12_381_tests =
+  tezt
+    [
+      "test_fr";
+      "test_g1";
+      "test_g2";
+      "test_pairing";
+      "test_hash_to_curve";
+      "test_random_state";
+      "test_fq12";
+      "test_gt";
+      "utils";
+      "ff_pbt";
+      "test_ec_make";
+    ]
+    ~path:"src/lib_bls12_381/test"
+    ~opam:"bls12-381"
+    ~deps:[alcotezt; qcheck_alcotest; bls12_381]
+    ~modes:[Native; JS]
+    ~js_compatible:true
+    ~dep_globs_rec:["test_vectors/*"]
+
+let _octez_bls12_381_utils =
+  let names =
+    [
+      "generate_pairing_vectors";
+      "generate_miller_loop_vectors";
+      "generate_final_exponentiation_vectors";
+      "generate_g1_test_vectors";
+      "generate_g2_test_vectors";
+      "generate_fr_test_vectors";
+      "generate_hash_to_curve_vectors";
+    ]
+  in
+  private_exes
+    names
+    ~path:"src/lib_bls12_381/utils"
+    ~opam:"bls12-381"
+    ~bisect_ppx:No
+    ~modules:names
+    ~deps:[hex; bls12_381]
+
 let octez_bls12_381_signature =
   public_lib
     "octez-bls12-381-signature"
@@ -991,7 +1199,7 @@ let octez_bls12_381_hash =
       "Implementation of some cryptographic hash primitives using the scalar \
        field of BLS12-381"
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
-    ~deps:[bls12_381; bisect_ppx]
+    ~deps:[bls12_381]
     ~js_compatible:false
     ~foreign_stubs:
       {
@@ -1098,7 +1306,7 @@ let octez_polynomial =
     ~path:"src/lib_polynomial"
     ~internal_name:"polynomial"
     ~synopsis:"Polynomials over finite fields"
-    ~deps:[bls12_381; bisect_ppx; zarith]
+    ~deps:[bls12_381; zarith]
 
 let _octez_polynomial_tests =
   tezt
@@ -1152,7 +1360,6 @@ let _octez_bls12_381_polynomial_tests =
         alcotezt;
         qcheck_alcotest;
         octez_polynomial;
-        bisect_ppx;
         bls12_381;
         octez_bls12_381_polynomial;
       ]

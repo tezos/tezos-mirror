@@ -22,9 +22,10 @@ let code_for_lib = function
 })
 |}
   | "ocaml-bls12-381" ->
-      {|
+      Format.asprintf
+        {|
 (function () {
-  var loader = require('@nomadic-labs/ocaml-bls12-381');
+  var loader = require('ocaml-bls12-381');
   return loader().then(function(loaded) {
     console.log('bls12-381 loaded');
     global._BLS12381 = loaded})
