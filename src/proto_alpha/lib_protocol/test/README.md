@@ -8,7 +8,7 @@ subdivision by theme:
 - `unit`: tests that sit below `Alpha_context`.
 - `integration`: tests that require passing around a context.
   - `michelson`: tests that involve Micheline expressions.
-  - `consensus`: tests for consensus: baking, endorsement, etc.
+  - `consensus`: tests for consensus: baking, attestation, etc.
   - `gas`: tests for gas.
   - `operations`: test for operations.
 - `pbt`: for property-based tests using `qcheck`.

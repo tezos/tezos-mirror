@@ -135,7 +135,7 @@ let test_cannot_bake_with_zero_deposits () =
   (* N.B. there is no non-zero frozen deposits value for which one cannot bake:
      even with a small deposit one can still bake, though with a smaller probability
      (because the frozen deposits value impacts the active stake and the active
-     stake is the one used to determine baking/endorsing rights. *)
+     stake is the one used to determine baking/attesting rights. *)
   (* To make account1 have zero deposits, we unstake all its deposits. *)
   Context.Delegate.current_frozen_deposits (B genesis) account1
   >>=? fun frozen_deposits ->
@@ -286,26 +286,35 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   Block.bake ~policy:(By_account slashed_account) ~operation genesis
   >>=? fun blk_a ->
   Block.bake ~policy:(By_account slashed_account) genesis >>=? fun blk_b ->
-  Op.raw_preattestation ~delegate:slashed_account blk_a >>=? fun preendo1 ->
-  Op.raw_preattestation ~delegate:slashed_account blk_b >>=? fun preendo2 ->
-  let preendo1, preendo2 = order_ops preendo1 preendo2 in
-  let double_preendo_op =
-    Op.double_preattestation (B blk_a) preendo1 preendo2
+  Op.raw_preattestation ~delegate:slashed_account blk_a
+  >>=? fun preattestation1 ->
+  Op.raw_preattestation ~delegate:slashed_account blk_b
+  >>=? fun preattestation2 ->
+  let preattestation1, preattestation2 =
+    order_ops preattestation1 preattestation2
+  in
+  let double_preattestation_op =
+    Op.double_preattestation (B blk_a) preattestation1 preattestation2
   in
   Block.bake
     ~policy:(By_account good_account)
-    ~operation:double_preendo_op
+    ~operation:double_preattestation_op
     blk_a
   >>=? fun b ->
   Op.transaction (B b) good_contract slashed_contract Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ~policy:(By_account slashed_account) ~operation b >>=? fun blk_a ->
   Block.bake ~policy:(By_account slashed_account) b >>=? fun blk_b ->
-  Op.raw_attestation ~delegate:slashed_account blk_a >>=? fun endo1 ->
-  Op.raw_attestation ~delegate:slashed_account blk_b >>=? fun endo2 ->
-  let endo1, endo2 = order_ops endo1 endo2 in
-  let double_endo_op = Op.double_attestation (B blk_a) endo1 endo2 in
-  Block.bake ~policy:(By_account good_account) ~operation:double_endo_op b
+  Op.raw_attestation ~delegate:slashed_account blk_a >>=? fun attestation1 ->
+  Op.raw_attestation ~delegate:slashed_account blk_b >>=? fun attestation2 ->
+  let attestation1, attestation2 = order_ops attestation1 attestation2 in
+  let double_attestation_op =
+    Op.double_attestation (B blk_a) attestation1 attestation2
+  in
+  Block.bake
+    ~policy:(By_account good_account)
+    ~operation:double_attestation_op
+    b
   >>=? fun b ->
   (* Assert that the [slashed_account]'s deposit is now 0 *)
   Context.Delegate.current_frozen_deposits (B b) slashed_account >>=? fun fd ->
@@ -384,7 +393,7 @@ let test_deposits_not_unfrozen_after_deactivation () =
   in
   Context.Delegate.current_frozen_deposits (B genesis) account1
   >>=? fun initial_frozen_deposits ->
-  (* [account1] will not participate (ie bake/endorse); we set the
+  (* [account1] will not participate (ie bake/attest); we set the
      expected last cycles at which it is considered active and at
      which it has non-zero deposits *)
   let last_active_cycle =

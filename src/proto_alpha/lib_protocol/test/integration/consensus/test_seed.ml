@@ -279,7 +279,7 @@ let test_revelation_missing_and_late () =
       | Nonce_storage.Too_late_revelation -> true
       | _ -> false)
 
-(** Test that we do not distribute endorsing rewards if the nonce was
+(** Test that we do not distribute attesting rewards if the nonce was
     not revealed. *)
 let test_unrevealed () =
   let open Lwt_result_syntax in
@@ -308,15 +308,15 @@ let test_unrevealed () =
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
   in
-  let bake_and_endorse_block ?policy (_pred_b, b) =
+  let bake_and_attest_block ?policy (_pred_b, b) =
     let* slots = Context.get_attesters (B b) in
-    let* endorsements =
+    let* attestations =
       List.map_es
         (fun {Plugin.RPC.Validators.consensus_key; _} ->
           Op.attestation ~delegate:consensus_key b)
         slots
     in
-    Block.bake ?policy ~operations:endorsements b
+    Block.bake ?policy ~operations:attestations b
   in
   (* Bake until commitment *)
   let* b = Block.bake_n (blocks_per_commitment - 2) b in
@@ -325,7 +325,7 @@ let test_unrevealed () =
   let* b = Block.bake_until_cycle_end ~policy b in
   let* info_before = Context.Delegate.info (B b) delegate2 in
   let* b' = Block.bake ~policy b in
-  let* b = bake_and_endorse_block ~policy (b, b') in
+  let* b = bake_and_attest_block ~policy (b, b') in
   (* Finish cycle 1 excluding the first baker *)
   let* b = Block.bake_until_cycle_end ~policy b in
   let* info_after = Context.Delegate.info (B b) delegate2 in

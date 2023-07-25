@@ -359,13 +359,13 @@ let secrets =
 
 (** {3 Context Manipulations } *)
 
-let pick_two_endorsers ctxt =
+let pick_two_attesters ctxt =
   let module V = Plugin.RPC.Validators in
   Context.get_attesters ctxt >>=? function
   | a :: b :: _ -> return (a.V.consensus_key, b.V.consensus_key)
   | _ -> assert false
 
-let pick_addr_endorser ctxt =
+let pick_addr_attester ctxt =
   let module V = Plugin.RPC.Validators in
   Context.get_attesters ctxt >>=? function
   | a :: _ -> return a.V.consensus_key

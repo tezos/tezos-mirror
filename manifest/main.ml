@@ -4824,14 +4824,19 @@ end = struct
             "test_deactivation";
             "test_delegation";
             "test_double_baking";
-            "test_double_endorsement";
-            "test_double_preendorsement";
-            "test_endorsement";
+            (if N.(number >= 018) then "test_double_attestation"
+            else "test_double_endorsement");
+            (if N.(number >= 018) then "test_double_preattestation"
+            else "test_double_preendorsement");
+            (if N.(number >= 018) then "test_attestation"
+            else "test_endorsement");
             "test_frozen_deposits";
             "test_helpers_rpcs";
             "test_participation";
-            "test_preendorsement_functor";
-            "test_preendorsement";
+            (if N.(number >= 018) then "test_preattestation_functor"
+            else "test_preendorsement_functor");
+            (if N.(number >= 018) then "test_preattestation"
+            else "test_preendorsement");
             "test_seed";
           ]
           ~path:(path // "lib_protocol/test/integration/consensus")

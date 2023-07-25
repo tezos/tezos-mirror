@@ -61,7 +61,7 @@ let deposits =
   let+ staker in
   Receipt_repr.Deposits staker
 
-let lost_endorsing_rewards =
+let lost_attesting_rewards =
   let pkh, _, _ = Signature.generate_key () in
   Receipt_repr.Lost_attesting_rewards (pkh, false, false)
 
@@ -96,7 +96,7 @@ let generate_balance =
       return Baking_bonuses;
       return Storage_fees;
       return Double_signing_punishments;
-      return lost_endorsing_rewards;
+      return lost_attesting_rewards;
       return Liquidity_baking_subsidies;
       return Burned;
       return commitments;

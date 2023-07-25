@@ -29,8 +29,8 @@
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_deactivation.ml
     Subject:    After a given number of cycles during which a delegate has not
-                made use of its baking and endorsing rights, its account will
-                be deactivated for validator selection. To bake/endorse
+                made use of its baking and attesting rights, its account will
+                be deactivated for validator selection. To bake/attest
                 again, it will have to re-activate its account.
 *)
 

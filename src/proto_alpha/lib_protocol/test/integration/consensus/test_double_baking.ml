@@ -95,8 +95,8 @@ let test_valid_double_baking_evidence () =
   >>=? fun initial_frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
 
-(* auxiliary function used in [double_endorsement] *)
-let order_endorsements ~correct_order op1 op2 =
+(* auxiliary function used in [double_attestation] *)
+let order_attestations ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
   let c = Operation_hash.compare oph1 oph2 in
@@ -105,13 +105,13 @@ let order_endorsements ~correct_order op1 op2 =
   else (op1, op2)
 
 (* auxiliary function used in
-   [test_valid_double_baking_followed_by_double_endorsing] and
-   [test_valid_double_endorsing_followed_by_double_baking] *)
-let double_endorsement ctxt ?(correct_order = true) op1 op2 =
-  let e1, e2 = order_endorsements ~correct_order op1 op2 in
+   [test_valid_double_baking_followed_by_double_attesting] and
+   [test_valid_double_attesting_followed_by_double_baking] *)
+let double_attestation ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_attestations ~correct_order op1 op2 in
   Op.double_attestation ctxt e1 e2
 
-let test_valid_double_baking_followed_by_double_endorsing () =
+let test_valid_double_baking_followed_by_double_attesting () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   Block.bake genesis >>=? fun b ->
@@ -126,9 +126,9 @@ let test_valid_double_baking_followed_by_double_endorsing () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_attestation ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_attestation ~delegate blk_b >>=? fun endorsement_b ->
-  let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
+  Op.raw_attestation ~delegate blk_a >>=? fun attestation_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun attestation_b ->
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   >>=? fun blk_final ->
   Context.Delegate.current_frozen_deposits (B blk_final) baker1
@@ -151,13 +151,13 @@ let test_valid_double_baking_followed_by_double_endorsing () =
     expected_frozen_deposits_after
     frozen_deposits_after
 
-(* auxiliary function used in [test_valid_double_endorsing_followed_by_double_baking] *)
+(* auxiliary function used in [test_valid_double_attesting_followed_by_double_baking] *)
 let block_fork_diff b =
   Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
 
-let test_valid_double_endorsing_followed_by_double_baking () =
+let test_valid_double_attesting_followed_by_double_baking () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork_diff genesis >>=? fun (blk_1, blk_2) ->
@@ -170,9 +170,9 @@ let test_valid_double_endorsing_followed_by_double_baking () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  Op.raw_attestation ~delegate blk_a >>=? fun endorsement_a ->
-  Op.raw_attestation ~delegate blk_b >>=? fun endorsement_b ->
-  let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
+  Op.raw_attestation ~delegate blk_a >>=? fun attestation_a ->
+  Op.raw_attestation ~delegate blk_b >>=? fun attestation_b ->
+  let operation = double_attestation (B genesis) attestation_a attestation_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_a
   >>=? fun blk_with_de_evidence ->
   block_fork ~policy:(By_account baker1) contracts blk_1
@@ -219,22 +219,22 @@ let test_payload_producer_gets_evidence_rewards () =
   double_baking (B b1) b1.header b2.header |> fun db_evidence ->
   Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   >>=? fun b_with_evidence ->
-  Context.get_attesters (B b_with_evidence) >>=? fun endorsers ->
+  Context.get_attesters (B b_with_evidence) >>=? fun attesters ->
   List.map_es
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-    endorsers
-  >>=? fun preendorsers ->
+    attesters
+  >>=? fun preattesters ->
   List.map_ep
-    (fun (endorser, _slots) ->
-      Op.preattestation ~delegate:endorser b_with_evidence)
-    preendorsers
-  >>=? fun preendos ->
+    (fun (attester, _slots) ->
+      Op.preattestation ~delegate:attester b_with_evidence)
+    preattesters
+  >>=? fun preattestations ->
   Block.bake
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker1)
-    ~operations:(preendos @ [db_evidence])
+    ~operations:(preattestations @ [db_evidence])
     b1
   >>=? fun b' ->
   (* the frozen deposits of the double-signer [baker1] are slashed *)
@@ -464,13 +464,13 @@ let tests =
       `Quick
       test_double_evidence;
     Tztest.tztest
-      "double baking followed by double endorsing"
+      "double baking followed by double attesting"
       `Quick
-      test_valid_double_baking_followed_by_double_endorsing;
+      test_valid_double_baking_followed_by_double_attesting;
     Tztest.tztest
-      "double endorsing followed by double baking"
+      "double attesting followed by double baking"
       `Quick
-      test_valid_double_endorsing_followed_by_double_baking;
+      test_valid_double_attesting_followed_by_double_baking;
   ]
 
 let () =

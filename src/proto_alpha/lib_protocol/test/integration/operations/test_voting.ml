@@ -252,7 +252,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
      accounts remain active during a voting period, which roughly
      translates to the following condition being assumed to hold:
      `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
-     We also set baking and endorsing rewards to zero in order to
+     We also set baking and attesting rewards to zero in order to
      ease accounting of exact baker stake. *)
   Context.init_gen
     tup

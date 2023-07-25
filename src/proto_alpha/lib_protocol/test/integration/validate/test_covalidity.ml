@@ -59,7 +59,7 @@ let pp_seed fmt = function
 
 let op_of_seed_gen = function Nonce -> KNonce | Vdf -> KVdf
 
-let is_not_preendorsement op =
+let is_not_preattestation op =
   let open Protocol.Alpha_context in
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with Single (Preattestation _) -> false | _ -> true
@@ -106,7 +106,7 @@ let covalid_permutation_and_bake ks nb_bootstrap =
           QCheck2.Gen.shuffle_l candidates
           |> QCheck2.Gen.generate1
           |> List.sort Protocol.Alpha_context.Operation.compare_by_passes
-          |> List.rev_filter is_not_preendorsement
+          |> List.rev_filter is_not_preattestation
         in
         (* Ensure that we can validate and apply this permutation *)
         let* (_ : Block.t) =

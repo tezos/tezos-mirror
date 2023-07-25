@@ -29,15 +29,16 @@ open Validate_helpers
 
 (** {2 Generation state} *)
 
-(** The state to generate valid double pre- and endorsement evidence
+(** The state to generate valid double pre- and attestation evidence
    contains a temporary state for making the slashable evidence, and
    the lists of slashables operations, one for each kind:
-   preendorsement and endorsement. *)
-type dbl_endorsement_state = {
+   preattestation and attestation. *)
+type dbl_attestation_state = {
   temporary : (Block.t * Block.t) option;
-  slashable_preend :
+  slashable_preattestations :
     (Kind.preattestation operation * Kind.preattestation operation) list;
-  slashable_end : (Kind.attestation operation * Kind.attestation operation) list;
+  slashable_attestations :
+    (Kind.attestation operation * Kind.attestation operation) list;
 }
 
 (** Generic generation state collecting
@@ -60,7 +61,7 @@ type state = {
   protocol_hashes : Protocol_hash.t list;
   slashable_bakes : (block_header * block_header) list;
   vdf : bool;
-  dbl_endorsement : dbl_endorsement_state;
+  dbl_attestation : dbl_attestation_state;
   manager : Manager.infos;
 }
 
@@ -120,8 +121,8 @@ type descriptor = {
   [non_exclusive_kinds]. Otherwise, see, for example, how voting
   operation op_kinds are handled in {! test_covalidity.tests}. *)
 type op_kind =
-  | KEndorsement
-  | KPreendorsement
+  | KAttestation
+  | KPreattestation
   | KDalattestation
   | KBallotExp
   | KBallotProm
