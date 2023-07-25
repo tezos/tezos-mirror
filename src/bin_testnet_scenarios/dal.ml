@@ -194,6 +194,9 @@ let scenario network =
       let* _ =
         Operation.Manager.(
           inject
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6127
+             Think of a better strategy to push slots *)
+            ~force:true
             [
               make ~source
               @@ dal_publish_slot_header
