@@ -42,8 +42,8 @@ let sum_weights (rewards : Constants_parametric_repr.issuance_weights) =
    [weight] is one of those reward weights as described in [rewards]
    [minimal_block_delay] is the minimum amouht of time between two blocks. *)
 let tez_from_weights
-    ~(issuance_weights : Constants_parametric_repr.issuance_weights) ~(weight : int)
-    ~(minimal_block_delay : Period_repr.t) =
+    ~(issuance_weights : Constants_parametric_repr.issuance_weights)
+    ~(weight : int) ~(minimal_block_delay : Period_repr.t) =
   let sum_weights = sum_weights issuance_weights in
   let block_delay =
     minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int

@@ -619,9 +619,9 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
 let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
-    ?bootstrap_contracts ?level ?cost_per_byte ?issuance_weights ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?sc_rollup_enable
-    ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
+    ?bootstrap_contracts ?level ?cost_per_byte ?issuance_weights
+    ?origination_size ?blocks_per_cycle ?cycles_per_voting_period
+    ?sc_rollup_enable ?sc_rollup_arith_pvm_enable ?dal_enable ?zk_rollup_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   prepare_initial_context_params

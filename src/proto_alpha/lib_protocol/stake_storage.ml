@@ -218,8 +218,7 @@ let add_frozen_stake ctxt staker amount =
   | Stake_repr.Single (contract, delegate)
     when Contract_repr.(contract = Implicit delegate) ->
       add_own_frozen_stake ctxt delegate amount
-  | Single (_staker, delegate) ->
-      add_staked_frozen_stake ctxt delegate amount
+  | Single (_staker, delegate) -> add_staked_frozen_stake ctxt delegate amount
   | Shared delegate -> add_shared_frozen_stake ctxt delegate amount
 
 let set_inactive ctxt delegate =

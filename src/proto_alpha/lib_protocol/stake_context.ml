@@ -38,8 +38,7 @@ let staking_weight ctxt {frozen; delegated} =
 let compare ctxt s1 s2 =
   Int64.compare (staking_weight ctxt s1) (staking_weight ctxt s2)
 
-let voting_weight ctxt {Stake_repr.Full.own_frozen; staked_frozen; delegated}
-    =
+let voting_weight ctxt {Stake_repr.Full.own_frozen; staked_frozen; delegated} =
   let open Result_syntax in
   let+ frozen = Tez_repr.(own_frozen +? staked_frozen) in
   staking_weight ctxt (Stake_repr.make ~frozen ~delegated)

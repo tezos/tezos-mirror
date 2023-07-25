@@ -333,8 +333,7 @@ let pseudotokens_of (delegate_balances : delegate_balances) tez_amount =
   assert (Tez_repr.(delegate_balances.frozen_deposits_staked_tez <> zero)) ;
   assert (Tez_repr.(tez_amount <> zero)) ;
   let frozen_deposits_staked_tez_z =
-    Z.of_int64
-      (Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
+    Z.of_int64 (Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
   in
   let frozen_deposits_pseudotokens_z =
     Staking_pseudotoken_repr.to_z delegate_balances.frozen_deposits_pseudotokens
@@ -356,8 +355,7 @@ let tez_of (delegate_balances : delegate_balances) pseudotoken_amount =
     Staking_pseudotoken_repr.(
       delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
   let frozen_deposits_staked_tez_z =
-    Z.of_int64
-      (Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
+    Z.of_int64 (Tez_repr.to_mutez delegate_balances.frozen_deposits_staked_tez)
   in
   let frozen_deposits_pseudotokens_z =
     Staking_pseudotoken_repr.to_z delegate_balances.frozen_deposits_pseudotokens
