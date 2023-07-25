@@ -86,7 +86,8 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
       else (false, punish_value)
     in
     let* reward =
-      Tez_repr.(punishing_amount /? global_limit_of_staking_over_baking_plus_two)
+      Tez_repr.(
+        punishing_amount /? global_limit_of_staking_over_baking_plus_two)
     in
     let+ amount_to_burn = Tez_repr.(punishing_amount -? reward) in
     (should_forbid, {reward; amount_to_burn})

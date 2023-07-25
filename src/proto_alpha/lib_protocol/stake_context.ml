@@ -54,7 +54,8 @@ let apply_limits ctxt staking_parameters
       mul
         1_000_000L
         (of_int
-           (Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
+           (Constants_storage
+            .adaptive_issuance_global_limit_of_staking_over_baking
               ctxt)))
   in
   let {Staking_parameters_repr.limit_of_staking_over_baking_millionth; _} =

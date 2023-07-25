@@ -61,7 +61,11 @@ let make ~limit_of_staking_over_baking_millionth
          > maximum_edge_of_baking_over_staking_billionth)
   then Error ()
   else
-    Ok {limit_of_staking_over_baking_millionth; edge_of_baking_over_staking_billionth}
+    Ok
+      {
+        limit_of_staking_over_baking_millionth;
+        edge_of_baking_over_staking_billionth;
+      }
 
 let encoding =
   let open Data_encoding in
@@ -70,7 +74,8 @@ let encoding =
            limit_of_staking_over_baking_millionth;
            edge_of_baking_over_staking_billionth;
          } ->
-      (limit_of_staking_over_baking_millionth, edge_of_baking_over_staking_billionth))
+      ( limit_of_staking_over_baking_millionth,
+        edge_of_baking_over_staking_billionth ))
     (fun ( limit_of_staking_over_baking_millionth,
            edge_of_baking_over_staking_billionth ) ->
       Result.map_error

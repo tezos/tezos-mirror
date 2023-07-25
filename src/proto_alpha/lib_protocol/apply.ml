@@ -239,7 +239,8 @@ let () =
     (fun () -> Stake_modification_with_no_delegate_set) ;
   let staking_to_delegate_that_refuses_external_staking_description =
     "The delegate currently does not accept staking operations from sources \
-     other than itself: its `limit_of_staking_over_baking` parameter is set to 0."
+     other than itself: its `limit_of_staking_over_baking` parameter is set to \
+     0."
   in
   register_error_kind
     `Permanent
@@ -499,8 +500,8 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
   return (ctxt, result, [])
 
 let apply_set_delegate_parameters ~ctxt ~sender ~destination
-    ~limit_of_staking_over_baking_millionth ~edge_of_baking_over_staking_billionth
-    ~before_operation =
+    ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth ~before_operation =
   let open Lwt_result_syntax in
   let*? ctxt =
     Gas.consume ctxt Adaptive_issuance_costs.set_delegate_parameters_cost
