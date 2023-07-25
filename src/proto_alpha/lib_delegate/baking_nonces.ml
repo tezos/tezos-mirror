@@ -159,10 +159,11 @@ let filter_outdated_nonces state nonces =
   in
   return (remove_all nonces outdated_nonces)
 
-let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
+let blocks_from_previous_cycle {cctxt; chain; _} =
   let open Lwt_result_syntax in
+  let block = `Head 0 in
   let*! result =
-    Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
+    Plugin.RPC.levels_in_current_cycle cctxt ~offset:(-1l) (chain, block)
   in
   match result with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
@@ -200,7 +201,7 @@ let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
 
 let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =
   let open Lwt_result_syntax in
-  let* blocks = blocks_from_current_cycle state (`Head 0) ~offset:(-1l) () in
+  let* blocks = blocks_from_previous_cycle state in
   List.filter_map_es
     (fun hash ->
       match find_opt nonces hash with

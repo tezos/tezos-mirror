@@ -72,13 +72,6 @@ val get_outdated_nonces :
 val filter_outdated_nonces :
   t -> Nonce.t Block_hash.Map.t -> Nonce.t Block_hash.Map.t tzresult Lwt.t
 
-val blocks_from_current_cycle :
-  t ->
-  Block_services.block ->
-  ?offset:int32 ->
-  unit ->
-  Block_hash.t list tzresult Lwt.t
-
 val get_unrevealed_nonces :
   t -> Nonce.t Block_hash.Map.t -> (Raw_level.t * Nonce.t) list tzresult Lwt.t
 
