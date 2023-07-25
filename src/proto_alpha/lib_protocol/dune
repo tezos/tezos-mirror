@@ -163,8 +163,8 @@
   Contract_storage
   Token
   Fees_storage
-  Adaptive_inflation_costs
-  Adaptive_inflation_storage
+  Adaptive_issuance_costs
+  Adaptive_issuance_storage
   Delegate_staking_parameters
   Delegate_consensus_key
   Delegate_storage
@@ -261,7 +261,7 @@
   Delegate_services
   Voting_services
   Dal_services
-  Adaptive_inflation_services
+  Adaptive_issuance_services
   Alpha_services
   Main))
 
@@ -434,8 +434,8 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
-  adaptive_inflation_costs.ml adaptive_inflation_costs.mli
-  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
@@ -533,7 +533,7 @@
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
-  adaptive_inflation_services.ml adaptive_inflation_services.mli
+  adaptive_issuance_services.ml adaptive_issuance_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
@@ -707,8 +707,8 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
-  adaptive_inflation_costs.ml adaptive_inflation_costs.mli
-  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
@@ -806,7 +806,7 @@
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
-  adaptive_inflation_services.ml adaptive_inflation_services.mli
+  adaptive_issuance_services.ml adaptive_issuance_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action
@@ -964,8 +964,8 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   fees_storage.ml fees_storage.mli
-  adaptive_inflation_costs.ml adaptive_inflation_costs.mli
-  adaptive_inflation_storage.ml adaptive_inflation_storage.mli
+  adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
@@ -1063,7 +1063,7 @@
   delegate_services.ml delegate_services.mli
   voting_services.ml voting_services.mli
   dal_services.ml dal_services.mli
-  adaptive_inflation_services.ml adaptive_inflation_services.mli
+  adaptive_issuance_services.ml adaptive_issuance_services.mli
   alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action

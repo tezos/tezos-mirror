@@ -145,8 +145,8 @@
         "Contract_storage",
         "Token",
         "Fees_storage",
-        "Adaptive_inflation_costs",
-        "Adaptive_inflation_storage",
+        "Adaptive_issuance_costs",
+        "Adaptive_issuance_storage",
         "Delegate_staking_parameters",
         "Delegate_consensus_key",
         "Delegate_storage",
@@ -257,7 +257,7 @@
         "Delegate_services",
         "Voting_services",
         "Dal_services",
-	"Adaptive_inflation_services",
+	"Adaptive_issuance_services",
         "Alpha_services",
 
         "Main"

@@ -31,8 +31,8 @@
  (modules
   test_constants
   test_frozen_bonds
-  test_adaptive_inflation_launch
-  test_adaptive_inflation_roundtrip
+  test_adaptive_issuance_launch
+  test_adaptive_issuance_roundtrip
   test_liquidity_baking
   test_storage_functions
   test_storage
