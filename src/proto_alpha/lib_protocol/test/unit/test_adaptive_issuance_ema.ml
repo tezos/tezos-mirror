@@ -47,9 +47,7 @@ let compute_new_ema ~per_block_vote ema =
 let compute_new_ema_n per_block_votes initial_ema =
   List.fold_left
     (fun ema per_block_vote ->
-      Per_block_votes_repr.compute_new_adaptive_issuance_ema
-        ~per_block_vote
-        ema)
+      Per_block_votes_repr.compute_new_adaptive_issuance_ema ~per_block_vote ema)
     initial_ema
     per_block_votes
   |> ema_to_int32

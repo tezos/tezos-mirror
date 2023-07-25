@@ -524,8 +524,7 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) )
-         ) ->
+                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;

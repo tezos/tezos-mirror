@@ -174,10 +174,10 @@ let liquidity_baking_toggle_vote_arg =
 let adaptive_issuance_vote_arg =
   Tezos_clic.arg
     ~doc:
-      "Vote to adopt or not the adaptive issuance feature. The possible \
-       values for this option are: \"off\" to request not activating it, \
-       \"on\" to request activating it, and \"pass\" to abstain. If you do not \
-       vote, default value is \"pass\"."
+      "Vote to adopt or not the adaptive issuance feature. The possible values \
+       for this option are: \"off\" to request not activating it, \"on\" to \
+       request activating it, and \"pass\" to abstain. If you do not vote, \
+       default value is \"pass\"."
     ~long:"adaptive-issuance-vote"
     ~placeholder:"vote"
     per_block_vote_parameter

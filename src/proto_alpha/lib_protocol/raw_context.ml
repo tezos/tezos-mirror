@@ -339,8 +339,7 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
-let[@inline] adaptive_issuance_enable ctxt =
-  ctxt.back.adaptive_issuance_enable
+let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
 

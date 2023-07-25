@@ -112,12 +112,11 @@ let () =
         "@[The provided block vote file \"%s\" is a valid JSON file but its \
          content is unexpected. Expecting a JSON file containing \
          '{\"liquidity_baking_toggle_vote\": value1, \
-         \"adaptive_issuance_vote\": value2}' or \
-         '{\"adaptive_issuance_vote\": value1, \
-         \"liquidity_baking_toggle_vote\": value2}', where value1 is one of \
-         \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \"off\", or \
-         \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' where value \
-         is one of \"on\", \"off\", or \"pass\".@]"
+         \"adaptive_issuance_vote\": value2}' or '{\"adaptive_issuance_vote\": \
+         value1, \"liquidity_baking_toggle_vote\": value2}', where value1 is \
+         one of \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \
+         \"off\", or \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' \
+         where value is one of \"on\", \"off\", or \"pass\".@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function
@@ -139,12 +138,11 @@ let () =
         "@[In the provided block vote file \"%s\", the \
          \"liquidity_baking_toggle_vote\" field is missing. Expecting a JSON \
          file containing '{\"liquidity_baking_toggle_vote\": value1, \
-         \"adaptive_issuance_vote\": value2}' or \
-         '{\"adaptive_issuance_vote\": value1, \
-         \"liquidity_baking_toggle_vote\": value2}', where value1 is one of \
-         \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \"off\", or \
-         \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' where value \
-         is one of \"on\", \"off\", or \"pass\".@]"
+         \"adaptive_issuance_vote\": value2}' or '{\"adaptive_issuance_vote\": \
+         value1, \"liquidity_baking_toggle_vote\": value2}', where value1 is \
+         one of \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \
+         \"off\", or \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' \
+         where value is one of \"on\", \"off\", or \"pass\".@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function

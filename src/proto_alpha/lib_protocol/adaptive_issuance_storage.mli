@@ -28,8 +28,7 @@
    already launched. This means that the activation vote resulted in
    an approbation from the stakeholders and this happened sufficiently
    long ago. *)
-val set_adaptive_issuance_enable :
-  Raw_context.t -> Raw_context.t tzresult Lwt.t
+val set_adaptive_issuance_enable : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [load_reward_coeff ctxt] loads the current cycle's reward coeff from the
     storage into the context *)

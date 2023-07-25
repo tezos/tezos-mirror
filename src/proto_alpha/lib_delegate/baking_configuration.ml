@@ -79,8 +79,7 @@ type state_recorder_config = Filesystem | Disabled
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_issuance_vote :
-    Protocol.Alpha_context.Per_block_votes.per_block_vote;
+  adaptive_issuance_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
 }
 
 type t = {
@@ -257,9 +256,7 @@ let per_block_votes_config_encoding =
           (req
              "liquidity_baking_vote"
              liquidity_baking_toggle_vote_config_encoding)
-          (req
-             "adaptive_issuance_vote"
-             adaptive_issuance_vote_config_encoding))
+          (req "adaptive_issuance_vote" adaptive_issuance_vote_config_encoding))
 
 let force_config_encoding = Data_encoding.bool
 
