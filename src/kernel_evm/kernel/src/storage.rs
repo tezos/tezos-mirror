@@ -25,6 +25,9 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
+pub const STORAGE_VERSION: u64 = 0;
+const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
 
@@ -736,6 +739,30 @@ pub fn read_dictator_key<Host: Runtime>(host: &mut Host) -> Option<PublicKey> {
     let mut buffer = [0; DICTATOR_KEY_SIZE];
     store_read_slice(host, &DICTATOR_KEY, &mut buffer, DICTATOR_KEY_SIZE).ok()?;
     PublicKey::parse_slice(&buffer, None).ok()
+}
+
+pub fn store_storage_version<Host: Runtime>(
+    host: &mut Host,
+    storage_version: u64,
+) -> Result<(), Error> {
+    host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())
+        .map_err(Error::from)
+}
+
+pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
+    match host.store_read_all(&STORAGE_VERSION_PATH) {
+        Ok(bytes) => {
+            let slice_of_bytes: [u8; 8] =
+                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+            Ok(u64::from_le_bytes(slice_of_bytes))
+        }
+        Err(RuntimeError::PathNotFound) => {
+            // It's safe to have a default storage version especially for fresh
+            // kernel that had 0 upgrade/migration yet.
+            Ok(STORAGE_VERSION)
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 pub(crate) mod internal_for_tests {
