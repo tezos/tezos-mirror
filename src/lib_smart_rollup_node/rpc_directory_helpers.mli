@@ -24,9 +24,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is a helper to extract a block hash
-    from block reference and Node_context *)
-val block_of_prefix :
-  _ Node_context.t ->
-  [< `Cemented | `Finalized | `Hash of Block_hash.t | `Head | `Level of int32] ->
-  Block_hash.t tzresult Lwt.t
+open Tezos_rpc
+
+(** This module defines subcontext type of the subdirectory and
+    the way to project it from Node_context and a path prefix. *)
+module type PARAM = sig
+  type prefix
+
+  type context
+
+  type subcontext
+
+  val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
+end
+
+(** Parameter signature to use with {!Make_directory}, where the prefix is
+    given. *)
+module type PARAM_PREFIX = sig
+  include PARAM
+
+  val prefix : (unit, prefix) Tezos_rpc.Path.t
+end
+
+(** This module is a helper to register your endpoints and
+    build a resulting subdirectory eventually. *)
+module Make_sub_directory (S : PARAM) : sig
+  (** Register an endpoint with no parameters in the path. *)
+  val register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (S.subcontext -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  (** Register an endpoint with a single parameter in the path. *)
+  val register1 :
+    ( [< Resto.meth],
+      'prefix,
+      'prefix * 'param1,
+      'query,
+      'input,
+      'output )
+    Service.t ->
+    (S.subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
+
+  (** Build sub-directory with registered endpoints with respect to
+      Node_context. *)
+  val build_sub_directory : S.context -> S.prefix Tezos_rpc.Directory.t
+end
+
+(** This module is a helper to register your endpoints and
+    build a resulting top level directory eventually. *)
+module Make_directory (S : PARAM_PREFIX) : sig
+  include module type of Make_sub_directory (S)
+
+  (** Build a top-level directory from a sub-directory by prefixing it with
+      {!val:prefix}. *)
+  val of_subdirectory :
+    S.prefix Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t
+
+  (** Build top-level directory with registered endpoints with respect to
+      Node_context. *)
+  val build_directory : S.context -> unit Tezos_rpc.Directory.t
+end

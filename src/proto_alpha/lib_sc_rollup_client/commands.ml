@@ -40,7 +40,7 @@ let block_arg =
          (String.concat ", " possible_block_ids))
     (Tezos_clic.parameter
        (fun _ s ->
-         match Sc_rollup_services.Arg.destruct_block_id s with
+         match Rollup_node_services.Arg.destruct_block_id s with
          | Ok b -> return b
          | Error reason -> failwith "Invalid block id: %s" reason)
        ~autocomplete:(fun _ -> return possible_block_ids))

@@ -23,10 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Protocol specific RPC directory.  *)
+(** Protocol specific RPC directory, used as a dynamic directory in the protocol
+    agnostic rollup node. *)
 module type RPC_DIRECTORY = sig
-  (** The RPC directory for the rollup node of this protocol *)
-  val directory : Node_context.rw -> unit Tezos_rpc.Directory.t
+  (** The RPC directory, specific to blocks of the protocol, for this rollup
+      node. *)
+  val block_directory :
+    Node_context.rw ->
+    (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
 end
 
 (** Protocol specific functions to track endorsed DAL slots of L1 blocks. *)
@@ -182,6 +186,13 @@ end
 (** Protocol specific batcher. NOTE: The batcher has to be stopped and the new
     one restarted on protocol change. *)
 module type BATCHER = sig
+  (** The type for the status of messages in the batcher.  *)
+  type status =
+    | Pending_batch  (** The message is in the queue of the batcher. *)
+    | Batched of Injector.Inj_operation.hash
+        (** The message has already been batched and sent to the injector in an
+            L1 operation whose hash is given. *)
+
   (** [init config ~signer node_ctxt] initializes and starts the batcher for
       [signer]. If [config.simulation] is [true] (the default), messages added
       to the batcher are simulated in an incremental simulation context. *)
@@ -199,6 +210,22 @@ module type BATCHER = sig
   (** [shutdown ()] stops the batcher, waiting for the ongoing request to be
       processed. *)
   val shutdown : unit -> unit Lwt.t
+
+  (** List all queued messages in the order they appear in the queue, i.e. the
+      message that were added first to the queue are at the end of list. *)
+  val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
+
+  (** [register_messages messages] registers new L2 [messages] in the queue of
+      the batcher for future injection on L1. If the batcher was initialized
+      with [simualte = true], the messages are evaluated the batcher's
+      incremental simulation context. In this case, when the application fails,
+      the messages are not queued.  *)
+  val register_messages : string list -> L2_message.hash list tzresult Lwt.t
+
+  (** The status of a message in the batcher. Returns [None] if the message is
+      not known by the batcher (the batcher only keeps the batched status of the
+      last 500000 messages). *)
+  val message_status : L2_message.hash -> (status * string) option tzresult
 end
 
 (** Protocol specific functions to interact with the L1 node. *)

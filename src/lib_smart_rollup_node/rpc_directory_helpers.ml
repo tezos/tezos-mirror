@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of L2 messages.  *)
-type t
+(* Conveniences to construct RPC directory
+   against a subcontext of the Node_context *)
 
-(** [make message] constructs a message with content [message]. *)
-val make : string -> t
+module type PARAM = sig
+  type prefix
 
-(** [content message] returns the string content of [message], i.e.
-    [content (make s) = s]. *)
-val content : t -> string
+  type context
 
-(** Hash with b58check encoding scmsg(55), for hashes of L2 messages. *)
-module Hash : Tezos_crypto.Intfs.HASH
+  type subcontext
 
-(** Alias for message hash *)
-type hash = Hash.t
+  val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
+end
 
-(**  {2 Serialization} *)
+module type PARAM_PREFIX = sig
+  include PARAM
 
-val content_encoding : string Data_encoding.t
+  val prefix : (unit, prefix) Tezos_rpc.Path.t
+end
 
-val encoding : t Data_encoding.t
+module Make_sub_directory (S : PARAM) = struct
+  open S
 
-val hash : t -> Hash.t
+  let directory : subcontext tzresult Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
+
+  let register service f =
+    directory := Tezos_rpc.Directory.register !directory service f
+
+  let register0 service f =
+    let open Lwt_result_syntax in
+    register (Tezos_rpc.Service.subst0 service) @@ fun ctxt query input ->
+    let*? ctxt in
+    f ctxt query input
+
+  let register1 service f =
+    let open Lwt_result_syntax in
+    register (Tezos_rpc.Service.subst1 service)
+    @@ fun (ctxt, arg) query input ->
+    let*? ctxt in
+    f ctxt arg query input
+
+  let build_sub_directory node_ctxt =
+    !directory
+    |> Tezos_rpc.Directory.map (fun prefix ->
+           context_of_prefix node_ctxt prefix)
+end
+
+module Make_directory (S : PARAM_PREFIX) = struct
+  include Make_sub_directory (S)
+
+  let of_subdirectory = Tezos_rpc.Directory.prefix S.prefix
+
+  let build_directory node_ctxt =
+    build_sub_directory node_ctxt |> Tezos_rpc.Directory.prefix S.prefix
+end

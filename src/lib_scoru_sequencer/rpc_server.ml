@@ -25,11 +25,12 @@
 (*****************************************************************************)
 
 open Tezos_rpc_http_server
-open RPC_directory_helpers
+open Rpc_directory_helpers
+open Octez_smart_rollup
 open Octez_smart_rollup_node
 
 module Local_directory = Make_directory (struct
-  include Sc_rollup_services.Local
+  include Rollup_node_services.Local
 
   type context = Node_context.rw
 
@@ -49,7 +50,7 @@ let () =
       (Sequencer_services.Local.durable_state_subkeys Kind.Wasm_2_0_0)
   @@ fun () {key} () -> Seq_batcher.get_simulated_state_subkeys key ) ;
 
-  Local_directory.register0 Sc_rollup_services.Local.injection
+  Local_directory.register0 Rollup_node_services.Local.injection
   @@ fun _node_ctxt () messages -> Seq_batcher.register_messages messages
 
 let register (node_ctxt : _ Node_context.t) =

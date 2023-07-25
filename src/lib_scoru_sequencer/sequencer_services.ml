@@ -25,12 +25,13 @@
 (*****************************************************************************)
 
 open Protocol.Alpha_context
+open Octez_smart_rollup
 module Sc_services = Sc_rollup_services
 
 module Local = struct
   open Tezos_rpc.Path
 
-  include Sc_services.Make_services (struct
+  include Rollup_node_services.Make_services (struct
     type prefix = unit
 
     let prefix = open_root / "local"
@@ -55,5 +56,5 @@ module Local = struct
       ~output:Data_encoding.(list string)
       (path / "durable" / Sc_rollup.Kind.to_string pvm_kind / "subkeys")
 
-  let injection = Sc_services.Local.injection
+  let injection = Rollup_node_services.Local.injection
 end

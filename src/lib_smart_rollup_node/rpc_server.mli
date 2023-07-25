@@ -34,7 +34,3 @@ val start : Configuration.t -> unit Tezos_rpc.Directory.t -> t tzresult Lwt.t
 (** Shutdown a running RPC server. When this function is called, the rollup node
     will stop listening to incoming requests. *)
 val shutdown : t -> unit Lwt.t
-
-(** Changes the directory for the RPC server. WARNING: this function stops and
-    restarts the RPC server. *)
-val change_directory : t -> unit Tezos_rpc.Directory.t -> t tzresult Lwt.t

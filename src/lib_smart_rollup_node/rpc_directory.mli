@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of L2 messages.  *)
-type t
+(** The RPC top level directory (without the block directory) for this rollup
+    node. *)
+val top_directory : Node_context.rw -> unit Tezos_rpc.Directory.t
 
-(** [make message] constructs a message with content [message]. *)
-val make : string -> t
-
-(** [content message] returns the string content of [message], i.e.
-    [content (make s) = s]. *)
-val content : t -> string
-
-(** Hash with b58check encoding scmsg(55), for hashes of L2 messages. *)
-module Hash : Tezos_crypto.Intfs.HASH
-
-(** Alias for message hash *)
-type hash = Hash.t
-
-(**  {2 Serialization} *)
-
-val content_encoding : string Data_encoding.t
-
-val encoding : t Data_encoding.t
-
-val hash : t -> Hash.t
+(** The full RPC directory for the protocol agnostic rollup node. *)
+val directory : Node_context.rw -> unit Tezos_rpc.Directory.t
