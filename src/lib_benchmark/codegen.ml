@@ -236,6 +236,19 @@ let load_solution (fn : string) : solution =
 let save_solution (s : solution) (fn : string) =
   Out_channel.with_open_bin fn @@ fun outfile -> Marshal.to_channel outfile s []
 
+let solution_to_csv {map; scores_list} =
+  let csv_mapping =
+    Inference.mapping_to_csv (map |> Free_variable.Map.to_seq |> List.of_seq)
+  in
+  let csv_scores_list =
+    List.fold_left
+      (fun csv (name, score) ->
+        Csv.concat csv (Inference.scores_to_csv_column name score))
+      [[]; []]
+      scores_list
+  in
+  Csv.concat csv_mapping csv_scores_list
+
 let load_exclusions exclude_fn =
   (* one model name like N_IXxx_yyy__alpha per line *)
   let open In_channel in

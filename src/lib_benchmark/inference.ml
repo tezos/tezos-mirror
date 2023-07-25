@@ -310,14 +310,13 @@ let problem_to_csv : problem -> Csv.csv = function
       let measured_csv = timing_matrix_to_csv "timings" measured in
       Csv.concat predicted_csv measured_csv
 
-let solution_to_csv : solution -> Csv.csv option =
- fun {mapping; _} ->
-  match mapping with
-  | [] -> None
-  | _ ->
-      let headers = List.map (fun (fv, _) -> fv_to_string fv) mapping
-      and row = List.map (fun x -> Float.to_string (snd x)) mapping in
-      Some [headers; row]
+let mapping_to_csv mapping =
+  let headers = List.map (fun (fv, _) -> fv_to_string fv) mapping in
+  let row = List.map (fun x -> Float.to_string (snd x)) mapping in
+  [headers; row]
+
+let solution_to_csv {mapping; _} =
+  if mapping = [] then None else Some (mapping_to_csv mapping)
 
 (* -------------------------------------------------------------------------- *)
 (* Solving problems *)

@@ -376,7 +376,6 @@ and infer_for_measurements ?local_model_name measurements
             let scores_label = (local_model_name, Bench.name) in
             let scores_list = (scores_label, solution.scores) :: scores_list in
             perform_plot measure local_model_name problem solution infer_opts ;
-            perform_csv_export scores_label solution infer_opts ;
             (overrides_map, scores_list, report))
           (overrides_map, scores_list, report)
           solutions)
@@ -385,6 +384,7 @@ and infer_for_measurements ?local_model_name measurements
   in
   let solution = Codegen.{map = overrides_map; scores_list} in
   perform_save_solution solution infer_opts ;
+  perform_save_solution_to_csv solution infer_opts ;
   (match (infer_opts.report, report) with
   | Cmdline.NoReport, _ -> ()
   | ReportToStdout, Some report ->
@@ -436,6 +436,13 @@ and perform_csv_export scores_label solution
             ~filename
             Inference.(scores_to_csv_column scores_label scores) ;
           Csv.append_columns ~filename solution_csv)
+
+and perform_save_solution_to_csv solution infer_opts =
+  Option.iter
+    (fun filename ->
+      let solution_csv = Codegen.solution_to_csv solution in
+      Csv.append_columns ~filename solution_csv)
+    infer_opts.csv_export
 
 and perform_save_solution solution
     (infer_opts : Cmdline.infer_parameters_options) =
