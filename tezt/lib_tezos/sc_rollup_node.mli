@@ -231,6 +231,17 @@ val wait_for_ready : t -> unit Lwt.t
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
 
+(** Unbounded variant of {!wait_for_sync}. Do not use in a Tezt tests, as it
+    has been proven time and again that it is a source of waste of CI time when
+    a test is buggy or flaky.
+
+    This variant of {!wait_for_sync} should not be used in sandboxes, as it has
+    been witnessed time and time again that these tests are more subject to
+    race conditions when setting up rollup infrastructure. On open testnets
+    like mondaynet and dailynet, this does not happen because of the large
+    block time. *)
+val unsafe_wait_sync : ?timeout:float -> t -> int Lwt.t
+
 (** Wait until the layer 1 of the sc node is synchronized with its
     underlying l1 node. *)
 val wait_sync : t -> timeout:float -> int Lwt.t
