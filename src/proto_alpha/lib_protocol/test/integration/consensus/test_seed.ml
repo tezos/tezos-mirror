@@ -309,11 +309,11 @@ let test_unrevealed () =
     Int32.to_int csts.parametric.blocks_per_commitment
   in
   let bake_and_endorse_block ?policy (_pred_b, b) =
-    let* slots = Context.get_endorsers (B b) in
+    let* slots = Context.get_attesters (B b) in
     let* endorsements =
       List.map_es
         (fun {Plugin.RPC.Validators.consensus_key; _} ->
-          Op.endorsement ~delegate:consensus_key b)
+          Op.attestation ~delegate:consensus_key b)
         slots
     in
     Block.bake ?policy ~operations:endorsements b

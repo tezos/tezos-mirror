@@ -55,18 +55,18 @@ let mk_block_payload_hash payload_round (b : Block.t) =
     hashes
 
 let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
-    ?block_payload_hash ?branch endorsed_block =
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let branch =
     match branch with
-    | None -> endorsed_block.Block.header.shell.predecessor
+    | None -> attested_block.Block.header.shell.predecessor
     | Some branch -> branch
   in
   let* delegate_pkh, slots =
     match delegate with
-    | None -> Context.get_endorser (B endorsed_block)
+    | None -> Context.get_attester (B attested_block)
     | Some del -> (
-        let* slots = Context.get_endorser_slot (B endorsed_block) del in
+        let* slots = Context.get_attester_slot (B attested_block) del in
         match slots with
         | None -> return (del, [])
         | Some slots -> return (del, slots))
@@ -77,28 +77,28 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
   let* level =
     match level with
     | None ->
-        let*? level = Context.get_level (B endorsed_block) in
+        let*? level = Context.get_level (B attested_block) in
         return level
     | Some level -> return level
   in
   let* round =
     match round with
     | None ->
-        let*? round = Block.get_round endorsed_block in
+        let*? round = Block.get_round attested_block in
         return round
     | Some round -> return round
   in
   let block_payload_hash =
     match block_payload_hash with
-    | None -> mk_block_payload_hash round endorsed_block
+    | None -> mk_block_payload_hash round attested_block
     | Some block_payload_hash -> block_payload_hash
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
   let* signer = Account.find delegate_pkh in
   return (consensus_content, signer.sk, branch)
 
-let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -108,7 +108,7 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   let op = Single (Attestation consensus_content) in
   return
@@ -118,23 +118,23 @@ let raw_endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
        branch
        op)
 
-let endorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* op =
-    raw_endorsement
+    raw_attestation
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   return (Operation.pack op)
 
-let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
@@ -144,7 +144,7 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   let op = Single (Preattestation consensus_content) in
   return
@@ -154,18 +154,18 @@ let raw_preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
        branch
        op)
 
-let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    endorsed_block =
+let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+    attested_block =
   let open Lwt_result_syntax in
   let* op =
-    raw_preendorsement
+    raw_preattestation
       ?delegate
       ?slot
       ?level
       ?round
       ?block_payload_hash
       ?branch
-      endorsed_block
+      attested_block
   in
   return (Operation.pack op)
 
@@ -638,7 +638,7 @@ let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_endorsement ctxt op1 op2 =
+let double_attestation ctxt op1 op2 =
   let contents = Single (Double_attestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {
@@ -646,7 +646,7 @@ let double_endorsement ctxt op1 op2 =
     protocol_data = Operation_data {contents; signature = None};
   }
 
-let double_preendorsement ctxt op1 op2 =
+let double_preattestation ctxt op1 op2 =
   let contents = Single (Double_preattestation_evidence {op1; op2}) in
   let branch = Context.branch ctxt in
   {

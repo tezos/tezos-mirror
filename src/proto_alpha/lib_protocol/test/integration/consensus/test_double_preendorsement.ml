@@ -56,7 +56,7 @@ end = struct
 
   let pick_endorsers ctxt =
     let module V = Plugin.RPC.Validators in
-    Context.get_endorsers ctxt >>=? function
+    Context.get_attesters ctxt >>=? function
     | a :: b :: _ ->
         return ((a.V.delegate, a.V.slots), (b.V.delegate, b.V.slots))
     | _ -> assert false
@@ -70,17 +70,17 @@ end = struct
 
   let malformed_double_preendorsement_denunciation
       ?(include_endorsement = false) ?(block_round = 0)
-      ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preendorsement ctxt p1 p2)
+      ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preattestation ctxt p1 p2)
       ~loc () =
     Context.init_n ~consensus_threshold:0 10 ()
     >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
     bake ~policy:(By_round 0) b1 >>=? fun b2_A ->
-    Op.endorsement b1 >>=? fun e ->
+    Op.attestation b1 >>=? fun e ->
     let operations = if include_endorsement then [e] else [] in
     bake ~policy:(By_round block_round) ~operations b1 >>=? fun b2_B ->
-    Op.raw_preendorsement b2_A >>=? fun op1 ->
-    Op.raw_preendorsement b2_B >>=? fun op2 ->
+    Op.raw_preattestation b2_A >>=? fun op1 ->
+    Op.raw_preattestation b2_B >>=? fun op2 ->
     let op = mk_evidence (B genesis) op1 op2 in
     bake b1 ~operations:[op] >>= fun res -> invalid_denunciation loc res
 
@@ -199,23 +199,23 @@ end = struct
     bake ~policy:(By_round 0) blk ~operations:[trans] >>=? fun head_B ->
     pick_endorsers (B head_A) >>=? fun ((d1, _slots1), (d2, _slots2)) ->
     (* default: d1 = d2 *)
-    Op.raw_preendorsement ~delegate:d1 head_A >>=? fun op1 ->
-    Op.raw_preendorsement ~delegate:d2 head_B >>=? fun op2 ->
+    Op.raw_preattestation ~delegate:d1 head_A >>=? fun op1 ->
+    Op.raw_preattestation ~delegate:d2 head_B >>=? fun op2 ->
     let op1, op2 = order_preendorsements ~correct_order:true op1 op2 in
     (* bake `nb_blocks_before_denunciation` before double preend. denunciation *)
     bake_n nb_blocks_before_denunciation blk >>=? fun blk ->
-    let op : Operation.packed = Op.double_preendorsement (B blk) op1 op2 in
+    let op : Operation.packed = Op.double_preattestation (B blk) op1 op2 in
     Context.get_baker (B blk) ~round:Round.zero >>=? fun baker ->
     bake ~policy:(By_account baker) blk ~operations:[op] >>= function
     | Ok new_head ->
         test_expected_ok loc baker blk new_head d1 d2 >>=? fun () ->
         let op : Operation.packed =
-          Op.double_preendorsement (B new_head) op2 op1
+          Op.double_preattestation (B new_head) op2 op1
         in
         bake new_head ~operations:[op] >>= invalid_denunciation loc
         >>=? fun () ->
         let op : Operation.packed =
-          Op.double_preendorsement (B new_head) op1 op2
+          Op.double_preattestation (B new_head) op1 op2
         in
         bake new_head ~operations:[op] >>= already_denounced loc
     | Error _ as res -> test_expected_ko loc res
@@ -242,7 +242,7 @@ end = struct
   let malformed_double_preendorsement_denunciation_same_preendorsement () =
     malformed_double_preendorsement_denunciation
     (* exactly the same preendorsement operation => illformed *)
-      ~mk_evidence:(fun ctxt p1 _p2 -> Op.double_preendorsement ctxt p1 p1)
+      ~mk_evidence:(fun ctxt p1 _p2 -> Op.double_preattestation ctxt p1 p1)
       ~loc:__LOC__
       ()
 
@@ -297,7 +297,7 @@ end = struct
 
   let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
     let e1, e2 = order_preendorsements ~correct_order op1 op2 in
-    Op.double_preendorsement ctxt e1 e2
+    Op.double_preattestation ctxt e1 e2
 
   let block_fork b =
     Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
@@ -311,9 +311,9 @@ end = struct
     block_fork genesis >>=? fun (blk_1, blk_2) ->
     Block.bake blk_1 >>=? fun blk_a ->
     Block.bake blk_2 >>=? fun blk_b ->
-    Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
-    Op.raw_preendorsement blk_a >>=? fun preendorsement_a ->
-    Op.raw_preendorsement blk_b >>=? fun preendorsement_b ->
+    Context.get_attester (B blk_a) >>=? fun (delegate, _) ->
+    Op.raw_preattestation blk_a >>=? fun preendorsement_a ->
+    Op.raw_preattestation blk_b >>=? fun preendorsement_b ->
     let operation =
       double_preendorsement (B genesis) preendorsement_a preendorsement_b
     in

@@ -286,11 +286,11 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   Block.bake ~policy:(By_account slashed_account) ~operation genesis
   >>=? fun blk_a ->
   Block.bake ~policy:(By_account slashed_account) genesis >>=? fun blk_b ->
-  Op.raw_preendorsement ~delegate:slashed_account blk_a >>=? fun preendo1 ->
-  Op.raw_preendorsement ~delegate:slashed_account blk_b >>=? fun preendo2 ->
+  Op.raw_preattestation ~delegate:slashed_account blk_a >>=? fun preendo1 ->
+  Op.raw_preattestation ~delegate:slashed_account blk_b >>=? fun preendo2 ->
   let preendo1, preendo2 = order_ops preendo1 preendo2 in
   let double_preendo_op =
-    Op.double_preendorsement (B blk_a) preendo1 preendo2
+    Op.double_preattestation (B blk_a) preendo1 preendo2
   in
   Block.bake
     ~policy:(By_account good_account)
@@ -301,10 +301,10 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   >>=? fun operation ->
   Block.bake ~policy:(By_account slashed_account) ~operation b >>=? fun blk_a ->
   Block.bake ~policy:(By_account slashed_account) b >>=? fun blk_b ->
-  Op.raw_endorsement ~delegate:slashed_account blk_a >>=? fun endo1 ->
-  Op.raw_endorsement ~delegate:slashed_account blk_b >>=? fun endo2 ->
+  Op.raw_attestation ~delegate:slashed_account blk_a >>=? fun endo1 ->
+  Op.raw_attestation ~delegate:slashed_account blk_b >>=? fun endo2 ->
   let endo1, endo2 = order_ops endo1 endo2 in
-  let double_endo_op = Op.double_endorsement (B blk_a) endo1 endo2 in
+  let double_endo_op = Op.double_attestation (B blk_a) endo1 endo2 in
   Block.bake ~policy:(By_account good_account) ~operation:double_endo_op b
   >>=? fun b ->
   (* Assert that the [slashed_account]'s deposit is now 0 *)

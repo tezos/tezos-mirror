@@ -349,8 +349,8 @@ let dbl_endorsement_prelude state =
   | None -> return ([], state)
   | Some (b1, b2) ->
       let* delegate1, delegate2 = pick_two_endorsers (B b1) in
-      let* op1 = Op.raw_preendorsement ~delegate:delegate1 b1 in
-      let* op2 = Op.raw_preendorsement ~delegate:delegate1 b2 in
+      let* op1 = Op.raw_preattestation ~delegate:delegate1 b1 in
+      let* op2 = Op.raw_preattestation ~delegate:delegate1 b2 in
       let op1, op2 =
         let comp =
           Operation_hash.compare (Operation.hash op1) (Operation.hash op2)
@@ -361,8 +361,8 @@ let dbl_endorsement_prelude state =
       let slashable_preend =
         (op1, op2) :: state.dbl_endorsement.slashable_preend
       in
-      let* op3 = Op.raw_endorsement ~delegate:delegate2 b1 in
-      let* op4 = Op.raw_endorsement ~delegate:delegate2 b2 in
+      let* op3 = Op.raw_attestation ~delegate:delegate2 b1 in
+      let* op4 = Op.raw_attestation ~delegate:delegate2 b2 in
       let op3, op4 =
         let comp =
           Operation_hash.compare (Operation.hash op3) (Operation.hash op4)
@@ -387,10 +387,10 @@ let double_consensus_descriptor =
       (fun state ->
         let open Lwt_result_syntax in
         let gen_dbl_pre (op1, op2) =
-          Op.double_preendorsement (Context.B state.block) op1 op2
+          Op.double_preattestation (Context.B state.block) op1 op2
         in
         let gen_dbl_end (op1, op2) =
-          Op.double_endorsement (Context.B state.block) op1 op2
+          Op.double_attestation (Context.B state.block) op1 op2
         in
         let candidates_pre =
           List.map gen_dbl_pre state.dbl_endorsement.slashable_preend
@@ -578,7 +578,7 @@ let preendorsement_descriptor =
       (fun state ->
         let open Lwt_result_syntax in
         let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
+          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
           match slots_opt with
           | None -> return_none
@@ -586,7 +586,7 @@ let preendorsement_descriptor =
               match slots with
               | [] -> return_none
               | _ :: _ ->
-                  let* op = Op.preendorsement ~delegate state.block in
+                  let* op = Op.preattestation ~delegate state.block in
                   return_some op)
         in
         List.filter_map_es gen state.delegates);
@@ -603,7 +603,7 @@ let endorsement_descriptor =
       (fun state ->
         let open Lwt_result_syntax in
         let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_endorser_slot (B state.block) delegate in
+          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
           let delegate = Option.value ~default:delegate ck_opt in
           match slots_opt with
           | None -> return_none
@@ -611,7 +611,7 @@ let endorsement_descriptor =
               match slots with
               | [] -> return_none
               | _ :: _ ->
-                  let* op = Op.endorsement ~delegate state.block in
+                  let* op = Op.attestation ~delegate state.block in
                   return_some op)
         in
         List.filter_map_es gen state.delegates);

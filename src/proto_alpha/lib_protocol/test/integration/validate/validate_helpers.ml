@@ -361,13 +361,13 @@ let secrets =
 
 let pick_two_endorsers ctxt =
   let module V = Plugin.RPC.Validators in
-  Context.get_endorsers ctxt >>=? function
+  Context.get_attesters ctxt >>=? function
   | a :: b :: _ -> return (a.V.consensus_key, b.V.consensus_key)
   | _ -> assert false
 
 let pick_addr_endorser ctxt =
   let module V = Plugin.RPC.Validators in
-  Context.get_endorsers ctxt >>=? function
+  Context.get_attesters ctxt >>=? function
   | a :: _ -> return a.V.consensus_key
   | _ -> assert false
 
@@ -377,7 +377,7 @@ let init_params =
 
 let delegates_of_block block =
   let open Lwt_result_syntax in
-  let+ validators = Context.get_endorsers (B block) in
+  let+ validators = Context.get_attesters (B block) in
   List.map
     (fun Plugin.RPC.Validators.{consensus_key; slots; _} ->
       (consensus_key, slots))

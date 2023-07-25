@@ -26,7 +26,7 @@
 
 (** The tables are precomputed using this the following formulas:
 
-let max_endos = 256
+let max_attestations = 256
 let max_reward = 40
 
 let r = 0.5
@@ -43,12 +43,12 @@ let baking_rewards =
       else
         a
     in
-    let r = r_aux /. (float_of_int max_endos) in
+    let r = r_aux /. (float_of_int max_attestations) in
     let r = 1_000_000. *. r in
     Float.to_int ((float_of_int e) *. (ceil r)) in
 
   let ps = 0 -- 2 in
-  let es = 0 -- max_endos in
+  let es = 0 -- max_attestations in
 
   List.map (fun p ->
       List.map (fun e ->
@@ -57,18 +57,18 @@ let baking_rewards =
     ) ps |> Array.of_list
 
 
-let endorsing_rewards =
+let attesting_rewards =
   let reward p e =
     let r_aux =
                 (1. -. r) *.
                 (float_of_int max_reward) /.
-                (float_of_int max_endos) in
+                (float_of_int max_attestations) in
     let r = if p = 0 then r_aux else r_aux /. b in
     let r = 1_000_000. *. r in
     Float.to_int ((float_of_int e) *. (floor r)) in
 
   let ps = 0 -- 2 in
-  let es = 0 -- max_endos in
+  let es = 0 -- max_attestations in
 
   List.map (fun p ->
       List.map (fun e ->
@@ -859,7 +859,7 @@ let baking_rewards : int array array =
     |];
   |]
 
-let endorsing_rewards : int array array =
+let attesting_rewards : int array array =
   [|
     [|
       0;

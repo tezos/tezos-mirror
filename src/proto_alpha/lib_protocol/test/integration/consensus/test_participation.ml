@@ -37,7 +37,7 @@ open Alpha_context
 (** [baker] bakes and [endorser] endorses *)
 let bake_and_endorse_once (_b_pred, b_cur) baker endorser =
   let open Context in
-  Context.get_endorsers (B b_cur) >>=? fun endorsers_list ->
+  Context.get_attesters (B b_cur) >>=? fun endorsers_list ->
   List.find_map
     (function
       | {Plugin.RPC.Validators.delegate; slots; _} ->
@@ -49,7 +49,7 @@ let bake_and_endorse_once (_b_pred, b_cur) baker endorser =
   | None -> assert false
   | Some (delegate, _slots) ->
       Block.get_round b_cur >>?= fun round ->
-      Op.endorsement ~round ~delegate b_cur >>=? fun endorsement ->
+      Op.attestation ~round ~delegate b_cur >>=? fun endorsement ->
       Block.bake ~policy:(By_account baker) ~operation:endorsement b_cur
 
 (** We test that:
@@ -89,7 +89,7 @@ let test_participation ~sufficient_participation () =
     (fun (b_pred, b_crt, endorsing_power) level ->
       let int_level = Int32.of_int level in
       Environment.wrap_tzresult (Raw_level.of_int32 int_level) >>?= fun level ->
-      Context.get_endorsing_power_for_delegate (B b_crt) ~level del1
+      Context.get_attesting_power_for_delegate (B b_crt) ~level del1
       >>=? fun endorsing_power_for_level ->
       let endorser, new_endorsing_power =
         if sufficient_participation && endorsing_power < minimal_nb_active_slots
@@ -110,7 +110,7 @@ let test_participation ~sufficient_participation () =
      to del2.
      - If sufficient participation, we check that the balance of del2 at b is the
      balance of del2 at pred_b plus the endorsing rewards. *)
-  Context.get_endorsing_reward (B b) ~expected_endorsing_power:expected_nb_slots
+  Context.get_attesting_reward (B b) ~expected_attesting_power:expected_nb_slots
   >|=? Tez.to_mutez
   >>=? fun er ->
   let endorsing_rewards = if sufficient_participation then er else 0L in
@@ -186,7 +186,7 @@ let test_participation_rpc () =
       level_int |> Int32.of_int |> Raw_level.of_int32
       |> Environment.wrap_tzresult
       >>?= fun level ->
-      Context.get_endorsing_power_for_delegate (B b_crt) ~level del2
+      Context.get_attesting_power_for_delegate (B b_crt) ~level del2
       >>=? fun endorsing_power ->
       return (b_crt, b, total_endorsing_power + endorsing_power))
     (b0, b1, 0)

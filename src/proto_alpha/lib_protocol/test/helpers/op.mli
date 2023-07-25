@@ -61,7 +61,7 @@ val sign :
 
     Finally, the operation [branch] can be specified. It defaults to the
     predecessor of the attested block. *)
-val raw_endorsement :
+val raw_attestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -74,8 +74,8 @@ val raw_endorsement :
 (** Create an unpacked preattestation that is expected for a given
     [Block.t].
 
-    Optional parameters are the same than {!raw_endorsement}. *)
-val raw_preendorsement :
+    Optional parameters are the same than {!raw_attestation}. *)
+val raw_preattestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -86,8 +86,8 @@ val raw_preendorsement :
   Kind.preattestation Operation.t tzresult Lwt.t
 
 (** Create a packed attestation that is expected for a given
-    [Block.t] by packing the result of {!raw_endorsement}. *)
-val endorsement :
+    [Block.t] by packing the result of {!raw_attestation}. *)
+val attestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -98,8 +98,8 @@ val endorsement :
   Operation.packed tzresult Lwt.t
 
 (** Create a packed preattestation that is expected for a given
-    [Block.t] by packing the result of {!raw_preendorsement}. *)
-val preendorsement :
+    [Block.t] by packing the result of {!raw_preattestation}. *)
+val preattestation :
   ?delegate:public_key_hash ->
   ?slot:Slot.t ->
   ?level:Raw_level.t ->
@@ -273,13 +273,13 @@ val register_global_constant :
   value:Protocol.Alpha_context.Script.lazy_expr ->
   (Protocol.operation, tztrace) result Lwt.t
 
-val double_endorsement :
+val double_attestation :
   Context.t ->
   Kind.attestation Operation.t ->
   Kind.attestation Operation.t ->
   Operation.packed
 
-val double_preendorsement :
+val double_preattestation :
   Context.t ->
   Kind.preattestation Operation.t ->
   Kind.preattestation Operation.t ->

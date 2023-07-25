@@ -58,11 +58,11 @@ end = struct
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
     Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
-    Op.endorsement b1 >>=? fun endo ->
+    Op.attestation b1 >>=? fun endo ->
     bake b1 ~operations:[endo] >>=? fun b2 ->
     let endorsed_block = preendorsed_block genesis b1 b2 in
     get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
-    Op.preendorsement ?delegate ?slot ~round:preend_round endorsed_block
+    Op.preattestation ?delegate ?slot ~round:preend_round endorsed_block
     >>=? fun p ->
     let operations = endo :: (mk_ops @@ p) in
     bake
@@ -155,7 +155,7 @@ end = struct
     aux_simple_preendorsement_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_endorsers (B curr) >>=? function
+        Context.get_attesters (B curr) >>=? function
         | {V.delegate; slots = s :: _; _} :: _ -> return (Some delegate, Some s)
         | _ -> assert false
         (* there is at least one endorser with a slot *))
@@ -167,7 +167,7 @@ end = struct
     aux_simple_preendorsement_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_endorsers (B curr) >>=? function
+        Context.get_attesters (B curr) >>=? function
         | {V.delegate; V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
             return (Some delegate, Some non_canonical_slot)
         | _ -> assert false
@@ -188,7 +188,7 @@ end = struct
     aux_simple_preendorsement_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_endorsers (B curr) >>=? function
+        Context.get_attesters (B curr) >>=? function
         | {V.delegate; _} :: {V.slots = s :: _; _} :: _ ->
             (* the canonical slot s is not owned by the delegate "delegate" !*)
             return (Some delegate, Some s)
