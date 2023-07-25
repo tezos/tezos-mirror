@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Baking_cache
 
 type state = {
   cctxt : Protocol_client_context.full;
@@ -33,6 +34,7 @@ type state = {
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
+  cycle_cache : Block_hash.t list Cycle_cache.t;
 }
 
 type t = state
