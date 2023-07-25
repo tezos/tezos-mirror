@@ -214,6 +214,10 @@ Node
   names from ``legacy_logging_event-rpc_http_event-<level>`` into
   ``rpc_http_event_<level>``.
 
+- Reduced the workload of the mempool by preventing unnecessary worker
+  requests to be made and fixed a data-race that would request a
+  resource that was already received. (MR :gl:`!9520`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

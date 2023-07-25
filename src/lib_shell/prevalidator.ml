@@ -171,6 +171,9 @@ type ('protocol_data, 'a) types_state_shell = {
   mutable live_blocks : Block_hash.Set.t;
   mutable live_operations : Operation_hash.Set.t;
   mutable fetching : Operation_hash.Set.t;
+      (** An operation is in [fetching] while the ddb is actively
+          requesting it from peers. It is removed from it when the
+          operation arrives or if the request fails (e.g. timeout). *)
   mutable pending : 'protocol_data Pending_ops.t;
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
@@ -250,7 +253,7 @@ module type S = sig
     (protocol_operation, prevalidation_t) types_state_shell ->
     P2p_peer_id.t option ->
     Operation_hash.t ->
-    unit Lwt.t
+    unit
 
   (** The function called after every call to a function of {!API}. *)
   val handle_unprocessed : types_state -> unit Lwt.t
@@ -284,8 +287,7 @@ module type S = sig
     val on_inject :
       types_state -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
-    val on_notify :
-      _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit Lwt.t
+    val on_notify : _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit
   end
 end
 
@@ -319,19 +321,20 @@ module Make_s
     lock : Lwt_mutex.t;
   }
 
-  (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
-    let open Lwt_syntax in
-    if Operation_hash.Set.mem oph shell.banned_operations then
-      let+ () = Events.(emit ban_operation_encountered) (origin, oph) in
-      true
+    if Operation_hash.Set.mem oph shell.banned_operations then (
+      (* In order to avoid data-races (for instance in
+         [may_fetch_operation]), this event is triggered
+         asynchronously which may lead to misordered events. *)
+      ignore
+        (Unit.catch_s (fun () ->
+             Events.(emit ban_operation_encountered) (origin, oph))) ;
+      true)
     else
-      Lwt.return
-        (Pending_ops.mem oph shell.pending
-        || Operation_hash.Set.mem oph shell.fetching
-        || Operation_hash.Set.mem oph shell.live_operations
-        || Classification.is_in_mempool oph shell.classification <> None
-        || Classification.is_known_unparsable oph shell.classification)
+      Pending_ops.mem oph shell.pending
+      || Operation_hash.Set.mem oph shell.live_operations
+      || Classification.is_in_mempool oph shell.classification <> None
+      || Classification.is_known_unparsable oph shell.classification
 
   let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     let open Lwt_syntax in
@@ -540,11 +543,12 @@ module Make_s
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
      usual. *)
-  let fetch_operation (shell : ('operation_data, _) types_state_shell) ?peer oph
-      =
+  let fetch_operation ~notify_arrival
+      (shell : ('operation_data, _) types_state_shell) ?peer oph =
     let open Lwt_syntax in
-    let+ () = Events.(emit fetching_operation) oph in
+    let* () = Events.(emit fetching_operation) oph in
     let* r =
+      protect @@ fun () ->
       shell.parameters.tools.fetch
         ~timeout:shell.parameters.limits.operation_timeout
         ?peer
@@ -552,13 +556,19 @@ module Make_s
     in
     match r with
     | Ok op ->
-        shell.worker.push_request_now (Arrived (oph, op)) ;
+        if notify_arrival then shell.worker.push_request_now (Arrived (oph, op)) ;
         Lwt.return_unit
-    | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        Events.(emit operation_included) oph
-    | Error _ ->
-        (* This may happen if the peer timed out for example. *)
-        Events.(emit operation_not_fetched) oph
+    | Error err -> (
+        (* Make sure to remove the operation from fetching if the
+           retrieval fails. This only needs to be done once. *)
+        if notify_arrival then
+          shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
+        match err with
+        | Distributed_db.Operation.Canceled _ :: _ ->
+            Events.(emit operation_included) oph
+        | _ ->
+            (* This may happen if the peer timed out for example. *)
+            Events.(emit operation_not_fetched) oph)
 
   (* This function fetches an operation if it is not already handled
      by the mempool. To ensure we fetch at most a given operation,
@@ -573,21 +583,23 @@ module Make_s
      happened, we can still fetch this operation in the future. *)
   let may_fetch_operation (shell : ('operation_data, _) types_state_shell) peer
       oph =
-    let open Lwt_syntax in
     let origin =
       match peer with Some peer -> Events.Peer peer | None -> Leftover
     in
-    let* already_handled = already_handled ~origin shell oph in
-    if not already_handled then
+    let spawn_fetch_operation ~notify_arrival =
       ignore
-        (Lwt.finalize
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-             fetch_operation shell ?peer oph)
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
-             Lwt.return_unit)) ;
-    Lwt.return_unit
+        (Unit.catch_s (fun () ->
+             fetch_operation ~notify_arrival shell ?peer oph))
+    in
+    if Operation_hash.Set.mem oph shell.fetching then
+      (* If the operation is already being fetched, we notify the DDB
+         that another peer may also be requested for the resource. In
+         any case, the initial fetching thread will still be resolved
+         and push an arrived worker request. *)
+      spawn_fetch_operation ~notify_arrival:false
+    else if not (already_handled ~origin shell oph) then (
+      shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
+      spawn_fetch_operation ~notify_arrival:true)
 
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
@@ -597,10 +609,8 @@ module Make_s
 
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
-      let* already_handled =
-        already_handled ~origin:Events.Arrived pv.shell oph
-      in
-      if already_handled then return_ok_unit
+      pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
+      if already_handled ~origin:Events.Arrived pv.shell oph then return_ok_unit
       else
         match Parser.parse oph op with
         | Error _ ->
@@ -643,10 +653,7 @@ module Make_s
          But, this may change in the future
       *)
       let prio = `High in
-      let*! already_handled =
-        already_handled ~origin:Events.Injected pv.shell oph
-      in
-      if already_handled then
+      if already_handled ~origin:Events.Injected pv.shell oph then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
         return_unit
@@ -744,14 +751,11 @@ module Make_s
 
     let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
         =
-      let open Lwt_syntax in
       let may_fetch_operation = may_fetch_operation shell (Some peer) in
-      let* () =
-        Operation_hash.Set.iter_s
-          may_fetch_operation
-          mempool.Mempool.known_valid
+      let () =
+        Operation_hash.Set.iter may_fetch_operation mempool.Mempool.known_valid
       in
-      Seq.S.iter
+      Seq.iter
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
@@ -1252,7 +1256,7 @@ module Make
             live_blocks
             live_operations
       | Request.Notify (peer, mempool) ->
-          let*! () = Requests.on_notify pv.shell peer mempool in
+          Requests.on_notify pv.shell peer mempool ;
           return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
@@ -1386,11 +1390,9 @@ module Make
           lock = Lwt_mutex.create ();
         }
       in
-      let*! () =
-        Seq.S.iter
-          (may_fetch_operation pv.shell None)
-          (Operation_hash.Set.to_seq fetching)
-      in
+      Seq.iter
+        (may_fetch_operation pv.shell None)
+        (Operation_hash.Set.to_seq fetching) ;
       return pv
 
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
