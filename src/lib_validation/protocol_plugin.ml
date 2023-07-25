@@ -193,25 +193,55 @@ let validation_plugin_not_found =
     ~pp1:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+module Patch_T (Proto : T) : T = struct
+  include Proto
+
+  let validate_operation ?check_signature validation_state oph op =
+    let open Lwt_syntax in
+    let* status = Proto.Plugin.syntactic_check op in
+    match status with
+    | `Ill_formed -> failwith "Ill-formed operation filtered"
+    | `Well_formed ->
+        Proto.validate_operation ?check_signature validation_state oph op
+
+  module Plugin = struct
+    include Proto.Plugin
+
+    let pre_filter info config op =
+      let open Lwt_syntax in
+      let* status = Proto.Plugin.syntactic_check op in
+      match status with
+      | `Ill_formed ->
+          Lwt.return
+            (`Refused
+              (Error_monad.TzTrace.make
+                 (Error_monad.error_of_fmt "Ill-formed operation filtered")))
+      | `Well_formed -> Proto.Plugin.pre_filter info config op
+  end
+end
+
 let proto_with_validation_plugin ~block_hash protocol_hash =
   let open Lwt_result_syntax in
-  match Protocol_hash.Table.find validation_plugin_table protocol_hash with
-  | Some proto_with_plugin -> return proto_with_plugin
-  | None -> (
-      match Registered_protocol.get protocol_hash with
-      | None ->
-          tzfail
-            (Block_validator_errors.Unavailable_protocol
-               {block = block_hash; protocol = protocol_hash})
-      | Some (module Proto : Registered_protocol.T) ->
-          let*! () =
-            match Proto.environment_version with
-            | V0 ->
-                (* This is normal for protocols Genesis and 000
-                   because they don't have a plugin. *)
-                Lwt.return_unit
-            | _ ->
-                Internal_event.Simple.(emit validation_plugin_not_found)
-                  protocol_hash
-          in
-          return (module No_plugin (Proto) : T))
+  let* (module Proto_with_plugin) =
+    match Protocol_hash.Table.find validation_plugin_table protocol_hash with
+    | Some proto_with_plugin -> return proto_with_plugin
+    | None -> (
+        match Registered_protocol.get protocol_hash with
+        | None ->
+            tzfail
+              (Block_validator_errors.Unavailable_protocol
+                 {block = block_hash; protocol = protocol_hash})
+        | Some (module Proto : Registered_protocol.T) ->
+            let*! () =
+              match Proto.environment_version with
+              | V0 ->
+                  (* This is normal for protocols Genesis and 000
+                     because they don't have a plugin. *)
+                  Lwt.return_unit
+              | _ ->
+                  Internal_event.Simple.(emit validation_plugin_not_found)
+                    protocol_hash
+            in
+            return (module No_plugin (Proto) : T))
+  in
+  return (module Patch_T (Proto_with_plugin) : T)
