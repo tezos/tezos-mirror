@@ -40,10 +40,7 @@ let resolve_plugin
   in
   return plugin_opt
 
-type error +=
-  | Cryptobox_initialisation_failed of string
-  | Reveal_data_path_not_a_directory of string
-  | Cannot_create_reveal_data_dir of string
+type error += Cryptobox_initialisation_failed of string
 
 let () =
   register_error_kind
@@ -161,19 +158,23 @@ module Handler = struct
           let* cryptobox = init_cryptobox dal_config proto_parameters in
           Store.Value_size_hooks.set_share_size
             (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-          let () =
-            let pctxt =
-              List.fold_left
-                (fun profile_ctxt profile ->
-                  Profile_manager.add_profile
-                    profile_ctxt
-                    proto_parameters
-                    (Node_context.get_gs_worker ctxt)
-                    profile)
-                (Node_context.get_profile_ctxt ctxt)
-                config.Configuration_file.profiles
+          let* () =
+            let* pctxt =
+              let pctxt = Node_context.get_profile_ctxt ctxt in
+              match config.Configuration_file.profiles with
+              | Bootstrap -> return @@ Profile_manager.bootstrap_profile
+              | Operator operator_profiles -> (
+                  match
+                    Profile_manager.add_operator_profiles
+                      pctxt
+                      proto_parameters
+                      (Node_context.get_gs_worker ctxt)
+                      operator_profiles
+                  with
+                  | None -> fail Errors.[Profile_incompatibility]
+                  | Some pctxt -> return pctxt)
             in
-            Node_context.set_profile_ctxt ctxt pctxt
+            return @@ Node_context.set_profile_ctxt ctxt pctxt
           in
           Node_context.set_ready
             ctxt
@@ -305,6 +306,7 @@ module Handler = struct
             let () =
               Profile_manager.on_new_head
                 (Node_context.get_profile_ctxt ctxt)
+                proto_parameters
                 (Node_context.get_gs_worker ctxt)
                 committee
             in
@@ -465,7 +467,7 @@ let run ~data_dir configuration_override =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; peers; endpoint; _} as config) =
+  let* ({network_name; rpc_addr; peers; endpoint; profiles; _} as config) =
     let*! result = Configuration_file.load ~data_dir in
     match result with
     | Ok configuration -> return (configuration_override configuration)
@@ -487,6 +489,22 @@ let run ~data_dir configuration_override =
       Random.State.make [|seed|]
     in
     let open Worker_parameters in
+    let limits =
+      match profiles with
+      | Services.Types.Bootstrap ->
+          (* Bootstrap nodes should always have a mesh size of zero.
+             so all grafts are responded with prunes with PX. See:
+             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators *)
+          {
+            limits with
+            degree_low = 0;
+            degree_high = 0;
+            degree_out = 0;
+            degree_optimal = 0;
+            degree_score = 0;
+          }
+      | Operator _ -> limits
+    in
     Gossipsub.Worker.(
       make ~events_logging:Logging.event rng limits peer_filter_parameters
       |> start [])

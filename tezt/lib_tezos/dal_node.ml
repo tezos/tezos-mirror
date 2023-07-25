@@ -79,7 +79,8 @@ let spawn_command dal_node =
   Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
-    ?(attestor_profiles = []) ?(producer_profiles = []) dal_node =
+    ?(attestor_profiles = []) ?(producer_profiles = [])
+    ?(bootstrap_profile = false) dal_node =
   spawn_command dal_node
   @@ List.filter_map
        Fun.id
@@ -100,6 +101,7 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (String.concat "," attestor_profiles);
          Some "--producer-profiles";
          Some (String.concat "," (List.map string_of_int producer_profiles));
+         (if bootstrap_profile then Some "--bootstrap-profile" else None);
        ]
 
 module Config_file = struct
@@ -113,13 +115,14 @@ module Config_file = struct
 end
 
 let init_config ?expected_pow ?peers ?attestor_profiles ?producer_profiles
-    dal_node =
+    ?bootstrap_profile dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
       ?attestor_profiles
       ?producer_profiles
+      ?bootstrap_profile
       dal_node
   in
   Process.check process

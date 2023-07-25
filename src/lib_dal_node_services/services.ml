@@ -67,11 +67,13 @@ module Types = struct
     status : header_status;
   }
 
-  type profile =
+  type operator_profile =
     | Attestor of Tezos_crypto.Signature.public_key_hash
     | Producer of {slot_index : int}
 
-  type profiles = profile list
+  type operator_profiles = operator_profile list
+
+  type profiles = Bootstrap | Operator of operator_profiles
 
   type with_proof = {with_proof : bool}
 
@@ -157,14 +159,7 @@ module Types = struct
             (obj1 (req "commitment" Cryptobox.Commitment.encoding))
             header_status_encoding))
 
-  let equal_profile prof1 prof2 =
-    match (prof1, prof2) with
-    | Attestor p1, Attestor p2 ->
-        Tezos_crypto.Signature.Public_key_hash.equal p1 p2
-    | Producer {slot_index = s1}, Producer {slot_index = s2} -> Int.equal s1 s2
-    | Attestor _, _ | Producer _, _ -> false
-
-  let profile_encoding =
+  let operator_profile_encoding =
     let open Data_encoding in
     union
       [
@@ -189,7 +184,25 @@ module Types = struct
 
   let profiles_encoding =
     let open Data_encoding in
-    list profile_encoding
+    union
+      [
+        case
+          ~title:"Boostrap node"
+          (Tag 1)
+          (obj1 (req "kind" (constant "bootstrap")))
+          (function Bootstrap -> Some () | _ -> None)
+          (function () -> Bootstrap);
+        case
+          ~title:"Operator"
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "operator"))
+             (req "operator_profiles" (list operator_profile_encoding)))
+          (function
+            | Operator operator_profiles -> Some ((), operator_profiles)
+            | _ -> None)
+          (function (), operator_profiles -> Operator operator_profiles);
+      ]
 
   let with_proof_encoding =
     let open Data_encoding in
@@ -357,16 +370,19 @@ let get_published_level_headers :
 
 let patch_profiles :
     < meth : [`PATCH]
-    ; input : Types.profiles
+    ; input : Types.operator_profiles
     ; output : unit
     ; prefix : unit
     ; params : unit
     ; query : unit >
     service =
   Tezos_rpc.Service.patch_service
-    ~description:"Update the list of profiles tracked by the DAL node"
+    ~description:
+      "Update the list of profiles tracked by the DAL node. Note that it does \
+       not take the bootstrap profile as it is incompatible with other \
+       profiles."
     ~query:Tezos_rpc.Query.empty
-    ~input:Types.profiles_encoding
+    ~input:(Data_encoding.list Types.operator_profile_encoding)
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "profiles")
 

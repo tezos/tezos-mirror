@@ -23,6 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
+   Improve profile configuration UX for when we have conflicting CLI and config file. *)
+let merge_profiles ~from_config_file ~from_cli =
+  let open Services.Types in
+  match from_cli with
+  | None -> from_config_file
+  | Some from_cli -> (
+      (* Note that the profile from the CLI is prioritized over
+         the profile provided from the config file. *)
+      match (from_config_file, from_cli) with
+      | Bootstrap, Bootstrap -> Bootstrap
+      | Operator _, Bootstrap -> Bootstrap
+      | Bootstrap, Operator op -> Operator op
+      | Operator op1, Operator op2 -> Operator (op1 @ op2))
+
 let merge
     Cli.
       {
@@ -44,7 +59,10 @@ let merge
       expected_pow =
         Option.value ~default:configuration.expected_pow expected_pow;
       endpoint = Option.value ~default:configuration.endpoint endpoint;
-      profiles = profiles @ configuration.profiles;
+      profiles =
+        merge_profiles
+          ~from_cli:profiles
+          ~from_config_file:configuration.profiles;
       metrics_addr =
         Option.value ~default:configuration.metrics_addr metrics_addr;
       peers = peers @ configuration.peers;

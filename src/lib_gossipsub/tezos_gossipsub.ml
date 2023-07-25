@@ -420,7 +420,7 @@ module Make (C : AUTOMATON_CONFIG) :
   let check_limits l =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5129
        Replace the asserts by something more informative. *)
-    assert (l.degree_low > 0) ;
+    assert (l.degree_low >= 0) ;
     assert (l.degree_out >= 0) ;
     assert (l.degree_score >= 0) ;
     assert (l.degree_low <= l.degree_optimal) ;
