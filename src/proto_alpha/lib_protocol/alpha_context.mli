@@ -848,8 +848,8 @@ module Constants : sig
     }
 
     type adaptive_issuance = {
-      staking_over_baking_global_limit : int;
-      staking_over_delegation_edge : int;
+      global_limit_of_staking_over_baking : int;
+      edge_of_staking_over_delegation : int;
       launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
     }
@@ -892,7 +892,7 @@ module Constants : sig
       consensus_committee_size : int;
       consensus_threshold : int;
       max_slashing_period : int;
-      delegation_over_baking_limit : int;
+      limit_of_delegation_over_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_baking : int;
       percentage_of_frozen_deposits_slashed_per_double_attestation : int;
       testnet_dictator : public_key_hash option;
@@ -977,7 +977,7 @@ module Constants : sig
 
   val max_slashing_period : context -> int
 
-  val delegation_over_baking_limit : context -> int
+  val limit_of_delegation_over_baking : context -> int
 
   val percentage_of_frozen_deposits_slashed_per_double_baking : context -> int
 

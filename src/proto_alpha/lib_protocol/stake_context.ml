@@ -28,11 +28,11 @@ open Stake_repr
 let staking_weight ctxt {frozen; delegated} =
   let frozen = Tez_repr.to_mutez frozen in
   let delegated = Tez_repr.to_mutez delegated in
-  let staking_over_delegation_edge =
-    Constants_storage.adaptive_issuance_staking_over_delegation_edge ctxt
+  let edge_of_staking_over_delegation =
+    Constants_storage.adaptive_issuance_edge_of_staking_over_delegation ctxt
   in
   if Constants_storage.adaptive_issuance_enable ctxt then
-    Int64.(add frozen (div delegated (of_int staking_over_delegation_edge)))
+    Int64.(add frozen (div delegated (of_int edge_of_staking_over_delegation)))
   else Int64.add frozen delegated
 
 let compare ctxt s1 s2 =
@@ -46,33 +46,33 @@ let voting_weight ctxt {Stake_repr.Full.own_frozen; staked_frozen; delegated} =
 let apply_limits ctxt staking_parameters
     {Stake_repr.Full.own_frozen; staked_frozen; delegated} =
   let open Result_syntax in
-  let delegation_over_baking_limit =
-    Int64.of_int (Constants_storage.delegation_over_baking_limit ctxt)
+  let limit_of_delegation_over_baking =
+    Int64.of_int (Constants_storage.limit_of_delegation_over_baking ctxt)
   in
-  let staking_over_baking_global_limit_millionth =
+  let global_limit_of_staking_over_baking_millionth =
     Int64.(
       mul
         1_000_000L
         (of_int
-           (Constants_storage.adaptive_issuance_staking_over_baking_global_limit
+           (Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking
               ctxt)))
   in
-  let {Staking_parameters_repr.staking_over_baking_limit_millionth; _} =
+  let {Staking_parameters_repr.limit_of_staking_over_baking_millionth; _} =
     staking_parameters
   in
-  let staking_over_baking_limit_millionth =
-    let delegate_staking_over_baking_limit_millionth =
-      Int64.of_int32 staking_over_baking_limit_millionth
+  let limit_of_staking_over_baking_millionth =
+    let delegate_limit_of_staking_over_baking_millionth =
+      Int64.of_int32 limit_of_staking_over_baking_millionth
     in
     Compare.Int64.min
-      staking_over_baking_global_limit_millionth
-      delegate_staking_over_baking_limit_millionth
+      global_limit_of_staking_over_baking_millionth
+      delegate_limit_of_staking_over_baking_millionth
   in
   let allowed_staked_frozen =
     match
       Tez_repr.mul_ratio
         own_frozen
-        ~num:staking_over_baking_limit_millionth
+        ~num:limit_of_staking_over_baking_millionth
         ~den:1_000_000L
     with
     | Ok max_allowed_staked_frozen ->
@@ -84,7 +84,7 @@ let apply_limits ctxt staking_parameters
   let* delegated = Tez_repr.(delegated +? overstaked) in
   (* Overdelegated tez don't count. *)
   let delegated =
-    match Tez_repr.(own_frozen *? delegation_over_baking_limit) with
+    match Tez_repr.(own_frozen *? limit_of_delegation_over_baking) with
     | Ok max_allowed_delegated -> Tez_repr.min max_allowed_delegated delegated
     | Error _max_allowed_delegated_overflows -> delegated
   in

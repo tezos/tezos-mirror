@@ -36,7 +36,7 @@ val apply_limits :
 
 (** The weight of a staker or a set of stakers. When adaptive
     issuance is active, the delegated tez weight
-    staking_over_delegation_edge less than frozen ones. Since this
+    edge_of_staking_over_delegation less than frozen ones. Since this
     function is applied on a [Stake_repr.t], the limits should already
     have been applied using [apply_limits] if necessary. *)
 val staking_weight : Raw_context.t -> Stake_repr.t -> int64

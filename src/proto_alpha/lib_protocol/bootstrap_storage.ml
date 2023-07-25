@@ -76,11 +76,11 @@ let init_account (ctxt, balance_updates)
       | _ ->
           (* Self-delegated => contract is a delegate.
              Freeze the largest amount of tokens to avoid over-delegation
-             according to the [delegation_over_baking_limit].
+             according to the [limit_of_delegation_over_baking].
              This is necessary so that the network (in tests too) starts with
              accounts with baking rights. *)
-          let delegation_over_baking_limit =
-            Constants_storage.delegation_over_baking_limit ctxt
+          let limit_of_delegation_over_baking =
+            Constants_storage.limit_of_delegation_over_baking ctxt
           in
           let amount_to_freeze =
             let minimal_to_bake =
@@ -91,7 +91,7 @@ let init_account (ctxt, balance_updates)
               Tez_repr.max minimal_stake minimal_frozen_stake
             in
             let minimal_to_not_be_overdelegated =
-              Tez_repr.div_exn amount (delegation_over_baking_limit + 1)
+              Tez_repr.div_exn amount (limit_of_delegation_over_baking + 1)
             in
             Tez_repr.(
               min amount (max minimal_to_bake minimal_to_not_be_overdelegated))

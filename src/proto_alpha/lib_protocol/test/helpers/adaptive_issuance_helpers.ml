@@ -398,16 +398,16 @@ let stake ctxt contract amount =
     contract
     amount
 
-let set_delegate_parameters ctxt delegate ~staking_over_baking_limit
-    ~baking_over_staking_edge_billionth =
+let set_delegate_parameters ctxt delegate ~limit_of_staking_over_baking
+    ~edge_of_baking_over_staking_billionth =
   let entrypoint = Protocol.Alpha_context.Entrypoint.set_delegate_parameters in
   let parameters =
     Protocol.Alpha_context.Script.lazy_expr
       (Expr.from_string
          (Printf.sprintf
             "Pair %d (Pair %d Unit)"
-            staking_over_baking_limit
-            baking_over_staking_edge_billionth))
+            limit_of_staking_over_baking
+            edge_of_baking_over_staking_billionth))
   in
   Op.transaction
     ctxt

@@ -143,8 +143,8 @@ type adaptive_rewards_params = {
 }
 
 type adaptive_issuance = {
-  staking_over_baking_global_limit : int;
-  staking_over_delegation_edge : int;
+  global_limit_of_staking_over_baking : int;
+  edge_of_staking_over_delegation : int;
   launch_ema_threshold : int32;
   adaptive_rewards_params : adaptive_rewards_params;
 }
@@ -187,7 +187,7 @@ type t = {
   consensus_committee_size : int;
   consensus_threshold : int;
   max_slashing_period : int;
-  delegation_over_baking_limit : int;
+  limit_of_delegation_over_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_attestation : int;
   testnet_dictator : Signature.Public_key_hash.t option;
@@ -378,22 +378,22 @@ let adaptive_issuance_encoding =
   let open Data_encoding in
   conv
     (fun {
-           staking_over_baking_global_limit;
-           staking_over_delegation_edge;
+           global_limit_of_staking_over_baking;
+           edge_of_staking_over_delegation;
            launch_ema_threshold;
            adaptive_rewards_params;
          } ->
-      ( staking_over_baking_global_limit,
-        staking_over_delegation_edge,
+      ( global_limit_of_staking_over_baking,
+        edge_of_staking_over_delegation,
         launch_ema_threshold,
         adaptive_rewards_params ))
-    (fun ( staking_over_baking_global_limit,
-           staking_over_delegation_edge,
+    (fun ( global_limit_of_staking_over_baking,
+           edge_of_staking_over_delegation,
            launch_ema_threshold,
            adaptive_rewards_params ) ->
       {
-        staking_over_baking_global_limit;
-        staking_over_delegation_edge;
+        global_limit_of_staking_over_baking;
+        edge_of_staking_over_delegation;
         launch_ema_threshold;
         adaptive_rewards_params;
       })
@@ -479,7 +479,7 @@ let encoding =
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
                 c.max_slashing_period,
-                c.delegation_over_baking_limit,
+                c.limit_of_delegation_over_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_baking,
                 c.percentage_of_frozen_deposits_slashed_per_double_attestation,
                 c.testnet_dictator,
@@ -516,7 +516,7 @@ let encoding =
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
                    max_slashing_period,
-                   delegation_over_baking_limit,
+                   limit_of_delegation_over_baking,
                    percentage_of_frozen_deposits_slashed_per_double_baking,
                    percentage_of_frozen_deposits_slashed_per_double_attestation,
                    testnet_dictator,
@@ -553,7 +553,7 @@ let encoding =
         max_slashing_period;
         consensus_committee_size;
         consensus_threshold;
-        delegation_over_baking_limit;
+        limit_of_delegation_over_baking;
         percentage_of_frozen_deposits_slashed_per_double_baking;
         percentage_of_frozen_deposits_slashed_per_double_attestation;
         testnet_dictator;

@@ -83,7 +83,7 @@ val minimal_participation_ratio : Raw_context.t -> Ratio_repr.t
 
 val max_slashing_period : Raw_context.t -> int
 
-val delegation_over_baking_limit : Raw_context.t -> int
+val limit_of_delegation_over_baking : Raw_context.t -> int
 
 val percentage_of_frozen_deposits_slashed_per_double_baking :
   Raw_context.t -> int
@@ -140,9 +140,9 @@ val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
 
 val adaptive_issuance_enable : Raw_context.t -> bool
 
-val adaptive_issuance_staking_over_baking_global_limit : Raw_context.t -> int
+val adaptive_issuance_global_limit_of_staking_over_baking : Raw_context.t -> int
 
-val adaptive_issuance_staking_over_delegation_edge : Raw_context.t -> int
+val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
 
 val adaptive_issuance_launch_ema_threshold : Raw_context.t -> int32
 

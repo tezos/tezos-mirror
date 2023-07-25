@@ -132,9 +132,9 @@ let max_slashing_period c =
   let constants = Raw_context.constants c in
   constants.max_slashing_period
 
-let delegation_over_baking_limit c =
+let limit_of_delegation_over_baking c =
   let constants = Raw_context.constants c in
-  constants.delegation_over_baking_limit
+  constants.limit_of_delegation_over_baking
 
 let percentage_of_frozen_deposits_slashed_per_double_baking c =
   let constants = Raw_context.constants c in
@@ -232,11 +232,11 @@ let adaptive_issuance c = (Raw_context.constants c).adaptive_issuance
 
 let adaptive_issuance_enable c = Raw_context.adaptive_issuance_enable c
 
-let adaptive_issuance_staking_over_baking_global_limit c =
-  (adaptive_issuance c).staking_over_baking_global_limit
+let adaptive_issuance_global_limit_of_staking_over_baking c =
+  (adaptive_issuance c).global_limit_of_staking_over_baking
 
-let adaptive_issuance_staking_over_delegation_edge c =
-  (adaptive_issuance c).staking_over_delegation_edge
+let adaptive_issuance_edge_of_staking_over_delegation c =
+  (adaptive_issuance c).edge_of_staking_over_delegation
 
 let adaptive_issuance_launch_ema_threshold c =
   (adaptive_issuance c).launch_ema_threshold
