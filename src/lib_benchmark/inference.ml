@@ -386,8 +386,9 @@ let calculate_benchmark_scores ~input ~output =
           let arr = Matrix.row output r |> vector_to_array in
           Array.sort Float.compare arr ;
           (* Eliminate the upper 10% to reduce influence of GC *)
+          (* Don't eliminate when len <= 1 (e.g. allocation benchmark) *)
           let len = Array.length arr in
-          let q = len * 9 / 10 in
+          let q = if len <= 1 then len else len * 9 / 10 in
           Array.init q (fun i -> arr.(i)))
     in
     Maths.matrix_of_array_array arrs
