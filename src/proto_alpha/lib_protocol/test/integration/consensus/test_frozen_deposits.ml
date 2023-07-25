@@ -193,7 +193,7 @@ let adjust_staking_towards_limit ~limit ~block ~account ~contract =
             Block.bake ~operation:adjustment_operation block)
 
 let test_limit_with_overdelegation () =
-  let constants = {constants with delegation_over_baking_limit = 9} in
+  let constants = {constants with limit_of_delegation_over_baking = 9} in
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let (contract1, account1), (contract2, account2) =
     get_first_2_accounts_contracts contracts

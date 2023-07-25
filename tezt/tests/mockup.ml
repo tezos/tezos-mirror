@@ -1245,15 +1245,15 @@ let test_create_mockup_config_show_init_roundtrip protocols =
   let compute_expected_amounts protocol bootstrap_accounts protocol_constants =
     let convert =
       if protocol > Protocol.Nairobi then
-        let delegation_over_baking_limit =
+        let limit_of_delegation_over_baking =
           JSON.(
             protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
         in
-        let delegation_over_baking_limit_plus_1 =
-          Int64.of_int (delegation_over_baking_limit + 1)
+        let limit_of_delegation_over_baking_plus_1 =
+          Int64.of_int (limit_of_delegation_over_baking + 1)
         in
         fun amount ->
-          Tez.(amount - (amount /! delegation_over_baking_limit_plus_1))
+          Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
       else
         let frozen_deposits_percentage =
           JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)

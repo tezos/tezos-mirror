@@ -178,7 +178,7 @@ let constants_mainnet =
     (* 4667 slots *)
     minimal_participation_ratio = {numerator = 2; denominator = 3};
     max_slashing_period = 2;
-    delegation_over_baking_limit = 9;
+    limit_of_delegation_over_baking = 9;
     percentage_of_frozen_deposits_slashed_per_double_baking = 10;
     percentage_of_frozen_deposits_slashed_per_double_attestation = 50;
     (* The `testnet_dictator` should absolutely be None on mainnet *)
@@ -255,8 +255,8 @@ let constants_mainnet =
       };
     adaptive_issuance =
       {
-        staking_over_baking_global_limit = 5;
-        staking_over_delegation_edge = 2;
+        global_limit_of_staking_over_baking = 5;
+        edge_of_staking_over_delegation = 2;
         launch_ema_threshold = 1_600_000_000l;
         adaptive_rewards_params =
           {
@@ -316,7 +316,7 @@ let constants_sandbox =
     consensus_committee_size = 256;
     consensus_threshold = 0;
     max_slashing_period = 2;
-    delegation_over_baking_limit = 19;
+    limit_of_delegation_over_baking = 19;
   }
 
 let constants_test =
@@ -350,7 +350,7 @@ let constants_test =
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
     max_slashing_period = 2;
-    delegation_over_baking_limit =
+    limit_of_delegation_over_baking =
       19
       (* Not 9 so that multiplication by a percentage and
          divisions by a limit do not easily get intermingled. *);

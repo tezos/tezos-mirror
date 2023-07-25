@@ -112,10 +112,11 @@ type adaptive_rewards_params = {
 }
 
 type adaptive_issuance = {
-  staking_over_baking_global_limit
+  global_limit_of_staking_over_baking
     (* Global maximum stake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
-  staking_over_delegation_edge : (* Weight of staking over delegation. *) int;
+  edge_of_staking_over_delegation :
+    (* Weight of staking over delegation. *) int;
   launch_ema_threshold : (* Threshold of the activation vote *) int32;
   adaptive_rewards_params :
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
@@ -169,7 +170,7 @@ type t = {
   (* in slots *)
   max_slashing_period : int;
   (* in cycles *)
-  delegation_over_baking_limit : int;
+  limit_of_delegation_over_baking : int;
   (* upper bound on the (delegated tz / own frozen tz) ratio *)
   percentage_of_frozen_deposits_slashed_per_double_baking : int;
   percentage_of_frozen_deposits_slashed_per_double_attestation : int;

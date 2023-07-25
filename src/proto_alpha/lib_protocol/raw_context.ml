@@ -1024,8 +1024,8 @@ let prepare_first_block ~level ~timestamp ctxt =
       let adaptive_issuance =
         Constants_parametric_repr.
           {
-            staking_over_baking_global_limit = 5;
-            staking_over_delegation_edge = 2;
+            global_limit_of_staking_over_baking = 5;
+            edge_of_staking_over_delegation = 2;
             launch_ema_threshold =
               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l;
             adaptive_rewards_params;
@@ -1056,13 +1056,13 @@ let prepare_first_block ~level ~timestamp ctxt =
         in
         Int64.to_int percentage_rounded_down
       in
-      let delegation_over_baking_limit =
+      let limit_of_delegation_over_baking =
         (100 / c.frozen_deposits_percentage) - 1
       in
       let minimal_frozen_stake =
         Tez_repr.(
           div_exn
-            (mul_exn c.minimal_stake (delegation_over_baking_limit + 1))
+            (mul_exn c.minimal_stake (limit_of_delegation_over_baking + 1))
             100)
       in
       let constants =
@@ -1097,7 +1097,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             consensus_threshold = c.consensus_threshold;
             minimal_participation_ratio = c.minimal_participation_ratio;
             max_slashing_period = c.max_slashing_period;
-            delegation_over_baking_limit;
+            limit_of_delegation_over_baking;
             percentage_of_frozen_deposits_slashed_per_double_baking;
             percentage_of_frozen_deposits_slashed_per_double_attestation;
             (* The `testnet_dictator` should absolutely be None on mainnet *)

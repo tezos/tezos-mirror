@@ -44,13 +44,13 @@ let action_color = Log.Color.FG.green
 let event_color = Log.Color.FG.blue
 
 type staking_parameters = {
-  staking_over_baking_limit : int;
+  limit_of_staking_over_baking : int;
   baking_over_staking_edge : int;
 }
 
 let default_params =
   {
-    staking_over_baking_limit = 1_000_000;
+    limit_of_staking_over_baking = 1_000_000;
     baking_over_staking_edge = 1_000_000_000;
   }
 
@@ -560,8 +560,8 @@ let run_action :
         set_delegate_parameters
           (B block)
           delegate.contract
-          ~staking_over_baking_limit:params.staking_over_baking_limit
-          ~baking_over_staking_edge_billionth:params.baking_over_staking_edge
+          ~limit_of_staking_over_baking:params.limit_of_staking_over_baking
+          ~edge_of_baking_over_staking_billionth:params.baking_over_staking_edge
       in
       let* block, info = bake ~operation (block, info) in
       let info =

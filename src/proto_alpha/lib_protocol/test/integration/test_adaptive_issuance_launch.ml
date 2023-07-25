@@ -81,15 +81,15 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
   let expected_liquid = Int64.add balance expected_delegated in
   let expected_frozen = Int64.add expected_staked expected_ext_staked in
   let* constants = Context.get_constants (B block) in
-  let staking_over_delegation_edge =
+  let edge_of_staking_over_delegation =
     Int64.of_int
-      constants.parametric.adaptive_issuance.staking_over_delegation_edge
+      constants.parametric.adaptive_issuance.edge_of_staking_over_delegation
   in
   let expected_power =
     if ai_enabled then
       Int64.add
         expected_frozen
-        (Int64.div expected_liquid staking_over_delegation_edge)
+        (Int64.div expected_liquid edge_of_staking_over_delegation)
     else Int64.add expected_frozen expected_liquid
   in
   let* actual_voting_power =
@@ -145,7 +145,7 @@ let test_launch threshold expected_vote_duration () =
   (* To test that adaptive issuance is active, we test that
      staking, a feature only available after the activation, is
      allowed. But by default, delegates reject stakers, they must
-     explicitely set a positive staking_over_baking_limit to allow
+     explicitely set a positive limit_of_staking_over_baking to allow
      them. Setting this limit does not immediately take effect but can
      be done before the activation. For these reasons, we set it at
      the beginning.
@@ -161,8 +161,8 @@ let test_launch threshold expected_vote_duration () =
       set_delegate_parameters
         (B block)
         delegate
-        ~staking_over_baking_limit:1_000_000
-        ~baking_over_staking_edge_billionth:1_000_000_000
+        ~limit_of_staking_over_baking:1_000_000
+        ~edge_of_baking_over_staking_billionth:1_000_000_000
     in
     Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in

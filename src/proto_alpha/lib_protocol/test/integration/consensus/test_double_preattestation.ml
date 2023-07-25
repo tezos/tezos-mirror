@@ -143,7 +143,7 @@ end = struct
         2L
         (Int64.of_int
            constants.parametric.adaptive_issuance
-             .staking_over_baking_global_limit)
+             .global_limit_of_staking_over_baking)
     in
     let denun_reward = Test_tez.(lost_deposit /! divider) in
     (* if the baker is the attester, he'll only loose half of the deposits *)
