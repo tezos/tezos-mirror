@@ -104,7 +104,7 @@ let constants_mainnet =
           consensus_threshold;
           reward_weights =
             {
-              base_total_rewards_per_minute;
+              base_total_issued_per_minute;
               baking_reward_fixed_portion_weight;
               baking_reward_bonus_weight;
               attesting_reward_weight;
@@ -140,7 +140,7 @@ let constants_mainnet =
     origination_size = 257;
     reward_weights =
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         (* 85.007812 tez/minute *)
         baking_reward_fixed_portion_weight;
         (* 1/4th of total block rewards *)

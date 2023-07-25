@@ -220,7 +220,7 @@ let apply_rewards_info current_level info =
   let {last_level_rewards; total_supply; constants; _} = info in
   (* We assume one block per minute *)
   let rewards_per_block =
-    constants.reward_weights.base_total_rewards_per_minute
+    constants.reward_weights.base_total_issued_per_minute
   in
   if Tez.(rewards_per_block = zero) then return info
   else
@@ -536,7 +536,7 @@ let run_action :
       Log.info ~color:action_color "[Next cycle]" ;
       let block, ({constants; activate_ai; _} as info) = input in
       if
-        Tez.(constants.reward_weights.base_total_rewards_per_minute = zero)
+        Tez.(constants.reward_weights.base_total_issued_per_minute = zero)
         || not activate_ai
       then
         (* Apply rewards in info only after the while cycle ends *)
@@ -790,12 +790,12 @@ let add_account_with_funds name source amount =
 
 let init_constants ?reward_per_block () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
-  let base_total_rewards_per_minute = Tez.of_mutez reward_per_block in
+  let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
   let reward_weights =
     Protocol.Alpha_context.Constants.Parametric.
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         baking_reward_fixed_portion_weight = 1;
         baking_reward_bonus_weight = 0;
         attesting_reward_weight = 0;

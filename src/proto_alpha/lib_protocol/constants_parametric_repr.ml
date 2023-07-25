@@ -150,7 +150,7 @@ type adaptive_inflation = {
 }
 
 type reward_weights = {
-  base_total_rewards_per_minute : Tez_repr.t;
+  base_total_issued_per_minute : Tez_repr.t;
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
@@ -407,7 +407,7 @@ let reward_weights_encoding =
   let open Data_encoding in
   conv
     (fun ({
-            base_total_rewards_per_minute;
+            base_total_issued_per_minute;
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
@@ -416,14 +416,14 @@ let reward_weights_encoding =
             vdf_revelation_tip_weight;
           } :
            reward_weights) ->
-      ( base_total_rewards_per_minute,
+      ( base_total_issued_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
         attesting_reward_weight,
         liquidity_baking_subsidy_weight,
         seed_nonce_revelation_tip_weight,
         vdf_revelation_tip_weight ))
-    (fun ( base_total_rewards_per_minute,
+    (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
@@ -431,7 +431,7 @@ let reward_weights_encoding =
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight ) ->
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
         baking_reward_bonus_weight;
         attesting_reward_weight;
@@ -440,7 +440,7 @@ let reward_weights_encoding =
         vdf_revelation_tip_weight;
       })
     (obj7
-       (req "base_total_rewards_per_minute" Tez_repr.encoding)
+       (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)

@@ -198,7 +198,7 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
             reward_weights =
               {
                 c.reward_weights with
-                base_total_rewards_per_minute = Tez_repr.zero;
+                base_total_issued_per_minute = Tez_repr.zero;
               };
           })
       >>= fun ctxt ->
@@ -210,7 +210,7 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
           {
             (* Hack: we store the rewards here *)
             baking_reward_fixed_portion =
-              constants.reward_weights.base_total_rewards_per_minute;
+              constants.reward_weights.base_total_issued_per_minute;
             baking_reward_bonus_per_slot = Tez_repr.zero;
             attesting_reward_per_slot = Tez_repr.zero;
           }))
@@ -228,7 +228,7 @@ let cycle_end ctxt last_cycle =
             reward_weights =
               {
                 c.reward_weights with
-                base_total_rewards_per_minute = baking_reward_fixed_portion;
+                base_total_issued_per_minute = baking_reward_fixed_portion;
               };
           })
       >|= ok

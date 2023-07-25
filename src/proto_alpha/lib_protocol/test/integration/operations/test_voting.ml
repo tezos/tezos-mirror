@@ -261,7 +261,7 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     ~consensus_threshold:0
     ~reward_weights:
       {
-        base_total_rewards_per_minute = Tez.zero;
+        base_total_issued_per_minute = Tez.zero;
         attesting_reward_weight = 1;
         baking_reward_bonus_weight = 1;
         baking_reward_fixed_portion_weight = 1;

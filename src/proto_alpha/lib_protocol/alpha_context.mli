@@ -855,7 +855,7 @@ module Constants : sig
     }
 
     type reward_weights = {
-      base_total_rewards_per_minute : Tez.t;
+      base_total_issued_per_minute : Tez.t;
       baking_reward_fixed_portion_weight : int;
       baking_reward_bonus_weight : int;
       attesting_reward_weight : int;

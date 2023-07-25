@@ -40,7 +40,7 @@ let constants =
     reward_weights =
       {
         Default_parameters.constants_test.reward_weights with
-        base_total_rewards_per_minute = Tez.zero;
+        base_total_issued_per_minute = Tez.zero;
       };
     consensus_threshold = 0;
     origination_size = 0;

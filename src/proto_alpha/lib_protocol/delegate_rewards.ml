@@ -49,7 +49,7 @@ let tez_from_weights
     minimal_block_delay |> Period_repr.to_seconds |> Int64.to_int
   in
   let weighted_rewards_per_minute =
-    Tez_repr.mul_exn reward_weights.base_total_rewards_per_minute weight
+    Tez_repr.mul_exn reward_weights.base_total_issued_per_minute weight
   in
   let weighted_rewards_per_block =
     Tez_repr.(div_exn (mul_exn weighted_rewards_per_minute block_delay) 60)

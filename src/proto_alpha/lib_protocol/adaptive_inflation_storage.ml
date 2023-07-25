@@ -167,12 +167,12 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_rewards_per_minute
+  fun ~base_total_issued_per_minute
       ~total_supply
       ~total_frozen_stake
       ~bonus
       ~reward_params ->
-    if Compare.Int64.equal (Tez_repr.to_mutez base_total_rewards_per_minute) 0L
+    if Compare.Int64.equal (Tez_repr.to_mutez base_total_issued_per_minute) 0L
     then Q.one
     else
       let Constants_parametric_repr.{reward_ratio_min; reward_ratio_max; _} =
@@ -187,8 +187,8 @@ let compute_coeff =
           q_total_frozen_stake
           q_total_supply (* = portion of frozen stake *)
       in
-      let q_base_total_rewards_per_minute =
-        Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
+      let q_base_total_issued_per_minute =
+        Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
       let f =
         compute_reward_coeff_ratio
@@ -199,7 +199,7 @@ let compute_coeff =
       in
       let f = Q.div f q_min_per_year (* = inflation per minute *) in
       let f = Q.mul f q_total_supply (* = rewards per minute *) in
-      Q.div f q_base_total_rewards_per_minute
+      Q.div f q_base_total_issued_per_minute
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
@@ -214,8 +214,8 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let before_for_cycle = Cycle_repr.pred for_cycle in
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
-    let base_total_rewards_per_minute =
-      (Constants_storage.reward_weights ctxt).base_total_rewards_per_minute
+    let base_total_issued_per_minute =
+      (Constants_storage.reward_weights ctxt).base_total_issued_per_minute
     in
     let total_frozen_stake = Stake_repr.get_frozen total_stake in
     let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in
@@ -236,7 +236,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     in
     let coeff =
       compute_coeff
-        ~base_total_rewards_per_minute
+        ~base_total_issued_per_minute
         ~total_supply
         ~total_frozen_stake
         ~bonus

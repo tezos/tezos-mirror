@@ -162,15 +162,15 @@ let q_to_float_string q =
 
 let current_rewards_per_minute ctxt =
   let open Lwt_result_syntax in
-  let base_total_rewards_per_minute =
-    (Constants.reward_weights ctxt).base_total_rewards_per_minute
+  let base_total_issued_per_minute =
+    (Constants.reward_weights ctxt).base_total_issued_per_minute
   in
-  let q_base_total_rewards_per_minute =
-    Tez.to_mutez base_total_rewards_per_minute |> Q.of_int64
+  let q_base_total_issued_per_minute =
+    Tez.to_mutez base_total_issued_per_minute |> Q.of_int64
   in
   let cycle = (Level.current ctxt).cycle in
   let* f = Delegate.Rewards.For_RPC.get_reward_coeff ctxt ~cycle in
-  let f = Q.mul f q_base_total_rewards_per_minute (* rewards per minute *) in
+  let f = Q.mul f q_base_total_issued_per_minute (* rewards per minute *) in
   return f
 
 (* Does the reverse operations of [compute_coeff] in [adaptive_inflation_storage.ml] *)

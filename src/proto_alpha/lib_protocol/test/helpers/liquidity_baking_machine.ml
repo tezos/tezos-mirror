@@ -874,7 +874,7 @@ module ConcreteBaseMachine :
       ~cost_per_byte:Tez.zero
       ~reward_weights:
         {
-          base_total_rewards_per_minute =
+          base_total_issued_per_minute =
             Tez.(div_exn (mul_exn liquidity_baking_subsidy 60) block_delay);
           attesting_reward_weight = 0;
           baking_reward_fixed_portion_weight = 0;

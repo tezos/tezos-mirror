@@ -122,12 +122,12 @@ type adaptive_inflation = {
 }
 
 type reward_weights = {
-  (* [base_total_rewards_per_minute] is the total amount of rewards expected to
+  (* [base_total_issued_per_minute] is the total amount of rewards expected to
      be distributed every minute *)
-  base_total_rewards_per_minute : Tez_repr.t;
+  base_total_issued_per_minute : Tez_repr.t;
   (* The following fields represent the "weights" of the respective reward kinds.
      The actual reward values are computed proportionally from the other weights
-     as a portion of the [base_total_rewards_per_minute]. See the module
+     as a portion of the [base_total_issued_per_minute]. See the module
      {!Delegate_rewards} for more details *)
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
