@@ -23,14 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
-module Fueled_pvm = Fueled_pvm.Free
-
 type level_position = Start | Middle | End
 
 type info_per_level = {
-  predecessor_timestamp : Timestamp.time;
+  predecessor_timestamp : Time.Protocol.t;
   predecessor : Block_hash.t;
 }
 
@@ -42,18 +38,22 @@ type t = {
   nb_messages_inbox : int;
   level_position : level_position;
   info_per_level : info_per_level;
+  plugin : (module Protocol_plugin_sig.S);
 }
 
 let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
   let open Lwt_result_syntax in
-  let* block_info =
-    Layer1_helpers.fetch_tezos_block node_ctxt.l1_ctxt predecessor
+  let* pred_header =
+    Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt predecessor
   in
-  let predecessor_timestamp = block_info.header.shell.timestamp in
+  let predecessor_timestamp = pred_header.timestamp in
   return {predecessor_timestamp; predecessor}
 
 let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
+  let inbox_level = Int32.succ level in
+  let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt inbox_level in
+  let module Plugin = (val plugin) in
   let*? () =
     error_unless
       (level >= node_ctxt.Node_context.genesis_info.level)
@@ -67,9 +67,8 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
       return (Context.empty node_ctxt.context)
     else Node_context.checkout_context node_ctxt hash
   in
-  let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
+  let* ctxt, state = Plugin.Interpreter.state_of_head node_ctxt ctxt head in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
-  let inbox_level = Int32.succ level in
   {
     ctxt;
     inbox_level;
@@ -78,6 +77,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     nb_messages_inbox = 0;
     level_position = Start;
     info_per_level;
+    plugin;
   }
 
 let simulate_messages_no_checks (node_ctxt : Node_context.ro)
@@ -87,19 +87,20 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
        inbox_level;
        reveal_map;
        nb_messages_inbox;
+       plugin;
        level_position = _;
        info_per_level = _;
      } as sim) messages =
   let open Lwt_result_syntax in
-  let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! state_hash = PVM.state_hash state in
-  let*! tick = PVM.get_tick state in
+  let open (val plugin) in
+  let*! state_hash = Pvm.state_hash node_ctxt.kind state in
+  let*! tick = Pvm.get_tick node_ctxt.kind state in
   let eval_state =
     Pvm_plugin_sig.
       {
         state;
-        state_hash = Sc_rollup_proto_types.State_hash.to_octez state_hash;
-        tick = Sc_rollup.Tick.to_z tick;
+        state_hash;
+        tick;
         inbox_level;
         message_counter_offset = nb_messages_inbox;
         remaining_fuel = Fuel.Free.of_ticks 0L;
@@ -108,52 +109,44 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   in
   (* Build new state *)
   let* eval_result =
-    Fueled_pvm.eval_messages ?reveal_map node_ctxt eval_state
+    Pvm.Fueled.Free.eval_messages ?reveal_map node_ctxt eval_state
   in
   let Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Delayed_write_monad.ignore eval_result
   in
-  let*! ctxt = PVM.State.set ctxt state in
+  let*! ctxt = Context.PVMState.set ctxt state in
   let nb_messages_inbox = nb_messages_inbox + num_messages in
   return ({sim with ctxt; state; nb_messages_inbox}, num_ticks)
 
 let simulate_messages (node_ctxt : Node_context.ro) sim messages =
   let open Lwt_result_syntax in
+  let open (val sim.plugin) in
   (* Build new inbox *)
   let*? () =
     error_when
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let*? messages =
-    let open Result_syntax in
+  let messages =
     if sim.level_position = Start then
       let {predecessor_timestamp; predecessor} = sim.info_per_level in
-      let open Sc_rollup_inbox_message_repr in
-      let+ info_per_level =
-        Environment.wrap_tzresult
-        @@ serialize
-             (Internal (Info_per_level {predecessor; predecessor_timestamp}))
-      in
-      unsafe_to_string start_of_level_serialized
-      :: unsafe_to_string info_per_level
+      Pvm.start_of_level_serialized
+      :: Pvm.info_per_level_serialized ~predecessor ~predecessor_timestamp
       :: messages
-    else return messages
+    else messages
   in
   let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
   ({sim with level_position = Middle}, num_ticks)
 
 let end_simulation node_ctxt sim =
   let open Lwt_result_syntax in
+  let open (val sim.plugin) in
   let*? () =
     error_when
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
   let+ sim, num_ticks =
-    simulate_messages_no_checks
-      node_ctxt
-      sim
-      [Sc_rollup_inbox_message_repr.(unsafe_to_string end_of_level_serialized)]
+    simulate_messages_no_checks node_ctxt sim [Pvm.end_of_level_serialized]
   in
   ({sim with level_position = End}, num_ticks)

@@ -23,13 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-module Fueled_pvm = Fueled_pvm.Free
-
 type level_position = Start | Middle | End
 
 type info_per_level = {
-  predecessor_timestamp : Timestamp.time;
+  predecessor_timestamp : Time.Protocol.t;
   predecessor : Block_hash.t;
 }
 
@@ -42,6 +39,7 @@ type t = {
   nb_messages_inbox : int;
   level_position : level_position;
   info_per_level : info_per_level;
+  plugin : (module Protocol_plugin_sig.S);
 }
 
 (** [start_simulation node_ctxt reveal_source block] starts a new simulation {e
