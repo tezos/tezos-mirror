@@ -75,6 +75,11 @@ module type INBOX = sig
     Octez_smart_rollup.Inbox.t ->
     unit tzresult Lwt.t
 
+  (** Serialize an external messages to the protocol representation. NOTE: so
+      far, in all available protocols, this adds a tag ['\001'] at the
+      beginning. *)
+  val serialize_external_message : string -> string tzresult
+
   (**/**)
 
   module Internal_for_tests : sig

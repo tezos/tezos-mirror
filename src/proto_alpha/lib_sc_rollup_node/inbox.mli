@@ -90,6 +90,10 @@ val same_as_layer_1 :
   Octez_smart_rollup.Inbox.t ->
   unit tzresult Lwt.t
 
+(** Serialize an external messages to the protocol representation. NOTE: this
+    adds a tag ['\001'] at the beginning. *)
+val serialize_external_message : string -> string tzresult
+
 (**/**)
 
 module Internal_for_tests : sig

@@ -248,6 +248,14 @@ let payloads_history_of_messages ~predecessor ~predecessor_timestamp messages =
      in
      payloads_history
 
+let serialize_external_message msg =
+  Environment.wrap_tzresult
+  @@
+  let open Result_syntax in
+  let open Sc_rollup.Inbox_message in
+  let+ msg = serialize @@ External msg in
+  unsafe_to_string msg
+
 module Internal_for_tests = struct
   let process_messages node_ctxt ~is_first_block ~predecessor head messages =
     assert (not is_first_block) ;
