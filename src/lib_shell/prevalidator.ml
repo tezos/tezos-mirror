@@ -253,7 +253,7 @@ module type S = sig
     (protocol_operation, prevalidation_t) types_state_shell ->
     P2p_peer_id.t option ->
     Operation_hash.t ->
-    unit Lwt.t
+    unit
 
   (** The function called after every call to a function of {!API}. *)
   val handle_unprocessed : types_state -> unit Lwt.t
@@ -287,8 +287,7 @@ module type S = sig
     val on_inject :
       types_state -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
-    val on_notify :
-      _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit Lwt.t
+    val on_notify : _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit
   end
 end
 
@@ -592,18 +591,15 @@ module Make_s
         (Unit.catch_s (fun () ->
              fetch_operation ~notify_arrival shell ?peer oph))
     in
-    if Operation_hash.Set.mem oph shell.fetching then (
+    if Operation_hash.Set.mem oph shell.fetching then
       (* If the operation is already being fetched, we notify the DDB
          that another peer may also be requested for the resource. In
          any case, the initial fetching thread will still be resolved
          and push an arrived worker request. *)
-      spawn_fetch_operation ~notify_arrival:false ;
-      Lwt.return_unit)
-    else if already_handled ~origin shell oph then Lwt.return_unit
-    else (
+      spawn_fetch_operation ~notify_arrival:false
+    else if not (already_handled ~origin shell oph) then (
       shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-      spawn_fetch_operation ~notify_arrival:true ;
-      Lwt.return_unit)
+      spawn_fetch_operation ~notify_arrival:true)
 
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
@@ -755,14 +751,11 @@ module Make_s
 
     let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
         =
-      let open Lwt_syntax in
       let may_fetch_operation = may_fetch_operation shell (Some peer) in
-      let* () =
-        Operation_hash.Set.iter_s
-          may_fetch_operation
-          mempool.Mempool.known_valid
+      let () =
+        Operation_hash.Set.iter may_fetch_operation mempool.Mempool.known_valid
       in
-      Seq.S.iter
+      Seq.iter
         may_fetch_operation
         (Operation_hash.Set.to_seq mempool.Mempool.pending)
 
@@ -1263,7 +1256,7 @@ module Make
             live_blocks
             live_operations
       | Request.Notify (peer, mempool) ->
-          let*! () = Requests.on_notify pv.shell peer mempool in
+          Requests.on_notify pv.shell peer mempool ;
           return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
@@ -1397,11 +1390,9 @@ module Make
           lock = Lwt_mutex.create ();
         }
       in
-      let*! () =
-        Seq.S.iter
-          (may_fetch_operation pv.shell None)
-          (Operation_hash.Set.to_seq fetching)
-      in
+      Seq.iter
+        (may_fetch_operation pv.shell None)
+        (Operation_hash.Set.to_seq fetching) ;
       return pv
 
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
