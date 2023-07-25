@@ -51,11 +51,11 @@ type block_to_bake = {
 type action =
   | Do_nothing
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
-  | Inject_preendorsements of {
-      preendorsements : (consensus_key_and_delegate * consensus_content) list;
+  | Inject_preattestations of {
+      preattestations : (consensus_key_and_delegate * consensus_content) list;
     }
-  | Inject_endorsements of {
-      endorsements : (consensus_key_and_delegate * consensus_content) list;
+  | Inject_attestations of {
+      attestations : (consensus_key_and_delegate * consensus_content) list;
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
@@ -90,21 +90,21 @@ val inject_block :
   updated_state:state ->
   state tzresult Lwt.t
 
-val inject_preendorsements :
+val inject_preattestations :
   state ->
-  preendorsements:(consensus_key_and_delegate * consensus_content) list ->
+  preattestations:(consensus_key_and_delegate * consensus_content) list ->
   unit tzresult Lwt.t
 
-val sign_endorsements :
+val sign_attestations :
   state ->
   (consensus_key_and_delegate * consensus_content) list ->
   (consensus_key_and_delegate * packed_operation * int32 * Round.t) list
   tzresult
   Lwt.t
 
-val inject_endorsements :
+val inject_attestations :
   state ->
-  endorsements:(consensus_key_and_delegate * consensus_content) list ->
+  attestations:(consensus_key_and_delegate * consensus_content) list ->
   unit tzresult Lwt.t
 
 val sign_dal_attestations :
@@ -122,9 +122,9 @@ val get_dal_attestations :
 val prepare_waiting_for_quorum :
   state -> int * (slot:Slot.t -> int option) * Operation_worker.candidate
 
-val start_waiting_for_preendorsement_quorum : state -> unit Lwt.t
+val start_waiting_for_preattestation_quorum : state -> unit Lwt.t
 
-val start_waiting_for_endorsement_quorum : state -> unit Lwt.t
+val start_waiting_for_attestation_quorum : state -> unit Lwt.t
 
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 

@@ -410,7 +410,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
       (prefixes ["attest"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.endorse ~force cctxt delegates);
+        Baking_lib.attest ~force cctxt delegates);
     command
       ~group
       ~desc:
@@ -420,7 +420,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
       (prefixes ["endorse"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.endorse ~force cctxt delegates);
+        Baking_lib.attest ~force cctxt delegates);
     command
       ~group
       ~desc:"Forge and inject a preattestation operation."
@@ -428,7 +428,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
       (prefixes ["preattest"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.preendorse ~force cctxt delegates);
+        Baking_lib.preattest ~force cctxt delegates);
     command
       ~group
       ~desc:
@@ -438,7 +438,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
       (prefixes ["preendorse"; "for"] @@ sources_param)
       (fun force pkhs cctxt ->
         let* delegates = get_delegates cctxt pkhs in
-        Baking_lib.preendorse ~force cctxt delegates);
+        Baking_lib.preattest ~force cctxt delegates);
     command
       ~group
       ~desc:"Send a Tenderbake proposal"

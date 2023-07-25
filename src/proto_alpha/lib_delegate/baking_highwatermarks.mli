@@ -35,8 +35,6 @@ type error += Block_previously_attested of highwatermark
 
 type t
 
-val encoding : t Data_encoding.t
-
 val load :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
@@ -50,7 +48,7 @@ val may_sign_block :
   round:Round.t ->
   bool tzresult Lwt.t
 
-val may_sign_preendorsement :
+val may_sign_preattestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
   delegate:Signature.public_key_hash ->
@@ -58,7 +56,7 @@ val may_sign_preendorsement :
   round:Round.t ->
   bool tzresult Lwt.t
 
-val may_sign_endorsement :
+val may_sign_attestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
   delegate:Signature.public_key_hash ->
@@ -74,7 +72,7 @@ val record_block :
   round:Round.t ->
   unit tzresult Lwt.t
 
-val record_preendorsement :
+val record_preattestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
   delegate:Signature.public_key_hash ->
@@ -82,7 +80,7 @@ val record_preendorsement :
   round:Round.t ->
   unit tzresult Lwt.t
 
-val record_endorsement :
+val record_attestation :
   #Protocol_client_context.full ->
   [`Highwatermarks] Baking_files.location ->
   delegate:Signature.public_key_hash ->

@@ -55,7 +55,7 @@ let get_current_proposal cctxt ?cache () =
 
 module Events = Baking_events.Lib
 
-let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
+let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
   let open Lwt_result_syntax in
@@ -86,9 +86,9 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
           Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
-  Baking_actions.inject_preendorsements state ~preendorsements:consensus_list
+  Baking_actions.inject_preattestations state ~preattestations:consensus_list
 
-let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
+let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
   let open Lwt_result_syntax in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -120,7 +120,7 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_endorsements state ~endorsements:consensus_list
+  Baking_actions.inject_attestations state ~attestations:consensus_list
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in
@@ -145,7 +145,7 @@ let bake_at_next_level state =
       return (Baking_state.Timeout (Time_to_bake_next_level {at_round = round}))
 
 (* Simulate the end of the current round to bootstrap the automaton
-   or endorse the block if necessary *)
+   or attest the block if necessary *)
 let first_automaton_event state =
   match state.level_state.elected_block with
   | None -> Lwt.return (Baking_scheduling.compute_bootstrap_event state)
@@ -154,21 +154,21 @@ let first_automaton_event state =
          level after waiting its date *)
       bake_at_next_level state
 
-let endorsements_endorsing_power state endorsements =
-  let get_endorsement_voting_power {slot; _} =
+let attestations_attesting_power state attestations =
+  let get_attestation_voting_power {slot; _} =
     match
       Delegate_slots.voting_power state.level_state.delegate_slots ~slot
     with
     | None -> 0 (* cannot happen *)
-    | Some endorsing_power -> endorsing_power
+    | Some attesting_power -> attesting_power
   in
-  List.sort_uniq compare endorsements
+  List.sort_uniq compare attestations
   |> List.fold_left
-       (fun power endorsement ->
-         power + get_endorsement_voting_power endorsement)
+       (fun power attestation ->
+         power + get_attestation_voting_power attestation)
        0
 
-let generic_endorsing_power (filter : packed_operation list -> 'a list)
+let generic_attesting_power (filter : packed_operation list -> 'a list)
     (extract : 'a -> consensus_content) state =
   let current_mempool =
     Operation_worker.get_current_operations state.global_state.operation_worker
@@ -176,10 +176,10 @@ let generic_endorsing_power (filter : packed_operation list -> 'a list)
   let latest_proposal = state.level_state.latest_proposal in
   let block_round = latest_proposal.block.round in
   let shell_level = latest_proposal.block.shell.level in
-  let endorsements =
+  let attestations =
     filter (Operation_pool.Operation_set.elements current_mempool.consensus)
   in
-  let endorsements_in_mempool =
+  let attestations_in_mempool =
     List.filter_map
       (fun v ->
         let consensus_content = extract v in
@@ -189,14 +189,14 @@ let generic_endorsing_power (filter : packed_operation list -> 'a list)
                Raw_level.to_int32 consensus_content.level = shell_level)
         then Some consensus_content
         else None)
-      endorsements
+      attestations
   in
-  let power = endorsements_endorsing_power state endorsements_in_mempool in
-  (power, endorsements)
+  let power = attestations_attesting_power state attestations_in_mempool in
+  (power, attestations)
 
-let state_endorsing_power =
-  generic_endorsing_power
-    Operation_pool.filter_endorsements
+let state_attesting_power =
+  generic_attesting_power
+    Operation_pool.filter_attestations
     (fun
       ({
          protocol_data = {contents = Single (Attestation consensus_content); _};
@@ -262,23 +262,23 @@ let propose_at_next_level ~minimal_timestamp state =
     let* state = State_transitions.step state event >>= do_action in
     cctxt#message "Proposal injected" >>= fun () -> return state
 
-let endorsement_quorum state =
-  let power, endorsements = state_endorsing_power state in
+let attestation_quorum state =
+  let power, attestations = state_attesting_power state in
   if
     Compare.Int.(
       power >= state.global_state.constants.parametric.consensus_threshold)
-  then Some (power, endorsements)
+  then Some (power, attestations)
   else None
 
 (* Here's the sketch of the algorithm:
-   Do I have an endorsement quorum for the current block or an elected block?
+   Do I have an attestation quorum for the current block or an elected block?
    - Yes :: wait and propose at next level
    - No  ::
      Is the current proposal at the right round?
      - Yes :: fail propose
      - No  ::
-       Is there a preendorsement quorum or does the last proposal contain a prequorum?
-       - Yes :: repropose block with right payload and preendorsements for current round
+       Is there a preattestation quorum or does the last proposal contain a prequorum?
+       - Yes :: repropose block with right payload and preattestations for current round
        - No  :: repropose fresh block for current round *)
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
@@ -302,15 +302,15 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     match state.level_state.elected_block with
     | Some _ -> propose_at_next_level ~minimal_timestamp state
     | None -> (
-        match endorsement_quorum state with
-        | Some (_voting_power, endorsement_qc) ->
+        match attestation_quorum state with
+        | Some (_voting_power, attestation_qc) ->
             let state =
               {
                 state with
                 round_state =
                   {
                     state.round_state with
-                    current_phase = Baking_state.Awaiting_endorsements;
+                    current_phase = Baking_state.Awaiting_attestations;
                   };
               }
             in
@@ -325,7 +325,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             let* state =
               State_transitions.step
                 state
-                (Baking_state.Quorum_reached (candidate, endorsement_qc))
+                (Baking_state.Quorum_reached (candidate, attestation_qc))
               >>= do_action
               (* this will register the elected block *)
             in
@@ -401,20 +401,20 @@ let bake_using_automaton config state heads_stream =
       return_unit
   | _ -> cctxt#error "Baking loop unexpectedly ended"
 
-(* endorse the latest proposal and bake with it *)
+(* attest the latest proposal and bake with it *)
 let baking_minimal_timestamp state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
-  let own_endorsements =
+  let own_attestations =
     State_transitions.make_consensus_list state latest_proposal
   in
   let current_mempool =
     Operation_worker.get_current_operations state.global_state.operation_worker
   in
-  let endorsements_in_mempool =
+  let attestations_in_mempool =
     Operation_pool.(
-      filter_endorsements (Operation_set.elements current_mempool.consensus))
+      filter_attestations (Operation_set.elements current_mempool.consensus))
     |> List.filter_map
          (fun
            ({
@@ -434,10 +434,10 @@ let baking_minimal_timestamp state =
   in
   let total_voting_power =
     List.fold_left
-      (fun endorsements own -> snd own :: endorsements)
-      endorsements_in_mempool
-      own_endorsements
-    |> endorsements_endorsing_power state
+      (fun attestations own -> snd own :: attestations)
+      attestations_in_mempool
+      own_attestations
+    |> attestations_attesting_power state
   in
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
@@ -460,13 +460,13 @@ let baking_minimal_timestamp state =
     | None -> cctxt#error "No potential baking slot for the given delegates."
     | Some first_potential_round -> return first_potential_round
   in
-  let* signed_endorsements =
-    Baking_actions.sign_endorsements state own_endorsements
+  let* signed_attestations =
+    Baking_actions.sign_attestations state own_attestations
   in
   let pool =
     Operation_pool.add_operations
       current_mempool
-      (List.map (fun (_, x, _, _) -> x) signed_endorsements)
+      (List.map (fun (_, x, _, _) -> x) signed_attestations)
   in
   let dal_attestation_level = Int32.succ latest_proposal.block.shell.level in
   let* own_dal_attestations =

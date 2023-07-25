@@ -139,11 +139,11 @@ type block_to_bake = {
 type action =
   | Do_nothing
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
-  | Inject_preendorsements of {
-      preendorsements : (consensus_key_and_delegate * consensus_content) list;
+  | Inject_preattestations of {
+      preattestations : (consensus_key_and_delegate * consensus_content) list;
     }
-  | Inject_endorsements of {
-      endorsements : (consensus_key_and_delegate * consensus_content) list;
+  | Inject_attestations of {
+      attestations : (consensus_key_and_delegate * consensus_content) list;
     }
   | Update_to_level of level_update
   | Synchronize_round of round_update
@@ -168,8 +168,8 @@ type t = action
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
   | Inject_block _ -> Format.fprintf fmt "inject block"
-  | Inject_preendorsements _ -> Format.fprintf fmt "inject preattestations"
-  | Inject_endorsements _ -> Format.fprintf fmt "inject attestations"
+  | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
+  | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
   | Watch_proposal -> Format.fprintf fmt "watch proposal"
@@ -422,7 +422,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   in
   return updated_state
 
-let inject_preendorsements state ~preendorsements =
+let inject_preattestations state ~preattestations =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -450,7 +450,7 @@ let inject_preendorsements state ~preendorsements =
         let* may_sign =
           cctxt#with_lock (fun () ->
               let* may_sign =
-                Baking_highwatermarks.may_sign_preendorsement
+                Baking_highwatermarks.may_sign_preattestation
                   cctxt
                   block_location
                   ~delegate:consensus_key.public_key_hash
@@ -460,7 +460,7 @@ let inject_preendorsements state ~preendorsements =
               match may_sign with
               | true ->
                   let* () =
-                    Baking_highwatermarks.record_preendorsement
+                    Baking_highwatermarks.record_preattestation
                       cctxt
                       block_location
                       ~delegate:consensus_key.public_key_hash
@@ -496,7 +496,7 @@ let inject_preendorsements state ~preendorsements =
             in
             let operation : Operation.packed = {shell; protocol_data} in
             return_some (delegate, operation, level, round))
-      preendorsements
+      preattestations
   in
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
@@ -517,7 +517,7 @@ let inject_preendorsements state ~preendorsements =
           return_unit))
     signed_operations
 
-let sign_endorsements state endorsements =
+let sign_attestations state attestations =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -547,7 +547,7 @@ let sign_endorsements state endorsements =
       let* may_sign =
         cctxt#with_lock (fun () ->
             let* may_sign =
-              Baking_highwatermarks.may_sign_endorsement
+              Baking_highwatermarks.may_sign_attestation
                 cctxt
                 block_location
                 ~delegate:consensus_key.public_key_hash
@@ -557,7 +557,7 @@ let sign_endorsements state endorsements =
             match may_sign with
             | true ->
                 let* () =
-                  Baking_highwatermarks.record_endorsement
+                  Baking_highwatermarks.record_attestation
                     cctxt
                     block_location
                     ~delegate:consensus_key.public_key_hash
@@ -591,7 +591,7 @@ let sign_endorsements state endorsements =
           in
           let operation : Operation.packed = {shell; protocol_data} in
           return_some (delegate, operation, level, round))
-    endorsements
+    attestations
 
 let sign_dal_attestations state attestations =
   let open Lwt_result_syntax in
@@ -636,11 +636,11 @@ let sign_dal_attestations state attestations =
             (delegate, operation, consensus_content.Dal.Attestation.attestation))
     attestations
 
-let inject_endorsements state ~endorsements =
+let inject_attestations state ~attestations =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let* signed_operations = sign_endorsements state endorsements in
+  let* signed_operations = sign_attestations state attestations in
   (* TODO: add a RPC to inject multiple operations *)
   List.iter_ep
     (fun (delegate, operation, level, round) ->
@@ -792,23 +792,23 @@ let prepare_waiting_for_quorum state =
   in
   (consensus_threshold, get_slot_voting_power, candidate)
 
-let start_waiting_for_preendorsement_quorum state =
+let start_waiting_for_preattestation_quorum state =
   let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
-  Operation_worker.monitor_preendorsement_quorum
+  Operation_worker.monitor_preattestation_quorum
     operation_worker
     ~consensus_threshold
     ~get_slot_voting_power
     candidate
 
-let start_waiting_for_endorsement_quorum state =
+let start_waiting_for_attestation_quorum state =
   let consensus_threshold, get_slot_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
-  Operation_worker.monitor_endorsement_quorum
+  Operation_worker.monitor_attestation_quorum
     operation_worker
     ~consensus_threshold
     ~get_slot_voting_power
@@ -902,15 +902,15 @@ let rec perform_action ~state_recorder state (action : action) =
       return state
   | Inject_block {block_to_bake; updated_state} ->
       inject_block state ~state_recorder block_to_bake ~updated_state
-  | Inject_preendorsements {preendorsements} ->
-      let* () = inject_preendorsements state ~preendorsements in
+  | Inject_preattestations {preattestations} ->
+      let* () = inject_preattestations state ~preattestations in
       perform_action ~state_recorder state Watch_proposal
-  | Inject_endorsements {endorsements} ->
+  | Inject_attestations {attestations} ->
       let* () = state_recorder ~new_state:state in
-      let* () = inject_endorsements state ~endorsements in
-      (* We wait for endorsements to trigger the [Quorum_reached]
+      let* () = inject_attestations state ~attestations in
+      (* We wait for attestations to trigger the [Quorum_reached]
          event *)
-      let*! () = start_waiting_for_endorsement_quorum state in
+      let*! () = start_waiting_for_attestation_quorum state in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4667
          Also inject attestations for the migration block. *)
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4671
@@ -924,7 +924,7 @@ let rec perform_action ~state_recorder state (action : action) =
       let* new_state, new_action = synchronize_round state round_update in
       perform_action ~state_recorder new_state new_action
   | Watch_proposal ->
-      (* We wait for preendorsements to trigger the
+      (* We wait for preattestations to trigger the
            [Prequorum_reached] event *)
-      let*! () = start_waiting_for_preendorsement_quorum state in
+      let*! () = start_waiting_for_preattestation_quorum state in
       return state
