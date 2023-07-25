@@ -42,8 +42,8 @@ type error +=
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
-  | Staking_for_delegator_while_costaking_disabled
-  | Staking_to_delegate_that_refuses_costaking
+  | Staking_for_delegator_while_external_staking_disabled
+  | Staking_to_delegate_that_refuses_external_staking
   | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
   | Invalid_unstake_request_amount of {requested_amount : Z.t}
@@ -205,23 +205,25 @@ let () =
     Data_encoding.unit
     (function Invalid_self_transaction_destination -> Some () | _ -> None)
     (fun () -> Invalid_self_transaction_destination) ;
-  let staking_for_delegator_while_costaking_disabled_description =
-    "As long as co-staking is not enabled, staking operations are only allowed \
-     from delegates."
+  let staking_for_delegator_while_external_staking_disabled_description =
+    "As long as external staking is not enabled, staking operations are only \
+     allowed from delegates."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.staking_for_delegator_while_costaking_disabled"
-    ~title:"Staking for a delegator while co-staking is disabled"
-    ~description:staking_for_delegator_while_costaking_disabled_description
+    ~id:"operations.staking_for_delegator_while_external_staking_disabled"
+    ~title:"Staking for a delegator while external staking is disabled"
+    ~description:
+      staking_for_delegator_while_external_staking_disabled_description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        staking_for_delegator_while_costaking_disabled_description)
+        staking_for_delegator_while_external_staking_disabled_description)
     Data_encoding.unit
     (function
-      | Staking_for_delegator_while_costaking_disabled -> Some () | _ -> None)
-    (fun () -> Staking_for_delegator_while_costaking_disabled) ;
+      | Staking_for_delegator_while_external_staking_disabled -> Some ()
+      | _ -> None)
+    (fun () -> Staking_for_delegator_while_external_staking_disabled) ;
   let stake_modification_without_delegate_description =
     "(Un)Stake operations are only allowed when delegate is set."
   in
@@ -235,23 +237,23 @@ let () =
     Data_encoding.unit
     (function Stake_modification_with_no_delegate_set -> Some () | _ -> None)
     (fun () -> Stake_modification_with_no_delegate_set) ;
-  let staking_to_delegate_that_refuses_costaking_description =
+  let staking_to_delegate_that_refuses_external_staking_description =
     "The delegate currently does not accept staking operations from sources \
      other than itself: its `staking_over_baking_limit` parameter is set to 0."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.staking_to_delegate_that_refuses_costaking"
+    ~id:"operations.staking_to_delegate_that_refuses_external_staking"
     ~title:"Staking to delegate that does not accept external staking"
-    ~description:staking_to_delegate_that_refuses_costaking_description
+    ~description:staking_to_delegate_that_refuses_external_staking_description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        staking_to_delegate_that_refuses_costaking_description)
+        staking_to_delegate_that_refuses_external_staking_description)
     Data_encoding.unit
     (function
-      | Staking_to_delegate_that_refuses_costaking -> Some () | _ -> None)
-    (fun () -> Staking_to_delegate_that_refuses_costaking) ;
+      | Staking_to_delegate_that_refuses_external_staking -> Some () | _ -> None)
+    (fun () -> Staking_to_delegate_that_refuses_external_staking) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_nonzero_transaction_amount"
@@ -387,7 +389,9 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         || Constants.adaptive_inflation_enable ctxt
       in
       let*? () =
-        error_unless allowed Staking_for_delegator_while_costaking_disabled
+        error_unless
+          allowed
+          Staking_for_delegator_while_external_staking_disabled
       in
       let* {staking_over_baking_limit_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
@@ -397,7 +401,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         && Compare.Int32.(staking_over_baking_limit_millionth = 0l)
       in
       let*? () =
-        error_when forbidden Staking_to_delegate_that_refuses_costaking
+        error_when forbidden Staking_to_delegate_that_refuses_external_staking
       in
       let* ctxt, balance_updates =
         Staking.stake ctxt ~sender ~delegate amount

@@ -126,6 +126,6 @@ module Full = struct
         {own_frozen; costaked_frozen; delegated})
       (obj3
          (req "own_frozen" Tez_repr.encoding)
-         (req "costaked_frozen" Tez_repr.encoding)
+         (req "staked_frozen" Tez_repr.encoding)
          (req "delegated" Tez_repr.encoding))
 end

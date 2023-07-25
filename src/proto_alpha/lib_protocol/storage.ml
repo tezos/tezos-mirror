@@ -481,7 +481,7 @@ module Contract = struct
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["costaking_pseudotokens"]
+        let name = ["staking_pseudotokens"]
       end)
       (Staking_pseudotoken_repr)
 
