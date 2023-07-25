@@ -354,13 +354,15 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
   let* r =
     let open Lwt_result_syntax in
-    let* new_protocol =
+    let* new_protocol_hash =
       Store.Block.protocol_hash parameters.chain_store block
     in
-    let* filter =
-      Shell_plugin.find_filter ~block_hash:(Store.Block.hash block) new_protocol
+    let* proto =
+      Protocol_plugin.proto_with_validation_plugin
+        ~block_hash:(Store.Block.hash block)
+        new_protocol_hash
     in
-    Prevalidator.create parameters.prevalidator_limits filter chain_db
+    Prevalidator.create parameters.prevalidator_limits proto chain_db
   in
   match r with
   | Error errs ->
@@ -629,7 +631,7 @@ let collect_proto ~metrics (chain_store, block) =
              does not exist *)
           let* (module Metrics_plugin) =
             let* protocol = Store.Block.protocol_hash_exn chain_store block in
-            Shell_plugin.safe_find_metrics protocol
+            Protocol_plugin.safe_find_metrics protocol
           in
           let fitness = Store.Block.fitness block in
           let* () =

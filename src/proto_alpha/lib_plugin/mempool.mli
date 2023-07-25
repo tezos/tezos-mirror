@@ -48,30 +48,29 @@ val config_encoding : config Data_encoding.t
 (** Static information needed by {!pre_filter}.
 
     It depends on the [head] block upon which a mempool is built. *)
-type filter_info
+type info
 
-(** Create a {!filter_info} based on the [head] block and the current
+(** Create an {!info} based on the [head] block and the current
     context. *)
 val init :
   Environment.Context.t ->
   head:Block_header.shell_header ->
-  (filter_info, tztrace) result Lwt.t
+  (info, tztrace) result Lwt.t
 
-(** Create a new {!filter_info} based on the [head] block.
+(** Create a new {!info} based on the [head] block.
 
-    Parts of the old {!filter_info} (which may have been built on
+    Parts of the old {!info} (which may have been built on
     a different block) are recycled, so that this function is more
     efficient than {!init} and does not need an
     {!Environment.Context.t} argument. *)
-val flush :
-  filter_info -> head:Block_header.shell_header -> filter_info tzresult Lwt.t
+val flush : info -> head:Block_header.shell_header -> info tzresult Lwt.t
 
 (** Perform some syntactic checks on the operation.
 
-        To be used mostly as an exceptional mechanism to prevent
-        ill-formed operations to block block application.
+    To be used mostly as an exceptional mechanism to prevent
+    ill-formed operations to block block application.
 
-        Should be called before the {!pre_filter}, does not need a context. *)
+    Should be called before the {!pre_filter}, does not need a context. *)
 val syntactic_check :
   Protocol.Alpha_context.packed_operation -> [`Well_formed | `Ill_formed]
 
@@ -88,7 +87,7 @@ val syntactic_check :
     consensus operations for any future rounds or levels. The ml file
     contains more detailled explanations with diagrams. *)
 val pre_filter :
-  filter_info ->
+  info ->
   config ->
   Protocol.Alpha_context.packed_operation ->
   [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]

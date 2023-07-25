@@ -230,8 +230,7 @@ module type S = sig
     shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable validation_state : prevalidation_t;
         (** Internal prevalidation state. Among others, this contains the
-            internal states of the protocol mempool and of the plugin
-            filter. *)
+            internal states of the protocol mempool and of the plugin. *)
     mutable operation_stream :
       (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
@@ -297,16 +296,16 @@ end
     this functor doesn't assume a specific chain store implementation,
     which is the crux for having it easily unit-testable. *)
 module Make_s
-    (Filter : Shell_plugin.FILTER)
+    (Proto : Protocol_plugin.T)
     (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Filter.Proto.operation) :
+                         with type protocol_operation = Proto.operation) :
   S
     with type config = Prevalidation_t.config
-     and type protocol_operation = Filter.Proto.operation
+     and type protocol_operation = Proto.operation
      and type prevalidation_t = Prevalidation_t.t = struct
   type config = Prevalidation_t.config
 
-  type protocol_operation = Filter.Proto.operation
+  type protocol_operation = Proto.operation
 
   type prevalidation_t = Prevalidation_t.t
 
@@ -605,7 +604,7 @@ module Make_s
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
   module Requests = struct
-    module Parser = MakeParser (Filter.Proto)
+    module Parser = MakeParser (Proto)
 
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
@@ -893,19 +892,19 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
     Note that, because this functor [include]s {!Make_s}, it is a
     strict extension of [Make_s]. *)
 module Make
-    (Filter : Shell_plugin.FILTER)
+    (Proto : Protocol_plugin.T)
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Filter.Proto.operation
+                         with type protocol_operation = Proto.operation
                           and type chain_store = Store.chain_store) : T = struct
-  module S = Make_s (Filter) (Prevalidation_t)
+  module S = Make_s (Proto) (Prevalidation_t)
   open S
 
   type types_state = S.types_state
 
   let get_rpc_directory pv = pv.rpc_directory
 
-  let name = (Arg.chain_id, Filter.Proto.hash)
+  let name = (Arg.chain_id, Proto.hash)
 
   module Types = struct
     type state = types_state
@@ -942,7 +941,7 @@ module Make
     match allowed_validation_passes with
     | [] -> true
     | validation_passes -> (
-        match Filter.Proto.acceptable_pass op with
+        match Proto.acceptable_pass op with
         | None -> false
         | Some validation_pass ->
             List.mem ~equal:Compare.Int.equal validation_pass validation_passes)
@@ -953,9 +952,7 @@ module Make
       let dir : state Tezos_rpc.Directory.t ref =
         ref Tezos_rpc.Directory.empty
       in
-      let module Proto_services =
-        Block_services.Make (Filter.Proto) (Filter.Proto)
-      in
+      let module Proto_services = Block_services.Make (Proto) (Proto) in
       dir :=
         Tezos_rpc.Directory.register
           !dir
@@ -1443,11 +1440,11 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
-let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) =
-  let module Prevalidation_t = Prevalidation.Make (Filter) in
+let make limits chain_db chain_id (module Proto : Protocol_plugin.T) =
+  let module Prevalidation_t = Prevalidation.Make (Proto) in
   let module Prevalidator =
     Make
-      (Filter)
+      (Proto)
       (struct
         let limits = limits
 
@@ -1474,15 +1471,15 @@ type t = (module T)
 let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
 
-let create limits (module Filter : Shell_plugin.FILTER) chain_db =
+let create limits (module Proto : Protocol_plugin.T) chain_db =
   let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let chain_id = Store.Chain.chain_id chain_store in
   match
-    ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
+    ChainProto_registry.find (chain_id, Proto.hash) !chain_proto_registry
   with
   | None ->
-      let prevalidator = make limits chain_db chain_id (module Filter) in
+      let prevalidator = make limits chain_db chain_id (module Proto) in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
         ChainProto_registry.add

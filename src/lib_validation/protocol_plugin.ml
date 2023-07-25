@@ -24,34 +24,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type FILTER = sig
-  module Proto : Registered_protocol.T
+module type T = sig
+  include Registered_protocol.T
 
-  module Mempool : sig
+  module Plugin : sig
     type config
 
     val config_encoding : config Data_encoding.t
 
     val default_config : config
 
-    type filter_info
+    type info
 
     val init :
       Tezos_protocol_environment.Context.t ->
       head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info tzresult Lwt.t
 
     val flush :
-      filter_info ->
-      head:Tezos_base.Block_header.shell_header ->
-      filter_info tzresult Lwt.t
+      info -> head:Tezos_base.Block_header.shell_header -> info tzresult Lwt.t
 
-    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : operation -> [`Well_formed | `Ill_formed]
 
     val pre_filter :
-      filter_info ->
+      info ->
       config ->
-      Proto.operation ->
+      operation ->
       [ `Passed_prefilter of [`High | `Medium | `Low of Q.t list]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
@@ -59,7 +57,7 @@ module type FILTER = sig
       | `Outdated of tztrace ]
       Lwt.t
 
-    val conflict_handler : config -> Proto.Mempool.conflict_handler
+    val conflict_handler : config -> Mempool.conflict_handler
 
     module Conflict_map : sig
       type t
@@ -67,19 +65,14 @@ module type FILTER = sig
       val empty : t
 
       val update :
-        t ->
-        new_operation:Proto.operation ->
-        replacements:Proto.operation list ->
-        t
+        t -> new_operation:operation -> replacements:operation list -> t
 
       val fee_needed_to_replace_by_fee :
-        config -> candidate_op:Proto.operation -> conflict_map:t -> int64 option
+        config -> candidate_op:operation -> conflict_map:t -> int64 option
     end
 
     val fee_needed_to_overtake :
-      op_to_overtake:Proto.operation ->
-      candidate_op:Proto.operation ->
-      int64 option
+      op_to_overtake:operation -> candidate_op:operation -> int64 option
   end
 end
 
@@ -90,18 +83,22 @@ module type RPC = sig
     Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
 end
 
-module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto and type Mempool.filter_info = unit = struct
-  module Proto = Proto
+module No_plugin (Proto : Registered_protocol.T) :
+  T
+    with type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type Mempool.t = Proto.Mempool.t
+     and type Plugin.info = unit = struct
+  include Proto
 
-  module Mempool = struct
+  module Plugin = struct
     type config = unit
 
     let config_encoding = Data_encoding.empty
 
     let default_config = ()
 
-    type filter_info = unit
+    type info = unit
 
     let init _ ~head:_ = Lwt_result_syntax.return_unit
 
@@ -112,8 +109,7 @@ module No_filter (Proto : Registered_protocol.T) :
     let pre_filter _ _ _ = Lwt.return @@ `Passed_prefilter (`Low [])
 
     let conflict_handler _ ~existing_operation ~new_operation =
-      if Proto.compare_operations existing_operation new_operation < 0 then
-        `Replace
+      if compare_operations existing_operation new_operation < 0 then `Replace
       else `Keep
 
     module Conflict_map = struct
@@ -176,29 +172,31 @@ let safe_find_metrics hash =
       end) in
       Lwt.return (module Metrics : METRICS)
 
-let filter_table : (module FILTER) Protocol_hash.Table.t =
+let validation_plugin_table : (module T) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
-let add_to_filter_table proto_hash filter =
-  assert (not (Protocol_hash.Table.mem filter_table proto_hash)) ;
-  Protocol_hash.Table.add filter_table proto_hash filter
+let add_to_validation_plugin_table proto_hash proto_with_plugin =
+  assert (not (Protocol_hash.Table.mem validation_plugin_table proto_hash)) ;
+  Protocol_hash.Table.add validation_plugin_table proto_hash proto_with_plugin
 
-let register_filter (module Filter : FILTER) =
-  add_to_filter_table Filter.Proto.hash (module Filter)
+let register_validation_plugin (module Proto_with_plugin : T) =
+  add_to_validation_plugin_table
+    Proto_with_plugin.hash
+    (module Proto_with_plugin)
 
-let validator_filter_not_found =
+let validation_plugin_not_found =
   Internal_event.Simple.declare_1
     ~section:["block"; "validation"]
-    ~name:"protocol_filter_not_found"
-    ~msg:"no protocol filter found for protocol {protocol_hash}"
+    ~name:"validation_plugin_not_found"
+    ~msg:"no validation plugin found for protocol {protocol_hash}"
     ~level:Warning
     ~pp1:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
-let find_filter ~block_hash protocol_hash =
+let proto_with_validation_plugin ~block_hash protocol_hash =
   let open Lwt_result_syntax in
-  match Protocol_hash.Table.find filter_table protocol_hash with
-  | Some filter -> return filter
+  match Protocol_hash.Table.find validation_plugin_table protocol_hash with
+  | Some proto_with_plugin -> return proto_with_plugin
   | None -> (
       match Registered_protocol.get protocol_hash with
       | None ->
@@ -213,7 +211,7 @@ let find_filter ~block_hash protocol_hash =
                    because they don't have a plugin. *)
                 Lwt.return_unit
             | _ ->
-                Internal_event.Simple.(emit validator_filter_not_found)
+                Internal_event.Simple.(emit validation_plugin_not_found)
                   protocol_hash
           in
-          return (module No_filter (Proto) : FILTER))
+          return (module No_plugin (Proto) : T))

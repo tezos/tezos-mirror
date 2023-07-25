@@ -318,9 +318,7 @@ let may_patch_protocol ~user_activated_upgrades
       in
       return {validation_result with context}
 
-module Make (Filter : Shell_plugin.FILTER) = struct
-  module Proto = Filter.Proto
-
+module Make (Proto : Protocol_plugin.T) = struct
   type 'operation_data preapplied_operation = {
     hash : Operation_hash.t;
     raw : Operation.t;
@@ -898,7 +896,7 @@ module Make (Filter : Shell_plugin.FILTER) = struct
             in
             let open Lwt_result_syntax in
             let* validation_state =
-              match Filter.Mempool.syntactic_check operation with
+              match Proto.Plugin.syntactic_check operation with
               | `Ill_formed -> failwith "Ill-formed operation filtered"
               | `Well_formed ->
                   Proto.validate_operation
@@ -1286,7 +1284,7 @@ module Make (Filter : Shell_plugin.FILTER) = struct
         (fun state ops ->
           List.fold_left_es
             (fun state (oph, op, check_signature) ->
-              match Filter.Mempool.syntactic_check op with
+              match Proto.Plugin.syntactic_check op with
               | `Ill_formed -> failwith "Ill-formed operation filtered"
               | `Well_formed ->
                   Proto.validate_operation ~check_signature state oph op)
@@ -1382,10 +1380,10 @@ let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
     block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.recompute_metadata
     chain_id
     ~predecessor_block_header
@@ -1424,10 +1422,10 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
   let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.precheck
     chain_id
     ~predecessor_block_header
@@ -1453,12 +1451,11 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
     } ~cache block_hash block_header operations =
   let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash pred_protocol_hash
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash
   in
   let* () =
-    if should_precheck && Filter.Proto.(compare environment_version V7 >= 0)
-    then
+    if should_precheck && Proto.(compare environment_version V7 >= 0) then
       precheck
         ~chain_id
         ~predecessor_block_header
@@ -1470,7 +1467,7 @@ let apply ?simulate ?cached_result ?(should_precheck = true)
         operations
     else return_unit
   in
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   Block_validation.apply
     ?simulate
     ?cached_result
@@ -1537,16 +1534,18 @@ let preapply ~chain_id ~user_activated_upgrades
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
-  let* (module Filter) =
-    Shell_plugin.find_filter ~block_hash:predecessor_hash protocol
+  let* (module Proto) =
+    Protocol_plugin.proto_with_validation_plugin
+      ~block_hash:predecessor_hash
+      protocol
   in
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)
-  let module Block_validation = Make (Filter) in
+  let module Block_validation = Make (Proto) in
   let* protocol_data =
     match
       Data_encoding.Binary.of_bytes_opt
-        Filter.Proto.block_header_data_encoding
+        Proto.block_header_data_encoding
         protocol_data
     with
     | None -> failwith "Invalid block header"

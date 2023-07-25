@@ -218,6 +218,11 @@ Node
   requests to be made and fixed a data-race that would request a
   resource that was already received. (MR :gl:`!9520`)
 
+- Event ``block.validation.protocol_filter_not_found`` renamed to
+  ``block.validation.validation_plugin_not_found`` with updated
+  message ``no validation plugin found for protocol
+  <protocol_hash>``. (MR :gl:`!9583`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.

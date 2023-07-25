@@ -135,7 +135,7 @@ let config_encoding : config Data_encoding.t =
           default_config.replace_by_fee_factor))
 
 (** Static information to store in the filter state. *)
-type filter_info = {
+type info = {
   head : Block_header.shell_header;
   round_durations : Round.round_durations;
   hard_gas_limit_per_block : Gas.Arith.integral;
@@ -196,7 +196,7 @@ let init context ~(head : Tezos_base.Block_header.shell_header) =
   let hard_gas_limit_per_block = Constants.hard_gas_limit_per_block ctxt in
   init_state ~head round_durations hard_gas_limit_per_block
 
-let flush old_filter_info ~head =
+let flush old_info ~head =
   (* To avoid the need to prepare a context as in [init], we retrieve
      the [round_durations] from the previous state. Indeed, they are
      only determined by the [minimal_block_delay] and
@@ -205,10 +205,7 @@ let flush old_filter_info ~head =
      during the lifetime of a protocol. As to
      [hard_gas_limit_per_block], it is directly a protocol
      constant. *)
-  init_state
-    ~head
-    old_filter_info.round_durations
-    old_filter_info.hard_gas_limit_per_block
+  init_state ~head old_info.round_durations old_info.hard_gas_limit_per_block
 
 let manager_prio p = `Low p
 
@@ -271,7 +268,7 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
 
 let pre_filter_manager :
     type t.
-    filter_info ->
+    info ->
     config ->
     Operation.packed_protocol_data ->
     t Kind.manager contents_list ->
@@ -280,7 +277,7 @@ let pre_filter_manager :
     | `Branch_delayed of tztrace
     | `Refused of tztrace
     | `Outdated of tztrace ] =
- fun filter_info config packed_op op ->
+ fun info config packed_op op ->
   let size = size_of_operation packed_op in
   let check_gas_and_fee fee gas_limit =
     let fees_in_nanotez =
@@ -317,7 +314,7 @@ let pre_filter_manager :
       | `Fees_ok ->
           let weight, _op_resources =
             weight_and_resources_manager_operation
-              ~hard_gas_limit_per_block:filter_info.hard_gas_limit_per_block
+              ~hard_gas_limit_per_block:info.hard_gas_limit_per_block
               ~fee
               ~gas:gas_limit
               packed_op
@@ -488,27 +485,25 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
        acceptable *)
     acceptable ~drift ~op_earliest_ts ~now_timestamp
 
-let pre_filter_far_future_consensus_ops filter_info config
+let pre_filter_far_future_consensus_ops info config
     ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t =
   let res =
     let open Result_syntax in
     let now_timestamp = Time.System.now () |> Time.System.to_protocol in
-    let* proposal_level = Raw_level.of_int32 filter_info.head.level in
+    let* proposal_level = Raw_level.of_int32 info.head.level in
     acceptable_op
       ~config
-      ~round_durations:filter_info.round_durations
-      ~round_zero_duration:filter_info.round_zero_duration
+      ~round_durations:info.round_durations
+      ~round_zero_duration:info.round_zero_duration
       ~proposal_level
-      ~proposal_round:filter_info.head_round
-      ~proposal_timestamp:filter_info.head.timestamp
-      ~proposal_predecessor_level_start:filter_info.grandparent_level_start
+      ~proposal_round:info.head_round
+      ~proposal_timestamp:info.head.timestamp
+      ~proposal_predecessor_level_start:info.grandparent_level_start
       ~op_level
       ~op_round
       ~now_timestamp
   in
   match res with Ok b -> Lwt.return b | Error _ -> Lwt.return_false
-
-let syntactic_check _ = `Well_formed
 
 (** A quasi infinite amount of "valid" (pre)endorsements could be
       sent by a committee member, one for each possible round number.
@@ -519,13 +514,13 @@ let syntactic_check _ = `Well_formed
 
       We add [config.clock_drift] time as a safety margin.
   *)
-let pre_filter filter_info config
+let pre_filter info config
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
   let prefilter_manager_op manager_op =
     Lwt.return
     @@
-    match pre_filter_manager filter_info config op manager_op with
+    match pre_filter_manager info config op manager_op with
     | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
     | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as err
       ->
@@ -536,7 +531,7 @@ let pre_filter filter_info config
       Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Preendorsement consensus_content)
   | Single (Endorsement consensus_content) ->
-      pre_filter_far_future_consensus_ops filter_info config consensus_content
+      pre_filter_far_future_consensus_ops info config consensus_content
       >>= fun keep ->
       if keep then Lwt.return @@ `Passed_prefilter consensus_prio
       else
@@ -556,6 +551,8 @@ let pre_filter filter_info config
       Lwt.return @@ `Passed_prefilter other_prio
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
+
+let syntactic_check _ = `Well_formed
 
 let is_manager_operation op =
   match Operation.acceptable_pass op with

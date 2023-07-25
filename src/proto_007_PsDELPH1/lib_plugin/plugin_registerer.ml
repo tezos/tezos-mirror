@@ -28,4 +28,4 @@ module RPC = struct
   include Plugin.RPC
 end
 
-let () = Shell_plugin.register_rpc (module RPC)
+let () = Protocol_plugin.register_rpc (module RPC)
