@@ -177,7 +177,9 @@ let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "smart_rollup_timeout_period_in_blocks" timeout
-    @ make_bool_parameter "smart_rollup_private_enable" whitelist_enable
+    @ (if Protocol.number protocol >= 19 then
+       make_bool_parameter "smart_rollup_private_enable" whitelist_enable
+      else [])
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in

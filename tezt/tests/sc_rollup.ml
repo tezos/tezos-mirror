@@ -245,7 +245,7 @@ let wait_for_computed_dissection sc_node =
 let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
     ?boot_sector ?(parameters_ty = "string")
     ?(operator = Constant.bootstrap1.alias) ?data_dir ?rollup_node_name
-    tezos_node tezos_client =
+    ?whitelist tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup
       ?hooks
@@ -253,6 +253,7 @@ let setup_rollup ~protocol ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       ?boot_sector
       ~parameters_ty
       ?alias
+      ?whitelist
       ~src:operator
       tezos_client
   in
@@ -341,7 +342,8 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?rollup_node_name {variant; tags; description} scenario =
+    ?rollup_node_name ?whitelist_enable ?whitelist {variant; tags; description}
+    scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?supports
@@ -351,7 +353,12 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let* tezos_node, tezos_client =
-    setup_l1 ?commitment_period ?challenge_window ?timeout protocol
+    setup_l1
+      ?commitment_period
+      ?challenge_window
+      ?timeout
+      ?whitelist_enable
+      protocol
   in
   let* rollup_node, rollup_client, sc_rollup =
     setup_rollup
@@ -362,6 +369,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?mode
       ?boot_sector
       ?rollup_node_name
+      ?whitelist
       tezos_node
       tezos_client
   in
@@ -4558,6 +4566,7 @@ let test_rpcs ~kind
     ~hooks
     ~kind
     ~boot_sector
+    ~whitelist_enable:true
     {
       tags = ["rpc"; "api"];
       variant = None;
@@ -4759,7 +4768,24 @@ let test_rpcs ~kind
   let l2_block_hash' = JSON.(l2_block |-> "block_hash" |> as_string) in
   Check.((l2_block_hash' = l2_block_hash) string)
     ~error_msg:"L2 head is from full block is %L but should be %R" ;
-  unit
+  if Protocol.number protocol >= 019 then (
+    let whitelist = [Constant.bootstrap1.public_key_hash] in
+    let* _, _, sc_rollup =
+      setup_rollup ~protocol ~alias:"rollup2" ~kind ~whitelist node client
+    in
+    let* retrieved_whitelist =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist
+           sc_rollup
+    in
+    Check.(
+      is_true
+        (match retrieved_whitelist with
+        | Some l -> List.equal String.equal l whitelist
+        | _ -> false))
+      ~error_msg:"no whitelist found." ;
+    unit)
+  else unit
 
 let test_messages_processed_by_commitment ~kind =
   test_full_scenario
