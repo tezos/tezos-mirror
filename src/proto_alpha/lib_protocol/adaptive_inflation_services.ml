@@ -90,7 +90,7 @@ module S = struct
 
   let context_path = RPC_path.(open_root / "context")
 
-  let path = RPC_path.(context_path / "inflation")
+  let path = RPC_path.(context_path / "issuance")
 
   let total_supply =
     RPC_service.get_service
@@ -109,7 +109,7 @@ module S = struct
   let current_yearly_rate =
     RPC_service.get_service
       ~description:
-        "Returns the current expected maximum yearly inflation rate (in %)"
+        "Returns the current expected maximum yearly issuance rate (in %)"
       ~query:RPC_query.empty
       ~output:(string Plain)
       RPC_path.(path / "current_yearly_rate")
@@ -117,19 +117,19 @@ module S = struct
   let current_yearly_rate_exact =
     RPC_service.get_service
       ~description:
-        "Returns the current expected maximum yearly inflation rate (exact \
+        "Returns the current expected maximum yearly issuance rate (exact \
          quotient)"
       ~query:RPC_query.empty
       ~output:q_encoding
       RPC_path.(path / "current_yearly_rate_exact")
 
-  let current_rewards_per_minute =
+  let current_issuance_per_minute =
     RPC_service.get_service
       ~description:
-        "Returns the current expected maximum rewards per minute (in mutez)"
+        "Returns the current expected maximum issuance per minute (in mutez)"
       ~query:RPC_query.empty
       ~output:Tez.encoding
-      RPC_path.(path / "rewards_per_minute")
+      RPC_path.(path / "issuance_per_minute")
 
   let launch_cycle =
     RPC_service.get_service
@@ -141,14 +141,14 @@ module S = struct
       ~output:(Data_encoding.option Cycle.encoding)
       RPC_path.(context_path / "adaptive_inflation_launch_cycle")
 
-  let expected_rewards =
+  let expected_issuance =
     RPC_service.get_service
       ~description:
-        "Returns the expected rewards for the provided block and the next five \
-         cycles"
+        "Returns the expected issued tez for the provided block and the next \
+         five cycles"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list expected_rewards_encoding)
-      RPC_path.(path / "expected_rewards")
+      RPC_path.(path / "expected_issuance")
 end
 
 let q_to_float_string q =
@@ -258,12 +258,12 @@ let register () =
       current_yearly_rate_value ~formatter:q_to_float_string ctxt) ;
   register0 ~chunked:false S.current_yearly_rate_exact (fun ctxt () () ->
       current_yearly_rate_value ~formatter:(fun x -> x) ctxt) ;
-  register0 ~chunked:false S.current_rewards_per_minute (fun ctxt () () ->
+  register0 ~chunked:false S.current_issuance_per_minute (fun ctxt () () ->
       let* f = current_rewards_per_minute ctxt in
       return (Tez.of_mutez_exn (Q.to_int64 f))) ;
   register0 ~chunked:false S.launch_cycle (fun ctxt () () ->
       Adaptive_inflation.launch_cycle ctxt) ;
-  register0 ~chunked:false S.expected_rewards (fun ctxt () () ->
+  register0 ~chunked:false S.expected_issuance (fun ctxt () () ->
       collect_expected_rewards ~ctxt)
 
 let total_supply ctxt block =
@@ -278,11 +278,11 @@ let current_yearly_rate ctxt block =
 let current_yearly_rate_exact ctxt block =
   RPC_context.make_call0 S.current_yearly_rate_exact ctxt block () ()
 
-let current_rewards_per_minute ctxt block =
-  RPC_context.make_call0 S.current_rewards_per_minute ctxt block () ()
+let current_issuance_per_minute ctxt block =
+  RPC_context.make_call0 S.current_issuance_per_minute ctxt block () ()
 
 let launch_cycle ctxt block =
   RPC_context.make_call0 S.launch_cycle ctxt block () ()
 
-let expected_rewards ctxt block =
-  RPC_context.make_call0 S.expected_rewards ctxt block () ()
+let expected_issuance ctxt block =
+  RPC_context.make_call0 S.expected_issuance ctxt block () ()

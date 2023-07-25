@@ -48,15 +48,15 @@ val current_yearly_rate :
 val current_yearly_rate_exact :
   'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
 
-val current_rewards_per_minute :
+val current_issuance_per_minute :
   'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
 val launch_cycle :
   'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
 
-(** Returns the list of expected rewards for the current cycle and for the next
+(** Returns the list of expected issued tez for the current cycle and for the next
     [preserved_cycles] cycles. *)
-val expected_rewards :
+val expected_issuance :
   'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
 
 val register : unit -> unit
