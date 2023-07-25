@@ -22,52 +22,19 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Protocol
-open Alpha_context
 
-module Request = struct
+module Request : sig
+  (** Type of requests accepted by the refutation player. *)
   type ('a, 'b) t =
-    | Play : Sc_rollup.Game.t -> (unit, error trace) t
-    | Play_opening :
-        Sc_rollup.Refutation_storage.conflict
-        -> (unit, error trace) t
+    | Play : Game.t -> (unit, error trace) t
+        (** Play a step of an ongoing refutation game. *)
+    | Play_opening : Game.conflict -> (unit, error trace) t
+        (** Play the opening move of a refutation game. *)
 
   type view = View : _ t -> view
 
-  let view req = View req
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Play"
-          (obj2
-             (req "request" (constant "play"))
-             (req "game" Sc_rollup.Game.encoding))
-          (function View (Play g) -> Some ((), g) | _ -> None)
-          (fun ((), g) -> View (Play g));
-        case
-          (Tag 1)
-          ~title:"Play opening"
-          (obj2
-             (req "request" (constant "play_opening"))
-             (req "conflict" Sc_rollup.Refutation_storage.conflict_encoding))
-          (function View (Play_opening c) -> Some ((), c) | _ -> None)
-          (fun ((), c) -> View (Play_opening c));
-      ]
-
-  let pp ppf (View r) =
-    match r with
-    | Play game -> Format.fprintf ppf "Playing game %a" Sc_rollup.Game.pp game
-    | Play_opening conflict ->
-        Format.fprintf
-          ppf
-          "Playing opening move for conflict against staker %a at our \
-           commitment %a"
-          Sc_rollup.Staker.pp
-          conflict.other
-          Sc_rollup.Commitment.pp
-          conflict.our_commitment
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
 end
