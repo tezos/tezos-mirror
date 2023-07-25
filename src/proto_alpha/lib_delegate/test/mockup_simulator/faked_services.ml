@@ -7,14 +7,14 @@ module Block_services_alpha = Protocol_client_context.Alpha_block_services
 module type Mocked_services_hooks = sig
   type mempool = Mockup.M.Block_services.Mempool.t
 
-  (** The baker and endorser rely on this stream to be notified of new
+  (** The baker relies on this stream to be notified of new
      valid blocks. *)
   val monitor_validated_blocks :
     unit ->
     (Chain_id.t * Block_hash.t * Block_header.t * Operation.t list list)
     Tezos_rpc.Answer.stream
 
-  (** The baker and endorser rely on this stream to be notified of new
+  (** The baker relies on this stream to be notified of new
      heads. *)
   val monitor_heads :
     unit -> (Block_hash.t * Block_header.t) Tezos_rpc.Answer.stream
@@ -50,19 +50,19 @@ module type Mocked_services_hooks = sig
     Operation.t trace trace ->
     unit tzresult Lwt.t
 
-  (** [inject_operation] is used by the endorser (or the client) to inject
-      operations, including endorsements. *)
+  (** [inject_operation] is used by the baker (or the client) to inject
+      operations, including attestations. *)
   val inject_operation : Operation.t -> Operation_hash.t tzresult Lwt.t
 
   (** [pending_operations] returns the current contents of the mempool. It
      is used by the baker to fetch operations to potentially include in the
-     block being baked. These operations might include endorsements. If
-     there aren't enough endorsements, the baker waits on
+     block being baked. These operations might include attestations. If
+     there aren't enough attestations, the baker waits on
      [monitor_operations]. *)
   val pending_operations : unit -> mempool Lwt.t
 
   (** Return a stream of list of operations. Used by the baker to wait on
-     endorsements. Invariant: the stream becomes empty when the node changes
+     attestations. Invariant: the stream becomes empty when the node changes
      head. *)
   val monitor_operations :
     version:Block_services.version ->
