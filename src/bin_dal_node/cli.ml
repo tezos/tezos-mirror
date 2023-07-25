@@ -133,20 +133,20 @@ module Term = struct
   let attestor_profile =
     let open Cmdliner in
     let doc =
-      "The Octez DAL node attestor profile for a given public key hash."
+      "The Octez DAL node attestor profiles for given public key hashes."
     in
     Arg.(
       value
       & opt (list attestor_profile_arg) []
-      & info ~docs ~doc ~docv:"[PKH]" ["attestor-profile"])
+      & info ~docs ~doc ~docv:"[PKH]" ["attestor-profiles"])
 
   let producer_profile =
     let open Cmdliner in
-    let doc = "The Octez DAL node producer profile for a given slot index." in
+    let doc = "The Octez DAL node producer profiles for given slot indexes." in
     Arg.(
       value
       & opt (list producer_profile_arg) []
-      & info ~docs ~doc ~docv:"[slot index]" ["producer-profile"])
+      & info ~docs ~doc ~docv:"[slot index]" ["producer-profiles"])
 
   let peers =
     let open Cmdliner in

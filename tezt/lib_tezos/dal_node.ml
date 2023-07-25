@@ -96,11 +96,11 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (string_of_float expected_pow);
          Some "--peers";
          Some (String.concat "," peers);
+         Some "--attestor-profiles";
+         Some (String.concat "," attestor_profiles);
+         Some "--producer-profiles";
+         Some (String.concat "," (List.map string_of_int producer_profiles));
        ]
-  @ List.concat_map (fun pkh -> ["--attestor-profile"; pkh]) attestor_profiles
-  @ List.concat_map
-      (fun slot_index -> ["--producer-profile"; string_of_int slot_index])
-      producer_profiles
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
