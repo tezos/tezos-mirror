@@ -36,31 +36,31 @@ let bonus_unit = 1_000_000_000_000_000L
 
 let ratio_to_bonus q = Q.(q * of_int64 bonus_unit |> to_int64)
 
-type error += Undetermined_inflation_coeff_for_cycle of Cycle_repr.t
+type error += Undetermined_issuance_coeff_for_cycle of Cycle_repr.t
 
 let () =
   let open Data_encoding in
-  let undetermined_inflation_coeff_for_cycle_description =
-    "Inflation coefficient is only determined for the current cycle and the \
+  let undetermined_issuance_coeff_for_cycle_description =
+    "Issuance coefficient is only determined for the current cycle and the \
      next [preserved_cycles] cycles to come. Requested cycle is not in this \
      window."
   in
   register_error_kind
     `Permanent
-    ~id:"undetermined_inflation_coeff_for_cycle"
-    ~title:"Undetermined inflation coeff for cycle"
-    ~description:undetermined_inflation_coeff_for_cycle_description
+    ~id:"undetermined_issuance_coeff_for_cycle"
+    ~title:"Undetermined issuance coeff for cycle"
+    ~description:undetermined_issuance_coeff_for_cycle_description
     ~pp:(fun ppf cycle ->
       Format.fprintf
         ppf
         "%s (cycle %a)"
-        undetermined_inflation_coeff_for_cycle_description
+        undetermined_issuance_coeff_for_cycle_description
         Cycle_repr.pp
         cycle)
-    (obj1 (req "Undetermined_inflation_coeff_for_cycle" Cycle_repr.encoding))
+    (obj1 (req "Undetermined_issuance_coeff_for_cycle" Cycle_repr.encoding))
     (function
-      | Undetermined_inflation_coeff_for_cycle cycle -> Some cycle | _ -> None)
-    (fun cycle -> Undetermined_inflation_coeff_for_cycle cycle)
+      | Undetermined_issuance_coeff_for_cycle cycle -> Some cycle | _ -> None)
+    (fun cycle -> Undetermined_issuance_coeff_for_cycle cycle)
 
 let check_determined_cycle ctxt cycle =
   let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
@@ -70,7 +70,7 @@ let check_determined_cycle ctxt cycle =
     fail_unless
       Cycle_repr.(
         ctxt_cycle <= cycle && cycle <= add ctxt_cycle preserved_cycles)
-      (Undetermined_inflation_coeff_for_cycle cycle)
+      (Undetermined_issuance_coeff_for_cycle cycle)
   else return_unit
 
 let get_reward_coeff ctxt ~cycle =
