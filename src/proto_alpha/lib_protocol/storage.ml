@@ -1185,19 +1185,19 @@ module Cycle = struct
       end)
 
   (* Unit = 1_000_000_000_000_000L, defined in [adaptive_inflation_storage.ml] *)
-  module Reward_bonus =
+  module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["reward_bonus"]
+        let name = ["issuance_bonus"]
       end)
       (Encoding.Int64)
 
-  module Reward_coeff =
+  module Issuance_coeff =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["reward_coeff"]
+        let name = ["issuance_coeff"]
       end)
       (struct
         type t = Q.t
@@ -1363,8 +1363,8 @@ module Stake = struct
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
-module Reward_bonus = Cycle.Reward_bonus
-module Reward_coeff = Cycle.Reward_coeff
+module Issuance_bonus = Cycle.Issuance_bonus
+module Issuance_coeff = Cycle.Issuance_coeff
 
 (** Votes *)
 

@@ -567,7 +567,7 @@ module Delegate_sampler_state :
      and type t := Raw_context.t
 
 (** Compounding reward bonus for Adaptive Inflation *)
-module Reward_bonus :
+module Issuance_bonus :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Int64.t
@@ -575,7 +575,7 @@ module Reward_bonus :
 
 (** Multiplicative coefficient for rewards under Adaptive Inflation
     (Includes the bonus) *)
-module Reward_coeff :
+module Issuance_coeff :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Q.t

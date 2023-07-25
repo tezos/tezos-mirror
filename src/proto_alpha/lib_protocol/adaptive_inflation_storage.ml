@@ -80,7 +80,7 @@ let get_reward_coeff ctxt ~cycle =
   if ai_enable then
     (* Even if AI is enabled, the storage can be empty: this is the case for
        the first 5 cycles after AI is enabled *)
-    let* k_opt = Storage.Reward_coeff.find ctxt cycle in
+    let* k_opt = Storage.Issuance_coeff.find ctxt cycle in
     return (Option.value ~default:default_reward k_opt)
   else return default_reward
 
@@ -91,7 +91,7 @@ let get_reward_bonus ctxt ~cycle =
   | Some cycle ->
       let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
       if ai_enable then
-        let* k_opt = Storage.Reward_bonus.find ctxt cycle in
+        let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
         return (Option.value ~default:default_bonus k_opt)
       else return default_bonus
 
@@ -242,8 +242,8 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
         ~bonus
         ~reward_params
     in
-    let*! ctxt = Storage.Reward_bonus.add ctxt for_cycle bonus in
-    let*! ctxt = Storage.Reward_coeff.add ctxt for_cycle coeff in
+    let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
+    let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
     return ctxt
 
 let clear_outdated_reward_data ctxt ~new_cycle =
@@ -251,8 +251,8 @@ let clear_outdated_reward_data ctxt ~new_cycle =
   match Cycle_repr.sub new_cycle 1 with
   | None -> Lwt.return ctxt
   | Some cycle ->
-      let* ctxt = Storage.Reward_coeff.remove ctxt cycle in
-      Storage.Reward_bonus.remove ctxt cycle
+      let* ctxt = Storage.Issuance_coeff.remove ctxt cycle in
+      Storage.Issuance_bonus.remove ctxt cycle
 
 let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in

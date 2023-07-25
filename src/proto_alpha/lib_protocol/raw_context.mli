@@ -287,7 +287,7 @@ val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
 
 (** Returns the reward coefficient for the current cycle
-    This value is equal to the value in {!Storage.Reward_coeff} if it exists,
+    This value is equal to the value in {!Storage.Issuance_coeff} if it exists,
     or equal to [Q.one] otherwise. *)
 val reward_coeff_for_current_cycle : t -> Q.t
 
