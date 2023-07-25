@@ -300,6 +300,28 @@ let unknown_const1 ~name ~const =
   end in
   (module M : Model_impl with type arg_type = unit)
 
+let unknown_const1_skip2 ~name ~const =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun (_ : size repr) ->
+        lam ~name:"size2" @@ fun (_ : size repr) -> free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
 let linear ~name ~coeff =
   let module M = struct
     type arg_type = int * unit
@@ -469,6 +491,29 @@ let linear_sum ~name ~intercept ~coeff =
         lam ~name:"size1" @@ fun size1 ->
         lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept + (free ~name:coeff * (size1 + size2))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
+let linear_sat_sub ~name ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept + (free ~name:coeff * sat_sub size1 size2)
     end
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))
