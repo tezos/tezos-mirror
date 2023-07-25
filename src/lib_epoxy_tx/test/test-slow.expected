@@ -1,14 +1,30 @@
 RandomTx.make_rollup:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 RandomTx.make_rollup_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 RandomTx.make_rollup:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 RandomTx.make_rollup_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 RandomTx.make_rollup:
 Proof size: 3.56 KB
@@ -17,64 +33,144 @@ Prover_pp hash: 844d511ac926449087740c7b5741dd6a77e54722ab1f1bb9e5ac32731645113a
 Verifier_pp hash: 7b65a603f1f1a8958318fb1d44314054d59f902dc12f7396de9df4ac88a4df5a
 
 insufficient balance: amount > bal:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 insufficient balance: amount > bal_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount + fee > bal:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 insufficient balance: amount + fee > bal_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid dst:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid dst_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid src:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid src_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 replay:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 replay_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 balance out of bounds 1:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 balance out of bounds 1_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad msg:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: bad msg_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad sk:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: bad sk_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: not on curve:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: not on curve_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount > bal:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 insufficient balance: amount > bal_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount > bal:
 Proof size: 4.23 KB
@@ -83,10 +179,18 @@ Prover_pp hash: 7fbb5d0b9449f76e99860088023450a15b2f3802bc7bf4dbe03e2264a8addfcd
 Verifier_pp hash: a2d2117af71d4d535c0d6506f91efab62f8631861adb96b97995bf598050d6a2
 
 insufficient balance: amount + fee > bal:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 insufficient balance: amount + fee > bal_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 insufficient balance: amount + fee > bal:
 Proof size: 4.52 KB
@@ -95,10 +199,18 @@ Prover_pp hash: f6983f0dda4595524e75ff20713b1b0f8ca8cdd5b924f7a18109ca0a51db55d4
 Verifier_pp hash: 8a9240cd10b685becc0e08c218a5aaa089e663a9d14cb244ffa16550a6ec75db
 
 invalid dst:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid dst_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid dst:
 Proof size: 3.13 KB
@@ -107,10 +219,18 @@ Prover_pp hash: a715e33858ed1732d063d783e088daa89ba283b21359d6379bc948f6991f87d0
 Verifier_pp hash: c8177e79654768fc8d477adf3f9d52b79ec005e7fa1532bd192e8dc82df5dba6
 
 invalid src:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid src_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid src:
 Proof size: 3.13 KB
@@ -119,10 +239,18 @@ Prover_pp hash: fa2fcfbc2e053ffc333ffa3d399f99662d642ea4d2cfcdc1e9a4217e802dad5b
 Verifier_pp hash: 9fc5529e3389c37c62948b0fec18bf8e2ca1434ee1d2dc20ccde05c6618c4670
 
 replay:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 replay_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 replay:
 Proof size: 2.89 KB
@@ -131,10 +259,18 @@ Prover_pp hash: 43aa19646403ee674beeaae9f2f243271a362c7144dc70af25d017109f4f7004
 Verifier_pp hash: b0993f82d9844535af18dcf91071f724b2548a70897ca9b3c5d2d2d931088087
 
 balance out of bounds 1:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 balance out of bounds 1_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 balance out of bounds 1:
 Proof size: 3.71 KB
@@ -143,10 +279,18 @@ Prover_pp hash: 75910c584aa81e054399c1e3a7de36960ad9d6136e32345681e4b8a447e03827
 Verifier_pp hash: 35e8fdcbdf7ca6c9525bb88a859d64d13074bf4e2772f00aaf4bdcf94fe5bf65
 
 invalid signature: bad msg:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: bad msg_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad msg:
 Proof size: 3.85 KB
@@ -155,10 +299,18 @@ Prover_pp hash: 183de69f06e9b13231a5d3a5adadf84301faa10009de0a80147709ad68282143
 Verifier_pp hash: 37e647f5962914ad23b76feb115400cfa02154ff4e9187ec41d2e95db0df2667
 
 invalid signature: bad sk:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: bad sk_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: bad sk:
 Proof size: 3.80 KB
@@ -167,10 +319,18 @@ Prover_pp hash: 2854951e3e204f0f56d7fdd7270f9f07c194e48f7b0bf3a21ce2086f69b116c1
 Verifier_pp hash: 8157432c770276f4e6a76279aff62bac077490e1de47b50ff639643634edff84
 
 invalid signature: not on curve:
-Constraints: 3759
+Constraints       : 3759 [11.88]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 3759 [11.88]
 
 invalid signature: not on curve_optimized:
-Constraints: 1400
+Constraints       : 1400 [10.45]
+Range-Checks-Total: 0 [0.00]
+Range-Checks-Max  : 0 [0.00]
+Tables            : 0 [0.00]
+Circuit Size      : 1400 [10.45]
 
 invalid signature: not on curve:
 Proof size: 4.09 KB
