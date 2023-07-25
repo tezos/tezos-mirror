@@ -134,8 +134,8 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  reward_ratio_min : Q.t;
-  reward_ratio_max : Q.t;
+  issuance_ratio_min : Q.t;
+  issuance_ratio_max : Q.t;
   max_bonus : int64;
   growth_rate : int64;
   center_dz : Q.t;
@@ -339,36 +339,36 @@ let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
     (fun {
-           reward_ratio_min;
-           reward_ratio_max;
+           issuance_ratio_min;
+           issuance_ratio_max;
            max_bonus;
            growth_rate;
            center_dz;
            radius_dz;
          } ->
-      ( reward_ratio_min,
-        reward_ratio_max,
+      ( issuance_ratio_min,
+        issuance_ratio_max,
         max_bonus,
         growth_rate,
         center_dz,
         radius_dz ))
-    (fun ( reward_ratio_min,
-           reward_ratio_max,
+    (fun ( issuance_ratio_min,
+           issuance_ratio_max,
            max_bonus,
            growth_rate,
            center_dz,
            radius_dz ) ->
       {
-        reward_ratio_min;
-        reward_ratio_max;
+        issuance_ratio_min;
+        issuance_ratio_max;
         max_bonus;
         growth_rate;
         center_dz;
         radius_dz;
       })
     (obj6
-       (req "reward_ratio_min" extremum_encoding)
-       (req "reward_ratio_max" extremum_encoding)
+       (req "issuance_ratio_min" extremum_encoding)
+       (req "issuance_ratio_max" extremum_encoding)
        (req "max_bonus" int64)
        (req "growth_rate" int64)
        (req "center_dz" center_encoding)

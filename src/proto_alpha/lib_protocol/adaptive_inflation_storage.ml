@@ -105,22 +105,22 @@ let load_reward_coeff ctxt ~cycle =
 
 let compute_reward_coeff_ratio =
   let q_1600 = Q.of_int 1600 in
-  fun ~stake_ratio ~bonus ~reward_ratio_max ~reward_ratio_min ->
+  fun ~stake_ratio ~bonus ~issuance_ratio_max ~issuance_ratio_min ->
     let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
     let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly inflation rate *) in
     let f = Q.add f q_bonus in
     (* f is truncated so that 0.05% <= f <= 5% *)
-    let f = Q.(min f reward_ratio_max) in
-    let f = Q.(max f reward_ratio_min) in
+    let f = Q.(min f issuance_ratio_max) in
+    let f = Q.(max f issuance_ratio_min) in
     f
 
 let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
     ~previous_bonus ~reward_params =
   let Constants_parametric_repr.
         {
-          reward_ratio_min;
-          reward_ratio_max;
+          issuance_ratio_min;
+          issuance_ratio_max;
           max_bonus;
           growth_rate;
           center_dz;
@@ -139,11 +139,11 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
     compute_reward_coeff_ratio
       ~stake_ratio
       ~bonus:0L
-      ~reward_ratio_max
-      ~reward_ratio_min
+      ~issuance_ratio_max
+      ~issuance_ratio_min
   in
   let base_reward_coeff_dist_to_max =
-    ratio_to_bonus Q.(reward_ratio_max - base_reward_coeff_ratio)
+    ratio_to_bonus Q.(issuance_ratio_max - base_reward_coeff_ratio)
   in
   (* The bonus reward is truncated between [0] and [max_bonus] *)
   (* It is done in a way that the bonus does not increase if the coeff
@@ -175,7 +175,8 @@ let compute_coeff =
     if Compare.Int64.equal (Tez_repr.to_mutez base_total_issued_per_minute) 0L
     then Q.one
     else
-      let Constants_parametric_repr.{reward_ratio_min; reward_ratio_max; _} =
+      let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
+          =
         reward_params
       in
       let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
@@ -194,8 +195,8 @@ let compute_coeff =
         compute_reward_coeff_ratio
           ~stake_ratio
           ~bonus
-          ~reward_ratio_max
-          ~reward_ratio_min
+          ~issuance_ratio_max
+          ~issuance_ratio_min
       in
       let f = Q.div f q_min_per_year (* = inflation per minute *) in
       let f = Q.mul f q_total_supply (* = rewards per minute *) in

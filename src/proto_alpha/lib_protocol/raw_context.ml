@@ -1010,8 +1010,8 @@ let prepare_first_block ~level ~timestamp ctxt =
       let adaptive_rewards_params =
         Constants_parametric_repr.
           {
-            reward_ratio_min = Q.(5 // 10000) (* 0.05% *);
-            reward_ratio_max = Q.(1 // 20) (* 5% *);
+            issuance_ratio_min = Q.(5 // 10000) (* 0.05% *);
+            issuance_ratio_max = Q.(1 // 20) (* 5% *);
             max_bonus = 50_000_000_000_000L (* 5% *);
             growth_rate =
               115_740_740L
