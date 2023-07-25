@@ -1308,8 +1308,8 @@ let get_chain_block_context_issuance_current_yearly_rate ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_issuance_current_yearly_rate_exact
-    ?(chain = "main") ?(block = "head") () =
+let get_chain_block_context_issuance_current_yearly_rate_exact ?(chain = "main")
+    ?(block = "head") () =
   make
     GET
     [
@@ -1357,13 +1357,7 @@ let get_chain_block_context_issuance_expected_rewards ?(chain = "main")
   make
     GET
     [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "issuance";
-      "expected_rewards";
+      "chains"; chain; "blocks"; block; "context"; "issuance"; "expected_rewards";
     ]
     Fun.id
 
