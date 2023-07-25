@@ -1057,6 +1057,14 @@ let test_simulate =
         ~error_msg:"The simulation should advance one L2 block" ;
       unit)
 
+let read_tx_from_file () =
+  read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
+  |> String.trim |> String.split_on_char '\n'
+  |> List.map (fun line ->
+         match String.split_on_char ' ' line with
+         | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
+         | _ -> failwith "Unexpected tx_raw and tx_hash.")
+
 let test_full_blocks =
   Protocol.register_test
     ~__FILE__
@@ -1069,9 +1077,9 @@ let test_full_blocks =
     setup_past_genesis ~deposit_admin:None protocol
   in
   let txs =
-    read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
-    |> String.trim |> String.split_on_char '\n'
+    read_tx_from_file ()
     |> List.filteri (fun i _ -> i < 5)
+    |> List.map (fun (tx, _hash) -> tx)
   in
   let* _requests, receipt =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
@@ -1175,10 +1183,7 @@ let test_inject_100_transactions =
     setup_past_genesis ~deposit_admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
-  let txs =
-    read_file (kernel_inputs_path ^ "/100-inputs-for-proxy")
-    |> String.trim |> String.split_on_char '\n'
-  in
+  let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, receipt =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
   in
@@ -1840,6 +1845,46 @@ let test_kernel_upgrade_no_dictator =
   in
   unit
 
+let send_raw_transaction_request raw_tx =
+  Evm_proxy_server.
+    {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
+
+let send_raw_transaction proxy_server raw_tx =
+  let* transaction_hash =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (send_raw_transaction_request raw_tx)
+  in
+  let hash =
+    transaction_hash |> Evm_proxy_server.extract_result |> JSON.as_string
+  in
+  return hash
+
+let test_rpc_sendRawTransaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_hash"]
+    ~title:
+      "Ensure EVM proxy returns appropriate hash for any given transactions."
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} =
+    setup_past_genesis ~deposit_admin:None protocol
+  in
+  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
+  let* hashes =
+    Lwt_list.map_p
+      (fun (tx_raw, _) ->
+        let* hash = send_raw_transaction evm_proxy_server tx_raw in
+        return hash)
+      txs
+  in
+  let expected_hashes =
+    List.map (fun (_, expected_hash) -> expected_hash) txs
+  in
+  Check.((hashes = expected_hashes) (list string))
+    ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1874,6 +1919,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_key protocols ;
   test_kernel_upgrade_wrong_nonce protocols ;
   test_kernel_upgrade_wrong_rollup_address protocols ;
-  test_kernel_upgrade_no_dictator protocols
+  test_kernel_upgrade_no_dictator protocols ;
+  test_rpc_sendRawTransaction protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
