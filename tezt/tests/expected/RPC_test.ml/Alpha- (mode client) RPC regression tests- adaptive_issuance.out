@@ -1,23 +1,23 @@
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/total_supply
+./octez-client rpc get /chains/main/blocks/head/context/total_supply
 "20000001000100"
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/total_frozen_stake
+./octez-client rpc get /chains/main/blocks/head/context/total_frozen_stake
 "1000000000000"
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate
+./octez-client rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate
 "223.400"
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate_exact
+./octez-client rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate_exact
 { "numerator": "44680105987200", "denominator": "200000010001" }
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/issuance/rewards_per_minute
+./octez-client rpc get /chains/main/blocks/head/context/issuance/issuance_per_minute
 "85007812"
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/adaptive_issuance_launch_cycle
+./octez-client rpc get /chains/main/blocks/head/context/adaptive_issuance_launch_cycle
 null
 
-./octez-client --mode proxy rpc get /chains/main/blocks/head/context/issuance/expected_rewards
+./octez-client rpc get /chains/main/blocks/head/context/issuance/expected_issuance
 [ { "cycle": 0, "baking_reward_fixed_portion": "333333",
     "baking_reward_bonus_per_slot": "1302",
     "attesting_reward_per_slot": "2604", "liquidity_baking_subsidy": "83333",
