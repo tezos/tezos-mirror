@@ -425,7 +425,7 @@ let test_adaptive_issuance_on_alpha ?endpoint client =
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_issuance_rewards_per_minute ()
+    @@ RPC.get_chain_block_context_issuance_issuance_per_minute ()
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
@@ -433,7 +433,7 @@ let test_adaptive_issuance_on_alpha ?endpoint client =
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_issuance_expected_rewards ()
+    @@ RPC.get_chain_block_context_issuance_expected_issuance ()
   in
   unit
 

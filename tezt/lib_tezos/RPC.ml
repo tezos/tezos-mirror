@@ -1323,7 +1323,7 @@ let get_chain_block_context_issuance_current_yearly_rate_exact ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_issuance_rewards_per_minute ?(chain = "main")
+let get_chain_block_context_issuance_issuance_per_minute ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1334,7 +1334,7 @@ let get_chain_block_context_issuance_rewards_per_minute ?(chain = "main")
       block;
       "context";
       "issuance";
-      "rewards_per_minute";
+      "issuance_per_minute";
     ]
     Fun.id
 
@@ -1352,12 +1352,18 @@ let get_chain_block_context_adaptive_issuance_launch_cycle ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_issuance_expected_rewards ?(chain = "main")
+let get_chain_block_context_issuance_expected_issuance ?(chain = "main")
     ?(block = "head") () =
   make
     GET
     [
-      "chains"; chain; "blocks"; block; "context"; "issuance"; "expected_rewards";
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "issuance";
+      "expected_issuance";
     ]
     Fun.id
 

@@ -1072,11 +1072,11 @@ val get_chain_block_context_issuance_current_yearly_rate :
 val get_chain_block_context_issuance_current_yearly_rate_exact :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/rewards_per_minute]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/issuance_per_minute]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_issuance_rewards_per_minute :
+val get_chain_block_context_issuance_issuance_per_minute :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/adaptive_issuance_launch_cycle]
@@ -1086,11 +1086,11 @@ val get_chain_block_context_issuance_rewards_per_minute :
 val get_chain_block_context_adaptive_issuance_launch_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/expected_rewards]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/issuance/expected_issuance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_issuance_expected_rewards :
+val get_chain_block_context_issuance_expected_issuance :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** Call RPC
