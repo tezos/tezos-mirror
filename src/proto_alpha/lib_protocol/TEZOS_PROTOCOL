@@ -176,6 +176,7 @@
         "Sc_rollup_staker_index_storage",
         "Sc_rollup_commitment_storage",
         "Sc_rollup_outbox_storage",
+        "Sc_rollup_whitelist_storage",
         "Sc_rollup_stake_storage",
         "Sc_rollup_storage",
         "Dal_slot_storage",

@@ -147,10 +147,17 @@ let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
+  let* ctxt, whitelist_size =
+    let*? () = check_whitelist ctxt whitelist in
+    match whitelist with
+    | Some whitelist -> Sc_rollup_whitelist_storage.init ~whitelist ctxt address
+    | None -> return (ctxt, 0)
+  in
   let size =
     Z.of_int
       (origination_size + stored_kind_size + addresses_size + param_ty_size
-     + pvm_kind_size + genesis_info_size_diff + commitment_size_diff)
+     + pvm_kind_size + genesis_info_size_diff + commitment_size_diff
+     + whitelist_size)
   in
   return (size, genesis_info.commitment_hash, ctxt)
 

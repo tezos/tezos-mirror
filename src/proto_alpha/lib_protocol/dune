@@ -190,6 +190,7 @@
   Sc_rollup_staker_index_storage
   Sc_rollup_commitment_storage
   Sc_rollup_outbox_storage
+  Sc_rollup_whitelist_storage
   Sc_rollup_stake_storage
   Sc_rollup_storage
   Dal_slot_storage
@@ -463,6 +464,7 @@
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
@@ -737,6 +739,7 @@
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
@@ -995,6 +998,7 @@
   sc_rollup_staker_index_storage.ml sc_rollup_staker_index_storage.mli
   sc_rollup_commitment_storage.ml sc_rollup_commitment_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
+  sc_rollup_whitelist_storage.ml sc_rollup_whitelist_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
