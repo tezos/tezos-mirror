@@ -78,6 +78,16 @@ let () =
     unit
     (function WASM_proof_production_failed -> Some () | _ -> None)
     (fun () -> WASM_proof_production_failed) ;
+  let msg = "Proof verification failed" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_wasm_proof_verification_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function WASM_proof_verification_failed -> Some () | _ -> None)
+    (fun () -> WASM_proof_verification_failed) ;
   let msg =
     "Invalid dissection distribution: not all ticks are a multiplier of the \
      maximum number of ticks of a snapshot"
