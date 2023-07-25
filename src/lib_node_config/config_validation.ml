@@ -457,8 +457,8 @@ let maintenance_disabled =
     ~name:"maintenance_disabled"
     ~level:Warning
     ~msg:
-      "the maintenance is disabled, this should be used for testing purposes \
-       only"
+      "The P2P maintenance is disabled. The P2P maintenance should only be \
+       disabled for testing purposes."
     ()
 
 let warn_maintenance_deactivated (config : Config_file.t) =
