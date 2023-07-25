@@ -386,7 +386,7 @@ let assert_balance_breakdown ~loc ctxt contract
 
 let get_launch_cycle ~loc blk =
   let open Lwt_result_syntax in
-  let* launch_cycle_opt = Context.get_adaptive_inflation_launch_cycle (B blk) in
+  let* launch_cycle_opt = Context.get_adaptive_issuance_launch_cycle (B blk) in
   Assert.get_some ~loc launch_cycle_opt
 
 let stake ctxt contract amount =

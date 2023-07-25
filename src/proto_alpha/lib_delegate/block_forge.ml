@@ -41,13 +41,13 @@ type simulation_kind =
 type simulation_mode = Local of Context.index | Node
 
 (* [forge_faked_protocol_data ?payload_hash ~payload_round ~seed_nonce_hash
-   ~liquidity_baking_toggle_vote ~adaptive_inflation_vote] forges a fake [block_header_data] with
+   ~liquidity_baking_toggle_vote ~adaptive_issuance_vote] forges a fake [block_header_data] with
    [payload_hash] ([zero] by default), [payload_round], [seed_nonce_hash],
    [liquidity_baking_toggle_vote] and with an empty [proof_of_work_nonce] and a
    dummy [signature]. *)
 let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
     ~payload_round ~seed_nonce_hash ~liquidity_baking_toggle_vote
-    ~adaptive_inflation_vote () =
+    ~adaptive_issuance_vote () =
   Block_header.
     {
       contents =
@@ -59,7 +59,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_inflation_vote;
+              adaptive_issuance_vote;
             };
         };
       signature = Signature.zero;
@@ -382,7 +382,7 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
 let forge (cctxt : #Protocol_client_context.full) ~chain_id
     ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
     ~pred_live_blocks ~timestamp ~round ~liquidity_baking_toggle_vote
-    ~adaptive_inflation_vote ~user_activated_upgrades fees_config ~force_apply
+    ~adaptive_issuance_vote ~user_activated_upgrades fees_config ~force_apply
     ~seed_nonce_hash ~payload_round simulation_mode simulation_kind constants =
   let open Lwt_result_syntax in
   let hard_gas_limit_per_block =
@@ -409,7 +409,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~payload_round
             ~seed_nonce_hash
             ~liquidity_baking_toggle_vote
-            ~adaptive_inflation_vote
+            ~adaptive_issuance_vote
             ()
         in
         filter_via_node
@@ -429,7 +429,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~payload_round
             ~seed_nonce_hash
             ~liquidity_baking_toggle_vote
-            ~adaptive_inflation_vote
+            ~adaptive_issuance_vote
             ()
         in
         apply_via_node
@@ -446,7 +446,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~payload_round
             ~seed_nonce_hash
             ~liquidity_baking_toggle_vote
-            ~adaptive_inflation_vote
+            ~adaptive_issuance_vote
             ()
         in
         filter_with_context
@@ -471,7 +471,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~payload_round
             ~seed_nonce_hash
             ~liquidity_baking_toggle_vote
-            ~adaptive_inflation_vote
+            ~adaptive_issuance_vote
             ()
         in
         apply_with_context
@@ -501,7 +501,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
           per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_inflation_vote;
+              adaptive_issuance_vote;
             };
         })
   in

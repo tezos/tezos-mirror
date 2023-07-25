@@ -1184,7 +1184,7 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
-  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_inflation_storage.ml] *)
+  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_issuance_storage.ml] *)
   module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
@@ -1697,18 +1697,18 @@ module Liquidity_baking = struct
       end)
 end
 
-module Adaptive_inflation = struct
+module Adaptive_issuance = struct
   module Launch_ema =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["adaptive_inflation_ema"]
+        let name = ["adaptive_issuance_ema"]
       end)
       (Encoding.Int32)
 
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["adaptive_inflation_launch_cycle"]
+        let name = ["adaptive_issuance_launch_cycle"]
       end)
       (struct
         type t = Cycle_repr.t option

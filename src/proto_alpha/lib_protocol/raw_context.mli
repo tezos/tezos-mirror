@@ -89,7 +89,7 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
-  adaptive_inflation_enable:bool ->
+  adaptive_issuance_enable:bool ->
   Context.t ->
   t tzresult Lwt.t
 
@@ -293,14 +293,14 @@ val reward_coeff_for_current_cycle : t -> Q.t
 
 (** Updates the reward coefficient for the current cycle.
     This update should only be called once per cycle. It is done in
-    [Adaptive_inflation_storage] *)
+    [Adaptive_issuance_storage] *)
 val update_reward_coeff_for_current_cycle : t -> Q.t -> t
 
-(** Returns true if adaptive inflation has launched. *)
-val adaptive_inflation_enable : t -> bool
+(** Returns true if adaptive issuance has launched. *)
+val adaptive_issuance_enable : t -> bool
 
-(** Set the feature flag of adaptive inflation. *)
-val set_adaptive_inflation_enable : t -> t
+(** Set the feature flag of adaptive issuance. *)
+val set_adaptive_issuance_enable : t -> t
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t

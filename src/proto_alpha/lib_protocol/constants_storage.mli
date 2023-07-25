@@ -138,13 +138,13 @@ val zk_rollup_origination_size : Raw_context.t -> int
 
 val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
 
-val adaptive_inflation_enable : Raw_context.t -> bool
+val adaptive_issuance_enable : Raw_context.t -> bool
 
-val adaptive_inflation_staking_over_baking_global_limit : Raw_context.t -> int
+val adaptive_issuance_staking_over_baking_global_limit : Raw_context.t -> int
 
-val adaptive_inflation_staking_over_delegation_edge : Raw_context.t -> int
+val adaptive_issuance_staking_over_delegation_edge : Raw_context.t -> int
 
-val adaptive_inflation_launch_ema_threshold : Raw_context.t -> int32
+val adaptive_issuance_launch_ema_threshold : Raw_context.t -> int32
 
-val adaptive_inflation_rewards_params :
+val adaptive_issuance_rewards_params :
   Raw_context.t -> Constants_parametric_repr.adaptive_rewards_params

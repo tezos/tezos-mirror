@@ -70,7 +70,7 @@ let perform_finalizable_unstake_transfers ctxt contract finalizable =
 let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
   let open Lwt_result_syntax in
   let*? ctxt =
-    Gas.consume ctxt Adaptive_inflation_costs.prepare_finalize_unstake_cost
+    Gas.consume ctxt Adaptive_issuance_costs.prepare_finalize_unstake_cost
   in
   let* prepared_opt = Unstake_requests.prepare_finalize_unstake ctxt contract in
   match prepared_opt with
@@ -89,7 +89,7 @@ let finalize_unstake_and_check ~check_unfinalizable ctxt contract =
           let*? ctxt =
             Gas.consume
               ctxt
-              Adaptive_inflation_costs.finalize_unstake_and_check_cost
+              Adaptive_issuance_costs.finalize_unstake_and_check_cost
           in
           let* ctxt = Unstake_requests.update ctxt contract unfinalizable in
           perform_finalizable_unstake_transfers ctxt contract finalizable)
@@ -169,7 +169,7 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
   if Tez.(tez_to_unstake = zero) then return (ctxt, [])
   else
     let*? ctxt =
-      Gas.consume ctxt Adaptive_inflation_costs.request_unstake_cost
+      Gas.consume ctxt Adaptive_issuance_costs.request_unstake_cost
     in
     let current_cycle = (Level.current ctxt).cycle in
     let* ctxt, balance_updates =

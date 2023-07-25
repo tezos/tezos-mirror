@@ -142,7 +142,7 @@ type adaptive_rewards_params = {
   radius_dz : Q.t;
 }
 
-type adaptive_inflation = {
+type adaptive_issuance = {
   staking_over_baking_global_limit : int;
   staking_over_delegation_edge : int;
   launch_ema_threshold : int32;
@@ -200,7 +200,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
-  adaptive_inflation : adaptive_inflation;
+  adaptive_issuance : adaptive_issuance;
 }
 
 let sc_rollup_encoding =
@@ -374,7 +374,7 @@ let adaptive_rewards_params_encoding =
        (req "center_dz" center_encoding)
        (req "radius_dz" radius_encoding))
 
-let adaptive_inflation_encoding =
+let adaptive_issuance_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -400,7 +400,7 @@ let adaptive_inflation_encoding =
     (obj4
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
-       (req "adaptive_inflation_launch_ema_threshold" int32)
+       (req "adaptive_issuance_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
 let issuance_weights_encoding =
@@ -487,7 +487,7 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_inflation)) ) )
+                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_issuance)) ) )
           ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -524,7 +524,7 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (dal, ((sc_rollup, zk_rollup), adaptive_inflation)) ) ) ) )
+                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) )
          ) ->
       {
         preserved_cycles;
@@ -565,7 +565,7 @@ let encoding =
         dal;
         sc_rollup;
         zk_rollup;
-        adaptive_inflation;
+        adaptive_issuance;
       })
     (merge_objs
        (obj10
@@ -624,4 +624,4 @@ let encoding =
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
-                         adaptive_inflation_encoding)))))))
+                         adaptive_issuance_encoding)))))))

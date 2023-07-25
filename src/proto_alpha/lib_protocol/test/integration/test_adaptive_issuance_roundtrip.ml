@@ -25,13 +25,13 @@
 
 (** Testing
     -------
-    Component:    Adaptive Inflation, launch vote
+    Component:    Adaptive Issuance, launch vote
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
-                   -- --file test_adaptive_inflation_roundtrip.ml
-    Subject:      Test staking stability under Adaptive Inflation.
+                   -- --file test_adaptive_issuance_roundtrip.ml
+    Subject:      Test staking stability under Adaptive Issuance.
 *)
 
-open Adaptive_inflation_helpers
+open Adaptive_issuance_helpers
 
 type error += Inconsistent_number_of_bootstrap_accounts
 
@@ -334,7 +334,7 @@ let bake ?operation (block, info) =
     "Baking level %d"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level))) ;
   let current_cycle = Block.current_cycle block in
-  let adaptive_inflation_vote =
+  let adaptive_issuance_vote =
     if info.activate_ai then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
@@ -346,7 +346,7 @@ let bake ?operation (block, info) =
       assert false
   in
   let policy = Block.By_account baker.pkh in
-  let* block = Block.bake ~policy ~adaptive_inflation_vote ?operation block in
+  let* block = Block.bake ~policy ~adaptive_issuance_vote ?operation block in
   let new_current_cycle = Block.current_cycle block in
   let* input =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
@@ -467,8 +467,8 @@ let run_action :
           Log.info ~color:event_color "Setting ai threshold to 0" ;
           {
             constants with
-            adaptive_inflation =
-              {constants.adaptive_inflation with launch_ema_threshold = 0l};
+            adaptive_issuance =
+              {constants.adaptive_issuance with launch_ema_threshold = 0l};
           })
         else constants
       in
@@ -878,5 +878,5 @@ let () =
   Alcotest_lwt.run
     ~__FILE__
     Protocol.name
-    [("adaptive inflation roundtrip", tests)]
+    [("adaptive issuance roundtrip", tests)]
   |> Lwt_main.run

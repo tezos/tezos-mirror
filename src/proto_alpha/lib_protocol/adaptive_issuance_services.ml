@@ -134,12 +134,12 @@ module S = struct
   let launch_cycle =
     RPC_service.get_service
       ~description:
-        "Returns the cycle at which the launch of the Adaptive Inflation \
+        "Returns the cycle at which the launch of the Adaptive Issuance \
          feature is set to happen. A result of None means that the feature is \
          not yet set to launch."
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Cycle.encoding)
-      RPC_path.(context_path / "adaptive_inflation_launch_cycle")
+      RPC_path.(context_path / "adaptive_issuance_launch_cycle")
 
   let expected_issuance =
     RPC_service.get_service
@@ -173,15 +173,15 @@ let current_rewards_per_minute ctxt =
   let f = Q.mul f q_base_total_issued_per_minute (* rewards per minute *) in
   return f
 
-(* Does the reverse operations of [compute_coeff] in [adaptive_inflation_storage.ml] *)
+(* Does the reverse operations of [compute_coeff] in [adaptive_issuance_storage.ml] *)
 let current_yearly_rate_value ~formatter ctxt =
   let open Lwt_result_syntax in
   let q_min_per_year = Q.of_int 525600 in
   let* total_supply = Contract.get_total_supply ctxt in
   let q_total_supply = Tez.to_mutez total_supply |> Q.of_int64 in
   let* f = current_rewards_per_minute ctxt in
-  let f = Q.div f q_total_supply (* inflation per minute *) in
-  let f = Q.mul f q_min_per_year (* inflation per year *) in
+  let f = Q.div f q_total_supply (* issuance rate per minute *) in
+  let f = Q.mul f q_min_per_year (* issuance rate per year *) in
   (* transform into a string *)
   let f = Q.(mul f (100 // 1)) in
   return (formatter f)
@@ -262,7 +262,7 @@ let register () =
       let* f = current_rewards_per_minute ctxt in
       return (Tez.of_mutez_exn (Q.to_int64 f))) ;
   register0 ~chunked:false S.launch_cycle (fun ctxt () () ->
-      Adaptive_inflation.launch_cycle ctxt) ;
+      Adaptive_issuance.launch_cycle ctxt) ;
   register0 ~chunked:false S.expected_issuance (fun ctxt () () ->
       collect_expected_rewards ~ctxt)
 

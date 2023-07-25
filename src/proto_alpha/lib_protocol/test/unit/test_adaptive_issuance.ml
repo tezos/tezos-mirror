@@ -27,8 +27,8 @@
     -------
     Component:  Protocol (rewards)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                 -- --file test_adaptive_inflation.ml
-    Subject:    Test reward values under adaptive inflation
+                 -- --file test_adaptive_issuance.ml
+    Subject:    Test reward values under adaptive issuance
 *)
 
 open Protocol
@@ -54,11 +54,11 @@ let tests =
   Tztest.
     [
       tztest
-        "adaptive inflation - application of coefficient to rewards"
+        "adaptive issuance - application of coefficient to rewards"
         `Quick
         test_reward_coefficient;
     ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive inflation", tests)]
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive issuance", tests)]
   |> Lwt_main.run

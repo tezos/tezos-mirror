@@ -63,7 +63,7 @@ let () =
     (fun cycle -> Undetermined_issuance_coeff_for_cycle cycle)
 
 let check_determined_cycle ctxt cycle =
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
@@ -76,7 +76,7 @@ let check_determined_cycle ctxt cycle =
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let* () = check_determined_cycle ctxt cycle in
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     (* Even if AI is enabled, the storage can be empty: this is the case for
        the first 5 cycles after AI is enabled *)
@@ -89,7 +89,7 @@ let get_reward_bonus ctxt ~cycle =
   match cycle with
   | None -> return default_bonus
   | Some cycle ->
-      let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+      let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
       if ai_enable then
         let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
         return (Option.value ~default:default_bonus k_opt)
@@ -108,7 +108,7 @@ let compute_reward_coeff_ratio =
   fun ~stake_ratio ~bonus ~issuance_ratio_max ~issuance_ratio_min ->
     let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
-    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly inflation rate *) in
+    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly issuance rate *) in
     let f = Q.add f q_bonus in
     (* f is truncated so that 0.05% <= f <= 5% *)
     let f = Q.(min f issuance_ratio_max) in
@@ -198,17 +198,17 @@ let compute_coeff =
           ~issuance_ratio_max
           ~issuance_ratio_min
       in
-      let f = Q.div f q_min_per_year (* = inflation per minute *) in
-      let f = Q.mul f q_total_supply (* = rewards per minute *) in
+      let f = Q.div f q_min_per_year (* = issuance rate per minute *) in
+      let f = Q.mul f q_total_supply (* = issuance per minute *) in
       Q.div f q_base_total_issued_per_minute
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if not ai_enable then return ctxt
   else
     let reward_params =
-      Constants_storage.adaptive_inflation_rewards_params ctxt
+      Constants_storage.adaptive_issuance_rewards_params ctxt
     in
     let preserved = Constants_storage.preserved_cycles ctxt in
     let for_cycle = Cycle_repr.add new_cycle preserved in
@@ -266,15 +266,15 @@ let load_reward_coeff ctxt =
 
 let init ctxt =
   let open Lwt_result_syntax in
-  let* ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0l in
-  Storage.Adaptive_inflation.Activation.init ctxt None
+  let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
+  Storage.Adaptive_issuance.Activation.init ctxt None
 
 let activate ctxt ~cycle =
-  Storage.Adaptive_inflation.Activation.update ctxt (Some cycle)
+  Storage.Adaptive_issuance.Activation.update ctxt (Some cycle)
 
-let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
+let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
 
-let set_adaptive_inflation_enable ctxt =
+let set_adaptive_issuance_enable ctxt =
   let open Lwt_result_syntax in
   let+ enable =
     let+ launch_cycle = launch_cycle ctxt in
@@ -284,26 +284,26 @@ let set_adaptive_inflation_enable ctxt =
         let current_cycle = (Level_storage.current ctxt).cycle in
         Cycle_repr.(current_cycle >= launch_cycle)
   in
-  if enable then Raw_context.set_adaptive_inflation_enable ctxt else ctxt
+  if enable then Raw_context.set_adaptive_issuance_enable ctxt else ctxt
 
 let update_ema ctxt ~vote =
-  Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
-  Per_block_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
+  Storage.Adaptive_issuance.Launch_ema.get ctxt >>=? fun old_ema ->
+  Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
   >>=? fun old_ema ->
   let new_ema =
-    Per_block_votes_repr.compute_new_adaptive_inflation_ema
+    Per_block_votes_repr.compute_new_adaptive_issuance_ema
       ~per_block_vote:vote
       old_ema
   in
-  Storage.Adaptive_inflation.Launch_ema.update
+  Storage.Adaptive_issuance.Launch_ema.update
     ctxt
-    (Per_block_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
+    (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
   >>=? fun ctxt ->
   launch_cycle ctxt >>=? fun launch_cycle ->
   let open Constants_storage in
   (if
-   Per_block_votes_repr.Adaptive_inflation_launch_EMA.(
-     new_ema < adaptive_inflation_launch_ema_threshold ctxt)
+   Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
+     new_ema < adaptive_issuance_launch_ema_threshold ctxt)
   then return (ctxt, launch_cycle)
   else
     match launch_cycle with

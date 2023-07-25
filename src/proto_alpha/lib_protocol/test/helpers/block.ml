@@ -188,7 +188,7 @@ module Forge = struct
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
-      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash shell =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -202,7 +202,7 @@ module Forge = struct
           per_block_votes =
             {
               liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_inflation_vote;
+              adaptive_issuance_vote;
             };
         }
 
@@ -263,7 +263,7 @@ module Forge = struct
 
   let forge_header ?(locked_round = None) ?(payload_round = None)
       ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_toggle_vote ?adaptive_inflation_vote pred =
+      ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
       | Ok pred_fitness -> pred_fitness
@@ -312,7 +312,7 @@ module Forge = struct
     make_contents
       ~seed_nonce_hash
       ?liquidity_baking_toggle_vote
-      ?adaptive_inflation_vote
+      ?adaptive_issuance_vote
       ~payload_hash
       ~payload_round
       shell
@@ -324,7 +324,7 @@ module Forge = struct
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
-      ?(adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass)
+      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~payload_hash ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -335,7 +335,7 @@ module Forge = struct
         per_block_votes =
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
-            adaptive_inflation_vote;
+            adaptive_issuance_vote;
           };
         payload_hash;
         payload_round;
@@ -588,7 +588,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
         };
       dal = {dal with feature_enable = dal_enable};
       zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
-      adaptive_inflation = constants.adaptive_inflation;
+      adaptive_issuance = constants.adaptive_issuance;
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
@@ -828,7 +828,7 @@ let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ?check_size ~baking_mode ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote pred =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
   let operations =
     match (operation, operations) with
     | Some op, Some ops -> Some (op :: ops)
@@ -843,7 +843,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?policy
     ?operations
     ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote
+    ?adaptive_issuance_vote
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
@@ -858,7 +858,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
 
 let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
     ?check_size ?(baking_mode = Application) ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n pred =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n pred =
   let get_next b =
     bake_with_metadata
       ?locked_round
@@ -869,7 +869,7 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
       ~baking_mode
       ~allow_manager_failures
       ?liquidity_baking_toggle_vote
-      ?adaptive_inflation_vote
+      ?adaptive_issuance_vote
       b
   in
   get_next pred >>=? fun b ->
@@ -877,7 +877,7 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
 
 let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote ?check_size pred =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote ?check_size pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -888,7 +888,7 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
     ?operation
     ?operations
     ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote
+    ?adaptive_issuance_vote
     ?check_size
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
@@ -896,20 +896,20 @@ let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
 (********** Cycles ****************)
 
 let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote n b =
+    ?adaptive_issuance_vote n b =
   List.fold_left_es
     (fun b _ ->
       bake
         ~baking_mode
         ?policy
         ?liquidity_baking_toggle_vote
-        ?adaptive_inflation_vote
+        ?adaptive_issuance_vote
         b)
     b
     (1 -- n)
 
 let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
     ?(invariant = fun _ -> return_unit) predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
@@ -918,7 +918,7 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
-      ?adaptive_inflation_vote
+      ?adaptive_issuance_vote
       b
   in
   if predicate new_block metadata then
@@ -926,42 +926,42 @@ let rec bake_while_with_metadata ?(baking_mode = Application) ?policy
       ~baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
-      ?adaptive_inflation_vote
+      ?adaptive_issuance_vote
       ~invariant
       predicate
       new_block
   else return b
 
 let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote ?invariant predicate b =
+    ?adaptive_issuance_vote ?invariant predicate b =
   bake_while_with_metadata
     ?baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote
+    ?adaptive_issuance_vote
     ?invariant
     (fun block _metadata -> predicate block)
     b
 
 let bake_until_level ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote level b =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote level b =
   bake_while
     ~baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
-    ?adaptive_inflation_vote
+    ?adaptive_issuance_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
       bake_with_metadata
         ~baking_mode
         ?policy
         ?liquidity_baking_toggle_vote
-        ?adaptive_inflation_vote
+        ?adaptive_issuance_vote
         b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
@@ -1040,14 +1040,14 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
 let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_inflation_vote n b =
+    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
   let open Lwt_result_syntax in
   let+ b, metadata =
     bake_n_with_metadata
       ?baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
-      ?adaptive_inflation_vote
+      ?adaptive_issuance_vote
       n
       b
   in

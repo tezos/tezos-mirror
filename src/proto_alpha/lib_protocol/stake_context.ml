@@ -29,9 +29,9 @@ let staking_weight ctxt {frozen; delegated} =
   let frozen = Tez_repr.to_mutez frozen in
   let delegated = Tez_repr.to_mutez delegated in
   let staking_over_delegation_edge =
-    Constants_storage.adaptive_inflation_staking_over_delegation_edge ctxt
+    Constants_storage.adaptive_issuance_staking_over_delegation_edge ctxt
   in
-  if Constants_storage.adaptive_inflation_enable ctxt then
+  if Constants_storage.adaptive_issuance_enable ctxt then
     Int64.(add frozen (div delegated (of_int staking_over_delegation_edge)))
   else Int64.add frozen delegated
 
@@ -55,7 +55,7 @@ let apply_limits ctxt staking_parameters
         1_000_000L
         (of_int
            (Constants_storage
-            .adaptive_inflation_staking_over_baking_global_limit
+            .adaptive_issuance_staking_over_baking_global_limit
               ctxt)))
   in
   let {Staking_parameters_repr.staking_over_baking_limit_millionth; _} =

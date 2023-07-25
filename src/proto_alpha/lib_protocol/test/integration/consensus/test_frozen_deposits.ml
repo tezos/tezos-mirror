@@ -139,7 +139,7 @@ let test_cannot_bake_with_zero_deposits () =
   (* To make account1 have zero deposits, we unstake all its deposits. *)
   Context.Delegate.current_frozen_deposits (B genesis) account1
   >>=? fun frozen_deposits ->
-  Adaptive_inflation_helpers.unstake (B genesis) contract1 frozen_deposits
+  Adaptive_issuance_helpers.unstake (B genesis) contract1 frozen_deposits
   >>=? fun operation ->
   Block.bake ~policy:(By_account account2) ~operation genesis >>=? fun b ->
   let expected_number_of_cycles_with_previous_deposit =
@@ -181,14 +181,14 @@ let adjust_staking_towards_limit ~limit ~block ~account ~contract =
   else
     match Tez.sub_opt limit fd with
     | Some diff ->
-        Adaptive_inflation_helpers.stake (B block) contract diff
+        Adaptive_issuance_helpers.stake (B block) contract diff
         >>=? fun adjustment_operation ->
         Block.bake ~operation:adjustment_operation block
     | None -> (
         match Tez.sub_opt fd limit with
         | None -> return block
         | Some diff ->
-            Adaptive_inflation_helpers.unstake (B block) contract diff
+            Adaptive_issuance_helpers.unstake (B block) contract diff
             >>=? fun adjustment_operation ->
             Block.bake ~operation:adjustment_operation block)
 

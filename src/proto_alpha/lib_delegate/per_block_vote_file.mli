@@ -29,18 +29,18 @@
     - {v {"liquidity_baking_toggle_vote": "on"} v}
     - {v {"liquidity_baking_toggle_vote": "off"} v}
     - {v {"liquidity_baking_toggle_vote": "pass"} v}
-    - {v {"adaptive_inflation_vote": "on"} v}
-    - {v {"adaptive_inflation_vote": "off"} v}
-    - {v {"adaptive_inflation_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_inflation_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_inflation_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_inflation_vote": "pass"} v}
+    - {v {"adaptive_issuance_vote": "on"} v}
+    - {v {"adaptive_issuance_vote": "off"} v}
+    - {v {"adaptive_issuance_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "pass"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "on"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "off"} v}
+    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "pass"} v}
 
     Moreover, in order to handle dynamic voting (i.e. change the
     baker's vote without having to restart it), each time a block is
@@ -76,12 +76,12 @@ val read_per_block_votes_no_fail :
     vote is mandatory, it has to come from either the per-block vote
     file [per_block_vote_file] or from
     [default_liquidity_baking_vote]. If a vote cannot be determined
-    from those values, this function fails. Adaptive inflation feature
+    from those values, this function fails. Adaptive issuance feature
     vote is optional. Priority is given to the values in the
     [per_block_vote_file] file for all votes at the time of the block
     (the file is freshly read each time). *)
 val load_per_block_votes_config :
   default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
-  default_adaptive_inflation_vote:Per_block_votes.per_block_vote option ->
+  default_adaptive_issuance_vote:Per_block_votes.per_block_vote option ->
   per_block_vote_file:string option ->
   Baking_configuration.per_block_votes_config tzresult Lwt.t

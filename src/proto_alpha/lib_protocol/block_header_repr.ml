@@ -76,26 +76,26 @@ let contents_encoding =
              payload_round;
              seed_nonce_hash;
              proof_of_work_nonce;
-             per_block_votes = {liquidity_baking_vote; adaptive_inflation_vote};
+             per_block_votes = {liquidity_baking_vote; adaptive_issuance_vote};
            } ->
         ( payload_hash,
           payload_round,
           proof_of_work_nonce,
           seed_nonce_hash,
           liquidity_baking_vote,
-          adaptive_inflation_vote ))
+          adaptive_issuance_vote ))
       (fun ( payload_hash,
              payload_round,
              proof_of_work_nonce,
              seed_nonce_hash,
              liquidity_baking_vote,
-             adaptive_inflation_vote ) ->
+             adaptive_issuance_vote ) ->
         {
           payload_hash;
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce;
-          per_block_votes = {liquidity_baking_vote; adaptive_inflation_vote};
+          per_block_votes = {liquidity_baking_vote; adaptive_issuance_vote};
         })
       (obj6
          (req "payload_hash" Block_payload_hash.encoding)
@@ -108,8 +108,8 @@ let contents_encoding =
             "liquidity_baking_toggle_vote"
             Per_block_votes_repr.liquidity_baking_vote_encoding)
          (req
-            "adaptive_inflation_vote"
-            Per_block_votes_repr.adaptive_inflation_vote_encoding))
+            "adaptive_issuance_vote"
+            Per_block_votes_repr.adaptive_issuance_vote_encoding))
   in
   let binary =
     conv
@@ -208,7 +208,7 @@ let max_header_length =
       per_block_votes =
         {
           liquidity_baking_vote = Per_block_vote_pass;
-          adaptive_inflation_vote = Per_block_vote_pass;
+          adaptive_issuance_vote = Per_block_vote_pass;
         };
     }
   in

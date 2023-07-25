@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines costs for the adaptive inflation operations. *)
+(** This module defines costs for the adaptive issuance operations. *)
 
 val find_delegate_cost : Gas_limit_repr.cost
 

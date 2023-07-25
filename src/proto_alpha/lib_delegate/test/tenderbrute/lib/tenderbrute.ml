@@ -61,7 +61,7 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
     ~level:1l
     ~predecessor_timestamp:timestamp
     ~timestamp
-    ~adaptive_inflation_enable:false
+    ~adaptive_issuance_enable:false
   >|= Environment.wrap_tzresult
 
 (* Change the initial seed for the first preserved cycles. This suppose that the

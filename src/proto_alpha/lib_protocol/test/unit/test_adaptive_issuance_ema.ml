@@ -25,29 +25,29 @@
 
 (** Testing
     -------
-    Component:  Protocol, Adaptive Inflation
+    Component:  Protocol, Adaptive Issuance
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                  -- --file test_adaptive_inflation_ema.ml
+                  -- --file test_adaptive_issuance_ema.ml
     Subject:    Tests for the update functions of the EMA of the launch vote of
-                Adaptive Inflation
+                Adaptive Issuance
 *)
 
 open Protocol
-module Votes_EMA = Per_block_votes_repr.Adaptive_inflation_launch_EMA
+module Votes_EMA = Per_block_votes_repr.Adaptive_issuance_launch_EMA
 
 let ema_of_int32 ema = Votes_EMA.of_int32 ema >|= Environment.wrap_tzresult
 
 let ema_to_int32 = Votes_EMA.to_int32
 
 let compute_new_ema ~per_block_vote ema =
-  Per_block_votes_repr.compute_new_adaptive_inflation_ema ~per_block_vote ema
+  Per_block_votes_repr.compute_new_adaptive_issuance_ema ~per_block_vote ema
   |> ema_to_int32
 
 (* Folds compute_new_ema on a list of votes *)
 let compute_new_ema_n per_block_votes initial_ema =
   List.fold_left
     (fun ema per_block_vote ->
-      Per_block_votes_repr.compute_new_adaptive_inflation_ema
+      Per_block_votes_repr.compute_new_adaptive_issuance_ema
         ~per_block_vote
         ema)
     initial_ema
@@ -291,5 +291,5 @@ let tests =
   ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive inflation ema", tests)]
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive issuance ema", tests)]
   |> Lwt_main.run

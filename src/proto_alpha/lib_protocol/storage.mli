@@ -566,14 +566,14 @@ module Delegate_sampler_state :
      and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
-(** Compounding reward bonus for Adaptive Inflation *)
+(** Compounding reward bonus for Adaptive Issuance *)
 module Issuance_bonus :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Int64.t
      and type t := Raw_context.t
 
-(** Multiplicative coefficient for rewards under Adaptive Inflation
+(** Multiplicative coefficient for rewards under Adaptive Issuance
     (Includes the bonus) *)
 module Issuance_coeff :
   Indexed_data_storage
@@ -748,14 +748,14 @@ module Liquidity_baking : sig
        and type value = Contract_hash.t
 end
 
-module Adaptive_inflation : sig
+module Adaptive_issuance : sig
   (** Exponential moving average (ema) of votes set in the block header
       protocol_data.contents. Once the feature is activated, it can no
       longer be deactivated without a protocol amendment. **)
   module Launch_ema :
     Single_data_storage with type t := Raw_context.t and type value = Int32.t
 
-  (** Cycle [Some c] from which adaptive inflation is (or will be)
+  (** Cycle [Some c] from which adaptive issuance is (or will be)
      active, or [None] if the feature is not yet planned to activate. **)
   module Activation :
     Single_data_storage

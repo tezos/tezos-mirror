@@ -111,7 +111,7 @@ type adaptive_rewards_params = {
     (* Minimum distance from center required for non-zero growth *) Q.t;
 }
 
-type adaptive_inflation = {
+type adaptive_issuance = {
   staking_over_baking_global_limit
     (* Global maximum stake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
@@ -184,7 +184,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
-  adaptive_inflation : adaptive_inflation;
+  adaptive_issuance : adaptive_issuance;
 }
 
 val encoding : t Data_encoding.encoding

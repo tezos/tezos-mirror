@@ -255,14 +255,14 @@ let get_liquidity_baking_subsidy ctxt =
 let get_liquidity_baking_cpmm_address ctxt =
   Alpha_services.Liquidity_baking.get_cpmm_address rpc_ctxt ctxt
 
-let get_adaptive_inflation_launch_cycle ctxt =
-  Adaptive_inflation_services.launch_cycle rpc_ctxt ctxt
+let get_adaptive_issuance_launch_cycle ctxt =
+  Adaptive_issuance_services.launch_cycle rpc_ctxt ctxt
 
 let get_total_frozen_stake ctxt =
-  Adaptive_inflation_services.total_frozen_stake rpc_ctxt ctxt
+  Adaptive_issuance_services.total_frozen_stake rpc_ctxt ctxt
 
 let get_total_supply ctxt =
-  Adaptive_inflation_services.total_supply rpc_ctxt ctxt
+  Adaptive_issuance_services.total_supply rpc_ctxt ctxt
 
 let get_seed_nonce_revelation_tip ctxt =
   get_constants ctxt >>=? fun {Constants.parametric = csts; _} ->

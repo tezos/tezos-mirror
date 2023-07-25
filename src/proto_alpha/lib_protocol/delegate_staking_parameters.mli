@@ -59,7 +59,7 @@ val activate : Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
 
     The distribution is based on the baker's staking parameters.
 
-    If adaptive inflation is enabled, it also accounts for the repartition of the
+    If adaptive issuance is enabled, it also accounts for the repartition of the
     delegate's [active_stake] between delegated token and frozen deposits.
     If [active_stake] is not provided, it will be retrieved from the context.
 *)

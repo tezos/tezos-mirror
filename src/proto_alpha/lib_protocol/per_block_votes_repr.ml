@@ -33,7 +33,7 @@ type per_block_vote =
 
 type per_block_votes = {
   liquidity_baking_vote : per_block_vote;
-  adaptive_inflation_vote : per_block_vote;
+  adaptive_issuance_vote : per_block_vote;
 }
 
 let per_block_vote_compact_encoding =
@@ -66,23 +66,23 @@ let liquidity_baking_vote_encoding =
     "liquidity_baking_vote"
     (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)
 
-let adaptive_inflation_vote_encoding =
+let adaptive_issuance_vote_encoding =
   let open Data_encoding in
   def
-    "adaptive_inflation_vote"
+    "adaptive_issuance_vote"
     (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)
 
 let per_block_votes_compact_encoding =
   let open Data_encoding in
   let open Compact in
   conv
-    (fun {liquidity_baking_vote; adaptive_inflation_vote} ->
-      (liquidity_baking_vote, adaptive_inflation_vote))
-    (fun (liquidity_baking_vote, adaptive_inflation_vote) ->
-      {liquidity_baking_vote; adaptive_inflation_vote})
+    (fun {liquidity_baking_vote; adaptive_issuance_vote} ->
+      (liquidity_baking_vote, adaptive_issuance_vote))
+    (fun (liquidity_baking_vote, adaptive_issuance_vote) ->
+      {liquidity_baking_vote; adaptive_issuance_vote})
     (obj2
        (req "liquidity_baking_vote" per_block_vote_compact_encoding)
-       (req "adaptive_inflation_vote" per_block_vote_compact_encoding))
+       (req "adaptive_issuance_vote" per_block_vote_compact_encoding))
 
 let per_block_votes_encoding =
   let open Data_encoding in
@@ -96,8 +96,8 @@ module Liquidity_baking_toggle_EMA = Votes_EMA_repr.Make (struct
   let ema_max = 2_000_000_000l
 end)
 
-module Adaptive_inflation_launch_EMA = Votes_EMA_repr.Make (struct
-  (* The baker_contribution parameter of the adaptive inflation
+module Adaptive_issuance_launch_EMA = Votes_EMA_repr.Make (struct
+  (* The baker_contribution parameter of the adaptive issuance
      activation vote was chosen so that 2 weeks are needed to move
      the EMA from 0% to 50% when all bakers vote On.
 
@@ -120,8 +120,8 @@ let compute_new_liquidity_baking_ema ~per_block_vote ema =
   | Per_block_vote_off -> Liquidity_baking_toggle_EMA.update_ema_up ema
   | Per_block_vote_on -> Liquidity_baking_toggle_EMA.update_ema_down ema
 
-let compute_new_adaptive_inflation_ema ~per_block_vote ema =
+let compute_new_adaptive_issuance_ema ~per_block_vote ema =
   match per_block_vote with
   | Per_block_vote_pass -> ema
-  | Per_block_vote_off -> Adaptive_inflation_launch_EMA.update_ema_down ema
-  | Per_block_vote_on -> Adaptive_inflation_launch_EMA.update_ema_up ema
+  | Per_block_vote_off -> Adaptive_issuance_launch_EMA.update_ema_down ema
+  | Per_block_vote_on -> Adaptive_issuance_launch_EMA.update_ema_up ema

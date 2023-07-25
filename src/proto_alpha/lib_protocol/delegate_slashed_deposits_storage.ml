@@ -69,7 +69,7 @@ let punish_double_signing ~get ~set ~get_percentage ctxt delegate
   let slashing_percentage = get_percentage ctxt in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
   let staking_over_baking_global_limit =
-    Constants_storage.adaptive_inflation_staking_over_baking_global_limit ctxt
+    Constants_storage.adaptive_issuance_staking_over_baking_global_limit ctxt
   in
   let staking_over_baking_global_limit_plus_two =
     Int64.add (Int64.of_int staking_over_baking_global_limit) 2L

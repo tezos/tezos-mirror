@@ -253,7 +253,7 @@ let constants_mainnet =
         min_pending_to_process = 10;
         max_ticket_payload_size = 2_048;
       };
-    adaptive_inflation =
+    adaptive_issuance =
       {
         staking_over_baking_global_limit = 5;
         staking_over_delegation_edge = 2;

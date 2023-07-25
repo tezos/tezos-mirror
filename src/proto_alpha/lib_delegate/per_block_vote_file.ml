@@ -31,7 +31,7 @@ let default_vote_json_filename = "per_block_votes.json"
 type per_block_votes = {
   liquidity_baking_toggle_vote :
     Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_inflation_vote_opt :
+  adaptive_issuance_vote_opt :
     Protocol.Alpha_context.Per_block_votes.per_block_vote option;
 }
 
@@ -39,19 +39,19 @@ let vote_file_content_encoding =
   let open Data_encoding in
   def (String.concat "." [Protocol.name; "vote_file_content"])
   @@ conv
-       (fun {liquidity_baking_toggle_vote; adaptive_inflation_vote_opt} ->
-         (liquidity_baking_toggle_vote, adaptive_inflation_vote_opt))
-       (fun (liquidity_baking_toggle_vote, adaptive_inflation_vote_opt) ->
-         {liquidity_baking_toggle_vote; adaptive_inflation_vote_opt})
+       (fun {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt} ->
+         (liquidity_baking_toggle_vote, adaptive_issuance_vote_opt))
+       (fun (liquidity_baking_toggle_vote, adaptive_issuance_vote_opt) ->
+         {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt})
        (obj2
           (req
              "liquidity_baking_toggle_vote"
              Protocol.Alpha_context.Per_block_votes
              .liquidity_baking_vote_encoding)
           (opt
-             "adaptive_inflation_vote"
+             "adaptive_issuance_vote"
              Protocol.Alpha_context.Per_block_votes
-             .adaptive_inflation_vote_encoding))
+             .adaptive_issuance_vote_encoding))
 
 type error += Block_vote_file_not_found of string
 
@@ -112,8 +112,8 @@ let () =
         "@[The provided block vote file \"%s\" is a valid JSON file but its \
          content is unexpected. Expecting a JSON file containing \
          '{\"liquidity_baking_toggle_vote\": value1, \
-         \"adaptive_inflation_vote\": value2}' or \
-         '{\"adaptive_inflation_vote\": value1, \
+         \"adaptive_issuance_vote\": value2}' or \
+         '{\"adaptive_issuance_vote\": value1, \
          \"liquidity_baking_toggle_vote\": value2}', where value1 is one of \
          \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \"off\", or \
          \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' where value \
@@ -139,8 +139,8 @@ let () =
         "@[In the provided block vote file \"%s\", the \
          \"liquidity_baking_toggle_vote\" field is missing. Expecting a JSON \
          file containing '{\"liquidity_baking_toggle_vote\": value1, \
-         \"adaptive_inflation_vote\": value2}' or \
-         '{\"adaptive_inflation_vote\": value1, \
+         \"adaptive_issuance_vote\": value2}' or \
+         '{\"adaptive_issuance_vote\": value1, \
          \"liquidity_baking_toggle_vote\": value2}', where value1 is one of \
          \"on\", \"off\", or \"pass\" and value2 is one of \"on\", \"off\", or \
          \"pass\", or '{\"liquidity_baking_toggle_vote\": value}' where value \
@@ -204,30 +204,30 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
   | Ok
       {
         liquidity_baking_toggle_vote;
-        adaptive_inflation_vote_opt = Some adaptive_inflation_vote;
+        adaptive_issuance_vote_opt = Some adaptive_issuance_vote;
       } ->
       Lwt.return
         Protocol.Alpha_context.Per_block_votes.
           {
             liquidity_baking_vote = liquidity_baking_toggle_vote;
-            adaptive_inflation_vote;
+            adaptive_issuance_vote;
           }
-  | Ok {liquidity_baking_toggle_vote; adaptive_inflation_vote_opt = None} ->
+  | Ok {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt = None} ->
       Lwt.return
         {default with liquidity_baking_vote = liquidity_baking_toggle_vote}
 
 let load_per_block_votes_config ~default_liquidity_baking_vote
-    ~default_adaptive_inflation_vote ~per_block_vote_file :
+    ~default_adaptive_issuance_vote ~per_block_vote_file :
     Baking_configuration.per_block_votes_config tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* If a vote file is given, it takes priority. Otherwise, we expect
      per-block vote arguments to be passed. *)
-  let default_adaptive_inflation_vote =
+  let default_adaptive_issuance_vote =
     (* Unlike the vote for liquidity baking, the vote for adaptive
-       inflation is not mandatory. *)
-    match default_adaptive_inflation_vote with
+       issuance is not mandatory. *)
+    match default_adaptive_issuance_vote with
     | None -> Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
-    | Some default_adaptive_inflation_vote -> default_adaptive_inflation_vote
+    | Some default_adaptive_issuance_vote -> default_adaptive_issuance_vote
   in
   let* config =
     match (per_block_vote_file, default_liquidity_baking_vote) with
@@ -237,7 +237,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
           {
             Baking_configuration.vote_file = None;
             liquidity_baking_vote;
-            adaptive_inflation_vote = default_adaptive_inflation_vote;
+            adaptive_issuance_vote = default_adaptive_issuance_vote;
           }
     | Some per_block_vote_file, _ -> (
         let*! (res : _ tzresult) = read_per_block_votes ~per_block_vote_file in
@@ -245,18 +245,18 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
         | Ok
             {
               liquidity_baking_toggle_vote = liquidity_baking_vote;
-              adaptive_inflation_vote_opt;
+              adaptive_issuance_vote_opt;
             } ->
-            let adaptive_inflation_vote =
+            let adaptive_issuance_vote =
               Option.value
-                ~default:default_adaptive_inflation_vote
-                adaptive_inflation_vote_opt
+                ~default:default_adaptive_issuance_vote
+                adaptive_issuance_vote_opt
             in
             return
               {
                 Baking_configuration.vote_file = Some per_block_vote_file;
                 liquidity_baking_vote;
-                adaptive_inflation_vote;
+                adaptive_issuance_vote;
               }
         | Error errs ->
             Events.(emit per_block_vote_file_fail) errs >>= fun () ->
@@ -266,6 +266,6 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     Events.(emit liquidity_baking_toggle_vote) config.liquidity_baking_vote
   in
   let*! () =
-    Events.(emit adaptive_inflation_vote) config.adaptive_inflation_vote
+    Events.(emit adaptive_issuance_vote) config.adaptive_issuance_vote
   in
   return config

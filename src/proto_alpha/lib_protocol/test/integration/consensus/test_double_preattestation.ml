@@ -142,7 +142,7 @@ end = struct
       Int64.add
         2L
         (Int64.of_int
-           constants.parametric.adaptive_inflation
+           constants.parametric.adaptive_issuance
              .staking_over_baking_global_limit)
     in
     let denun_reward = Test_tez.(lost_deposit /! divider) in

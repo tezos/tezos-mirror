@@ -25,13 +25,13 @@
 
 (** Testing
     -------
-    Component:    Adaptive Inflation, launch vote
+    Component:    Adaptive Issuance, launch vote
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
-                   -- --file test_adaptive_inflation_launch.ml
-    Subject:      Test the launch vote feature of Adaptive Inflation.
+                   -- --file test_adaptive_issuance_launch.ml
+    Subject:      Test the launch vote feature of Adaptive Issuance.
 *)
 
-open Adaptive_inflation_helpers
+open Adaptive_issuance_helpers
 
 let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
@@ -39,7 +39,7 @@ let assert_level ~loc (blk : Block.t) expected =
 
 let assert_is_not_yet_set_to_launch ~loc blk =
   let open Lwt_result_syntax in
-  let* launch_cycle_opt = Context.get_adaptive_inflation_launch_cycle (B blk) in
+  let* launch_cycle_opt = Context.get_adaptive_issuance_launch_cycle (B blk) in
   Assert.is_none
     ~loc
     ~pp:(fun fmt cycle ->
@@ -83,7 +83,7 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
   let* constants = Context.get_constants (B block) in
   let staking_over_delegation_edge =
     Int64.of_int
-      constants.parametric.adaptive_inflation.staking_over_delegation_edge
+      constants.parametric.adaptive_issuance.staking_over_delegation_edge
   in
   let expected_power =
     if ai_enabled then
@@ -102,7 +102,7 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
   Assert.equal_int64 ~loc actual_baking_power expected_power
 
 (* Test that:
-   - the EMA of the adaptive inflation vote reaches the threshold after the
+   - the EMA of the adaptive issuance vote reaches the threshold after the
      expected duration,
    - the launch cycle is set as soon as the threshold is reached,
    - the launch cycle is not reset before it is reached,
@@ -113,23 +113,23 @@ let test_launch threshold expected_vote_duration () =
   let assert_ema_above_threshold ~loc
       (metadata : Protocol.Main.block_header_metadata) =
     let ema =
-      Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
+      Protocol.Alpha_context.Per_block_votes.Adaptive_issuance_launch_EMA
       .to_int32
-        metadata.adaptive_inflation_vote_ema
+        metadata.adaptive_issuance_vote_ema
     in
     Assert.lt_int32 ~loc threshold ema
   in
   (* Initialize the state with a single delegate. *)
   let constants =
     let default_constants = Default_parameters.constants_test in
-    let adaptive_inflation =
+    let adaptive_issuance =
       {
-        default_constants.adaptive_inflation with
+        default_constants.adaptive_issuance with
         launch_ema_threshold = threshold;
       }
     in
     let consensus_threshold = 0 in
-    {default_constants with consensus_threshold; adaptive_inflation}
+    {default_constants with consensus_threshold; adaptive_issuance}
   in
   let preserved_cycles = constants.preserved_cycles in
   let* block, delegate = Context.init_with_constants1 constants in
@@ -142,7 +142,7 @@ let test_launch threshold expected_vote_duration () =
       (Protocol.Alpha_context.Tez.of_mutez_exn 200_000_000_000L)
   in
 
-  (* To test that adaptive inflation is active, we test that
+  (* To test that adaptive issuance is active, we test that
      staking, a feature only available after the activation, is
      allowed. But by default, delegates reject stakers, they must
      explicitely set a positive staking_over_baking_limit to allow
@@ -164,7 +164,7 @@ let test_launch threshold expected_vote_duration () =
         ~staking_over_baking_limit:1_000_000
         ~baking_over_staking_edge_billionth:1_000_000_000
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
+    Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
 
   (* Initialization of a delegator account which will attempt to
@@ -188,7 +188,7 @@ let test_launch threshold expected_vote_duration () =
         wannabe_staker
         (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
+    Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
   let* block =
     let* operation =
@@ -197,7 +197,7 @@ let test_launch threshold expected_vote_duration () =
         (B block)
         wannabe_staker_account.pk
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
+    Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
   let* block =
     let* operation =
@@ -207,7 +207,7 @@ let test_launch threshold expected_vote_duration () =
         wannabe_staker
         (Some delegate_pkh)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
+    Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
   (* Self-staking most of the remaining balance. *)
   let* block =
@@ -217,7 +217,7 @@ let test_launch threshold expected_vote_duration () =
         delegate
         (Protocol.Alpha_context.Tez.of_mutez_exn 1_800_000_000_000L)
     in
-    Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
+    Block.bake ~operation ~adaptive_issuance_vote:Per_block_vote_on block
   in
 
   (* We are now ready to activate the feature through by baking many
@@ -227,14 +227,14 @@ let test_launch threshold expected_vote_duration () =
 
   let* block =
     Block.bake_while_with_metadata
-      ~adaptive_inflation_vote:Per_block_vote_on
+      ~adaptive_issuance_vote:Per_block_vote_on
       (fun _block metadata ->
         let ema =
-          Protocol.Alpha_context.Per_block_votes.Adaptive_inflation_launch_EMA
+          Protocol.Alpha_context.Per_block_votes.Adaptive_issuance_launch_EMA
           .to_int32
-            metadata.adaptive_inflation_vote_ema
+            metadata.adaptive_issuance_vote_ema
         in
-        let launch_cycle = metadata.adaptive_inflation_launch_cycle in
+        let launch_cycle = metadata.adaptive_issuance_launch_cycle in
         let cond = Compare.Int32.(ema < threshold) in
         assert (
           if cond then Option.is_none launch_cycle
@@ -250,7 +250,7 @@ let test_launch threshold expected_vote_duration () =
   (* We bake one more block to end the vote and set the feature to launch. *)
   let* block, metadata =
     Block.bake_n_with_metadata
-      ~adaptive_inflation_vote:Per_block_vote_on
+      ~adaptive_issuance_vote:Per_block_vote_on
       1
       block
   in
@@ -290,7 +290,7 @@ let test_launch threshold expected_vote_duration () =
     (* Check that the block metadata information about the launch cycle
        is consistent with the RPC. *)
     let* cycle =
-      Assert.get_some ~loc:__LOC__ metadata.adaptive_inflation_launch_cycle
+      Assert.get_some ~loc:__LOC__ metadata.adaptive_issuance_launch_cycle
     in
     assert_cycle_eq ~loc:__LOC__ launch_cycle cycle
   in
@@ -373,27 +373,27 @@ let tests =
   [
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launches (very low threshold)"
+       issuance launches (very low threshold)"
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
          59l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
-       inflation launches (realistic threshold)"
+       issuance launches (realistic threshold)"
       `Slow
       (test_launch
-         Default_parameters.constants_test.adaptive_inflation
+         Default_parameters.constants_test.adaptive_issuance
            .launch_ema_threshold
          187259l
          (* This vote duration is consistent with the result of the
             unit test for this EMA in
-            ../unit/test_adaptive_inflation_ema.ml*));
+            ../unit/test_adaptive_issuance_ema.ml*));
   ]
 
 let () =
   Alcotest_lwt.run
     ~__FILE__
     Protocol.name
-    [("adaptive inflation launch", tests)]
+    [("adaptive issuance launch", tests)]
   |> Lwt_main.run

@@ -269,7 +269,7 @@ type back = {
      dummy slot headers. *)
   dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
   dal_committee : dal_committee;
-  adaptive_inflation_enable : bool;
+  adaptive_issuance_enable : bool;
 }
 
 (*
@@ -339,8 +339,8 @@ let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
-let[@inline] adaptive_inflation_enable ctxt =
-  ctxt.back.adaptive_inflation_enable
+let[@inline] adaptive_issuance_enable ctxt =
+  ctxt.back.adaptive_issuance_enable
 
 let[@inline] update_back ctxt back = {ctxt with back}
 
@@ -387,8 +387,8 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
-let[@inline] set_adaptive_inflation_enable ctxt =
-  update_back ctxt {ctxt.back with adaptive_inflation_enable = true}
+let[@inline] set_adaptive_issuance_enable ctxt =
+  update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -809,7 +809,7 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_inflation_enable
+let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
     ctxt =
   Raw_level_repr.of_int32 level >>?= fun level ->
   check_inited ctxt >>=? fun () ->
@@ -858,7 +858,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_inflation_enable
           Dal_attestation_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_committee = empty_dal_committee;
-        adaptive_inflation_enable;
+        adaptive_issuance_enable;
       };
   }
 
@@ -1022,7 +1022,7 @@ let prepare_first_block ~level ~timestamp ctxt =
           }
       in
 
-      let adaptive_inflation =
+      let adaptive_issuance =
         Constants_parametric_repr.
           {
             staking_over_baking_global_limit = 5;
@@ -1110,7 +1110,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             dal;
             sc_rollup;
             zk_rollup;
-            adaptive_inflation;
+            adaptive_issuance;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
@@ -1120,7 +1120,7 @@ let prepare_first_block ~level ~timestamp ctxt =
     ~level
     ~predecessor_timestamp:timestamp
     ~timestamp
-    ~adaptive_inflation_enable:false
+    ~adaptive_issuance_enable:false
   >|=? fun ctxt -> (previous_proto, ctxt)
 
 let activate ctxt h = Updater.activate (context ctxt) h >|= update_context ctxt
