@@ -107,7 +107,7 @@ val check_constants : Constants_parametric_repr.t -> unit tzresult
 module Generated : sig
   type t = {
     consensus_threshold : int;
-    reward_weights : Constants_parametric_repr.reward_weights;
+    issuance_weights : Constants_parametric_repr.issuance_weights;
   }
 
   (* This function is meant to be used just in lib_parameters and in the

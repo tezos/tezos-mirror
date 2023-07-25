@@ -513,7 +513,7 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
 let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
-    ?reward_weights ?origination_size ?blocks_per_cycle
+    ?issuance_weights ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?sc_rollup_enable ?sc_rollup_arith_pvm_enable
     ?dal_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal () =
@@ -536,7 +536,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?bootstrap_contracts
     ?level
     ?cost_per_byte
-    ?reward_weights
+    ?issuance_weights
     ?origination_size
     ?blocks_per_cycle
     ?cycles_per_voting_period

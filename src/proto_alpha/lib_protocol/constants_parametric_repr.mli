@@ -121,7 +121,7 @@ type adaptive_inflation = {
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
 }
 
-type reward_weights = {
+type issuance_weights = {
   (* [base_total_issued_per_minute] is the total amount of rewards expected to
      be distributed every minute *)
   base_total_issued_per_minute : Tez_repr.t;
@@ -151,7 +151,7 @@ type t = {
   minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
-  reward_weights : reward_weights;
+  issuance_weights : issuance_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;

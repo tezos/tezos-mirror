@@ -163,7 +163,7 @@ let q_to_float_string q =
 let current_rewards_per_minute ctxt =
   let open Lwt_result_syntax in
   let base_total_issued_per_minute =
-    (Constants.reward_weights ctxt).base_total_issued_per_minute
+    (Constants.issuance_weights ctxt).base_total_issued_per_minute
   in
   let q_base_total_issued_per_minute =
     Tez.to_mutez base_total_issued_per_minute |> Q.of_int64

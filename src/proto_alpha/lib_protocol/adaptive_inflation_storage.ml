@@ -215,7 +215,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
     let base_total_issued_per_minute =
-      (Constants_storage.reward_weights ctxt).base_total_issued_per_minute
+      (Constants_storage.issuance_weights ctxt).base_total_issued_per_minute
     in
     let total_frozen_stake = Stake_repr.get_frozen total_stake in
     let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in

@@ -60,7 +60,7 @@ val vdf_difficulty : Raw_context.t -> int64
 
 val origination_size : Raw_context.t -> int
 
-val reward_weights : Raw_context.t -> Constants_parametric_repr.reward_weights
+val issuance_weights : Raw_context.t -> Constants_parametric_repr.issuance_weights
 
 val quorum_min : Raw_context.t -> int32
 

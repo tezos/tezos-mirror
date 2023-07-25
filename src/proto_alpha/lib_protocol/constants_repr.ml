@@ -357,7 +357,7 @@ let check_constants constants =
 module Generated = struct
   type t = {
     consensus_threshold : int;
-    reward_weights : Constants_parametric_repr.reward_weights;
+    issuance_weights : Constants_parametric_repr.issuance_weights;
   }
 
   let generate ~consensus_committee_size =
@@ -372,7 +372,7 @@ module Generated = struct
     let reward_parts_16th = 1280 (* = reward_parts_whole / 16 *) in
     {
       consensus_threshold;
-      reward_weights =
+      issuance_weights =
         {
           base_total_issued_per_minute;
           (* 85.007812 tez/minute *)

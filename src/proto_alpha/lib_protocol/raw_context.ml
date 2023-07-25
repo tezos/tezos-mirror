@@ -1033,12 +1033,12 @@ let prepare_first_block ~level ~timestamp ctxt =
           }
       in
 
-      let reward_weights =
+      let issuance_weights =
         let c_gen =
           Constants_repr.Generated.generate
             ~consensus_committee_size:c.consensus_committee_size
         in
-        c_gen.reward_weights
+        c_gen.issuance_weights
       in
 
       let percentage_of_frozen_deposits_slashed_per_double_attestation =
@@ -1083,7 +1083,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             vdf_difficulty = c.vdf_difficulty;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
-            reward_weights;
+            issuance_weights;
             cost_per_byte = c.cost_per_byte;
             hard_storage_limit_per_operation =
               c.hard_storage_limit_per_operation;

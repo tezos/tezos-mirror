@@ -84,9 +84,9 @@ let origination_size c =
   let constants = Raw_context.constants c in
   constants.origination_size
 
-let reward_weights c =
+let issuance_weights c =
   let constants = Raw_context.constants c in
-  constants.reward_weights
+  constants.issuance_weights
 
 let quorum_min c =
   let constants = Raw_context.constants c in

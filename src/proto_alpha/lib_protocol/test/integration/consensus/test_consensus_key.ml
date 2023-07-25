@@ -37,9 +37,9 @@ open Alpha_context
 let constants =
   {
     Default_parameters.constants_test with
-    reward_weights =
+    issuance_weights =
       {
-        Default_parameters.constants_test.reward_weights with
+        Default_parameters.constants_test.issuance_weights with
         base_total_issued_per_minute = Tez.zero;
       };
     consensus_threshold = 0;

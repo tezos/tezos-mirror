@@ -872,7 +872,7 @@ module ConcreteBaseMachine :
       ~consensus_threshold:0
       ~bootstrap_balances
       ~cost_per_byte:Tez.zero
-      ~reward_weights:
+      ~issuance_weights:
         {
           base_total_issued_per_minute =
             Tez.(div_exn (mul_exn liquidity_baking_subsidy 60) block_delay);

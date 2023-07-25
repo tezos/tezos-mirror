@@ -854,7 +854,7 @@ module Constants : sig
       adaptive_rewards_params : adaptive_rewards_params;
     }
 
-    type reward_weights = {
+    type issuance_weights = {
       base_total_issued_per_minute : Tez.t;
       baking_reward_fixed_portion_weight : int;
       baking_reward_bonus_weight : int;
@@ -878,7 +878,7 @@ module Constants : sig
       minimal_frozen_stake : Tez.t;
       vdf_difficulty : int64;
       origination_size : int;
-      reward_weights : reward_weights;
+      issuance_weights : issuance_weights;
       cost_per_byte : Tez.t;
       hard_storage_limit_per_operation : Z.t;
       quorum_min : int32;
@@ -912,7 +912,7 @@ module Constants : sig
   module Generated : sig
     type t = {
       consensus_threshold : int;
-      reward_weights : Parametric.reward_weights;
+      issuance_weights : Parametric.issuance_weights;
     }
 
     val generate : consensus_committee_size:int -> t
@@ -952,7 +952,7 @@ module Constants : sig
 
   val origination_size : context -> int
 
-  val reward_weights : context -> Parametric.reward_weights
+  val issuance_weights : context -> Parametric.issuance_weights
 
   val quorum_min : context -> int32
 

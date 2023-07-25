@@ -16,7 +16,7 @@
   "proof_of_work_threshold": "4611686018427387903",
   "minimal_stake": "6000000000", "minimal_frozen_stake": "600000000",
   "vdf_difficulty": "50000", "origination_size": 257,
-  "reward_weights":
+  "issuance_weights":
     { "base_total_issued_per_minute": "85007812",
       "baking_reward_fixed_portion_weight": 5120,
       "baking_reward_bonus_weight": 5120, "attesting_reward_weight": 10240,

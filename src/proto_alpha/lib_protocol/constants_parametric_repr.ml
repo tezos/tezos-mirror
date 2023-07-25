@@ -149,7 +149,7 @@ type adaptive_inflation = {
   adaptive_rewards_params : adaptive_rewards_params;
 }
 
-type reward_weights = {
+type issuance_weights = {
   base_total_issued_per_minute : Tez_repr.t;
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
@@ -173,7 +173,7 @@ type t = {
   minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
-  reward_weights : reward_weights;
+  issuance_weights : issuance_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
@@ -403,7 +403,7 @@ let adaptive_inflation_encoding =
        (req "adaptive_inflation_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
-let reward_weights_encoding =
+let issuance_weights_encoding =
   let open Data_encoding in
   conv
     (fun ({
@@ -415,7 +415,7 @@ let reward_weights_encoding =
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
           } :
-           reward_weights) ->
+           issuance_weights) ->
       ( base_total_issued_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
@@ -465,7 +465,7 @@ let encoding =
         ( ( c.minimal_frozen_stake,
             c.vdf_difficulty,
             c.origination_size,
-            c.reward_weights,
+            c.issuance_weights,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
             c.quorum_min ),
@@ -502,7 +502,7 @@ let encoding =
            ( ( minimal_frozen_stake,
                vdf_difficulty,
                origination_size,
-               reward_weights,
+               issuance_weights,
                cost_per_byte,
                hard_storage_limit_per_operation,
                quorum_min ),
@@ -540,7 +540,7 @@ let encoding =
         minimal_frozen_stake;
         vdf_difficulty;
         origination_size;
-        reward_weights;
+        issuance_weights;
         cost_per_byte;
         hard_storage_limit_per_operation;
         quorum_min;
@@ -588,7 +588,7 @@ let encoding =
              (req "minimal_frozen_stake" Tez_repr.encoding)
              (req "vdf_difficulty" int64)
              (req "origination_size" int31)
-             (req "reward_weights" reward_weights_encoding)
+             (req "issuance_weights" issuance_weights_encoding)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
