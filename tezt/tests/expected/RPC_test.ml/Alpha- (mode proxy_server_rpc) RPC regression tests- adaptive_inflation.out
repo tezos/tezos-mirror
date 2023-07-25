@@ -5,19 +5,19 @@
 ./octez-client rpc get /chains/main/blocks/head/context/total_frozen_stake
 "1000000000000"
 
-./octez-client rpc get /chains/main/blocks/head/context/inflation/current_yearly_rate
+./octez-client rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate
 "223.400"
 
-./octez-client rpc get /chains/main/blocks/head/context/inflation/current_yearly_rate_exact
+./octez-client rpc get /chains/main/blocks/head/context/issuance/current_yearly_rate_exact
 { "numerator": "744668433120000", "denominator": "3333333569461" }
 
-./octez-client rpc get /chains/main/blocks/head/context/inflation/rewards_per_minute
+./octez-client rpc get /chains/main/blocks/head/context/issuance/rewards_per_minute
 "85007812"
 
-./octez-client rpc get /chains/main/blocks/head/context/adaptive_inflation_launch_cycle
+./octez-client rpc get /chains/main/blocks/head/context/adaptive_issuance_launch_cycle
 null
 
-./octez-client rpc get /chains/main/blocks/head/context/inflation/expected_rewards
+./octez-client rpc get /chains/main/blocks/head/context/issuance/expected_rewards
 [ { "cycle": 0, "baking_reward_fixed_portion": "333333",
     "baking_reward_bonus_per_slot": "1302",
     "attesting_reward_per_slot": "2604", "liquidity_baking_subsidy": "83333",

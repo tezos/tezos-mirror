@@ -404,8 +404,8 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   unit
 
-let test_adaptive_inflation_on_alpha ?endpoint client =
-  Log.info "Test adaptive inflation parameters retrieval" ;
+let test_adaptive_issuance_on_alpha ?endpoint client =
+  Log.info "Test adaptive issuance parameters retrieval" ;
 
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
@@ -417,23 +417,23 @@ let test_adaptive_inflation_on_alpha ?endpoint client =
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_inflation_current_yearly_rate ()
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate ()
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_inflation_current_yearly_rate_exact ()
+    @@ RPC.get_chain_block_context_issuance_current_yearly_rate_exact ()
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_inflation_rewards_per_minute ()
+    @@ RPC.get_chain_block_context_issuance_rewards_per_minute ()
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_adaptive_inflation_launch_cycle ()
+    @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
   in
   let* _ =
     RPC.Client.call ?endpoint client ~hooks
-    @@ RPC.get_chain_block_context_inflation_expected_rewards ()
+    @@ RPC.get_chain_block_context_issuance_expected_rewards ()
   in
   unit
 
@@ -615,9 +615,9 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
-(* Test the adaptive inflation RPC. *)
-let test_adaptive_inflation _test_mode_tag _protocol ?endpoint client =
-  test_adaptive_inflation_on_alpha ?endpoint client
+(* Test the adaptive issuance RPC. *)
+let test_adaptive_issuance _test_mode_tag _protocol ?endpoint client =
+  test_adaptive_issuance_on_alpha ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -1519,9 +1519,9 @@ let register protocols =
       ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
     check_rpc_regression
-      "adaptive_inflation"
+      "adaptive_issuance"
       ~supports:Protocol.(From_protocol (number Nairobi + 1))
-      ~test_function:test_adaptive_inflation ;
+      ~test_function:test_adaptive_issuance ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

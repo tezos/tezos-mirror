@@ -42,7 +42,7 @@ module Proto = struct
              ~level
              ~predecessor_timestamp
              ~timestamp
-             ~adaptive_inflation_enable:false
+             ~adaptive_issuance_enable:false
              ctxt
       in
       Raw_context.set_gas_limit

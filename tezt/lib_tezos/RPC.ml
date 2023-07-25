@@ -1293,7 +1293,7 @@ let get_chain_block_context_total_frozen_stake ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "total_frozen_stake"]
     Fun.id
 
-let get_chain_block_context_inflation_current_yearly_rate ?(chain = "main")
+let get_chain_block_context_issuance_current_yearly_rate ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1303,12 +1303,12 @@ let get_chain_block_context_inflation_current_yearly_rate ?(chain = "main")
       "blocks";
       block;
       "context";
-      "inflation";
+      "issuance";
       "current_yearly_rate";
     ]
     Fun.id
 
-let get_chain_block_context_inflation_current_yearly_rate_exact
+let get_chain_block_context_issuance_current_yearly_rate_exact
     ?(chain = "main") ?(block = "head") () =
   make
     GET
@@ -1318,12 +1318,12 @@ let get_chain_block_context_inflation_current_yearly_rate_exact
       "blocks";
       block;
       "context";
-      "inflation";
+      "issuance";
       "current_yearly_rate_exact";
     ]
     Fun.id
 
-let get_chain_block_context_inflation_rewards_per_minute ?(chain = "main")
+let get_chain_block_context_issuance_rewards_per_minute ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1333,12 +1333,12 @@ let get_chain_block_context_inflation_rewards_per_minute ?(chain = "main")
       "blocks";
       block;
       "context";
-      "inflation";
+      "issuance";
       "rewards_per_minute";
     ]
     Fun.id
 
-let get_chain_block_context_adaptive_inflation_launch_cycle ?(chain = "main")
+let get_chain_block_context_adaptive_issuance_launch_cycle ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1348,11 +1348,11 @@ let get_chain_block_context_adaptive_inflation_launch_cycle ?(chain = "main")
       "blocks";
       block;
       "context";
-      "adaptive_inflation_launch_cycle";
+      "adaptive_issuance_launch_cycle";
     ]
     Fun.id
 
-let get_chain_block_context_inflation_expected_rewards ?(chain = "main")
+let get_chain_block_context_issuance_expected_rewards ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1362,7 +1362,7 @@ let get_chain_block_context_inflation_expected_rewards ?(chain = "main")
       "blocks";
       block;
       "context";
-      "inflation";
+      "issuance";
       "expected_rewards";
     ]
     Fun.id

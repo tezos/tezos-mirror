@@ -197,7 +197,7 @@ Node
   ``prevalidation.operation_conflict`` error. (MR :gl:`!9314`)
 
 - In RPC ``/protocol_data``, ``"per_block_votes"`` replaces ``"liquidity_baking_toggle_vote"``;
-  ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_inflation_vote"``.
+  ``"per_block_votes"`` has two properties ``"liquidity_baking_vote"`` and ``"adaptive_issuance_vote"``.
   A vote is one of ``"on"``, ``"off"``, ``"pass"``.
 
 - Added version ``1`` to RPC ``GET ../blocks/<blocks>/metadata``. It can be used
@@ -247,7 +247,7 @@ Baker
   directory, takes predecence.
 
 - Bakers are now asked (but not required) to set their votes for the adoption of the
-  adaptive inflation feature. They may use the CLI option ``--adaptive-inflation-vote``
+  adaptive issuance feature. They may use the CLI option ``--adaptive-issuance-vote``
   or the per-block votes file (which is re-read at each block, and overrides the CLI option).
   Absence of vote is equivalent to voting "pass".
 
