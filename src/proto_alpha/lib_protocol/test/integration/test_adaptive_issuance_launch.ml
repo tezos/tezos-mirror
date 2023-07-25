@@ -269,7 +269,7 @@ let test_launch threshold expected_vote_duration () =
     Assert.proto_error_with_info
       ~loc:__LOC__
       i
-      "Staking for a non-delegate while staking is disabled"
+      "Staking for a delegator while external staking is disabled"
   in
   let* () =
     assert_voting_power
