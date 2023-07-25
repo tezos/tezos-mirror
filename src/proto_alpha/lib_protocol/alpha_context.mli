@@ -2304,7 +2304,7 @@ module Delegate : sig
         The frozen balance is composed of all frozen bonds associated to the
         contract (given by [Contract_storage.get_frozen_bonds]), all unstaked
         frozen deposits, and of the fraction of the frozen deposits that
-        actually belongs to the delegate and not to its costakers.
+        actually belongs to the delegate and not to its stakers.
 
     Only use this function for RPCs: this is expensive. *)
     val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t

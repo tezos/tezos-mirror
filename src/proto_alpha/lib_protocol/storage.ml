@@ -477,7 +477,7 @@ module Contract = struct
       end)
       (Staking_pseudotoken_repr)
 
-  module Costaking_pseudotokens =
+  module Staking_pseudotokens =
     Indexed_context.Make_map
       (Registered)
       (struct

@@ -728,7 +728,7 @@ let has_frozen_bonds ctxt contract =
 
 let has_frozen_deposits ctxt contract =
   let open Lwt_result_syntax in
-  let* pseudo = Storage.Contract.Costaking_pseudotokens.find ctxt contract in
+  let* pseudo = Storage.Contract.Staking_pseudotokens.find ctxt contract in
   match pseudo with
   | Some v when not Staking_pseudotoken_repr.(v = zero) -> return_true
   | _ -> (

@@ -185,7 +185,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** Tez that were part of {!Frozen_deposits} but have been requested to be
-      unstaked by a costaker.
+      unstaked by a staker.
       They won't be part of the stake for future distributions.
       For cycles [current_cycle - preserved_cycles - max_slashing_period + 1] to
       [current_cycle] they are still slashable.
@@ -205,7 +205,7 @@ module Contract : sig
        and type value = Unstake_request.t
        and type t := Raw_context.t
 
-  (** The sum of all pseudotokens owned by costakers (the delegate included)
+  (** The sum of all pseudotokens owned by stakers (the delegate included)
       corresponding to shares of the {!Frozen_deposits} current amount. *)
   module Frozen_deposits_pseudotokens :
     Indexed_data_storage
@@ -214,7 +214,7 @@ module Contract : sig
        and type t := Raw_context.t
 
   (** Share of the contract's delegate frozen deposits the contract owns. *)
-  module Costaking_pseudotokens :
+  module Staking_pseudotokens :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Staking_pseudotoken_repr.t
@@ -281,10 +281,10 @@ module Contract : sig
       - 2021-12-17 for double baking (154 events in total),
       - 2019-08-08 for double endorsing (24 events in total).
 
-      The slashing percentages are used to compute the real value of costake
+      The slashing percentages are used to compute the real value of stake
       withdrawals.
       Currently there is no limit to the age of the events we need to store
-      because there is no such limit for costake withdrawals.
+      because there is no such limit for stake withdrawals.
       At worst we can revisit this decision in a later protocol amendment (in
       25 cycles) or clean up this storage manually or automatically.
   *)

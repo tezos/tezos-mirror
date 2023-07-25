@@ -116,8 +116,8 @@ let migrate_staking_balance_for_o ctxt =
       Tez_repr.sub_opt staking_balance own_frozen
       |> Option.value ~default:Tez_repr.zero
     in
-    let costaked_frozen = Tez_repr.zero in
-    return (Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+    let staked_frozen = Tez_repr.zero in
+    return (Stake_repr.Full.make ~own_frozen ~staked_frozen ~delegated)
   in
   Storage.Stake.Staking_balance_up_to_Nairobi.fold
     ctxt

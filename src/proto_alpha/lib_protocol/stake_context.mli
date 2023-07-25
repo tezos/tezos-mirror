@@ -26,7 +26,7 @@
 (** Functions on stake and depending on the context. *)
 
 (** Apply the delegation_over_baking and staking_over_baking limits of
-    a delegate. Overcostaked tez count as delegated, overdelegated tez
+    a delegate. Overstaked tez count as delegated, overdelegated tez
     do not count at all.  *)
 val apply_limits :
   Raw_context.t ->

@@ -71,15 +71,15 @@ let assert_total_frozen_stake ~loc block expected =
 
 (* Assert that the current voting power of a delegate is the expected
    one. The expectation is computed based on the expected self-staked,
-   delegated, and costaked tez. The delegate's own liquid balance is
+   delegated, and staked tez. The delegate's own liquid balance is
    measured. *)
 let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
-    ~expected_delegated ~expected_costaked =
+    ~expected_delegated ~expected_ext_staked =
   let open Lwt_result_syntax in
   let* balance = Context.Contract.balance (B block) (Implicit delegate) in
   let balance = Protocol.Alpha_context.Tez.to_mutez balance in
   let expected_liquid = Int64.add balance expected_delegated in
-  let expected_frozen = Int64.add expected_staked expected_costaked in
+  let expected_frozen = Int64.add expected_staked expected_ext_staked in
   let* constants = Context.get_constants (B block) in
   let staking_over_delegation_edge =
     Int64.of_int
@@ -106,8 +106,8 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
      expected duration,
    - the launch cycle is set as soon as the threshold is reached,
    - the launch cycle is not reset before it is reached,
-   - once the launch cycle is reached, costaking is allowed,
-   - costaking increases total_frozen_stake. *)
+   - once the launch cycle is reached, staking is allowed,
+   - staking increases total_frozen_stake. *)
 let test_launch threshold expected_vote_duration () =
   let open Lwt_result_wrap_syntax in
   let assert_ema_above_threshold ~loc
@@ -143,8 +143,8 @@ let test_launch threshold expected_vote_duration () =
   in
 
   (* To test that adaptive inflation is active, we test that
-     costaking, a feature only available after the activation, is
-     allowed. But by default, delegates reject costakers, they must
+     staking, a feature only available after the activation, is
+     allowed. But by default, delegates reject stakers, they must
      explicitely set a positive staking_over_baking_limit to allow
      them. Setting this limit does not immediately take effect but can
      be done before the activation. For these reasons, we set it at
@@ -168,14 +168,14 @@ let test_launch threshold expected_vote_duration () =
   in
 
   (* Initialization of a delegator account which will attempt to
-     costake. *)
-  let wannabe_costaker_account = Account.new_account () in
-  let wannabe_costaker =
+     stake. *)
+  let wannabe_staker_account = Account.new_account () in
+  let wannabe_staker =
     Protocol.Alpha_context.Contract.Implicit
-      Account.(wannabe_costaker_account.pkh)
+      Account.(wannabe_staker_account.pkh)
   in
 
-  (* To set up the wannabe costaker, we need three operations: a
+  (* To set up the wannabe staker, we need three operations: a
      transfer from the delegate to initialize its balance, a
      revelation of its public key, and a delegation toward the
      delegate. For simplicity we put these operations in different
@@ -185,7 +185,7 @@ let test_launch threshold expected_vote_duration () =
       Op.transaction
         (B block)
         delegate
-        wannabe_costaker
+        wannabe_staker
         (Protocol.Alpha_context.Tez.of_mutez_exn 2_000_000_000_000L)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
@@ -195,7 +195,7 @@ let test_launch threshold expected_vote_duration () =
       Op.revelation
         ~fee:Protocol.Alpha_context.Tez.zero
         (B block)
-        wannabe_costaker_account.pk
+        wannabe_staker_account.pk
     in
     Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
   in
@@ -204,7 +204,7 @@ let test_launch threshold expected_vote_duration () =
       Op.delegation
         ~fee:Protocol.Alpha_context.Tez.zero
         (B block)
-        wannabe_costaker
+        wannabe_staker
         (Some delegate_pkh)
     in
     Block.bake ~operation ~adaptive_inflation_vote:Per_block_vote_on block
@@ -259,12 +259,12 @@ let test_launch threshold expected_vote_duration () =
   (* At this point the feature is not launched yet, it is simply
      planned to be launched. *)
   (* We check that the feature is not yet active by attempting a
-     costake operation. *)
+     stake operation. *)
   let* () =
     let* operation =
       stake
         (B block)
-        wannabe_costaker
+        wannabe_staker
         (Protocol.Alpha_context.Tez.of_mutez_exn 10L)
     in
     let* i = Incremental.begin_construction block in
@@ -272,7 +272,7 @@ let test_launch threshold expected_vote_duration () =
     Assert.proto_error_with_info
       ~loc:__LOC__
       i
-      "Staking for a non-delegate while co-staking is disabled"
+      "Staking for a non-delegate while staking is disabled"
   in
   let* () =
     assert_voting_power
@@ -282,7 +282,7 @@ let test_launch threshold expected_vote_duration () =
       ~ai_enabled:false
       ~expected_staked:2_000_000_000_000L
       ~expected_delegated:2_000_000_000_000L
-      ~expected_costaked:0L
+      ~expected_ext_staked:0L
   in
 
   let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
@@ -322,18 +322,18 @@ let test_launch threshold expected_vote_duration () =
       ~ai_enabled:true
       ~expected_staked:2_000_000_000_000L
       ~expected_delegated:2_000_000_000_000L
-      ~expected_costaked:0L
+      ~expected_ext_staked:0L
   in
 
-  (* Test that the wannabe costaker is now allowed to stake almost all
-     its balance. It cannot totally costake it however because this is
+  (* Test that the wannabe staker is now allowed to stake almost all
+     its balance. It cannot totally stake it however because this is
      considered by the protocol as an attempt to empty the account, and
      emptying delegated accounts is forbidden. *)
-  let* balance = Context.Contract.balance (B block) wannabe_costaker in
+  let* balance = Context.Contract.balance (B block) wannabe_staker in
   let*?@ balance_to_stake = Protocol.Alpha_context.Tez.(balance -? one) in
-  let* operation = stake (B block) wannabe_costaker balance_to_stake in
+  let* operation = stake (B block) wannabe_staker balance_to_stake in
   let* block = Block.bake ~operation block in
-  (* The costaking operation leads to an increase of the
+  (* The staking operation leads to an increase of the
      total_frozen_stake but only preserved_cycles after the
      operation. *)
   let start_cycle = Block.current_cycle block in
@@ -365,7 +365,7 @@ let test_launch threshold expected_vote_duration () =
       ~ai_enabled:true
       ~expected_staked:2_000_000_000_000L
       ~expected_delegated:1_000_000L
-      ~expected_costaked:1_999_999_000_000L
+      ~expected_ext_staked:1_999_999_000_000L
   in
   return_unit
 
