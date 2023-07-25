@@ -477,11 +477,11 @@ module Contract = struct
       end)
       (Staking_pseudotoken_repr)
 
-  module Costaking_pseudotokens =
+  module Staking_pseudotokens =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["costaking_pseudotokens"]
+        let name = ["staking_pseudotokens"]
       end)
       (Staking_pseudotoken_repr)
 
@@ -1184,20 +1184,20 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
-  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_inflation_storage.ml] *)
-  module Reward_bonus =
+  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_issuance_storage.ml] *)
+  module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["reward_bonus"]
+        let name = ["issuance_bonus"]
       end)
       (Encoding.Int64)
 
-  module Reward_coeff =
+  module Issuance_coeff =
     Indexed_context.Make_map
       (Registered)
       (struct
-        let name = ["reward_coeff"]
+        let name = ["issuance_coeff"]
       end)
       (struct
         type t = Q.t
@@ -1363,8 +1363,8 @@ module Stake = struct
 end
 
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
-module Reward_bonus = Cycle.Reward_bonus
-module Reward_coeff = Cycle.Reward_coeff
+module Issuance_bonus = Cycle.Issuance_bonus
+module Issuance_coeff = Cycle.Issuance_coeff
 
 (** Votes *)
 
@@ -1697,18 +1697,18 @@ module Liquidity_baking = struct
       end)
 end
 
-module Adaptive_inflation = struct
+module Adaptive_issuance = struct
   module Launch_ema =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["adaptive_inflation_ema"]
+        let name = ["adaptive_issuance_ema"]
       end)
       (Encoding.Int32)
 
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["adaptive_inflation_launch_cycle"]
+        let name = ["adaptive_issuance_launch_cycle"]
       end)
       (struct
         type t = Cycle_repr.t option

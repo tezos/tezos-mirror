@@ -25,12 +25,12 @@
 
 (** This module is responsible for maintaining the
     {!Storage.Contract.Frozen_deposits_pseudotokens} and
-    {!Storage.Contract.Costaking_pseudotokens} tables. *)
+    {!Storage.Contract.Staking_pseudotokens} tables. *)
 
 (** [stake ctxt ~contract ~delegate amount] credits the [contract]'s
-    costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
+    staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s 
-    costaked frozen deposits pseudotokens/tez rate.
+    staked frozen deposits pseudotokens/tez rate.
     
     This function must be called on "stake" **before** transferring tez to
     [delegate]'s frozen deposits. 
@@ -44,9 +44,9 @@ val stake :
   Raw_context.t tzresult Lwt.t
 
 (** [request_unstake ctxt ~contract ~delegate amount] debits the [contract]'s
-    costaking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
+    staking pseudotokens and the [delegate]'s frozen deposits pseudotokens by
     an amount of pseudotokens corresponding to [amount] using [delegate]'s
-    costaked frozen deposits pseudotokens/tez rate capped by [contract]'s costaking
+    staked frozen deposits pseudotokens/tez rate capped by [contract]'s staking
     pseudotokens balance.
 
     It returns the tez amount corresponding to the debited pseudotokens.
@@ -65,7 +65,7 @@ module For_RPC : sig
     current staked tez.
     For delegate, it is their own frozen deposits.
     For delegators, their staking balance in pseudotokens is converted into tez
-    using [delegate]'s costaked frozen deposits tez/pseudotokens rate.
+    using [delegate]'s staked frozen deposits tez/pseudotokens rate.
     
     The given [delegate] should be [contract]'s delegate. Otherwise the given
     [Tez.t] amount will not make sense. *)

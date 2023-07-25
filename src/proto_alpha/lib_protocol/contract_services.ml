@@ -131,7 +131,7 @@ module S = struct
   let full_balance =
     RPC_service.get_service
       ~description:
-        "Access the full balance of a contract, incuding frozen bonds and \
+        "Access the full balance of a contract, including frozen bonds and \
          stake."
       ~query:RPC_query.empty
       ~output:Tez.encoding

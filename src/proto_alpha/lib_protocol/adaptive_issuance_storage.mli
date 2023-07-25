@@ -23,32 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [set_adaptive_inflation_enable ctxt] sets the feature flag in the
-   in-memory part of the context if the adaptive inflation feature has
+(** [set_adaptive_issuance_enable ctxt] sets the feature flag in the
+   in-memory part of the context if the adaptive issuance feature has
    already launched. This means that the activation vote resulted in
    an approbation from the stakeholders and this happened sufficiently
    long ago. *)
-val set_adaptive_inflation_enable :
-  Raw_context.t -> Raw_context.t tzresult Lwt.t
+val set_adaptive_issuance_enable : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [load_reward_coeff ctxt] loads the current cycle's reward coeff from the
     storage into the context *)
 val load_reward_coeff : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_stored_rewards_at_cycle_end ctxt ~new_cycle] updates
-    {!Storage.Reward_coeff} with a new coefficient that will be applied
+    {!Storage.Issuance_coeff} with a new coefficient that will be applied
     [preserved_cycles] cycles after the given [new_cycle]. This new coefficient
     depends on the current {!Storage.Total_supply}, and the total active stake
     for when this coefficient is computed.
 
-    This function also removes obsolete values from {!Storage.Reward_coeff},
+    This function also removes obsolete values from {!Storage.Issuance_coeff},
     and stores the current cycle's coefficient in the context for faster
     access. *)
 val update_stored_rewards_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [init ctxt] adds into the context an adaptive inflation vote EMA
-    at 0, and and adaptive inflation launch cycle at None. *)
+(** [init ctxt] adds into the context an adaptive issuance vote EMA
+    at 0, and and adaptive issuance launch cycle at None. *)
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** [update_ema ctxt ~vote] returns the new context with the new EMA *)
@@ -57,12 +56,12 @@ val update_ema :
   vote:Per_block_votes_repr.per_block_vote ->
   (Raw_context.t
   * Cycle_repr.t option
-  * Per_block_votes_repr.Adaptive_inflation_launch_EMA.t)
+  * Per_block_votes_repr.Adaptive_issuance_launch_EMA.t)
   tzresult
   Lwt.t
 
 (** [launch_cycle ctxt] reads from the context the cycle at which
-    the adaptive inflation feature is set to activate.
+    the adaptive issuance feature is set to activate.
 
     If this function returns [None], then it means the feature has not been
     voted to be activated (yet). *)
@@ -75,7 +74,7 @@ module For_RPC : sig
       Fails if the given cycle is not between [current_cycle] and
       [current_cycle + preserved_cycles].
 
-      If adaptive inflation has not been activated,
+      If adaptive issuance has not been activated,
       then this function returns [Q.one].
       Used only for RPCs. To get the actual rewards, use [Delegate_rewards]. *)
   val get_reward_coeff :

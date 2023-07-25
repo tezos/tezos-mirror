@@ -36,51 +36,51 @@ let bonus_unit = 1_000_000_000_000_000L
 
 let ratio_to_bonus q = Q.(q * of_int64 bonus_unit |> to_int64)
 
-type error += Undetermined_inflation_coeff_for_cycle of Cycle_repr.t
+type error += Undetermined_issuance_coeff_for_cycle of Cycle_repr.t
 
 let () =
   let open Data_encoding in
-  let undetermined_inflation_coeff_for_cycle_description =
-    "Inflation coefficient is only determined for the current cycle and the \
+  let undetermined_issuance_coeff_for_cycle_description =
+    "Issuance coefficient is only determined for the current cycle and the \
      next [preserved_cycles] cycles to come. Requested cycle is not in this \
      window."
   in
   register_error_kind
     `Permanent
-    ~id:"undetermined_inflation_coeff_for_cycle"
-    ~title:"Undetermined inflation coeff for cycle"
-    ~description:undetermined_inflation_coeff_for_cycle_description
+    ~id:"undetermined_issuance_coeff_for_cycle"
+    ~title:"Undetermined issuance coeff for cycle"
+    ~description:undetermined_issuance_coeff_for_cycle_description
     ~pp:(fun ppf cycle ->
       Format.fprintf
         ppf
         "%s (cycle %a)"
-        undetermined_inflation_coeff_for_cycle_description
+        undetermined_issuance_coeff_for_cycle_description
         Cycle_repr.pp
         cycle)
-    (obj1 (req "Undetermined_inflation_coeff_for_cycle" Cycle_repr.encoding))
+    (obj1 (req "Undetermined_issuance_coeff_for_cycle" Cycle_repr.encoding))
     (function
-      | Undetermined_inflation_coeff_for_cycle cycle -> Some cycle | _ -> None)
-    (fun cycle -> Undetermined_inflation_coeff_for_cycle cycle)
+      | Undetermined_issuance_coeff_for_cycle cycle -> Some cycle | _ -> None)
+    (fun cycle -> Undetermined_issuance_coeff_for_cycle cycle)
 
 let check_determined_cycle ctxt cycle =
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     let ctxt_cycle = (Raw_context.current_level ctxt).cycle in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
     fail_unless
       Cycle_repr.(
         ctxt_cycle <= cycle && cycle <= add ctxt_cycle preserved_cycles)
-      (Undetermined_inflation_coeff_for_cycle cycle)
+      (Undetermined_issuance_coeff_for_cycle cycle)
   else return_unit
 
 let get_reward_coeff ctxt ~cycle =
   let open Lwt_result_syntax in
   let* () = check_determined_cycle ctxt cycle in
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if ai_enable then
     (* Even if AI is enabled, the storage can be empty: this is the case for
        the first 5 cycles after AI is enabled *)
-    let* k_opt = Storage.Reward_coeff.find ctxt cycle in
+    let* k_opt = Storage.Issuance_coeff.find ctxt cycle in
     return (Option.value ~default:default_reward k_opt)
   else return default_reward
 
@@ -89,9 +89,9 @@ let get_reward_bonus ctxt ~cycle =
   match cycle with
   | None -> return default_bonus
   | Some cycle ->
-      let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+      let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
       if ai_enable then
-        let* k_opt = Storage.Reward_bonus.find ctxt cycle in
+        let* k_opt = Storage.Issuance_bonus.find ctxt cycle in
         return (Option.value ~default:default_bonus k_opt)
       else return default_bonus
 
@@ -105,22 +105,22 @@ let load_reward_coeff ctxt ~cycle =
 
 let compute_reward_coeff_ratio =
   let q_1600 = Q.of_int 1600 in
-  fun ~stake_ratio ~bonus ~reward_ratio_max ~reward_ratio_min ->
+  fun ~stake_ratio ~bonus ~issuance_ratio_max ~issuance_ratio_min ->
     let q_bonus = Q.(div (of_int64 bonus) (of_int64 bonus_unit)) in
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
-    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly inflation rate *) in
+    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly issuance rate *) in
     let f = Q.add f q_bonus in
     (* f is truncated so that 0.05% <= f <= 5% *)
-    let f = Q.(min f reward_ratio_max) in
-    let f = Q.(max f reward_ratio_min) in
+    let f = Q.(min f issuance_ratio_max) in
+    let f = Q.(max f issuance_ratio_min) in
     f
 
 let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
     ~previous_bonus ~reward_params =
   let Constants_parametric_repr.
         {
-          reward_ratio_min;
-          reward_ratio_max;
+          issuance_ratio_min;
+          issuance_ratio_max;
           max_bonus;
           growth_rate;
           center_dz;
@@ -139,11 +139,11 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
     compute_reward_coeff_ratio
       ~stake_ratio
       ~bonus:0L
-      ~reward_ratio_max
-      ~reward_ratio_min
+      ~issuance_ratio_max
+      ~issuance_ratio_min
   in
   let base_reward_coeff_dist_to_max =
-    ratio_to_bonus Q.(reward_ratio_max - base_reward_coeff_ratio)
+    ratio_to_bonus Q.(issuance_ratio_max - base_reward_coeff_ratio)
   in
   (* The bonus reward is truncated between [0] and [max_bonus] *)
   (* It is done in a way that the bonus does not increase if the coeff
@@ -167,15 +167,16 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
 
 let compute_coeff =
   let q_min_per_year = Q.of_int 525600 in
-  fun ~base_total_rewards_per_minute
+  fun ~base_total_issued_per_minute
       ~total_supply
       ~total_frozen_stake
       ~bonus
       ~reward_params ->
-    if Compare.Int64.equal (Tez_repr.to_mutez base_total_rewards_per_minute) 0L
+    if Compare.Int64.equal (Tez_repr.to_mutez base_total_issued_per_minute) 0L
     then Q.one
     else
-      let Constants_parametric_repr.{reward_ratio_min; reward_ratio_max; _} =
+      let Constants_parametric_repr.{issuance_ratio_min; issuance_ratio_max; _}
+          =
         reward_params
       in
       let q_total_supply = Tez_repr.to_mutez total_supply |> Q.of_int64 in
@@ -187,35 +188,35 @@ let compute_coeff =
           q_total_frozen_stake
           q_total_supply (* = portion of frozen stake *)
       in
-      let q_base_total_rewards_per_minute =
-        Tez_repr.to_mutez base_total_rewards_per_minute |> Q.of_int64
+      let q_base_total_issued_per_minute =
+        Tez_repr.to_mutez base_total_issued_per_minute |> Q.of_int64
       in
       let f =
         compute_reward_coeff_ratio
           ~stake_ratio
           ~bonus
-          ~reward_ratio_max
-          ~reward_ratio_min
+          ~issuance_ratio_max
+          ~issuance_ratio_min
       in
-      let f = Q.div f q_min_per_year (* = inflation per minute *) in
-      let f = Q.mul f q_total_supply (* = rewards per minute *) in
-      Q.div f q_base_total_rewards_per_minute
+      let f = Q.div f q_min_per_year (* = issuance rate per minute *) in
+      let f = Q.mul f q_total_supply (* = issuance per minute *) in
+      Q.div f q_base_total_issued_per_minute
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
-  let ai_enable = Constants_storage.adaptive_inflation_enable ctxt in
+  let ai_enable = Constants_storage.adaptive_issuance_enable ctxt in
   if not ai_enable then return ctxt
   else
     let reward_params =
-      Constants_storage.adaptive_inflation_rewards_params ctxt
+      Constants_storage.adaptive_issuance_rewards_params ctxt
     in
     let preserved = Constants_storage.preserved_cycles ctxt in
     let for_cycle = Cycle_repr.add new_cycle preserved in
     let before_for_cycle = Cycle_repr.pred for_cycle in
     let* total_supply = Storage.Contract.Total_supply.get ctxt in
     let* total_stake = Stake_storage.get_total_active_stake ctxt for_cycle in
-    let base_total_rewards_per_minute =
-      (Constants_storage.reward_weights ctxt).base_total_rewards_per_minute
+    let base_total_issued_per_minute =
+      (Constants_storage.issuance_weights ctxt).base_total_issued_per_minute
     in
     let total_frozen_stake = Stake_repr.get_frozen total_stake in
     let* previous_bonus = get_reward_bonus ctxt ~cycle:before_for_cycle in
@@ -236,14 +237,14 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     in
     let coeff =
       compute_coeff
-        ~base_total_rewards_per_minute
+        ~base_total_issued_per_minute
         ~total_supply
         ~total_frozen_stake
         ~bonus
         ~reward_params
     in
-    let*! ctxt = Storage.Reward_bonus.add ctxt for_cycle bonus in
-    let*! ctxt = Storage.Reward_coeff.add ctxt for_cycle coeff in
+    let*! ctxt = Storage.Issuance_bonus.add ctxt for_cycle bonus in
+    let*! ctxt = Storage.Issuance_coeff.add ctxt for_cycle coeff in
     return ctxt
 
 let clear_outdated_reward_data ctxt ~new_cycle =
@@ -251,8 +252,8 @@ let clear_outdated_reward_data ctxt ~new_cycle =
   match Cycle_repr.sub new_cycle 1 with
   | None -> Lwt.return ctxt
   | Some cycle ->
-      let* ctxt = Storage.Reward_coeff.remove ctxt cycle in
-      Storage.Reward_bonus.remove ctxt cycle
+      let* ctxt = Storage.Issuance_coeff.remove ctxt cycle in
+      Storage.Issuance_bonus.remove ctxt cycle
 
 let update_stored_rewards_at_cycle_end ctxt ~new_cycle =
   let open Lwt_result_syntax in
@@ -265,15 +266,15 @@ let load_reward_coeff ctxt =
 
 let init ctxt =
   let open Lwt_result_syntax in
-  let* ctxt = Storage.Adaptive_inflation.Launch_ema.init ctxt 0l in
-  Storage.Adaptive_inflation.Activation.init ctxt None
+  let* ctxt = Storage.Adaptive_issuance.Launch_ema.init ctxt 0l in
+  Storage.Adaptive_issuance.Activation.init ctxt None
 
 let activate ctxt ~cycle =
-  Storage.Adaptive_inflation.Activation.update ctxt (Some cycle)
+  Storage.Adaptive_issuance.Activation.update ctxt (Some cycle)
 
-let launch_cycle ctxt = Storage.Adaptive_inflation.Activation.get ctxt
+let launch_cycle ctxt = Storage.Adaptive_issuance.Activation.get ctxt
 
-let set_adaptive_inflation_enable ctxt =
+let set_adaptive_issuance_enable ctxt =
   let open Lwt_result_syntax in
   let+ enable =
     let+ launch_cycle = launch_cycle ctxt in
@@ -283,26 +284,26 @@ let set_adaptive_inflation_enable ctxt =
         let current_cycle = (Level_storage.current ctxt).cycle in
         Cycle_repr.(current_cycle >= launch_cycle)
   in
-  if enable then Raw_context.set_adaptive_inflation_enable ctxt else ctxt
+  if enable then Raw_context.set_adaptive_issuance_enable ctxt else ctxt
 
 let update_ema ctxt ~vote =
-  Storage.Adaptive_inflation.Launch_ema.get ctxt >>=? fun old_ema ->
-  Per_block_votes_repr.Adaptive_inflation_launch_EMA.of_int32 old_ema
+  Storage.Adaptive_issuance.Launch_ema.get ctxt >>=? fun old_ema ->
+  Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
   >>=? fun old_ema ->
   let new_ema =
-    Per_block_votes_repr.compute_new_adaptive_inflation_ema
+    Per_block_votes_repr.compute_new_adaptive_issuance_ema
       ~per_block_vote:vote
       old_ema
   in
-  Storage.Adaptive_inflation.Launch_ema.update
+  Storage.Adaptive_issuance.Launch_ema.update
     ctxt
-    (Per_block_votes_repr.Adaptive_inflation_launch_EMA.to_int32 new_ema)
+    (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
   >>=? fun ctxt ->
   launch_cycle ctxt >>=? fun launch_cycle ->
   let open Constants_storage in
   (if
-   Per_block_votes_repr.Adaptive_inflation_launch_EMA.(
-     new_ema < adaptive_inflation_launch_ema_threshold ctxt)
+   Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
+     new_ema < adaptive_issuance_launch_ema_threshold ctxt)
   then return (ctxt, launch_cycle)
   else
     match launch_cycle with

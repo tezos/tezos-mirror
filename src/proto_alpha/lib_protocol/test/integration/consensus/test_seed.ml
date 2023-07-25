@@ -287,9 +287,9 @@ let test_unrevealed () =
   let constants =
     {
       Default_parameters.constants_test with
-      reward_weights =
+      issuance_weights =
         {
-          base_total_rewards_per_minute = Tez.one;
+          base_total_issued_per_minute = Tez.one;
           attesting_reward_weight = 1;
           baking_reward_bonus_weight = 0;
           baking_reward_fixed_portion_weight = 0;

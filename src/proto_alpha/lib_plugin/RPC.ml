@@ -1064,9 +1064,9 @@ module Scripts = struct
           migration_balance_updates = [];
           liquidity_baking_toggle_ema =
             Per_block_votes.Liquidity_baking_toggle_EMA.zero;
-          adaptive_inflation_vote_ema =
-            Per_block_votes.Adaptive_inflation_launch_EMA.zero;
-          adaptive_inflation_launch_cycle = None;
+          adaptive_issuance_vote_ema =
+            Per_block_votes.Adaptive_issuance_launch_EMA.zero;
+          adaptive_issuance_launch_cycle = None;
           implicit_operations_results = [];
         }
     in
@@ -2791,7 +2791,7 @@ module Forge = struct
                  per_block_votes_encoding
                  {
                    liquidity_baking_vote = Per_block_vote_pass;
-                   adaptive_inflation_vote = Per_block_vote_pass;
+                   adaptive_issuance_vote = Per_block_vote_pass;
                  }))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
@@ -2962,7 +2962,7 @@ module Forge = struct
   let protocol_data ctxt block ?(payload_hash = Block_payload_hash.zero)
       ?(payload_round = Round.zero) ?seed_nonce_hash
       ?(proof_of_work_nonce = empty_proof_of_work_nonce)
-      ~liquidity_baking_toggle_vote ~adaptive_inflation_vote () =
+      ~liquidity_baking_toggle_vote ~adaptive_issuance_vote () =
     RPC_context.make_call0
       S.protocol_data
       ctxt
@@ -2974,7 +2974,7 @@ module Forge = struct
         proof_of_work_nonce,
         {
           liquidity_baking_vote = liquidity_baking_toggle_vote;
-          adaptive_inflation_vote;
+          adaptive_issuance_vote;
         } )
 end
 

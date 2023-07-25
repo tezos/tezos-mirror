@@ -23,18 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module defines costs for the adaptive inflation operations. *)
+open Alpha_context
 
-val find_delegate_cost : Gas_limit_repr.cost
+type expected_rewards = {
+  cycle : Cycle.t;
+  baking_reward_fixed_portion : Tez.t;
+  baking_reward_bonus_per_slot : Tez.t;
+  attesting_reward_per_slot : Tez.t;
+  liquidity_baking_subsidy : Tez.t;
+  seed_nonce_revelation_tip : Tez.t;
+  vdf_revelation_tip : Tez.t;
+}
 
-val allocated_cost : Gas_limit_repr.cost
+val expected_rewards_encoding : expected_rewards Data_encoding.t
 
-val stake_cost : Gas_limit_repr.cost
+val total_supply : 'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
-val set_delegate_parameters_cost : Gas_limit_repr.cost
+val total_frozen_stake :
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
-val prepare_finalize_unstake_cost : Gas_limit_repr.cost
+val current_yearly_rate :
+  'a #RPC_context.simple -> 'a -> string shell_tzresult Lwt.t
 
-val finalize_unstake_and_check_cost : Gas_limit_repr.cost
+val current_yearly_rate_exact :
+  'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
 
-val request_unstake_cost : Gas_limit_repr.cost
+val current_issuance_per_minute :
+  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
+
+val launch_cycle :
+  'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
+
+(** Returns the list of expected issued tez for the current cycle and for the next
+    [preserved_cycles] cycles. *)
+val expected_issuance :
+  'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
+
+val register : unit -> unit

@@ -839,23 +839,23 @@ module Constants : sig
     }
 
     type adaptive_rewards_params = {
-      reward_ratio_min : Q.t;
-      reward_ratio_max : Q.t;
+      issuance_ratio_min : Q.t;
+      issuance_ratio_max : Q.t;
       max_bonus : int64;
       growth_rate : int64;
       center_dz : Q.t;
       radius_dz : Q.t;
     }
 
-    type adaptive_inflation = {
+    type adaptive_issuance = {
       staking_over_baking_global_limit : int;
       staking_over_delegation_edge : int;
       launch_ema_threshold : int32;
       adaptive_rewards_params : adaptive_rewards_params;
     }
 
-    type reward_weights = {
-      base_total_rewards_per_minute : Tez.t;
+    type issuance_weights = {
+      base_total_issued_per_minute : Tez.t;
       baking_reward_fixed_portion_weight : int;
       baking_reward_bonus_weight : int;
       attesting_reward_weight : int;
@@ -878,7 +878,7 @@ module Constants : sig
       minimal_frozen_stake : Tez.t;
       vdf_difficulty : int64;
       origination_size : int;
-      reward_weights : reward_weights;
+      issuance_weights : issuance_weights;
       cost_per_byte : Tez.t;
       hard_storage_limit_per_operation : Z.t;
       quorum_min : int32;
@@ -903,7 +903,7 @@ module Constants : sig
       dal : dal;
       sc_rollup : sc_rollup;
       zk_rollup : zk_rollup;
-      adaptive_inflation : adaptive_inflation;
+      adaptive_issuance : adaptive_issuance;
     }
 
     val encoding : t Data_encoding.t
@@ -912,7 +912,7 @@ module Constants : sig
   module Generated : sig
     type t = {
       consensus_threshold : int;
-      reward_weights : Parametric.reward_weights;
+      issuance_weights : Parametric.issuance_weights;
     }
 
     val generate : consensus_committee_size:int -> t
@@ -952,7 +952,7 @@ module Constants : sig
 
   val origination_size : context -> int
 
-  val reward_weights : context -> Parametric.reward_weights
+  val issuance_weights : context -> Parametric.issuance_weights
 
   val quorum_min : context -> int32
 
@@ -1015,7 +1015,7 @@ module Constants : sig
 
   val zk_rollup_min_pending_to_process : context -> int
 
-  val adaptive_inflation_enable : context -> bool
+  val adaptive_issuance_enable : context -> bool
 
   val zk_rollup_max_ticket_payload_size : context -> int
 
@@ -2257,7 +2257,7 @@ module Delegate : sig
           from the storage.
           Returns [Q.one] if the given cycle is not between [current_cycle] and
           [current_cycle + preserved_cycles].
-          If adaptive inflation has not been activated, or has been activated and the
+          If adaptive issuance has not been activated, or has been activated and the
           given cycle is less than [preserved_cycles] after the activation cycle,
           then this function returns [Q.one].
           Used only for RPCs. To get the actual rewards, use the reward functions
@@ -2304,7 +2304,7 @@ module Delegate : sig
         The frozen balance is composed of all frozen bonds associated to the
         contract (given by [Contract_storage.get_frozen_bonds]), all unstaked
         frozen deposits, and of the fraction of the frozen deposits that
-        actually belongs to the delegate and not to its costakers.
+        actually belongs to the delegate and not to its stakers.
 
     Only use this function for RPCs: this is expensive. *)
     val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
@@ -4775,28 +4775,28 @@ module Per_block_votes : sig
 
   type per_block_votes = Per_block_votes_repr.per_block_votes = {
     liquidity_baking_vote : per_block_vote;
-    adaptive_inflation_vote : per_block_vote;
+    adaptive_issuance_vote : per_block_vote;
   }
 
   val liquidity_baking_vote_encoding : per_block_vote Data_encoding.encoding
 
-  val adaptive_inflation_vote_encoding : per_block_vote Data_encoding.encoding
+  val adaptive_issuance_vote_encoding : per_block_vote Data_encoding.encoding
 
   val per_block_votes_encoding : per_block_votes Data_encoding.encoding
 
   module Liquidity_baking_toggle_EMA : Votes_EMA.T
 
-  module Adaptive_inflation_launch_EMA : Votes_EMA.T
+  module Adaptive_issuance_launch_EMA : Votes_EMA.T
 
   val compute_new_liquidity_baking_ema :
     per_block_vote:per_block_vote ->
     Liquidity_baking_toggle_EMA.t ->
     Liquidity_baking_toggle_EMA.t
 
-  val compute_new_adaptive_inflation_ema :
+  val compute_new_adaptive_issuance_ema :
     per_block_vote:per_block_vote ->
-    Adaptive_inflation_launch_EMA.t ->
-    Adaptive_inflation_launch_EMA.t
+    Adaptive_issuance_launch_EMA.t ->
+    Adaptive_issuance_launch_EMA.t
 end
 
 (** This module re-exports definitions from {!Liquidity_baking_storage}. *)
@@ -4811,12 +4811,12 @@ module Liquidity_baking : sig
     Lwt.t
 end
 
-(** This module re-exports definitions from {!Adaptive_inflation_storage}. *)
-module Adaptive_inflation : sig
+(** This module re-exports definitions from {!Adaptive_issuance_storage}. *)
+module Adaptive_issuance : sig
   val update_ema :
     context ->
     vote:Per_block_votes.per_block_vote ->
-    (context * Cycle.t option * Per_block_votes.Adaptive_inflation_launch_EMA.t)
+    (context * Cycle.t option * Per_block_votes.Adaptive_issuance_launch_EMA.t)
     tzresult
     Lwt.t
 

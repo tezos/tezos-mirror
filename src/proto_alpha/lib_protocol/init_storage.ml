@@ -116,8 +116,8 @@ let migrate_staking_balance_for_o ctxt =
       Tez_repr.sub_opt staking_balance own_frozen
       |> Option.value ~default:Tez_repr.zero
     in
-    let costaked_frozen = Tez_repr.zero in
-    return (Stake_repr.Full.make ~own_frozen ~costaked_frozen ~delegated)
+    let staked_frozen = Tez_repr.zero in
+    return (Stake_repr.Full.make ~own_frozen ~staked_frozen ~delegated)
   in
   Storage.Stake.Staking_balance_up_to_Nairobi.fold
     ctxt
@@ -291,7 +291,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
       Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt >>=? fun ctxt ->
-      Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
+      Adaptive_issuance_storage.init ctxt >>=? fun ctxt ->
       return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
   | Nairobi_017
   (* Please update [next_protocol] and [previous_protocol] in
@@ -317,7 +317,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
       initialize_total_supply_for_o chain_id ctxt >>= fun ctxt ->
       Remove_zero_amount_ticket_migration_for_o.remove_zero_ticket_entries ctxt
       >>= fun ctxt ->
-      Adaptive_inflation_storage.init ctxt >>=? fun ctxt ->
+      Adaptive_issuance_storage.init ctxt >>=? fun ctxt ->
       migrate_pending_consensus_keys_for_o ctxt >>= fun ctxt ->
       (* Migration of refutation games needs to be kept for each protocol. *)
       Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
@@ -334,8 +334,8 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
     ~level
     ~predecessor_timestamp
     ~timestamp
-    ~adaptive_inflation_enable:false
+    ~adaptive_issuance_enable:false
     ctxt
   >>=? fun ctxt ->
-  Adaptive_inflation_storage.set_adaptive_inflation_enable ctxt >>=? fun ctxt ->
+  Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt >>=? fun ctxt ->
   Storage.Pending_migration.remove ctxt

@@ -141,8 +141,8 @@ let compute_reward_distrib ctxt delegate stake rewards =
     delegate_parameter.baking_over_staking_edge_billionth
   in
   let staking_over_delegation_edge =
-    if Constants_storage.adaptive_inflation_enable ctxt then
-      Constants_storage.adaptive_inflation_staking_over_delegation_edge ctxt
+    if Constants_storage.adaptive_issuance_enable ctxt then
+      Constants_storage.adaptive_issuance_staking_over_delegation_edge ctxt
     else 1
   in
   Lwt.return

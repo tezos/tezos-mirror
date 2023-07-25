@@ -84,9 +84,9 @@ let origination_size c =
   let constants = Raw_context.constants c in
   constants.origination_size
 
-let reward_weights c =
+let issuance_weights c =
   let constants = Raw_context.constants c in
-  constants.reward_weights
+  constants.issuance_weights
 
 let quorum_min c =
   let constants = Raw_context.constants c in
@@ -228,18 +228,18 @@ let zk_rollup_max_ticket_payload_size c =
   let zk_rollup = Raw_context.zk_rollup c in
   zk_rollup.max_ticket_payload_size
 
-let adaptive_inflation c = (Raw_context.constants c).adaptive_inflation
+let adaptive_issuance c = (Raw_context.constants c).adaptive_issuance
 
-let adaptive_inflation_enable c = Raw_context.adaptive_inflation_enable c
+let adaptive_issuance_enable c = Raw_context.adaptive_issuance_enable c
 
-let adaptive_inflation_staking_over_baking_global_limit c =
-  (adaptive_inflation c).staking_over_baking_global_limit
+let adaptive_issuance_staking_over_baking_global_limit c =
+  (adaptive_issuance c).staking_over_baking_global_limit
 
-let adaptive_inflation_staking_over_delegation_edge c =
-  (adaptive_inflation c).staking_over_delegation_edge
+let adaptive_issuance_staking_over_delegation_edge c =
+  (adaptive_issuance c).staking_over_delegation_edge
 
-let adaptive_inflation_launch_ema_threshold c =
-  (adaptive_inflation c).launch_ema_threshold
+let adaptive_issuance_launch_ema_threshold c =
+  (adaptive_issuance c).launch_ema_threshold
 
-let adaptive_inflation_rewards_params c =
-  (adaptive_inflation c).adaptive_rewards_params
+let adaptive_issuance_rewards_params c =
+  (adaptive_issuance c).adaptive_rewards_params

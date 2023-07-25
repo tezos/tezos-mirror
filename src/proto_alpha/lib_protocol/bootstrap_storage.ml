@@ -195,10 +195,10 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
       Raw_context.patch_constants ctxt (fun c ->
           {
             c with
-            reward_weights =
+            issuance_weights =
               {
-                c.reward_weights with
-                base_total_rewards_per_minute = Tez_repr.zero;
+                c.issuance_weights with
+                base_total_issued_per_minute = Tez_repr.zero;
               };
           })
       >>= fun ctxt ->
@@ -210,7 +210,7 @@ let init ctxt ~typecheck_smart_contract ~typecheck_smart_rollup
           {
             (* Hack: we store the rewards here *)
             baking_reward_fixed_portion =
-              constants.reward_weights.base_total_rewards_per_minute;
+              constants.issuance_weights.base_total_issued_per_minute;
             baking_reward_bonus_per_slot = Tez_repr.zero;
             attesting_reward_per_slot = Tez_repr.zero;
           }))
@@ -225,10 +225,10 @@ let cycle_end ctxt last_cycle =
       Raw_context.patch_constants ctxt (fun c ->
           {
             c with
-            reward_weights =
+            issuance_weights =
               {
-                c.reward_weights with
-                base_total_rewards_per_minute = baking_reward_fixed_portion;
+                c.issuance_weights with
+                base_total_issued_per_minute = baking_reward_fixed_portion;
               };
           })
       >|= ok

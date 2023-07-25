@@ -5008,8 +5008,8 @@ end = struct
           [
             ("test_constants", true);
             ("test_frozen_bonds", true);
-            ("test_adaptive_inflation_launch", N.(number >= 018));
-            ("test_adaptive_inflation_roundtrip", N.(number >= 018));
+            ("test_adaptive_issuance_launch", N.(number >= 018));
+            ("test_adaptive_issuance_roundtrip", N.(number >= 018));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
@@ -5132,8 +5132,8 @@ end = struct
             ("test_dal_slot_proof", N.(number >= 016));
             ("test_tx_rollup_l2_apply", N.(number >= 015 && number <= 016));
             ("test_tx_rollup_l2", N.(number >= 015 && number <= 016));
-            ("test_adaptive_inflation", N.(number >= 018));
-            ("test_adaptive_inflation_ema", N.(number >= 018));
+            ("test_adaptive_issuance", N.(number >= 018));
+            ("test_adaptive_issuance_ema", N.(number >= 018));
           ]
           |> List.filter_map (fun (n, b) -> if b then Some n else None)
         in

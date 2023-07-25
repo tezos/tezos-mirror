@@ -122,7 +122,7 @@ val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 
 val get_liquidity_baking_cpmm_address : t -> Contract_hash.t tzresult Lwt.t
 
-val get_adaptive_inflation_launch_cycle : t -> Cycle.t option tzresult Lwt.t
+val get_adaptive_issuance_launch_cycle : t -> Cycle.t option tzresult Lwt.t
 
 val get_total_frozen_stake : t -> Tez.t tzresult Lwt.t
 
@@ -297,7 +297,7 @@ type 'accounts init :=
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?reward_weights:Constants.Parametric.reward_weights ->
+  ?issuance_weights:Constants.Parametric.issuance_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->

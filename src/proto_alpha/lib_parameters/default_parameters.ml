@@ -102,9 +102,9 @@ let constants_mainnet =
   let Constants.Generated.
         {
           consensus_threshold;
-          reward_weights =
+          issuance_weights =
             {
-              base_total_rewards_per_minute;
+              base_total_issued_per_minute;
               baking_reward_fixed_portion_weight;
               baking_reward_bonus_weight;
               attesting_reward_weight;
@@ -138,9 +138,9 @@ let constants_mainnet =
          clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
     vdf_difficulty = 8_000_000_000L;
     origination_size = 257;
-    reward_weights =
+    issuance_weights =
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         (* 85.007812 tez/minute *)
         baking_reward_fixed_portion_weight;
         (* 1/4th of total block rewards *)
@@ -253,15 +253,15 @@ let constants_mainnet =
         min_pending_to_process = 10;
         max_ticket_payload_size = 2_048;
       };
-    adaptive_inflation =
+    adaptive_issuance =
       {
         staking_over_baking_global_limit = 5;
         staking_over_delegation_edge = 2;
         launch_ema_threshold = 1_600_000_000l;
         adaptive_rewards_params =
           {
-            reward_ratio_min = Q.(5 // 10000);
-            reward_ratio_max = Q.(1 // 20);
+            issuance_ratio_min = Q.(5 // 10000);
+            issuance_ratio_max = Q.(1 // 20);
             max_bonus = 50_000_000_000_000L;
             growth_rate = 115_740_740L;
             center_dz = Q.(1 // 2);
@@ -286,7 +286,7 @@ let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
 let constants_sandbox =
   let consensus_committee_size = 256 in
   let block_time = 1 in
-  let Constants.Generated.{consensus_threshold = _; reward_weights} =
+  let Constants.Generated.{consensus_threshold = _; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
   in
   {
@@ -302,7 +302,7 @@ let constants_sandbox =
               ~redundancy_factor:8
               ~mainnet_constants_divider:32;
         };
-    reward_weights;
+    issuance_weights;
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -321,7 +321,7 @@ let constants_sandbox =
 
 let constants_test =
   let consensus_committee_size = 25 in
-  let Constants.Generated.{consensus_threshold; reward_weights} =
+  let Constants.Generated.{consensus_threshold; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
   in
   {
@@ -337,7 +337,7 @@ let constants_test =
               ~redundancy_factor:4
               ~mainnet_constants_divider:64;
         };
-    reward_weights;
+    issuance_weights;
     Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;

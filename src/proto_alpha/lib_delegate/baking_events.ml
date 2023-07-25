@@ -810,14 +810,14 @@ module Actions = struct
       ( "value",
         Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
 
-  let vote_for_adaptive_inflation =
+  let vote_for_adaptive_issuance =
     declare_1
       ~section
-      ~name:"vote_for_adaptive_inflation"
+      ~name:"vote_for_adaptive_issuance"
       ~level:Notice
-      ~msg:"Voting {value} for adaptive inflation vote"
+      ~msg:"Voting {value} for adaptive issuance vote"
       ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
+        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
       )
 
   let no_dal_node =
@@ -1043,14 +1043,14 @@ module Per_block_votes = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
-  let adaptive_inflation_vote =
+  let adaptive_issuance_vote =
     declare_1
       ~section
-      ~name:"read_adaptive_inflation_vote"
+      ~name:"read_adaptive_issuance_vote"
       ~level:Notice
-      ~msg:"read adaptive inflation vote = {value}"
+      ~msg:"read adaptive issuance vote = {value}"
       ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_inflation_vote_encoding
+        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
       )
 end
 

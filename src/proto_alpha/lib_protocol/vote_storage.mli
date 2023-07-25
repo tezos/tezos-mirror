@@ -106,7 +106,7 @@ val listings_encoding :
    staking power and sets `Voting_power_in_listings`. Inactive
    delegates or delegates without the minimal required stake are not
    included in the listings.
-   If adaptive inflation is enabled, voting power accounts for
+   If adaptive issuance is enabled, voting power accounts for
    {!Constants_parametric_repr.staking_over_delegation_edge}. *)
 val update_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 

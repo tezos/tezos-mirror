@@ -134,23 +134,23 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  reward_ratio_min : Q.t;
-  reward_ratio_max : Q.t;
+  issuance_ratio_min : Q.t;
+  issuance_ratio_max : Q.t;
   max_bonus : int64;
   growth_rate : int64;
   center_dz : Q.t;
   radius_dz : Q.t;
 }
 
-type adaptive_inflation = {
+type adaptive_issuance = {
   staking_over_baking_global_limit : int;
   staking_over_delegation_edge : int;
   launch_ema_threshold : int32;
   adaptive_rewards_params : adaptive_rewards_params;
 }
 
-type reward_weights = {
-  base_total_rewards_per_minute : Tez_repr.t;
+type issuance_weights = {
+  base_total_issued_per_minute : Tez_repr.t;
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
   attesting_reward_weight : int;
@@ -173,7 +173,7 @@ type t = {
   minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
-  reward_weights : reward_weights;
+  issuance_weights : issuance_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
@@ -200,7 +200,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
-  adaptive_inflation : adaptive_inflation;
+  adaptive_issuance : adaptive_issuance;
 }
 
 let sc_rollup_encoding =
@@ -339,42 +339,42 @@ let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
     (fun {
-           reward_ratio_min;
-           reward_ratio_max;
+           issuance_ratio_min;
+           issuance_ratio_max;
            max_bonus;
            growth_rate;
            center_dz;
            radius_dz;
          } ->
-      ( reward_ratio_min,
-        reward_ratio_max,
+      ( issuance_ratio_min,
+        issuance_ratio_max,
         max_bonus,
         growth_rate,
         center_dz,
         radius_dz ))
-    (fun ( reward_ratio_min,
-           reward_ratio_max,
+    (fun ( issuance_ratio_min,
+           issuance_ratio_max,
            max_bonus,
            growth_rate,
            center_dz,
            radius_dz ) ->
       {
-        reward_ratio_min;
-        reward_ratio_max;
+        issuance_ratio_min;
+        issuance_ratio_max;
         max_bonus;
         growth_rate;
         center_dz;
         radius_dz;
       })
     (obj6
-       (req "reward_ratio_min" extremum_encoding)
-       (req "reward_ratio_max" extremum_encoding)
+       (req "issuance_ratio_min" extremum_encoding)
+       (req "issuance_ratio_max" extremum_encoding)
        (req "max_bonus" int64)
        (req "growth_rate" int64)
        (req "center_dz" center_encoding)
        (req "radius_dz" radius_encoding))
 
-let adaptive_inflation_encoding =
+let adaptive_issuance_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -400,14 +400,14 @@ let adaptive_inflation_encoding =
     (obj4
        (req "global_limit_of_staking_over_baking" uint8)
        (req "edge_of_staking_over_delegation" uint8)
-       (req "adaptive_inflation_launch_ema_threshold" int32)
+       (req "adaptive_issuance_launch_ema_threshold" int32)
        (req "adaptive_rewards_params" adaptive_rewards_params_encoding))
 
-let reward_weights_encoding =
+let issuance_weights_encoding =
   let open Data_encoding in
   conv
     (fun ({
-            base_total_rewards_per_minute;
+            base_total_issued_per_minute;
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
@@ -415,15 +415,15 @@ let reward_weights_encoding =
             seed_nonce_revelation_tip_weight;
             vdf_revelation_tip_weight;
           } :
-           reward_weights) ->
-      ( base_total_rewards_per_minute,
+           issuance_weights) ->
+      ( base_total_issued_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
         attesting_reward_weight,
         liquidity_baking_subsidy_weight,
         seed_nonce_revelation_tip_weight,
         vdf_revelation_tip_weight ))
-    (fun ( base_total_rewards_per_minute,
+    (fun ( base_total_issued_per_minute,
            baking_reward_fixed_portion_weight,
            baking_reward_bonus_weight,
            attesting_reward_weight,
@@ -431,7 +431,7 @@ let reward_weights_encoding =
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight ) ->
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
         baking_reward_bonus_weight;
         attesting_reward_weight;
@@ -440,7 +440,7 @@ let reward_weights_encoding =
         vdf_revelation_tip_weight;
       })
     (obj7
-       (req "base_total_rewards_per_minute" Tez_repr.encoding)
+       (req "base_total_issued_per_minute" Tez_repr.encoding)
        (req "baking_reward_fixed_portion_weight" int31)
        (req "baking_reward_bonus_weight" int31)
        (req "attesting_reward_weight" int31)
@@ -465,7 +465,7 @@ let encoding =
         ( ( c.minimal_frozen_stake,
             c.vdf_difficulty,
             c.origination_size,
-            c.reward_weights,
+            c.issuance_weights,
             c.cost_per_byte,
             c.hard_storage_limit_per_operation,
             c.quorum_min ),
@@ -487,7 +487,7 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_inflation)) ) )
+                (c.dal, ((c.sc_rollup, c.zk_rollup), c.adaptive_issuance)) ) )
           ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -502,7 +502,7 @@ let encoding =
            ( ( minimal_frozen_stake,
                vdf_difficulty,
                origination_size,
-               reward_weights,
+               issuance_weights,
                cost_per_byte,
                hard_storage_limit_per_operation,
                quorum_min ),
@@ -524,8 +524,7 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (dal, ((sc_rollup, zk_rollup), adaptive_inflation)) ) ) ) )
-         ) ->
+                   (dal, ((sc_rollup, zk_rollup), adaptive_issuance)) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -540,7 +539,7 @@ let encoding =
         minimal_frozen_stake;
         vdf_difficulty;
         origination_size;
-        reward_weights;
+        issuance_weights;
         cost_per_byte;
         hard_storage_limit_per_operation;
         quorum_min;
@@ -565,7 +564,7 @@ let encoding =
         dal;
         sc_rollup;
         zk_rollup;
-        adaptive_inflation;
+        adaptive_issuance;
       })
     (merge_objs
        (obj10
@@ -588,7 +587,7 @@ let encoding =
              (req "minimal_frozen_stake" Tez_repr.encoding)
              (req "vdf_difficulty" int64)
              (req "origination_size" int31)
-             (req "reward_weights" reward_weights_encoding)
+             (req "issuance_weights" issuance_weights_encoding)
              (req "cost_per_byte" Tez_repr.encoding)
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
@@ -624,4 +623,4 @@ let encoding =
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
-                         adaptive_inflation_encoding)))))))
+                         adaptive_issuance_encoding)))))))

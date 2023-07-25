@@ -127,7 +127,7 @@ let test_valid_double_attestation_evidence () =
     Int64.add
       2L
       (Int64.of_int
-         csts.parametric.adaptive_inflation.staking_over_baking_global_limit)
+         csts.parametric.adaptive_issuance.staking_over_baking_global_limit)
   in
   let evidence_reward = Test_tez.(frozen_deposits_after /! divider) in
   let expected_reward = Test_tez.(baking_reward +! evidence_reward) in
@@ -387,10 +387,10 @@ let test_freeze_more_with_low_balance =
     let constants =
       {
         Default_parameters.constants_test with
-        reward_weights =
+        issuance_weights =
           {
-            Default_parameters.constants_test.reward_weights with
-            base_total_rewards_per_minute = Tez.zero;
+            Default_parameters.constants_test.issuance_weights with
+            base_total_issued_per_minute = Tez.zero;
           };
         consensus_threshold = 0;
         origination_size = 0;

@@ -102,18 +102,18 @@ type zk_rollup = {
 }
 
 type adaptive_rewards_params = {
-  reward_ratio_min : (* Maximum yearly inflation rate *) Q.t;
-  reward_ratio_max : (* Minimum yearly inflation rate *) Q.t;
-  max_bonus : (* Maximum reward bonus value *) int64;
+  issuance_ratio_min : (* Maximum yearly issuance rate *) Q.t;
+  issuance_ratio_max : (* Minimum yearly issuance rate *) Q.t;
+  max_bonus : (* Maximum issuance bonus value *) int64;
   growth_rate : (* Bonus value's groth rate *) int64;
   center_dz : (* Center for bonus *) Q.t;
   radius_dz :
     (* Minimum distance from center required for non-zero growth *) Q.t;
 }
 
-type adaptive_inflation = {
+type adaptive_issuance = {
   staking_over_baking_global_limit
-    (* Global maximum costake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
+    (* Global maximum stake tokens taken into account per baking token. Each baker can set their own lower limit. *) :
     int;
   staking_over_delegation_edge : (* Weight of staking over delegation. *) int;
   launch_ema_threshold : (* Threshold of the activation vote *) int32;
@@ -121,13 +121,13 @@ type adaptive_inflation = {
     (* Parameters for the reward mechanism *) adaptive_rewards_params;
 }
 
-type reward_weights = {
-  (* [base_total_rewards_per_minute] is the total amount of rewards expected to
+type issuance_weights = {
+  (* [base_total_issued_per_minute] is the total amount of rewards expected to
      be distributed every minute *)
-  base_total_rewards_per_minute : Tez_repr.t;
+  base_total_issued_per_minute : Tez_repr.t;
   (* The following fields represent the "weights" of the respective reward kinds.
      The actual reward values are computed proportionally from the other weights
-     as a portion of the [base_total_rewards_per_minute]. See the module
+     as a portion of the [base_total_issued_per_minute]. See the module
      {!Delegate_rewards} for more details *)
   baking_reward_fixed_portion_weight : int;
   baking_reward_bonus_weight : int;
@@ -151,7 +151,7 @@ type t = {
   minimal_frozen_stake : Tez_repr.t;
   vdf_difficulty : int64;
   origination_size : int;
-  reward_weights : reward_weights;
+  issuance_weights : issuance_weights;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
   quorum_min : int32;
@@ -184,7 +184,7 @@ type t = {
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
-  adaptive_inflation : adaptive_inflation;
+  adaptive_issuance : adaptive_issuance;
 }
 
 val encoding : t Data_encoding.encoding

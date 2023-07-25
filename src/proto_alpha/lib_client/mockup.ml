@@ -559,7 +559,7 @@ let mem_init :
           per_block_votes =
             {
               liquidity_baking_vote = Per_block_votes.Per_block_vote_pass;
-              adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass;
+              adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
             };
         }
       in

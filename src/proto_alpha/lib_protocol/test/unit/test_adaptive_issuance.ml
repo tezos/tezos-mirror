@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:  Protocol (rewards)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                 -- --file test_adaptive_issuance.ml
+    Subject:    Test reward values under adaptive issuance
+*)
+
+open Protocol
 open Alpha_context
 
-type expected_rewards = {
-  cycle : Cycle.t;
-  baking_reward_fixed_portion : Tez.t;
-  baking_reward_bonus_per_slot : Tez.t;
-  attesting_reward_per_slot : Tez.t;
-  liquidity_baking_subsidy : Tez.t;
-  seed_nonce_revelation_tip : Tez.t;
-  vdf_revelation_tip : Tez.t;
-}
+let test_reward_coefficient () =
+  let csts = Default_parameters.constants_test in
+  let default =
+    Delegate.Rewards.For_RPC.(
+      reward_from_constants csts ~reward_kind:Baking_reward_fixed_portion)
+  in
+  let default_times_4 =
+    Delegate.Rewards.For_RPC.(
+      reward_from_constants
+        ~coeff:(Q.of_int 4)
+        csts
+        ~reward_kind:Baking_reward_fixed_portion)
+  in
+  assert (Tez.(equal (mul_exn default 4) default_times_4)) ;
+  return_unit
 
-val expected_rewards_encoding : expected_rewards Data_encoding.t
+let tests =
+  Tztest.
+    [
+      tztest
+        "adaptive issuance - application of coefficient to rewards"
+        `Quick
+        test_reward_coefficient;
+    ]
 
-val total_supply : 'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val total_frozen_stake :
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val current_yearly_rate :
-  'a #RPC_context.simple -> 'a -> string shell_tzresult Lwt.t
-
-val current_yearly_rate_exact :
-  'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
-
-val current_rewards_per_minute :
-  'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
-val launch_cycle :
-  'a #RPC_context.simple -> 'a -> Cycle.t option shell_tzresult Lwt.t
-
-(** Returns the list of expected rewards for the current cycle and for the next
-    [preserved_cycles] cycles. *)
-val expected_rewards :
-  'a #RPC_context.simple -> 'a -> expected_rewards list shell_tzresult Lwt.t
-
-val register : unit -> unit
+let () =
+  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive issuance", tests)]
+  |> Lwt_main.run

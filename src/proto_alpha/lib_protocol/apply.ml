@@ -42,8 +42,8 @@ type error +=
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
-  | Staking_for_nondelegate_while_costaking_disabled
-  | Staking_to_delegate_that_refuses_costaking
+  | Staking_for_delegator_while_external_staking_disabled
+  | Staking_to_delegate_that_refuses_external_staking
   | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
   | Invalid_unstake_request_amount of {requested_amount : Z.t}
@@ -205,29 +205,31 @@ let () =
     Data_encoding.unit
     (function Invalid_self_transaction_destination -> Some () | _ -> None)
     (fun () -> Invalid_self_transaction_destination) ;
-  let staking_for_nondelegate_while_costaking_disabled_description =
-    "As long as co-staking is not enabled, staking operations are only allowed \
-     from delegates."
+  let staking_for_delegator_while_external_staking_disabled_description =
+    "As long as external staking is not enabled, staking operations are only \
+     allowed from delegates."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.staking_for_nondelegate_while_costaking_disabled"
-    ~title:"Staking for a non-delegate while co-staking is disabled"
-    ~description:staking_for_nondelegate_while_costaking_disabled_description
+    ~id:"operations.staking_for_delegator_while_external_staking_disabled"
+    ~title:"Staking for a delegator while external staking is disabled"
+    ~description:
+      staking_for_delegator_while_external_staking_disabled_description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        staking_for_nondelegate_while_costaking_disabled_description)
+        staking_for_delegator_while_external_staking_disabled_description)
     Data_encoding.unit
     (function
-      | Staking_for_nondelegate_while_costaking_disabled -> Some () | _ -> None)
-    (fun () -> Staking_for_nondelegate_while_costaking_disabled) ;
+      | Staking_for_delegator_while_external_staking_disabled -> Some ()
+      | _ -> None)
+    (fun () -> Staking_for_delegator_while_external_staking_disabled) ;
   let stake_modification_without_delegate_description =
     "(Un)Stake operations are only allowed when delegate is set."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.stake_modification_wiht_no_delegate_set"
+    ~id:"operations.stake_modification_with_no_delegate_set"
     ~title:"(Un)staking without any delegate set"
     ~description:stake_modification_without_delegate_description
     ~pp:(fun ppf () ->
@@ -235,23 +237,23 @@ let () =
     Data_encoding.unit
     (function Stake_modification_with_no_delegate_set -> Some () | _ -> None)
     (fun () -> Stake_modification_with_no_delegate_set) ;
-  let staking_to_delegate_that_refuses_costaking_description =
+  let staking_to_delegate_that_refuses_external_staking_description =
     "The delegate currently does not accept staking operations from sources \
      other than itself: its `staking_over_baking_limit` parameter is set to 0."
   in
   register_error_kind
     `Permanent
-    ~id:"operations.staking_to_delegate_that_refuses_costaking"
+    ~id:"operations.staking_to_delegate_that_refuses_external_staking"
     ~title:"Staking to delegate that does not accept external staking"
-    ~description:staking_to_delegate_that_refuses_costaking_description
+    ~description:staking_to_delegate_that_refuses_external_staking_description
     ~pp:(fun ppf () ->
       Format.pp_print_string
         ppf
-        staking_to_delegate_that_refuses_costaking_description)
+        staking_to_delegate_that_refuses_external_staking_description)
     Data_encoding.unit
     (function
-      | Staking_to_delegate_that_refuses_costaking -> Some () | _ -> None)
-    (fun () -> Staking_to_delegate_that_refuses_costaking) ;
+      | Staking_to_delegate_that_refuses_external_staking -> Some () | _ -> None)
+    (fun () -> Staking_to_delegate_that_refuses_external_staking) ;
   register_error_kind
     `Permanent
     ~id:"operations.invalid_nonzero_transaction_amount"
@@ -317,7 +319,7 @@ let apply_delegation ~ctxt ~(sender : Contract.t) ~delegate ~before_operation =
   let* ctxt, balance_updates =
     match sender with
     | Originated _ ->
-        (* Originated contracts have no costake (yet). *)
+        (* Originated contracts have no stake (yet). *)
         return (ctxt, [])
     | Implicit sender_pkh -> (
         let* sender_delegate_status =
@@ -377,17 +379,19 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
       Signature.Public_key_hash.(sender = destination)
       Invalid_self_transaction_destination
   in
-  let*? ctxt = Gas.consume ctxt Adaptive_inflation_costs.stake_cost in
+  let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.stake_cost in
   let* delegate_opt = Contract.Delegate.find ctxt contract in
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
       let allowed =
         Signature.Public_key_hash.(delegate = sender)
-        || Constants.adaptive_inflation_enable ctxt
+        || Constants.adaptive_issuance_enable ctxt
       in
       let*? () =
-        error_unless allowed Staking_for_nondelegate_while_costaking_disabled
+        error_unless
+          allowed
+          Staking_for_delegator_while_external_staking_disabled
       in
       let* {staking_over_baking_limit_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
@@ -397,7 +401,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         && Compare.Int32.(staking_over_baking_limit_millionth = 0l)
       in
       let*? () =
-        error_when forbidden Staking_to_delegate_that_refuses_costaking
+        error_when forbidden Staking_to_delegate_that_refuses_external_staking
       in
       let* ctxt, balance_updates =
         Staking.stake ctxt ~sender ~delegate amount
@@ -442,7 +446,7 @@ let apply_unstake ~ctxt ~sender ~amount ~requested_amount ~destination
     | Some requested_amount -> Ok requested_amount
   in
   let sender_contract = Contract.Implicit sender in
-  let*? ctxt = Gas.consume ctxt Adaptive_inflation_costs.find_delegate_cost in
+  let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost in
   let* delegate_opt = Contract.Delegate.find ctxt sender_contract in
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
@@ -475,7 +479,7 @@ let apply_finalize_unstake ~ctxt ~sender ~amount ~destination ~before_operation
     Invalid_self_transaction_destination
   >>?= fun () ->
   let contract = Contract.Implicit sender in
-  Gas.consume ctxt Adaptive_inflation_costs.find_delegate_cost >>?= fun ctxt ->
+  Gas.consume ctxt Adaptive_issuance_costs.find_delegate_cost >>?= fun ctxt ->
   Contract.allocated ctxt contract >>= fun already_allocated ->
   Staking.finalize_unstake ctxt contract >>=? fun (ctxt, balance_updates) ->
   let result =
@@ -499,7 +503,7 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
     ~before_operation =
   let open Lwt_result_syntax in
   let*? ctxt =
-    Gas.consume ctxt Adaptive_inflation_costs.set_delegate_parameters_cost
+    Gas.consume ctxt Adaptive_issuance_costs.set_delegate_parameters_cost
   in
   let*? () =
     error_unless
@@ -1974,8 +1978,8 @@ type application_state = {
   op_count : int;
   migration_balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_inflation_vote_ema : Per_block_votes.Adaptive_inflation_launch_EMA.t;
-  adaptive_inflation_launch_cycle : Cycle.t option;
+  adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
+  adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }
@@ -2547,12 +2551,12 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, adaptive_inflation_launch_cycle, adaptive_inflation_vote_ema =
-    let adaptive_inflation_vote =
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote =
       block_header.Block_header.protocol_data.contents.per_block_votes
-        .adaptive_inflation_vote
+        .adaptive_issuance_vote
     in
-    Adaptive_inflation.update_ema ctxt ~vote:adaptive_inflation_vote
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info
@@ -2578,8 +2582,8 @@ let begin_application ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_vote_ema;
-      adaptive_inflation_launch_cycle;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2617,11 +2621,11 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, adaptive_inflation_launch_cycle, adaptive_inflation_vote_ema =
-    let adaptive_inflation_vote =
-      block_data_contents.per_block_votes.adaptive_inflation_vote
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote =
+      block_data_contents.per_block_votes.adaptive_issuance_vote
     in
-    Adaptive_inflation.update_ema ctxt ~vote:adaptive_inflation_vote
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info ~predecessor:predecessor_hash ctxt
@@ -2646,8 +2650,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_vote_ema;
-      adaptive_inflation_launch_cycle;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2662,9 +2666,9 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, adaptive_inflation_launch_cycle, adaptive_inflation_vote_ema =
-    let adaptive_inflation_vote = Per_block_votes.Per_block_vote_pass in
-    Adaptive_inflation.update_ema ctxt ~vote:adaptive_inflation_vote
+  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
+    let adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass in
+    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to
@@ -2684,8 +2688,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_inflation_vote_ema;
-      adaptive_inflation_launch_cycle;
+      adaptive_issuance_vote_ema;
+      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -2693,8 +2697,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     }
 
 let finalize_application ctxt block_data_contents ~round ~predecessor_hash
-    ~liquidity_baking_toggle_ema ~adaptive_inflation_vote_ema
-    ~adaptive_inflation_launch_cycle ~implicit_operations_results
+    ~liquidity_baking_toggle_ema ~adaptive_issuance_vote_ema
+    ~adaptive_issuance_launch_cycle ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
@@ -2784,8 +2788,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         deactivated;
         balance_updates;
         liquidity_baking_toggle_ema;
-        adaptive_inflation_vote_ema;
-        adaptive_inflation_launch_cycle;
+        adaptive_issuance_vote_ema;
+        adaptive_issuance_launch_cycle;
         implicit_operations_results;
         dal_attestation;
       }
@@ -2835,8 +2839,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
   let {
     ctxt;
     liquidity_baking_toggle_ema;
-    adaptive_inflation_vote_ema;
-    adaptive_inflation_launch_cycle;
+    adaptive_issuance_vote_ema;
+    adaptive_issuance_launch_cycle;
     implicit_operations_results;
     migration_balance_updates;
     op_count;
@@ -2877,8 +2881,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash
           ~liquidity_baking_toggle_ema
-          ~adaptive_inflation_vote_ema
-          ~adaptive_inflation_launch_cycle
+          ~adaptive_issuance_vote_ema
+          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer
@@ -2909,8 +2913,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
               deactivated = [];
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
-              adaptive_inflation_vote_ema;
-              adaptive_inflation_launch_cycle;
+              adaptive_issuance_vote_ema;
+              adaptive_issuance_launch_cycle;
               implicit_operations_results;
               dal_attestation = None;
             } )
@@ -2933,8 +2937,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash:shell.predecessor
           ~liquidity_baking_toggle_ema
-          ~adaptive_inflation_vote_ema
-          ~adaptive_inflation_launch_cycle
+          ~adaptive_issuance_vote_ema
+          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer

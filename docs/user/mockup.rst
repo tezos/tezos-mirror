@@ -330,7 +330,7 @@ commands. The following was generated:
         "zk_rollup_max_ticket_payload_size": 2048,
         "staking_over_baking_global_limit": 5,
         "staking_over_delegation_edge": 2,
-        "adaptive_inflation_launch_ema_threshold": 1600000000,
+        "adaptive_issuance_launch_ema_threshold": 1600000000,
         "adaptive_rewards_params": {
             "reward_ratio_min": { "numerator": "1", "denominator": "200" },
             "reward_ratio_max": { "numerator": "1", "denominator": "10" },

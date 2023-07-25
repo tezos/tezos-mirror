@@ -72,8 +72,8 @@
   test_sc_rollup_wasm
   test_local_contexts
   test_dal_slot_proof
-  test_adaptive_inflation
-  test_adaptive_inflation_ema))
+  test_adaptive_issuance
+  test_adaptive_issuance_ema))
 
 (executable
  (name main)

@@ -76,7 +76,7 @@ module Forge : sig
     ?proof_of_work_threshold:Int64.t ->
     ?seed_nonce_hash:Nonce_hash.t ->
     ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-    ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     payload_hash:Block_payload_hash.t ->
     payload_round:Round.t ->
     Block_header.shell_header ->
@@ -95,7 +95,7 @@ module Forge : sig
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
     ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-    ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     t ->
     header tzresult Lwt.t
 
@@ -131,7 +131,7 @@ val genesis :
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?reward_weights:Constants.Parametric.reward_weights ->
+  ?issuance_weights:Constants.Parametric.issuance_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
@@ -214,7 +214,7 @@ val bake :
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   ?check_size:bool ->
   t ->
   t tzresult Lwt.t
@@ -224,7 +224,7 @@ val bake_n :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   block tzresult Lwt.t
@@ -234,7 +234,7 @@ val bake_until_level :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   Raw_level.t ->
   t ->
   block tzresult Lwt.t
@@ -245,7 +245,7 @@ val bake_n_with_all_balance_updates :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
@@ -269,7 +269,7 @@ val bake_n_with_liquidity_baking_toggle_ema :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   (block * Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.t) tzresult
@@ -286,7 +286,7 @@ val bake_n_with_metadata :
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   int ->
   block ->
   (block * block_header_metadata, Error_monad.tztrace) result Lwt.t
@@ -302,7 +302,7 @@ val bake_while :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> bool) ->
   block ->
@@ -314,7 +314,7 @@ val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_inflation_vote:Per_block_votes_repr.per_block_vote ->
+  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->
@@ -339,7 +339,7 @@ val prepare_initial_context_params :
   ?min_proposal_quorum:int32 ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
-  ?reward_weights:Constants.Parametric.reward_weights ->
+  ?issuance_weights:Constants.Parametric.issuance_weights ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->

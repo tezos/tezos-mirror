@@ -171,14 +171,14 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
-let adaptive_inflation_vote_arg =
+let adaptive_issuance_vote_arg =
   Tezos_clic.arg
     ~doc:
-      "Vote to adopt or not the adaptive inflation feature. The possible \
-       values for this option are: \"off\" to request not activating it, \
-       \"on\" to request activating it, and \"pass\" to abstain. If you do not \
-       vote, default value is \"pass\"."
-    ~long:"adaptive-inflation-vote"
+      "Vote to adopt or not the adaptive issuance feature. The possible values \
+       for this option are: \"off\" to request not activating it, \"on\" to \
+       request activating it, and \"pass\" to abstain. If you do not vote, \
+       default value is \"pass\"."
+    ~long:"adaptive-issuance-vote"
     ~placeholder:"vote"
     per_block_vote_parameter
 
@@ -325,7 +325,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
                         per_block_votes =
                           {
                             liquidity_baking_vote = Per_block_vote_pass;
-                            adaptive_inflation_vote = Per_block_vote_pass;
+                            adaptive_issuance_vote = Per_block_vote_pass;
                           };
                       })
               in
@@ -529,7 +529,7 @@ let baker_args =
     force_apply_switch_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
-    adaptive_inflation_vote_arg
+    adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
     endpoint_arg
@@ -542,7 +542,7 @@ let run_baker
       force_apply,
       keep_alive,
       liquidity_baking_vote,
-      adaptive_inflation_vote,
+      adaptive_issuance_vote,
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint ) baking_mode sources cctxt =
@@ -561,7 +561,7 @@ let run_baker
   let* votes =
     Per_block_vote_file.load_per_block_votes_config
       ~default_liquidity_baking_vote:liquidity_baking_vote
-      ~default_adaptive_inflation_vote:adaptive_inflation_vote
+      ~default_adaptive_issuance_vote:adaptive_issuance_vote
       ~per_block_vote_file
   in
   let* delegates = get_delegates cctxt sources in

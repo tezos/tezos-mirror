@@ -25,13 +25,13 @@
 
 (** Testing
     -------
-    Component:    Adaptive Inflation, launch vote
+    Component:    Adaptive Issuance, launch vote
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/main.exe \
-                   -- --file test_adaptive_inflation_roundtrip.ml
-    Subject:      Test staking stability under Adaptive Inflation.
+                   -- --file test_adaptive_issuance_roundtrip.ml
+    Subject:      Test staking stability under Adaptive Issuance.
 *)
 
-open Adaptive_inflation_helpers
+open Adaptive_issuance_helpers
 
 type error += Inconsistent_number_of_bootstrap_accounts
 
@@ -220,7 +220,7 @@ let apply_rewards_info current_level info =
   let {last_level_rewards; total_supply; constants; _} = info in
   (* We assume one block per minute *)
   let rewards_per_block =
-    constants.reward_weights.base_total_rewards_per_minute
+    constants.issuance_weights.base_total_issued_per_minute
   in
   if Tez.(rewards_per_block = zero) then return info
   else
@@ -334,7 +334,7 @@ let bake ?operation (block, info) =
     "Baking level %d"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level))) ;
   let current_cycle = Block.current_cycle block in
-  let adaptive_inflation_vote =
+  let adaptive_issuance_vote =
     if info.activate_ai then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
@@ -346,7 +346,7 @@ let bake ?operation (block, info) =
       assert false
   in
   let policy = Block.By_account baker.pkh in
-  let* block = Block.bake ~policy ~adaptive_inflation_vote ?operation block in
+  let* block = Block.bake ~policy ~adaptive_issuance_vote ?operation block in
   let new_current_cycle = Block.current_cycle block in
   let* input =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
@@ -467,8 +467,8 @@ let run_action :
           Log.info ~color:event_color "Setting ai threshold to 0" ;
           {
             constants with
-            adaptive_inflation =
-              {constants.adaptive_inflation with launch_ema_threshold = 0l};
+            adaptive_issuance =
+              {constants.adaptive_issuance with launch_ema_threshold = 0l};
           })
         else constants
       in
@@ -536,7 +536,7 @@ let run_action :
       Log.info ~color:action_color "[Next cycle]" ;
       let block, ({constants; activate_ai; _} as info) = input in
       if
-        Tez.(constants.reward_weights.base_total_rewards_per_minute = zero)
+        Tez.(constants.issuance_weights.base_total_issued_per_minute = zero)
         || not activate_ai
       then
         (* Apply rewards in info only after the while cycle ends *)
@@ -790,12 +790,12 @@ let add_account_with_funds name source amount =
 
 let init_constants ?reward_per_block () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
-  let base_total_rewards_per_minute = Tez.of_mutez reward_per_block in
+  let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
-  let reward_weights =
+  let issuance_weights =
     Protocol.Alpha_context.Constants.Parametric.
       {
-        base_total_rewards_per_minute;
+        base_total_issued_per_minute;
         baking_reward_fixed_portion_weight = 1;
         baking_reward_bonus_weight = 0;
         attesting_reward_weight = 0;
@@ -810,7 +810,7 @@ let init_constants ?reward_per_block () =
   {
     default_constants with
     consensus_threshold;
-    reward_weights;
+    issuance_weights;
     minimal_block_delay;
     cost_per_byte;
   }
@@ -878,5 +878,5 @@ let () =
   Alcotest_lwt.run
     ~__FILE__
     Protocol.name
-    [("adaptive inflation roundtrip", tests)]
+    [("adaptive issuance roundtrip", tests)]
   |> Lwt_main.run

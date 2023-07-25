@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:  Protocol (rewards)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-                 -- --file test_adaptive_inflation.ml
-    Subject:    Test reward values under adaptive inflation
-*)
+(** This module defines costs for the adaptive issuance operations. *)
 
-open Protocol
-open Alpha_context
+val find_delegate_cost : Gas_limit_repr.cost
 
-let test_reward_coefficient () =
-  let csts = Default_parameters.constants_test in
-  let default =
-    Delegate.Rewards.For_RPC.(
-      reward_from_constants csts ~reward_kind:Baking_reward_fixed_portion)
-  in
-  let default_times_4 =
-    Delegate.Rewards.For_RPC.(
-      reward_from_constants
-        ~coeff:(Q.of_int 4)
-        csts
-        ~reward_kind:Baking_reward_fixed_portion)
-  in
-  assert (Tez.(equal (mul_exn default 4) default_times_4)) ;
-  return_unit
+val allocated_cost : Gas_limit_repr.cost
 
-let tests =
-  Tztest.
-    [
-      tztest
-        "adaptive inflation - application of coefficient to rewards"
-        `Quick
-        test_reward_coefficient;
-    ]
+val stake_cost : Gas_limit_repr.cost
 
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("adaptive inflation", tests)]
-  |> Lwt_main.run
+val set_delegate_parameters_cost : Gas_limit_repr.cost
+
+val prepare_finalize_unstake_cost : Gas_limit_repr.cost
+
+val finalize_unstake_and_check_cost : Gas_limit_repr.cost
+
+val request_unstake_cost : Gas_limit_repr.cost

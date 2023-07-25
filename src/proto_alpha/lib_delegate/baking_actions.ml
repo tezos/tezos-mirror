@@ -316,15 +316,15 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   let {
     Baking_configuration.vote_file;
     liquidity_baking_vote;
-    adaptive_inflation_vote;
+    adaptive_issuance_vote;
   } =
     state.global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
-  let*! {liquidity_baking_vote; adaptive_inflation_vote} =
+  let*! {liquidity_baking_vote; adaptive_issuance_vote} =
     let default =
       Protocol.Alpha_context.Per_block_votes.
-        {liquidity_baking_vote; adaptive_inflation_vote}
+        {liquidity_baking_vote; adaptive_issuance_vote}
     in
     match vote_file with
     | Some per_block_vote_file ->
@@ -347,7 +347,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
                 {
                   updated_state.global_state.config.per_block_votes with
                   liquidity_baking_vote;
-                  adaptive_inflation_vote;
+                  adaptive_issuance_vote;
                 };
             };
         };
@@ -356,9 +356,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   let*! () =
     Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_vote
   in
-  let*! () =
-    Events.(emit vote_for_adaptive_inflation) adaptive_inflation_vote
-  in
+  let*! () = Events.(emit vote_for_adaptive_issuance) adaptive_issuance_vote in
   let chain = `Hash state.global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
@@ -383,7 +381,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
       ~seed_nonce_hash
       ~payload_round
       ~liquidity_baking_toggle_vote:liquidity_baking_vote
-      ~adaptive_inflation_vote
+      ~adaptive_issuance_vote
       ~user_activated_upgrades
       ~force_apply
       state.global_state.config.fees

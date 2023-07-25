@@ -259,9 +259,9 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
     ~blocks_per_cycle
     ~cycles_per_voting_period:1l
     ~consensus_threshold:0
-    ~reward_weights:
+    ~issuance_weights:
       {
-        base_total_rewards_per_minute = Tez.zero;
+        base_total_issued_per_minute = Tez.zero;
         attesting_reward_weight = 1;
         baking_reward_bonus_weight = 1;
         baking_reward_fixed_portion_weight = 1;
@@ -888,11 +888,11 @@ let test_supermajority_in_proposal there_is_a_winner () =
     del3
     bal3
   >>=? fun op3 ->
-  Adaptive_inflation_helpers.stake (B b) del1 minimal_frozen_stake
+  Adaptive_issuance_helpers.stake (B b) del1 minimal_frozen_stake
   >>=? fun op4 ->
-  Adaptive_inflation_helpers.stake (B b) del2 minimal_frozen_stake
+  Adaptive_issuance_helpers.stake (B b) del2 minimal_frozen_stake
   >>=? fun op5 ->
-  Adaptive_inflation_helpers.stake (B b) del3 minimal_frozen_stake
+  Adaptive_issuance_helpers.stake (B b) del3 minimal_frozen_stake
   >>=? fun op6 ->
   Block.bake ~policy ~operations:[op1; op2; op3; op4; op5; op6] b >>=? fun b ->
   bake_until_first_block_of_next_period ~policy b >>=? fun b ->
@@ -931,7 +931,7 @@ let test_quorum_in_proposal has_quorum () =
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
   Block.bake ~policy ~operation:op2 b >>=? fun b ->
-  Adaptive_inflation_helpers.stake (B b) del1 bal >>=? fun stake ->
+  Adaptive_issuance_helpers.stake (B b) del1 bal >>=? fun stake ->
   Block.bake ~policy ~operation:stake b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* make the proposal *)

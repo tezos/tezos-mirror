@@ -137,12 +137,12 @@ end = struct
     let diff_end_bal = Test_tez.(bal_good -! bal_bad) in
     (* amount lost due to denunciation *)
     let lost_deposit = Test_tez.(frozen_deposit *! Int64.of_int p /! 100L) in
-    (* some of the lost deposits (depending on co-staking constants) will be earned by the baker *)
+    (* some of the lost deposits (depending on staking constants) will be earned by the baker *)
     let divider =
       Int64.add
         2L
         (Int64.of_int
-           constants.parametric.adaptive_inflation
+           constants.parametric.adaptive_issuance
              .staking_over_baking_global_limit)
     in
     let denun_reward = Test_tez.(lost_deposit /! divider) in

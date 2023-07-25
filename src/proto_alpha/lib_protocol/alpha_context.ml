@@ -512,7 +512,7 @@ module Delegate = struct
 
     module For_RPC = struct
       include Delegate_rewards.For_RPC
-      include Adaptive_inflation_storage.For_RPC
+      include Adaptive_issuance_storage.For_RPC
     end
   end
 
@@ -582,7 +582,7 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   >>=? fun (ctxt, balance_updates, origination_results) ->
   Consensus.load_attestation_branch ctxt >>=? fun ctxt ->
   Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
-  Adaptive_inflation_storage.load_reward_coeff ctxt >>=? fun ctxt ->
+  Adaptive_issuance_storage.load_reward_coeff ctxt >>=? fun ctxt ->
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =
@@ -628,8 +628,8 @@ module Liquidity_baking = struct
   include Liquidity_baking_storage
 end
 
-module Adaptive_inflation = struct
-  include Adaptive_inflation_storage
+module Adaptive_issuance = struct
+  include Adaptive_issuance_storage
 end
 
 module Ticket_hash = struct
