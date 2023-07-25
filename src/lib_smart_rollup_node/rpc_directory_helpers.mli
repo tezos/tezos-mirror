@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Conveniences to construct RPC directory
-   against a subcontext of the Node_context *)
+open Tezos_rpc
 
+(** This module defines subcontext type of the subdirectory and
+    the way to project it from Node_context and a path prefix. *)
 module type PARAM = sig
-  include Sc_rollup_services.PREFIX
+  type prefix
+
+  val prefix : (unit, prefix) Tezos_rpc.Path.t
 
   type context
 
@@ -36,31 +40,27 @@ module type PARAM = sig
   val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
 end
 
-module Make_directory (S : PARAM) = struct
-  open S
+(** This module is a helper to register your endpoints and
+    build a resulting subdirectory eventually. *)
+module Make_directory (S : PARAM) : sig
+  (** Register an endpoint with no parameters in the path. *)
+  val register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (S.subcontext -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
 
-  let directory : subcontext tzresult Tezos_rpc.Directory.t ref =
-    ref Tezos_rpc.Directory.empty
+  (** Register an endpoint with a single parameter in the path. *)
+  val register1 :
+    ( [< Resto.meth],
+      'prefix,
+      'prefix * 'param1,
+      'query,
+      'input,
+      'output )
+    Service.t ->
+    (S.subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
+    unit
 
-  let register service f =
-    directory := Tezos_rpc.Directory.register !directory service f
-
-  let register0 service f =
-    let open Lwt_result_syntax in
-    register (Tezos_rpc.Service.subst0 service) @@ fun ctxt query input ->
-    let*? ctxt in
-    f ctxt query input
-
-  let register1 service f =
-    let open Lwt_result_syntax in
-    register (Tezos_rpc.Service.subst1 service)
-    @@ fun (ctxt, arg) query input ->
-    let*? ctxt in
-    f ctxt arg query input
-
-  let build_directory node_ctxt =
-    !directory
-    |> Tezos_rpc.Directory.map (fun prefix ->
-           context_of_prefix node_ctxt prefix)
-    |> Tezos_rpc.Directory.prefix prefix
+  (** Build directory with registered endpoints with respect to Node_context. *)
+  val build_directory : S.context -> unit Tezos_rpc.Directory.t
 end

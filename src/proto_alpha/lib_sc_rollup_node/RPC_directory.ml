@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_directory_helpers
+open Rpc_directory_helpers
 open Protocol
 
 let get_head_hash_opt node_ctxt =

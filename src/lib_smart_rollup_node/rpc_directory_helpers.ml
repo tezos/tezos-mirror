@@ -27,7 +27,9 @@
    against a subcontext of the Node_context *)
 
 module type PARAM = sig
-  include Sc_rollup_services.PREFIX
+  type prefix
+
+  val prefix : (unit, prefix) Tezos_rpc.Path.t
 
   type context
 
