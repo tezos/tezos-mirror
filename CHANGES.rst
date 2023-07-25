@@ -259,6 +259,9 @@ Baker
 - **Breaking change** Rename ``endorsement`` into ``attestation`` for baker errors and events.
   (MR :gl:`!9195`)
 
+- Cached costly RPC calls made when checking if nonces need to be
+  revealed. (MR :gl:`!9601`)
+
 Accuser
 -------
 
