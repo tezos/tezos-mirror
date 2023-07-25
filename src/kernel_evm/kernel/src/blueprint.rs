@@ -91,12 +91,14 @@ mod tests {
     #[test]
     fn test_filter_invalid_chain_id() {
         let chain_id = U256::one();
+        let gas_price = U256::from(40000000u64);
 
         let tx = EthereumTransactionCommon {
             type_: tezos_ethereum::transaction::TransactionType::Legacy,
             chain_id,
             nonce: U256::from(40000000u64),
-            gas_price: U256::from(40000000u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 21000u64,
             to: address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea"),
             value: U256::from(500000000u64),
