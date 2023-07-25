@@ -321,22 +321,26 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
 
 type pvm_intermediate_state =
   | Hash of Sc_rollup.State_hash.t
-  | Evaluated of Fueled_pvm.Accounted.eval_state
+  | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
 
 let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     our_view =
   let open Lwt_result_syntax in
   let state_of_tick ?start_state tick =
-    Interpreter.state_of_tick node_ctxt ?start_state tick last_level
+    Interpreter.state_of_tick
+      node_ctxt
+      ?start_state
+      ~tick:(Sc_rollup.Tick.to_z tick)
+      last_level
   in
-  let state_hash_of_eval_state Fueled_pvm.Accounted.{state_hash; _} =
-    state_hash
+  let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} =
+    Sc_rollup_proto_types.State_hash.of_octez state_hash
   in
   let start_hash, start_tick, start_state =
     match ok with
     | Hash hash, tick -> (hash, tick, None)
     | Evaluated ({state_hash; _} as state), tick ->
-        (state_hash, tick, Some state)
+        (Sc_rollup_proto_types.State_hash.of_octez state_hash, tick, Some state)
   in
   let start_chunk =
     Sc_rollup.Dissection_chunk.{state_hash = Some start_hash; tick = start_tick}
@@ -344,7 +348,8 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
   let our_state, our_tick = our_view in
   let our_state_hash =
     Option.map
-      (fun Fueled_pvm.Accounted.{state_hash; _} -> state_hash)
+      (fun Pvm_plugin_sig.{state_hash; _} ->
+        Sc_rollup_proto_types.State_hash.of_octez state_hash)
       our_state
   in
   let our_stop_chunk =
@@ -396,7 +401,11 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
           | Evaluated ok_state, _ -> Some ok_state
         in
         let* our =
-          Interpreter.state_of_tick node_ctxt ?start_state tick game.inbox_level
+          Interpreter.state_of_tick
+            node_ctxt
+            ?start_state
+            ~tick:(Sc_rollup.Tick.to_z tick)
+            game.inbox_level
         in
         match (their_hash, our) with
         | None, None ->
@@ -405,8 +414,11 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
             assert false
         | Some _, None | None, Some _ -> return (ok, (our, tick))
         | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
-            if Sc_rollup.State_hash.equal our_hash their_hash then
-              traverse (Evaluated our_state, tick) dissection
+            if
+              Sc_rollup.State_hash.equal
+                (Sc_rollup_proto_types.State_hash.of_octez our_hash)
+                their_hash
+            then traverse (Evaluated our_state, tick) dissection
             else return (ok, (our, tick)))
   in
   match dissection with
@@ -438,7 +450,10 @@ let next_move node_ctxt ~opponent game =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
-      Interpreter.state_of_tick node_ctxt start_tick game.inbox_level
+      Interpreter.state_of_tick
+        node_ctxt
+        ~tick:(Sc_rollup.Tick.to_z start_tick)
+        game.inbox_level
     in
     match start_state with
     | None ->

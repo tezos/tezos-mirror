@@ -333,17 +333,19 @@ let generate_proof (node_ctxt : _ Node_context.t) game start_state =
 
 type pvm_intermediate_state =
   | Hash of Sc_rollup.State_hash.t
-  | Evaluated of Fueled_pvm.Accounted.eval_state
+  | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
 
 let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
     our_view =
   let open Lwt_result_syntax in
   let state_of_tick ?start_state tick =
-    Interpreter.state_of_tick node_ctxt ?start_state tick last_level
+    Interpreter.state_of_tick
+      node_ctxt
+      ?start_state
+      ~tick:(Sc_rollup.Tick.to_z tick)
+      last_level
   in
-  let state_hash_of_eval_state Fueled_pvm.Accounted.{state_hash; _} =
-    state_hash
-  in
+  let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} = state_hash in
   let start_hash, start_tick, start_state =
     match ok with
     | Hash hash, tick -> (hash, tick, None)
@@ -355,9 +357,7 @@ let new_dissection ~opponent ~default_number_of_sections node_ctxt last_level ok
   in
   let our_state, our_tick = our_view in
   let our_state_hash =
-    Option.map
-      (fun Fueled_pvm.Accounted.{state_hash; _} -> state_hash)
-      our_state
+    Option.map (fun Pvm_plugin_sig.{state_hash; _} -> state_hash) our_state
   in
   let our_stop_chunk =
     Sc_rollup.Dissection_chunk.{state_hash = our_state_hash; tick = our_tick}
@@ -408,7 +408,11 @@ let generate_next_dissection ~default_number_of_sections node_ctxt ~opponent
           | Evaluated ok_state, _ -> Some ok_state
         in
         let* our =
-          Interpreter.state_of_tick node_ctxt ?start_state tick game.inbox_level
+          Interpreter.state_of_tick
+            node_ctxt
+            ?start_state
+            ~tick:(Sc_rollup.Tick.to_z tick)
+            game.inbox_level
         in
         match (their_hash, our) with
         | None, None ->
@@ -450,7 +454,10 @@ let next_move node_ctxt ~opponent game =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
-      Interpreter.state_of_tick node_ctxt start_tick game.inbox_level
+      Interpreter.state_of_tick
+        node_ctxt
+        ~tick:(Sc_rollup.Tick.to_z start_tick)
+        game.inbox_level
     in
     match start_state with
     | None ->

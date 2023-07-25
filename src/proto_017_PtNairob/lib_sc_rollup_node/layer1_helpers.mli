@@ -68,3 +68,8 @@ val retrieve_constants :
 
 val retrieve_genesis_info :
   #Client_context.full -> Address.t -> Node_context.genesis_info tzresult Lwt.t
+
+(** [get_boot_sector block_hash node_ctxt] retrieves the boot sector from the
+    rollup origination operation in block [block_hash]. Precondition:
+    [block_hash] has to be the block where the rollup was originated. *)
+val get_boot_sector : Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t

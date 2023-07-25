@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,68 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  type t
+module Reveal_hash_map = Map.Make (struct
+  type t = Dac_plugin.hash
 
-  (**  [consume consumption fuel] consumes the [consumption] amount from the
-       original [fuel].  It returns [None] when the [consumption] is greater
-       than the original [fuel] or [Some remaining_fuel].  *)
-  val consume : t -> t -> t option
-
-  (** The amount of fuel required to run one PVM tick.
-    {[
-      one_tick_consumption = of_ticks 1L
-    ]}
-   *)
-  val one_tick_consumption : t
-
-  (** [of_ticks ticks] gives the amount of fuel required to execute the amount
-      of [ticks]. *)
-  val of_ticks : int64 -> t
-
-  val is_empty : t -> bool
-
-  (** The maximum number of ticks that can be executed with the given amount of
-      fuel.
-      {[
-        max_ticks ∘ of_ticks = Fun.id
-        of_ticks ∘ max_ticks = Fun.id
-      ]}
-  *)
-  val max_ticks : t -> int64
-end
-
-(** Free fuel where consumption has no effect. *)
-module Free : S = struct
-  type t = Free
-
-  let one_tick_consumption = Free
-
-  let of_ticks _ = Free
-
-  let consume _ tank = Some tank
-
-  let is_empty _ = false
-
-  let max_ticks _ = Int64.max_int
-end
-
-(** Accounted fuel where each tick consumes one unit of fuel. *)
-module Accounted : S = struct
-  type t = int64
-
-  let of_ticks i =
-    assert (Int64.compare i 0L >= 0) ;
-    i
-
-  let one_tick_consumption = 1L
-
-  let consume consumption fuel =
-    if Int64.compare fuel consumption >= 0 then
-      Some (Int64.sub fuel consumption)
-    else None
-
-  let is_empty fuel = Int64.compare fuel 0L <= 0
-
-  let max_ticks fuel_left = Int64.max 0L fuel_left
-end
+  let compare = Dac_plugin.raw_compare
+end)

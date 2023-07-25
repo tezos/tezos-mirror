@@ -24,6 +24,7 @@ depends: [
   "tezos-workers"
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
+  "tezos-dac-lib"
   "tezos-shell-services"
   "octez-smart-rollup"
   "tezos-smart-rollup-017-PtNairob"

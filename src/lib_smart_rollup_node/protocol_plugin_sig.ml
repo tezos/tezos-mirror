@@ -297,4 +297,6 @@ module type S = sig
   module Layer1_helpers : LAYER1_HELPERS
 
   module L1_processing : L1_PROCESSING
+
+  module Pvm : Pvm_plugin_sig.S
 end

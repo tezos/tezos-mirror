@@ -40,6 +40,8 @@ module Plugin : Protocol_plugin_sig.S = struct
 
     let process_l1_block_operations = Daemon.process_l1_block_operations
   end
+
+  module Pvm = Pvm_plugin
 end
 
 let () = Protocol_plugins.register (module Plugin)

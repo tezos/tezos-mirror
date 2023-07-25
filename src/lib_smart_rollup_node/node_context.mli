@@ -383,6 +383,9 @@ type proto_info = {
 (** [protocol_of_level t level] returns the protocol of block level [level]. *)
 val protocol_of_level : _ t -> int32 -> proto_info tzresult Lwt.t
 
+(** Returns the last protocol seen by the rollup node. *)
+val last_seen_protocol : _ t -> Protocol_hash.t option tzresult Lwt.t
+
 (** [save_protocol_info t block ~predecessor] saves to disk the protocol
     information associated to the [block], if there is a protocol change
     between [block] and [predecessor]. *)

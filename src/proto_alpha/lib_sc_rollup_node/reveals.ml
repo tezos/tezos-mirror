@@ -113,3 +113,9 @@ let get ~dac_client ~data_dir ~pvm_kind hash =
     |> return
   in
   return contents
+
+let proto_hash_to_dac_hash proto_reveal_hash =
+  let dac_plugin =
+    WithExceptions.Option.get ~loc:__LOC__ @@ Dac_plugin.get Protocol.hash
+  in
+  proto_hash_to_dac_hash dac_plugin proto_reveal_hash

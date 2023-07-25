@@ -19,6 +19,7 @@ depends: [
   "octez-node-config"
   "prometheus-app" { >= "1.2" }
   "tezos-dal-node-lib"
+  "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-injector"
   "tezos-version"
