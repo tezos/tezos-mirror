@@ -105,6 +105,7 @@ module Make : functor (X : PARAMETERS) -> sig
     mutable status : status;
     event_pipe : string;
     mutable stdout_handlers : (string -> unit) list;
+    mutable stderr_handlers : (string -> unit) list;
     mutable persistent_event_handlers : (event -> unit) list;
     mutable one_shot_event_handlers : event_handler list String_map.t;
   }
@@ -170,13 +171,19 @@ module Make : functor (X : PARAMETERS) -> sig
       None. *)
   val get_event_from_full_event : JSON.t -> event option
 
-  (** Spawn a daemon. *)
+  (** Spawn a daemon.
+
+      If [capture_stderr] is [true] (default to [false]), then functions like
+      {!Process.check_and_read_stderr} or {!Process.check_error} will not work
+      as expected with the process of the daemon (as stored in its
+      [session_status]). *)
   val run :
     ?env:string String_map.t ->
     ?runner:Runner.t ->
     ?on_terminate:(Unix.process_status -> unit Lwt.t) ->
     ?event_level:Level.default_level ->
     ?event_sections_levels:(string * Level.level) list ->
+    ?capture_stderr:bool ->
     t ->
     X.session_state ->
     string list ->
@@ -232,7 +239,25 @@ module Make : functor (X : PARAMETERS) -> sig
       the order in which they trigger is unspecified. *)
   val on_event : t -> (event -> unit) -> unit
 
+  (** Add a callback to be called whenever the daemon prints to its stdout.
+
+      Contrary to [wait_for] functions, this callback is never removed.
+
+      Listening to events with [on_stdout] will not prevent [wait_for] promises
+      to be fulfilled. You can also have multiple [on_stdout] handlers,
+      although the order in which they trigger is unspecified. *)
   val on_stdout : t -> (string -> unit) -> unit
+
+  (** Add a callback to be called whenever the daemon prints to its stderr.
+      {!run} must have been called with [capture_stderr] flag set to true,
+      to call callbacks registered this way.
+
+      Contrary to [wait_for] functions, this callback is never removed.
+
+      Listening to events with [on_stderr] will not prevent [wait_for] promises
+      to be fulfilled. You can also have multiple [on_stderr] handlers,
+      although the order in which they trigger is unspecified. *)
+  val on_stderr : t -> (string -> unit) -> unit
 
   (** Register an event handler that logs all events.
 

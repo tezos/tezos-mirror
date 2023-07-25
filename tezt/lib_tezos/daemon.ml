@@ -97,6 +97,7 @@ module Make (X : PARAMETERS) = struct
     mutable status : status;
     event_pipe : string;
     mutable stdout_handlers : (string -> unit) list;
+    mutable stderr_handlers : (string -> unit) list;
     mutable persistent_event_handlers : (event -> unit) list;
     mutable one_shot_event_handlers : event_handler list String_map.t;
   }
@@ -183,6 +184,7 @@ module Make (X : PARAMETERS) = struct
       status = Not_running;
       event_pipe;
       stdout_handlers = [];
+      stderr_handlers = [];
       persistent_event_handlers = [];
       one_shot_event_handlers = String_map.empty;
     }
@@ -274,8 +276,8 @@ module Make (X : PARAMETERS) = struct
             loop [] events)
 
   let run ?(env = String_map.empty) ?runner ?(on_terminate = fun _ -> unit)
-      ?(event_level = `Info) ?(event_sections_levels = []) daemon session_state
-      arguments =
+      ?(event_level = `Info) ?(event_sections_levels = [])
+      ?(capture_stderr = false) daemon session_state arguments =
     (match daemon.status with
     | Not_running -> ()
     | Running _ -> Test.fail "daemon %s is already running" daemon.name) ;
@@ -355,23 +357,28 @@ module Make (X : PARAMETERS) = struct
                 let* () = Lwt_unix.sleep 0.01 in
                 event_loop ())
       in
-      let rec stdout_loop () =
-        let* stdout_line = Lwt_io.read_line_opt (Process.stdout process) in
-        match stdout_line with
+      let rec channel_loop get_channel get_handlers () =
+        let* channel_line = Lwt_io.read_line_opt (get_channel process) in
+        match channel_line with
         | Some line ->
-            List.iter (fun handler -> handler line) daemon.stdout_handlers ;
-            stdout_loop ()
+            List.iter (fun handler -> handler line) (get_handlers daemon) ;
+            channel_loop get_channel get_handlers ()
         | None -> (
             match daemon.status with
             | Not_running -> Lwt.return_unit
             | Running _ ->
                 (* TODO: is the sleep necessary here? *)
                 let* () = Lwt_unix.sleep 0.01 in
-                stdout_loop ())
+                channel_loop get_channel get_handlers ())
       in
       let ( and*!! ) = lwt_both_fail_early in
       let* () = event_loop ()
-      and*!! () = stdout_loop ()
+      and*!! () =
+        channel_loop Process.stdout (fun daemon -> daemon.stdout_handlers) ()
+      and*!! () =
+        if capture_stderr then
+          channel_loop Process.stderr (fun daemon -> daemon.stderr_handlers) ()
+        else unit
       and*!! () =
         let* process_status = Process.wait process in
         (* Setting [daemon.status] to [Not_running] stops the event loop cleanly. *)
@@ -428,6 +435,9 @@ module Make (X : PARAMETERS) = struct
 
   let on_stdout daemon handler =
     daemon.stdout_handlers <- handler :: daemon.stdout_handlers
+
+  let on_stderr daemon handler =
+    daemon.stderr_handlers <- handler :: daemon.stderr_handlers
 
   let log_events daemon =
     on_event daemon @@ fun event ->
