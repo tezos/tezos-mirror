@@ -123,9 +123,7 @@ let create_maintenance_worker limits pool connect_handler config triggers log =
   let open P2p_limits in
   let open Lwt_syntax in
   match limits.maintenance_idle_time with
-  | None ->
-      let* () = Events.(emit maintenance_disabled) () in
-      return_none
+  | None -> return_none
   | Some maintenance_idle_time ->
       let maintenance_config =
         {
