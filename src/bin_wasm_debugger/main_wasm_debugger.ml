@@ -54,10 +54,30 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     Repl_helpers.trap_exn (fun () ->
         Tezos_webassembly_interpreter.Import.link module_)
 
+  let handle_installer_config_instr durable
+      Octez_smart_rollup.Installer_config.(Set {value; to_}) =
+    let open Tezos_scoru_wasm.Durable in
+    let key = key_of_string_exn to_ in
+    set_value_exn durable key value
+
+  let handle_installer_config installer_config tree =
+    let open Lwt_syntax in
+    let* durable_storage = Wasm.wrap_as_durable_storage tree in
+    let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable_storage in
+    let* durable =
+      List.fold_left_s handle_installer_config_instr durable installer_config
+    in
+    let durable_storage = Tezos_scoru_wasm.Durable.to_storage durable in
+    let wrapped_tree = Durable_storage.to_tree_exn durable_storage in
+    Wasm.Tree_encoding_runner.encode
+      Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
+      wrapped_tree
+      tree
+
   (* Starting point of the module after reading the kernel file: parsing,
      typechecking and linking for safety before feeding kernel to the PVM, then
      installation into a tree for the PVM interpreter. *)
-  let handle_module version binary name module_ =
+  let handle_module ?installer_config version binary name module_ =
     let open Lwt_result_syntax in
     let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
     let* ast =
@@ -77,14 +97,19 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         ~from_binary:binary
         module_
     in
+    let*! tree =
+      match installer_config with
+      | None -> Lwt.return tree
+      | Some installer_config -> handle_installer_config installer_config tree
+    in
     let*! tree = Wasm.eval_until_input_requested tree in
     return tree
 
-  let start version binary file =
+  let start ?installer_config version binary file =
     let open Lwt_result_syntax in
     let module_name = Filename.(file |> basename |> chop_extension) in
     let*! buffer = Repl_helpers.read_file file in
-    handle_module version binary module_name buffer
+    handle_module ?installer_config version binary module_name buffer
 
   (* REPL main loop: reads an input, does something out of it, then loops. *)
   let repl tree inboxes level config =
@@ -135,6 +160,25 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       ~long:"inputs"
       ~placeholder:"inputs.json"
       file_parameter
+
+  let installer_config_parameter =
+    let open Lwt_result_syntax in
+    Tezos_clic.parameter (fun _ filename ->
+        let* kind =
+          if Filename.check_suffix filename ".yaml" then return `Yaml
+          else if Filename.check_suffix filename ".json" then return `Json
+          else Error_monad.failwith "Expecting either a .yaml of .json file"
+        in
+        let+ content = Repl_helpers.(trap_exn (fun () -> read_file filename)) in
+        (kind, content))
+
+  let installer_config_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:"installer configuration file"
+      ~long:"installer-config"
+      ~placeholder:"installer-config.yaml"
+      installer_config_parameter
 
   let rollup_parameter =
     let open Lwt_result_syntax in
@@ -238,7 +282,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
 
   let global_options =
     Tezos_clic.(
-      args8
+      args9
         wasm_arg
         input_arg
         rollup_arg
@@ -246,7 +290,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         dal_pages_directory_arg
         version_arg
         no_kernel_debug_flag
-        plugins_arg)
+        plugins_arg
+        installer_config_arg)
 
   let handle_plugin_file f =
     try Dynlink.loadfile f with
@@ -268,7 +313,8 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              dal_pages_directory,
              version,
              no_kernel_debug_flag,
-             plugins ),
+             plugins,
+             installer_config ),
            _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
@@ -296,7 +342,30 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       else if Filename.check_suffix wasm_file ".wast" then Ok false
       else error_with "Kernels should have .wasm or .wast file extension"
     in
-    let* tree = start version binary wasm_file in
+    let parse_json_config content =
+      match Data_encoding.Json.from_string content with
+      | Ok json -> (
+          try
+            Ok
+              (Data_encoding.Json.destruct
+                 Octez_smart_rollup.Installer_config.encoding
+                 json)
+          with exn ->
+            error_with
+              "Config is invalid:\n%a"
+              (Data_encoding.Json.print_error ?print_unknown:None)
+              exn)
+      | Error msg -> error_with "Config is not a valid JSON: %s" msg
+    in
+    let*? installer_config =
+      Option.map_e
+        (function
+          | `Yaml, content ->
+              Octez_smart_rollup.Installer_config.parse_yaml content
+          | `Json, content -> parse_json_config content)
+        installer_config
+    in
+    let* tree = start ?installer_config version binary wasm_file in
     let* inboxes =
       match inputs with
       | Some inputs -> Messages.parse_inboxes inputs config
