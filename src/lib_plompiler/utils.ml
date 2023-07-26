@@ -333,3 +333,11 @@ let dump_label_traces path (cs : Csir.CS.t) =
           Printf.fprintf outc "%s 1\n" @@ String.concat "; " (List.rev c.label)))
     cs ;
   close_out outc
+
+let dump_label_range_checks_traces path fg =
+  let outc = open_out path in
+  List.iter
+    (fun (label, nb) ->
+      Printf.fprintf outc "%s %d\n" (String.concat "; " label) nb)
+    fg ;
+  close_out outc

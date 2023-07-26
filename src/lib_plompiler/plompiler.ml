@@ -135,6 +135,9 @@ module LibCircuit : sig
     range_checks : (int * (int * int) list) list;
         (** Range checks following the format:
          index of wire * (index in wire * bound) *)
+    range_checks_labels : (string list * int) list;
+        (** label trace that creates a range-check and
+            the size of the range-check *)
     solver : Solver.t;  (** Solver for the [cs] *)
   }
   [@@deriving repr]

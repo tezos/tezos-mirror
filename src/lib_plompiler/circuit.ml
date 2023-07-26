@@ -94,6 +94,8 @@ type state = {
   tables : string list;
   solver : Solver.t;
   range_checks : Range_checks.t;
+  (* label trace that creates a range-check and the size of the range-check *)
+  range_checks_labels : (string list * int) list;
   (* label trace *)
   labels : string list;
   (* one and zero are used so often that it's worth reusing them across the
@@ -538,7 +540,13 @@ module Num = struct
   (* checks that 0 <= (Scalar l) < 2^nb_bits *)
   let range_check ~nb_bits (Scalar l) s =
     assert (nb_bits > 0) ;
-    ({s with range_checks = Range_checks.add ~nb_bits l s.range_checks}, Unit)
+    let range_checks_labels = (s.labels, nb_bits) :: s.range_checks_labels in
+    ( {
+        s with
+        range_checks = Range_checks.add ~nb_bits l s.range_checks;
+        range_checks_labels;
+      },
+      Unit )
 
   (* l ≠ 0  <=>  ∃ r ≠ 0 : l * r - 1 = 0 *)
   let assert_nonzero (Scalar l) =
@@ -1781,6 +1789,7 @@ let get f =
         delayed = ret Unit;
         check_wires = [];
         range_checks = Range_checks.empty;
+        range_checks_labels = [];
         labels = [];
         cache = Scalar_map.empty;
       }
@@ -1813,6 +1822,7 @@ type cs_result = {
   tables : Csir.Table.t list;
   (* wire index * (plonk index * bound) *)
   range_checks : (int * (int * int) list) list;
+  range_checks_labels : (string list * int) list;
   solver : Solver.t;
 }
 [@@deriving repr]
@@ -1898,6 +1908,9 @@ let get_cs ?(optimize = false) f : cs_result =
     else (s.cs, s.solver, [])
   in
   let range_checks = to_plonk_range_checks s.range_checks cs in
+  let range_checks_labels =
+    List.map (fun (label, nb) -> (List.rev label, nb)) s.range_checks_labels
+  in
   {
     nvars = s.nvars;
     free_wires;
@@ -1907,4 +1920,5 @@ let get_cs ?(optimize = false) f : cs_result =
     input_com_sizes = List.rev s.input_com_sizes;
     solver;
     range_checks;
+    range_checks_labels;
   }
