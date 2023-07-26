@@ -43,11 +43,14 @@ type t = {
   plugin : (module Protocol_plugin_sig.S);
 }
 
-(** [start_simulation node_ctxt reveal_source block] starts a new simulation {e
-    on top} of [block], i.e. for an hypothetical new inbox (level).  *)
+(** [start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file block] starts
+    a new simulation {e on top} of [block], i.e. for an hypothetical new inbox
+    (level). If [log_kernel_debug_file] is provided, kernel logs will be written
+    to [node_ctxt.data_dir/simulation_kernel_logs/log_kernel_debug_file]. *)
 val start_simulation :
   Node_context.ro ->
   reveal_map:string Utils.Reveal_hash_map.t option ->
+  ?log_kernel_debug_file:string ->
   Layer1.head ->
   t tzresult Lwt.t
 
