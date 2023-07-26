@@ -344,7 +344,6 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     | Some x -> ok x
     | None -> error Sc_rollup_invalid_output_proof
   in
-  let output = PVM.output_of_output_proof output_proof in
   (* Verify that the states match. *)
   let* {Sc_rollup.Commitment.compressed_state; _}, ctxt =
     Sc_rollup.Commitment.get_commitment ctxt rollup cemented_commitment
@@ -362,10 +361,7 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
       (Sc_rollup_costs.cost_verify_output_proof ~bytes_len:output_proof_length)
   in
   (* Verify that the proof is valid. *)
-  let* () =
-    let*! proof_is_valid = PVM.verify_output_proof output_proof in
-    fail_unless proof_is_valid Sc_rollup_invalid_output_proof
-  in
+  let* output = PVM.verify_output_proof output_proof in
   return (output, ctxt)
 
 let validate_outbox_level ctxt ~outbox_level ~lcc_level =

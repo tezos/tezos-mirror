@@ -389,13 +389,6 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
       let entries = children [P.name] P.encoding
 
-      let mapped_to k v state =
-        let open Lwt_syntax in
-        let* state', _ = Monad.(run (set k v) state) in
-        let* t = Tree.find_tree state (key k)
-        and* t' = Tree.find_tree state' (key k) in
-        Lwt.return (Option.equal Tree.equal t t')
-
       let pp =
         let open Monad.Syntax in
         let* l = entries in
@@ -1680,30 +1673,73 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
   let state_of_output_proof s = s.output_proof_state
 
-  let output_key (output : PS.output) = Z.to_string output.message_index
+  let output_key message_index = Z.to_string message_index
 
-  let has_output output tree =
+  let get_output ~outbox_level ~message_index ~message state =
     let open Lwt_syntax in
-    let* equal = Output.mapped_to (output_key output) output tree in
-    return (tree, equal)
+    let* _state, output = run (Output.get (output_key message_index)) state in
+    let output =
+      let output = Option.join output in
+      Option.bind
+        output
+        (fun
+          {
+            outbox_level = found_outbox_level;
+            message = found_message;
+            message_index = _;
+          }
+        ->
+          (* We can safely ignore the [message_index] since it is the key
+             used to fetch the messag from the storage. *)
+          let found_message_encoded =
+            Data_encoding.Binary.to_string_exn
+              Sc_rollup_outbox_message_repr.encoding
+              found_message
+          in
+          let given_message_encoded =
+            Data_encoding.Binary.to_string_exn
+              Sc_rollup_outbox_message_repr.encoding
+              message
+          in
+          if
+            Raw_level_repr.equal outbox_level found_outbox_level
+            && Compare.String.equal found_message_encoded given_message_encoded
+          then Some message
+          else None)
+    in
+    return (state, output)
 
   let verify_output_proof p =
-    let open Lwt_syntax in
-    let transition = has_output p.output_proof_output in
-    let* result = Context.verify_proof p.output_proof transition in
-    match result with None -> return false | Some _ -> return true
+    let open Lwt_result_syntax in
+    let outbox_level = p.output_proof_output.outbox_level in
+    let message_index = p.output_proof_output.message_index in
+    let message = p.output_proof_output.message in
+    let transition = get_output ~outbox_level ~message_index ~message in
+    let*! result = Context.verify_proof p.output_proof transition in
+    match result with
+    | Some (_state, Some message) ->
+        return Sc_rollup_PVM_sig.{outbox_level; message_index; message}
+    | _ -> tzfail Arith_output_proof_production_failed
 
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in
-    let*! output_proof_state = state_hash state in
+    let outbox_level = output_proof_output.Sc_rollup_PVM_sig.outbox_level in
+    let message_index = output_proof_output.message_index in
+    let message = output_proof_output.message in
     let*! result =
-      Context.produce_proof context state @@ has_output output_proof_output
+      Context.produce_proof context state
+      @@ get_output ~outbox_level ~message_index ~message
     in
     match result with
-    | Some (output_proof, true) ->
-        return {output_proof; output_proof_state; output_proof_output}
-    | Some (_, false) -> fail Arith_invalid_claim_about_outbox
-    | None -> fail Arith_output_proof_production_failed
+    | Some (output_proof, Some message) ->
+        let*! output_proof_state = state_hash state in
+        return
+          {
+            output_proof;
+            output_proof_state;
+            output_proof_output = {outbox_level; message_index; message};
+          }
+    | _ -> fail Arith_output_proof_production_failed
 
   module Internal_for_tests = struct
     let insert_failure state =

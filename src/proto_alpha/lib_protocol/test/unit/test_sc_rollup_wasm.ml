@@ -318,7 +318,9 @@ let test_output () =
   match pf with
   | Ok proof ->
       let*! valid = Full_Wasm.verify_output_proof proof in
-      fail_unless valid (Exn (Failure "An output proof is not valid."))
+      fail_unless
+        (Result.is_ok valid)
+        (Exn (Failure "An output proof is not valid."))
   | Error _ -> failwith "Error during proof generation"
 
 (* When snapshoting a new protocol, to fix this test, the following

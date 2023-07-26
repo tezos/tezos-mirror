@@ -431,15 +431,17 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
     if valid then
       match result with
       | Ok proof ->
-          let*! valid = verify_output_proof proof in
-          fail_unless valid (Exn (Failure "An output proof is not valid."))
+          let*! output = verify_output_proof proof in
+          fail_unless
+            (Result.is_ok output)
+            (Exn (Failure "An output proof is not valid."))
       | Error _ -> failwith "Error during proof generation"
     else
       match result with
       | Ok proof ->
           let*! proof_is_valid = verify_output_proof proof in
           fail_when
-            proof_is_valid
+            (Result.is_ok proof_is_valid)
             (Exn
                (Failure
                   (Format.asprintf

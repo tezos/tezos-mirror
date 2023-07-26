@@ -539,9 +539,10 @@ module type S = sig
       in [proof]'s statement. *)
   val state_of_output_proof : output_proof -> hash
 
-  (** [verify_output_proof output_proof] returns [true] iff [proof] is a valid
-      witness that its [output] is part of its [state]'s outbox. *)
-  val verify_output_proof : output_proof -> bool Lwt.t
+  (** [verify_output_proof output_proof] returns the [output_proof]'s output
+      iff the proof is a valid witness that its [output] is part of its
+      [state]'s outbox. *)
+  val verify_output_proof : output_proof -> output tzresult Lwt.t
 
   (** [produce_output_proof ctxt state output] returns a proof that witnesses
       the fact that [output] is part of [state]'s outbox. *)
