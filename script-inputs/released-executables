@@ -7,6 +7,10 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-smart-rollup-node-Proxford
+octez-smart-rollup-client-Proxford
+octez-accuser-Proxford
+octez-baker-Proxford
 octez-smart-rollup-node-PtNairob
 octez-smart-rollup-client-PtNairob
 octez-accuser-PtNairob

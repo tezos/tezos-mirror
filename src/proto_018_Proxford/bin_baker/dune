@@ -2,17 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_baker_alpha)
- (public_name octez-baker-alpha)
- (package octez-baker-alpha)
+ (name main_baker_018_Proxford)
+ (public_name octez-baker-Proxford)
+ (package octez-baker-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-clic
-  tezos-protocol-alpha
-  tezos-client-alpha
+  tezos-protocol-018-Proxford
+  tezos-client-018-Proxford
   tezos-client-commands
-  tezos-baking-alpha-commands
+  tezos-baking-018-Proxford-commands
   tezos-stdlib-unix
   tezos-client-base-unix)
  (link_flags
@@ -23,9 +23,9 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
-  -open Tezos_client_alpha
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_client_018_Proxford
   -open Tezos_client_commands
-  -open Tezos_baking_alpha_commands
+  -open Tezos_baking_018_Proxford_commands
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix))

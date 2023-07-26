@@ -6,9 +6,9 @@
  (libraries
   tezos-base
   tezos-client-base
-  tezos-client-alpha
-  tezos-protocol-alpha
-  tezos-baking-alpha.tenderbrute)
+  tezos-client-018-Proxford
+  tezos-protocol-018-Proxford
+  tezos-baking-018-Proxford.tenderbrute)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -19,6 +19,6 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base
   -open Tezos_client_base
-  -open Tezos_client_alpha
-  -open Tezos_protocol_alpha
-  -open Tenderbrute_alpha))
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_018_Proxford
+  -open Tenderbrute_018_Proxford))
