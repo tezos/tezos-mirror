@@ -1,0 +1,52 @@
+
+./octez-client --wait none set consensus key for bootstrap1 to dummy_account_0
+Node is bootstrapped.
+Estimated gas: 168.946 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000284
+    Expected counter: 1
+    Gas limit: 269
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000284
+      payload fees(the block proposer) ....... +ꜩ0.000284
+    Update_consensus_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      This consensus key update was successfully applied
+      Consumed gas: 168.880
+
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+{ "full_balance": "4000000000000", "current_frozen_deposits": "200000000000",
+  "frozen_deposits": "200000000000", "staking_balance": "4000000000000",
+  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
+  "delegated_balance": "0", "deactivated": false, "grace_period": 3,
+  "voting_power": "4000000000000", "remaining_proposals": 20,
+  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+{ "full_balance": "3999999999716", "current_frozen_deposits": "200000000000",
+  "frozen_deposits": "200000000000", "staking_balance": "3999999999716",
+  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
+  "delegated_balance": "0", "deactivated": false, "grace_period": 3,
+  "voting_power": "4000000000000", "remaining_proposals": 20,
+  "active_consensus_key": "[PUBLIC_KEY_HASH]",
+  "pending_consensus_keys":
+    [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
+
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+{ "full_balance": "4000002964496", "current_frozen_deposits": "200000000000",
+  "frozen_deposits": "200000000000", "staking_balance": "4000002964496",
+  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
+  "delegated_balance": "0", "deactivated": false, "grace_period": 3,
+  "voting_power": "4000000000000", "remaining_proposals": 20,
+  "active_consensus_key": "[PUBLIC_KEY_HASH]" }
