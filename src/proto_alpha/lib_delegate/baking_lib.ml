@@ -49,7 +49,8 @@ let get_current_proposal cctxt ?cache () =
   let* block_stream, _block_stream_stopper =
     Node_rpc.monitor_heads cctxt ?cache ~chain:cctxt#chain ()
   in
-  Lwt_stream.peek block_stream >>= function
+  let*! current_head = Lwt_stream.peek block_stream in
+  match current_head with
   | Some current_head -> return (block_stream, current_head)
   | None -> failwith "head stream unexpectedly ended"
 
@@ -71,7 +72,10 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let* () =
     if force then return_unit
     else
-      is_acceptable_proposal_for_current_level state proposal >>= function
+      let*! proposal_acceptance =
+        is_acceptable_proposal_for_current_level state proposal
+      in
+      match proposal_acceptance with
       | Invalid -> cctxt#error "Cannot preattest an invalid proposal"
       | Outdated_proposal -> cctxt#error "Cannot preattest an outdated proposal"
       | Valid_proposal -> return_unit
@@ -94,7 +98,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let cache = Baking_cache.Block_cache.create 10 in
   let* _, current_proposal = get_current_proposal cctxt ~cache () in
   let config = Baking_configuration.make ~force () in
-  create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
+  let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
   let*! () =
     Events.(emit attempting_attest_proposal state.level_state.latest_proposal)
@@ -102,7 +106,10 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* () =
     if force then return_unit
     else
-      is_acceptable_proposal_for_current_level state proposal >>= function
+      let*! proposal_acceptance =
+        is_acceptable_proposal_for_current_level state proposal
+      in
+      match proposal_acceptance with
       | Invalid -> cctxt#error "Cannot attest an invalid proposal"
       | Outdated_proposal -> cctxt#error "Cannot attest an outdated proposal"
       | Valid_proposal -> return_unit
@@ -125,8 +132,10 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
 let bake_at_next_level state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
-  Baking_scheduling.compute_next_potential_baking_time_at_next_level state
-  >>= function
+  let*! baking_time =
+    Baking_scheduling.compute_next_potential_baking_time_at_next_level state
+  in
+  match baking_time with
   | None -> cctxt#error "No baking slot found for the delegates"
   | Some (timestamp, round) ->
       let*! () =
@@ -259,8 +268,12 @@ let propose_at_next_level ~minimal_timestamp state =
     return state
   else
     let* event = bake_at_next_level state in
-    let* state = State_transitions.step state event >>= do_action in
-    cctxt#message "Proposal injected" >>= fun () -> return state
+    let* state =
+      let*! action = State_transitions.step state event in
+      do_action action
+    in
+    let*! () = cctxt#message "Proposal injected" in
+    return state
 
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
@@ -323,21 +336,25 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
               }
             in
             let* state =
-              State_transitions.step
-                state
-                (Baking_state.Quorum_reached (candidate, attestation_qc))
-              >>= do_action
+              let*! action =
+                State_transitions.step
+                  state
+                  (Baking_state.Quorum_reached (candidate, attestation_qc))
+              in
+              do_action action
               (* this will register the elected block *)
             in
             propose_at_next_level ~minimal_timestamp state
         | None -> (
-            Baking_scheduling.compute_bootstrap_event state >>?= fun event ->
+            let*? event = Baking_scheduling.compute_bootstrap_event state in
             let*! state, _action = State_transitions.step state event in
             let latest_proposal = state.level_state.latest_proposal in
             let open State_transitions in
             let round = state.round_state.current_round in
-            is_acceptable_proposal_for_current_level state latest_proposal
-            >>= function
+            let*! proposal_acceptance =
+              is_acceptable_proposal_for_current_level state latest_proposal
+            in
+            match proposal_acceptance with
             | Invalid | Outdated_proposal -> (
                 match round_proposer state ~level:`Current round with
                 | Some {consensus_key_and_delegate; _} ->
@@ -348,7 +365,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                         round
                         state.level_state.latest_proposal
                     in
-                    do_action (state, action) >>=? fun state ->
+                    let* state = do_action (state, action) in
                     let*! () =
                       cctxt#message
                         "Reproposed block at level %ld on round %a"
@@ -382,14 +399,16 @@ let bake_using_automaton config state heads_stream =
         Compare.Int32.(proposal.block.shell.level >= Int32.succ current_level)
     | _ -> false
   in
-  Baking_scheduling.automaton_loop
-    ~stop_on_event:stop_on_next_level_block
-    ~config
-    ~on_error:(fun err -> Lwt.return (Error err))
-    loop_state
-    state
-    initial_event
-  >>=? function
+  let* event_opt =
+    Baking_scheduling.automaton_loop
+      ~stop_on_event:stop_on_next_level_block
+      ~config
+      ~on_error:(fun err -> Lwt.return (Error err))
+      loop_state
+      state
+      initial_event
+  in
+  match event_opt with
   | Some (New_head_proposal proposal) ->
       let*! () =
         cctxt#message

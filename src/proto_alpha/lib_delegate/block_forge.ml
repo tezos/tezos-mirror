@@ -150,7 +150,7 @@ let check_protocol_changed ~user_activated_upgrades ~level
           in
           match voting_period.kind with
           | Voting_period.Proposal | Exploration | Cooldown | Promotion ->
-              return false
+              return_false
           | Adoption ->
               Lwt.map
                 Environment.wrap_tzresult
