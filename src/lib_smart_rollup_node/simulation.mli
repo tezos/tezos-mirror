@@ -32,6 +32,7 @@ type info_per_level = {
 
 (** Type of the state for a simulation. *)
 type t = {
+  node_ctxt : Node_context.ro;
   ctxt : Context.ro;
   inbox_level : int32;
   state : Context.tree;
@@ -50,13 +51,12 @@ val start_simulation :
   Layer1.head ->
   t tzresult Lwt.t
 
-(** [simulate_messages node_ctxt sim messages] runs a simulation of new
-    [messages] in the given simulation (state) [sim] and returns a new
-    simulation state, the remaining fuel (when [?fuel] is provided) and the
-    number of ticks that happened. *)
-val simulate_messages :
-  Node_context.ro -> t -> string list -> (t * Z.t) tzresult Lwt.t
+(** [simulate_messages sim messages] runs a simulation of new [messages] in the
+    given simulation (state) [sim] and returns a new simulation state, the
+    remaining fuel (when [?fuel] is provided) and the number of ticks that
+    happened. *)
+val simulate_messages : t -> string list -> (t * Z.t) tzresult Lwt.t
 
-(** [end_simulation node_ctxt sim] adds and [End_of_level] message and marks the
+(** [end_simulation sim] adds and [End_of_level] message and marks the
     simulation as ended. *)
-val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
+val end_simulation : t -> (t * Z.t) tzresult Lwt.t

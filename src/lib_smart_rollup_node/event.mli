@@ -67,6 +67,10 @@ val metrics_ended_dont_wait : string -> unit
 (** [kernel_debug str] emits the event that the kernel has logged [str]. *)
 val kernel_debug : string -> unit Lwt.t
 
+(** [simulation_kernel_debug str] emits the event that the kernel has logged
+    [str] during a simulation. *)
+val simulation_kernel_debug : string -> unit Lwt.t
+
 (** [kernel_debug str] emits the event that the kernel has logged [str].
     (Doesn't wait for event to be emitted) *)
 val kernel_debug_dont_wait : string -> unit

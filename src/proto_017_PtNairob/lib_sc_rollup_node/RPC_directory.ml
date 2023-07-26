@@ -140,10 +140,8 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       ~reveal_map
       Layer1.{hash = block; level}
   in
-  let* sim, num_ticks_0 = Simulation.simulate_messages node_ctxt sim messages in
-  let* {state; inbox_level; _}, num_ticks_end =
-    Simulation.end_simulation node_ctxt sim
-  in
+  let* sim, num_ticks_0 = Simulation.simulate_messages sim messages in
+  let* {state; inbox_level; _}, num_ticks_end = Simulation.end_simulation sim in
   let*! insights =
     List.map_p
       (function

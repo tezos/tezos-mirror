@@ -116,6 +116,15 @@ module Simple = struct
       ("log", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let simulation_kernel_debug =
+    declare_1
+      ~section
+      ~name:"simulation_kernel_debug"
+      ~level:Info
+      ~msg:"[simulation] {log}"
+      ("log", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
   let warn_dal_enabled_no_node =
     declare_0
       ~section
@@ -186,6 +195,8 @@ let metrics_ended_dont_wait error =
   Simple.(emit__dont_wait__use_with_care metrics_ended) error
 
 let kernel_debug msg = Simple.(emit kernel_debug) msg
+
+let simulation_kernel_debug msg = Simple.(emit simulation_kernel_debug) msg
 
 let kernel_debug_dont_wait msg =
   Simple.(emit__dont_wait__use_with_care kernel_debug) msg
