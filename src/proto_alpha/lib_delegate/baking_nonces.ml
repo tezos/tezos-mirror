@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Baking_cache
 module Events = Baking_events.Nonces
 
 type state = {
@@ -34,6 +35,11 @@ type state = {
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
+  cycle_cache : Block_hash.t list Cycle_cache.t;
+      (** This cache is used to avoid calling expensive RPCs at each
+          block. Still, this component's logic is very inefficient and
+          should be refactored. This cache is intended as "duct tape"
+          until a proper refactoring happens. *)
 }
 
 type t = state
@@ -159,10 +165,11 @@ let filter_outdated_nonces state nonces =
   in
   return (remove_all nonces outdated_nonces)
 
-let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
+let blocks_from_previous_cycle {cctxt; chain; _} =
   let open Lwt_result_syntax in
+  let block = `Head 0 in
   let*! result =
-    Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
+    Plugin.RPC.levels_in_current_cycle cctxt ~offset:(-1l) (chain, block)
   in
   match result with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
@@ -198,9 +205,28 @@ let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
              size %d (expected 1)"
             (List.length l))
 
+let cached_blocks_from_previous_cycle ({cctxt; chain; cycle_cache; _} as state)
+    =
+  let open Lwt_result_syntax in
+  let* {cycle = current_cycle; _} =
+    Plugin.RPC.current_level cctxt (chain, `Head 0)
+  in
+  match Cycle.pred current_cycle with
+  | None ->
+      (* This will be [None] iff [current_cycle = 0] which only
+         occurs during genesis. *)
+      return_nil
+  | Some cycle_key -> (
+      match Cycle_cache.find_opt cycle_cache cycle_key with
+      | Some blocks -> return blocks
+      | None ->
+          let* blocks = blocks_from_previous_cycle state in
+          Cycle_cache.replace cycle_cache cycle_key blocks ;
+          return blocks)
+
 let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =
   let open Lwt_result_syntax in
-  let* blocks = blocks_from_current_cycle state (`Head 0) ~offset:(-1l) () in
+  let* blocks = cached_blocks_from_previous_cycle state in
   List.filter_map_es
     (fun hash ->
       match find_opt nonces hash with
@@ -366,6 +392,7 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
       config;
       nonces_location;
       last_predecessor = Block_hash.zero;
+      cycle_cache = Cycle_cache.create 2;
     }
   in
   let rec worker_loop () =
