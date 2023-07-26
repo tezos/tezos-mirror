@@ -27,11 +27,16 @@
 (* Declaration order must respect the version order. *)
 type t = Mumbai | Nairobi | Oxford | Alpha
 
-type constants = Constants_sandbox | Constants_mainnet | Constants_test
+type constants =
+  | Constants_sandbox
+  | Constants_mainnet
+  | Constants_mainnet_with_chain_id
+  | Constants_test
 
 let constants_to_string = function
   | Constants_sandbox -> "sandbox"
   | Constants_mainnet -> "mainnet"
+  | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
 let name = function
