@@ -434,14 +434,14 @@ let cost_N_ISet_update size1 size2 =
   intercept + (S.safe_int 2 * log2 size2 * size1)
 
 (* model N_IMap_mem *)
-let cost_N_IMap_mem size1 size2 =
+let cost_N_IMap_mem' size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
   let intercept = S.safe_int 80 in
   intercept + (log2 size2 * size1)
 
-let cost_N_IMap_update size1 size2 =
+let cost_N_IMap_update' size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -450,7 +450,7 @@ let cost_N_IMap_update size1 size2 =
      on non-structured data *)
   intercept + (S.safe_int 2 * log2 size2 * size1)
 
-let cost_N_IMap_get_and_update size1 size2 =
+let cost_N_IMap_get_and_update' size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
