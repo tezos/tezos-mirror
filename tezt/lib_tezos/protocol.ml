@@ -29,6 +29,11 @@ type t = Mumbai | Nairobi | Oxford | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
+let constants_to_string = function
+  | Constants_sandbox -> "sandbox"
+  | Constants_mainnet -> "mainnet"
+  | Constants_test -> "test"
+
 let name = function
   | Alpha -> "Alpha"
   | Mumbai -> "Mumbai"
@@ -67,12 +72,7 @@ let protocol_zero_hash = "PrihK96nBAFSxVL1GLJTVhu9YnzkMFiBeuJRPA8NwuZVZCE1L6i"
 let default_constants = Constants_sandbox
 
 let parameter_file ?(constants = default_constants) protocol =
-  let name =
-    match constants with
-    | Constants_sandbox -> "sandbox"
-    | Constants_mainnet -> "mainnet"
-    | Constants_test -> "test"
-  in
+  let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
 let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
