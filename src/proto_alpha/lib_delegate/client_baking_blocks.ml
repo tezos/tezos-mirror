@@ -41,10 +41,12 @@ type block_info = {
 }
 
 let raw_info cctxt ?(chain = `Main) hash shell_header =
+  let open Lwt_result_syntax in
   let block = `Hash (hash, 0) in
-  Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Shell_services.Blocks.protocols cctxt ~chain ~block ()
-  >>=? fun {current_protocol = protocol; next_protocol} ->
+  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* {current_protocol = protocol; next_protocol} =
+    Shell_services.Blocks.protocols cctxt ~chain ~block ()
+  in
   let {
     Tezos_base.Block_header.predecessor;
     fitness;
@@ -74,9 +76,12 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   | Error _ -> failwith "Cannot convert level into int32"
 
 let info cctxt ?(chain = `Main) block =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  >>=? fun shell_header -> raw_info cctxt ~chain hash shell_header
+  let open Lwt_result_syntax in
+  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
+  let* shell_header =
+    Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+  in
+  raw_info cctxt ~chain hash shell_header
 
 module Block_seen_event = struct
   type t = {
@@ -144,14 +149,17 @@ module Block_seen_event = struct
 end
 
 let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
-  Monitor_services.applied_blocks cctxt ?chains ?protocols ?next_protocols ()
-  >>=? fun (block_stream, stop) ->
+  let open Lwt_result_syntax in
+  let* block_stream, stop =
+    Monitor_services.applied_blocks cctxt ?chains ?protocols ?next_protocols ()
+  in
   return
     ( Lwt_stream.map_s
         (fun (chain, block, header, _ops) ->
-          Block_seen_event.(
-            Event.emit (make block header (`Valid_blocks chain)))
-          >>=? fun () ->
+          let* () =
+            Block_seen_event.(
+              Event.emit (make block header (`Valid_blocks chain)))
+          in
           raw_info
             cctxt
             ~chain:(`Hash chain)
@@ -161,12 +169,14 @@ let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
       stop )
 
 let monitor_heads cctxt ~next_protocols chain =
-  Monitor_services.heads cctxt ?next_protocols chain
-  >>=? fun (block_stream, _stop) ->
+  let open Lwt_result_syntax in
+  let* block_stream, _stop =
+    Monitor_services.heads cctxt ?next_protocols chain
+  in
   return
     (Lwt_stream.map_s
        (fun (block, ({Tezos_base.Block_header.shell; _} as header)) ->
-         Block_seen_event.(Event.emit (make block header `Heads)) >>=? fun () ->
+         let* () = Block_seen_event.(Event.emit (make block header `Heads)) in
          raw_info cctxt ~chain block shell)
        block_stream)
 
@@ -206,26 +216,34 @@ let () =
       Unexpected_empty_block_list {chain; block_hash; length})
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  >>=? fun {level; _} ->
-  Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
+  let open Lwt_result_syntax in
+  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
+  let* {level; _} =
+    Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+  in
+  let*! result =
+    Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
+  in
+  match result with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
-      (Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-       >>=? function
-       | hd :: _ -> return hd
-       | [] ->
-           fail
-             (Unexpected_empty_block_list
-                {
-                  chain = Block_services.chain_to_string chain;
-                  block_hash = hash;
-                  length;
-                }))
-      >>=? fun head ->
+      let* head =
+        let* list =
+          Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
+        in
+        match list with
+        | hd :: _ -> return hd
+        | [] ->
+            tzfail
+              (Unexpected_empty_block_list
+                 {
+                   chain = Block_services.chain_to_string chain;
+                   block_hash = hash;
+                   length;
+                 })
+      in
       let blocks =
         List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
       in

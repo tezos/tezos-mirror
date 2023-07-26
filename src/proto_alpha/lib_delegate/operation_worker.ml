@@ -223,26 +223,29 @@ type t = {
 }
 
 let monitor_operations (cctxt : #Protocol_client_context.full) =
-  Alpha_block_services.Mempool.monitor_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~validated:true
-    ~branch_delayed:true
-    ~branch_refused:false
-    ~refused:false
-    ()
-  >>=? fun (operation_stream, stream_stopper) ->
+  let open Lwt_result_syntax in
+  let* operation_stream, stream_stopper =
+    Alpha_block_services.Mempool.monitor_operations
+      cctxt
+      ~chain:cctxt#chain
+      ~validated:true
+      ~branch_delayed:true
+      ~branch_refused:false
+      ~refused:false
+      ()
+  in
   let operation_stream =
     Lwt_stream.map
       (fun ops -> List.map (fun ((_, op), _) -> op) ops)
       operation_stream
   in
-  Shell_services.Blocks.Header.shell_header
-    cctxt
-    ~chain:cctxt#chain
-    ~block:(`Head 0)
-    ()
-  >>=? fun shell_header ->
+  let* shell_header =
+    Shell_services.Blocks.Header.shell_header
+      cctxt
+      ~chain:cctxt#chain
+      ~block:(`Head 0)
+      ()
+  in
   let round =
     match Fitness.(round_from_raw shell_header.fitness) with
     | Ok r -> r
@@ -292,11 +295,12 @@ let reset_monitoring state =
       Lwt.return_unit
 
 let update_monitoring ?(should_lock = true) state ops =
+  let open Lwt_syntax in
   (if should_lock then Lwt_mutex.with_lock state.lock else fun f -> f ())
   @@ fun () ->
   (* If no block is watched, don't do anything *)
   match state.proposal_watched with
-  | None -> Lwt.return_unit
+  | None -> return_unit
   | Some
       (Pqc_watch
         ({
@@ -349,12 +353,13 @@ let update_monitoring ?(should_lock = true) state ops =
       proposal_watched.preattestations_count <-
         proposal_watched.preattestations_count + preattestations_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
-        Events.(
-          emit
-            pqc_reached
-            ( proposal_watched.current_voting_power,
-              proposal_watched.preattestations_count ))
-        >>= fun () ->
+        let* () =
+          Events.(
+            emit
+              pqc_reached
+              ( proposal_watched.current_voting_power,
+                proposal_watched.preattestations_count ))
+        in
         state.qc_event_stream.push
           (Some
              (Prequorum_reached
@@ -363,7 +368,7 @@ let update_monitoring ?(should_lock = true) state ops =
                     proposal_watched.preattestations_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
-        Lwt.return_unit)
+        return_unit)
       else
         Events.(
           emit
@@ -421,12 +426,13 @@ let update_monitoring ?(should_lock = true) state ops =
       proposal_watched.attestations_count <-
         proposal_watched.attestations_count + attestations_count ;
       if proposal_watched.current_voting_power >= consensus_threshold then (
-        Events.(
-          emit
-            qc_reached
-            ( proposal_watched.current_voting_power,
-              proposal_watched.attestations_count ))
-        >>= fun () ->
+        let* () =
+          Events.(
+            emit
+              qc_reached
+              ( proposal_watched.current_voting_power,
+                proposal_watched.attestations_count ))
+        in
         state.qc_event_stream.push
           (Some
              (Quorum_reached
@@ -435,7 +441,7 @@ let update_monitoring ?(should_lock = true) state ops =
                     proposal_watched.attestations_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
-        Lwt.return_unit)
+        return_unit)
       else
         Events.(
           emit
@@ -489,7 +495,8 @@ let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
   monitor_quorum state new_proposal
 
 let shutdown_worker state =
-  Events.(emit shutting_down ()) >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit shutting_down ()) in
   Lwt_canceler.cancel state.canceler
 
 (* Each time a new head is received, the operation_pool field of the state is
@@ -536,35 +543,40 @@ let update_operations_pool state (head_level, head_round) =
 
 let create ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
+  let open Lwt_syntax in
   let state = make_initial_state ~monitor_node_operations () in
   (* TODO should we continue forever ? *)
   let rec worker_loop () =
-    monitor_operations cctxt >>= function
+    let* result = monitor_operations cctxt in
+    match result with
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
         (* request distant mempools (note: the node might not have
            received the full mempools, but just the deltas with respect
            to the last time the mempools where sent) *)
-        Alpha_block_services.Mempool.request_operations cctxt () >>= fun _ ->
-        Events.(emit starting_new_monitoring ()) >>= fun () ->
+        let* _ = Alpha_block_services.Mempool.request_operations cctxt () in
+        let* () = Events.(emit starting_new_monitoring ()) in
         state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
             op_stream_stopper () ;
             cancel_monitoring state ;
-            Lwt.return_unit) ;
+            return_unit) ;
         update_operations_pool state head ;
         let rec loop () =
-          Lwt_stream.get operation_stream >>= function
+          let* ops = Lwt_stream.get operation_stream in
+          match ops with
           | None ->
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
-              Events.(emit end_of_stream ()) >>= fun () ->
+              let* () = Events.(emit end_of_stream ()) in
               op_stream_stopper () ;
-              reset_monitoring state >>= fun () -> worker_loop ()
+              let* () = reset_monitoring state in
+              worker_loop ()
           | Some ops ->
               state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops ;
-              update_monitoring state ops >>= fun () -> loop ()
+              let* () = update_monitoring state ops in
+              loop ()
         in
         loop ()
   in
@@ -572,25 +584,28 @@ let create ?(monitor_node_operations = true)
     (fun () ->
       Lwt.finalize
         (fun () ->
-          if state.monitor_node_operations then worker_loop ()
-          else Lwt.return_unit)
-        (fun () -> shutdown_worker state >>= fun _ -> Lwt.return_unit))
+          if state.monitor_node_operations then worker_loop () else return_unit)
+        (fun () ->
+          let* _ = shutdown_worker state in
+          return_unit))
     (fun exn ->
       Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
-  Lwt.return state
+  return state
 
 let retrieve_pending_operations cctxt state =
+  let open Lwt_result_syntax in
   let open Protocol_client_context in
-  Alpha_block_services.Mempool.pending_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~validated:true
-    ~branch_delayed:true
-    ~branch_refused:false
-    ~refused:false
-    ~outdated:false
-    ()
-  >>=? fun pending_mempool ->
+  let* pending_mempool =
+    Alpha_block_services.Mempool.pending_operations
+      cctxt
+      ~chain:cctxt#chain
+      ~validated:true
+      ~branch_delayed:true
+      ~branch_refused:false
+      ~refused:false
+      ~outdated:false
+      ()
+  in
   state.operation_pool <-
     Operation_pool.add_operations state.operation_pool
     @@ List.rev_map snd pending_mempool.validated ;

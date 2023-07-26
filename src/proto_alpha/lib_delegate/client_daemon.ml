@@ -24,38 +24,48 @@
 (*****************************************************************************)
 
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
-  f () >>= function
+  let open Lwt_result_syntax in
+  let*! result = f () in
+  match result with
   | Ok () -> return_unit
   | Error (Baking_errors.Node_connection_lost :: _) ->
-      cctxt#warning
-        "Lost connection with the node. Retrying to establish connection..."
-      >>= fun () ->
+      let*! () =
+        cctxt#warning
+          "Lost connection with the node. Retrying to establish connection..."
+      in
       (* Wait forever when the node stops responding... *)
-      Client_confirmations.wait_for_bootstrapped
-        ~retry:
-          (Baking_scheduling.retry
-             cctxt
-             ~max_delay:10.
-             ~delay:1.
-             ~factor:1.5
-             ~tries:max_int)
-        cctxt
-      >>=? fun () -> retry_on_disconnection cctxt f
+      let* () =
+        Client_confirmations.wait_for_bootstrapped
+          ~retry:
+            (Baking_scheduling.retry
+               cctxt
+               ~max_delay:10.
+               ~delay:1.
+               ~factor:1.5
+               ~tries:max_int)
+          cctxt
+      in
+      retry_on_disconnection cctxt f
   | Error err ->
       cctxt#error "Unexpected error: %a. Exiting..." pp_print_trace err
 
 let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
-  cctxt#message "Waiting for protocol %s to start..." Protocol.name
-  >>= fun () -> Node_rpc.await_protocol_activation cctxt ~chain ()
+  let open Lwt_result_syntax in
+  let*! () =
+    cctxt#message "Waiting for protocol %s to start..." Protocol.name
+  in
+  Node_rpc.await_protocol_activation cctxt ~chain ()
 
 module Baker = struct
   let run (cctxt : Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
       ?extra_operations ?dal_node_endpoint ?force_apply ?context_path ~chain
       ~keep_alive delegates =
+    let open Lwt_result_syntax in
     let process () =
-      Config_services.user_activated_upgrades cctxt
-      >>=? fun user_activated_upgrades ->
+      let* user_activated_upgrades =
+        Config_services.user_activated_upgrades cctxt
+      in
       let config =
         Baking_configuration.make
           ?minimal_fees
@@ -69,53 +79,60 @@ module Baker = struct
           ~user_activated_upgrades
           ()
       in
-      cctxt#message
-        "Baker v%a (%s) for %a started."
-        Tezos_version.Version.pp
-        Tezos_version_value.Current_git_info.version
-        Tezos_version_value.Current_git_info.abbreviated_commit_hash
-        Protocol_hash.pp_short
-        Protocol.hash
-      >>= fun () ->
+      let*! () =
+        cctxt#message
+          "Baker v%a (%s) for %a started."
+          Tezos_version.Version.pp
+          Tezos_version_value.Current_git_info.version
+          Tezos_version_value.Current_git_info.abbreviated_commit_hash
+          Protocol_hash.pp_short
+          Protocol.hash
+      in
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-            cctxt#message "Shutting down the baker..." >>= fun () ->
-            Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return_unit)
+            let*! () = cctxt#message "Shutting down the baker..." in
+            let*! _ = Lwt_canceler.cancel canceler in
+            Lwt.return_unit)
       in
       Baking_scheduling.run cctxt ~canceler ~chain config delegates
     in
-    Client_confirmations.wait_for_bootstrapped
-      ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
-      cctxt
-    >>=? fun () ->
-    await_protocol_start cctxt ~chain >>=? fun () ->
+    let* () =
+      Client_confirmations.wait_for_bootstrapped
+        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        cctxt
+    in
+    let* () = await_protocol_start cctxt ~chain in
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
 module Accuser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
       ~keep_alive =
+    let open Lwt_result_syntax in
     let process () =
-      cctxt#message
-        "Accuser v%a (%s) for %a started."
-        Tezos_version.Version.pp
-        Tezos_version_value.Current_git_info.version
-        Tezos_version_value.Current_git_info.abbreviated_commit_hash
-        Protocol_hash.pp_short
-        Protocol.hash
-      >>= fun () ->
-      Client_baking_blocks.monitor_applied_blocks
-        ~next_protocols:(Some [Protocol.hash])
-        cctxt
-        ~chains:[chain]
-        ()
-      >>=? fun (valid_blocks_stream, _) ->
+      let*! () =
+        cctxt#message
+          "Accuser v%a (%s) for %a started."
+          Tezos_version.Version.pp
+          Tezos_version_value.Current_git_info.version
+          Tezos_version_value.Current_git_info.abbreviated_commit_hash
+          Protocol_hash.pp_short
+          Protocol.hash
+      in
+      let* valid_blocks_stream, _ =
+        Client_baking_blocks.monitor_applied_blocks
+          ~next_protocols:(Some [Protocol.hash])
+          cctxt
+          ~chains:[chain]
+          ()
+      in
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-            cctxt#message "Shutting down the accuser..." >>= fun () ->
-            Lwt_canceler.cancel canceler >>= fun _ -> Lwt.return_unit)
+            let*! () = cctxt#message "Shutting down the accuser..." in
+            let*! _ = Lwt_canceler.cancel canceler in
+            Lwt.return_unit)
       in
       Client_baking_denunciation.create
         cctxt
@@ -123,11 +140,12 @@ module Accuser = struct
         ~preserved_levels
         valid_blocks_stream
     in
-    Client_confirmations.wait_for_bootstrapped
-      ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
-      cctxt
-    >>=? fun () ->
-    await_protocol_start cctxt ~chain >>=? fun () ->
+    let* () =
+      Client_confirmations.wait_for_bootstrapped
+        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        cctxt
+    in
+    let* () = await_protocol_start cctxt ~chain in
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end
 
