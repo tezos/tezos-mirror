@@ -188,10 +188,10 @@ mod tests {
     use std::collections::VecDeque;
     use std::ops::Rem;
     use std::str::FromStr;
-    use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TRANSACTION_HASH_SIZE,
     };
+    use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> QueueElement {

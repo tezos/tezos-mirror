@@ -79,7 +79,7 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use primitive_types::{H160, H256, U256};
     use tezos_ethereum::{
-        signatures::EthereumTransactionCommon, transaction::TRANSACTION_HASH_SIZE,
+        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
 
     fn address_from_str(s: &str) -> Option<H160> {
