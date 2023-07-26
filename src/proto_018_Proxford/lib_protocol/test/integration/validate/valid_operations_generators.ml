@@ -101,7 +101,8 @@ let compose_preludes nb_cycles descrs =
 let initiated_params descrs nb_accounts =
   let consensus_committee_size = nb_accounts in
   let initial_params =
-    Tezos_protocol_018_Proxford_parameters.Default_parameters.parameters_of_constants
+    Tezos_protocol_018_Proxford_parameters.Default_parameters
+    .parameters_of_constants
       {
         Context.default_test_constants with
         consensus_threshold = 0;
