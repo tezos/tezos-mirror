@@ -136,3 +136,15 @@ let pp_function_subsection ppf map =
        ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
        pp_assoc
        ppf
+
+let parse_custom_sections name module_ =
+  let open Lwt_syntax in
+  let bytes = Tezos_lazy_containers.Chunked_byte_vector.of_string module_ in
+  let+ custom =
+    Tezos_webassembly_interpreter.Decode.decode_custom "name" ~name ~bytes
+  in
+  let functions_section =
+    List.map parse_function_subsection custom
+    |> List.fold_left (FuncMap.merge (fun _ -> Option.either)) FuncMap.empty
+  in
+  functions_section
