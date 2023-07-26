@@ -872,7 +872,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   let level = Node.get_level node + 1 in
   let* (`OpHash _oph) =
     (* The attestation from the new account should fail as
-       the new account is not an endorser and cannot be on the DAL committee. *)
+       the new account is not an attester and cannot be on the DAL committee. *)
     Operation.Consensus.(
       inject
         ~error:
@@ -888,7 +888,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   let* (`OpHash _oph) =
     (* The attestation from the bootstrap account should succeed as
-       the bootstrap node is an endorser and is on the DAL committee by default. *)
+       the bootstrap node is an attester and is on the DAL committee by default. *)
     Operation.Consensus.(
       inject
         ~signer:Constant.bootstrap1

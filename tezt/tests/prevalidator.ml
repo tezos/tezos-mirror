@@ -197,22 +197,22 @@ module Revamped = struct
     in
     Check.((mempool = mempool_after_empty_block) Mempool.typ ~error_msg) ;
 
-    log_step 6 "Inject endorsement operations." ;
+    log_step 6 "Inject attestation operations." ;
     let* () = Client.attest_for client ~protocol ~force:true in
-    let* mempool_with_endorsement = Mempool.get_mempool client in
+    let* mempool_with_attestation = Mempool.get_mempool client in
 
-    log_step 7 "Check endorsement is validated." ;
+    log_step 7 "Check attestation is validated." ;
     let mempool_diff =
-      Mempool.symmetric_diff mempool_after_empty_block mempool_with_endorsement
+      Mempool.symmetric_diff mempool_after_empty_block mempool_with_attestation
     in
-    (* [mempool_diff] should contain only the validated endorsement. *)
+    (* [mempool_diff] should contain only the validated attestation. *)
     let mempool_expected =
       let open Mempool in
       try {empty with validated = [List.hd mempool_diff.validated]}
       with Not_found ->
         {empty with validated = ["<validated field was empty>"]}
     in
-    let error_msg = "endorsement is not validated: expected %L, got %R" in
+    let error_msg = "attestation is not validated: expected %L, got %R" in
     Check.((mempool_expected = mempool_diff) Mempool.typ ~error_msg) ;
 
     log_step 8 "Bake with an empty mempool twice." ;
@@ -225,11 +225,11 @@ module Revamped = struct
     in
     let* last_mempool = Mempool.get_mempool client in
 
-    log_step 9 "Check endorsement is classified 'Outdated'." ;
+    log_step 9 "Check attestation is classified 'Outdated'." ;
     let error_msg = "one validated operation was lost: expected %L, got %R" in
-    Check.((mempool_with_endorsement = last_mempool) Mempool.typ ~error_msg) ;
+    Check.((mempool_with_attestation = last_mempool) Mempool.typ ~error_msg) ;
     let error_msg =
-      "endorsement is not classified as 'outdated': length expected %L, got %R"
+      "attestation is not classified as 'outdated': length expected %L, got %R"
     in
     Check.(
       (List.compare_length_with last_mempool.outdated 1 = 0) int ~error_msg) ;
@@ -374,12 +374,12 @@ module Revamped = struct
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
 
     (* TODO: this test should be adapt once the [bake for] command will have
-       an option to not automatically add an endorsement to a block that is
+       an option to not automatically add an attestation to a block that is
        being bake. Only one operation will be reclassified after that. *)
     log_step
       13
       "Check that %s is set to be reclassified on new branch as well as the \
-       endorsement from the head increment on node1."
+       attestation from the head increment on node1."
       oph2 ;
     let* pending = bake_waiter1 in
     let error_msg =
@@ -390,7 +390,7 @@ module Revamped = struct
     log_step
       14
       "Check that the mempool of node1 still contains %s as branch_refused \
-       operation and that the endorsement from the head increment block is now \
+       operation and that the attestation from the head increment block is now \
        outdated."
       oph2 ;
     let* mempool = Mempool.get_mempool client1 in
@@ -1215,10 +1215,10 @@ module Revamped = struct
     let* client = Client.init ~endpoint:(Node node) () in
     let* () = Client.activate_protocol_and_wait ~protocol client in
 
-    log_step 2 "Bake an empty block to be able to endorse it." ;
+    log_step 2 "Bake an empty block to be able to attest it." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
 
-    log_step 3 "Endorse with bootstrap1." ;
+    log_step 3 "Attest with bootstrap1." ;
     let* _ =
       Client.attest_for
         ~protocol
@@ -1227,7 +1227,7 @@ module Revamped = struct
         client
     in
 
-    log_step 3 "Endorse with bootstrap2." ;
+    log_step 3 "Attest with bootstrap2." ;
     let* _ =
       Client.attest_for
         ~protocol
@@ -1236,7 +1236,7 @@ module Revamped = struct
         client
     in
 
-    log_step 4 "Check that both endorsements are in the validated mempool." ;
+    log_step 4 "Check that both attestations are in the validated mempool." ;
     let* mempool = Mempool.get_mempool client in
     Check.(
       (2 = List.length mempool.validated)
@@ -1244,11 +1244,11 @@ module Revamped = struct
         ~error_msg:
           "number of mempool validated operations expected to be %L, got %R") ;
 
-    log_step 5 "Bake two empty block to force endorsements to be outdated." ;
+    log_step 5 "Bake two empty block to force attestations to be outdated." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
 
-    log_step 4 "Check that only one endorsement is in the outdated mempool." ;
+    log_step 4 "Check that only one attestation is in the outdated mempool." ;
     let* mempool = Mempool.get_mempool client in
     Check.(
       (max_refused_operations = List.length mempool.outdated)
@@ -2060,6 +2060,159 @@ module Revamped = struct
         client3
     in
     unit
+
+  (** This test checks that future attestations are correctly propagated, either
+      immediately or when the head is sufficiently incremented. *)
+  let propagation_future_attestation =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Ensure that future attestations are propagated"
+      ~tags:["attestation"; "mempool"; "branch_delayed"]
+      ~supports:Protocol.(From_protocol (number Nairobi))
+    @@ fun protocol ->
+    log_step 1 "Initialize 3 nodes, connect them, and activate the protocol." ;
+    let nodes_args = Node.[Synchronisation_threshold 0; Private_mode] in
+    let event_sections_levels = [("prevalidator", `Debug)] in
+    let* node_1, client_1 = Client.init_with_node ~nodes_args `Client ()
+    and* node_2, client_2 =
+      Client.init_with_node ~event_sections_levels ~nodes_args `Client ()
+    and* node_3, client_3 =
+      Client.init_with_node ~event_sections_levels ~nodes_args `Client ()
+    in
+    let* () = Client.Admin.trust_address client_1 ~peer:node_2
+    and* () = Client.Admin.trust_address client_2 ~peer:node_1
+    and* () = Client.Admin.trust_address client_2 ~peer:node_3
+    and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
+    let* () = Client.Admin.connect_address client_1 ~peer:node_2
+    and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+    let* () = Client.activate_protocol_and_wait ~protocol client_1 in
+    let* _ = Node.wait_for_level node_2 1
+    and* _ = Node.wait_for_level node_3 1 in
+
+    log_step 2 "Disconnect all the nodes from each other." ;
+    let* node_1_id = Node.wait_for_identity node_1
+    and* node_2_id = Node.wait_for_identity node_2
+    and* node_3_id = Node.wait_for_identity node_3 in
+    let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
+    and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id
+    and* () = Client.Admin.kick_peer client_2 ~peer:node_3_id
+    and* () = Client.Admin.kick_peer client_3 ~peer:node_2_id in
+
+    let retrieve_attestation client =
+      let* mempool =
+        RPC.Client.call client
+        @@ RPC.get_chain_mempool_pending_operations ~version:"2" ()
+      in
+      let op = List.hd JSON.(mempool |-> "validated" |> as_list) in
+      let oph = JSON.(op |-> "hash" |> as_string) in
+      let branch = JSON.(op |-> "branch" |> as_string) in
+      let content = JSON.(op |-> "contents" |> as_list |> List.hd) in
+      let kind = JSON.(content |-> "kind" |> as_string) in
+      let expected_kind =
+        if Protocol.number protocol < 018 then "endorsement" else "attestation"
+      in
+      Check.(
+        (expected_kind = kind)
+          string
+          ~error_msg:"Invalid operation kind, expected: %L, got %R") ;
+      let slot = JSON.(content |-> "slot" |> as_int) in
+      let level = JSON.(content |-> "level" |> as_int) in
+      let round = JSON.(content |-> "round" |> as_int) in
+      let block_payload_hash =
+        JSON.(content |-> "block_payload_hash" |> as_string)
+      in
+      let op =
+        Operation.Consensus.attestation
+          ~use_legacy_name:true
+          ~slot
+          ~level
+          ~round
+          ~block_payload_hash
+      in
+      return (op, branch, oph)
+    in
+
+    log_step
+      3
+      "Bake a block on node_1 then inject an attestation, which is one level \
+       in the future from the perspective of nodes 2 and 3. Retrieve the hash \
+       and bytes representing this attestation, called future1 from now on." ;
+    let* () = Client.bake_for_and_wait ~node:node_1 client_1 in
+    let injection_waiter = Node.wait_for_request ~request:`Inject node_1 in
+    let* () = Client.attest_for client_1 ~force:true ~protocol in
+    let* () = injection_waiter in
+    let* op_future1, branch_future1, oph_future1 =
+      retrieve_attestation client_1
+    in
+
+    log_step
+      4
+      "Bake another block on node_1 then inject another attestation, which is \
+       two levels in the future from the perspective of nodes 2 and 3. \
+       Retrieve the hash and bytes representing this attestation, called \
+       future2." ;
+    let* () = Node_event_level.bake_wait_log node_1 client_1 in
+
+    let injection_waiter2 = Node.wait_for_request ~request:`Inject node_1 in
+    let* () = Client.attest_for client_1 ~force:true ~protocol in
+    let* () = injection_waiter2 in
+    let* op_future2, branch_future2, oph_future2 =
+      retrieve_attestation client_1
+    in
+
+    log_step 5 "Inject both attestations in node_2." ;
+    let* _ =
+      Operation.Consensus.inject
+        ~force:true
+        ~branch:branch_future1
+        ~signer:Constant.bootstrap1
+        op_future1
+        client_2
+    in
+    let* _ =
+      Operation.Consensus.inject
+        ~force:true
+        ~branch:branch_future2
+        ~signer:Constant.bootstrap1
+        op_future2
+        client_2
+    in
+
+    log_step 6 "Reconnect node_2 and node_3, and synchronize their mempools." ;
+    let* () = Client.Admin.trust_address client_2 ~peer:node_3
+    and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
+    let* () = Client.Admin.connect_address client_2 ~peer:node_3 in
+    let* () = synchronize_mempool client_3 node_3 in
+
+    log_step
+      7
+      "Check that both attestations are in the mempool of node_2: future1 is \
+       validated; future2 is branch_delayed." ;
+    let* () =
+      check_mempool
+        ~validated:[oph_future1]
+        ~branch_delayed:[oph_future2]
+        client_2
+    in
+
+    log_step 8 "Check that future1 is validated in node_3 mempool." ;
+    let* () = check_mempool ~validated:[oph_future1] client_3 in
+
+    log_step
+      9
+      "Bake one block on node_2 and synchronize its mempool. Check that \
+       future1 is now validated, as well as future2." ;
+    let* () = Node_event_level.bake_wait_log node_2 client_2 in
+    let* () = synchronize_mempool client_2 node_2 in
+    let* () = check_mempool ~validated:[oph_future1; oph_future2] client_2 in
+
+    log_step
+      10
+      "Synchronize the mempool of node_3. Check that future1 and future2 are \
+       validated." ;
+    let* () = synchronize_mempool client_3 node_3 in
+    let* () = check_mempool ~validated:[oph_future1; oph_future2] client_3 in
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -2123,9 +2276,6 @@ let pp_mempool_count fmt
     refused
     outdated
     unprocessed
-
-(** Wait for an injection request event. *)
-let wait_for_injection = Node.wait_for_request ~request:`Inject
 
 (** Matches events which contain an flush request.
    For example:
@@ -2213,274 +2363,6 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
 
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
-
-let check_if_op_is_in_mempool client ~classification oph =
-  let* ops =
-    RPC.Client.call client
-    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
-  in
-  let open JSON in
-  let search_in ops c =
-    List.exists
-      (fun op -> get "hash" op |> as_string = oph)
-      (ops |-> c |> as_list)
-  in
-  match classification with
-  | Some c ->
-      let res = search_in ops c in
-      if not res then Test.fail "%s not found in %s" oph c else unit
-  | None ->
-      let res =
-        List.exists
-          (fun c -> search_in ops c)
-          ["applied"; "branch_refused"; "branch_delayed"; "refused"; "outdated"]
-      in
-      if res then Test.fail "%s found in mempool" oph else unit
-
-let get_endorsement_as_bytes client =
-  let* mempool =
-    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  let open JSON in
-  let ops_list = as_list (mempool |-> "applied") in
-  let op =
-    match ops_list with
-    | [op] -> op
-    | _ ->
-        Test.fail
-          "Applied field of mempool should contain one and only one operation"
-  in
-  let hash = JSON.get "hash" op |> as_string in
-  let shell =
-    let branch = JSON.as_string (JSON.get "branch" op) in
-    match Data_encoding.Json.from_string (sf {|{"branch":"%s"}|} branch) with
-    | Ok b ->
-        Data_encoding.Json.destruct Tezos_base.Operation.shell_header_encoding b
-    | Error e -> Test.fail "Data_encoding branch from %s error %s" branch e
-  in
-  let contents =
-    match JSON.as_list (JSON.get "contents" op) with
-    | [content] -> content
-    | _ -> Test.fail "Contents should countain only one element"
-  in
-  let slot =
-    let slot_elt = JSON.get "slot" contents |> JSON.as_int in
-    match Data_encoding.Json.from_string (sf {|%d|} slot_elt) with
-    | Ok e ->
-        Data_encoding.Json.destruct
-          Tezos_protocol_alpha.Protocol.Slot_repr.encoding
-          e
-    | Error _ -> Test.fail "foo"
-  in
-
-  let get_signature op =
-    let signature = JSON.get "signature" op |> JSON.as_string in
-    match Data_encoding.Json.from_string (sf {|"%s"|} signature) with
-    | Ok s -> Data_encoding.Json.destruct Tezos_crypto.Signature.encoding s
-    | Error e ->
-        Test.fail
-          "Data_encoding signature from string %s : error %s"
-          signature
-          e
-  in
-  let wrapped_bytes =
-    let signature = get_signature op in
-    let kind = JSON.get "kind" contents |> JSON.as_string in
-    if not (kind = "endorsement") then
-      Test.fail "Operation kind should be endorsement, got %s" kind ;
-    let level =
-      Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
-        (Int32.of_int (JSON.get "level" contents |> JSON.as_int))
-    in
-    let round =
-      let round = JSON.get "round" contents |> JSON.as_int in
-      match
-        Tezos_protocol_alpha.Protocol.Round_repr.of_int32 (Int32.of_int round)
-      with
-      | Ok round -> round
-      | Error _ ->
-          Test.fail
-            "Could not create a round with %d (from the mempool result) "
-            round
-    in
-    let block_payload_hash =
-      let block_payload_hash =
-        JSON.get "block_payload_hash" contents |> JSON.as_string
-      in
-      Tezos_protocol_alpha.Protocol.Block_payload_hash.of_b58check_exn
-        block_payload_hash
-    in
-    let wrapped =
-      Tezos_protocol_alpha.Protocol.Operation_repr.
-        {
-          shell;
-          protocol_data =
-            Operation_data
-              {
-                contents =
-                  Single (Attestation {slot; round; level; block_payload_hash});
-                signature = Some signature;
-              };
-        }
-    in
-    Data_encoding.Binary.to_bytes_exn
-      Tezos_protocol_alpha.Protocol.Operation_repr.encoding
-      wrapped
-  in
-  Lwt.return (wrapped_bytes, hash)
-
-let mempool_synchronisation client node =
-  let waiter = Node.wait_for_request ~request:`Notify node in
-  let* _ =
-    RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
-  in
-  waiter
-
-(** This test checks that future endorsements are correctly
-    propagated, either immediately or when the head is sufficiently
-    incremented. *)
-let propagation_future_endorsement =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Ensure that future endorsements are propagated"
-    ~tags:["endorsement"; "mempool"; "branch_delayed"]
-  @@ fun protocol ->
-  (* For this test to be moved to {!Revamped}, we need to update its
-     auxiliary functions. Notably, {!get_endorsement_as_bytes} should
-     use the {!Operation} module to build the endorsement bytes. *)
-  let log_step = Revamped.log_step in
-  log_step 1 "Initialize 3 nodes, connect them, and activate the protocol." ;
-  let* node_1 = Node.init [Synchronisation_threshold 0; Private_mode]
-  and* node_2 =
-    Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
-      [Synchronisation_threshold 0; Private_mode]
-  and* node_3 =
-    Node.init
-      ~event_sections_levels:[("prevalidator", `Debug)]
-      [Synchronisation_threshold 0; Private_mode]
-  in
-  let* client_1 = Client.init ~endpoint:(Node node_1) ()
-  and* client_2 = Client.init ~endpoint:(Node node_2) ()
-  and* client_3 = Client.init ~endpoint:(Node node_3) () in
-  let* () = Client.Admin.trust_address client_1 ~peer:node_2
-  and* () = Client.Admin.trust_address client_2 ~peer:node_1
-  and* () = Client.Admin.trust_address client_2 ~peer:node_3
-  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
-  let* () = Client.Admin.connect_address client_1 ~peer:node_2
-  and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  let* _ = Node.wait_for_level node_2 1 and* _ = Node.wait_for_level node_3 1 in
-  log_step 2 "Disconnect all the nodes from each other." ;
-  let* node_1_id = Node.wait_for_identity node_1
-  and* node_2_id = Node.wait_for_identity node_2
-  and* node_3_id = Node.wait_for_identity node_3 in
-  let* () = Client.Admin.kick_peer client_1 ~peer:node_2_id
-  and* () = Client.Admin.kick_peer client_2 ~peer:node_1_id
-  and* () = Client.Admin.kick_peer client_2 ~peer:node_3_id
-  and* () = Client.Admin.kick_peer client_3 ~peer:node_2_id in
-  log_step
-    3
-    "Bake a block on node_1 then inject an endorsement, which is one level in \
-     the future from the perspective of nodes 2 and 3. Retrieve the hash and \
-     bytes representing this endorsement, called future1 from now on." ;
-  let* () = Node_event_level.bake_wait_log node_1 client_1 in
-  let injection_waiter = wait_for_injection node_1 in
-  let* () = Client.attest_for client_1 ~force:true ~protocol in
-  let* () = injection_waiter in
-  let* bytes_future1, oph_future1 = get_endorsement_as_bytes client_1 in
-  log_step
-    4
-    "Bake another block on node_1 then inject another endorsement, which is \
-     two levels in the future from the perspective of nodes 2 and 3. Retrieve \
-     the hash and bytes representing this endorsement, called future2." ;
-  let* () = Node_event_level.bake_wait_log node_1 client_1 in
-  let injection_waiter2 = wait_for_injection node_1 in
-  let* () = Client.attest_for client_1 ~force:true ~protocol in
-  let* () = injection_waiter2 in
-  let* bytes_future2, oph_future2 = get_endorsement_as_bytes client_1 in
-  log_step 5 "Inject both endorsements in node_2." ;
-  let inject_bytes_in_node_2 bytes =
-    let (`Hex bytes) = Hex.of_bytes bytes in
-    let injection_waiter = wait_for_injection node_2 in
-    let* (_ : JSON.t) =
-      RPC.Client.call client_2
-      @@ RPC.post_private_injection_operation (Data (`String bytes))
-    in
-    injection_waiter
-  in
-  let* () = inject_bytes_in_node_2 bytes_future1 in
-  let* () = inject_bytes_in_node_2 bytes_future2 in
-  log_step 6 "Reconnect node_2 and node_3, and synchronize their mempools." ;
-  let* () = Client.Admin.trust_address client_2 ~peer:node_3
-  and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
-  let* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* () = mempool_synchronisation client_3 node_3 in
-  log_step
-    7
-    "Check that both endorsements are in the mempool of node_2: future1 is \
-     branch_delayed for protocols 016 and before, and applied for protocol 017 \
-     on; future2 is branch_delayed for all protocols." ;
-  (* From protocol N on, consensus operations that are one level in
-     the future are accepted and propagated by the mempool. *)
-  let accept_one_level_in_future = Protocol.number protocol >= 017 in
-  let* () =
-    let classification =
-      Some (if accept_one_level_in_future then "applied" else "branch_delayed")
-    in
-    check_if_op_is_in_mempool client_2 ~classification oph_future1
-  in
-  let* () =
-    let classification = Some "branch_delayed" in
-    check_if_op_is_in_mempool client_2 ~classification oph_future2
-  in
-  log_step
-    8
-    "Check that none of the endorsements is in node_3 mempool for protocols \
-     016 and before. For protocol 017 on, only future1 is present (and \
-     applied) in node_3 mempool." ;
-  let* () =
-    let classification =
-      if accept_one_level_in_future then Some "applied" else None
-    in
-    check_if_op_is_in_mempool client_3 ~classification oph_future1
-  in
-  let* () =
-    check_if_op_is_in_mempool client_3 ~classification:None oph_future2
-  in
-  log_step
-    9
-    "Bake one block on node_2 and synchronize its mempool. Check that future1 \
-     is now applied for all protocols, and future2 is also applied for \
-     protocol 017 on." ;
-  let* () = Node_event_level.bake_wait_log node_2 client_2 in
-  let* () = mempool_synchronisation client_2 node_2 in
-  let* () =
-    let classification = Some "applied" in
-    check_if_op_is_in_mempool client_2 ~classification oph_future1
-  in
-  let* () =
-    let classification =
-      Some (if accept_one_level_in_future then "applied" else "branch_delayed")
-    in
-    check_if_op_is_in_mempool client_2 ~classification oph_future2
-  in
-  log_step
-    10
-    "Synchronize the mempool of node_3. Check that future1 is present and \
-     applied for both protocols, and so is future2 for protocol 017 on." ;
-  let* () = mempool_synchronisation client_3 node_3 in
-  let* () =
-    let classification = Some "applied" in
-    check_if_op_is_in_mempool client_3 ~classification oph_future1
-  in
-  let* () =
-    let classification =
-      if accept_one_level_in_future then Some "applied" else None
-    in
-    check_if_op_is_in_mempool client_3 ~classification oph_future2
-  in
-  unit
 
 let check_empty_operation__ddb ddb =
   let open JSON in
@@ -3908,7 +3790,7 @@ let register ~protocols =
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   Revamped.mempool_disabled protocols ;
-  propagation_future_endorsement protocols ;
+  Revamped.propagation_future_attestation protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;
   ban_operation_and_check_applied protocols ;
