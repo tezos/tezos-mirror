@@ -348,6 +348,9 @@ Smart Rollup WASM Debugger
 - Added option ``--no-reboot`` to the ``profile`` command to profile a single
   ``kernel_run``.
 - Improved profiling output for consecutive kernel runs.
+- Allow serialized messages in inputs: ``{ "serialized": "01..." }``, instead
+  of only external and internal transfers. This allows to inject arbitrary
+  messages in the rollup. (MR :gl:`!9613`)
 
 Data Availability Committee (DAC)
 ----------------------------------
