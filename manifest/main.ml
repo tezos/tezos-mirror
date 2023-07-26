@@ -5763,6 +5763,11 @@ let hash = Protocol.hash
                 ~action:[S "run"; S "%{deps}"; S ("--" ^ name)]
             in
             let networks = List.["sandbox"; "test"; "mainnet"] in
+            let networks =
+              if N.(number >= 017) then
+                networks @ List.["mainnet-with-chain-id"]
+              else networks
+            in
             of_list
               (List.map gen_json networks
               @ (* TODO: why do we install these files? *)
