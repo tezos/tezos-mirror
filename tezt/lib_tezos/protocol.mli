@@ -31,6 +31,8 @@ type t = Mumbai | Nairobi | Oxford | Alpha
     These values denote which file to use from the ["parameters"] directory. *)
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
+val constants_to_string : constants -> string
+
 (** The default constants used by tests: [Constants_sandbox]. *)
 val default_constants : constants
 
