@@ -41,6 +41,10 @@ let protocols =
       "Nairobi",
       Some "/include/rpc_introduction.rst.inc",
       "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf" );
+    ( "oxford",
+      "Oxford",
+      Some "/include/rpc_introduction.rst.inc",
+      "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef" );
   ]
 
 let pp_name ppf = function
