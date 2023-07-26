@@ -287,36 +287,42 @@ let set_adaptive_issuance_enable ctxt =
   if enable then Raw_context.set_adaptive_issuance_enable ctxt else ctxt
 
 let update_ema ctxt ~vote =
-  Storage.Adaptive_issuance.Launch_ema.get ctxt >>=? fun old_ema ->
-  Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
-  >>=? fun old_ema ->
+  let open Lwt_result_syntax in
+  let* old_ema = Storage.Adaptive_issuance.Launch_ema.get ctxt in
+  let* old_ema =
+    Per_block_votes_repr.Adaptive_issuance_launch_EMA.of_int32 old_ema
+  in
   let new_ema =
     Per_block_votes_repr.compute_new_adaptive_issuance_ema
       ~per_block_vote:vote
       old_ema
   in
-  Storage.Adaptive_issuance.Launch_ema.update
-    ctxt
-    (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
-  >>=? fun ctxt ->
-  launch_cycle ctxt >>=? fun launch_cycle ->
+  let* ctxt =
+    Storage.Adaptive_issuance.Launch_ema.update
+      ctxt
+      (Per_block_votes_repr.Adaptive_issuance_launch_EMA.to_int32 new_ema)
+  in
+  let* launch_cycle = launch_cycle ctxt in
   let open Constants_storage in
-  (if
-   Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
-     new_ema < adaptive_issuance_launch_ema_threshold ctxt)
-  then return (ctxt, launch_cycle)
-  else
-    match launch_cycle with
-    | Some _ ->
-        (* the feature is already set to launch, do nothing to avoid postponing it. *)
-        return (ctxt, launch_cycle)
-    | None ->
-        (* set the feature to activate in a few cycles *)
-        let current_cycle = (Level_storage.current ctxt).cycle in
-        let delay = 1 + preserved_cycles ctxt + max_slashing_period ctxt in
-        let cycle = Cycle_repr.add current_cycle delay in
-        activate ctxt ~cycle >|=? fun ctxt -> (ctxt, Some cycle))
-  >|=? fun (ctxt, launch_cycle) -> (ctxt, launch_cycle, new_ema)
+  let+ ctxt, launch_cycle =
+    if
+      Per_block_votes_repr.Adaptive_issuance_launch_EMA.(
+        new_ema < adaptive_issuance_launch_ema_threshold ctxt)
+    then return (ctxt, launch_cycle)
+    else
+      match launch_cycle with
+      | Some _ ->
+          (* the feature is already set to launch, do nothing to avoid postponing it. *)
+          return (ctxt, launch_cycle)
+      | None ->
+          (* set the feature to activate in a few cycles *)
+          let current_cycle = (Level_storage.current ctxt).cycle in
+          let delay = 1 + preserved_cycles ctxt + max_slashing_period ctxt in
+          let cycle = Cycle_repr.add current_cycle delay in
+          let+ ctxt = activate ctxt ~cycle in
+          (ctxt, Some cycle)
+  in
+  (ctxt, launch_cycle, new_ema)
 
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
