@@ -126,6 +126,7 @@ type unparsed_batch =
       (string * Protocol.Contract_hash.t * Entrypoint.t option) list
   | Atomic_transaction_batch_typed of
       (string * string * Protocol.Contract_hash.t * Entrypoint.t option) list
+  | Whitelist_update of Sc_rollup.Whitelist.t option
 
 let unparsed_batch_encoding =
   let open Data_encoding in
@@ -147,6 +148,12 @@ let unparsed_batch_encoding =
           | Atomic_transaction_batch_typed transactions -> Some transactions
           | _ -> None)
         (fun transactions -> Atomic_transaction_batch_typed transactions);
+      case
+        (Tag 2)
+        ~title:"Whitelist_update"
+        (obj1 @@ req "whitelist" (option Sc_rollup.Whitelist.encoding))
+        (function Whitelist_update whitelist -> Some whitelist | _ -> None)
+        (fun whitelist -> Whitelist_update whitelist);
     ]
 
 let expand_expr expr =
@@ -195,6 +202,8 @@ let parse_unparsed_batch json =
       in
       return
         (Sc_rollup.Outbox.Message.Atomic_transaction_batch_typed {transactions})
+  | Whitelist_update whitelist ->
+      return (Sc_rollup.Outbox.Message.Whitelist_update whitelist)
 
 let outbox_message_parameter =
   Tezos_clic.parameter (fun (cctxt : #Configuration.sc_client_context) str ->
