@@ -78,18 +78,6 @@ pub fn string_to_sk_and_address(s: String) -> Result<(SecretKey, H160), SigError
     Ok((sk, value.into()))
 }
 
-/// the type of a transaction
-#[derive(Debug, PartialEq, Eq, Clone)]
-
-pub enum EthereumTransactionType {
-    /// transfer
-    EthereumTransfer,
-    ///create
-    EthereumCreate,
-    /// call
-    EthereumCall,
-}
-
 /// Data common to all Ethereum transaction types
 #[derive(Debug, PartialEq, Eq, Clone)]
 
