@@ -665,35 +665,18 @@ module Cost_of = struct
         map_update key map
     end
 
-    (* --------------------------------------------------------------------- *)
-    (* Hand-crafted models *)
-
-    (* The cost functions below where not benchmarked, a cost model was derived
-       from looking at similar instructions. *)
-
-    (* Cost for Concat_string is paid in two steps: when entering the interpreter,
-       the user pays for the cost of computing the information necessary to compute
-       the actual gas (so it's meta-gas): indeed, one needs to run through the
-       list of strings to compute the total allocated cost.
-       [concat_string_precheck] corresponds to the meta-gas cost of this computation.
-    *)
     let concat_string_precheck (l : 'a Script_list.t) =
-      (* we set the precheck to be slightly more expensive than cost_N_IList_iter *)
-      atomic_step_cost (S.mul (S.safe_int l.length) (S.safe_int 10))
+      atomic_step_cost (cost_N_IConcat_string_precheck l.length)
 
-    (* This is the cost of allocating a string and blitting existing ones into it. *)
     let concat_string total_bytes =
-      atomic_step_cost S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+      atomic_step_cost (cost_N_IConcat_string total_bytes)
 
-    (* Same story as Concat_string. *)
     let concat_bytes total_bytes =
-      atomic_step_cost S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+      atomic_step_cost (cost_N_IConcat_bytes total_bytes)
 
-    (* Cost of Unpack pays two integer comparisons, and a Bytes slice *)
     let unpack bytes =
       let blen = Bytes.length bytes in
-      let open S.Syntax in
-      atomic_step_cost (S.safe_int 260 + (S.safe_int blen lsr 1))
+      atomic_step_cost (cost_N_IUnpack blen)
 
     (* TODO benchmark *)
     (* FIXME: imported from 006, needs proper benchmarks *)

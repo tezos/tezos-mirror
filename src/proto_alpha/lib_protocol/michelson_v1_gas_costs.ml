@@ -413,8 +413,10 @@ let cost_CHECK_PRINTABLE size =
 (* Inferred: 2.26028815324 *)
 let cost_N_IList_iter = S.safe_int 20
 
+(* ------------------------------------------------------------------------ *)
+(* The following functions are moved from Michelson_v1_gas *)
+
 (* model interpreter/N_ISet_mem *)
-(* Moved from Michelson_v1_gas *)
 let cost_N_ISet_mem size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
@@ -422,7 +424,6 @@ let cost_N_ISet_mem size1 size2 =
   let intercept = S.safe_int 115 in
   intercept + (log2 size2 * size1)
 
-(* Moved from Michelson_v1_gas *)
 let cost_N_ISet_update size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
@@ -433,7 +434,6 @@ let cost_N_ISet_update size1 size2 =
   intercept + (S.safe_int 2 * log2 size2 * size1)
 
 (* model N_IMap_mem *)
-(* Moved from Michelson_v1_gas *)
 let cost_N_IMap_mem size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
@@ -441,7 +441,6 @@ let cost_N_IMap_mem size1 size2 =
   let intercept = S.safe_int 80 in
   intercept + (log2 size2 * size1)
 
-(* Moved from Michelson_v1_gas *)
 let cost_N_IMap_update size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
@@ -451,7 +450,6 @@ let cost_N_IMap_update size1 size2 =
      on non-structured data *)
   intercept + (S.safe_int 2 * log2 size2 * size1)
 
-(* Moved from Michelson_v1_gas *)
 let cost_N_IMap_get_and_update size1 size2 =
   let open S.Syntax in
   let size1 = S.safe_int size1 in
@@ -460,3 +458,36 @@ let cost_N_IMap_get_and_update size1 size2 =
   (* The 3 factor reflects the update vs mem overhead as benchmarked
      on non-structured data *)
   intercept + (S.safe_int 3 * log2 size2 * size1)
+
+(* --------------------------------------------------------------------- *)
+(* The following functions are moved from Michelson_v1_gas *)
+(* Hand-crafted models *)
+
+(* The cost functions below where not benchmarked, a cost model was derived
+    from looking at similar instructions. *)
+(* Cost for Concat_string is paid in two steps: when entering the interpreter,
+    the user pays for the cost of computing the information necessary to compute
+    the actual gas (so it's meta-gas): indeed, one needs to run through the
+    list of strings to compute the total allocated cost.
+    [concat_string_precheck] corresponds to the meta-gas cost of this computation.
+*)
+
+let cost_N_IConcat_string_precheck length =
+  (* we set the precheck to be slightly more expensive than cost_N_IList_iter *)
+  S.mul (S.safe_int length) (S.safe_int 10)
+
+(* This is the cost of allocating a string and blitting existing ones into it. *)
+let cost_N_IConcat_string total_bytes =
+  S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+
+(* Same story as Concat_string. *)
+let cost_N_IConcat_bytes total_bytes =
+  S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+
+(* A partially carbonated instruction,
+   so its model does not correspond to this function *)
+(* Cost of Unpack pays two integer comparisons, and a Bytes slice *)
+let cost_N_IUnpack bytes =
+  let open S.Syntax in
+  let bytes = S.safe_int bytes in
+  S.safe_int 260 + (bytes lsr 1)
