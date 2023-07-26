@@ -1894,7 +1894,7 @@ let octez_base_test_helpers =
     ~bisect_ppx:No
     ~release_status:Released
 
-let _ppx_profiler =
+let ppx_profiler =
   octez_lib
     "ppx_profiler"
     ~path:"src/lib_ppx_profiler"
@@ -3644,6 +3644,7 @@ let octez_shell =
       Dune.
         [[S "package"; S "octez-shell-libs"]; [S "mld_files"; S "octez_shell"]]
     ~inline_tests:ppx_expect
+    ~preprocess:(pps ppx_profiler)
     ~deps:
       [
         lwt_watcher;

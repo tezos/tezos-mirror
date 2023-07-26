@@ -28,7 +28,7 @@
   octez-libs.crypto-dal.dal-config
   lwt-exit)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_expect))
+ (preprocess (pps ppx_expect octez-libs.ppx_profiler))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
