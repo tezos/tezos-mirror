@@ -85,7 +85,7 @@ type error += No_slots_found_for of Signature.Public_key_hash.t
 let () =
   register_error_kind
     `Permanent
-    ~id:"Block.No_slots_found_for"
+    ~id:(Protocol.name ^ "_Block.No_slots_found_for")
     ~title:"No slots found for given pkh"
     ~description:"No slots found for given public key hash"
     ~pp:(fun ppf pkh ->
