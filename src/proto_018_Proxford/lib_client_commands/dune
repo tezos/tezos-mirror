@@ -1,0 +1,72 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_client_alpha_commands)
+ (public_name tezos-client-alpha.commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-clic
+  tezos-protocol-alpha
+  tezos-protocol-alpha.parameters
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-client-base
+  tezos-client-alpha
+  tezos-client-commands
+  tezos-rpc
+  tezos-client-base-unix
+  tezos-protocol-plugin-alpha
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_alpha
+  -open Tezos_client_commands
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_plugin_alpha)
+ (modules (:standard \ alpha_commands_registration)))
+
+(library
+ (name tezos_client_alpha_commands_registration)
+ (public_name tezos-client-alpha.commands-registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-clic
+  tezos-protocol-alpha
+  tezos-protocol-alpha.parameters
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-alpha
+  tezos-client-commands
+  tezos-client-alpha.commands
+  tezos-client-alpha.sapling
+  tezos-rpc
+  tezos-protocol-plugin-alpha)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_alpha
+  -open Tezos_client_commands
+  -open Tezos_client_alpha_commands
+  -open Tezos_client_sapling_alpha
+  -open Tezos_protocol_plugin_alpha)
+ (modules alpha_commands_registration))

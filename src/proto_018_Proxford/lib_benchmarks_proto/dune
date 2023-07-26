@@ -1,0 +1,45 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_alpha)
+ (public_name tezos-benchmarks-proto-alpha)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  tezos-stdlib
+  tezos-base
+  tezos-error-monad
+  tezos-protocol-alpha.parameters
+  tezos-lazy-containers
+  tezos-benchmark
+  tezos-benchmark-alpha
+  tezos-benchmark-type-inference-alpha
+  tezos-protocol-alpha
+  tezos-crypto
+  tezos-shell-benchmarks
+  tezos-micheline
+  tezos-alpha-test-helpers
+  tezos-sapling
+  tezos-client-alpha
+  tezos-protocol-plugin-alpha
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_error_monad
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_alpha
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha.Protocol
+  -open Tezos_micheline
+  -open Tezos_alpha_test_helpers
+  -open Tezos_client_alpha
+  -open Tezos_protocol_plugin_alpha))
