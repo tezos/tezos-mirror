@@ -132,7 +132,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           op_stream,
         stopper )
 
-  let baker cctxt hash =
+  let baker_and_cycle cctxt hash =
     let* metadata =
       Block_services.metadata
         ~chain:cctxt#chain
@@ -140,7 +140,11 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cctxt
         ()
     in
-    return metadata.protocol_data.baker.delegate
+    return
+      ( metadata.protocol_data.baker.delegate,
+        ( Tezos_raw_protocol_016_PtMumbai.Alpha_context.Cycle.to_int32
+            metadata.protocol_data.level_info.cycle,
+          metadata.protocol_data.level_info.cycle_position ) )
 
   let baking_right cctxt level round =
     let* baking_rights =
