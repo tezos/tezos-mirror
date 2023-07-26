@@ -351,6 +351,11 @@ Smart Rollup node
 - Released the protocol agnostic rollup node ``octez-smart-rollup-node`` as part
   of the Octez distribution. (MR :gl:`!10086`)
 
+- RPC ``/global/block/<block-id>/simulate`` accepts inputs with a new optional
+  field ``"log_kernel_debug_file"`` which allows to specify a file in which
+  kernel logs should be written (this file is in
+  ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
+
 Smart Rollup client
 -------------------
 
