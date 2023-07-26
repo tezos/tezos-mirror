@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = V0 | V1 | V2
+type t = V0 | V1 | V2 | V3
 
 (** Pretty-printer for store versions *)
 val pp : Format.formatter -> t -> unit
