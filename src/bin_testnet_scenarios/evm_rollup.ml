@@ -30,7 +30,7 @@ let preset_preimages ~rollup_preimages_dir ~preimages_dir =
   let* () = Process.run "mkdir" ["-p"; preimages_dir] in
   Process.run "cp" ["-rT"; rollup_preimages_dir; preimages_dir]
 
-let setup_evm_infra ~mode ~operator ?runner ?preexisting_rollup
+let setup_evm_infra ?setup_file ~mode ~operator ?runner ?preexisting_rollup
     ?rollup_node_name ?loser_mode node client =
   let rollup_node =
     Sc_rollup_node.create
@@ -47,10 +47,16 @@ let setup_evm_infra ~mode ~operator ?runner ?preexisting_rollup
     match preexisting_rollup with
     | Some {address; _} -> return address
     | None ->
+        let config =
+          Option.value
+            ~default:(`Path (project_root // "src/kernel_evm/config/dev.yaml"))
+            setup_file
+        in
         let* boot_sector =
           Sc_rollup_helpers.prepare_installer_kernel
             ~base_installee:"./"
             ~preimages_dir
+            ~config
             "evm_kernel"
         in
         Log.info "EVM Kernel installer ready." ;
@@ -111,9 +117,12 @@ let deploy_evm_rollup ~(testnet : unit -> Testnet.t) () =
   let mode =
     Cli.get_string ~default:"Operator" "mode" |> Sc_rollup_node.mode_of_string
   in
+  let setup_file =
+    Option.map (fun path -> `Path path) (Cli.get_string_opt "setup-file")
+  in
   let* () = check_operator_balance ~node ~client ~mode ~operator in
   let* _rollup_address, _rollup_node, _evm_proxy_server =
-    setup_evm_infra ~mode ~operator node client
+    setup_evm_infra ?setup_file ~mode ~operator node client
   in
   stop_or_keep_going ~node
 
