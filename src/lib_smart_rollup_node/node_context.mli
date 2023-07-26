@@ -486,6 +486,18 @@ val find_confirmed_slots_histories :
 val save_confirmed_slots_histories :
   rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
 
+(** {2 Helpers} *)
+
+(** [make_kernel_logger event ?log_kernel_debug_file logs_dir] returns two
+    functions [kernel_debug_logger] and [finaliser], to be used in the node
+    context. [kernel_debug_logger] writes kernel logs to
+    [logs_dir/log_kernel_debug_file] and emits them with the [event]. *)
+val make_kernel_logger :
+  (string -> unit Lwt.t) ->
+  ?log_kernel_debug_file:string ->
+  string ->
+  ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig

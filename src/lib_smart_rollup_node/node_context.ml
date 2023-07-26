@@ -123,17 +123,28 @@ let unlock {lockfile; _} =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
-let make_kernel_logger ?log_kernel_debug_file data_dir =
+let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   let open Lwt_syntax in
   let path =
     match log_kernel_debug_file with
-    | None -> Filename.concat data_dir "kernel.log"
+    | None -> Filename.concat logs_dir "kernel.log"
     | Some path -> path
   in
-  let+ fd =
+  let path_dir = Filename.dirname path in
+  let* () = Lwt_utils_unix.create_dir path_dir in
+  let* fd =
     Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
   in
-  Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+  let chan =
+    Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+  in
+  let kernel_debug msg =
+    let* () = Lwt_io.write chan msg in
+    let* () = Lwt_io.flush chan in
+    let* () = event msg in
+    return_unit
+  in
+  return (kernel_debug, fun () -> Lwt_io.close chan)
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc
@@ -193,17 +204,9 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   in
   let*! kernel_debug_logger, kernel_debug_finaliser =
     let open Lwt_syntax in
-    let kernel_debug = Event.kernel_debug in
     if configuration.log_kernel_debug then
-      let+ chan = make_kernel_logger ?log_kernel_debug_file data_dir in
-      let kernel_debug msg =
-        let* () = Lwt_io.write chan msg in
-        let* () = Lwt_io.flush chan in
-        let* () = kernel_debug msg in
-        return_unit
-      in
-      (kernel_debug, fun () -> Lwt_io.close chan)
-    else return (kernel_debug, fun () -> return_unit)
+      make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
+    else return (Event.kernel_debug, fun () -> return_unit)
   in
   return
     {
