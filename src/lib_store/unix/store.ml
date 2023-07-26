@@ -26,6 +26,13 @@
 open Store_types
 open Store_errors
 
+module Profiler = struct
+  include (val Profiler.wrap Shell_profiling.store_profiler)
+
+  let[@warning "-32"] reset_block_section =
+    Shell_profiling.create_reset_block_section Shell_profiling.store_profiler
+end
+
 module Shared = struct
   type 'a t = {mutable data : 'a; lock : Lwt_idle_waiter.t}
 
@@ -498,196 +505,199 @@ module Block = struct
 
   let store_block chain_store ~block_header ~operations validation_result =
     let open Lwt_result_syntax in
-    let {
-      Block_validation.validation_store =
-        {
-          resulting_context_hash;
-          timestamp = _;
-          message;
-          max_operations_ttl;
-          last_preserved_block_level;
-          last_finalized_block_level;
-        };
-      block_metadata;
-      ops_metadata;
-      shell_header_hash = _;
-    } =
-      validation_result
-    in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    let operations_length = List.length operations in
-    let operation_metadata_length =
-      match ops_metadata with
-      | Block_validation.No_metadata_hash x -> List.length x
-      | Block_validation.Metadata_hash x -> List.length x
-    in
-    let validation_passes = block_header.shell.validation_passes in
-    let* () =
-      fail_unless
-        (validation_passes = operations_length)
-        (Cannot_store_block
-           ( hash,
-             Invalid_operations_length
-               {validation_passes; operations = operations_length} ))
-    in
-    let* () =
-      fail_unless
-        (validation_passes = operation_metadata_length)
-        (Cannot_store_block
-           ( hash,
-             Invalid_operations_length
-               {validation_passes; operations = operation_metadata_length} ))
-    in
-    let* () =
-      match ops_metadata with
-      | No_metadata_hash ops_metadata ->
-          check_metadata_list ~block_hash:hash ~operations ~ops_metadata
-      | Metadata_hash ops_metadata ->
-          check_metadata_list ~block_hash:hash ~operations ~ops_metadata
-    in
-    let*! genesis_block = Stored_data.get chain_store.genesis_block_data in
-    let is_main_chain =
-      Chain_id.equal
-        chain_store.chain_id
-        (WithExceptions.Option.get
-           ~loc:__LOC__
-           chain_store.global_store.main_chain_store)
-          .chain_id
-    in
-    let genesis_level = Block_repr.level genesis_block in
-    let* last_preserved_block_level =
-      if is_main_chain then
-        let* () =
-          fail_unless
-            Compare.Int32.(last_preserved_block_level >= genesis_level)
-            (Cannot_store_block
-               ( hash,
-                 Invalid_last_preserved_block_level
-                   {last_preserved_block_level; genesis_level} ))
-        in
-        return last_preserved_block_level
-      else if Compare.Int32.(last_preserved_block_level < genesis_level) then
-        (* Hack: on the testchain, the block's lpbl depends on the
-           lpbl and is not max(genesis_level, expected_lpbl) *)
-        return genesis_level
-      else return last_preserved_block_level
-    in
-    let*! b = is_known_valid chain_store hash in
-    match b with
-    | true -> return_none
-    | false ->
-        (* Safety check: never ever commit a block that is not
-           compatible with the current checkpoint/target. *)
-        let*! acceptable_block, known_invalid =
-          Shared.use chain_store.chain_state (fun chain_state ->
-              let*! acceptable_block =
-                locked_is_acceptable_block
-                  chain_state
-                  (hash, block_header.shell.level)
-              in
-              let*! known_invalid = locked_is_known_invalid chain_state hash in
-              Lwt.return (acceptable_block, known_invalid))
-        in
-        let* () =
-          fail_unless
-            acceptable_block
-            (Validation_errors.Checkpoint_error (hash, None))
-        in
-        let* () =
-          fail_when
-            known_invalid
-            Store_errors.(Cannot_store_block (hash, Invalid_block))
-        in
-        let contents =
-          {
-            Block_repr.header = block_header;
-            operations;
-            block_metadata_hash = snd block_metadata;
-            operations_metadata_hashes =
-              (match ops_metadata with
-              | Block_validation.No_metadata_hash _ -> None
-              | Block_validation.Metadata_hash ops_metadata ->
-                  Some (List.map (List.map snd) ops_metadata));
-          }
-        in
-        let metadata =
-          Some
-            {
-              message;
-              max_operations_ttl;
-              last_preserved_block_level;
-              block_metadata = fst block_metadata;
-              operations_metadata =
-                (match ops_metadata with
-                | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
-                | Block_validation.Metadata_hash ops_metadata ->
-                    List.map (List.map fst) ops_metadata);
-            }
-        in
-        let block = {Block_repr.hash; contents; metadata} in
-        let* () =
-          Block_store.store_block
-            chain_store.block_store
-            block
-            resulting_context_hash
-        in
-        let protocol_level = Block_repr.proto_level block in
-        let* pred_block =
-          read_block chain_store (Block_repr.predecessor block)
-        in
-        let pred_proto_level = Block_repr.proto_level pred_block in
-        (* We update the protocol_table when a block contains a
-           protocol level change. *)
-        let* () =
-          if Compare.Int.(pred_proto_level < protocol_level) then
-            let context_index = chain_store.global_store.context_index in
-            let* resulting_context =
-              protect (fun () ->
-                  let*! c =
-                    Context_ops.checkout_exn
-                      context_index
-                      resulting_context_hash
-                  in
-                  return c)
-            in
-            let*! protocol_hash = Context_ops.get_protocol resulting_context in
-            let* (module NewProto) =
-              Registered_protocol.get_result protocol_hash
-            in
-            set_protocol_level
-              chain_store
-              ~protocol_level
-              ( block,
-                protocol_hash,
-                NewProto.expected_context_hash = Predecessor_resulting_context
-              )
-          else return_unit
-        in
-        let*! () =
-          Store_events.(emit store_block) (hash, block_header.shell.level)
-        in
-        let* () =
-          Shared.update_with chain_store.chain_state (fun chain_state ->
-              Block_lru_cache.remove chain_state.validated_blocks hash ;
-              let new_last_finalized_block_level =
-                match chain_state.last_finalized_block_level with
-                | None -> Some last_finalized_block_level
-                | Some prev_lfbl ->
-                    Some (Int32.max last_finalized_block_level prev_lfbl)
-              in
-              let new_chain_state =
-                {
-                  chain_state with
-                  last_finalized_block_level = new_last_finalized_block_level;
-                }
-              in
-              return (Some new_chain_state, ()))
-        in
-        Lwt_watcher.notify
-          chain_store.global_store.global_block_watcher
-          (chain_store, block) ;
-        return_some block
+    () [@profiler.reset_block_section hash] ;
+    (let {
+       Block_validation.validation_store =
+         {
+           resulting_context_hash;
+           timestamp = _;
+           message;
+           max_operations_ttl;
+           last_preserved_block_level;
+           last_finalized_block_level;
+         };
+       block_metadata;
+       ops_metadata;
+       shell_header_hash = _;
+     } =
+       validation_result
+     in
+     let operations_length = List.length operations in
+     let operation_metadata_length =
+       match ops_metadata with
+       | Block_validation.No_metadata_hash x -> List.length x
+       | Block_validation.Metadata_hash x -> List.length x
+     in
+     let validation_passes = block_header.shell.validation_passes in
+     let* () =
+       fail_unless
+         (validation_passes = operations_length)
+         (Cannot_store_block
+            ( hash,
+              Invalid_operations_length
+                {validation_passes; operations = operations_length} ))
+     in
+     let* () =
+       fail_unless
+         (validation_passes = operation_metadata_length)
+         (Cannot_store_block
+            ( hash,
+              Invalid_operations_length
+                {validation_passes; operations = operation_metadata_length} ))
+     in
+     let* () =
+       match ops_metadata with
+       | No_metadata_hash ops_metadata ->
+           check_metadata_list ~block_hash:hash ~operations ~ops_metadata
+       | Metadata_hash ops_metadata ->
+           check_metadata_list ~block_hash:hash ~operations ~ops_metadata
+     in
+     let*! genesis_block = Stored_data.get chain_store.genesis_block_data in
+     let is_main_chain =
+       Chain_id.equal
+         chain_store.chain_id
+         (WithExceptions.Option.get
+            ~loc:__LOC__
+            chain_store.global_store.main_chain_store)
+           .chain_id
+     in
+     let genesis_level = Block_repr.level genesis_block in
+     let* last_preserved_block_level =
+       if is_main_chain then
+         let* () =
+           fail_unless
+             Compare.Int32.(last_preserved_block_level >= genesis_level)
+             (Cannot_store_block
+                ( hash,
+                  Invalid_last_preserved_block_level
+                    {last_preserved_block_level; genesis_level} ))
+         in
+         return last_preserved_block_level
+       else if Compare.Int32.(last_preserved_block_level < genesis_level) then
+         (* Hack: on the testchain, the block's lpbl depends on the
+            lpbl and is not max(genesis_level, expected_lpbl) *)
+         return genesis_level
+       else return last_preserved_block_level
+     in
+     let*! b = is_known_valid chain_store hash in
+     match b with
+     | true -> return_none
+     | false ->
+         (* Safety check: never ever commit a block that is not
+            compatible with the current checkpoint/target. *)
+         let*! acceptable_block, known_invalid =
+           Shared.use chain_store.chain_state (fun chain_state ->
+               let*! acceptable_block =
+                 locked_is_acceptable_block
+                   chain_state
+                   (hash, block_header.shell.level)
+               in
+               let*! known_invalid = locked_is_known_invalid chain_state hash in
+               Lwt.return (acceptable_block, known_invalid))
+         in
+         let* () =
+           fail_unless
+             acceptable_block
+             (Validation_errors.Checkpoint_error (hash, None))
+         in
+         let* () =
+           fail_when
+             known_invalid
+             Store_errors.(Cannot_store_block (hash, Invalid_block))
+         in
+         let contents =
+           {
+             Block_repr.header = block_header;
+             operations;
+             block_metadata_hash = snd block_metadata;
+             operations_metadata_hashes =
+               (match ops_metadata with
+               | Block_validation.No_metadata_hash _ -> None
+               | Block_validation.Metadata_hash ops_metadata ->
+                   Some (List.map (List.map snd) ops_metadata));
+           }
+         in
+         let metadata =
+           Some
+             {
+               message;
+               max_operations_ttl;
+               last_preserved_block_level;
+               block_metadata = fst block_metadata;
+               operations_metadata =
+                 (match ops_metadata with
+                 | Block_validation.No_metadata_hash ops_metadata ->
+                     ops_metadata
+                 | Block_validation.Metadata_hash ops_metadata ->
+                     List.map (List.map fst) ops_metadata);
+             }
+         in
+         let block = {Block_repr.hash; contents; metadata} in
+         let* () =
+           Block_store.store_block
+             chain_store.block_store
+             block
+             resulting_context_hash
+         in
+         let protocol_level = Block_repr.proto_level block in
+         let* pred_block =
+           read_block chain_store (Block_repr.predecessor block)
+         in
+         let pred_proto_level = Block_repr.proto_level pred_block in
+         (* We update the protocol_table when a block contains a
+            protocol level change. *)
+         let* () =
+           if Compare.Int.(pred_proto_level < protocol_level) then
+             let context_index = chain_store.global_store.context_index in
+             let* resulting_context =
+               protect (fun () ->
+                   let*! c =
+                     Context_ops.checkout_exn
+                       context_index
+                       resulting_context_hash
+                   in
+                   return c)
+             in
+             let*! protocol_hash = Context_ops.get_protocol resulting_context in
+             let* (module NewProto) =
+               Registered_protocol.get_result protocol_hash
+             in
+             set_protocol_level
+               chain_store
+               ~protocol_level
+               ( block,
+                 protocol_hash,
+                 NewProto.expected_context_hash = Predecessor_resulting_context
+               )
+           else return_unit
+         in
+         let*! () =
+           Store_events.(emit store_block) (hash, block_header.shell.level)
+         in
+         let* () =
+           Shared.update_with chain_store.chain_state (fun chain_state ->
+               Block_lru_cache.remove chain_state.validated_blocks hash ;
+               let new_last_finalized_block_level =
+                 match chain_state.last_finalized_block_level with
+                 | None -> Some last_finalized_block_level
+                 | Some prev_lfbl ->
+                     Some (Int32.max last_finalized_block_level prev_lfbl)
+               in
+               let new_chain_state =
+                 {
+                   chain_state with
+                   last_finalized_block_level = new_last_finalized_block_level;
+                 }
+               in
+               return (Some new_chain_state, ()))
+         in
+         Lwt_watcher.notify
+           chain_store.global_store.global_block_watcher
+           (chain_store, block) ;
+         return_some block)
+    [@profiler.record_s "store_block"]
 
   let store_validated_block chain_store ~hash ~block_header ~operations =
     let open Lwt_result_syntax in
@@ -1265,43 +1275,44 @@ module Chain = struct
                 (Block.predecessor block)
                 (Block.hash current_head)
            && Ringo.Ring.capacity live_data = expected_capacity -> (
-        (* The block candidate is on top of the current head. It
-           corresponds to a new promoted head. We need to move the
-           live data window one stop forward, including that new head
-           and discarding the oldest block of the previous
-           state. Checking the expected capacity allows to force
-           recomputing the livedata as soon as a max_op_ttl changes
-           between blocks. *)
-        let most_recent_block = Block.hash block in
-        let most_recent_ops =
-          Block.all_operation_hashes block
-          |> List.flatten |> Operation_hash.Set.of_list
-        in
-        let new_live_blocks =
-          Block_hash.Set.add most_recent_block live_blocks
-        in
-        let new_live_operations =
-          Operation_hash.Set.union most_recent_ops live_operations
-        in
-        match
-          Ringo.Ring.add_and_return_erased
-            live_data
-            (most_recent_block, most_recent_ops)
-        with
-        | None -> return (new_live_blocks, new_live_operations)
-        | Some (last_block, last_ops) ->
-            let diffed_new_live_blocks =
-              Block_hash.Set.remove last_block new_live_blocks
-            in
-            let diffed_new_live_operations =
-              Operation_hash.Set.diff new_live_operations last_ops
-            in
-            chain_state.live_data_cache <-
-              {
-                chain_state.live_data_cache with
-                pred = Some (last_block, last_ops);
-              } ;
-            return (diffed_new_live_blocks, diffed_new_live_operations))
+        ((* The block candidate is on top of the current head. It
+            corresponds to a new promoted head. We need to move the
+            live data window one stop forward, including that new head
+            and discarding the oldest block of the previous
+            state. Checking the expected capacity allows to force
+            recomputing the livedata as soon as a max_op_ttl changes
+            between blocks. *)
+         let most_recent_block = Block.hash block in
+         let most_recent_ops =
+           Block.all_operation_hashes block
+           |> List.flatten |> Operation_hash.Set.of_list
+         in
+         let new_live_blocks =
+           Block_hash.Set.add most_recent_block live_blocks
+         in
+         let new_live_operations =
+           Operation_hash.Set.union most_recent_ops live_operations
+         in
+         match
+           Ringo.Ring.add_and_return_erased
+             live_data
+             (most_recent_block, most_recent_ops)
+         with
+         | None -> return (new_live_blocks, new_live_operations)
+         | Some (last_block, last_ops) ->
+             let diffed_new_live_blocks =
+               Block_hash.Set.remove last_block new_live_blocks
+             in
+             let diffed_new_live_operations =
+               Operation_hash.Set.diff new_live_operations last_ops
+             in
+             chain_state.live_data_cache <-
+               {
+                 chain_state.live_data_cache with
+                 pred = Some (last_block, last_ops);
+               } ;
+             return (diffed_new_live_blocks, diffed_new_live_operations))
+        [@profiler.record_s "Compute live blocks with new head"])
     | Some live_data, Some _
       when Block_hash.equal
              (Block.predecessor block)
@@ -1319,33 +1330,39 @@ module Chain = struct
           live_operations
           ~new_head:block
           ~cache_expected_capacity:expected_capacity
+        [@profiler.record_s "compute live blocks with alternative head"]
     | _ when update_cache ->
         (* The block candidate is not on top of the current head. It is
            likely to be an alternate branch. We recompute the whole live
            data. We may keep this new state in the cache. *)
-        let new_cache = Ringo.Ring.create expected_capacity in
-        let*! () =
-          Chain_traversal.live_blocks_with_ring
-            chain_store
-            block
-            expected_capacity
-            new_cache
-        in
-        chain_state.live_data_cache <- {live_data = Some new_cache; pred = None} ;
-        let live_blocks, live_ops =
-          Ringo.Ring.fold
-            new_cache
-            ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
-            ~f:(fun (bhs, opss) (bh, ops) ->
-              (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
-        in
-        return (live_blocks, live_ops)
+        (let new_cache = Ringo.Ring.create expected_capacity in
+         let*! () =
+           Chain_traversal.live_blocks_with_ring
+             chain_store
+             block
+             expected_capacity
+             new_cache
+         in
+         chain_state.live_data_cache <-
+           {live_data = Some new_cache; pred = None} ;
+         let live_blocks, live_ops =
+           Ringo.Ring.fold
+             new_cache
+             ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
+             ~f:(fun (bhs, opss) (bh, ops) ->
+               (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
+         in
+         return (live_blocks, live_ops))
+        [@profiler.record_s "compute live blocks with alternative branch"]
     | _ ->
         (* The block candidate is not on top of the current head. It
            is likely to be an alternate head. We recompute the whole
            live data. *)
         let*! new_live_blocks =
-          Chain_traversal.live_blocks chain_store block expected_capacity
+          (Chain_traversal.live_blocks
+             chain_store
+             block
+             expected_capacity [@profiler.record_s "compute whole live blocks"])
         in
         return new_live_blocks
 
@@ -1374,30 +1391,35 @@ module Chain = struct
         let pred_cache =
           WithExceptions.Option.get ~loc:__LOC__ live_data_cache.pred
         in
-        rollback_livedata ~current_head live_blocks live_operations ~pred_cache
+        (rollback_livedata
+           ~current_head
+           live_blocks
+           live_operations
+           ~pred_cache [@profiler.record_s "rollback livedata"])
       else
         locked_compute_live_blocks_with_cache
           ~update_cache
           chain_store
           chain_state
           block
-          metadata
+          metadata [@profiler.record_s "locked compute live blocks with cache"]
     in
     return res
 
   let compute_live_blocks chain_store ~block =
     let open Lwt_result_syntax in
-    Shared.use chain_store.chain_state (fun chain_state ->
-        let* metadata = Block.get_block_metadata chain_store block in
-        let* r =
-          locked_compute_live_blocks
-            ~update_cache:false
-            chain_store
-            chain_state
-            block
-            metadata
-        in
-        return r)
+    (Shared.use chain_store.chain_state (fun chain_state ->
+         let* metadata = Block.get_block_metadata chain_store block in
+         let* r =
+           locked_compute_live_blocks
+             ~update_cache:false
+             chain_store
+             chain_state
+             block
+             metadata
+         in
+         return r)
+    [@profiler.record_s "compute live blocks"])
 
   let is_ancestor chain_store ~head:(hash, lvl) ~ancestor:(hash', lvl') =
     let open Lwt_syntax in
@@ -1795,268 +1817,270 @@ module Chain = struct
 
   let set_head chain_store new_head =
     let open Lwt_result_syntax in
-    Shared.update_with chain_store.chain_state (fun chain_state ->
-        (* The merge cannot finish until we release the lock on the
-           chain state so its status cannot change while this
-           function is executed. *)
-        (* Also check the status to be extra-safe *)
-        let*! store_status = Block_store.status chain_store.block_store in
-        let* is_merge_ongoing =
-          match Block_store.get_merge_status chain_store.block_store with
-          | Merge_failed errs ->
-              (* If the merge has failed, notify in the logs but don't
-                 trigger any merge. *)
-              let*! () = Store_events.(emit notify_merge_error errs) in
-              (* We mark the merge as on-going to prevent the merge from
-                 being triggered and to update on-disk values. *)
-              return_true
-          | Not_running when not @@ Block_store_status.is_idle store_status ->
-              (* Degenerate case, do the same as the Merge_failed case *)
-              let*! () = Store_events.(emit notify_merge_error []) in
-              return_true
-          | Not_running -> return_false
-          | Running -> return_true
-        in
-        let previous_head = chain_state.current_head in
-        let*! checkpoint = Stored_data.get chain_state.checkpoint_data in
-        let new_head_descr = Block.descriptor new_head in
-        (* Check that the new_head is consistent with the checkpoint *)
-        let* () =
-          fail_unless
-            Compare.Int32.(Block.level new_head >= snd checkpoint)
-            (Invalid_head_switch
-               {checkpoint_level = snd checkpoint; given_head = new_head_descr})
-        in
-        (* Check that its predecessor exists and has metadata *)
-        let predecessor = Block.predecessor new_head in
-        let* new_head_metadata =
-          trace
-            Bad_head_invariant
-            (let* pred_block = Block.read_block chain_store predecessor in
-             (* check that predecessor's block metadata is
-                available *)
-             let* _pred_head_metadata =
-               Block.get_block_metadata chain_store pred_block
+    (Shared.update_with chain_store.chain_state (fun chain_state ->
+         (* The merge cannot finish until we release the lock on the
+            chain state so its status cannot change while this
+            function is executed. *)
+         (* Also check the status to be extra-safe *)
+         let*! store_status = Block_store.status chain_store.block_store in
+         let* is_merge_ongoing =
+           match Block_store.get_merge_status chain_store.block_store with
+           | Merge_failed errs ->
+               (* If the merge has failed, notify in the logs but don't
+                  trigger any merge. *)
+               let*! () = Store_events.(emit notify_merge_error errs) in
+               (* We mark the merge as on-going to prevent the merge from
+                  being triggered and to update on-disk values. *)
+               return_true
+           | Not_running when not @@ Block_store_status.is_idle store_status ->
+               (* Degenerate case, do the same as the Merge_failed case *)
+               let*! () = Store_events.(emit notify_merge_error []) in
+               return_true
+           | Not_running -> return_false
+           | Running -> return_true
+         in
+         let previous_head = chain_state.current_head in
+         let*! checkpoint = Stored_data.get chain_state.checkpoint_data in
+         let new_head_descr = Block.descriptor new_head in
+         (* Check that the new_head is consistent with the checkpoint *)
+         let* () =
+           fail_unless
+             Compare.Int32.(Block.level new_head >= snd checkpoint)
+             (Invalid_head_switch
+                {checkpoint_level = snd checkpoint; given_head = new_head_descr})
+         in
+         (* Check that its predecessor exists and has metadata *)
+         let predecessor = Block.predecessor new_head in
+         let* new_head_metadata =
+           (trace
+              Bad_head_invariant
+              (let* pred_block = Block.read_block chain_store predecessor in
+               (* check that predecessor's block metadata is
+                  available *)
+               let* _pred_head_metadata =
+                 Block.get_block_metadata chain_store pred_block
+               in
+               Block.get_block_metadata chain_store new_head)
+            [@profiler.record_s "get_pred_block"])
+         in
+         let*! target = Stored_data.get chain_state.target_data in
+         let new_head_lpbl =
+           Block.last_preserved_block_level new_head_metadata
+         in
+         let* () =
+           (may_split_context
+              ~disable_context_pruning:chain_store.disable_context_pruning
+              chain_store
+              new_head_lpbl
+              previous_head [@profiler.record_s "may_split_context"])
+         in
+         let*! cementing_highwatermark =
+           locked_determine_cementing_highwatermark
+             chain_store
+             chain_state
+             new_head_lpbl
+         in
+         (* This write call will initialize the cementing
+            highwatermark when it is not yet set or do nothing
+            otherwise. *)
+         let* () =
+           locked_may_update_cementing_highwatermark
+             chain_state
+             cementing_highwatermark
+         in
+         let* lfbl_block_opt =
+           match chain_state.last_finalized_block_level with
+           | None -> return_none
+           | Some lfbl ->
+               let distance =
+                 Int32.(to_int @@ max 0l (sub (Block.level new_head) lfbl))
+               in
+               Block_store.read_block
+                 chain_store.block_store
+                 ~read_metadata:false
+                 (Block (Block.hash new_head, distance))
+         in
+         let* new_checkpoint, new_target =
+           match lfbl_block_opt with
+           | None ->
+               (* This case may occur when importing a rolling snapshot
+                  where the lfbl block is not known or when a node was
+                  just started. We may use the checkpoint instead. *)
+               return (checkpoint, target)
+           | Some lfbl_block ->
+               may_update_checkpoint_and_target
+                 chain_store
+                 ~new_head:new_head_descr
+                 ~new_head_lfbl:(Block.descriptor lfbl_block)
+                 ~checkpoint
+                 ~target
+         in
+         (* [should_merge] is a placeholder acknowledging that a
+            storage maintenance can be triggered, thanks to several
+            fulfilled parameters. *)
+         let should_merge =
+           (* Make sure that the previous merge is completed before
+              starting a new merge. If the lock on the chain_state is
+              retained, the merge thread will never be able to
+              complete. *)
+           (not is_merge_ongoing)
+           &&
+           match cementing_highwatermark with
+           | None ->
+               (* Do not merge if the cementing highwatermark is not
+                  set. *)
+               false
+           | Some cementing_highwatermark ->
+               Compare.Int32.(new_head_lpbl > cementing_highwatermark)
+         in
+         let* new_cementing_highwatermark =
+           if should_merge then
+             (* [trigger_merge] is a placeholder that depends on
+                [should_merge] and that controls the delayed
+                maintenance. Thus, even if we [should_merge],
+                [trigger_merge] may interfere with the actual merge to
+                delay it. *)
+             let* trigger_merge =
+               match chain_store.storage_maintenance.maintenance_delay with
+               | Disabled ->
+                   (* The storage maintenance delay is off -- merging right now. *)
+                   let* () =
+                     (* Reset scheduled maintenance flag. It could be
+                        necessary if the node was stopped during a
+                        delay and restarted with the delay as
+                        disabled. *)
+                     Stored_data.write
+                       chain_store.storage_maintenance.scheduled_maintenance
+                       None
+                   in
+                   return_true
+               | Custom delay ->
+                   custom_delayed_maintenance chain_store new_head delay
+               | Auto ->
+                   auto_delayed_maintenance chain_store chain_state new_head
              in
-             Block.get_block_metadata chain_store new_head)
-        in
-        let*! target = Stored_data.get chain_state.target_data in
-        let new_head_lpbl =
-          Block.last_preserved_block_level new_head_metadata
-        in
-        let* () =
-          may_split_context
-            ~disable_context_pruning:chain_store.disable_context_pruning
-            chain_store
-            new_head_lpbl
-            previous_head
-        in
-        let*! cementing_highwatermark =
-          locked_determine_cementing_highwatermark
-            chain_store
-            chain_state
-            new_head_lpbl
-        in
-        (* This write call will initialize the cementing
-           highwatermark when it is not yet set or do nothing
-           otherwise. *)
-        let* () =
-          locked_may_update_cementing_highwatermark
-            chain_state
-            cementing_highwatermark
-        in
-        let* lfbl_block_opt =
-          match chain_state.last_finalized_block_level with
-          | None -> return_none
-          | Some lfbl ->
-              let distance =
-                Int32.(to_int @@ max 0l (sub (Block.level new_head) lfbl))
-              in
-              Block_store.read_block
-                chain_store.block_store
-                ~read_metadata:false
-                (Block (Block.hash new_head, distance))
-        in
-        let* new_checkpoint, new_target =
-          match lfbl_block_opt with
-          | None ->
-              (* This case may occur when importing a rolling snapshot
-                 where the lfbl block is not known or when a node was
-                 just started. We may use the checkpoint instead. *)
-              return (checkpoint, target)
-          | Some lfbl_block ->
-              may_update_checkpoint_and_target
-                chain_store
-                ~new_head:new_head_descr
-                ~new_head_lfbl:(Block.descriptor lfbl_block)
-                ~checkpoint
-                ~target
-        in
-        (* [should_merge] is a placeholder acknowledging that a
-           storage maintenance can be triggered, thanks to several
-           fulfilled parameters. *)
-        let should_merge =
-          (* Make sure that the previous merge is completed before
-             starting a new merge. If the lock on the chain_state is
-             retained, the merge thread will never be able to
-             complete. *)
-          (not is_merge_ongoing)
-          &&
-          match cementing_highwatermark with
-          | None ->
-              (* Do not merge if the cementing highwatermark is not
-                 set. *)
-              false
-          | Some cementing_highwatermark ->
-              Compare.Int32.(new_head_lpbl > cementing_highwatermark)
-        in
-        let* new_cementing_highwatermark =
-          if should_merge then
-            (* [trigger_merge] is a placeholder that depends on
-               [should_merge] and that controls the delayed
-               maintenance. Thus, even if we [should_merge],
-               [trigger_merge] may interfere with the actual merge to
-               delay it. *)
-            let* trigger_merge =
-              match chain_store.storage_maintenance.maintenance_delay with
-              | Disabled ->
-                  (* The storage maintenance delay is off -- merging right now. *)
-                  let* () =
-                    (* Reset scheduled maintenance flag. It could be
-                       necessary if the node was stopped during a
-                       delay and restarted with the delay as
-                       disabled. *)
-                    Stored_data.write
-                      chain_store.storage_maintenance.scheduled_maintenance
-                      None
-                  in
-                  (* Set the storage maintenance target to -1 to notify that no
-                     target is set. *)
-                  Prometheus.Gauge.set
-                    Store_metrics.metrics.maintenance_target
-                    Float.minus_one ;
-                  return_true
-              | Custom delay ->
-                  custom_delayed_maintenance chain_store new_head delay
-              | Auto ->
-                  auto_delayed_maintenance chain_store chain_state new_head
-            in
-            (* We effectively trigger the merge only if the delayed
-               maintenance is disabled or if the targeted delay is
-               reached. *)
-            if trigger_merge then
-              let*! b = try_lock_for_write chain_store.lockfile in
-              match b with
-              | false ->
-                  (* Delay the merge until the lock is available *)
-                  return cementing_highwatermark
-              | true ->
-                  (* Lock on lockfile is now taken *)
-                  let finalizer new_highest_cemented_level =
-                    let* () =
-                      merge_finalizer chain_store new_highest_cemented_level
-                    in
-                    let*! () = may_unlock chain_store.lockfile in
-                    return_unit
-                  in
-                  let on_error errs =
-                    (* Release the lockfile *)
-                    let*! () = may_unlock chain_store.lockfile in
-                    Lwt.return (Error errs)
-                  in
-                  (* Notes:
-                     - The lock will be released when the merge
-                       terminates. i.e. in [finalizer] or in
-                       [on_error].
-                     - The heavy-work of this function is asynchronously
-                       done so this call is expected to return quickly. *)
-                  let* () =
-                    Block_store.merge_stores
-                      chain_store.block_store
-                      ~on_error
-                      ~finalizer
-                      ~history_mode:(history_mode chain_store)
-                      ~new_head
-                      ~new_head_metadata
-                      ~cementing_highwatermark:
-                        (WithExceptions.Option.get
-                           ~loc:__LOC__
-                           cementing_highwatermark)
-                      ~disable_context_pruning:
-                        chain_store.disable_context_pruning
-                  in
-                  (* The new memory highwatermark is new_head_lpbl, the disk
-                     value will be updated after the merge completion. *)
-                  return_some new_head_lpbl
-            else return cementing_highwatermark
-          else return cementing_highwatermark
-        in
-        let*! new_checkpoint =
-          match new_cementing_highwatermark with
-          | None -> Lwt.return new_checkpoint
-          | Some new_cementing_highwatermark -> (
-              if
-                Compare.Int32.(
-                  snd new_checkpoint >= new_cementing_highwatermark)
-              then Lwt.return new_checkpoint
-              else
-                let*! o =
-                  read_ancestor_hash_by_level
-                    chain_store
-                    new_head
-                    new_cementing_highwatermark
-                in
-                match o with
-                | None -> Lwt.return new_checkpoint
-                | Some h -> Lwt.return (h, new_cementing_highwatermark))
-        in
-        let* () =
-          Lwt.finalize
-            (fun () ->
-              let*! () = lock_for_write chain_store.stored_data_lockfile in
-              let* () =
-                if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
-                  (* Remove potentially outdated invalid blocks if the
-                     checkpoint changed *)
-                  let* () =
-                    Stored_data.update_with
-                      chain_state.invalid_blocks_data
-                      (fun invalid_blocks ->
-                        Lwt.return
-                          (Block_hash.Map.filter
-                             (fun _k {level; _} -> level > snd new_checkpoint)
-                             invalid_blocks))
-                  in
-                  write_checkpoint chain_state new_checkpoint
-                else return_unit
-              in
-              (* Update values on disk but not the cementing highwatermark
-                 which will be updated by the merge finalizer. *)
-              let* () =
-                Stored_data.write chain_state.current_head_data new_head_descr
-              in
-              Stored_data.write chain_state.target_data new_target)
-            (fun () -> unlock chain_store.stored_data_lockfile)
-        in
-        (* Update live_data *)
-        let* live_blocks, live_operations =
-          locked_compute_live_blocks
-            ~update_cache:true
-            chain_store
-            chain_state
-            new_head
-            new_head_metadata
-        in
-        let new_chain_state =
-          {
-            chain_state with
-            live_blocks;
-            live_operations;
-            current_head = new_head;
-          }
-        in
-        let*! () = Store_events.(emit set_head) new_head_descr in
-        return (Some new_chain_state, previous_head))
+             (* We effectively trigger the merge only if the delayed
+                maintenance is disabled or if the targeted delay is
+                reached. *)
+             if trigger_merge then
+               let*! b = try_lock_for_write chain_store.lockfile in
+               match b with
+               | false ->
+                   (* Delay the merge until the lock is available *)
+                   return cementing_highwatermark
+               | true ->
+                   (* Lock on lockfile is now taken *)
+                   let finalizer new_highest_cemented_level =
+                     let* () =
+                       merge_finalizer chain_store new_highest_cemented_level
+                     in
+                     let*! () = may_unlock chain_store.lockfile in
+                     return_unit
+                   in
+                   let on_error errs =
+                     (* Release the lockfile *)
+                     let*! () = may_unlock chain_store.lockfile in
+                     Lwt.return (Error errs)
+                   in
+                   (* Notes:
+                      - The lock will be released when the merge
+                        terminates. i.e. in [finalizer] or in
+                        [on_error].
+                      - The heavy-work of this function is asynchronously
+                        done so this call is expected to return quickly. *)
+                   let* () =
+                     (Block_store.merge_stores
+                        chain_store.block_store
+                        ~on_error
+                        ~finalizer
+                        ~history_mode:(history_mode chain_store)
+                        ~new_head
+                        ~new_head_metadata
+                        ~cementing_highwatermark:
+                          (WithExceptions.Option.get
+                             ~loc:__LOC__
+                             cementing_highwatermark)
+                        ~disable_context_pruning:
+                          chain_store.disable_context_pruning
+                      [@profiler.span_s ["start merge store"]])
+                   in
+                   (* The new memory highwatermark is new_head_lpbl, the disk
+                      value will be updated after the merge completion. *)
+                   return_some new_head_lpbl
+             else return cementing_highwatermark
+           else return cementing_highwatermark
+         in
+         let*! new_checkpoint =
+           match new_cementing_highwatermark with
+           | None -> Lwt.return new_checkpoint
+           | Some new_cementing_highwatermark -> (
+               if
+                 Compare.Int32.(
+                   snd new_checkpoint >= new_cementing_highwatermark)
+               then Lwt.return new_checkpoint
+               else
+                 let*! o =
+                   read_ancestor_hash_by_level
+                     chain_store
+                     new_head
+                     new_cementing_highwatermark
+                 in
+                 match o with
+                 | None -> Lwt.return new_checkpoint
+                 | Some h -> Lwt.return (h, new_cementing_highwatermark))
+         in
+         let* () =
+           Lwt.finalize
+             (fun () ->
+               let*! () = lock_for_write chain_store.stored_data_lockfile in
+               let* () =
+                 if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
+                   (* Remove potentially outdated invalid blocks if the
+                      checkpoint changed *)
+                   let* () =
+                     Stored_data.update_with
+                       chain_state.invalid_blocks_data
+                       (fun invalid_blocks ->
+                         Lwt.return
+                           (Block_hash.Map.filter
+                              (fun _k {level; _} -> level > snd new_checkpoint)
+                              invalid_blocks))
+                   in
+                   write_checkpoint chain_state new_checkpoint
+                 else return_unit
+               in
+               (* Update values on disk but not the cementing highwatermark
+                  which will be updated by the merge finalizer. *)
+               let* () =
+                 (Stored_data.write
+                    chain_state.current_head_data
+                    new_head_descr [@profiler.record_s "write_new_head"])
+               in
+               (Stored_data.write
+                  chain_state.target_data
+                  new_target [@profiler.record_s "write_new_target"]))
+             (fun () -> unlock chain_store.stored_data_lockfile)
+         in
+         (* Update live_data *)
+         let* live_blocks, live_operations =
+           (locked_compute_live_blocks
+              ~update_cache:true
+              chain_store
+              chain_state
+              new_head
+              new_head_metadata [@profiler.record_s "updating live blocks"])
+         in
+         let new_chain_state =
+           {
+             chain_state with
+             live_blocks;
+             live_operations;
+             current_head = new_head;
+           }
+         in
+         let*! () = Store_events.(emit set_head) new_head_descr in
+         return (Some new_chain_state, previous_head))
+    [@profiler.record_s "set_head"])
 
   let set_target chain_store new_target =
     let open Lwt_result_syntax in
