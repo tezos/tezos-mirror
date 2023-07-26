@@ -78,9 +78,12 @@ pub fn string_to_sk_and_address(s: String) -> Result<(SecretKey, H160), SigError
     Ok((sk, value.into()))
 }
 
-/// Data common to all Ethereum transaction types
+/// Data common for all kind of Ethereum transactions
+/// (transfers, contract creation and contract invocation).
+/// All transaction versions (Legacy, EIP-2930 and EIP-1559)
+/// are parsed to this common type.
+/// This type is common for both signed and unsigned transactions as well.
 #[derive(Debug, PartialEq, Eq, Clone)]
-
 pub struct EthereumTransactionCommon {
     /// the id of the chain
     /// see `<https://chainlist.org/>` for values
@@ -120,7 +123,7 @@ pub struct EthereumTransactionCommon {
 
 impl EthereumTransactionCommon {
     /// Extracts the Keccak encoding of a message from an EthereumTransactionCommon
-    pub fn message(&self) -> Message {
+    fn message(&self) -> Message {
         let to_sign = EthereumTransactionCommon {
             v: self.chain_id,
             r: H256::zero(),
