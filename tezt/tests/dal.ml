@@ -2546,7 +2546,7 @@ let e2e_tests =
 let constants_to_string = function
   | Protocol.Constants_mainnet -> "mainnet"
   | Protocol.Constants_sandbox -> "sandbox"
-  | Protocol.Constants_test -> "testnet"
+  | Protocol.Constants_test -> "test"
 
 (* This function allows to register new (end-to-end) tests using
    [scenario_with_all_nodes] helper. For that, it instantiate function
