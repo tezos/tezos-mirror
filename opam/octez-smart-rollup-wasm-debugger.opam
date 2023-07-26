@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "tezos-clic"
   "tezos-tree-encoding"
+  "yaml" { >= "3.1.0" }
   "tezos-client-alpha"
   "tezos-scoru-wasm"
   "octez-smart-rollup-wasm-benchmark-lib"
