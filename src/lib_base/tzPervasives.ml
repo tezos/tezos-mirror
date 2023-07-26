@@ -119,3 +119,4 @@ module Empty = struct
 end
 
 module Skip_list = Skip_list
+module Profiler = Profiler

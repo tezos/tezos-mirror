@@ -185,3 +185,5 @@ module Empty : sig
       ]} *)
   val absurd : t -> 'a
 end
+
+module Profiler = Profiler
