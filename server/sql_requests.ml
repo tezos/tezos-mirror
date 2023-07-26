@@ -106,6 +106,10 @@ let create_endorsing_rights =
   \   FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
   \   UNIQUE (level, delegate))"
 
+let create_cycles =
+  "CREATE TABLE IF NOT EXISTS cycle(id INTEGER PRIMARY KEY, level UNIQUE \
+   INTEGER NOT NULL) WITHOUT ROWID"
+
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
    endorsing_rights(level)"
@@ -138,6 +142,7 @@ let create_tables =
     create_operations_reception;
     create_operations_inclusion;
     create_endorsing_rights;
+    create_cycles;
     create_endorsing_rights_level_idx;
     create_blocks_level_idx;
     create_operations_level_idx;
