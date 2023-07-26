@@ -48,6 +48,10 @@ module Lwt_result_option_syntax = struct
     let open Lwt_result_syntax in
     let* a in
     match a with None -> return_none | Some a -> f a
+
+  let fail = Lwt_result_syntax.return_none
+
+  let return x = Lwt_result_syntax.return_some x
 end
 
 module Lwt_result_option_list_syntax = struct
@@ -310,7 +314,7 @@ let earliest_cementing_level node_ctxt commitment_hash =
   let** {first_published_at_level; _} =
     Node_context.commitment_published_at_level node_ctxt commitment_hash
   in
-  Lwt_result_syntax.return_some
+  return
   @@ Int32.add
        first_published_at_level
        (sc_rollup_challenge_window node_ctxt |> Int32.of_int)
@@ -325,16 +329,15 @@ let earliest_cementing_level node_ctxt commitment_hash =
       start the search for cementable commitments. *)
 let latest_cementable_commitment (node_ctxt : _ Node_context.t)
     (head : Sc_rollup_block.t) =
-  let open Lwt_result_syntax in
   let open Lwt_result_option_syntax in
   let commitment_hash = Sc_rollup_block.most_recent_commitment head.header in
   let** commitment = Node_context.find_commitment node_ctxt commitment_hash in
   let** cementable_level_bound =
-    return
+    Lwt_result.return
     @@ sub_level commitment.inbox_level (sc_rollup_challenge_window node_ctxt)
   in
   let lcc = Reference.get node_ctxt.lcc in
-  if cementable_level_bound <= lcc.level then return_none
+  if cementable_level_bound <= lcc.level then fail
   else
     let** cementable_bound_block =
       Node_context.find_l2_block_by_level node_ctxt cementable_level_bound
@@ -342,7 +345,7 @@ let latest_cementable_commitment (node_ctxt : _ Node_context.t)
     let cementable_commitment =
       Sc_rollup_block.most_recent_commitment cementable_bound_block.header
     in
-    return_some cementable_commitment
+    return cementable_commitment
 
 let cementable_commitments (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
@@ -440,9 +443,7 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () Types.{node_ctxt} =
-    let open Lwt_result_syntax in
-    return node_ctxt
+  let on_launch _w () Types.{node_ctxt} = Lwt_result.return node_ctxt
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =
