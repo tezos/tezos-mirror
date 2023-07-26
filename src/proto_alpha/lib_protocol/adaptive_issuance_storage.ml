@@ -249,7 +249,7 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
 
 let clear_outdated_reward_data ctxt ~new_cycle =
   let open Lwt_syntax in
-  match Cycle_repr.sub new_cycle 1 with
+  match Cycle_repr.sub new_cycle 2 with
   | None -> Lwt.return ctxt
   | Some cycle ->
       let* ctxt = Storage.Issuance_coeff.remove ctxt cycle in
