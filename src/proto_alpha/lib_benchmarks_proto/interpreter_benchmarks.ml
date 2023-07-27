@@ -201,6 +201,12 @@ let register_model_for_code_generation model =
   let model = Model.make ~conv:Fun.id ~model in
   Registration.register_model_for_code_generation "interpreter" model
 
+let register_time_alloc_codegen_model instr_or_cont_name =
+  let (Model.Model codegen_model) =
+    Interpreter_model.make_time_alloc_codegen_model instr_or_cont_name
+  in
+  register_model_for_code_generation codegen_model
+
 let prepare_workload ?amplification ctxt step_constants stack_type kinstr stack
     =
   let workload =
@@ -461,6 +467,29 @@ let benchmark ?(benchmark_type = Time) ?amplification ?intercept ?more_tags
   in
   Registration_helpers.register ~benchmark_type bench
 
+let time_alloc_benchmark ?amplification ?intercept ?more_tags ?salt ?check ~name
+    ~kinstr_and_stack_sampler () =
+  benchmark
+    ~benchmark_type:Time
+    ?amplification
+    ?intercept
+    ?more_tags
+    ?salt
+    ?check
+    ~name
+    ~kinstr_and_stack_sampler
+    () ;
+  benchmark
+    ~benchmark_type:Alloc
+    ?intercept
+    ?more_tags
+    ?salt
+    ?check
+    ~name
+    ~kinstr_and_stack_sampler
+    () ;
+  register_time_alloc_codegen_model (Instr_name name)
+
 let benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
     ?intercept ?more_tags ?salt ?check ~stack_type ~name ~kinstr ~stack_sampler
     () =
@@ -483,7 +512,7 @@ let benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
   Registration_helpers.register ~benchmark_type bench
 
 let benchmark_with_fixed_stack ?(benchmark_type = Time) ?amplification
-    ?intercept ?more_tags ?salt ?check ~name ~stack ~kinstr () =
+    ?intercept ?more_tags ?salt ?check ~name ~stack_type ~stack ~kinstr () =
   benchmark_with_stack_sampler
     ?amplification
     ?intercept
@@ -491,10 +520,38 @@ let benchmark_with_fixed_stack ?(benchmark_type = Time) ?amplification
     ?salt
     ?check
     ~name
+    ~stack_type
     ~benchmark_type
     ~kinstr
     ~stack_sampler:(fun _cfg _rng_state () -> stack)
     ()
+
+let time_alloc_benchmark_with_fixed_stack ?amplification ?intercept ?more_tags
+    ?salt ?check ~name ~stack_type ~stack ~kinstr () =
+  benchmark_with_fixed_stack
+    ~benchmark_type:Time
+    ?amplification
+    ?intercept
+    ?more_tags
+    ?salt
+    ?check
+    ~name
+    ~stack_type
+    ~stack
+    ~kinstr
+    () ;
+  benchmark_with_fixed_stack
+    ~benchmark_type:Alloc
+    ?intercept
+    ?more_tags
+    ?salt
+    ?check
+    ~name
+    ~stack_type
+    ~stack
+    ~kinstr
+    () ;
+  register_time_alloc_codegen_model (Instr_name name)
 
 let simple_benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
     ?intercept_stack ?salt ?more_tags ?check ~name ~stack_type ~kinstr
@@ -526,6 +583,34 @@ let simple_benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
         ~kinstr
         ())
     intercept_stack
+
+let simple_time_alloc_benchmark_with_stack_sampler ?amplification
+    ?intercept_stack ?salt ?more_tags ?check ~name ~stack_type ~kinstr
+    ~stack_sampler () =
+  simple_benchmark_with_stack_sampler
+    ~benchmark_type:Time
+    ?amplification
+    ?intercept_stack
+    ?salt
+    ?more_tags
+    ?check
+    ~name
+    ~stack_type
+    ~kinstr
+    ~stack_sampler
+    () ;
+  simple_benchmark_with_stack_sampler
+    ~benchmark_type:Alloc
+    ?intercept_stack
+    ?salt
+    ?more_tags
+    ?check
+    ~name
+    ~stack_type
+    ~kinstr
+    ~stack_sampler
+    () ;
+  register_time_alloc_codegen_model (Instr_name name)
 
 let simple_benchmark ?(benchmark_type = Time) ?amplification ?intercept_stack
     ?more_tags ?salt ?check ~name ~stack_type ~kinstr () =
@@ -582,10 +667,7 @@ let simple_time_alloc_benchmark ?amplification ?intercept_stack ?more_tags ?salt
     ~stack_type
     ~kinstr
     () ;
-  let (Model.Model codegen_model) =
-    Interpreter_model.make_time_alloc_codegen_model (Instr_name name)
-  in
-  register_model_for_code_generation codegen_model
+  register_time_alloc_codegen_model (Instr_name name)
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers for creating benchmarks for [Script_interpreter.next] *)
@@ -832,10 +914,7 @@ let continuation_time_alloc_benchmark ?amplification ?intercept ?salt ?more_tags
     ~benchmark_type:Alloc
     ~cont_and_stack_sampler
     () ;
-  let (Model.Model codegen_model) =
-    Interpreter_model.make_time_alloc_codegen_model (Cont_name name)
-  in
-  register_model_for_code_generation codegen_model
+  register_time_alloc_codegen_model (Cont_name name)
 
 (* ------------------------------------------------------------------------- *)
 (* Sampling helpers *)
