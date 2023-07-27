@@ -100,7 +100,9 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
     (Node.Config_file.set_sandbox_network_with_dal_config config) ;
   (* Restart the node to load the new config. *)
   let* () = Node.terminate node in
-  let* () = Node.run node nodes_args in
+  let* () =
+    Node.run ~event_sections_levels:[("prevalidator", `Debug)] node nodes_args
+  in
   let* () = Node.wait_for_ready node in
   return (node, client)
 
@@ -141,7 +143,7 @@ let store_slot_to_dal_node ~slot_size dal_node =
 
 let publish_slot_header_to_l1_node ~slot_index ~source ~commitment_hash ~proof
     client =
-  let* _op_hash =
+  let* (`OpHash op_hash) =
     Operation.Manager.(
       inject
         [
@@ -153,7 +155,7 @@ let publish_slot_header_to_l1_node ~slot_index ~source ~commitment_hash ~proof
         ]
         client)
   in
-  unit
+  return op_hash
 
 let measure f =
   let start = Unix.gettimeofday () in
@@ -233,13 +235,28 @@ let test_produce_and_propagate_shards ~executors ~protocol =
         dal_node2
     in
     Log.info "Publish slot header from [node2]." ;
-    let* () =
+    let* op_hash =
       publish_slot_header_to_l1_node
         ~slot_index
         ~source:Constant.bootstrap2
         ~commitment_hash
         ~proof
         client2
+    in
+    Log.info
+      "Before having [node1] bake a block, check that [node1] contains \
+       [op_hash] in it's mempool." ;
+    let* () =
+      (* Wait until [node1] gets notified about a new operation
+         (should be the above publish slot header operation in this case). *)
+      let* () = Node.wait_for_request ~request:`Notify node1 in
+      let* m = Mempool.get_mempool client1 in
+      Check.(
+        ([op_hash] = m.validated)
+          (list string)
+          ~error_msg:
+            "Expected validated operations in mempool to be %L, got %R.") ;
+      unit
     in
     let dal_node_endpoint = Rollup.Dal.endpoint dal_node2 in
     Log.info "Bake two blocks to finalize the slot header." ;
