@@ -288,6 +288,19 @@ let encoding =
 let empty =
   {cycle_info = None; blocks = []; delegate_operations = []; unaccurate = true}
 
+type batch_item = {level : int32; data : t}
+
+type batch = batch_item list
+
+let batch_item_encoding =
+  let open Data_encoding in
+  conv
+    (fun {level; data} -> (level, data))
+    (fun (level, data) -> {level; data})
+    (obj2 (req "level" int32) (req "data" encoding))
+
+let batch_encoding = Data_encoding.list batch_item_encoding
+
 let block_data_encoding =
   let open Data_encoding in
   conv

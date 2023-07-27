@@ -25,108 +25,143 @@
 
 open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
 
-let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
-  Tezos_crypto.Hashed.Block_hash.Map.add
-    hash
-    Teztale_lib.Data.Block.
-      {
-        hash;
-        predecessor;
-        delegate;
-        round;
-        reception_times = [];
-        timestamp;
-        nonce = None;
-      }
-    acc
+module Int32Map = Map.Make (Int32)
 
-let parse_block_reception_row (hash, application_time, validation_time, source)
+let parse_block_row ((level, hash, predecessor, delegate), (round, timestamp))
     acc =
-  Tezos_crypto.Hashed.Block_hash.Map.update
-    hash
-    (function
-      | Some
-          Teztale_lib.Data.Block.
-            {
-              hash;
-              predecessor;
-              delegate;
-              round;
-              reception_times;
-              timestamp;
-              nonce;
-            } ->
-          Some
+  let blocks =
+    match Int32Map.find_opt level acc with
+    | Some m -> m
+    | None -> Tezos_crypto.Hashed.Block_hash.Map.empty
+  in
+  let blocks =
+    Tezos_crypto.Hashed.Block_hash.Map.add
+      hash
+      Teztale_lib.Data.Block.
+        {
+          hash;
+          predecessor;
+          delegate;
+          round;
+          reception_times = [];
+          timestamp;
+          nonce = None;
+        }
+      blocks
+  in
+  Int32Map.add level blocks acc
+
+let parse_block_reception_row
+    ((level, hash, application_time, validation_time), source) acc =
+  let blocks =
+    match Int32Map.find_opt level acc with
+    | Some m -> m
+    | None -> Tezos_crypto.Hashed.Block_hash.Map.empty
+  in
+  let blocks =
+    Tezos_crypto.Hashed.Block_hash.Map.update
+      hash
+      (function
+        | Some
             Teztale_lib.Data.Block.
               {
                 hash;
                 predecessor;
                 delegate;
                 round;
-                reception_times =
-                  {source; application_time; validation_time} :: reception_times;
+                reception_times;
                 timestamp;
                 nonce;
-              }
-      | None -> None)
-    acc
+              } ->
+            Some
+              Teztale_lib.Data.Block.
+                {
+                  hash;
+                  predecessor;
+                  delegate;
+                  round;
+                  reception_times =
+                    {source; application_time; validation_time}
+                    :: reception_times;
+                  timestamp;
+                  nonce;
+                }
+        | None -> None)
+      blocks
+  in
+  Int32Map.add level blocks acc
 
-let select_cycle_info db_pool level =
+let select_single_cycle_info db_pool level =
+  let cycle_request =
+    Caqti_request.Infix.(Caqti_type.int32 ->? Caqti_type.(tup2 int32 int32))
+      "SELECT id, size FROM cycles WHERE level = (SELECT MAX (level) FROM \
+       cycles WHERE level <= $1)"
+  in
+  Caqti_lwt.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt cycle_request level)
+    db_pool
+
+let select_cycles db_pool boundaries =
   let cycle_request =
     Caqti_request.Infix.(
-      Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
-      "SELECT id, $1 - level, size FROM cycles WHERE level = (SELECT MAX \
-       (level) FROM cycles WHERE level <= $1)"
+      Caqti_type.(tup2 int32 int32)
+      ->* Caqti_type.(tup2 (option int32) (option int32)))
+      "SELECT level, size FROM cycles WHERE level >= (SELECT MAX(level) WHERE \
+       level <= $1) AND level <= $2"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Lwt_result.map
-        (Option.map (fun (cycle, cycle_position, cycle_size) ->
-             Teztale_lib.Data.{cycle; cycle_position; cycle_size}))
-        (Db.find_opt cycle_request level))
+      Db.fold
+        cycle_request
+        (fun r acc ->
+          match r with
+          | Some level, Some size -> (level, size) :: acc
+          | _ -> acc)
+        boundaries
+        [])
     db_pool
 
-let select_blocks db_pool level =
+let select_blocks db_pool boundaries =
   let block_request =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup3
+              (tup4
+                 int32
                  Sql_requests.Type.block_hash
                  (option Sql_requests.Type.block_hash)
                  Sql_requests.Type.public_key_hash)
               (tup2 int32 Sql_requests.Type.time_protocol)))
-      "SELECT b.hash, p.hash, d.address, b.round, b.timestamp FROM blocks b \
-       JOIN delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id = \
-       b.predecessor WHERE b.level = ?"
+      "SELECT b.level, b.hash, p.hash, d.address, b.round, b.timestamp FROM \
+       blocks b JOIN delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id \
+       = b.predecessor WHERE b.level >= ? AND b.level <= ?"
   in
   let* blocks =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold
-          block_request
-          parse_block_row
-          level
-          Tezos_crypto.Hashed.Block_hash.Map.empty)
+        Db.fold block_request parse_block_row boundaries Int32Map.empty)
       db_pool
   in
   let reception_request =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
-            tup4
-              Sql_requests.Type.block_hash
-              (option ptime)
-              (option ptime)
+            tup2
+              (tup4
+                 int32
+                 Sql_requests.Type.block_hash
+                 (option ptime)
+                 (option ptime))
               string))
-      "SELECT b.hash, r.application_timestamp, r.validation_timestamp, n.name \
-       FROM blocks b JOIN blocks_reception r ON r.block = b.id JOIN nodes n ON \
-       n.id = r.source WHERE b.level = ?"
+      "SELECT b.level, b.hash, r.application_timestamp, \
+       r.validation_timestamp, n.name FROM blocks b JOIN blocks_reception r ON \
+       r.block = b.id JOIN nodes n ON n.id = r.source WHERE b.level >= ? AND \
+       b.level <= ?"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.fold reception_request parse_block_reception_row level blocks)
+      Db.fold reception_request parse_block_reception_row boundaries blocks)
     db_pool
 
 type op_info = {
@@ -159,7 +194,7 @@ let kind_of_bool = function
   | false -> Teztale_lib.Consensus_ops.Preendorsement
   | true -> Teztale_lib.Consensus_ops.Endorsement
 
-let select_ops db_pool level =
+let select_ops db_pool boundaries =
   (* We make 3 queries:
      - one to detect "missing" ops (not included, not received)
      - one to detect included ops
@@ -168,111 +203,132 @@ let select_ops db_pool level =
   *)
   let q_rights =
     Caqti_request.Infix.(
-      Caqti_type.int32
-      ->* Caqti_type.(tup3 Sql_requests.Type.public_key_hash int int))
-      "SELECT d.address, e.first_slot, e.endorsing_power FROM endorsing_rights \
-       e JOIN delegates d ON e.delegate = d.id WHERE e.level = ?"
+      Caqti_type.(tup2 int32 int32)
+      ->* Caqti_type.(tup4 int32 Sql_requests.Type.public_key_hash int int))
+      "SELECT e.level, d.address, e.first_slot, e.endorsing_power FROM \
+       endorsing_rights e JOIN delegates d ON e.delegate = d.id WHERE e.level \
+       >= ? AND e.level <= ?"
   in
   let q_included =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup4
-                 Sql_requests.Type.public_key_hash
-                 bool
-                 (option int32)
-                 Sql_requests.Type.operation_hash)
-              Sql_requests.Type.block_hash))
-      "SELECT d.address, o.endorsement, o.round, o.hash, b.hash FROM \
+              (tup4 int32 Sql_requests.Type.public_key_hash bool (option int32))
+              (tup2
+                 Sql_requests.Type.operation_hash
+                 Sql_requests.Type.block_hash)))
+      "SELECT o.level, d.address, o.endorsement, o.round, o.hash, b.hash FROM \
        operations o JOIN operations_inclusion i ON i.operation = o.id JOIN \
        delegates d ON o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE \
-       o.level = ?"
+       o.level >= ? AND o.level <= ?"
   in
   let q_received =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup3
+              (tup4
+                 int32
                  Sql_requests.Type.public_key_hash
                  ptime
                  Sql_requests.Type.operation_hash)
               (tup4 Sql_requests.Type.errors string bool (option int32))))
-      "SELECT d.address, r.timestamp, o.hash, r.errors, n.name, o.endorsement, \
-       o.round FROM operations o JOIN operations_reception r ON r.operation = \
-       o.id JOIN delegates d ON o.endorser = d.id JOIN nodes n ON n.id = \
-       r.source WHERE o.level = ?"
+      "SELECT o.level, d.address, r.timestamp, o.hash, r.errors, n.name, \
+       o.endorsement, o.round FROM operations o JOIN operations_reception r ON \
+       r.operation = o.id JOIN delegates d ON o.endorser = d.id JOIN nodes n \
+       ON n.id = r.source WHERE o.level >= ? AND o.level <= ?"
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
-  let cb_rights (delegate, first_slot, power) info =
-    Ops.add
-      delegate
-      (first_slot, power, Tezos_crypto.Hashed.Operation_hash.Map.empty)
-      info
+  let cb_rights (level, delegate, first_slot, power) info =
+    let ops =
+      match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
+    in
+    let ops =
+      Ops.add
+        delegate
+        (first_slot, power, Tezos_crypto.Hashed.Operation_hash.Map.empty)
+        ops
+    in
+    Int32Map.add level ops info
   in
-  let cb_included ((delegate, endorsement, round, op_hash), block_hash) info =
-    let kind = kind_of_bool endorsement in
-    Ops.update
-      delegate
-      (function
-        | Some (first_slot, power, ops) ->
-            let op =
-              match
-                Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
-              with
-              | Some op_info ->
-                  {op_info with included = block_hash :: op_info.included}
-              | None -> {kind; round; included = [block_hash]; received = []}
-            in
-            let ops' =
-              Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
-            in
-            Some (first_slot, power, ops')
-        | None -> None)
-      info
-  in
-  let cb_received
-      ((delegate, reception_time, op_hash), (errors, source, endorsement, round))
+  let cb_included ((level, delegate, endorsement, round), (op_hash, block_hash))
       info =
+    let ops =
+      match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
+    in
+    let kind = kind_of_bool endorsement in
+    let ops =
+      Ops.update
+        delegate
+        (function
+          | Some (first_slot, power, ops) ->
+              let op =
+                match
+                  Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
+                with
+                | Some op_info ->
+                    {op_info with included = block_hash :: op_info.included}
+                | None -> {kind; round; included = [block_hash]; received = []}
+              in
+              let ops' =
+                Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
+              in
+              Some (first_slot, power, ops')
+          | None -> None)
+        ops
+    in
+    Int32Map.add level ops info
+  in
+
+  let cb_received
+      ( (level, delegate, reception_time, op_hash),
+        (errors, source, endorsement, round) ) info =
+    let ops =
+      match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
+    in
     let kind = kind_of_bool endorsement in
     let received_info =
       Teztale_lib.Data.Delegate_operations.{source; reception_time; errors}
     in
-    Ops.update
-      delegate
-      (function
-        | Some (first_slot, power, ops) ->
-            let op =
-              match
-                Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
-              with
-              | Some op_info ->
-                  {op_info with received = received_info :: op_info.received}
-              | None -> {kind; round; included = []; received = [received_info]}
-            in
-            let ops' =
-              Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
-            in
-            Some (first_slot, power, ops')
-        | None -> None)
-      info
+    let ops =
+      Ops.update
+        delegate
+        (function
+          | Some (first_slot, power, ops) ->
+              let op =
+                match
+                  Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
+                with
+                | Some op_info ->
+                    {op_info with received = received_info :: op_info.received}
+                | None ->
+                    {kind; round; included = []; received = [received_info]}
+              in
+              let ops' =
+                Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
+              in
+              Some (first_slot, power, ops')
+          | None -> None)
+        ops
+    in
+    Int32Map.add level ops info
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold q_rights cb_rights level Ops.empty)
+        Db.fold q_rights cb_rights boundaries Int32Map.empty)
       db_pool
   in
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold q_included cb_included level out)
+        Db.fold q_included cb_included boundaries out)
       db_pool
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.fold q_received cb_received level out)
+      Db.fold q_received cb_received boundaries out)
     db_pool
 
 let translate_ops info =
@@ -291,18 +347,21 @@ let translate_ops info =
       pkh_ops
       []
   in
-  Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (first_slot, power, pkh_ops) acc ->
-      Teztale_lib.Data.Delegate_operations.
-        {
-          delegate = pkh;
-          first_slot;
-          endorsing_power = power;
-          operations = translate pkh_ops;
-        }
-      :: acc)
+  Int32Map.map
+    (fun info ->
+      Tezos_crypto.Signature.Public_key_hash.Map.fold
+        (fun pkh (first_slot, power, pkh_ops) acc ->
+          Teztale_lib.Data.Delegate_operations.
+            {
+              delegate = pkh;
+              first_slot;
+              endorsing_power = power;
+              operations = translate pkh_ops;
+            }
+          :: acc)
+        info
+        [])
     info
-    []
 
 (* NB: We're not yet extracting [Incorrect] operations. we easily
      could, they are quite noisy. At least in some cases, the "consensus
@@ -332,18 +391,68 @@ let anomalies level ops =
     ops
     []
 
-let data_at_level db_pool level =
-  let* cycle_info = select_cycle_info db_pool level in
-  let blocks_e = select_blocks db_pool level in
-  let* delegate_operations = select_ops db_pool level in
-  let* blocks = blocks_e in
+let data_at_level_range db_pool boundaries =
+  let cycles =
+    (* FIXME: do better than a list *)
+    let low, high = boundaries in
+    if high = low then
+      Lwt_result.map
+        (function
+          | Some (cycle_level, cycle_size) -> [(cycle_level, cycle_size)]
+          | None -> [])
+        (select_single_cycle_info db_pool high)
+    else Lwt_result.map (List.sort compare) (select_cycles db_pool boundaries)
+  in
+  let blocks = select_blocks db_pool boundaries in
+  let* delegate_operations = select_ops db_pool boundaries in
+  let* blocks in
+  let* cycles in
   let delegate_operations = translate_ops delegate_operations in
   let blocks =
-    Tezos_crypto.Hashed.Block_hash.Map.fold (fun _ x acc -> x :: acc) blocks []
+    Int32Map.map
+      (fun blocks ->
+        Tezos_crypto.Hashed.Block_hash.Map.fold
+          (fun _ x acc -> x :: acc)
+          blocks
+          [])
+      blocks
   in
   let unaccurate = false in
-  return Teztale_lib.Data.{cycle_info; blocks; delegate_operations; unaccurate}
+  let result =
+    Int32Map.fold
+      (fun level blocks acc ->
+        let delegate_operations =
+          match Int32Map.find_opt level delegate_operations with
+          | Some x -> x
+          | None -> []
+        in
+        let cycle_info =
+          match
+            List.find_opt
+              (fun (cycle_level, cycle_size) ->
+                cycle_level <= level && Int32.add cycle_level cycle_size > level)
+              cycles
+          with
+          | Some (cycle, cycle_size) ->
+              Some
+                Teztale_lib.Data.
+                  {cycle; cycle_position = Int32.sub level cycle; cycle_size}
+          | None -> None
+        in
+        Teztale_lib.Data.
+          {
+            level;
+            data =
+              Teztale_lib.Data.
+                {cycle_info; blocks; delegate_operations; unaccurate};
+          }
+        :: acc)
+      blocks
+      []
+  in
+  return result
 
 let anomalies_at_level db_pool level =
-  let* ops = select_ops db_pool level in
+  let* ops = select_ops db_pool (level, level) in
+  let ops = Int32Map.find level ops in
   return (anomalies level ops)

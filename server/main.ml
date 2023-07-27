@@ -644,8 +644,35 @@ let routes :
       fun g ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
-            with_caqti_error (Exporter.data_at_level db_pool level) (fun data ->
-                reply_public_json Teztale_lib.Data.encoding data)) );
+            with_caqti_error
+              (Exporter.data_at_level_range db_pool (level, level))
+              (fun data ->
+                reply_public_json Teztale_lib.Data.encoding (List.hd data).data))
+    );
+    ( Re.seq
+        [
+          Re.str "/";
+          Re.group (Re.rep1 Re.digit);
+          Re.str "-";
+          Re.group (Re.rep1 Re.digit);
+          Re.str ".json";
+        ],
+      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
+        get_only_endpoint meth (fun () ->
+            let min = Re.Group.get g 1 in
+            let max = Re.Group.get g 2 in
+            let min' = int_of_string min in
+            let max' = int_of_string max in
+            if min' > max' || max' - min' > 1000 then
+              let body = "Invalid block range." in
+              Cohttp_lwt_unix.Server.respond_error ~body ()
+            else
+              with_caqti_error
+                (Exporter.data_at_level_range
+                   db_pool
+                   (Int32.of_string min, Int32.of_string max))
+                (fun data ->
+                  reply_public_json Teztale_lib.Data.batch_encoding data)) );
     ( Re.seq
         [
           Re.str "/";

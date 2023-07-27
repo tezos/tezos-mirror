@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val data_at_level :
+val data_at_level_range :
   ( Caqti_lwt.connection,
     ([> Caqti_error.call_or_retrieve] as 'a) )
   Caqti_lwt.Pool.t ->
-  Int32.t ->
-  (Teztale_lib.Data.t, 'a) result Lwt.t
+  Int32.t * Int32.t ->
+  (Teztale_lib.Data.batch, 'a) result Lwt.t
 
 val anomalies_at_level :
   ( Caqti_lwt.connection,
