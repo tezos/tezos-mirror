@@ -1,0 +1,13 @@
+{ parameter (pair int bool) ;
+  storage (pair (big_map int unit) unit) ;
+  code { DUP ;
+         DUP ;
+         { CAR ; CDR } ;
+         DIP { { CAR ; CAR } ; DIP { { CDR ; CAR } ; DUP } ; MEM } ;
+         { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;
+         UNIT ;
+         SWAP ;
+         PAIR ;
+         NIL operation ;
+         PAIR } }
+

@@ -20,6 +20,7 @@ depends: [
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "tezos-dac-017-PtNairob"
+  "tezos-dac-018-Proxford"
 ]
 depopts: [
   "tezos-dac-alpha"

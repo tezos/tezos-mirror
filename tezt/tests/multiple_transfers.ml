@@ -170,7 +170,7 @@ let test_multiple_transfer =
       if payer = source then
         Tez.of_mutez_int
           (match protocol with
-          | Nairobi | Alpha -> 0_000_434
+          | Nairobi | Oxford | Alpha -> 0_000_434
           | Mumbai -> 0_000_608)
       else Tez.zero
     in

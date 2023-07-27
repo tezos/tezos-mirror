@@ -6757,6 +6757,8 @@ let hash = Protocol.hash
 
   let _017_PtNairob = active (Name.v "PtNairob" 017)
 
+  let _018_Proxford = active (Name.v "Proxford" 018)
+
   let alpha = active Name.alpha
 
   let all = List.rev !all_rev

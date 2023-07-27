@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_dal_018_Proxford)
+ (public_name tezos-dal-018-Proxford)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  octez-protocol-compiler.registerer
+  tezos-stdlib-unix
+  tezos-dal-node-lib
+  tezos-client-018-Proxford
+  tezos-protocol-plugin-018-Proxford
+  tezos-embedded-protocol-018-Proxford
+  tezos-layer2-utils-018-Proxford
+  tezos-protocol-018-Proxford)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_registerer
+  -open Tezos_stdlib_unix
+  -open Tezos_dal_node_lib
+  -open Tezos_client_018_Proxford
+  -open Tezos_protocol_plugin_018_Proxford
+  -open Tezos_embedded_protocol_018_Proxford
+  -open Tezos_layer2_utils_018_Proxford
+  -open Tezos_protocol_018_Proxford))

@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test_uf test_inference)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-018-Proxford
+  tezos-protocol-018-Proxford
+  tezos-error-monad
+  tezos-client-018-Proxford)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_micheline
+  -open Tezos_benchmark_type_inference_018_Proxford))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-018-Proxford)
+ (action (run %{dep:./test_uf.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-type-inference-018-Proxford)
+ (action (run %{dep:./test_inference.exe})))

@@ -867,7 +867,7 @@ module Deserialisation = struct
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
     | Protocol.Mumbai -> 2109
-    | Nairobi | Alpha -> 1941
+    | Nairobi | Oxford | Alpha -> 1941
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =

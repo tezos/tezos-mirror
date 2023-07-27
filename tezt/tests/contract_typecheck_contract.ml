@@ -189,7 +189,7 @@ let test_implicit =
   let no_entrypoint_error = "Contract has no entrypoint named a" in
   let type_mismatch_error =
     match protocol with
-    | Alpha ->
+    | Oxford | Alpha ->
         "is not acceptable as a handle to an implicit account, whose \
          parameters type can only be unit or ticket <ty>"
     | Mumbai | Nairobi -> "Type nat is not compatible with type unit."

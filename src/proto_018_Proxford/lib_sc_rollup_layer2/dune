@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_smart_rollup_layer2_018_Proxford)
+ (public_name tezos-smart-rollup-layer2-018-Proxford)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-018-Proxford
+  octez-injector
+  octez-smart-rollup)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_018_Proxford
+  -open Octez_injector
+  -open Octez_smart_rollup))

@@ -1,0 +1,64 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_018_Proxford_lib_protocol_test_integration_validate_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-alcotezt
+  tezos-base
+  tezos-protocol-018-Proxford
+  qcheck-alcotest
+  tezos-client-018-Proxford
+  tezos-test-helpers
+  tezos-018-Proxford-test-helpers
+  tezos-base-test-helpers
+  tezos-protocol-plugin-018-Proxford)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_018_Proxford
+  -open Tezos_client_018_Proxford
+  -open Tezos_test_helpers
+  -open Tezos_018_Proxford_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_018_Proxford)
+ (modules
+  generator_descriptors
+  generators
+  manager_operation_helpers
+  test_1m_restriction
+  test_covalidity
+  test_manager_operation_validation
+  test_mempool
+  test_sanity
+  test_validation_batch
+  valid_operations_generators
+  validate_helpers))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_018_Proxford_lib_protocol_test_integration_validate_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-018-Proxford-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -1,0 +1,10 @@
+{ parameter (ticket nat) ;
+  storage (option (ticket nat)) ;
+  code { UNPAIR ;
+         SWAP ;
+         IF_NONE
+           {}
+           { PAIR ; JOIN_TICKETS ; { IF_NONE { { UNIT ; FAILWITH } } {} } } ;
+         SOME ;
+         NIL operation ;
+         PAIR } }
