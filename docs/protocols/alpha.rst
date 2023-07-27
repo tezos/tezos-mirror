@@ -15,6 +15,10 @@ Environment Version
 Smart Rollups
 -------------
 
+- The ``smart_rollup_originate`` operation now also takes an optional
+  whitelist of public key hashes. This whitelist cannot be used yet
+  (the ``sc_rollup.private_enable`` flag has to be set to true). (MR :gl:`!9401`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
