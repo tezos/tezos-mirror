@@ -1918,6 +1918,77 @@ let commands_rw () =
             successor_level ));
     command
       ~group
+      ~desc:"Unstake"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefix "unstake"
+      @@ tez_param ~name:"qty" ~desc:"amount to unstake from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better printer? *)
+          Some (Int64.to_string (Tez.to_mutez amount))
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.unstake in
+        (* TODO #6162
+           (unless --force)
+              - check contract is delegated
+              - check contract has stake
+              - check amount is positive
+              - check contract is a baker if AI is not enabled
+              - print a warning if effective stake is lower *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
