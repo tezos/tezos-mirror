@@ -5762,20 +5762,17 @@ let hash = Protocol.hash
                 ~deps:[S "gen.exe"]
                 ~action:[S "run"; S "%{deps}"; S ("--" ^ name)]
             in
-            [
-              gen_json "sandbox";
-              gen_json "test";
-              gen_json "mainnet";
-              (* TODO: why do we install these files? *)
-              install
+            let networks = List.["sandbox"; "test"; "mainnet"] in
+            of_list
+              (List.map gen_json networks
+              @ (* TODO: why do we install these files? *)
+              List.
                 [
-                  S "sandbox-parameters.json";
-                  S "test-parameters.json";
-                  S "mainnet-parameters.json";
-                ]
-                ~package:(sf "tezos-protocol-%s" name_dash)
-                ~section:"lib";
-            ])
+                  install
+                    (List.map (fun n -> S (n ^ "-parameters.json")) networks)
+                    ~package:(sf "tezos-protocol-%s" name_dash)
+                    ~section:"lib";
+                ]))
         ~bisect_ppx:No
     in
     let octez_sc_rollup =
