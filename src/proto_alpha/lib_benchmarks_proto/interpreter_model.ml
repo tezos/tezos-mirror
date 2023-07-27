@@ -520,7 +520,7 @@ let ir_model instr_or_cont =
       | N_IAmount | N_IChainId | N_ILevel | N_ISelf_address | N_INever
       | N_IUnpair | N_IVoting_power | N_ITotal_voting_power | N_IList_size
       | N_ISet_size | N_IMap_size | N_ISapling_empty_state ->
-          const1_model name |> m
+          (const1_model, const1_model) |> m2 name
       | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
       | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update
       | N_IMap_get_and_update | N_IBig_map_get_and_update ->
@@ -528,11 +528,11 @@ let ir_model instr_or_cont =
       | N_IConcat_string -> concat_model name |> m
       | N_IConcat_string_pair -> concat_pair_model name |> m
       | N_ISlice_string -> affine_model name |> m
-      | N_IString_size -> const1_model name |> m
+      | N_IString_size -> (const1_model, const1_model) |> m2 name
       | N_IConcat_bytes -> concat_model name |> m
       | N_IConcat_bytes_pair -> concat_pair_model name |> m
       | N_ISlice_bytes -> affine_model name |> m
-      | N_IBytes_size -> const1_model name |> m
+      | N_IBytes_size -> (const1_model, const1_model) |> m2 name
       | N_IOr_bytes -> linear_max_model name |> m
       | N_IAnd_bytes -> linear_min_model name |> m
       | N_IXor_bytes -> linear_max_model name |> m
@@ -548,11 +548,11 @@ let ir_model instr_or_cont =
           linear_max_model name |> m
       | N_IAdd_tez | N_ISub_tez | N_ISub_tez_legacy | N_IEdiv_tez
       | N_IMul_teznat | N_IMul_nattez | N_IEdiv_teznat ->
-          const1_model name |> m
-      | N_IIs_nat -> const1_model name |> m
+          (const1_model, const1_model) |> m2 name
+      | N_IIs_nat -> (const1_model, const1_model) |> m2 name
       | N_INeg -> affine_model name |> m
       | N_IAbs_int -> affine_model name |> m
-      | N_IInt_nat -> const1_model name |> m
+      | N_IInt_nat -> (const1_model, const1_model) |> m2 name
       | N_IAdd_int -> linear_max_model name |> m
       | N_IAdd_nat -> linear_max_model name |> m
       | N_ISub_int -> linear_max_model name |> m
@@ -568,7 +568,8 @@ let ir_model instr_or_cont =
       | N_IXor_nat -> linear_max_model name |> m
       | N_INot_int -> affine_model name |> m
       | N_ICompare -> linear_min_offset_model name ~offset:1 |> m
-      | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe -> const1_model name |> m
+      | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe ->
+          (const1_model, const1_model) |> m2 name
       | N_IPack -> pack_model name |> m
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
           affine_model name |> m
@@ -576,7 +577,7 @@ let ir_model instr_or_cont =
       | N_ICheck_signature_p256 | N_ICheck_signature_bls ->
           affine_model name |> m
       | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
-          const1_model name |> m
+          (const1_model, const1_model) |> m2 name
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
       | N_IDupN -> break_model_2_const_offset name 300 400 ~offset:1 |> m
@@ -586,48 +587,38 @@ let ir_model instr_or_cont =
       | N_IMul_bls12_381_g1 | N_IMul_bls12_381_g2 | N_IMul_bls12_381_fr
       | N_INeg_bls12_381_g1 | N_INeg_bls12_381_g2 | N_INeg_bls12_381_fr
       | N_IInt_bls12_381_z_fr ->
-          const1_model name |> m
+          (const1_model, const1_model) |> m2 name
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
           affine_model name |> m
       | N_IComb | N_IUncomb -> affine_offset_model name ~offset:2 |> m
       | N_IComb_get | N_IComb_set -> affine_model name |> m
-      | N_ITicket | N_IRead_ticket -> const1_model name |> m
+      | N_ITicket | N_IRead_ticket -> (const1_model, const1_model) |> m2 name
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m
       | N_ISapling_verify_update -> verify_update_model name |> m
       | N_IList_map -> const1_model name |> m
-      | N_IList_iter -> const1_model name |> m
-      | N_IIter -> const1_model name |> m
+      | N_IList_iter | N_IIter -> (const1_model, const1_model) |> m2 name
       | N_IMap_map -> affine_model name |> m
       | N_IMap_iter -> affine_model name |> m
       | N_ISet_iter -> affine_model name |> m
       | N_IHalt -> (const1_model, const1_model) |> m2 name
       | N_IApply -> lambda_model name |> m
-      | N_ILambda_lam -> const1_model name |> m
-      | N_ILambda_lamrec -> const1_model name |> m
-      | N_ILog -> const1_model name |> m
+      | N_ILambda_lam | N_ILambda_lamrec | N_ILog ->
+          (const1_model, const1_model) |> m2 name
       | N_IOpen_chest -> open_chest_model name |> m
-      | N_IEmit -> const1_model name |> m
-      | N_IOpt_map_none -> const1_model name |> m
-      | N_IOpt_map_some -> const1_model name |> m)
+      | N_IEmit | N_IOpt_map_none | N_IOpt_map_some ->
+          (const1_model, const1_model) |> m2 name)
   | Cont_name cont -> (
       match cont with
-      | N_KNil -> (const1_model, const1_model) |> m2 name
-      | N_KCons -> const1_model name |> m
-      | N_KReturn -> const1_model name |> m
-      | N_KView_exit -> const1_model name |> m
-      | N_KMap_head -> const1_model name |> m
-      | N_KUndip -> const1_model name |> m
-      | N_KLoop_in -> const1_model name |> m
-      | N_KLoop_in_left -> const1_model name |> m
-      | N_KIter_empty -> const1_model name |> m
-      | N_KIter_nonempty -> const1_model name |> m
+      | N_KNil | N_KCons | N_KReturn | N_KView_exit | N_KMap_head | N_KUndip
+      | N_KLoop_in | N_KLoop_in_left | N_KIter_empty | N_KIter_nonempty ->
+          (const1_model, const1_model) |> m2 name
       | N_KList_enter_body -> list_enter_body_model name |> m
       | N_KList_exit_body -> const1_model name |> m
       | N_KMap_enter_body -> empty_branch_model name |> m
       | N_KMap_exit_body -> nlogm_model name |> m
-      | N_KLog -> const1_model name |> m)
+      | N_KLog -> (const1_model, const1_model) |> m2 name)
 
 let gas_unit_per_allocation_word = 4
 
