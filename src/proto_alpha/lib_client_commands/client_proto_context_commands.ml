@@ -2052,6 +2052,92 @@ let commands_rw () =
             successor_level ));
     command
       ~group
+      ~desc:"Set delegate parameters"
+      (args14
+         limit_of_staking_over_baking_millionth_arg
+         edge_of_baking_over_staking_billionth_arg
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["set"; "delegate"; "parameters"; "for"]
+      @@ Public_key_hash.source_param ~name:"src" ~desc:"name of the delegate"
+      @@ stop)
+      (fun ( limit_of_staking_over_baking_millionth_opt,
+             edge_of_baking_over_staking_billionth_opt,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* limit_of_staking_over_baking_millionth =
+          match limit_of_staking_over_baking_millionth_opt with
+          | None ->
+              cctxt#error
+                "The --limit-of-staking-over-baking argument is mandatory"
+          | Some x -> return x
+        in
+        let* edge_of_baking_over_staking_billionth =
+          match edge_of_baking_over_staking_billionth_opt with
+          | None ->
+              cctxt#error
+                "The --edge-of-baking-over-staking argument is mandatory"
+          | Some x -> return x
+        in
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better way? *)
+          Some
+            (Format.sprintf
+               "Pair %d %d Unit"
+               limit_of_staking_over_baking_millionth
+               edge_of_baking_over_staking_billionth)
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.set_delegate_parameters in
+        (* TODO #6162
+           (unless --force)
+              - check contract is a baker
+        *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]

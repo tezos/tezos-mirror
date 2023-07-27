@@ -217,6 +217,12 @@ val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 
 val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg
 
+val limit_of_staking_over_baking_millionth_arg :
+  (int option, full) Tezos_clic.arg
+
+val edge_of_baking_over_staking_billionth_arg :
+  (int option, full) Tezos_clic.arg
+
 module Sc_rollup_params : sig
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
 

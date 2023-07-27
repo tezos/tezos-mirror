@@ -691,6 +691,55 @@ let display_names_flag =
     ~doc:"Print names of scripts passed to this command"
     ()
 
+let fixed_point_parameter ~decimals =
+  if decimals < 0 then
+    raise (Invalid_argument "fixed_point_parameter: negative decimals")
+  else
+    let rec remove_trailing_zeroes ~right i =
+      if i < decimals then Some (String.sub right 0 decimals)
+      else if right.[i] <> '0' then None
+      else (remove_trailing_zeroes [@ocaml.tailcall]) ~right (i - 1)
+    in
+    let parse ~left ~right =
+      let open Option_syntax in
+      let* right =
+        if String.length right > decimals then
+          remove_trailing_zeroes ~right (String.length right - 1)
+        else Some (right ^ String.make (decimals - String.length right) '0')
+      in
+      int_of_string_opt (left ^ right)
+    in
+    fun ~name ->
+      Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
+          match
+            match String.split_on_char '.' p with
+            | [left; right] -> parse ~left ~right
+            | [left] -> parse ~left ~right:""
+            | _ -> None
+          with
+          | Some res -> return res
+          | None -> cctxt#error "Cannot read %s parameter" name)
+
+let limit_of_staking_over_baking_millionth_arg =
+  Tezos_clic.arg
+    ~long:"limit-of-staking-over-baking"
+    ~placeholder:"limit"
+    ~doc:"Limit of staking over baking"
+    ((* should we check it's between 0 and 5 million? *)
+     fixed_point_parameter
+       ~decimals:6
+       ~name:"limit of staking over baking")
+
+let edge_of_baking_over_staking_billionth_arg =
+  Tezos_clic.arg
+    ~long:"edge-of-baking-over-staking"
+    ~placeholder:"edge"
+    ~doc:"Edge of baking over staking"
+    ((* TODO #6162: check it's between 0 and 1 billion *)
+     fixed_point_parameter
+       ~decimals:9
+       ~name:"edge of baking over staking")
+
 module Sc_rollup_params = struct
   let rollup_kind_parameter =
     Tezos_clic.parameter (fun (cctxt : #Client_context.full) name ->
