@@ -26,28 +26,9 @@
 module Make (Wasm : Wasm_utils_intf.S) = struct
   module Commands = Commands.Make (Wasm)
 
-  (* [parse_binary_module module_name module_stream] parses a binary encoded
-     module and its custom sections. Parsing outside of the PVM allows locations
-     in case of errors. *)
   let parse_binary_module name module_ =
-    let open Lwt_syntax in
     let bytes = Tezos_lazy_containers.Chunked_byte_vector.of_string module_ in
-    let* modl_ =
-      Tezos_webassembly_interpreter.Decode.decode
-        ~allow_floats:false
-        ~name
-        ~bytes
-    in
-    let+ custom =
-      Tezos_webassembly_interpreter.Decode.decode_custom "name" ~name ~bytes
-    in
-    let functions_section =
-      List.map Custom_section.parse_function_subsection custom
-      |> List.fold_left
-           (Custom_section.FuncMap.merge (fun _ -> Option.either))
-           Custom_section.FuncMap.empty
-    in
-    (modl_, functions_section)
+    Tezos_webassembly_interpreter.Decode.decode ~allow_floats:false ~name ~bytes
 
   (* [typecheck_module module_ast] runs the typechecker on the module, which is
      not done by the PVM. *)
@@ -79,12 +60,10 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
   let handle_module version binary name module_ =
     let open Lwt_result_syntax in
     let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
-    let* ast, functions =
+    let* ast =
       Repl_helpers.trap_exn (fun () ->
           if binary then parse_binary_module name module_
-          else
-            Lwt.return
-              (Wasm_utils.parse_module module_, Custom_section.FuncMap.empty))
+          else Lwt.return (Wasm_utils.parse_module module_))
     in
     let* () = typecheck_module ast in
     let* () = import_pvm_host_functions ~version () in
@@ -99,7 +78,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
         module_
     in
     let*! tree = Wasm.eval_until_input_requested tree in
-    return (tree, Commands.{functions})
+    return tree
 
   let start version binary file =
     let open Lwt_result_syntax in
@@ -108,7 +87,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     handle_module version binary module_name buffer
 
   (* REPL main loop: reads an input, does something out of it, then loops. *)
-  let repl tree inboxes level config extra =
+  let repl tree inboxes level config =
     let open Lwt_result_syntax in
     let rec loop tree inboxes level =
       let*! () = Lwt_io.printf "> " in
@@ -122,7 +101,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       match input with
       | Some command ->
           let* tree, inboxes, level =
-            Commands.handle_command command config extra tree inboxes level
+            Commands.handle_command command config tree inboxes level
           in
           loop tree inboxes level
       | None -> return tree
@@ -253,13 +232,13 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       else if Filename.check_suffix wasm_file ".wast" then Ok false
       else error_with "Kernels should have .wasm or .wast file extension"
     in
-    let* tree, extra = start version binary wasm_file in
+    let* tree = start version binary wasm_file in
     let* inboxes =
       match inputs with
       | Some inputs -> Messages.parse_inboxes inputs config
       | None -> return []
     in
-    let+ _tree = repl tree inboxes 0l config extra in
+    let+ _tree = repl tree inboxes 0l config in
     ()
 
   let main () =

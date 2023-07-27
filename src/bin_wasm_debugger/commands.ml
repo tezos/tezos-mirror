@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,7 @@
 
 open Repl_helpers
 open Tezos_scoru_wasm
+open Custom_section
 
 (* Possible step kinds. *)
 type eval_step =
@@ -391,8 +393,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick
         ))
 
-  type extra = {functions : string Custom_section.FuncMap.t}
-
   let produce_flamegraph ~collapse ~max_depth kernel_runs =
     let filename =
       Time.System.(
@@ -441,7 +441,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            `kernel_run`, please open an issue.\n\
            %!"
 
-  let eval_and_profile ~collapse ~with_time ~no_reboot config extra tree =
+  let eval_and_profile ~collapse ~with_time ~no_reboot config function_symbols
+      tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         Format.printf
@@ -455,7 +456,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ~reveal_builtins:(reveals config)
             ~with_time
             ~no_reboot
-            extra.functions
+            function_symbols
             tree
         in
         produce_flamegraph ~collapse ~max_depth:100 graph ;
@@ -540,7 +541,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             return (tree, ticks, inboxes, level)
         | Error _ -> return' (eval_until_input_requested config tree))
 
-  let profile ~collapse ~with_time ~no_reboot level inboxes config extra tree =
+  let profile ~collapse ~with_time ~no_reboot level inboxes config
+      function_symbols tree =
     let open Lwt_result_syntax in
     let*! pvm_state =
       Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
@@ -559,12 +561,24 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     | Ok () when is_profilable ->
         let* tree, inboxes, level = load_inputs inboxes level tree in
         let* tree =
-          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+          eval_and_profile
+            ~collapse
+            ~with_time
+            ~no_reboot
+            config
+            function_symbols
+            tree
         in
         return (tree, inboxes, level)
     | Error _ when is_profilable ->
         let* tree =
-          eval_and_profile ~collapse ~with_time ~no_reboot config extra tree
+          eval_and_profile
+            ~collapse
+            ~with_time
+            ~no_reboot
+            config
+            function_symbols
+            tree
         in
         return (tree, inboxes, level)
     | _ ->
@@ -846,9 +860,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
               state
         | exn -> Lwt_io.printf "Error: %s\n%!" (Printexc.to_string exn))
 
-  let dump_function_symbols extra =
+  let dump_function_symbols function_symbols =
     let functions =
-      Format.asprintf "%a" Custom_section.pp_function_subsection extra.functions
+      Format.asprintf
+        "%a"
+        Custom_section.pp_function_subsection
+        function_symbols
     in
     Lwt_io.printf "Functions:\n%s\n" functions
 
@@ -886,9 +903,25 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
         tree
 
+  let get_function_symbols tree =
+    let open Lwt_result_syntax in
+    let*! durable = Wasm_utils.wrap_as_durable_storage tree in
+    let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+    let*! module_ =
+      Tezos_scoru_wasm.(Durable.find_value_exn durable Constants.kernel_key)
+    in
+    let*! module_string =
+      Tezos_lazy_containers.Chunked_byte_vector.to_string module_
+    in
+    let* function_symbols =
+      Repl_helpers.trap_exn (fun () ->
+          parse_custom_sections "kernel" module_string)
+    in
+    return function_symbols
+
   (* [handle_command command tree inboxes level] dispatches the commands to their
      actual implementation. *)
-  let handle_command c config extra tree inboxes level =
+  let handle_command c config tree inboxes level =
     let open Lwt_result_syntax in
     let command = parse_commands c in
     let return ?(tree = tree) ?(inboxes = inboxes) () =
@@ -941,7 +974,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           let*! () = show_memory tree address length kind in
           return ()
       | Dump_function_symbols ->
-          let*! () = dump_function_symbols extra in
+          let* function_symbols = get_function_symbols tree in
+          let*! () = dump_function_symbols function_symbols in
           return ()
       | Reveal_preimage bytes ->
           let*! tree = reveal_preimage config bytes tree in
@@ -950,6 +984,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           let*! tree = reveal_metadata config tree in
           return ~tree ()
       | Profile {collapse; with_time; no_reboot} ->
+          let* function_symbols = get_function_symbols tree in
           let* tree, inboxes, level =
             profile
               ~collapse
@@ -958,7 +993,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
               level
               inboxes
               config
-              extra
+              function_symbols
               tree
           in
           Lwt.return_ok (tree, inboxes, level)
