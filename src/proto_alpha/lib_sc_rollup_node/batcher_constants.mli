@@ -23,19 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin : Protocol_plugin_sig.S = struct
-  let protocol = Protocol.hash
+(** Maximum size of an L2 message allowed by the prototcol. Is
+    {!val:Protocol.Constants_repr.sc_rollup_message_size_limit}. *)
+val message_size_limit : int
 
-  module RPC_directory = RPC_directory
-  module Dal_slots_tracker = Dal_slots_tracker
-  module Inbox = Inbox
-  module Interpreter = Interpreter
-  module Publisher = Publisher
-  module Refutation_coordinator = Refutation_coordinator
-  module Batcher_constants = Batcher_constants
-  module Layer1_helpers = Layer1_helpers
-  module L1_processing = Daemon_helpers
-  module Pvm = Pvm_plugin
-end
-
-let () = Protocol_plugins.register (module Plugin)
+(** Maximum size in bytes of an batch of L2 messages that can fit in an
+    operation on L1. It is protocol dependent. *)
+val protocol_max_batch_size : int

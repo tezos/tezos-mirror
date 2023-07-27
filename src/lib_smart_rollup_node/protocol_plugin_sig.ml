@@ -75,6 +75,11 @@ module type INBOX = sig
     Octez_smart_rollup.Inbox.t ->
     unit tzresult Lwt.t
 
+  (** Serialize an external messages to the protocol representation. NOTE: so
+      far, in all available protocols, this adds a tag ['\001'] at the
+      beginning. *)
+  val serialize_external_message : string -> string tzresult
+
   (**/**)
 
   module Internal_for_tests : sig
@@ -181,6 +186,17 @@ module type REFUTATION_COORDINATOR = sig
 
   (** [shutdown ()] stops the refutation coordinator. *)
   val shutdown : unit -> unit Lwt.t
+end
+
+(** Protocol specific constants for the batcher. *)
+module type BATCHER_CONSTANTS = sig
+  (** Maximum size of an L2 message allowed by the prototcol, which is
+      {!val:Protocol.Constants_repr.sc_rollup_message_size_limit}. *)
+  val message_size_limit : int
+
+  (** Maximum size in bytes of an batch of L2 messages that can fit in an
+      operation on L1. It is protocol dependent. *)
+  val protocol_max_batch_size : int
 end
 
 (** Protocol specific batcher. NOTE: The batcher has to be stopped and the new
@@ -292,7 +308,7 @@ module type S = sig
 
   module Refutation_coordinator : REFUTATION_COORDINATOR
 
-  module Batcher : BATCHER
+  module Batcher_constants : BATCHER_CONSTANTS
 
   module Layer1_helpers : LAYER1_HELPERS
 

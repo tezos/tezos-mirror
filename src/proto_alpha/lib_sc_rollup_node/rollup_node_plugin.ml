@@ -32,15 +32,9 @@ module Plugin : Protocol_plugin_sig.S = struct
   module Interpreter = Interpreter
   module Publisher = Publisher
   module Refutation_coordinator = Refutation_coordinator
-  module Batcher = Batcher
+  module Batcher_constants = Batcher_constants
   module Layer1_helpers = Layer1_helpers
-
-  module L1_processing = struct
-    let check_pvm_initial_state_hash = Daemon.check_initial_state_hash
-
-    let process_l1_block_operations = Daemon.process_l1_block_operations
-  end
-
+  module L1_processing = Daemon_helpers
   module Pvm = Pvm_plugin
 end
 

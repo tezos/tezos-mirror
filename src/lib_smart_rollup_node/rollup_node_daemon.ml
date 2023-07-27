@@ -58,8 +58,9 @@ let previous_context (node_ctxt : _ Node_context.t)
   else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
 
 let start_workers ?(degraded = false) (configuration : Configuration.t)
-    (module Plugin : Protocol_plugin_sig.S) (node_ctxt : _ Node_context.t) =
+    (plugin : (module Protocol_plugin_sig.S)) (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
+  let module Plugin = (val plugin) in
   let* () =
     unless degraded @@ fun () ->
     let* () = Plugin.Publisher.init node_ctxt in
@@ -67,7 +68,7 @@ let start_workers ?(degraded = false) (configuration : Configuration.t)
       Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
     with
     | None -> return_unit
-    | Some signer -> Plugin.Batcher.init configuration.batcher ~signer node_ctxt
+    | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
   in
   let* () = Plugin.Refutation_coordinator.init node_ctxt in
   return_unit
@@ -272,7 +273,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let* () = Plugin.Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Plugin.Refutation_coordinator.process stripped_head in
-  let* () = Plugin.Batcher.new_head stripped_head in
+  let* () = Batcher.new_head stripped_head in
   let*! () = Injector.inject ~header:head.header () in
   return_unit
 
@@ -285,7 +286,7 @@ let degraded_refutation_mode state =
   let message = state.node_ctxt.Node_context.cctxt#message in
   let module Plugin = (val state.plugin) in
   let*! () = message "Shutting down Batcher@." in
-  let*! () = Plugin.Batcher.shutdown () in
+  let*! () = Batcher.shutdown () in
   let*! () = message "Shutting down Commitment Publisher@." in
   let*! () = Plugin.Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
@@ -309,7 +310,7 @@ let install_finalizer state =
   let* () = message "Shutting down Injector@." in
   let* () = Injector.shutdown () in
   let* () = message "Shutting down Batcher@." in
-  let* () = Plugin.Batcher.shutdown () in
+  let* () = Batcher.shutdown () in
   let* () = message "Shutting down Commitment Publisher@." in
   let* () = Plugin.Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in

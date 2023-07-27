@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,47 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Request = struct
-  type ('a, 'b) t =
-    | Register : string list -> (L2_message.hash list, error trace) t
-    | New_head : Layer1.head -> (unit, error trace) t
+(** Ensure that the initial state hash of the PVM as defined by the rollup node
+    matches the one of the PVM on the L1 node.  *)
+val check_pvm_initial_state_hash : _ Node_context.t -> unit tzresult Lwt.t
 
-  type view = View : _ t -> view
-
-  let view req = View req
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Register"
-          (obj2
-             (req "request" (constant "register"))
-             (req "messages" (list L2_message.content_encoding)))
-          (function
-            | View (Register messages) -> Some ((), messages) | _ -> None)
-          (fun ((), messages) -> View (Register messages));
-        case
-          (Tag 1)
-          ~title:"New_head"
-          (obj2
-             (req "request" (constant "new_head"))
-             (req "block" Layer1.head_encoding))
-          (function View (New_head b) -> Some ((), b) | _ -> None)
-          (fun ((), b) -> View (New_head b));
-      ]
-
-  let pp ppf (View r) =
-    match r with
-    | Register messages ->
-        Format.fprintf ppf "register %d new L2 message" (List.length messages)
-    | New_head {Layer1.hash; level} ->
-        Format.fprintf
-          ppf
-          "switching to new L1 head %a at level %ld"
-          Block_hash.pp
-          hash
-          level
-end
+(** React to L1 operations included in a block of the chain. *)
+val process_l1_block_operations :
+  Node_context.rw -> Layer1.header -> unit tzresult Lwt.t

@@ -27,7 +27,7 @@
 open Protocol
 open Alpha_context
 open Octez_smart_rollup_node_alpha
-open Octez_smart_rollup_node_alpha.Batcher_worker_types
+open Octez_smart_rollup_node.Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 module Durable_state = Wasm_2_0_0_pvm.Durable_state
 

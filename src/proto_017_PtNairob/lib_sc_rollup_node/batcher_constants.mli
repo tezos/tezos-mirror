@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,21 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains the parameters for the worker (see {!Worker}) used by
-    the batcher. *)
+(** Maximum size of an L2 message allowed by the prototcol. Is
+    {!val:Protocol.Constants_repr.sc_rollup_message_size_limit}. *)
+val message_size_limit : int
 
-module Request : sig
-  (** Type of requests accepted by the batcher worker. *)
-  type ('a, 'b) t =
-    | Register : string list -> (L2_message.hash list, error trace) t
-        (** Request to register new L2 messages in the queue. *)
-    | New_head : Layer1.head -> (unit, error trace) t
-        (** Request to handle a new L1 head. *)
-
-  type view = View : _ t -> view
-
-  include
-    Worker_intf.REQUEST
-      with type ('a, 'request_error) t := ('a, 'request_error) t
-       and type view := view
-end
+(** Maximum size in bytes of an batch of L2 messages that can fit in an
+    operation on L1. It is protocol dependent. *)
+val protocol_max_batch_size : int

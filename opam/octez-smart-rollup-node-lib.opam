@@ -25,6 +25,7 @@ depends: [
   "tezos-version"
   "tezos-layer2-store"
   "octez-crawler"
+  "tezos-workers"
   "octez-smart-rollup"
 ]
 build: [

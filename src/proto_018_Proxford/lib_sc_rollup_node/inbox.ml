@@ -261,6 +261,14 @@ let payloads_history_of_messages ~is_first_block ~predecessor
   in
   payloads_history
 
+let serialize_external_message msg =
+  Environment.wrap_tzresult
+  @@
+  let open Result_syntax in
+  let open Sc_rollup.Inbox_message in
+  let+ msg = serialize @@ External msg in
+  unsafe_to_string msg
+
 module Internal_for_tests = struct
   let process_messages = process_messages
 end
