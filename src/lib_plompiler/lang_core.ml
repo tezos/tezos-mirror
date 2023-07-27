@@ -378,6 +378,13 @@ module type COMMON = sig
   val bits_of_scalar :
     ?shift:Z.t -> nb_bits:int -> scalar repr -> bool list repr t
 
+  val limbs_of_scalar :
+    ?shift:Z.t ->
+    total_nb_bits:int ->
+    nb_bits:int ->
+    scalar repr ->
+    scalar list repr t
+
   (** [with_label ~label c] adds a [label] to the Plompiler computation
       [c]. Useful for debugging and flamegraphs. *)
   val with_label : label:string -> 'a t -> 'a t

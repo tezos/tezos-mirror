@@ -532,6 +532,27 @@ let bits_of_scalar ?(shift = Z.zero) ~nb_bits sx =
   in
   with_bool_check (equal sx sum) >* ret bits
 
+let limbs_of_scalar ?(shift = Z.zero) ~total_nb_bits ~nb_bits sx =
+  let x = of_s sx |> S.to_z in
+  let x = Z.add shift x in
+  let binary_decomposition = Utils.bool_list_of_z ~nb_bits:total_nb_bits x in
+  let nb_decomposition =
+    Utils.limbs_of_bool_list ~nb_bits binary_decomposition
+  in
+  let limbs = L (List.map (fun x -> to_s @@ S.of_int x) nb_decomposition) in
+  let sx = S (X (S.of_z x)) in
+  let* sum =
+    let base = 1 lsl nb_bits |> Z.of_int in
+    let nb_limbs = total_nb_bits / nb_bits in
+    let powers = List.init nb_limbs (fun i -> S.of_z @@ Z.pow base i) in
+    let slimbs = of_list limbs in
+    foldM
+      (fun acc (qr, w) -> Num.add ~qr acc w)
+      (List.hd slimbs)
+      List.(tl @@ combine powers slimbs)
+  in
+  with_bool_check (equal sx sum) >* ret limbs
+
 let of_b (B x) = x
 
 let get_checks_wire : bool repr t =
