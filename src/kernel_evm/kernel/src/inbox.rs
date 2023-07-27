@@ -224,6 +224,7 @@ pub fn read_inbox<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
+    use crate::storage::*;
     use libsecp256k1::PublicKey;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -359,7 +360,7 @@ mod tests {
     #[test]
     fn parse_valid_kernel_upgrade() {
         let mut host = MockHost::default();
-        crate::storage::store_kernel_upgrade_nonce(&mut host, 1).unwrap();
+        store_kernel_upgrade_nonce(&mut host, 1).unwrap();
 
         let dictator_bytes = hex::decode(
             "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01",
@@ -394,5 +395,39 @@ mod tests {
             read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
+    }
+
+    #[test]
+    // Assert that trying to create a chunked transaction has no impact. Only
+    // the first `NewChunkedTransaction` should be considered.
+    fn recreate_chunked_transaction() {
+        let mut host = MockHost::default();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let new_chunk1 = Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks: 2,
+        };
+        let new_chunk2 = Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks: 42,
+        };
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk1,
+        )));
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk2,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
+            .expect("The number of chunks should exist");
+        // Only the first `NewChunkedTransaction` should be considered.
+        assert_eq!(num_chunks, 2);
     }
 }

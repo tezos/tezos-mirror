@@ -540,6 +540,23 @@ pub fn create_chunked_transaction<Host: Runtime>(
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
     let chunked_transaction_num_chunks_path =
         chunked_transaction_num_chunks_path(&chunked_transaction_path)?;
+
+    // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
+    // is at least one key, it was already created.
+    if host
+        .store_count_subkeys(&chunked_transaction_path)
+        .unwrap_or(0)
+        > 0
+    {
+        log!(
+            host,
+            Info,
+            "The chunked transaction {} already exist, ignoring the message.\n",
+            hex::encode(tx_hash)
+        );
+        return Ok(());
+    }
+
     host.store_write(
         &chunked_transaction_num_chunks_path,
         &u16::to_le_bytes(num_chunks),
