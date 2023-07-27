@@ -1,6 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,19 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin : Protocol_plugin_sig.S = struct
-  let protocol = Protocol.hash
+(** Ensure that the initial state hash of the PVM as defined by the rollup node
+    matches the one of the PVM on the L1 node.  *)
+val check_pvm_initial_state_hash : _ Node_context.t -> unit tzresult Lwt.t
 
-  module RPC_directory = RPC_directory
-  module Dal_slots_tracker = Dal_slots_tracker
-  module Inbox = Inbox
-  module Interpreter = Interpreter
-  module Publisher = Publisher
-  module Refutation_coordinator = Refutation_coordinator
-  module Batcher = Batcher
-  module Layer1_helpers = Layer1_helpers
-  module L1_processing = Daemon_helpers
-  module Pvm = Pvm_plugin
-end
-
-let () = Protocol_plugins.register (module Plugin)
+(** React to L1 operations included in a block of the chain. *)
+val process_l1_block_operations :
+  Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
