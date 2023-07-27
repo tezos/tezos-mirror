@@ -8,6 +8,8 @@ use nom::{
     combinator::{all_consuming, map},
     sequence::preceded,
 };
+#[cfg(test)]
+use tezos_crypto_rs::hash::SecretKeyEd25519;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_crypto_rs::{blake2b, hash::Signature};
 use tezos_data_encoding::{
@@ -57,6 +59,18 @@ where
             Ok(true) => Ok(self.body),
             _ => Err(RuntimeError::DecodingError),
         }
+    }
+
+    /// Return a signed body
+    #[cfg(test)]
+    fn sign_ed25519(body: A, secret: &SecretKeyEd25519) -> Result<Self, RuntimeError> {
+        use tezos_smart_rollup_host::Error;
+
+        let hash = UnverifiedSigned::hash_body(&body)?;
+        let signature = secret
+            .sign(hash)
+            .map_err(|_| RuntimeError::HostErr(Error::GenericInvalidAccess))?;
+        Ok(UnverifiedSigned { body, signature })
     }
 }
 
@@ -201,7 +215,8 @@ mod tests {
 
     use super::{KernelMessage, Sequence};
     use crate::message::SetSequencer;
-    use tezos_crypto_rs::hash::{SecretKeyEd25519, SeedEd25519, Signature};
+    use tezos_crypto_rs::hash::{PublicKeyEd25519, SecretKeyEd25519, SeedEd25519, Signature};
+    use tezos_crypto_rs::PublicKeySignatureVerifier;
     use tezos_data_encoding::enc::{self, BinWriter};
     use tezos_data_encoding::nom::NomReader;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -437,5 +452,136 @@ mod tests {
         });
 
         assert_eq!(kernel_message, expected);
+    }
+
+    #[test]
+    fn test_incorrect_sequence_signature() {
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let nonce = 0;
+        let delayed_messages_prefix = 0;
+        let delayed_messages_suffix = 0;
+        let messages = vec![];
+        let signature = Signature::from_base58_check("edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q").unwrap();
+
+        let message = UnverifiedSigned {
+            body: Framed {
+                destination,
+                payload: SequencerMsg::Sequence(Sequence {
+                    nonce,
+                    delayed_messages_prefix,
+                    delayed_messages_suffix,
+                    messages,
+                }),
+            },
+            signature: signature.clone(),
+        };
+
+        let hash = message.hash().expect("hash failure");
+
+        let public_key = PublicKey::Ed25519(
+            PublicKeyEd25519::from_base58_check(
+                "edpkuDMUm7Y53wp4gxeLBXuiAhXZrLn8XB1R83ksvvesH8Lp8bmCfK",
+            )
+            .unwrap(),
+        );
+
+        let is_correct = public_key.verify_signature(&signature, &hash);
+
+        assert!(matches!(is_correct, Ok(false) | Err(_)));
+    }
+
+    #[test]
+    fn test_correct_sequence_signature() {
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+
+        let seed = SeedEd25519::from_base58_check(
+            "edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB",
+        )
+        .unwrap();
+
+        let (public_key, secret_key) = seed.keypair().unwrap();
+
+        let body = Framed {
+            destination,
+            payload: SequencerMsg::Sequence(Sequence {
+                nonce: 0,
+                delayed_messages_prefix: 0,
+                delayed_messages_suffix: 0,
+                messages: vec![],
+            }),
+        };
+
+        let sequence =
+            UnverifiedSigned::sign_ed25519(body, &secret_key).expect("error when signing body");
+
+        let hash = sequence.hash().unwrap();
+        let is_correct = public_key.verify_signature(&sequence.signature, &hash);
+        assert!(matches!(is_correct, Ok(true)));
+    }
+
+    #[test]
+    fn test_correct_non_empty_sequence_signature() {
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+
+        let seed = SeedEd25519::from_base58_check(
+            "edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB",
+        )
+        .unwrap();
+
+        let (public_key, secret_key) = seed.keypair().unwrap();
+
+        let body = Framed {
+            destination,
+            payload: SequencerMsg::Sequence(Sequence {
+                nonce: 0,
+                delayed_messages_prefix: 0,
+                delayed_messages_suffix: 0,
+                messages: vec![Bytes {
+                    inner: b"hello".to_vec(),
+                }],
+            }),
+        };
+
+        let sequence =
+            UnverifiedSigned::sign_ed25519(body, &secret_key).expect("error when signing body");
+
+        let hash = sequence.hash().unwrap();
+        let is_correct = public_key.verify_signature(&sequence.signature, &hash);
+        assert!(matches!(is_correct, Ok(true)));
+    }
+
+    #[test]
+    fn test_correct_signature_encoding() {
+        let signed_msg = hex::decode("006227a8721213bd7ddb9b56227e3acb01161b1e67000000000000000000000000000000000f0000000b68656c6c6f20776f726c64bc682e5a009f3ee1dc1280d6b538aa53c626c29c5d5c528c8dd92092915aa24d414cc4f7ac81be8a4eb6a6046f9beea09c3c5a54374d68e6bfbad6cb51edc306").unwrap();
+        let (_, signed_msg): (&[u8], UnverifiedSigned<Framed<SequencerMsg>>) =
+            UnverifiedSigned::nom_read(&signed_msg).unwrap();
+
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let seed = SeedEd25519::from_base58_check(
+            "edsk3a5SDDdMWw3Q5hPiJwDXUosmZMTuKQkriPqY6UqtSfdLifpZbB",
+        )
+        .unwrap();
+        let (public_key, _) = seed.keypair().unwrap();
+
+        let body = Framed {
+            destination,
+            payload: SequencerMsg::Sequence(Sequence {
+                nonce: 0,
+                delayed_messages_prefix: 0,
+                delayed_messages_suffix: 0,
+                messages: vec![Bytes {
+                    inner: b"hello world".to_vec(),
+                }],
+            }),
+        };
+        let hash = UnverifiedSigned::hash_body(&body).unwrap();
+
+        let is_correct = public_key.verify_signature(&signed_msg.signature, &hash);
+
+        assert!(matches!(is_correct, Ok(true)));
     }
 }
