@@ -12,6 +12,9 @@ branch of Octez.
 Environment Version
 -------------------
 
+This protocol requires a different protocol environment version than Oxford.
+It requires protocol environment V11, compared to V10 for Oxford.
+
 Smart Rollups
 -------------
 
