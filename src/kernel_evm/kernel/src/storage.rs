@@ -373,7 +373,7 @@ pub fn store_transaction_object<Host: Runtime>(
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
 const CHUNKED_TRANSACTION_NUM_CHUNKS: RefPath = RefPath::assert_from(b"/num_chunks");
 
-fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+pub fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(tx_hash);
     let raw_chunked_transaction_path: Vec<u8> = format!("/{}", hash).into();
     let chunked_transaction_path = OwnedPath::try_from(raw_chunked_transaction_path)?;
@@ -386,7 +386,7 @@ fn chunked_transaction_num_chunks_path(
     concat(chunked_transaction_path, &CHUNKED_TRANSACTION_NUM_CHUNKS).map_err(Error::from)
 }
 
-fn transaction_chunk_path(
+pub fn transaction_chunk_path(
     chunked_transaction_path: &OwnedPath,
     i: u16,
 ) -> Result<OwnedPath, Error> {
@@ -447,7 +447,7 @@ fn store_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-fn read_transaction_chunk_data<Host: Runtime>(
+pub fn read_transaction_chunk_data<Host: Runtime>(
     host: &mut Host,
     transaction_chunk_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {

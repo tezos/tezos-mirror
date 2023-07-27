@@ -89,9 +89,13 @@ fn handle_transaction_chunk<Host: Runtime>(
     i: u16,
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error> {
+    let num_chunks = crate::storage::chunked_transaction_num_chunks(host, &tx_hash)?;
+    // Checks that the transaction is not out of bounds
+    if i >= num_chunks {
+        return Ok(None);
+    }
     // Sanity check to verify that the transaction chunk uses the maximum
     // space capacity allowed.
-    let num_chunks = crate::storage::chunked_transaction_num_chunks(host, &tx_hash)?;
     if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
         crate::storage::remove_chunked_transaction(host, &tx_hash)?;
         return Ok(None);
@@ -307,6 +311,12 @@ mod tests {
         buffer
     }
 
+    fn large_transaction() -> (Vec<u8>, EthereumTransactionCommon) {
+        let data: Vec<u8> = hex::decode(["f917e180843b9aca0082520894b53dc01974176e5dff2298c5a94343c2585e3c548a021dfe1f5c5363780000b91770".to_string(), "a".repeat(12_000), "820a96a07fd9567a72223bbc8f70bd2b42011339b61044d16b5a2233534db8ca01f3e57aa03ea489c4bb2b2b52f3c1a18966881114767654c9ab61d46b1fbff78a498043c2".to_string()].join("")).unwrap();
+        let tx = EthereumTransactionCommon::from_rlp_bytes(&data).unwrap();
+        (data, tx)
+    }
+
     #[test]
     fn parse_valid_simple_transaction() {
         let mut host = MockHost::default();
@@ -336,8 +346,7 @@ mod tests {
     fn parse_valid_chunked_transaction() {
         let mut host = MockHost::default();
 
-        let data: Vec<u8> = hex::decode(["f917e180843b9aca0082520894b53dc01974176e5dff2298c5a94343c2585e3c548a021dfe1f5c5363780000b91770".to_string(), "a".repeat(12_000), "820a96a07fd9567a72223bbc8f70bd2b42011339b61044d16b5a2233534db8ca01f3e57aa03ea489c4bb2b2b52f3c1a18966881114767654c9ab61d46b1fbff78a498043c2".to_string()].join("")).unwrap();
-        let tx = EthereumTransactionCommon::from_rlp_bytes(&data).unwrap();
+        let (data, tx) = large_transaction();
 
         let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
 
@@ -429,5 +438,56 @@ mod tests {
             .expect("The number of chunks should exist");
         // Only the first `NewChunkedTransaction` should be considered.
         assert_eq!(num_chunks, 2);
+    }
+
+    #[test]
+    // Assert that an out of bound chunk is simply ignored and does
+    // not make the kernel fail.
+    fn out_of_bound_chunk_is_ignored() {
+        let mut host = MockHost::default();
+
+        let (data, _tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let mut inputs = make_chunked_transactions(tx_hash, data);
+        let new_chunk = inputs.remove(0);
+        let chunk = inputs.remove(0);
+
+        // Announce a chunked transaction.
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk,
+        )));
+
+        // Give a chunk with an invalid `i`.
+        let out_of_bound_i = 42;
+        let chunk = match chunk {
+            Input::TransactionChunk {
+                tx_hash,
+                i: _,
+                data,
+            } => Input::TransactionChunk {
+                tx_hash,
+                i: out_of_bound_i,
+                data,
+            },
+            _ => panic!("Expected a transaction chunk"),
+        };
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        // The out of bounds chunk should not exist.
+        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
+        let transaction_chunk_path =
+            transaction_chunk_path(&chunked_transaction_path, out_of_bound_i).unwrap();
+        match read_transaction_chunk_data(&mut host, &transaction_chunk_path) {
+            Ok(_) => panic!("The chunk should not exist in the storage"),
+            Err(_) => (),
+        }
     }
 }
