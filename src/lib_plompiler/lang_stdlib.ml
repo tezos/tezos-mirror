@@ -199,10 +199,11 @@ module type LIB = sig
     end
   end
 
-  (** Module for describing operations over fixed size integers *)
   module Limbs (N : sig
     val nb_bits : int
   end) : sig
+    (* This module is a more generic version of Bytes, where each scalar
+       stores an [nb_bits]-bit number. *)
     type sl = scalar list
 
     val of_bytes : Bytes.bl repr -> sl repr t
@@ -211,26 +212,12 @@ module type LIB = sig
 
     val to_scalar : sl repr -> scalar repr t
 
-    (** [xor_lookup a b] returns the exclusive disjunction of [a] and [b].
-      This primitive uses a precomputed lookup table called "xor" ^ [nb_bits].
-    *)
     val xor_lookup : sl repr -> sl repr -> sl repr t
 
-    (** [band_lookup a b] returns the conjunction of [a] and [b].
-      This primitive uses a precomputed lookup table called "band" ^ [nb_bits].
-    *)
     val band_lookup : sl repr -> sl repr -> sl repr t
 
-    (** [bnot_lookup b] returns the negation of [b].
-      This primitive uses a precomputed lookup table called "bnot" ^ [nb_bits].
-    *)
     val bnot_lookup : sl repr -> sl repr t
 
-    (** [rotate_right_lookup x y i] returns the low [nb_bits] of
-      [rotate_right (x + y * 2 ^ nb_bits) i] where [0 < i < nb_bits].
-      This primitive uses a precomputed lookup table called
-      "rotate_right" ^ [nb_bits] ^ "_" ^ [i].
-    *)
     val rotate_right_lookup : sl repr -> int -> sl repr t
 
     val shift_right_lookup : sl repr -> int -> sl repr t
