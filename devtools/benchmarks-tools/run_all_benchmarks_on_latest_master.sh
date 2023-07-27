@@ -68,14 +68,14 @@ echo $$ > "$SNOOP_RESULT_DIR"/STARTED
 cd tezos
 dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
-# BLST_PORTABLE=y is needed to benchmark BLS instructions
 # OPAMSOLVERTIMEOUT=0 means that the opam solver won't timeout
-make BLST_PORTABLE=y OPAMSOLVERTIMEOUT=0 build-dev-deps
+make OPAMSOLVERTIMEOUT=0 build-dev-deps
 eval "$(opam env)"
 
 # Build Tezos
 dated_log "Make"
-make
+# BLST_PORTABLE=y is needed to benchmark BLS instructions
+BLST_PORTABLE=y make
 
 # Run benchmarks.
 dated_log "Running benchmarks"
