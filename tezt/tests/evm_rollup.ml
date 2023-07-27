@@ -927,44 +927,103 @@ let test_l2_deploy_erc20 =
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
-let transfer ?data protocol =
-  let* ({evm_proxy_server; _} as full_evm_setup) =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+type transfer_result = {
+  sender_balance_before : Wei.t;
+  sender_balance_after : Wei.t;
+  sender_nonce_before : int64;
+  sender_nonce_after : int64;
+  value : Wei.t;
+  tx_hash : string;
+  tx_object : Transaction.transaction_object;
+  receiver_balance_before : Wei.t;
+  receiver_balance_after : Wei.t;
+}
+
+let get_tx_object ~endpoint ~tx_hash =
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash in
+  match tx_object with
+  | Some tx_object -> return tx_object
+  | None -> Test.fail "The transaction object of %s should be available" tx_hash
+
+let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
+    full_evm_setup =
+  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
   let balance account = Eth_cli.balance ~account ~endpoint in
+  let* sender_balance = balance sender.Eth_account.address in
+  assert (sender_balance = transfer_result.sender_balance_after) ;
+  let* receiver_balance = balance receiver.Eth_account.address in
+  assert (receiver_balance = transfer_result.receiver_balance_after) ;
+  let* sender_nonce =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  assert (sender_nonce = transfer_result.sender_nonce_after) ;
+  let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
+  assert (tx_object = transfer_result.tx_object) ;
+  unit
+
+let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
+  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
+  let balance account = Eth_cli.balance ~account ~endpoint in
+  let* sender_balance_before = balance sender.Eth_account.address in
+  let* receiver_balance_before = balance receiver.Eth_account.address in
+  let* sender_nonce_before =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  let* tx_hash = send ~sender ~receiver ~value ?data full_evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx_hash in
+  let* sender_balance_after = balance sender.address in
+  let* receiver_balance_after = balance receiver.address in
+  let* sender_nonce_after =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  let* tx_object = get_tx_object ~endpoint ~tx_hash in
+  return
+    {
+      sender_balance_before;
+      sender_balance_after;
+      sender_nonce_before;
+      sender_nonce_after;
+      value;
+      tx_hash;
+      tx_object;
+      receiver_balance_before;
+      receiver_balance_after;
+    }
+
+let transfer ?data protocol =
+  let* full_evm_setup = setup_past_genesis ~deposit_admin:None protocol in
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
-  let* sender_balance = balance sender.address in
-  let* receiver_balance = balance receiver.address in
-  let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
-  (* We always send less than the balance, to ensure it always works. *)
-  let value = Wei.(sender_balance - one) in
-  let* tx = send ~sender ~receiver ~value ?data full_evm_setup in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  let* new_sender_balance = balance sender.address in
-  let* new_receiver_balance = balance receiver.address in
-  let* new_sender_nonce =
-    get_transaction_count evm_proxy_server sender.address
+  let* {
+         sender_balance_before;
+         sender_balance_after;
+         sender_nonce_before;
+         sender_nonce_after;
+         value;
+         tx_object;
+         receiver_balance_before;
+         receiver_balance_after;
+         _;
+       } =
+    make_transfer
+      ?data
+      ~value:Wei.(default_bootstrap_account_balance - one)
+      ~sender
+      ~receiver
+      full_evm_setup
   in
-  Check.(Wei.(new_sender_balance = sender_balance - value) Wei.typ)
+  Check.(Wei.(sender_balance_after = sender_balance_before - value) Wei.typ)
     ~error_msg:
       "Unexpected sender balance after transfer, should be %R, but got %L" ;
-  Check.(Wei.(new_receiver_balance = receiver_balance + value) Wei.typ)
+  Check.(Wei.(receiver_balance_after = receiver_balance_before + value) Wei.typ)
     ~error_msg:
       "Unexpected receiver balance after transfer, should be %R, but got %L" ;
-  Check.((new_sender_nonce = Int64.succ sender_nonce) int64)
+  Check.((sender_nonce_after = Int64.succ sender_nonce_before) int64)
     ~error_msg:
       "Unexpected sender nonce after transfer, should be %R, but got %L" ;
   (* Perform some sanity checks on the transaction object produced by the
      kernel. *)
-  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
-  let tx_object =
-    match tx_object with
-    | Some tx_object -> tx_object
-    | None -> Test.fail "The transaction object of %s should be available" tx
-  in
   Check.((tx_object.from = sender.address) string)
     ~error_msg:"Unexpected transaction's sender" ;
   Check.((tx_object.to_ = Some receiver.address) (option string))
