@@ -21,7 +21,7 @@ use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::log;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -89,7 +89,22 @@ fn handle_transaction_chunk<Host: Runtime>(
     i: u16,
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error> {
-    let num_chunks = crate::storage::chunked_transaction_num_chunks(host, &tx_hash)?;
+    // If the number of chunks doesn't exist in the storage, the chunked
+    // transaction wasn't created, so the chunk is ignored.
+    let num_chunks = match crate::storage::chunked_transaction_num_chunks(host, &tx_hash)
+    {
+        Ok(x) => x,
+        Err(_) => {
+            log!(
+                host,
+                Info,
+                "Ignoring chunk {} of unknown transaction {}\n",
+                i,
+                hex::encode(tx_hash)
+            );
+            return Ok(None);
+        }
+    };
     // Checks that the transaction is not out of bounds
     if i >= num_chunks {
         return Ok(None);
@@ -485,9 +500,43 @@ mod tests {
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
         let transaction_chunk_path =
             transaction_chunk_path(&chunked_transaction_path, out_of_bound_i).unwrap();
-        match read_transaction_chunk_data(&mut host, &transaction_chunk_path) {
-            Ok(_) => panic!("The chunk should not exist in the storage"),
-            Err(_) => (),
+        if read_transaction_chunk_data(&mut host, &transaction_chunk_path).is_ok() {
+            panic!("The chunk should not exist in the storage")
+        }
+    }
+
+    #[test]
+    // Assert that an unknown chunk is simply ignored and does
+    // not make the kernel fail.
+    fn unknown_chunk_is_ignored() {
+        let mut host = MockHost::default();
+
+        let (data, _tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let mut inputs = make_chunked_transactions(tx_hash, data);
+        let chunk = inputs.remove(1);
+
+        // Extract the index of the non existing chunked transaction.
+        let index = match chunk {
+            Input::TransactionChunk { i, .. } => i,
+            _ => panic!("Expected a transaction chunk"),
+        };
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        // The unknown chunk should not exist.
+        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
+        let transaction_chunk_path =
+            transaction_chunk_path(&chunked_transaction_path, index).unwrap();
+        if read_transaction_chunk_data(&mut host, &transaction_chunk_path).is_ok() {
+            panic!("The chunk should not exist in the storage")
         }
     }
 }
