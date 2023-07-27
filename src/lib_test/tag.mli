@@ -54,9 +54,7 @@ val flaky : string
 val ci_disabled : string
 
 (** ["memory_3k"]: tag memory hungry tests ( >3 GB of memory ). *)
-
 val memory_3k : string
 
 (** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
-
 val memory_4k : string

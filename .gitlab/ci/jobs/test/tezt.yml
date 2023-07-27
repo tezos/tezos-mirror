@@ -9,16 +9,17 @@ include: .gitlab/ci/jobs/test/common.yml
 .tezt_template:
   variables:
     JUNIT: "tezt-junit.xml"
-    # if we do not set BISECT_FILE here, it will be empty, and include the 
+    # if we do not set BISECT_FILE here, it will be empty, and include the
     # full CI_PROJECT_DIR in artifacts as per the template .tezt_template.
     BISECT_FILE: "$CI_PROJECT_DIR/_coverage_output/"
+    TEZT_VARIANT: ""
   artifacts:
     reports:
       junit: $JUNIT
     paths:
       - tezt.log
       - tezt-*.log
-      - tezt-results-$CI_NODE_INDEX.json
+      - tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
       - $BISECT_FILE
       - $JUNIT
     # The record artifacts (tezt-results-$CI_NODE_INDEX.json) should
@@ -36,7 +37,7 @@ include: .gitlab/ci/jobs/test/common.yml
     expire_in: 3 day
     when: always
   script:
-    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}"'
+    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}" TEZT_PARALLEL: ${TEZT_PARALLEL} TEZT_VARIANT: ${TEZT_VARIANT}'
     # For Tezt tests, there are multiple timeouts:
     # - --global-timeout is the internal timeout of Tezt, which only works if tests
     #   are cooperative;
@@ -59,12 +60,12 @@ include: .gitlab/ci/jobs/test/common.yml
         --junit ${JUNIT}
         --from-record tezt/records
         --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-        --record tezt-results-${CI_NODE_INDEX}.json
-        --job-count 3
+        --record tezt-results-${CI_NODE_INDEX}${TEZT_VARIANT}.json
+        --job-count ${TEZT_PARALLEL:-3}
         --retry 1
     - ./scripts/ci/merge_coverage.sh
 
-tezt:
+.tezt_tests:
   extends:
     - .test_template
     - .image_template__runtime_e2etest_dependencies
@@ -88,6 +89,32 @@ tezt:
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60
+
+tezt:
+  extends: [.tezt_tests]
+  variables:
+    # Exclude tests with tags 'ci_disabled', 'flaky' and `memory_{3,4}k`.
+    # See tezt/lib_tezos/tag.mli for more information.
+    TESTS: "/ci_disabled /flaky /memory_3k /memory_4k"
+    # the -j option of tezt
+    TEZT_PARALLEL: 3
+
+# the following memory hungry tests are executed with -j 1
+tezt-greedy-4k:
+  extends: [.tezt_tests]
+  variables:
+    TESTS: "memory_4k"
+    TEZT_PARALLEL: 1
+    TEZT_VARIANT: "-memory_4k"
+  parallel: 4
+
+tezt-greedy-3k:
+  extends: [.tezt_tests]
+  variables:
+    TESTS: "memory_3k"
+    TEZT_PARALLEL: 1
+    TEZT_VARIANT: "-memory_3k"
+  parallel: 1
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:

@@ -1,0 +1,18 @@
+[
+  {
+    "file": "tezt/tests/storage_snapshots.ml",
+    "title": "Oxford: storage snapshot export and import",
+    "tags": [
+      "oxford",
+      "storage",
+      "snapshot",
+      "export",
+      "import",
+      "memory_4k"
+    ],
+    "successful_runs": {
+      "total_time": "75877320",
+      "count": "1"
+    }
+  }
+]

@@ -505,14 +505,7 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:
-      [
-        Tag.ci_disabled;
-        "synchronisation_threshold";
-        "bootstrap";
-        "threshold";
-        Tag.memory_4k;
-      ]
+    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"; Tag.memory_4k]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in
