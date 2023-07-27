@@ -81,13 +81,13 @@ TMPDIR=${TMPDIR:-/tmp}
 rm -f libblst.a
 trap '[ $? -ne 0 ] && rm -f libblst.a; rm -f *.o ${TMPDIR}/*.blst.$$' 0
 
-(set -x; ${CC} ${CFLAGS} -c ${TOP}/src/server.c)
-(set -x; ${CC} ${CFLAGS} -c ${TOP}/build/assembly.S)
-(set -x; ${AR} rc libblst.a *.o)
+(${CC} ${CFLAGS} -c ${TOP}/src/server.c)
+(${CC} ${CFLAGS} -c ${TOP}/build/assembly.S)
+(${AR} rc libblst.a *.o)
 
 if [ $shared ]; then
     case $flavour in
-        macosx) (set -x; ${CC} -dynamiclib -o libblst.dylib \
+        macosx) (${CC} -dynamiclib -o libblst.dylib \
                                -all_load libblst.a ${CFLAGS}); exit 0;;
         mingw*) sharedlib=blst.dll
                 CFLAGS="${CFLAGS} --entry=DllMain ${TOP}/build/win64/dll.c"
@@ -95,7 +95,7 @@ if [ $shared ]; then
         *)      sharedlib=libblst.so;;
     esac
     echo "{ global: blst_*; BLS12_381_*; local: *; };" > ${TMPDIR}/ld.blst.$$
-    (set -x; ${CC} -shared -o $sharedlib \
+    (${CC} -shared -o $sharedlib \
                    -Wl,--whole-archive,libblst.a,--no-whole-archive ${CFLAGS} \
                    -Wl,-Bsymbolic,--version-script=${TMPDIR}/ld.blst.$$)
 fi

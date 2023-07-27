@@ -21,6 +21,8 @@ mv bindings/blst_aux.h "${SCRIPT_DIR}"/libblst/bindings
 
 # copy build script, removing tabs to pass the sanity checks
 tr "\t" ' ' < build.sh > "${SCRIPT_DIR}"/libblst/build.sh
+# patch script to not print the compilation steps to the terminal
+sed -i 's/(set -x;[ tab]\+/(/' "${SCRIPT_DIR}"/libblst/build.sh
 
 # copy source and build directories
 mv build "${SCRIPT_DIR}"/libblst
