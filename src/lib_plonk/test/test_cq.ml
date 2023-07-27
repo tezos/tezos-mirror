@@ -76,7 +76,7 @@ let test_not_in_table () =
   with Plonk.Cq.Entry_not_in_table -> ()
 
 let test_wrong_proof () =
-  let module Cq = Plonk.Cq.Make (PC) in
+  let module Cq = Plonk.Cq.Internal in
   let prv, vrf = Cq.setup ~srs ~wire_size ~table in
   let transcript = Bytes.empty in
   let proof_f, _ = Cq.prove prv transcript [List.hd f_map] in
