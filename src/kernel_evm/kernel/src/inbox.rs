@@ -60,6 +60,7 @@ pub struct KernelUpgrade {
     pub signature: [u8; SIGNATURE_HASH_SIZE],
 }
 
+#[derive(Debug, PartialEq)]
 pub struct InboxContent {
     pub kernel_upgrade: Option<KernelUpgrade>,
     pub transactions: Vec<Transaction>,
@@ -538,5 +539,73 @@ mod tests {
         if read_transaction_chunk_data(&mut host, &transaction_chunk_path).is_ok() {
             panic!("The chunk should not exist in the storage")
         }
+    }
+
+    #[test]
+    // Assert that a transaction is marked as complete only when each chunk
+    // is stored in the storage. That is, if a transaction chunk is sent twice,
+    // it rewrites the chunk.
+    //
+    // This serves as a non-regression test, a previous optimization made unwanted
+    // behavior for very little gain:
+    //
+    // Level 0:
+    // - New chunk of size 2
+    // - Chunk 0
+    //
+    // Level 1:
+    // - New chunk of size 2 (ignored)
+    // - Chunk 0
+    // |--> Oh great! I have the two chunks for my transaction, it is then complete!
+    // - Chunk 1
+    // |--> Fails because the chunk is unknown
+    fn transaction_is_complete_when_each_chunk_is_stored() {
+        let mut host = MockHost::default();
+
+        let (data, tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let inputs = make_chunked_transactions(tx_hash, data);
+        // The test works if there are 3 inputs: new chunked of size 2, first and second
+        // chunks.
+        assert_eq!(inputs.len(), 3);
+
+        let new_chunk = inputs[0].clone();
+        let chunk0 = inputs[1].clone();
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk,
+        )));
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk0,
+        )));
+
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        assert_eq!(
+            inbox_content,
+            InboxContent {
+                kernel_upgrade: None,
+                transactions: vec![]
+            }
+        );
+
+        // On the next level, try to re-give the chunks, but this time in full:
+        for input in inputs {
+            host.add_external(Bytes::from(input_to_bytes(
+                ZERO_SMART_ROLLUP_ADDRESS,
+                input,
+            )))
+        }
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let expected_transactions = vec![Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx),
+        }];
+        assert_eq!(inbox_content.transactions, expected_transactions);
     }
 }
