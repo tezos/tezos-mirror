@@ -162,6 +162,16 @@ let bool_list_change_endianness b =
   assert (List.length b mod 8 = 0) ;
   split_exactly b 8 |> List.rev |> List.concat
 
+let limbs_of_bool_list ~nb_bits bl =
+  let bl = split_exactly bl nb_bits in
+  let sum x =
+    List.fold_left
+      (fun acc a -> (acc lsl 1) + if a then 1 else 0)
+      0
+      (List.rev x)
+  in
+  List.map sum bl
+
 module Z = struct
   include Z
 

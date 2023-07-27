@@ -99,9 +99,7 @@ module Op_limbs_impl (L : LIB) = struct
        of_bytes x
 
   let of_constant ~le x =
-    with_label ~label:"Sha2.of_constant"
-    @@ let* x = Bytes.constant ~le x in
-       of_bytes x
+    with_label ~label:"Sha2.of_constant" @@ Limbs.constant ~le x
 end
 
 module Op_bits_impl (L : LIB) : Op with module L = L and type tl = L.Bytes.bl =

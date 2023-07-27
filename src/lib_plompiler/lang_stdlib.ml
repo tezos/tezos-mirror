@@ -212,6 +212,8 @@ module type LIB = sig
 
     val to_scalar : sl repr -> scalar repr t
 
+    val constant : le:bool -> bytes -> sl repr t
+
     val xor_lookup : sl repr -> sl repr -> sl repr t
 
     val band_lookup : sl repr -> sl repr -> sl repr t
@@ -861,6 +863,12 @@ module Lib (C : COMMON) = struct
         (fun acc b -> Num.add acc b ~ql:pow2_nb_bits ~qr:S.one)
         zero
         (List.rev (of_list b))
+
+    let constant ~le b =
+      let bl = Utils.bitlist ~le b in
+      let limbs = Utils.limbs_of_bool_list ~nb_bits bl in
+      let* r = mapM (fun x -> Num.constant @@ S.of_int x) limbs in
+      ret @@ to_list r
 
     let xor_lookup a b =
       let* r = map2M Limb.xor_lookup (of_list a) (of_list b) in
