@@ -197,11 +197,11 @@ impl BinWriter for KernelMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::{Framed, SequencerMsg, UnverifiedSigned};
+    use crate::message::{Bytes, Framed, SequencerMsg, UnverifiedSigned};
 
     use super::{KernelMessage, Sequence};
     use crate::message::SetSequencer;
-    use tezos_crypto_rs::hash::{SecretKeyEd25519, SeedEd25519};
+    use tezos_crypto_rs::hash::{SecretKeyEd25519, SeedEd25519, Signature};
     use tezos_data_encoding::enc::{self, BinWriter};
     use tezos_data_encoding::nom::NomReader;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -317,5 +317,125 @@ mod tests {
 
         assert!(remaining.is_empty());
         assert_eq!(msg_read, KernelMessage::DelayedMessage(bin))
+    }
+
+    /// Deserialize a string to a KernelMessage
+    fn from_string(hex: &str) -> KernelMessage {
+        let hex = hex::decode(hex).expect("valid hexadecimal");
+        let (_, msg) = KernelMessage::nom_read(&hex).expect("deserialization should work");
+        msg
+    }
+
+    #[test]
+    fn test_deserialization_empty_sequence() {
+        let kernel_message = from_string("01006227a8721213bd7ddb9b56227e3acb01161b1e67000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        let rollup_address =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let sign = Signature::from_base58_check("edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q").unwrap();
+
+        match kernel_message {
+            KernelMessage::Sequencer(UnverifiedSigned {
+                body:
+                    Framed {
+                        destination,
+                        payload:
+                            SequencerMsg::Sequence(Sequence {
+                                nonce,
+                                delayed_messages_prefix,
+                                delayed_messages_suffix,
+                                messages,
+                            }),
+                    },
+                signature,
+            }) => {
+                assert_eq!(destination, rollup_address);
+                assert_eq!(nonce, 0);
+                assert_eq!(delayed_messages_prefix, 0);
+                assert_eq!(delayed_messages_suffix, 0);
+                assert_eq!(messages, vec![]);
+                assert_eq!(signature, sign)
+            }
+            _ => panic!("Wrong message encoding"),
+        }
+    }
+
+    #[test]
+    fn test_deserialization_one_empty_message_sequence() {
+        let kernel_message = from_string("01006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let signature = Signature::from_base58_check("edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q").unwrap();
+
+        let expected = KernelMessage::Sequencer(UnverifiedSigned {
+            body: Framed {
+                destination,
+                payload: SequencerMsg::Sequence(Sequence {
+                    nonce: 0,
+                    delayed_messages_prefix: 0,
+                    delayed_messages_suffix: 0,
+                    messages: vec![Bytes {
+                        inner: b"".to_vec(),
+                    }],
+                }),
+            },
+            signature,
+        });
+
+        assert_eq!(kernel_message, expected);
+    }
+
+    #[test]
+    fn test_deserialization_one_message_sequence() {
+        let kernel_message = from_string("01006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000090000000568656c6c6f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let signature = Signature::from_base58_check("edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q").unwrap();
+
+        let expected = KernelMessage::Sequencer(UnverifiedSigned {
+            body: Framed {
+                destination,
+                payload: SequencerMsg::Sequence(Sequence {
+                    nonce: 0,
+                    delayed_messages_prefix: 0,
+                    delayed_messages_suffix: 0,
+                    messages: vec![Bytes {
+                        inner: b"hello".to_vec(),
+                    }],
+                }),
+            },
+            signature,
+        });
+
+        assert_eq!(kernel_message, expected);
+    }
+
+    #[test]
+    fn test_deserialization_two_messages_sequence() {
+        let kernel_message = from_string("01006227a8721213bd7ddb9b56227e3acb01161b1e6700000000000000000000000000000000120000000568656c6c6f00000005776f726c6400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        let destination =
+            SmartRollupAddress::from_b58check("sr1EzLeJYWrvch2Mhvrk1nUVYrnjGQ8A4qdb").unwrap();
+        let signature = Signature::from_base58_check("edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q").unwrap();
+
+        let expected = KernelMessage::Sequencer(UnverifiedSigned {
+            body: Framed {
+                destination,
+                payload: SequencerMsg::Sequence(Sequence {
+                    nonce: 0,
+                    delayed_messages_prefix: 0,
+                    delayed_messages_suffix: 0,
+                    messages: vec![
+                        Bytes {
+                            inner: b"hello".to_vec(),
+                        },
+                        Bytes {
+                            inner: b"world".to_vec(),
+                        },
+                    ],
+                }),
+            },
+            signature,
+        });
+
+        assert_eq!(kernel_message, expected);
     }
 }
