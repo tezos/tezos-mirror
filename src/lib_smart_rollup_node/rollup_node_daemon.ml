@@ -63,7 +63,7 @@ let start_workers ?(degraded = false) (configuration : Configuration.t)
   let module Plugin = (val plugin) in
   let* () =
     unless degraded @@ fun () ->
-    let* () = Plugin.Publisher.init node_ctxt in
+    let* () = Publisher.init node_ctxt in
     match
       Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
     with
@@ -139,7 +139,8 @@ let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   in
   let*! context_hash = Context.commit ctxt in
   let* commitment_hash =
-    Plugin.Publisher.process_head
+    Publisher.process_head
+      state.plugin
       node_ctxt
       ~predecessor:predecessor.hash
       head
@@ -269,8 +270,8 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
       new_chain_prefetching
   in
   let module Plugin = (val state.plugin) in
-  let* () = Plugin.Publisher.publish_commitments () in
-  let* () = Plugin.Publisher.cement_commitments () in
+  let* () = Publisher.publish_commitments () in
+  let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Plugin.Refutation_coordinator.process stripped_head in
   let* () = Batcher.new_head stripped_head in
@@ -288,7 +289,7 @@ let degraded_refutation_mode state =
   let*! () = message "Shutting down Batcher@." in
   let*! () = Batcher.shutdown () in
   let*! () = message "Shutting down Commitment Publisher@." in
-  let*! () = Plugin.Publisher.shutdown () in
+  let*! () = Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
   let* () =
     handle_protocol_migration ~degraded:true ~catching_up:false state head
@@ -312,7 +313,7 @@ let install_finalizer state =
   let* () = message "Shutting down Batcher@." in
   let* () = Batcher.shutdown () in
   let* () = message "Shutting down Commitment Publisher@." in
-  let* () = Plugin.Publisher.shutdown () in
+  let* () = Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in
   let* () = Plugin.Refutation_coordinator.shutdown () in
   let* (_ : unit tzresult) = Node_context.close state.node_ctxt in
@@ -452,7 +453,8 @@ module Internal_for_tests = struct
     in
     let*! context_hash = Context.commit ctxt in
     let* commitment_hash =
-      Plugin.Publisher.process_head
+      Publisher.process_head
+        (module Plugin)
         node_ctxt
         ~predecessor:predecessor.Layer1.hash
         head

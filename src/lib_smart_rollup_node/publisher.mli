@@ -40,34 +40,35 @@
     commitment that was not published already.
 *)
 
-(** [process_head node_ctxt ~predecessor head ctxt] builds a new commitment if
-    needed, by looking at the level of [head] and checking whether it is a
-    multiple of `Commitment.sc_rollup_commitment_period` levels away from
-    [node_ctxt.initial_level]. It uses the functionalities of [PVM] to compute
-    the hash of to be included in the commitment.  *)
+(** [process_head plugin node_ctxt ~predecessor head ctxt] builds a new
+    commitment if needed, by looking at the level of [head] and checking whether
+    it is a multiple of `Commitment.sc_rollup_commitment_period` levels away
+    from [node_ctxt.initial_level]. It uses the functionalities of [PVM] to
+    compute the hash of to be included in the commitment.  *)
 val process_head :
+  (module Protocol_plugin_sig.S) ->
   Node_context.rw ->
   predecessor:Block_hash.t ->
   Layer1.header ->
   Context.rw ->
-  Octez_smart_rollup.Commitment.Hash.t option tzresult Lwt.t
+  Commitment.Hash.t option tzresult Lwt.t
 
 (** [publish_single_commitment node_ctxt commitment] publishes a single
     [commitment] if it is missing. This function is meant to be used by the {e
     accuser} mode to sparingly publish commitments when it detects a
     conflict. *)
 val publish_single_commitment :
-  _ Node_context.t -> Octez_smart_rollup.Commitment.t -> unit tzresult Lwt.t
+  _ Node_context.t -> Commitment.t -> unit tzresult Lwt.t
 
 (** Initialize worker for publishing and cementing commitments. *)
 val init : _ Node_context.t -> unit tzresult Lwt.t
 
-(** [publish_commitments node_ctxt] publishes the commitments that were not yet
+(** [publish_commitments ()] publishes the commitments that were not yet
     published up to the finalized head and which are after the last cemented
     commitment. *)
 val publish_commitments : unit -> unit tzresult Lwt.t
 
-(** [cement_commitments node_ctxt] cements the commitments that can be cemented,
+(** [cement_commitments ()] cements the commitments that can be cemented,
     i.e. the commitments that are after the current last cemented commitment and
     which have [sc_rollup_challenge_period] levels on top of them since they
     were originally published.  *)

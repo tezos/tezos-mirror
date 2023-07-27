@@ -30,7 +30,6 @@ module Plugin : Protocol_plugin_sig.S = struct
   module Dal_slots_tracker = Dal_slots_tracker
   module Inbox = Inbox
   module Interpreter = Interpreter
-  module Publisher = Publisher
   module Refutation_coordinator = Refutation_coordinator
   module Batcher_constants = Batcher_constants
   module Layer1_helpers = Layer1_helpers
