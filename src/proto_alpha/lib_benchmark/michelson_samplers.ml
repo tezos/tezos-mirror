@@ -702,25 +702,31 @@ end)
         key Script_typed_ir.comparable_ty ->
         (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.big_map sampler =
+      let open Lwt_result_wrap_syntax in
       let open Script_typed_ir in
       fun key_ty elt_ty rng_state ->
         let open TzPervasives in
         let result =
           Lwt_main.run
-            ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
-              let big_map = Script_big_map.empty key_ty elt_ty in
-              (* Cannot have big maps under big maps *)
-              option_t (-1) elt_ty |> Environment.wrap_tzresult
-              >>?= fun opt_elt_ty ->
-              let map = generate_map key_ty opt_elt_ty rng_state in
-              Script_map.fold
-                (fun k v acc ->
-                  acc >>=? fun (bm, ctxt_acc) ->
-                  Script_big_map.update ctxt_acc k v bm)
-                map
-                (return (big_map, ctxt))
-              >|= Environment.wrap_tzresult
-              >>=? fun (big_map, _) -> return big_map )
+            (let* ctxt, _ = Execution_context.make ~rng_state () in
+             let big_map = Script_big_map.empty key_ty elt_ty in
+             (* Cannot have big maps under big maps *)
+             let*? opt_elt_ty =
+               option_t (-1) elt_ty |> Environment.wrap_tzresult
+             in
+             let map = generate_map key_ty opt_elt_ty rng_state in
+             let* big_map, _ =
+               let*! result =
+                 Script_map.fold
+                   (fun k v acc ->
+                     let* bm, ctxt_acc = acc in
+                     Script_big_map.update ctxt_acc k v bm)
+                   map
+                   (return (big_map, ctxt))
+               in
+               Lwt.return @@ Environment.wrap_tzresult result
+             in
+             return big_map)
         in
         match result with
         | Ok x -> x
