@@ -1002,6 +1002,89 @@ functor
       @ tests_not @ tests_band @ tests_shift_left @ tests_shift_right
   end
 
+module Limbs : Test =
+functor
+  (L : LIB)
+  ->
+  struct
+    open L
+
+    open Utils (L)
+
+    let bytes_of_hex = Plompiler.Utils.bytes_of_hex
+
+    module Limbs4 = Limbs (struct
+      let nb_bits = 4
+    end)
+
+    let test_constant4_bytes ~le b c () =
+      let* o' = input @@ Bytes.input_bytes ~le c in
+      let* lo' = Limbs4.of_bytes o' in
+      let* o = Bytes.constant ~le b in
+      let* lo = Limbs4.of_bytes o in
+      assert_equal lo lo'
+
+    let test_constant4_limbs ~le b c () =
+      let* o' = input @@ Bytes.input_bytes ~le c in
+      let* lo' = Limbs4.of_bytes o' in
+      let* o = Limbs4.constant ~le b in
+      assert_equal o lo'
+
+    let tests_constant str f =
+      List.map
+        (fun (valid, le, b, c) ->
+          let name = "Limbs.test_constant" ^ str in
+          let b = bytes_of_hex b in
+          let c = bytes_of_hex c in
+          test ~valid ~name @@ f ~le b c)
+        [
+          (true, false, "0f", "0f");
+          (true, true, "0f", "0f");
+          (true, true, "becd", "becd");
+          (false, true, "00", "0f");
+        ]
+
+    let test_limbs_of_scalar ~total_nb_bits ~nb_bits sx expected () =
+      let* x = input ~kind:`Public sx in
+      let* expected = input expected in
+      let* xlimbs = limbs_of_scalar ~total_nb_bits ~nb_bits x in
+      assert_equal xlimbs expected
+
+    let test_limbs_of_scalar_bytes ~total_nb_bits ~nb_bits sx expected () =
+      let module Limbs_n = Limbs (struct
+        let nb_bits = nb_bits
+      end) in
+      let* x = input ~kind:`Public sx in
+      let* expected = input expected in
+      let* xbits = bits_of_scalar ~nb_bits:total_nb_bits x in
+      let* xlimbs = Limbs_n.of_bytes xbits in
+      assert_equal xlimbs expected
+
+    let tests_limbs_of_scalar str f =
+      List.map
+        (fun (valid, sx, expected, total_nb_bits, nb_bits) ->
+          let sx = si sx in
+          let expected = Input.list @@ List.map si expected in
+          test ~valid ~name:("Limbs.test_limbs_of_scalar" ^ str)
+          @@ f ~total_nb_bits ~nb_bits sx expected)
+        [
+          (true, 9, [1; 0; 0; 1; 0], 5, 1);
+          (true, 30, [0; 1; 1; 1; 1], 5, 1);
+          (false, 3, [1; 1; 1; 0; 0], 5, 1);
+          (true, 128, [0; 0; 0; 0; 0; 0; 0; 1], 8, 1);
+          (true, 128, [0; 0; 0; 2], 8, 2);
+          (true, 128, [0; 8], 8, 4);
+          (true, 255, [15; 15], 8, 4);
+          (true, 3225, [9; 9; 12], 12, 4);
+        ]
+
+    let tests =
+      tests_constant "4_bytes" test_constant4_bytes
+      @ tests_constant "4_limbs" test_constant4_limbs
+      @ tests_limbs_of_scalar "_limbs" test_limbs_of_scalar
+      @ tests_limbs_of_scalar "_bytes" test_limbs_of_scalar_bytes
+  end
+
 module ECC : Test =
 functor
   (L : LIB)
@@ -1191,6 +1274,7 @@ let tests =
       ("Tuple", (module Tuple : Test));
       ("ECC", (module ECC : Test));
       ("Bytes", (module Bytes : Test));
+      ("Limbs", (module Limbs : Test));
     ]
   in
   (* This test uses plonk and it is marked quick so that it
