@@ -874,7 +874,13 @@ let bls12_381 =
     ~foreign_stubs:
       {
         language = C;
-        flags = ["-Wall"; "-Wextra"; ":standard"];
+        flags =
+          [
+            S "-Wall";
+            S "-Wextra";
+            S ":standard";
+            [S ":include"; S "c_flags_blst.sexp"];
+          ];
         names = ["blst_wrapper"; "blst_bindings_stubs"];
       }
     ~dune:
@@ -1065,7 +1071,7 @@ let octez_bls12_381_signature =
     ~foreign_stubs:
       {
         language = C;
-        flags = ["-Wall"; "-Wextra"; ":standard"];
+        flags = [S "-Wall"; S "-Wextra"; S ":standard"];
         names = ["blst_bindings_stubs"];
       }
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
@@ -2777,7 +2783,7 @@ let octez_sapling =
       {
         language = C;
         flags =
-          [":standard"; "-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs"];
+          [S ":standard"; S "-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs"];
         names = ["rustzcash_ctypes_c_stubs"];
       }
     ~c_library_flags:
@@ -3930,7 +3936,7 @@ let octez_benchmark =
       "Tezos: library for writing benchmarks and performing simple parameter \
        inference"
     ~foreign_stubs:
-      {language = C; flags = [":standard"]; names = ["snoop_stubs"]}
+      {language = C; flags = [S ":standard"]; names = ["snoop_stubs"]}
     ~private_modules:["builtin_models"; "builtin_benchmarks"]
     ~deps:
       [

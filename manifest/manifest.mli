@@ -100,7 +100,7 @@ module Dune : sig
       in the generated dune file. *)
   type foreign_stubs = {
     language : language;
-    flags : string list;
+    flags : s_expr;
     names : string list;
   }
 

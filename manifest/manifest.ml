@@ -85,7 +85,7 @@ module Dune = struct
 
   type foreign_stubs = {
     language : language;
-    flags : string list;
+    flags : s_expr;
     names : string list;
   }
 
@@ -283,9 +283,7 @@ module Dune = struct
             [
               S "foreign_stubs";
               [S "language"; (match x.language with C -> S "c")];
-              (match x.flags with
-              | [] -> E
-              | _ -> [S "flags"; of_atom_list x.flags]);
+              (match x.flags with [] -> E | _ -> [S "flags"; x.flags]);
               S "names" :: of_atom_list x.names;
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
