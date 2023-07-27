@@ -874,7 +874,13 @@ let bls12_381 =
     ~foreign_stubs:
       {
         language = C;
-        flags = ["-Wall"; "-Wextra"; ":standard"];
+        flags =
+          [
+            S "-Wall";
+            S "-Wextra";
+            S ":standard";
+            [S ":include"; S "c_flags_blst.sexp"];
+          ];
         names = ["blst_wrapper"; "blst_bindings_stubs"];
       }
     ~dune:

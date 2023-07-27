@@ -18,7 +18,7 @@
  (foreign_archives blst)
  (foreign_stubs
   (language c)
-  (flags (-Wall -Wextra :standard))
+  (flags (-Wall -Wextra :standard (:include c_flags_blst.sexp)))
   (names blst_wrapper blst_bindings_stubs))
  (c_library_flags (-Wall -Wextra :standard -lpthread)))
 
