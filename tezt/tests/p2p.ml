@@ -321,7 +321,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:["p2p"; "node"; "maintenance"]
+      ~tags:["p2p"; "node"; "maintenance"; Tag.memory_4k]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -568,7 +568,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:["p2p"; "node"; "swap"]
+      ~tags:["p2p"; "node"; "swap"; Tag.memory_4k]
     @@ fun () ->
     (* Since we try to verify that something does not happen, we need
        to find when we consider having waited enough time to consider
@@ -1219,7 +1219,7 @@ module P2p_stat = struct
     Test.register
       ~__FILE__
       ~title:"Test [octez-admin-client p2p stat]"
-      ~tags:["p2p"; "connections"; "p2p_stat"]
+      ~tags:["p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
     @@ fun () ->
     let num_nodes = 5 in
     Log.info "Start a clique of %d nodes" num_nodes ;

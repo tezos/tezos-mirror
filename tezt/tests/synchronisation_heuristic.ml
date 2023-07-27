@@ -77,7 +77,12 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
-        Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "node"; "sync";
+        Tag.ci_disabled;
+        "synchronisation_threshold";
+        "bootstrap";
+        "node";
+        "sync";
+        Tag.memory_3k;
       ]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
@@ -501,7 +506,13 @@ let test_many_nodes_bootstrap =
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
     ~tags:
-      [Tag.ci_disabled; "synchronisation_threshold"; "bootstrap"; "threshold"]
+      [
+        Tag.ci_disabled;
+        "synchronisation_threshold";
+        "bootstrap";
+        "threshold";
+        Tag.memory_4k;
+      ]
   @@ fun protocol ->
   let num_nodes = 8 in
   let running_time = 10.0 in

@@ -26,3 +26,7 @@
 let ci_disabled = "ci_disabled"
 
 let flaky = "flaky"
+
+let memory_3k = "memory_3k"
+
+let memory_4k = "memory_4k"
