@@ -178,6 +178,12 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or(false)
     }
 
+    /// Record the base fee part of the transaction cost. We need the SputnikVM
+    /// error code in case this goes wrong, so that's what we return.
+    fn record_base_gas_cost(&mut self) -> Result<(), ExitError> {
+        self.gasometer.record_cost(self.config.gas_transaction_call)
+    }
+
     /// Execute a SputnikVM runtime with this handler
     fn execute(
         &mut self,
@@ -461,6 +467,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(is_static)?;
 
+        if let Err(err) = self.record_base_gas_cost() {
+            return self.end_initial_transaction(Ok((
+                ExitReason::Error(err),
+                None,
+                vec![],
+            )));
+        }
+
         let result = self.execute_call(
             callee,
             value.map(|value| Transfer {
@@ -485,6 +499,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
         self.begin_initial_transaction(false)?;
+
+        if let Err(err) = self.record_base_gas_cost() {
+            return self.end_initial_transaction(Ok((
+                ExitReason::Error(err),
+                None,
+                vec![],
+            )));
+        }
 
         let default_create_scheme = CreateScheme::Legacy { caller };
 
@@ -511,22 +533,17 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
         self.increment_nonce(from)?;
 
-        // TODO gas cost - it costs a fixed amount transferring funds
-
-        let transfer_cost = self.config.gas_transaction_call;
-
-        let gas_result = self.gasometer.record_cost(transfer_cost);
-
-        let tx_result = match gas_result {
-            Ok(()) => Ok((
-                self.execute_transfer(from, to, value, gas_limit)?,
+        if let Err(err) = self.record_base_gas_cost() {
+            return self.end_initial_transaction(Ok((
+                ExitReason::Error(err),
                 None,
                 vec![],
-            )),
-            Err(err) => Ok((ExitReason::Error(err), None, vec![])),
-        };
+            )));
+        }
 
-        self.end_initial_transaction(tx_result)
+        let result = self.execute_transfer(from, to, value, gas_limit)?;
+
+        self.end_initial_transaction(Ok((result, None, vec![])))
     }
 
     fn get_or_create_account(

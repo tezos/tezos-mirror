@@ -431,7 +431,7 @@ mod test {
             callee,
             caller,
             call_data,
-            Some(10000),
+            Some(31000),
             Some(transaction_value),
         );
 
@@ -457,7 +457,7 @@ mod test {
             new_address,
             caller,
             call_data2,
-            Some(10000),
+            Some(31000),
             Some(U256::zero()),
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -496,7 +496,7 @@ mod test {
             new_address,
             caller,
             hex::decode(STORAGE_CONTRACT_CALL_NUM).unwrap(),
-            Some(10000),
+            Some(31000),
             Some(U256::zero()),
         );
         assert!(result2.is_ok(), "execution should have succeeded");
@@ -620,13 +620,13 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            None,
+            Some(21000),
             None,
         );
 
         // Assert
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 0,
+            gas_used: 21000,
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -754,13 +754,13 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(6),
+            Some(21006),
             None,
         );
 
         // Assert
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 6,
+            gas_used: 21006,
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -942,13 +942,13 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(1),
+            Some(21001),
             None,
         );
 
         // Assert
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 0,
+            gas_used: 21000,
             is_success: true,
             new_address: None,
             logs: vec![],
@@ -1301,7 +1301,7 @@ mod test {
         };
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 1345,
+            gas_used: 22345,
             is_success: true,
             new_address: None,
             logs: vec![log_record1, log_record2],
@@ -1391,7 +1391,7 @@ mod test {
         };
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 908,
+            gas_used: 21908,
             is_success: true,
             new_address: None,
             logs: vec![log_record1],
@@ -1470,7 +1470,7 @@ mod test {
         );
 
         let expected_result = Ok(ExecutionOutcome {
-            gas_used: 30124,
+            gas_used: 51124,
             is_success: true,
             new_address: None,
             logs: vec![],
