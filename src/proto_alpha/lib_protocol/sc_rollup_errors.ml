@@ -99,6 +99,8 @@ type error +=
       Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
   | (* `Permanent *)
       Sc_rollup_double_publish of Sc_rollup_commitment_repr.Hash.t
+  | Sc_rollup_empty_whitelist
+  | Sc_rollup_whitelist_disabled
 
 let () =
   register_error_kind
@@ -693,4 +695,24 @@ let () =
     (function
       | Sc_rollup_double_publish commitment_hash -> Some commitment_hash
       | _ -> None)
-    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash)
+    (fun commitment_hash -> Sc_rollup_double_publish commitment_hash) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_empty_whitelist"
+    ~title:"Invalid whitelist: whitelist cannot be empty"
+    ~description:"Smart rollup whitelist cannot be empty"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Smart rollup whitelist cannot be empty.")
+    Data_encoding.empty
+    (function Sc_rollup_empty_whitelist -> Some () | _ -> None)
+    (fun () -> Sc_rollup_empty_whitelist) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_whitelist_disabled"
+    ~title:"Invalid whitelist: must be None when the feature is deactivated"
+    ~description:"The whitelist must be None when the feature is deactivated."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Private smart rollup with whitelist ACL is disabled.")
+    Data_encoding.empty
+    (function Sc_rollup_whitelist_disabled -> Some () | _ -> None)
+    (fun () -> Sc_rollup_whitelist_disabled)

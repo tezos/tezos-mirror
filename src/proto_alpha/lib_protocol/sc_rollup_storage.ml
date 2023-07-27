@@ -109,8 +109,27 @@ let init_commitment_storage ctxt address
       + commitment_first_publication_level_diff
       + commitments_per_inbox_level_diff )
 
-let raw_originate ctxt ~kind ~parameters_ty ~genesis_commitment ~address =
+let check_whitelist ctxt whitelist =
+  let open Result_syntax in
+  match whitelist with
+  | Some whitelist ->
+      let private_enabled = Constants_storage.sc_rollup_private_enable ctxt in
+      (* The whitelist must be None when the feature is deactivated. *)
+      let* () =
+        error_unless
+          private_enabled
+          Sc_rollup_errors.Sc_rollup_whitelist_disabled
+      in
+      (* The origination fails with an empty list. *)
+      error_when
+        (List.is_empty whitelist)
+        Sc_rollup_errors.Sc_rollup_empty_whitelist
+  | None -> Ok ()
+
+let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
+    ~address =
   let open Lwt_result_syntax in
+  let*? () = check_whitelist ctxt whitelist in
   let* ctxt, pvm_kind_size = Store.PVM_kind.init ctxt address kind in
   let* ctxt, param_ty_size =
     Store.Parameters_type.init ctxt address parameters_ty
@@ -135,11 +154,17 @@ let raw_originate ctxt ~kind ~parameters_ty ~genesis_commitment ~address =
   in
   return (size, genesis_info.commitment_hash, ctxt)
 
-let originate ctxt ~kind ~parameters_ty ~genesis_commitment =
+let originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment =
   let open Lwt_result_syntax in
   let*? ctxt, address = new_address ctxt in
   let* size, genesis_commitment, ctxt =
-    raw_originate ctxt ~kind ~parameters_ty ~genesis_commitment ~address
+    raw_originate
+      ?whitelist
+      ctxt
+      ~kind
+      ~parameters_ty
+      ~genesis_commitment
+      ~address
   in
   return (address, size, genesis_commitment, ctxt)
 

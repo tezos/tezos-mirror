@@ -530,13 +530,14 @@ let dumb_init_repr level =
     level
 
 let origination_op ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ?(boot_sector = "") ?(parameters_ty = "unit") ctxt src kind =
+    ?(boot_sector = "") ?(parameters_ty = "unit") ?whitelist ctxt src kind =
   Op.sc_rollup_origination
     ?force_reveal
     ?counter
     ?fee
     ?gas_limit
     ?storage_limit
+    ?whitelist
     ctxt
     src
     kind

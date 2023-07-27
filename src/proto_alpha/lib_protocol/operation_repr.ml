@@ -344,6 +344,7 @@ and _ manager_operation =
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
       parameters_ty : Script_repr.lazy_expr;
+      whitelist : Sc_rollup_whitelist_repr.t option;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
@@ -814,20 +815,22 @@ module Encoding = struct
           tag = sc_rollup_operation_origination_tag;
           name = "smart_rollup_originate";
           encoding =
-            obj3
+            obj4
               (req "pvm_kind" Sc_rollups.Kind.encoding)
               (req "kernel" (string Hex))
-              (req "parameters_ty" Script_repr.lazy_expr_encoding);
+              (req "parameters_ty" Script_repr.lazy_expr_encoding)
+              (opt "whitelist" Sc_rollup_whitelist_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
-                (kind, boot_sector, parameters_ty));
+            | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist}
+              ->
+                (kind, boot_sector, parameters_ty, whitelist));
           inj =
-            (fun (kind, boot_sector, parameters_ty) ->
-              Sc_rollup_originate {kind; boot_sector; parameters_ty});
+            (fun (kind, boot_sector, parameters_ty, whitelist) ->
+              Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist});
         }
 
     let dal_publish_slot_header_case =

@@ -56,6 +56,11 @@ module Sc_rollup_repr = Sc_rollup_repr
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
+
+  module Whitelist = struct
+    include Sc_rollup_whitelist_repr
+  end
+
   module Metadata = Sc_rollup_metadata_repr
   module Dissection_chunk = Sc_rollup_dissection_chunk_repr
   include Sc_rollup_PVM_sig
