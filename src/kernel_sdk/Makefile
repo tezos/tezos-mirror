@@ -20,7 +20,7 @@ ifneq ($(NATIVE_TARGET),)
 NATIVE_OPT := --target "$(NATIVE_TARGET)"
 endif
 
-SDK_VERSION := "0.2.0"
+SDK_VERSION := "0.2.1"
 
 .PHONY: check
 check: installer-template publish-check doc
