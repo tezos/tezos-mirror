@@ -10,7 +10,8 @@
   octez-libs.base.unix
   octez-libs.stdlib-unix
   octez-libs.crypto
-  octez-libs.crypto-dal)
+  octez-libs.crypto-dal
+  yaml)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
