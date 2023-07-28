@@ -148,7 +148,10 @@ let scenario network =
   let cryptobox = dal_parameters.cryptobox in
   let number_of_slots = dal_parameters.number_of_slots in
   let lag = dal_parameters.attestation_lag in
-  let first_level = 1 + Node.get_level node in
+  let* first_level =
+    let* level = Node.wait_for_level node 0 in
+    1 + level |> return
+  in
 
   (* [publish_slot key_index] publishes a slot from the [key_index+1]-th account
      in [keys] for every level from current level to [first_level + num_levels -
