@@ -836,3 +836,7 @@ let txpool_encoding =
     (fun {pending; queued} -> (pending, queued))
     (fun (pending, queued) -> {pending; queued})
     (obj2 (req "pending" field_encoding) (req "queued" field_encoding))
+
+let hash_raw_tx str =
+  str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+  |> Bytes.to_string
