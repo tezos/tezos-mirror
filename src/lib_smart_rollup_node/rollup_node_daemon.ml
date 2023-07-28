@@ -64,7 +64,7 @@ let start_workers (configuration : Configuration.t)
   let* () = Publisher.init node_ctxt in
   let* () =
     match
-      Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
+      Configuration.Operation_kind_map.find Add_messages node_ctxt.operators
     with
     | None -> return_unit
     | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
@@ -317,24 +317,24 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Configuration.Operator_purpose_map.bindings node_ctxt.operators
+      Configuration.Operation_kind_map.bindings node_ctxt.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
-             let purposes =
+             let operation_kinds =
                match Signature.Public_key_hash.Map.find operator acc with
                | None -> [purpose]
                | Some ps -> purpose :: ps
              in
-             Signature.Public_key_hash.Map.add operator purposes acc)
+             Signature.Public_key_hash.Map.add operator operation_kinds acc)
            Signature.Public_key_hash.Map.empty
       |> Signature.Public_key_hash.Map.bindings
-      |> List.map (fun (operator, purposes) ->
+      |> List.map (fun (operator, operation_kinds) ->
              let strategy =
-               match purposes with
+               match operation_kinds with
                | [Configuration.Add_messages] -> `Delay_block 0.5
                | _ -> `Each_block
              in
-             (operator, strategy, purposes))
+             (operator, strategy, operation_kinds))
     in
     let* () =
       unless (signers = []) @@ fun () ->
@@ -501,7 +501,7 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Operator_purpose_map.iter_es
+    Operation_kind_map.iter_es
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
@@ -520,7 +520,7 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let publisher =
-    Configuration.Operator_purpose_map.find
+    Configuration.Operation_kind_map.find
       Publish
       configuration.sc_rollup_node_operators
   in

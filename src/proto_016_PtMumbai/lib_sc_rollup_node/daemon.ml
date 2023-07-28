@@ -298,7 +298,7 @@ let run node_ctxt configuration
   let start () =
     let*! () = Inbox.start () in
     let signers =
-      Configuration.Operator_purpose_map.bindings node_ctxt.operators
+      Configuration.Operation_kind_map.bindings node_ctxt.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
              let purposes =
@@ -343,7 +343,7 @@ let run node_ctxt configuration
     in
     let* () =
       match
-        Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
+        Configuration.Operation_kind_map.find Add_messages node_ctxt.operators
       with
       | None -> return_unit
       | Some signer ->
@@ -495,7 +495,7 @@ let run
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Operator_purpose_map.iter_es
+    Operation_kind_map.iter_es
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
@@ -517,7 +517,7 @@ let run
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
   let publisher =
-    Configuration.Operator_purpose_map.find
+    Configuration.Operation_kind_map.find
       Publish
       configuration.sc_rollup_node_operators
   in

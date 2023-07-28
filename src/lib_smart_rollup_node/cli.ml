@@ -55,7 +55,7 @@ let sc_rollup_node_operator_param next =
           key or alias by said purpose, e.g. publish:alias_of_my_operator. The \
           possible purposes are: %s."
          (String.concat ", "
-         @@ Configuration.(List.map string_of_purpose purposes)))
+         @@ Configuration.(List.map string_of_operation_kind operation_kinds)))
     ( Tezos_clic.parameter @@ fun cctxt s ->
       let parse_pkh s =
         let from_alias s = Client_keys.Public_key_hash.find cctxt s in
@@ -74,7 +74,7 @@ let sc_rollup_node_operator_param next =
           let+ pkh = parse_pkh s in
           `Default pkh
       | [purpose; operator_s] -> (
-          match Configuration.purpose_of_string purpose with
+          match Configuration.operation_kind_of_string purpose with
           | Some purpose ->
               let+ pkh = parse_pkh operator_s in
               `Purpose (purpose, pkh)

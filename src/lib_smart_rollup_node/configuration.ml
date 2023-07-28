@@ -27,19 +27,19 @@
 
 type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
 
-type purpose = Publish | Add_messages | Cement | Timeout | Refute
+type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
 
-let purposes = [Publish; Add_messages; Cement; Timeout; Refute]
+let operation_kinds = [Publish; Add_messages; Cement; Timeout; Refute]
 
-module Operator_purpose_map = Map.Make (struct
-  type t = purpose
+module Operation_kind_map = Map.Make (struct
+  type t = operation_kind
 
   let compare = Stdlib.compare
 end)
 
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
+type operators = Signature.Public_key_hash.t Operation_kind_map.t
 
-type fee_parameters = Injector_sigs.fee_parameter Operator_purpose_map.t
+type fee_parameters = Injector_sigs.fee_parameter Operation_kind_map.t
 
 type batcher = {
   simulate : bool;
@@ -182,11 +182,11 @@ let default_burn = function
       (* A refutation move can store data, e.g. opening a game. *)
       tez 1
 
-let default_fee_parameter ?purpose () =
+let default_fee_parameter ?operation_kind () =
   let fee_cap, burn_cap =
-    match purpose with
+    match operation_kind with
     | None -> (default_fee_cap, default_burn_cap)
-    | Some purpose -> (default_fee purpose, default_burn purpose)
+    | Some kind -> (default_fee kind, default_burn kind)
   in
   {
     Injector_sigs.minimal_fees = default_minimal_fees;
@@ -199,10 +199,13 @@ let default_fee_parameter ?purpose () =
 
 let default_fee_parameters =
   List.fold_left
-    (fun acc purpose ->
-      Operator_purpose_map.add purpose (default_fee_parameter ~purpose ()) acc)
-    Operator_purpose_map.empty
-    purposes
+    (fun acc operation_kind ->
+      Operation_kind_map.add
+        operation_kind
+        (default_fee_parameter ~operation_kind ())
+        acc)
+    Operation_kind_map.empty
+    operation_kinds
 
 let default_batcher_simulate = true
 
@@ -231,14 +234,14 @@ let default_l1_blocks_cache_size = 64
 
 let default_l2_blocks_cache_size = 64
 
-let string_of_purpose = function
+let string_of_operation_kind = function
   | Publish -> "publish"
   | Add_messages -> "add_messages"
   | Cement -> "cement"
   | Timeout -> "timeout"
   | Refute -> "refute"
 
-let purpose_of_string = function
+let operation_kind_of_string = function
   | "publish" -> Some Publish
   | "add_messages" -> Some Add_messages
   | "cement" -> Some Cement
@@ -246,53 +249,53 @@ let purpose_of_string = function
   | "refute" -> Some Refute
   | _ -> None
 
-let purpose_of_string_exn s =
-  match purpose_of_string s with
+let operation_kind_of_string_exn s =
+  match operation_kind_of_string s with
   | Some p -> p
-  | None -> invalid_arg ("purpose_of_string " ^ s)
+  | None -> invalid_arg ("operation_kind_of_string " ^ s)
 
 let add_fallbacks map fallbacks =
   List.fold_left
-    (fun map (missing_purpose, fallback_purpose) ->
-      if Operator_purpose_map.mem missing_purpose map then
-        (* No missing purpose, don't fallback *)
+    (fun map (missing_operation_kind, fallback_operation_kind) ->
+      if Operation_kind_map.mem missing_operation_kind map then
+        (* No missing operation_kind, don't fallback *)
         map
       else
-        match Operator_purpose_map.find fallback_purpose map with
+        match Operation_kind_map.find fallback_operation_kind map with
         | None ->
             (* Nothing to fallback on *)
             map
-        | Some operator -> Operator_purpose_map.add missing_purpose operator map)
+        | Some kind -> Operation_kind_map.add missing_operation_kind kind map)
     map
     fallbacks
 
-let make_purpose_map ~default bindings =
-  let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
+let make_operation_kind_map ~default bindings =
+  let map = Operation_kind_map.of_seq @@ List.to_seq bindings in
   let map = add_fallbacks map [(Timeout, Refute)] in
   match default with
   | None -> map
   | Some default ->
       List.fold_left
-        (fun map purpose ->
-          if Operator_purpose_map.mem purpose map then map
-          else Operator_purpose_map.add purpose default map)
+        (fun map kind ->
+          if Operation_kind_map.mem kind map then map
+          else Operation_kind_map.add kind default map)
         map
-        purposes
+        operation_kinds
 
-let operator_purpose_map_encoding encoding =
+let operation_kind_map_encoding encoding =
   let open Data_encoding in
   let schema =
     let open Json_schema in
-    let v_schema p = Data_encoding.Json.schema (encoding p) in
-    let v_schema_r p = root (v_schema p) in
+    let v_schema op = Data_encoding.Json.schema (encoding op) in
+    let v_schema_r op = root (v_schema op) in
     let kind =
       Object
         {
           properties =
             List.map
-              (fun purpose ->
-                (string_of_purpose purpose, v_schema_r purpose, false, None))
-              purposes;
+              (fun kind ->
+                (string_of_operation_kind kind, v_schema_r kind, false, None))
+              operation_kinds;
           pattern_properties = [];
           additional_properties = None;
           min_properties = 0;
@@ -307,24 +310,25 @@ let operator_purpose_map_encoding encoding =
     ~schema
     (fun map ->
       let fields =
-        Operator_purpose_map.bindings map
-        |> List.map (fun (p, v) ->
-               (string_of_purpose p, Data_encoding.Json.construct (encoding p) v))
+        Operation_kind_map.bindings map
+        |> List.map (fun (op, v) ->
+               ( string_of_operation_kind op,
+                 Data_encoding.Json.construct (encoding op) v ))
       in
       `O fields)
     (function
       | `O fields ->
           List.map
-            (fun (p, v) ->
-              let purpose = purpose_of_string_exn p in
-              (purpose, Data_encoding.Json.destruct (encoding purpose) v))
+            (fun (op, v) ->
+              let kind = operation_kind_of_string_exn op in
+              (kind, Data_encoding.Json.destruct (encoding kind) v))
             fields
-          |> List.to_seq |> Operator_purpose_map.of_seq
+          |> List.to_seq |> Operation_kind_map.of_seq
       | _ -> assert false)
     Data_encoding.Json.encoding
 
 let operators_encoding =
-  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
+  operation_kind_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
 (* Encoding for Tez amounts, replicated from mempool. *)
 let tez_encoding =
@@ -351,7 +355,7 @@ let nanotez_encoding =
        (fun (num, den) -> {Q.num; den})
        (tup2 z z))
 
-let fee_parameter_encoding purpose =
+let fee_parameter_encoding operation_kind =
   let open Data_encoding in
   conv
     (fun {
@@ -408,15 +412,14 @@ let fee_parameter_encoding purpose =
           "fee-cap"
           ~description:"The fee cap"
           tez_encoding
-          (default_fee purpose))
+          (default_fee operation_kind))
        (dft
           "burn-cap"
           ~description:"The burn cap"
           tez_encoding
-          (default_burn purpose)))
+          (default_burn operation_kind)))
 
-let fee_parameters_encoding =
-  operator_purpose_map_encoding fee_parameter_encoding
+let fee_parameters_encoding = operation_kind_map_encoding fee_parameter_encoding
 
 let modes = [Observer; Batcher; Maintenance; Operator; Custom]
 
@@ -667,34 +670,36 @@ let encoding : t Data_encoding.t =
 
 let check_mode config =
   let open Result_syntax in
-  let check_purposes purposes =
+  let check_operation_kinds operation_kinds =
     let missing_operators =
       List.filter
         (fun p ->
-          not (Operator_purpose_map.mem p config.sc_rollup_node_operators))
-        purposes
+          not (Operation_kind_map.mem p config.sc_rollup_node_operators))
+        operation_kinds
     in
     if missing_operators <> [] then
       let mode = string_of_mode config.mode in
-      let missing_operators = List.map string_of_purpose missing_operators in
+      let missing_operators =
+        List.map string_of_operation_kind missing_operators
+      in
       tzfail (Missing_mode_operators {mode; missing_operators})
     else return_unit
   in
-  let narrow_purposes purposes =
-    let+ () = check_purposes purposes in
+  let narrow_operation_kinds operation_kinds =
+    let+ () = check_operation_kinds operation_kinds in
     let sc_rollup_node_operators =
-      Operator_purpose_map.filter
-        (fun op_purpose _ -> List.mem ~equal:Stdlib.( = ) op_purpose purposes)
+      Operation_kind_map.filter
+        (fun op_kind _ -> List.mem ~equal:Stdlib.( = ) op_kind operation_kinds)
         config.sc_rollup_node_operators
     in
     {config with sc_rollup_node_operators}
   in
   match config.mode with
-  | Observer -> narrow_purposes []
-  | Batcher -> narrow_purposes [Add_messages]
-  | Accuser -> narrow_purposes [Publish; Refute]
-  | Maintenance -> narrow_purposes [Publish; Cement; Refute]
-  | Operator -> narrow_purposes [Publish; Cement; Add_messages; Refute]
+  | Observer -> narrow_operation_kinds []
+  | Batcher -> narrow_operation_kinds [Add_messages]
+  | Accuser -> narrow_operation_kinds [Publish; Refute]
+  | Maintenance -> narrow_operation_kinds [Publish; Cement; Refute]
+  | Operator -> narrow_operation_kinds [Publish; Cement; Add_messages; Refute]
   | Custom -> return config
 
 let refutation_player_buffer_levels = 5
@@ -745,7 +750,7 @@ module Cli = struct
       | [default_operator] -> Some default_operator
       | _ -> Stdlib.failwith "Multiple default operators"
     in
-    make_purpose_map purposed_operators ~default:default_operator
+    make_operation_kind_map purposed_operators ~default:default_operator
 
   let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
@@ -766,7 +771,7 @@ module Cli = struct
         dac_observer_endpoint;
         dac_timeout;
         metrics_addr;
-        fee_parameters = Operator_purpose_map.empty;
+        fee_parameters = Operation_kind_map.empty;
         mode;
         loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
         batcher = default_batcher;
@@ -799,7 +804,7 @@ module Cli = struct
     in
     (* Merge operators *)
     let sc_rollup_node_operators =
-      Operator_purpose_map.merge
+      Operation_kind_map.merge
         (fun _purpose -> Option.either)
         new_sc_rollup_node_operators
         configuration.sc_rollup_node_operators
