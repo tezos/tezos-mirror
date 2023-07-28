@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Request = struct
-  type ('a, 'b) t = Process : Layer1.head -> (unit, error trace) t
+(** This module implements the refutation game logic of the rollup node. *)
 
-  type view = View : _ t -> view
+(** [play_opening_move node_ctxt self conflict] injects the opening refutation
+    game move for [conflict]. *)
+val play_opening_move :
+  [< `Read | `Write > `Read] Node_context.t ->
+  Signature.public_key_hash ->
+  Octez_smart_rollup.Game.conflict ->
+  (unit, tztrace) result Lwt.t
 
-  let view req = View req
-
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Process"
-          (obj2
-             (req "request" (constant "process"))
-             (req "block" Layer1.head_encoding))
-          (function View (Process b) -> Some ((), b))
-          (fun ((), b) -> View (Process b));
-      ]
-
-  let pp ppf (View r) =
-    match r with
-    | Process {Layer1.hash; level} ->
-        Format.fprintf
-          ppf
-          "Processing new L1 head %a at level %ld"
-          Block_hash.pp
-          hash
-          level
-end
+(** [play head_block plugin node_ctxt ~self game opponent] injects the next move
+    in the refutation [game] played by [self] and [opponent]. *)
+val play :
+  Node_context.rw ->
+  self:Signature.public_key_hash ->
+  Octez_smart_rollup.Game.t ->
+  Signature.public_key_hash ->
+  (unit, tztrace) result Lwt.t

@@ -76,9 +76,17 @@ end
 module Inbox : sig
   type t = Sc_rollup.Inbox.t
 
+  type history_proof = Sc_rollup.Inbox.history_proof
+
   val of_octez : Octez_smart_rollup.Inbox.t -> t
 
   val to_octez : t -> Octez_smart_rollup.Inbox.t
+
+  val history_proof_of_octez :
+    Octez_smart_rollup.Inbox.history_proof -> history_proof
+
+  val history_proof_to_octez :
+    history_proof -> Octez_smart_rollup.Inbox.history_proof
 end
 
 module Game : sig
@@ -107,6 +115,30 @@ module Game : sig
   val index_of_octez : Octez_smart_rollup.Game.index -> index
 
   val index_to_octez : index -> Octez_smart_rollup.Game.index
+
+  type player = Sc_rollup.Game.player
+
+  val player_of_octez : Octez_smart_rollup.Game.player -> player
+
+  val player_to_octez : player -> Octez_smart_rollup.Game.player
+
+  type game_state = Sc_rollup.Game.game_state
+
+  val game_state_of_octez : Octez_smart_rollup.Game.game_state -> game_state
+
+  val game_state_to_octez : game_state -> Octez_smart_rollup.Game.game_state
+
+  type t = Sc_rollup.Game.t
+
+  val of_octez : Octez_smart_rollup.Game.t -> t
+
+  val to_octez : t -> Octez_smart_rollup.Game.t
+
+  type conflict = Sc_rollup.Refutation_storage.conflict
+
+  val conflict_of_octez : Octez_smart_rollup.Game.conflict -> conflict
+
+  val conflict_to_octez : conflict -> Octez_smart_rollup.Game.conflict
 end
 
 module Kind : sig

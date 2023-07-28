@@ -23,25 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Component for managing refutation games.
-    This module is implemented as a single worker in the rollup node,
-    which takes care of processing new L1 heads, and coordinating
-    the refutation game players. (See {!Refutation_player}).
+(** Worker module for a single refutation game player.  The node's refutation
+    coordinator will spawn a new refutation player for each refutation game.
 *)
+module Worker : Worker.T
 
-(** Initiatilize the refuation coordinator. *)
-val init : Node_context.rw -> unit tzresult Lwt.t
+(** Type for a refutation game player.  *)
+type worker = Worker.infinite Worker.queue Worker.t
 
-(** Process a new l1 head. This means that the coordinator will:
-    {ol
-      {li Gather all existing conflicts}
-      {li Launch new refutation players for each conflict that doesn't
-          have a player in this node}
-      {li Kill all players whose conflict has disappeared from L1}
-      {li Make all players play a step in the refutation}
-    }
+(** [init_and_play node_ctxt ~self ~conflict ~game ~level] initializes a new
+    refutation game player for signer [self].  After initizialization, the
+    worker will play the next move depending on the [game] state.  If no [game]
+    is passed, the worker will play the opening move for [conflict].  *)
+val init_and_play :
+  Node_context.rw ->
+  self:Signature.public_key_hash ->
+  conflict:Game.conflict ->
+  game:Game.t option ->
+  level:int32 ->
+  unit tzresult Lwt.t
+
+(** [play worker game ~level] makes the [worker] play the next move depending
+      on the [game] state for their conflict.
   *)
-val process : Layer1.head -> unit tzresult Lwt.t
+val play : worker -> Game.t -> level:int32 -> unit Lwt.t
 
-(** Shutdown the refutation coordinator. *)
-val shutdown : unit -> unit Lwt.t
+(** Shutdown a refutaiton game player. *)
+val shutdown : worker -> unit Lwt.t
+
+(** [current_games ()] lists the opponents' this node is playing refutation
+    games against, alongside the worker that takes care of each game. *)
+val current_games : unit -> (Signature.public_key_hash * worker) list

@@ -23,25 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Component for managing refutation games.
-    This module is implemented as a single worker in the rollup node,
-    which takes care of processing new L1 heads, and coordinating
-    the refutation game players. (See {!Refutation_player}).
-*)
+module Request : sig
+  (** Type of requests accepted by the refutation player. *)
+  type ('a, 'b) t =
+    | Play : Game.t -> (unit, error trace) t
+        (** Play a step of an ongoing refutation game. *)
+    | Play_opening : Game.conflict -> (unit, error trace) t
+        (** Play the opening move of a refutation game. *)
 
-(** Initiatilize the refuation coordinator. *)
-val init : Node_context.rw -> unit tzresult Lwt.t
+  type view = View : _ t -> view
 
-(** Process a new l1 head. This means that the coordinator will:
-    {ol
-      {li Gather all existing conflicts}
-      {li Launch new refutation players for each conflict that doesn't
-          have a player in this node}
-      {li Kill all players whose conflict has disappeared from L1}
-      {li Make all players play a step in the refutation}
-    }
-  *)
-val process : Layer1.head -> unit tzresult Lwt.t
-
-(** Shutdown the refutation coordinator. *)
-val shutdown : unit -> unit Lwt.t
+  include
+    Worker_intf.REQUEST
+      with type ('a, 'request_error) t := ('a, 'request_error) t
+       and type view := view
+end

@@ -23,25 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Component for managing refutation games.
-    This module is implemented as a single worker in the rollup node,
-    which takes care of processing new L1 heads, and coordinating
-    the refutation game players. (See {!Refutation_player}).
-*)
+module Request = struct
+  type ('a, 'b) t =
+    | Play : Game.t -> (unit, error trace) t
+    | Play_opening : Game.conflict -> (unit, error trace) t
 
-(** Initiatilize the refuation coordinator. *)
-val init : Node_context.rw -> unit tzresult Lwt.t
+  type view = View : _ t -> view
 
-(** Process a new l1 head. This means that the coordinator will:
-    {ol
-      {li Gather all existing conflicts}
-      {li Launch new refutation players for each conflict that doesn't
-          have a player in this node}
-      {li Kill all players whose conflict has disappeared from L1}
-      {li Make all players play a step in the refutation}
-    }
-  *)
-val process : Layer1.head -> unit tzresult Lwt.t
+  let view req = View req
 
-(** Shutdown the refutation coordinator. *)
-val shutdown : unit -> unit Lwt.t
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Play"
+          (obj2 (req "request" (constant "play")) (req "game" Game.encoding))
+          (function View (Play g) -> Some ((), g) | _ -> None)
+          (fun ((), g) -> View (Play g));
+        case
+          (Tag 1)
+          ~title:"Play opening"
+          (obj2
+             (req "request" (constant "play_opening"))
+             (req "conflict" Game.conflict_encoding))
+          (function View (Play_opening c) -> Some ((), c) | _ -> None)
+          (fun ((), c) -> View (Play_opening c));
+      ]
+
+  let pp ppf (View r) =
+    match r with
+    | Play game ->
+        Format.fprintf
+          ppf
+          "Playing game %a"
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct Game.encoding game)
+    | Play_opening conflict ->
+        Format.fprintf
+          ppf
+          "Playing opening move for conflict against staker %a at our \
+           commitment %a"
+          Signature.Public_key_hash.pp
+          conflict.other
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct
+             Commitment.encoding
+             conflict.our_commitment)
+end

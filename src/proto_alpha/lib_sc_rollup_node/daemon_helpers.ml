@@ -99,7 +99,7 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
         Refutation_game_event.potential_conflict_detected
           ~our_commitment_hash
           ~their_commitment_hash
-          ~level:their_commitment.inbox_level
+          ~level:(Raw_level.to_int32 their_commitment.inbox_level)
           ~other
       in
       assert (Sc_rollup.Address.(node_ctxt.rollup_address = rollup)) ;

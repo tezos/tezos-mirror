@@ -57,24 +57,22 @@ let previous_context (node_ctxt : _ Node_context.t)
     return (Context.empty node_ctxt.context)
   else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
 
-let start_workers ?(degraded = false) (configuration : Configuration.t)
+let start_workers (configuration : Configuration.t)
     (plugin : (module Protocol_plugin_sig.S)) (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let module Plugin = (val plugin) in
+  let* () = Publisher.init node_ctxt in
   let* () =
-    unless degraded @@ fun () ->
-    let* () = Publisher.init node_ctxt in
     match
       Configuration.Operator_purpose_map.find Add_messages node_ctxt.operators
     with
     | None -> return_unit
     | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
   in
-  let* () = Plugin.Refutation_coordinator.init node_ctxt in
+  let* () = Refutation_coordinator.init node_ctxt in
   return_unit
 
-let handle_protocol_migration ?degraded ~catching_up state
-    (head : Layer1.header) =
+let handle_protocol_migration ~catching_up state (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* head_proto = Node_context.protocol_of_level state.node_ctxt head.level in
   let new_protocol = head_proto.protocol in
@@ -90,10 +88,7 @@ let handle_protocol_migration ?degraded ~catching_up state
   let*? constants, new_plugin =
     protocol_info state.node_ctxt.cctxt new_protocol head.hash
   in
-  let* constants
-  and* () =
-    start_workers ?degraded state.configuration new_plugin state.node_ctxt
-  in
+  let* constants in
   let new_protocol =
     {
       Node_context.hash = new_protocol;
@@ -273,7 +268,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-  let* () = Plugin.Refutation_coordinator.process stripped_head in
+  let* () = Refutation_coordinator.process stripped_head in
   let* () = Batcher.new_head stripped_head in
   let*! () = Injector.inject ~header:head.header () in
   return_unit
@@ -291,13 +286,9 @@ let degraded_refutation_mode state =
   let*! () = message "Shutting down Commitment Publisher@." in
   let*! () = Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
-  let* () =
-    handle_protocol_migration ~degraded:true ~catching_up:false state head
-  in
+  let* () = handle_protocol_migration ~catching_up:false state head in
   let module Plugin = (val state.plugin) in
-  let* () =
-    Plugin.Refutation_coordinator.process (Layer1.head_of_header head)
-  in
+  let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
   let*! () = Injector.inject () in
   return_unit
 
@@ -315,7 +306,7 @@ let install_finalizer state =
   let* () = message "Shutting down Commitment Publisher@." in
   let* () = Publisher.shutdown () in
   let* () = message "Shutting down Refutation Coordinator@." in
-  let* () = Plugin.Refutation_coordinator.shutdown () in
+  let* () = Refutation_coordinator.shutdown () in
   let* (_ : unit tzresult) = Node_context.close state.node_ctxt in
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
