@@ -20,9 +20,8 @@ anyhow.workspace = true
 primitive-types.workspace = true
 num-traits.workspace = true
 
-hex.workspace = true
-tezos_data_encoding.workspace = true
 rlp.workspace = true
+hex.workspace = true
 
 sha3.workspace = true
 libsecp256k1.workspace = true
@@ -34,12 +33,15 @@ tezos-evm-logging.workspace = true
 
 tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
-tezos-smart-rollup-panic-hook.workspace = true
 tezos-smart-rollup-entrypoint.workspace = true
 tezos-smart-rollup-debug.workspace = true
 tezos-smart-rollup-encoding.workspace = true
 tezos-smart-rollup-installer-config.workspace = true
+
+[dev-dependencies]
 tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-panic-hook.workspace = true
+tezos_data_encoding.workspace = true
 
 [features]
 default = ["panic-hook"]

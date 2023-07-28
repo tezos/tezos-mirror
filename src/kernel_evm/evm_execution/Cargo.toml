@@ -23,7 +23,6 @@ primitive-types.workspace = true
 hex.workspace = true
 rlp.workspace = true
 const-decoder.workspace = true
-tezos_data_encoding.workspace = true
 
 tezos_crypto_rs.workspace = true
 sha2.workspace = true
@@ -39,13 +38,16 @@ tezos-smart-rollup-core.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-debug.workspace = true
 tezos-smart-rollup-encoding.workspace = true
-tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-storage.workspace = true
 
 # Adding these to 'dev_dependencies' causes the rand feature in crypto to be enabled
 # on wasm builds, when building the entire workspace.
 rand = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+tezos-smart-rollup-mock.workspace = true
+tezos_data_encoding.workspace = true
 
 [features]
 default = ["evm_execution"]
