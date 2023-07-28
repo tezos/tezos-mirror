@@ -314,6 +314,10 @@ pub fn apply_transaction<Host: Runtime>(
 
     match apply_result {
         Some((caller, execution_outcome, gas_used)) => {
+            if let Some(outcome) = &execution_outcome {
+                log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
+            }
+
             let receipt_info = make_receipt_info(
                 transaction.tx_hash,
                 index,
