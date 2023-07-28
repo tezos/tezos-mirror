@@ -491,7 +491,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
       in
       let* client_to =
         Client.init_mockup
-          ~constants:Protocol.Constants_mainnet
+          ~constants:Protocol.Constants_mainnet_with_chain_id
           ~protocol:migrate_to
           ()
       in
@@ -500,7 +500,7 @@ let test_migration_constants ~migrate_from ~migrate_to =
         perform_migration
           ~protocol:migrate_from
           ~next_protocol:migrate_to
-          ~next_constants:Protocol.Constants_mainnet
+          ~next_constants:Protocol.Constants_mainnet_with_chain_id
           ~pre_migration:(fun _ -> return ())
           ~post_migration:(fun client () ->
             Client.(rpc GET constants_path client))

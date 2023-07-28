@@ -2543,11 +2543,6 @@ let e2e_tests =
   in
   [test1; test2; mainnet1; mainnet2]
 
-let constants_to_string = function
-  | Protocol.Constants_mainnet -> "mainnet"
-  | Protocol.Constants_sandbox -> "sandbox"
-  | Protocol.Constants_test -> "testnet"
-
 (* This function allows to register new (end-to-end) tests using
    [scenario_with_all_nodes] helper. For that, it instantiate function
    [e2e_test_script] with the various configurations in [e2e_tests]. *)
@@ -2568,7 +2563,7 @@ let register_end_to_end_tests ~protocols =
       } =
         test
       in
-      let network = constants_to_string constants in
+      let network = Protocol.constants_to_string constants in
       let title =
         sf
           "%s_lag-%d_time-%d_preinject-%d_slots-%d"

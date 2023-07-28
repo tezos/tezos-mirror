@@ -48,7 +48,14 @@
  (deps gen.exe)
  (action (run %{deps} --mainnet)))
 
+(rule
+ (targets mainnet-with-chain-id-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet-with-chain-id)))
+
 (install
  (package tezos-protocol-alpha)
  (section lib)
- (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
+ (files
+  sandbox-parameters.json test-parameters.json mainnet-parameters.json
+  mainnet-with-chain-id-parameters.json))
