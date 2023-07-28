@@ -927,6 +927,36 @@ let test_l2_deploy_erc20 =
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
+(* TODO: add internal parameters here (e.g the kernel version) *)
+type config_result = {chain_id : int64}
+
+let config_setup evm_setup =
+  let web3_clientVersion =
+    Evm_proxy_server.{method_ = "web3_clientVersion"; parameters = `A []}
+  in
+  let chain_id =
+    Evm_proxy_server.{method_ = "eth_chainId"; parameters = `Null}
+  in
+  let* results =
+    Evm_proxy_server.batch_evm_rpc
+      evm_setup.evm_proxy_server
+      [web3_clientVersion; chain_id]
+  in
+  match JSON.as_list results with
+  | [web3_clientVersion; chain_id] ->
+      (* We don't need to return the web3_clientVersion because,
+         it might change after the upgrade.
+         The only thing that we need to look out for is,
+         are we able to retrieve it and deserialize it. *)
+      let _sanity_check = JSON.(web3_clientVersion |-> "result" |> as_string) in
+      return {chain_id = JSON.(chain_id |-> "result" |> as_int64)}
+  | _ -> Test.fail "Unexpected result from batching two requests"
+
+let ensure_config_setup_integrity ~config_result evm_setup =
+  let* upcoming_config_setup = config_setup evm_setup in
+  assert (config_result = upcoming_config_setup) ;
+  unit
+
 let ensure_block_integrity ~block_result evm_setup =
   let* block_json =
     Evm_proxy_server.(
