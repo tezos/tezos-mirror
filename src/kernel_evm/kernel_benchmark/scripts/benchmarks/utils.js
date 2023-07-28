@@ -13,6 +13,7 @@
 
 const { sign } = require('../lib/signature');
 const { legacy_contract_address } = require('../lib/contract');
+const { execSync } = require('child_process');
 
 
 const transfer_prototype_json = require('./transfer_prototype.json');
@@ -64,11 +65,21 @@ exports.send = function (player, contract_addr, amount, data) {
 const print_list = function (src) {
     const txs = src.slice();
     console.log("[")
-    while (txs.length > 1) {
-        console.log(`{"external": "${txs.shift()}"},`);
+    for (var i = 0; i < txs.length; i++) {
+        transaction = txs[i];
+        messages = chunk_data(transaction);
+        for (var j = 0; j < messages.length; j++) {
+            seperator = (i < txs.length - 1 || j < messages.length - 1) ? "," : "";
+            console.log(`{"external": "${messages[j]}"}${seperator}`);
+        }
     }
-    console.log(`{"external": "${txs.shift()}"}`);
     console.log("]")
+}
+
+const chunk_data = function (src) {
+    run_chunker_command = `_build/default/src/bin_evm_proxy/chunker/octez_evm_chunker.exe "${src}"`;
+    chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
+    return chunked_message.split("\n").slice(1, -1);
 }
 
 exports.print_bench = function (src) {
