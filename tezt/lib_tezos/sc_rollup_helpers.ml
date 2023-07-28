@@ -108,10 +108,16 @@ let prepare_installer_kernel_gen ?runner
   let setup_file_args =
     match config with
     | Some config ->
-        let setup_file = Temp.file "setup-config.yaml" in
-        Base.write_file
-          setup_file
-          ~contents:(Installer_kernel_config.to_yaml config) ;
+        let setup_file =
+          match config with
+          | `Config config ->
+              let setup_file = Temp.file "setup-config.yaml" in
+              Base.write_file
+                setup_file
+                ~contents:(Installer_kernel_config.to_yaml config) ;
+              setup_file
+          | `Path path -> path
+        in
         ["--setup-file"; setup_file]
     | None -> []
   in

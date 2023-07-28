@@ -58,15 +58,16 @@ let setup_sequencer_kernel
     prepare_installer_kernel
       ~base_installee:"./"
       ~config:
-        [
-          Installer_kernel_config.Set
-            {
-              value =
-                (* encodings of State::Sequenced(edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav) *)
-                "00004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
-              to_ = "/__sequencer/state";
-            };
-        ]
+        (`Config
+          [
+            Installer_kernel_config.Set
+              {
+                value =
+                  (* encodings of State::Sequenced(edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav) *)
+                  "00004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
+                to_ = "/__sequencer/state";
+              };
+          ])
       ~preimages_dir:(Filename.concat data_dir "wasm_2_0_0")
       "sequenced_kernel"
   in

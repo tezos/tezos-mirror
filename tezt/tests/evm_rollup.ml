@@ -285,7 +285,7 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   in
   match ticketer @ bootstrap_accounts @ dictator with
   | [] -> None
-  | res -> Some res
+  | res -> Some (`Config res)
 
 type kernel_installee = {base_installee : string; installee : string}
 
@@ -1650,14 +1650,15 @@ let test_preinitialized_evm_kernel =
   let dictator_key_path = Durable_storage_path.dictator in
   let dictator_key = Eth_account.bootstrap_accounts.(0).address in
   let config =
-    Sc_rollup_helpers.Installer_kernel_config.
-      [
-        Set
-          {
-            value = Hex.(of_string dictator_key |> show);
-            to_ = dictator_key_path;
-          };
-      ]
+    `Config
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              value = Hex.(of_string dictator_key |> show);
+              to_ = dictator_key_path;
+            };
+        ]
   in
   let* {sc_rollup_client; _} =
     setup_evm_kernel ~config ~deposit_admin:None protocol
