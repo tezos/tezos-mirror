@@ -102,94 +102,6 @@ module type INBOX = sig
   end
 end
 
-(** Protocol specific functions to interpret inbox and messages of L1
-    blocks. *)
-module type INTERPRETER = sig
-  (** [process_head node_ctxt ctxt ~predecessor head (inbox, messages)] interprets
-      the [messages] associated with a [head] (where [predecessor] is the
-      predecessor of [head] in the L1 chain). This requires the [inbox] to be
-      updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)]
-      where [ctxt] is the updated layer 2 context (with the new PVM state),
-      [num_messages] is the number of [messages], [num_ticks] is the number of
-      ticks taken by the PVM for the evaluation and [tick] is the tick reached
-      by the PVM after the evaluation. *)
-  val process_head :
-    Node_context.rw ->
-    'a Context.t ->
-    predecessor:Layer1.header ->
-    Layer1.header ->
-    Octez_smart_rollup.Inbox.t * string trace ->
-    ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
-
-  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
-      block [head], or the state at rollup genesis if the block is before the
-      rollup origination. *)
-  val state_of_head :
-    'a Node_context.t ->
-    'a Context.t ->
-    Layer1.head ->
-    ('a Context.t * Context.tree) tzresult Lwt.t
-end
-
-(** Protocol specific refutation helper functions.  *)
-module type REFUTATION_GAME_HELPERS = sig
-  (** [generate_proof node_ctxt (game) start_state] generates a serialized proof
-    for the current [game] for the execution step starting with
-    [start_state]. *)
-  val generate_proof :
-    Node_context.rw -> Game.t -> Context.tree -> string tzresult Lwt.t
-
-  (** [state_of_tick node_ctxt ?start_state ~tick level] returns [Some
-    (state, hash)] for a given [tick] if this [tick] happened before
-    [level]. Otherwise, returns [None]. If provided, the evaluation is resumed
-    from [start_state]. *)
-  val state_of_tick :
-    _ Node_context.t ->
-    ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
-    tick:Z.t ->
-    int32 ->
-    Fuel.Accounted.t Pvm_plugin_sig.eval_state option tzresult Lwt.t
-
-  (** [make_dissection node_ctxt ~start_state ~start_chunk ~our_stop_chunk
-    ~default_number_of_sections ~last_level] computes a dissection from between
-    [start_chunk] and [our_stop_chunk] at level [last_level]. This dissection
-    has [default_number_of_sections] if there are enough ticks. *)
-  val make_dissection :
-    _ Node_context.t ->
-    start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
-    start_chunk:Game.dissection_chunk ->
-    our_stop_chunk:Game.dissection_chunk ->
-    default_number_of_sections:int ->
-    last_level:int32 ->
-    Game.dissection_chunk trace tzresult Lwt.t
-
-  (** [timeout_reached node_ctxt ~self ~opponent] returns [true] if the
-    timeout is reached against opponent in head of the L1 chain. *)
-  val timeout_reached :
-    _ Node_context.t ->
-    self:Signature.public_key_hash ->
-    opponent:Signature.public_key_hash ->
-    bool tzresult Lwt.t
-
-  (** [get_conflicts cctxt rollup signer] returns the conflicts for commitments
-    staked on by [signer]. *)
-  val get_conflicts :
-    Client_context.full ->
-    Address.t ->
-    Signature.public_key_hash ->
-    Game.conflict list tzresult Lwt.t
-
-  (** [get_ongoing_games cctxt rollup signer] returns the games that [signer] is
-    currently playing. *)
-  val get_ongoing_games :
-    Client_context.full ->
-    Address.t ->
-    Signature.public_key_hash ->
-    (Game.t * Signature.public_key_hash * Signature.public_key_hash) list
-    tzresult
-    Lwt.t
-end
-
 (** Protocol specific constants for the batcher. *)
 module type BATCHER_CONSTANTS = sig
   (** Maximum size of an L2 message allowed by the prototcol, which is
@@ -279,6 +191,9 @@ module type LAYER1_HELPERS = sig
     #Client_context.full ->
     Address.t ->
     Node_context.genesis_info tzresult Lwt.t
+
+  val get_boot_sector :
+    Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)
@@ -292,11 +207,71 @@ module type L1_PROCESSING = sig
     Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
 end
 
+(** Partial protocol plugin with just the PVM and the function to access the
+    Layer1. This signature exists in order to build plugins for the interpreter
+    and the refutation games while avoiding circular dependencies. *)
+module type PARTIAL = sig
+  (** The protocol for which this plugin is. *)
+  val protocol : Protocol_hash.t
+
+  module Layer1_helpers : LAYER1_HELPERS
+
+  module Pvm : Pvm_plugin_sig.S
+end
+
+(** Protocol specific refutation helper functions.  *)
+module type REFUTATION_GAME_HELPERS = sig
+  (** [generate_proof node_ctxt (game) start_state] generates a serialized proof
+    for the current [game] for the execution step starting with
+    [start_state]. *)
+  val generate_proof :
+    Node_context.rw -> Game.t -> Context.tree -> string tzresult Lwt.t
+
+  (** [make_dissection plugin node_ctxt ~start_state ~start_chunk ~our_stop_chunk
+    ~default_number_of_sections ~last_level] computes a dissection from between
+    [start_chunk] and [our_stop_chunk] at level [last_level]. This dissection
+    has [default_number_of_sections] if there are enough ticks. *)
+  val make_dissection :
+    (module PARTIAL) ->
+    _ Node_context.t ->
+    start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
+    start_chunk:Game.dissection_chunk ->
+    our_stop_chunk:Game.dissection_chunk ->
+    default_number_of_sections:int ->
+    last_level:int32 ->
+    Game.dissection_chunk trace tzresult Lwt.t
+
+  (** [timeout_reached node_ctxt ~self ~opponent] returns [true] if the
+    timeout is reached against opponent in head of the L1 chain. *)
+  val timeout_reached :
+    _ Node_context.t ->
+    self:Signature.public_key_hash ->
+    opponent:Signature.public_key_hash ->
+    bool tzresult Lwt.t
+
+  (** [get_conflicts cctxt rollup signer] returns the conflicts for commitments
+    staked on by [signer]. *)
+  val get_conflicts :
+    Client_context.full ->
+    Address.t ->
+    Signature.public_key_hash ->
+    Game.conflict list tzresult Lwt.t
+
+  (** [get_ongoing_games cctxt rollup signer] returns the games that [signer] is
+    currently playing. *)
+  val get_ongoing_games :
+    Client_context.full ->
+    Address.t ->
+    Signature.public_key_hash ->
+    (Game.t * Signature.public_key_hash * Signature.public_key_hash) list
+    tzresult
+    Lwt.t
+end
+
 (** Signature of protocol plugins for the rollup node. NOTE: the plugins have to
     be registered to be made available to the rollup node.  *)
 module type S = sig
-  (** The protocol for which this plugin is. *)
-  val protocol : Protocol_hash.t
+  include PARTIAL
 
   module RPC_directory : RPC_DIRECTORY
 
@@ -304,15 +279,9 @@ module type S = sig
 
   module Inbox : INBOX
 
-  module Interpreter : INTERPRETER
-
-  module Refutation_game_helpers : REFUTATION_GAME_HELPERS
-
   module Batcher_constants : BATCHER_CONSTANTS
-
-  module Layer1_helpers : LAYER1_HELPERS
 
   module L1_processing : L1_PROCESSING
 
-  module Pvm : Pvm_plugin_sig.S
+  module Refutation_game_helpers : REFUTATION_GAME_HELPERS
 end

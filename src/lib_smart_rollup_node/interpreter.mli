@@ -23,17 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
-(** [process_head node_ctxt ~predecessor head (inbox, messages)] interprets the
-    [messages] associated with a [head] (where [predecessor] is the predecessor
-    of [head] in the L1 chain). This requires the [inbox] to be updated
-    beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where [ctxt]
-    is the updated layer 2 context (with the new PVM state), [num_messages] is
-    the number of [messages], [num_ticks] is the number of ticks taken by the
-    PVM for the evaluation and [tick] is the tick reached by the PVM after the
-    evaluation. *)
+(** [process_head plugin node_ctxt ctxt ~predecessor head (inbox, messages)]
+    interprets the [messages] associated with a [head] (where [predecessor] is
+    the predecessor of [head] in the L1 chain). This requires the [inbox] to be
+    updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where
+    [ctxt] is the updated layer 2 context (with the new PVM state),
+    [num_messages] is the number of [messages], [num_ticks] is the number of
+    ticks taken by the PVM for the evaluation and [tick] is the tick reached by
+    the PVM after the evaluation. *)
 val process_head :
+  (module Protocol_plugin_sig.PARTIAL) ->
   Node_context.rw ->
   'a Context.t ->
   predecessor:Layer1.header ->
@@ -41,21 +40,23 @@ val process_head :
   Octez_smart_rollup.Inbox.t * string list ->
   ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
 
-(** [state_of_tick node_ctxt ?start_state ~tick level] returns [Some (state,
-    hash)] for a given [tick] if this [tick] happened before [level]. Otherwise,
-    returns [None]. If provided, the evaluation is resumed from
-    [start_state]. *)
+(** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
+    (state, hash)] for a given [tick] if this [tick] happened before
+    [level]. Otherwise, returns [None]. If provided, the evaluation is resumed
+    from [start_state]. *)
 val state_of_tick :
+  (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
   ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
-  Raw_level.t ->
+  int32 ->
   Fuel.Accounted.t Pvm_plugin_sig.eval_state option tzresult Lwt.t
 
-(** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
-    block [head], or the state at rollup genesis if the block is before the
-    rollup origination. *)
+(** [state_of_head plugin node_ctxt ctxt head] returns the state corresponding
+    to the block [head], or the state at rollup genesis if the block is before
+    the rollup origination. *)
 val state_of_head :
+  (module Protocol_plugin_sig.PARTIAL) ->
   'a Node_context.t ->
   'a Context.t ->
   Layer1.head ->

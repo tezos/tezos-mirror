@@ -26,7 +26,7 @@
 module Simple = struct
   include Internal_event.Simple
 
-  let section = [Protocol.name; "sc_rollup_node"; "interpreter"]
+  let section = ["sc_rollup_node"; "interpreter"]
 
   let transitioned_pvm =
     declare_4
@@ -37,7 +37,7 @@ module Simple = struct
          {ticks} with {num_messages} messages"
       ~level:Notice
       ("inbox_level", Data_encoding.int32)
-      ("state_hash", Octez_smart_rollup.State_hash.encoding)
+      ("state_hash", State_hash.encoding)
       ("ticks", Data_encoding.z)
       ("num_messages", Data_encoding.int31)
 

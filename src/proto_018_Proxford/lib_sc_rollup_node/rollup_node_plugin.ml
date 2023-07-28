@@ -29,7 +29,6 @@ module Plugin : Protocol_plugin_sig.S = struct
   module RPC_directory = RPC_directory
   module Dal_slots_tracker = Dal_slots_tracker
   module Inbox = Inbox
-  module Interpreter = Interpreter
   module Refutation_game_helpers = Refutation_game_helpers
   module Batcher_constants = Batcher_constants
   module Layer1_helpers = Layer1_helpers
