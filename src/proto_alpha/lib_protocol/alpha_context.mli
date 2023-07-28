@@ -829,6 +829,7 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
       max_number_of_parallel_games : int;
       reveal_activation_level : sc_rollup_reveal_activation_level;
+      private_enable : bool;
     }
 
     type zk_rollup = {
@@ -1010,6 +1011,8 @@ module Constants : sig
 
   val sc_rollup_reveal_activation_level :
     context -> Parametric.sc_rollup_reveal_activation_level
+
+  val sc_rollup_private_enable : context -> bool
 
   val zk_rollup_enable : context -> bool
 
@@ -2782,6 +2785,14 @@ module Sc_rollup : sig
 
   val must_exist : context -> t -> context tzresult Lwt.t
 
+  module Whitelist : sig
+    type t = public_key_hash list
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+  end
+
   module Staker : sig
     include S.SIGNATURE_PUBLIC_KEY_HASH with type t = public_key_hash
 
@@ -3458,6 +3469,7 @@ module Sc_rollup : sig
   end
 
   val originate :
+    ?whitelist:Whitelist.t ->
     context ->
     kind:Kind.t ->
     parameters_ty:Script.lazy_expr ->
@@ -4276,6 +4288,7 @@ and _ manager_operation =
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
       parameters_ty : Script.lazy_expr;
+      whitelist : Sc_rollup.Whitelist.t option;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {

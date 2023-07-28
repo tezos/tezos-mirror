@@ -529,7 +529,9 @@ let generate_sc_rollup_originate =
   let kind = Sc_rollup.Kind.Example_arith in
   let boot_sector = "" in
   let parameters_ty = Script.lazy_expr (Expr.from_string "1") in
-  QCheck2.Gen.pure (Sc_rollup_originate {kind; boot_sector; parameters_ty})
+  let whitelist = None in
+  QCheck2.Gen.pure
+    (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist})
 
 let generate_sc_rollup_add_messages =
   let open QCheck2.Gen in

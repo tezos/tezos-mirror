@@ -226,7 +226,7 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
      for L1 to L2 messages is not propagated to the rollup. *)
   validate_parameters_ty ctxt arg_type entrypoint
 
-let originate ctxt ~kind ~boot_sector ~parameters_ty =
+let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
   let open Lwt_result_syntax in
   let*? ctxt =
     let open Result_syntax in
@@ -264,7 +264,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
       ~origination_level:(Level.current ctxt).level
   in
   let+ address, size, genesis_commitment_hash, ctxt =
-    Sc_rollup.originate ctxt ~kind ~parameters_ty ~genesis_commitment
+    Sc_rollup.originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   in
   ({address; size; genesis_commitment_hash}, ctxt)
 

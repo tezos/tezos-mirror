@@ -3480,6 +3480,32 @@ let test_start_game_on_cemented_commitment () =
       return_unit)
     hashes
 
+let test_origination_fails_with_empty_whitelist () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let* operation, _rollup =
+    Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
+  in
+  let*! b = Block.bake ~operation b in
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    b
+    "Invalid whitelist: whitelist cannot be empty"
+
+let test_private_rollup_is_deactivated_by_default () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 () in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let* operation, _rollup =
+    Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
+  in
+  let*! b = Block.bake ~operation b in
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    b
+    "Invalid whitelist: must be None when the feature is deactivated"
+
 let tests =
   [
     Tztest.tztest
@@ -3621,6 +3647,14 @@ let tests =
       "cannot start a game on a cemented commitment"
       `Quick
       test_start_game_on_cemented_commitment;
+    Tztest.tztest
+      "Origination fails with empty whitelist"
+      `Quick
+      test_origination_fails_with_empty_whitelist;
+    Tztest.tztest
+      "Origination fails when whitelist is set and the feature is deactivated"
+      `Quick
+      test_private_rollup_is_deactivated_by_default;
   ]
 
 let () =

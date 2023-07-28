@@ -1006,8 +1006,9 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk ~fee_parameter () =
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter
+    ?whitelist ~source ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk
+    ~fee_parameter () =
   let open Lwt_result_syntax in
   let op =
     Annotated_manager_operation.Single_manager
@@ -1015,7 +1016,7 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_originate {kind; boot_sector; parameters_ty}))
+         (Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist}))
   in
   let* oph, _, op, result =
     Injection.inject_manager_operation

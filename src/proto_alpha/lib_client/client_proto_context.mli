@@ -603,6 +603,7 @@ val sc_rollup_originate :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
+  ?whitelist:Sc_rollup.Whitelist.t ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->

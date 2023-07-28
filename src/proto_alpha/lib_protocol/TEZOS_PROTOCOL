@@ -61,6 +61,7 @@
         "Sc_rollup_tick_repr",
         "Sc_rollup_inbox_message_repr",
         "Sc_rollup_inbox_merkelized_payload_hashes_repr",
+        "Sc_rollup_whitelist_repr",
         "Sc_rollup_outbox_message_repr",
         "Sc_rollup_dissection_chunk_repr",
         "Sc_rollup_PVM_sig",

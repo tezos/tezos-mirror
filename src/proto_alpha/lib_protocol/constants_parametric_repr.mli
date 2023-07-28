@@ -86,6 +86,9 @@ type sc_rollup = {
   max_number_of_parallel_games : int;
   (* Activation's block level of reveal kinds. *)
   reveal_activation_level : sc_rollup_reveal_activation_level;
+  (* Activates an updatable whitelist of stakers. Only keys in the whitelist are
+     allowed to stake and publish a commitment. *)
+  private_enable : bool;
 }
 
 type zk_rollup = {

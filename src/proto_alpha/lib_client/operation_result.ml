@@ -232,19 +232,23 @@ let pp_manager_operation_content (type kind) source ppf
         entrypoint
         Contract.pp
         source
-  | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
+  | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist} ->
       Format.fprintf
         ppf
         "Smart rollup origination:@,\
          Kind: %a@,\
          Parameter type: %a@,\
-         Kernel Blake2B hash: '%a'"
+         Kernel Blake2B hash: '%a'%a"
         Sc_rollup.Kind.pp
         kind
         pp_micheline_from_lazy_expr
         parameters_ty
         Tezos_crypto.Blake2B.pp
         (Tezos_crypto.Blake2B.hash_string [boot_sector])
+        Format.(
+          pp_print_option (fun ppf ->
+              fprintf ppf "@,Whitelist: %a" Sc_rollup.Whitelist.pp))
+        whitelist
   | Sc_rollup_add_messages {messages = _} ->
       Format.pp_print_string ppf "Smart rollup messages submission:"
   | Sc_rollup_cement {rollup} ->

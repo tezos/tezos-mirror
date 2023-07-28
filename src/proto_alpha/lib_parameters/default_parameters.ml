@@ -243,6 +243,7 @@ let constants_mainnet =
                    exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
                 Raw_level.of_int32_exn Int32.(pred max_int));
           };
+        private_enable = false;
       };
     zk_rollup =
       {

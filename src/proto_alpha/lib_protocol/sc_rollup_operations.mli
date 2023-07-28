@@ -45,10 +45,11 @@ type origination_result = {
   genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
-(** [originate context ~kind ~boot_sector ~parameters_ty] adds a new rollup
+(** [originate ?whitelist context ~kind ~boot_sector ~parameters_ty] adds a new rollup
     running in a given [kind] initialized with a [boot_sector] and to accept
     smart contract calls of type [parameters_ty]. *)
 val originate :
+  ?whitelist:Sc_rollup.Whitelist.t ->
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
