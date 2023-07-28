@@ -201,9 +201,9 @@ module type Fixed_point_lang_sig = sig
 
   val shift_right : size repr -> int -> size repr
 
-  val shift_left : size repr -> int -> size repr
-
   val ( + ) : size repr -> size repr -> size repr
+
+  val ( * ) : size repr -> size repr -> size repr
 
   val int : int -> size repr
 end
@@ -292,7 +292,7 @@ end = struct
     let fpcl = assert_fp_is_correct x in
     match fpcl with
     | FP_zero -> Lang.int 0
-    | _ -> (
+    | _ ->
         let _sign, exp, mant = decompose x in
         let exp = Int64.to_int @@ exponent_bits_to_int exp in
         (* The mantissa is always implicitly prefixed by one (except for
@@ -314,27 +314,30 @@ end = struct
               | [] | 0L :: _ -> (exp, bits)
               | _ -> assert false)
         in
-        (* convert bits to sum of powers of 2 computed with shifts *)
-        let _, terms =
+        (* convert bits for < 1.0 to sum of powers of 2 computed with shifts *)
+        let _, integer, fracs =
           List.fold_left
-            (fun (k, acc) bit ->
-              let acc =
+            (fun (k, integer, fracs) bit ->
+              let integer, fracs =
                 if bit = 1L then
-                  let new_term =
-                    if exp - k < 0 then Lang.shift_right i (k - exp)
-                    else if exp - k > 0 then Lang.shift_left i (exp - k)
-                    else i
-                  in
-                  new_term :: acc
-                else acc
+                  if exp - k < 0 then
+                    (integer, Lang.shift_right i (k - exp) :: fracs)
+                  else (integer + (1 lsl (exp - k)), fracs)
+                else (integer, fracs)
               in
-              (k + 1, acc))
-            (0, [])
+              (k + 1, integer, fracs))
+            (0, 0, [])
             bits_rounded
         in
-        match List.rev terms with
-        | [] -> assert false (* impossible *)
-        | t :: ts -> List.fold_left (fun sum t -> Lang.(sum + t)) t ts)
+        if integer = 0 then
+          match List.rev fracs with
+          | [] -> assert false
+          | f :: fracs -> List.fold_left (fun sum t -> Lang.(sum + t)) f fracs
+        else
+          List.fold_left
+            (fun t sum -> Lang.(sum + t))
+            (if integer = 1 then i else Lang.(i * int integer))
+            (List.rev fracs)
 end
 
 (* [Convert_mult] approximates [float] values to integers:
