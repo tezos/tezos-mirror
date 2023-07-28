@@ -69,10 +69,10 @@ type rw = [`Read | `Write] t
 type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
-  Configuration.Operation_kind_map.find purpose node_ctxt.operators
+  Configuration.Operator_purpose_map.find purpose node_ctxt.operators
 
 let is_operator node_ctxt pkh =
-  Configuration.Operation_kind_map.exists
+  Configuration.Operator_purpose_map.exists
     (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
     node_ctxt.operators
 
@@ -961,7 +961,7 @@ module Internal_for_tests = struct
         rollup_address = Address.zero;
         boot_sector_file = None;
         mode = Observer;
-        operators = Configuration.Operation_kind_map.empty;
+        operators = Configuration.Operator_purpose_map.empty;
         genesis_info;
         lcc;
         lpc;

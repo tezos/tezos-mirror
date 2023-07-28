@@ -39,9 +39,15 @@ type mode =
 (** The kind of operations that can be injected by the rollup node. *)
 type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
 
+(** Purposes for operators, indicating their role and thus the kinds of
+    operations that they sign. *)
+type purpose = Operating | Batching | Cementing
+
 module Operation_kind_map : Map.S with type key = operation_kind
 
-type operators = Signature.Public_key_hash.t Operation_kind_map.t
+module Operator_purpose_map : Map.S with type key = purpose
+
+type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injector_sigs.fee_parameter Operation_kind_map.t
 
@@ -105,8 +111,8 @@ type t = {
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
     bindings [purposes], with a potential [default] value. *)
-val make_operation_kind_map :
-  default:'a option -> (operation_kind * 'a) trace -> 'a Operation_kind_map.t
+val make_purpose_map :
+  default:'a option -> (purpose * 'a) trace -> 'a Operator_purpose_map.t
 
 (** [operation_kind_of_string s] parses an operation kind from the given string [s]. *)
 val operation_kind_of_string : string -> operation_kind option
@@ -114,8 +120,20 @@ val operation_kind_of_string : string -> operation_kind option
 (** [string_of_operation_kind o] returns a string representation of operation_kind [o]. *)
 val string_of_operation_kind : operation_kind -> string
 
+(** [purpose_of_string s] parses a purpose from the given string [s]. *)
+val purpose_of_string : string -> purpose option
+
+(** [string_of_purpose p] returns a string representation of purpose [p]. *)
+val string_of_purpose : purpose -> string
+
+(** List of possible purposes for operator specialization. *)
+val purposes : purpose list
+
 (** List of possible operations kind for operator specialization. *)
 val operation_kinds : operation_kind list
+
+(* For each purpose, it returns a list of associated operation kinds. *)
+val operation_kinds_of_purpose : purpose -> operation_kind list
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
@@ -219,7 +237,7 @@ module Cli : sig
     boot_sector_file:string option ->
     sc_rollup_node_operators:
       [< `Default of Signature.public_key_hash
-      | `Purpose of operation_kind * Signature.public_key_hash ]
+      | `Purpose of purpose * Signature.public_key_hash ]
       trace ->
     log_kernel_debug:bool ->
     t tzresult
@@ -242,7 +260,7 @@ module Cli : sig
     boot_sector_file:string option ->
     sc_rollup_node_operators:
       [< `Default of Signature.public_key_hash
-      | `Purpose of operation_kind * Signature.public_key_hash ]
+      | `Purpose of purpose * Signature.public_key_hash ]
       list ->
     log_kernel_debug:bool ->
     t tzresult Lwt.t

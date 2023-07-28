@@ -52,7 +52,7 @@ let make_game_map self ongoing_games =
 let on_process Layer1.{level; _} state =
   let node_ctxt = state.node_ctxt in
   let open Lwt_result_syntax in
-  let refute_signer = Node_context.get_operator node_ctxt Refute in
+  let refute_signer = Node_context.get_operator node_ctxt Operating in
   match refute_signer with
   | None ->
       (* Not injecting refutations, don't play refutation games *)

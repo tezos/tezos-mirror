@@ -233,11 +233,7 @@ let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let timeout_operation =
     L1_operation.Timeout {rollup = node_ctxt.rollup_address; stakers}
   in
-  let source =
-    Node_context.get_operator node_ctxt Timeout |> Option.value ~default:self
-    (* We fallback on the [Refute] operator if none is provided for [Timeout] *)
-  in
-  let* _hash = Injector.add_pending_operation ~source timeout_operation in
+  let* _hash = Injector.add_pending_operation ~source:self timeout_operation in
   return_unit
 
 let play node_ctxt ~self game opponent =

@@ -46,16 +46,21 @@ let sc_rollup_address_arg : (_, Client_context.full) Tezos_clic.arg =
 
 let sc_rollup_node_operator_param next =
   let open Lwt_result_syntax in
+  let format_purpose_list purposes =
+    let pp_purpose fmt purpose =
+      Format.pp_print_string fmt (Configuration.string_of_purpose purpose)
+    in
+    Format.asprintf
+      "Public key hash, or alias, of a smart rollup node operator. An operator \
+       can be specialized to a particular purpose by prefixing its key or \
+       alias by said purpose, e.g. operating:alias_of_my_operator. The \
+       possible purposes are: @[<h>%a@]."
+      (Format.pp_print_list pp_purpose)
+      purposes
+  in
   Tezos_clic.param
     ~name:"operator"
-    ~desc:
-      (Printf.sprintf
-         "Public key hash, or alias, of a smart rollup node operator. An \
-          operator can be specialized to a particular purpose by prefixing its \
-          key or alias by said purpose, e.g. publish:alias_of_my_operator. The \
-          possible purposes are: %s."
-         (String.concat ", "
-         @@ Configuration.(List.map string_of_operation_kind operation_kinds)))
+    ~desc:(format_purpose_list Configuration.purposes)
     ( Tezos_clic.parameter @@ fun cctxt s ->
       let parse_pkh s =
         let from_alias s = Client_keys.Public_key_hash.find cctxt s in
@@ -74,7 +79,7 @@ let sc_rollup_node_operator_param next =
           let+ pkh = parse_pkh s in
           `Default pkh
       | [purpose; operator_s] -> (
-          match Configuration.operation_kind_of_string purpose with
+          match Configuration.purpose_of_string purpose with
           | Some purpose ->
               let+ pkh = parse_pkh operator_s in
               `Purpose (purpose, pkh)

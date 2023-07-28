@@ -64,7 +64,7 @@ let start_workers (configuration : Configuration.t)
   let* () = Publisher.init node_ctxt in
   let* () =
     match
-      Configuration.Operation_kind_map.find Add_messages node_ctxt.operators
+      Configuration.Operator_purpose_map.find Batching node_ctxt.operators
     with
     | None -> return_unit
     | Some signer -> Batcher.init plugin configuration.batcher ~signer node_ctxt
@@ -317,13 +317,16 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   let module Plugin = (val state.plugin) in
   let start () =
     let signers =
-      Configuration.Operation_kind_map.bindings node_ctxt.operators
+      Configuration.Operator_purpose_map.bindings node_ctxt.operators
       |> List.fold_left
            (fun acc (purpose, operator) ->
              let operation_kinds =
+               Configuration.operation_kinds_of_purpose purpose
+             in
+             let operation_kinds =
                match Signature.Public_key_hash.Map.find operator acc with
-               | None -> [purpose]
-               | Some ps -> purpose :: ps
+               | None -> operation_kinds
+               | Some kinds -> operation_kinds @ kinds
              in
              Signature.Public_key_hash.Map.add operator operation_kinds acc)
            Signature.Public_key_hash.Map.empty
@@ -501,7 +504,7 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Operation_kind_map.iter_es
+    Operator_purpose_map.iter_es
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
@@ -520,8 +523,8 @@ let run ~data_dir ?log_kernel_debug_file (configuration : Configuration.t)
     Layer1.fetch_tezos_shell_header l1_ctxt head.header.predecessor
   in
   let publisher =
-    Configuration.Operation_kind_map.find
-      Publish
+    Configuration.Operator_purpose_map.find
+      Operating
       configuration.sc_rollup_node_operators
   in
 

@@ -281,7 +281,7 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
 
 let on_publish_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Publish in
+  let operator = Node_context.get_operator node_ctxt Operating in
   if Node_context.is_accuser node_ctxt then
     (* Accuser does not publish all commitments *)
     return_unit
@@ -297,7 +297,7 @@ let on_publish_commitments (node_ctxt : state) =
 let publish_single_commitment node_ctxt
     (commitment : Octez_smart_rollup.Commitment.t) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Publish in
+  let operator = Node_context.get_operator node_ctxt Operating in
   let lcc = Reference.get node_ctxt.lcc in
   match operator with
   | None ->
@@ -396,7 +396,7 @@ let cement_commitment (node_ctxt : _ Node_context.t) ~source commitment =
 
 let on_cement_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
-  let operator = Node_context.get_operator node_ctxt Cement in
+  let operator = Node_context.get_operator node_ctxt Cementing in
   match operator with
   | None ->
       (* Configured to not cement commitments *)

@@ -103,7 +103,7 @@ type ro = [`Read] t
     who has purpose [purpose], if any.
 *)
 val get_operator :
-  _ t -> Configuration.operation_kind -> Signature.Public_key_hash.t option
+  _ t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)

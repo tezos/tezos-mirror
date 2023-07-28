@@ -309,24 +309,27 @@ let run node_ctxt configuration
   let start () =
     let*! () = Inbox.start () in
     let signers =
-      Configuration.Operation_kind_map.bindings node_ctxt.operators
+      Configuration.Operator_purpose_map.bindings node_ctxt.operators
       |> List.fold_left
-           (fun acc (purpose, operator) ->
-             let purposes =
-               match Signature.Public_key_hash.Map.find operator acc with
-               | None -> [purpose]
-               | Some ps -> purpose :: ps
+           (fun acc (operation_kind, operator) ->
+             let operation_kinds =
+               Configuration.operation_kinds_of_purpose operation_kind
              in
-             Signature.Public_key_hash.Map.add operator purposes acc)
+             let operation_kinds =
+               match Signature.Public_key_hash.Map.find operator acc with
+               | None -> operation_kinds
+               | Some kinds -> operation_kinds @ kinds
+             in
+             Signature.Public_key_hash.Map.add operator operation_kinds acc)
            Signature.Public_key_hash.Map.empty
       |> Signature.Public_key_hash.Map.bindings
-      |> List.map (fun (operator, purposes) ->
+      |> List.map (fun (operator, operation_kinds) ->
              let strategy =
-               match purposes with
+               match operation_kinds with
                | [Configuration.Add_messages] -> `Delay_block 0.5
                | _ -> `Each_block
              in
-             (operator, strategy, purposes))
+             (operator, strategy, operation_kinds))
     in
     let* () = Publisher.init node_ctxt in
     let* () = Refutation_coordinator.init node_ctxt in
@@ -349,7 +352,7 @@ let run node_ctxt configuration
     in
     let* () =
       match
-        Configuration.Operation_kind_map.find Add_messages node_ctxt.operators
+        Configuration.Operator_purpose_map.find Batching node_ctxt.operators
       with
       | None -> return_unit
       | Some signer ->
@@ -510,7 +513,7 @@ let run
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
-    Operation_kind_map.iter_es
+    Operator_purpose_map.iter_es
       (fun _purpose operator ->
         let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
         ())
@@ -532,8 +535,8 @@ let run
   in
   let*! () = Event.received_first_block head.hash Protocol.hash in
   let publisher =
-    Configuration.Operation_kind_map.find
-      Publish
+    Configuration.Operator_purpose_map.find
+      Operating
       configuration.sc_rollup_node_operators
   in
   let* constants = Layer1_helpers.retrieve_constants cctxt
