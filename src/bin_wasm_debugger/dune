@@ -11,10 +11,10 @@
   octez-libs.clic
   octez-libs.tree-encoding
   octez-libs.base.unix
-  yaml
   octez-protocol-alpha-libs.client
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
+  octez-l2-libs.smart-rollup
   octez-l2-libs.webassembly-interpreter
   octez-l2-libs.webassembly-interpreter-extra
   octez-version.value
