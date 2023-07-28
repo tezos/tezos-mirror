@@ -39,6 +39,7 @@ mod parsing;
 mod safe_storage;
 mod simulation;
 mod storage;
+mod tick_model;
 mod upgrade;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in

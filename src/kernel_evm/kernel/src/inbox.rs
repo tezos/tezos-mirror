@@ -3,15 +3,8 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
-use primitive_types::{H160, U256};
-use sha3::{Digest, Keccak256};
-use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::signatures::EthereumTransactionCommon;
-use tezos_evm_logging::log;
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_host::runtime::Runtime;
 
-use crate::block_in_progress::BlockInProgress;
+use crate::error::UpgradeProcessError::{InvalidUpgradeNonce, NoDictator};
 use crate::parsing::{
     Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
 };
@@ -20,12 +13,17 @@ use crate::storage::{
     get_and_increment_deposit_nonce, read_dictator_key, read_kernel_upgrade_nonce,
     store_last_info_per_level_timestamp,
 };
-
-use crate::error::UpgradeProcessError::{InvalidUpgradeNonce, NoDictator};
+use crate::tick_model;
 use crate::upgrade::check_dictator_signature;
 use crate::Error;
-
+use primitive_types::{H160, U256};
+use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
+use tezos_evm_logging::log;
+use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::runtime::Runtime;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Deposit {
@@ -47,9 +45,11 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    /// give an approximation of the number of ticks necessary to process the
+    /// transaction. Overapproximated using the [gas_limit] and benchmarks
     pub fn estimate_ticks(&self) -> u64 {
         // all details of tick model stay in the same module
-        BlockInProgress::estimate_ticks_for_transaction(self)
+        tick_model::estimate_ticks_for_transaction(self)
     }
 }
 

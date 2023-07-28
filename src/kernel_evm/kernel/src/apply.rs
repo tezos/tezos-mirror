@@ -292,7 +292,7 @@ pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
-    transaction: Transaction,
+    transaction: &Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
@@ -325,7 +325,7 @@ pub fn apply_transaction<Host: Runtime>(
                 caller,
                 to,
             );
-            let object_info = make_object_info(&transaction, caller, index, gas_used);
+            let object_info = make_object_info(transaction, caller, index, gas_used);
             index_new_accounts(host, accounts_index, &receipt_info)?;
             Ok(Some((receipt_info, object_info)))
         }
