@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-embedded-protocol-010-PtGRANAD"
   "tezos-protocol-plugin-010-PtGRANAD"
   "tezos-validation"

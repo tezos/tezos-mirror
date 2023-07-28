@@ -6,7 +6,7 @@
  (public_name tezos-dac-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-updater)
  (flags
   (:standard)

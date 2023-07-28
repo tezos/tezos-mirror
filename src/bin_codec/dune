@@ -8,13 +8,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-client-base-unix
   tezos-client-base
   tezos-clic
-  tezos-stdlib-unix
-  tezos-event-logging
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-event-logging
   tezos-signer-services
   tezos-version.value
   (select void_for_linking-tezos-client-005-PsBabyM1 from

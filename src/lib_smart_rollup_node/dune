@@ -6,10 +6,10 @@
  (public_name octez-smart-rollup-node-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-crypto
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
   tezos-client-base
   tezos-client-base-unix
   cohttp-lwt-unix
@@ -22,7 +22,7 @@
   tezos-version.value
   tezos_layer2_store
   octez-crawler
-  tezos-workers
+  octez-libs.tezos-workers
   octez-smart-rollup)
  (flags
   (:standard)

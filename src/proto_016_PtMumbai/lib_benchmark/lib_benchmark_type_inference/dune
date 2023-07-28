@@ -6,10 +6,10 @@
  (public_name tezos-benchmark-type-inference-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib
-  tezos-error-monad
-  tezos-crypto
-  tezos-micheline
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-error-monad
+  octez-libs.tezos-crypto
+  octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-protocol-016-PtMumbai
   hashcons)

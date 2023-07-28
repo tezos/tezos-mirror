@@ -6,7 +6,7 @@
  (public_name tezos-protocol-015-PtLimaPt.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-environment
   tezos-protocol-015-PtLimaPt)
  (library_flags (:standard -linkall))
@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-015-PtLimaPt.parameters
   tezos-protocol-015-PtLimaPt)
  (link_flags

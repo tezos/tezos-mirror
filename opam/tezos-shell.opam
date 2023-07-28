@@ -14,30 +14,20 @@ depends: [
   "lwt-watcher" { = "0.2" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "prometheus" { >= "1.2" }
-  "tezos-base"
-  "tezos-rpc"
-  "tezos-context"
+  "octez-libs"
   "tezos-store"
   "tezos-protocol-environment"
   "tezos-context-ops"
   "tezos-shell-context"
-  "tezos-p2p"
-  "tezos-stdlib-unix"
-  "tezos-shell-services"
-  "tezos-p2p-services"
   "tezos-protocol-updater"
   "tezos-requester"
-  "tezos-workers"
   "tezos-validation"
-  "tezos-version"
-  "tezos-crypto-dal"
   "lwt-exit"
   "tezt" { with-test & >= "3.1.1" }
-  "tezos-base-test-helpers" {with-test}
   "tezos-embedded-protocol-demo-noops" {with-test}
-  "tezos-event-logging-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-version" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

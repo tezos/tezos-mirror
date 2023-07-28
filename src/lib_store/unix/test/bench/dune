@@ -5,7 +5,7 @@
  (name bench)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezt
   octez-alcotezt
   src_lib_store_unix_test_tezt_lib)

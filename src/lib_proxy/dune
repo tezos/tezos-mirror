@@ -8,13 +8,13 @@
  (libraries
   aches
   aches-lwt
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-client-base
   tezos-protocol-environment
-  tezos-rpc
-  tezos-shell-services
-  tezos-context.memory
+  octez-libs.tezos-rpc
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-context.memory
   uri)
  (flags
   (:standard)

@@ -16,7 +16,7 @@ depends: [
   "stdint"
   "hacl-star" { >= "0.7.1" & < "0.8" }
   "octez-bls12-381-hash"
-  "octez-polynomial"
+  "octez-libs"
   "octez-mec"
 ]
 build: [

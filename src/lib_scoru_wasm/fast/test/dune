@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-tree-encoding
-  tezos-base.unix
-  tezos-context.disk
-  tezos-base-test-helpers
+  octez-libs.tezos-base
+  octez-libs.tezos-tree-encoding
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-context.disk
+  octez-libs.tezos-base-test-helpers
   tezos-scoru-wasm-helpers
   tezos_scoru_wasm_test_helpers
   tezos-test-helpers

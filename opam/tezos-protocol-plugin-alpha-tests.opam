@@ -11,13 +11,10 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "3.1.1" }
-  "tezos-base" {with-test}
-  "tezos-base-test-helpers" {with-test}
+  "octez-libs" {with-test}
   "octez-alcotezt" {with-test}
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "tezos-stdlib-unix" {with-test}
-  "tezos-micheline" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
   "tezos-protocol-alpha" {with-test}
   "tezos-alpha-test-helpers" {with-test}

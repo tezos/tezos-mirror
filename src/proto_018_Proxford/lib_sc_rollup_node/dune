@@ -6,33 +6,33 @@
  (package octez-smart-rollup-node-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib-unix
   tezos-client-base
   tezos-client-base-unix
   tezos-client-018-Proxford
-  tezos-context.encoding
-  tezos-context.helpers
+  octez-libs.tezos-context.encoding
+  octez-libs.tezos-context.helpers
   tezos-protocol-018-Proxford
   tezos-protocol-plugin-018-Proxford
   tezos-protocol-018-Proxford.parameters
-  tezos-rpc
-  tezos-rpc-http
-  tezos-rpc-http-server
-  tezos-workers
+  octez-libs.tezos-rpc
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-rpc-http-server
+  octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
   tezos-dac-018-Proxford
   tezos-dac-lib
   tezos-dac-client-lib
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   octez-smart-rollup
   tezos-smart-rollup-018-Proxford
   tezos-smart-rollup-layer2-018-Proxford
   tezos-layer2-utils-018-Proxford
   tezos_layer2_store
   octez-crawler
-  tezos-tree-encoding
+  octez-libs.tezos-tree-encoding
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -43,7 +43,7 @@
   octez-smart-rollup-node-lib
   tezos-scoru-wasm
   tezos-scoru-wasm-fast
-  tezos-crypto-dal
+  octez-libs.tezos-crypto-dal
   tezos-version.value)
  (flags
   (:standard)

@@ -6,10 +6,10 @@
  (public_name tezos-store.shared)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib-unix
-  tezos-base
-  tezos-crypto
-  tezos-shell-services
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-crypto
+  octez-libs.tezos-shell-services
   aches
   aches-lwt
   tezos-validation)

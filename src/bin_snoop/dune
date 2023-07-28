@@ -7,9 +7,9 @@
  (package octez-snoop)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
   tezos-clic
   tezos-benchmark
   tezos-benchmark-examples

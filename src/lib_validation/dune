@@ -7,15 +7,15 @@
  (instrumentation (backend bisect_ppx))
  (instrumentation (backend tezos-time-measurement))
  (libraries
-  tezos-base
-  tezos-crypto
-  tezos-rpc
-  tezos-context
+  octez-libs.tezos-base
+  octez-libs.tezos-crypto
+  octez-libs.tezos-rpc
+  octez-libs.tezos-context
   tezos-context-ops
   tezos-shell-context
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-protocol-updater
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-version.value)
  (flags
   (:standard)

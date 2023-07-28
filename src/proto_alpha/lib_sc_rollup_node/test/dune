@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-test-helpers
   tezos-smart-rollup-layer2-alpha

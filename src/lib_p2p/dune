@@ -3,21 +3,21 @@
 
 (library
  (name tezos_p2p)
- (public_name tezos-p2p)
+ (public_name octez-libs.tezos-p2p)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt-watcher
   lwt-canceler
   ringo
   aches
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-p2p-services
-  tezos-version
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-p2p-services
+  octez-libs.tezos-version
   prometheus
-  tezos-base.p2p-identity-file)
+  octez-libs.tezos-base.p2p-identity-file)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

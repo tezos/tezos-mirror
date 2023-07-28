@@ -1,10 +1,10 @@
 (executable
  (name main)
- (libraries tezos-stdlib
+ (libraries octez-libs.tezos-stdlib
             tezos-alpha-test-helpers
-            tezos-micheline
+            octez-libs.tezos-micheline
             tezos-protocol-alpha
-            tezt-tezos
+            octez-libs.tezt-tezos
             ptime)
  (flags (:standard
           (:include %{workspace_root}/macos-link-flags.sexp)

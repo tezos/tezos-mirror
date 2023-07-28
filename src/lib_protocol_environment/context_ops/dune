@@ -6,10 +6,10 @@
  (public_name tezos-context-ops)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-error-monad
+  octez-libs.tezos-base
+  octez-libs.tezos-error-monad
   tezos-protocol-environment
-  tezos-context
+  octez-libs.tezos-context
   tezos-shell-context)
  (flags
   (:standard)

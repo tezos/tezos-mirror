@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-micheline
+  octez-libs.tezos-base
+  octez-libs.tezos-micheline
   tezos-client-018-Proxford
   tezos-protocol-018-Proxford
-  tezos-context.merkle_proof_encoding
+  octez-libs.tezos-context.merkle_proof_encoding
   tezos-test-helpers
   tezos-018-Proxford-test-helpers
   octez-alcotezt
@@ -19,8 +19,8 @@
   tezos-benchmark-018-Proxford
   tezos-benchmark-type-inference-018-Proxford
   tezos-smart-rollup-018-Proxford
-  tezos-crypto-dal
-  tezos-base-test-helpers
+  octez-libs.tezos-crypto-dal
+  octez-libs.tezos-base-test-helpers
   tezos-protocol-018-Proxford.parameters)
  (library_flags (:standard -linkall))
  (flags

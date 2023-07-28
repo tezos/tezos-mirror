@@ -12,10 +12,8 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_deriving"
   "tezos-lwt-result-stdlib"
-  "tezos-stdlib"
-  "tezos-error-monad"
+  "octez-libs"
   "zarith" { >= "1.12" & < "1.13" }
-  "tezos-lazy-containers"
   "tezt" { with-test & >= "3.1.1" }
   "octez-alcotezt" {with-test}
 ]

@@ -5,7 +5,7 @@
  (name get_git_info)
  (libraries
   dune-configurator
-  tezos-version.parser)
+  octez-libs.tezos-version.parser)
  (modules get_git_info))
 
 (executable
@@ -14,8 +14,8 @@
  (package tezos-version)
  (libraries
   tezos-version.value
-  tezos-version
-  tezos-base.unix)
+  octez-libs.tezos-version
+  octez-libs.tezos-base.unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))

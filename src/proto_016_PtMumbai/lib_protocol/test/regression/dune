@@ -6,13 +6,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezt-tezos
+  octez-libs.tezos-base
+  octez-libs.tezt-tezos
   tezos-protocol-016-PtMumbai
   tezos-client-016-PtMumbai
   tezos-protocol-plugin-016-PtMumbai
   tezos-016-PtMumbai-test-helpers
-  tezos-micheline)
+  octez-libs.tezos-micheline)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -30,10 +30,10 @@
 (rule
  (alias runtest_js)
  (target api.json.corrected)
- (package tezos-hacl)
+ (package octez-libs)
  (action (setenv NODE_PRELOAD hacl-wasm (run node %{dep:./check-api.js}))))
 
 (rule
  (alias runtest_js)
- (package tezos-hacl)
+ (package octez-libs)
  (action (diff api.json api.json.corrected)))

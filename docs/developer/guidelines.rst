@@ -640,7 +640,7 @@ Lwt-, Result-, and Lwt-Result-specific variants of all the traversal functions
 (``map``, ``iter``, ``for_all``, ``exists``, etc.)
 
 Check the
-:package-api:`online documentation <tezos-base/Tezos_base/TzPervasives/List/index.html>` for a full list of the content of the ``List`` module.
+:package-api:`online documentation <octez-libs/Tezos_base/TzPervasives/List/index.html>` for a full list of the content of the ``List`` module.
 
 .. _chaining_concat_map:
 

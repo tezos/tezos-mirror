@@ -6,10 +6,10 @@
  (public_name tezos-clic)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-stdlib
+  octez-libs.tezos-stdlib
   lwt
   re
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   tezos-lwt-result-stdlib)
  (js_of_ocaml)
  (flags

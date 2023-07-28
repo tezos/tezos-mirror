@@ -6,7 +6,7 @@
  (public_name tezos-protocol-plugin-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-smart-rollup-alpha)
  (flags
@@ -22,7 +22,7 @@
  (public_name tezos-protocol-plugin-alpha-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-embedded-protocol-alpha
   tezos-protocol-plugin-alpha
   tezos-validation)

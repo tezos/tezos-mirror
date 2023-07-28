@@ -3,10 +3,10 @@
 
 (library
  (name test_parser)
- (package tezos-micheline)
+ (package octez-libs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-micheline)
+  octez-libs.tezos-micheline)
  (inline_tests (flags -verbose) (modes native js))
  (preprocess (pps ppx_expect))
  (js_of_ocaml)
@@ -17,10 +17,10 @@
 
 (library
  (name test_diff)
- (package tezos-micheline)
+ (package octez-libs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-micheline)
+  octez-libs.tezos-micheline)
  (inline_tests (flags -verbose) (modes native js))
  (preprocess (pps ppx_expect))
  (js_of_ocaml)

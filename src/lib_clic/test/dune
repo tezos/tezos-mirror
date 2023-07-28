@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-stdlib
+  octez-libs.tezos-stdlib
   tezos-clic
   lwt.unix
   octez-alcotezt)

@@ -6,21 +6,21 @@
  (public_name tezos-store.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-shell-services
-  tezos-base
-  tezos-version
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-base
+  octez-libs.tezos-version
   index
   irmin-pack
   tezos-store.shared
   tezos-protocol-environment
-  tezos-context
+  octez-libs.tezos-context
   tezos-context-ops
   tezos-shell-context
   tezos-validation
   tezos-protocol-updater
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-crypto
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-crypto
   lwt-watcher
   aches
   aches-lwt
@@ -58,10 +58,10 @@
  (public_name tezos-store.unix-reconstruction)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-shell-services
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
+  octez-libs.tezos-shell-services
   tezos-protocol-updater
   tezos-validation
   tezos-context-ops
@@ -86,11 +86,11 @@
  (public_name tezos-store.unix-snapshots)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib-unix
-  tezos-crypto
-  tezos-shell-services
-  tezos-context
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-crypto
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-context
   tezos-validation
   tezos-store.shared
   tezos-store.unix)

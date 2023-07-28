@@ -10,16 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-protocol-017-PtNairob"
-  "tezos-stdlib-unix"
   "tezos-protocol-environment"
-  "tezos-shell-services"
   "tezos-client-base"
   "tezos-client-017-PtNairob"
   "tezos-client-commands"
   "tezos-baking-017-PtNairob"
-  "tezos-rpc"
   "uri" { >= "3.1.0" }
 ]
 build: [

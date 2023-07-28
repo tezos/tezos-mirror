@@ -10,9 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-clic"
-  "tezos-tree-encoding"
   "yaml" { >= "3.1.0" }
   "tezos-client-alpha"
   "tezos-scoru-wasm"

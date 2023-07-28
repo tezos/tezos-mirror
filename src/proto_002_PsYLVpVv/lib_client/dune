@@ -5,14 +5,14 @@
  (name tezos_client_002_PsYLVpVv)
  (public_name tezos-client-002-PsYLVpVv)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-protocol-002-PsYLVpVv
   tezos-protocol-002-PsYLVpVv.lifted
   tezos-signer-backends
-  tezos-rpc
+  octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))
  (flags

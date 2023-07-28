@@ -6,10 +6,10 @@
  (public_name tezos-client-016-PtMumbai.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
-  tezos-crypto
-  tezos-stdlib-unix
+  octez-libs.tezos-crypto
+  octez-libs.tezos-stdlib-unix
   tezos-client-base
   tezos-signer-backends
   tezos-client-016-PtMumbai

@@ -7,7 +7,7 @@
  (package octez-testnet-scenarios)
  (libraries
   tezt
-  tezt-tezos
+  octez-libs.tezt-tezos
   tezt_ethereum)
  (flags
   (:standard)

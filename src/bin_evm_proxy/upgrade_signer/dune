@@ -5,8 +5,8 @@
  (name octez_evm_upgrade_signer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-clic
   evm_proxy_lib)
  (flags

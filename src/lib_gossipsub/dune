@@ -9,12 +9,12 @@
   ringo
   aches
   fmt
-  tezos-error-monad
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  tezos-stdlib
-  tezos-version)
+  octez-libs.tezos-error-monad
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-version)
  (flags
   (:standard)
   -open Tezos_error_monad

@@ -6,14 +6,14 @@
  (public_name tezos-client-base-unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-clic
-  tezos-rpc
-  tezos-rpc-http
-  tezos-rpc-http-client-unix
-  tezos-shell-services
-  tezos-stdlib-unix
+  octez-libs.tezos-rpc
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-stdlib-unix
   tezos-client-base
   tezos-client-commands
   tezos-mockup

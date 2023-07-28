@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
+  octez-libs.tezos-base
   tezos-dal-alpha
   tezos-protocol-alpha
-  tezos-base-test-helpers
+  octez-libs.tezos-base-test-helpers
   tezos-alpha-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))

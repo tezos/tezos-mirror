@@ -8,9 +8,9 @@
   tezt.core
   octez-alcotezt
   qcheck-alcotest
-  octez-polynomial
+  octez-libs.octez-polynomial
   bls12-381
-  octez-bls12-381-polynomial)
+  octez-libs.octez-bls12-381-polynomial)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -37,7 +37,7 @@
 
 (rule
  (alias runtest)
- (package octez-bls12-381-polynomial)
+ (package octez-libs)
  (deps srs_zcash_g1_5)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))

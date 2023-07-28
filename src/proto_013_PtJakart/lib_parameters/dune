@@ -6,7 +6,7 @@
  (public_name tezos-protocol-013-PtJakart.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-environment
   tezos-protocol-013-PtJakart)
  (library_flags (:standard -linkall))
@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-013-PtJakart.parameters
   tezos-protocol-013-PtJakart)
  (link_flags

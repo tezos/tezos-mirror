@@ -7,10 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-lwt-result-stdlib
-  tezos-stdlib
-  tezos-error-monad
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-error-monad
   zarith
-  tezos-lazy-containers)
+  octez-libs.tezos-lazy-containers)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)

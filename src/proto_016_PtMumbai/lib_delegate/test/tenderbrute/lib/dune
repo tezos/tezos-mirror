@@ -6,8 +6,8 @@
  (public_name tezos-baking-016-PtMumbai.tenderbrute)
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-protocol-016-PtMumbai
   tezos-client-base
   tezos-client-016-PtMumbai)

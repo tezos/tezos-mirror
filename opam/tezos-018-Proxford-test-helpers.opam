@@ -12,16 +12,12 @@ depends: [
   "ocaml" { >= "4.14" }
   "qcheck-alcotest" { >= "0.20" }
   "tezos-test-helpers"
-  "tezos-base"
-  "tezos-micheline"
-  "tezos-stdlib-unix"
+  "octez-libs"
   "tezos-protocol-018-Proxford"
   "tezos-client-018-Proxford"
   "tezos-protocol-environment"
   "tezos-protocol-plugin-018-Proxford"
-  "tezos-shell-services"
   "octez-plompiler"
-  "tezos-crypto-dal"
   "tezos-smart-rollup-018-Proxford"
 ]
 build: [

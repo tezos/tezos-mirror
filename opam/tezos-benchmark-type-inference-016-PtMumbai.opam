@@ -10,10 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
-  "tezos-error-monad"
-  "tezos-crypto"
-  "tezos-micheline"
+  "octez-libs"
   "tezos-micheline-rewriting"
   "tezos-protocol-016-PtMumbai"
   "hashcons"

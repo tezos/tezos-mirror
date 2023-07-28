@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   tezos_layer2_store
   qcheck-alcotest
   octez-alcotezt)

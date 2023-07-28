@@ -1,0 +1,45 @@
+{0 Octez-libs: octez libraries}
+
+This is a package containing some libraries used by the Octez project.
+
+It contains the following libraries:
+
+- {{!module-Octez_bls12_381_polynomial}Octez_bls12_381_polynomial}
+- {{!module-Polynomial}Polynomial}
+- {{!module-Tezos_base}Tezos_base}
+- {{!module-Tezos_base_p2p_identity_file}Tezos_base_p2p_identity_file}
+- {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}
+- {{!module-Tezos_base_unix}Tezos_base_unix}
+- {{!module-Tezos_context}Tezos_context}
+- {{!module-Tezos_context_disk}Tezos_context_disk}
+- {{!module-Tezos_context_dump}Tezos_context_dump}
+- {{!module-Tezos_context_encoding}Tezos_context_encoding}
+- {{!module-Tezos_context_helpers}Tezos_context_helpers}
+- {{!module-Tezos_context_memory}Tezos_context_memory}
+- {{!module-Tezos_context_merkle_proof_encoding}Tezos_context_merkle_proof_encoding}
+- {{!module-Tezos_context_sigs}Tezos_context_sigs}
+- {{!module-Tezos_crypto}Tezos_crypto}
+- {{!module-Tezos_crypto_dal}Tezos_crypto_dal}
+- {{!module-Tezos_crypto_dal_octez_dal_config}Tezos_crypto_dal_octez_dal_config}
+- {{!module-Tezos_error_monad}Tezos_error_monad}
+- {{!module-Tezos_event_logging}Tezos_event_logging}
+- {{!module-Tezos_event_logging_test_helpers}Tezos_event_logging_test_helpers}
+- {{!module-Tezos_hacl}Tezos_hacl}
+- {{!module-Tezos_lazy_containers}Tezos_lazy_containers}
+- {{!module-Tezos_micheline}Tezos_micheline}
+- {{!module-Tezos_p2p}Tezos_p2p}
+- {{!module-Tezos_p2p_services}Tezos_p2p_services}
+- {{!module-Tezos_p2p_test_common}Tezos_p2p_test_common}
+- {{!module-Tezos_rpc}Tezos_rpc}
+- {{!module-Tezos_rpc_http}Tezos_rpc_http}
+- {{!module-Tezos_rpc_http_client}Tezos_rpc_http_client}
+- {{!module-Tezos_rpc_http_client_unix}Tezos_rpc_http_client_unix}
+- {{!module-Tezos_rpc_http_server}Tezos_rpc_http_server}
+- {{!module-Tezos_shell_services}Tezos_shell_services}
+- {{!module-Tezos_stdlib}Tezos_stdlib}
+- {{!module-Tezos_stdlib_unix}Tezos_stdlib_unix}
+- {{!module-Tezos_tree_encoding}Tezos_tree_encoding}
+- {{!module-Tezos_version}Tezos_version}
+- {{!module-Tezos_version_parser}Tezos_version_parser}
+- {{!module-Tezt_tezos}Tezt_tezos}
+- {{!page-tezos_workers}tezos_workers}

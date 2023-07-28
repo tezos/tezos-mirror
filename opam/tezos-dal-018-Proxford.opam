@@ -11,9 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "ppx_expect"
-  "tezos-base"
+  "octez-libs"
   "octez-protocol-compiler"
-  "tezos-stdlib-unix"
   "tezos-dal-node-lib"
   "tezos-client-018-Proxford"
   "tezos-protocol-plugin-018-Proxford"
@@ -21,7 +20,6 @@ depends: [
   "tezos-layer2-utils-018-Proxford"
   "tezos-protocol-018-Proxford"
   "tezt" { with-test & >= "3.1.1" }
-  "tezos-base-test-helpers" {with-test}
   "tezos-018-Proxford-test-helpers" {with-test}
   "octez-alcotezt" {with-test}
 ]

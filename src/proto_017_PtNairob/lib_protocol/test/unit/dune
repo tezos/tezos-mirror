@@ -6,21 +6,21 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-base-test-helpers
-  tezos-micheline
+  octez-libs.tezos-base
+  octez-libs.tezos-base-test-helpers
+  octez-libs.tezos-micheline
   tezos-client-017-PtNairob
   tezos-client-base
   tezos-protocol-017-PtNairob.parameters
   tezos-protocol-environment
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-017-PtNairob
   tezos-test-helpers
   tezos-017-PtNairob-test-helpers
   octez-alcotezt
   tezos-scoru-wasm-helpers
-  tezos-stdlib
-  tezos-crypto-dal
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-crypto-dal
   tezos-scoru-wasm
   tezos-webassembly-interpreter-extra)
  (library_flags (:standard -linkall))

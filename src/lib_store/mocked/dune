@@ -7,10 +7,10 @@
  (implements tezos-store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-crypto
-  tezos-shell-services
-  tezos-context.memory
+  octez-libs.tezos-base
+  octez-libs.tezos-crypto
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-context.memory
   tezos-context-ops
   tezos-validation
   tezos-protocol-environment

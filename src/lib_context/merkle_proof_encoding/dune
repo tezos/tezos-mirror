@@ -5,12 +5,12 @@
 
 (library
  (name tezos_context_merkle_proof_encoding)
- (public_name tezos-context.merkle_proof_encoding)
+ (public_name octez-libs.tezos-context.merkle_proof_encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-stdlib
-  tezos-context.sigs)
+  octez-libs.tezos-base
+  octez-libs.tezos-stdlib
+  octez-libs.tezos-context.sigs)
  (js_of_ocaml)
  (flags
   (:standard)

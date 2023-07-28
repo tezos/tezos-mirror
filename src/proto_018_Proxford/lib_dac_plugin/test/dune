@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
+  octez-libs.tezos-base
   tezos-dac-018-Proxford
   tezos-protocol-018-Proxford
-  tezos-base-test-helpers
+  octez-libs.tezos-base-test-helpers
   tezos-018-Proxford-test-helpers
   tezos-dac-lib
   tezos_dac_node_lib

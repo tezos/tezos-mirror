@@ -5,16 +5,16 @@
 
 (library
  (name tezos_shell_services)
- (public_name tezos-shell-services)
+ (public_name octez-libs.tezos-shell-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc
-  tezos-p2p-services
-  tezos-version
-  tezos-context.sigs
-  tezos-context.merkle_proof_encoding
-  tezos-crypto-dal.octez-dal-config)
+  octez-libs.tezos-base
+  octez-libs.tezos-rpc
+  octez-libs.tezos-p2p-services
+  octez-libs.tezos-version
+  octez-libs.tezos-context.sigs
+  octez-libs.tezos-context.merkle_proof_encoding
+  octez-libs.tezos-crypto-dal.octez-dal-config)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

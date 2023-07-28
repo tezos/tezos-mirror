@@ -6,8 +6,8 @@
  (public_name tezos-baking-alpha.tenderbrute)
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-protocol-alpha
   tezos-client-base
   tezos-client-alpha)

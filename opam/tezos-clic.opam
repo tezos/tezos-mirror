@@ -10,12 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-stdlib"
+  "octez-libs"
   "lwt" { >= "5.6.0" }
   "re" { >= "1.9.0" }
-  "tezos-error-monad"
   "tezos-lwt-result-stdlib"
-  "tezos-stdlib-unix"
   "tezt" { with-test & >= "3.1.1" }
   "octez-alcotezt" {with-test}
 ]

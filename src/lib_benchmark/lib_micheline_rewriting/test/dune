@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-micheline
+  octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-protocol-alpha
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   tezos-client-alpha)
  (library_flags (:standard -linkall))
  (flags

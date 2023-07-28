@@ -8,8 +8,8 @@
   tezos-webassembly-interpreter
   tezos-webassembly-interpreter-extra
   lwt.unix
-  tezos-tree-encoding
-  tezos-lazy-containers)
+  octez-libs.tezos-tree-encoding
+  octez-libs.tezos-lazy-containers)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter

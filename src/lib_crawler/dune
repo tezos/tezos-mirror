@@ -6,10 +6,10 @@
  (public_name octez-crawler)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-rpc-http
-  tezos-base.unix
-  tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-rpc-http
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
   tezos-client-base
   tezos-shell)
  (flags

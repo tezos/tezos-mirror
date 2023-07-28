@@ -6,20 +6,20 @@
  (public_name tezos-client-015-PtLimaPt.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-protocol-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters
-  tezos-stdlib-unix
+  octez-libs.tezos-stdlib-unix
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-mockup
   tezos-mockup-registration
   tezos-mockup-commands
   tezos-client-base
   tezos-client-015-PtLimaPt
   tezos-client-commands
-  tezos-rpc
+  octez-libs.tezos-rpc
   tezos-client-base-unix
   tezos-protocol-plugin-015-PtLimaPt
   uri)
@@ -43,18 +43,18 @@
  (public_name tezos-client-015-PtLimaPt.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-protocol-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters
   tezos-protocol-environment
-  tezos-shell-services
+  octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-015-PtLimaPt
   tezos-client-commands
   tezos-client-015-PtLimaPt.commands
   tezos-client-015-PtLimaPt.sapling
-  tezos-rpc
+  octez-libs.tezos-rpc
   tezos-protocol-plugin-015-PtLimaPt)
  (library_flags (:standard -linkall))
  (flags

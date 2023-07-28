@@ -6,8 +6,8 @@
  (public_name tezos-baking-017-PtNairob.tenderbrute)
  (libraries
   data-encoding
-  tezos-base
-  tezos-base.unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
   tezos-protocol-017-PtNairob
   tezos-client-base
   tezos-client-017-PtNairob)

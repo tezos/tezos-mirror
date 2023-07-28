@@ -3,11 +3,11 @@
 
 (library
  (name tezos_tree_encoding)
- (public_name tezos-tree-encoding)
+ (public_name octez-libs.tezos-tree-encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
-  tezos-context.sigs
+  octez-libs.tezos-base
+  octez-libs.tezos-context.sigs
   tezos-lwt-result-stdlib
   data-encoding)
  (flags

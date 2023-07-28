@@ -7,7 +7,7 @@
  (package octez-smart-rollup-client-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-clic
   tezos-protocol-016-PtMumbai
   octez_smart_rollup_client_PtMumbai

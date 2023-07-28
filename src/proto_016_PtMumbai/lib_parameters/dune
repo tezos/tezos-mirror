@@ -6,7 +6,7 @@
  (public_name tezos-protocol-016-PtMumbai.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-environment
   tezos-protocol-016-PtMumbai)
  (library_flags (:standard -linkall))
@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  tezos-base
+  octez-libs.tezos-base
   tezos-protocol-016-PtMumbai.parameters
   tezos-protocol-016-PtMumbai)
  (link_flags

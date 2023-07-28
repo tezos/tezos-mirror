@@ -10,16 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-smart-rollup-layer2-alpha"
   "tezos-protocol-alpha"
   "octez-smart-rollup-node-alpha"
-  "tezos-workers"
   "octez-smart-rollup-node-lib"
   "octez-smart-rollup"
-  "tezos-rpc"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

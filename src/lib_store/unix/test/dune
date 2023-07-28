@@ -6,15 +6,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  tezos-base
-  tezos-crypto
+  octez-libs.tezos-base
+  octez-libs.tezos-crypto
   tezos-context-ops
   tezos-store.shared
   tezos-store.unix
   tezos-store.unix-reconstruction
   tezos-store.unix-snapshots
-  tezos-shell-services
-  tezos-stdlib-unix
+  octez-libs.tezos-shell-services
+  octez-libs.tezos-stdlib-unix
   tezos-validation
   tezos-protocol-updater
   tezos-embedded-protocol-demo-noops

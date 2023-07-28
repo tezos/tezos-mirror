@@ -8,15 +8,15 @@
   test_autocompletion
   test_distribution)
  (libraries
-  tezos-base
-  tezos-micheline
+  octez-libs.tezos-base
+  octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-protocol-alpha
   tezos-benchmark
   tezos-benchmark-type-inference-alpha
   tezos-benchmark-alpha
   tezos-alpha-test-helpers
-  tezos-error-monad
+  octez-libs.tezos-error-monad
   prbnmcn-stats)
  (link_flags
   (:standard)

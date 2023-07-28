@@ -12,10 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "3.1.1" }
   "octez-alcotezt" {with-test}
-  "tezos-base" {with-test}
-  "tezos-stdlib-unix" {with-test}
-  "tezos-micheline" {with-test}
-  "tezos-crypto" {with-test}
+  "octez-libs" {with-test}
   "tezos-benchmark" {with-test}
   "tezos-benchmark-examples" {with-test}
 ]

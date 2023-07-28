@@ -11,12 +11,10 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "tezos-base"
+  "octez-libs"
   "tezos-client-base-unix"
   "tezos-client-base"
   "tezos-clic"
-  "tezos-stdlib-unix"
-  "tezos-event-logging"
   "tezos-signer-services"
   "tezos-version"
 ]

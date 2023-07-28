@@ -10,20 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "tezos-base"
+  "octez-libs"
   "tezos-version"
   "octez-node-config"
-  "tezos-stdlib-unix"
-  "tezos-shell-services"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-p2p"
   "tezos-shell"
   "tezos-store"
-  "tezos-context"
   "tezos-validation"
   "tezos-shell-context"
-  "tezos-workers"
   "tezos-protocol-updater"
   "cmdliner" { >= "1.1.0" }
   "fmt" { >= "0.8.7" }
