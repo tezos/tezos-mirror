@@ -935,6 +935,7 @@ type transfer_result = {
   value : Wei.t;
   tx_hash : string;
   tx_object : Transaction.transaction_object;
+  tx_receipt : Transaction.transaction_receipt;
   receiver_balance_before : Wei.t;
   receiver_balance_after : Wei.t;
 }
@@ -944,6 +945,14 @@ let get_tx_object ~endpoint ~tx_hash =
   match tx_object with
   | Some tx_object -> return tx_object
   | None -> Test.fail "The transaction object of %s should be available" tx_hash
+
+let get_transaction_receipt ~full_evm_setup ~tx_hash =
+  let* json =
+    Evm_proxy_server.call_evm_rpc
+      full_evm_setup.evm_proxy_server
+      {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
+  in
+  return JSON.(json |-> "result" |> Transaction.transaction_receipt_of_json)
 
 let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
     full_evm_setup =
@@ -959,6 +968,10 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
   assert (sender_nonce = transfer_result.sender_nonce_after) ;
   let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
   assert (tx_object = transfer_result.tx_object) ;
+  let* tx_receipt =
+    get_transaction_receipt ~full_evm_setup ~tx_hash:transfer_result.tx_hash
+  in
+  assert (tx_receipt = transfer_result.tx_receipt) ;
   unit
 
 let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
@@ -977,6 +990,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
     get_transaction_count full_evm_setup.evm_proxy_server sender.address
   in
   let* tx_object = get_tx_object ~endpoint ~tx_hash in
+  let* tx_receipt = get_transaction_receipt ~full_evm_setup ~tx_hash in
   return
     {
       sender_balance_before;
@@ -986,6 +1000,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
       value;
       tx_hash;
       tx_object;
+      tx_receipt;
       receiver_balance_before;
       receiver_balance_after;
     }
