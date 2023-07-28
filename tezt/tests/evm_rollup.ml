@@ -289,7 +289,9 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   | [] -> None
   | res -> Some res
 
-let setup_evm_kernel ?config
+type kernel_installee = {base_installee : string; installee : string}
+
+let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ?dictator
@@ -321,12 +323,17 @@ let setup_evm_kernel ?config
   in
   (* Start a rollup node *)
   let* boot_sector =
+    let base_installee, installee =
+      match kernel_installee with
+      | Some {base_installee; installee} -> (base_installee, installee)
+      | None -> ("./", "evm_kernel")
+    in
     prepare_installer_kernel
-      ~base_installee:"./"
+      ~base_installee
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
       ?config
-      "evm_kernel"
+      installee
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -378,12 +385,14 @@ let setup_evm_kernel ?config
       deposit_addresses;
     }
 
-let setup_past_genesis ?originator_key ?rollup_operator_key ~deposit_admin
-    protocol =
+let setup_past_genesis ?dictator ?kernel_installee ?originator_key
+    ?rollup_operator_key ~deposit_admin protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
+      ?kernel_installee
       ?originator_key
       ?rollup_operator_key
+      ?dictator
       ~deposit_admin
       protocol
   in
@@ -1766,8 +1775,8 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
-    ~base_installee ~installee ?dictator ~private_key protocol =
+let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
+    ?(nonce = 2) ~base_installee ~installee ?dictator ~private_key protocol =
   let* {
          node;
          client;
@@ -1777,7 +1786,9 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
          evm_proxy_server;
          _;
        } =
-    setup_evm_kernel ?dictator ~deposit_admin:None protocol
+    match evm_setup with
+    | Some evm_setup -> return evm_setup
+    | None -> setup_evm_kernel ?dictator ~deposit_admin:None protocol
   in
   let sc_rollup_address =
     Option.value ~default:sc_rollup_address rollup_address
@@ -2084,6 +2095,94 @@ let test_rpc_sendRawTransaction =
     ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
   unit
 
+type storage_migration_results = {
+  transfer_result : transfer_result;
+  block_result : Block.t;
+  config_result : config_result;
+}
+
+(* This is the test generator that will trigger the sanity checks for migration
+   tests.
+   Note that:
+   - it uses the latest version of the ghostnet EVM rollup as a starter kernel.
+   - the upgrade of the kernel during the test will always target the latest one
+     on master.
+   - everytime a new path/rpc/object is stored in the kernel, a new sanity check
+     MUST be generated. *)
+let gen_kernel_migration_test ~dictator ~scenario_prior ~scenario_after
+    ~protocol =
+  let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let current_kernel_installee = "ghostnet_evm_kernel" in
+  let* evm_setup =
+    setup_past_genesis
+      ~dictator:dictator.Eth_account.public_key
+      ~kernel_installee:
+        {
+          base_installee = current_kernel_base_installee;
+          installee = current_kernel_installee;
+        }
+      ~deposit_admin:None
+      protocol
+  in
+  (* Load the EVM rollup's storage and sanity check results. *)
+  let* sanity_check = scenario_prior ~evm_setup in
+  (* Upgrade the kernel. *)
+  let next_kernel_base_installee = "./" in
+  let next_kernel_installee = "evm_kernel" in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup
+      ~base_installee:next_kernel_base_installee
+      ~installee:next_kernel_installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
+  in
+  (* Check the values after the upgrade with [sanity_check] results. *)
+  scenario_after ~evm_setup ~sanity_check
+
+let test_kernel_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
+  @@ fun protocol ->
+  let sender, receiver =
+    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+  in
+  let scenario_prior ~evm_setup =
+    let* transfer_result =
+      make_transfer
+        ~value:Wei.(default_bootstrap_account_balance - one)
+        ~sender
+        ~receiver
+        evm_setup
+    in
+    let* block_result = latest_block evm_setup in
+    let* config_result = config_setup evm_setup in
+    return {transfer_result; block_result; config_result}
+  in
+  let scenario_after ~evm_setup ~sanity_check =
+    let* () =
+      ensure_transfer_result_integrity
+        ~sender
+        ~receiver
+        ~transfer_result:sanity_check.transfer_result
+        evm_setup
+    in
+    let* () =
+      ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
+    in
+    ensure_config_setup_integrity
+      ~config_result:sanity_check.config_result
+      evm_setup
+  in
+  gen_kernel_migration_test
+    ~dictator:sender
+    ~scenario_prior
+    ~scenario_after
+    ~protocol
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2120,6 +2219,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_dictator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
-  test_rpc_sendRawTransaction protocols
+  test_rpc_sendRawTransaction protocols ;
+  test_kernel_migration protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
