@@ -312,11 +312,14 @@ let make ~version ~reveal_builtins ~write_debug state =
       ("store_create", store_create);
     ]
   in
+  let v2 = v1 @ [("store_exists", store_exists)] in
+  let v3 = v2 in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
     | V1 -> v1
-    | V2 -> v1 @ [("store_exists", store_exists)]
+    | V2 -> v2
+    | V3 -> v3
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))

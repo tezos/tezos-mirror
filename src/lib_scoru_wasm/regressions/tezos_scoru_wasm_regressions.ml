@@ -40,6 +40,7 @@ let version_name = function
   | Wasm_pvm_state.V0 -> "v0"
   | V1 -> "v1"
   | V2 -> "v2"
+  | V3 -> "v3"
 
 let capture_hash_of tree =
   Regression.capture @@ Context_hash.to_b58check

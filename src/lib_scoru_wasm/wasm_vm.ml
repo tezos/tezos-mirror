@@ -75,7 +75,9 @@ let get_wasm_version {durable; _} =
   let+ bytes = Tezos_lazy_containers.Chunked_byte_vector.to_bytes cbv in
   Data_encoding.Binary.of_bytes_exn Wasm_pvm_state.version_encoding bytes
 
-let stack_size_limit = function Wasm_pvm_state.V0 -> 300 | V1 | V2 -> 60_000
+let stack_size_limit = function
+  | Wasm_pvm_state.V0 -> 300
+  | V1 | V2 | V3 -> 60_000
 (* The limit 60_000 has been chosen such that the simplest WASM program
    consisting in trying to recursively call 60,000 times the same function
    results in Wasmer raising a runtime error.
