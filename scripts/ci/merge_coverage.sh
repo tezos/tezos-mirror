@@ -21,6 +21,6 @@ else
     if [ "${SLACK_COVERAGE_TOKEN:-}" != "" ]; then
         scripts/send_slack_alert_coverage.sh "$SLACK_COVERAGE_TOKEN" "$SLACK_COVERAGE_CHANNEL";
     fi
-    exit 1
+    exit 64
 fi
 
