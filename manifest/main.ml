@@ -333,6 +333,8 @@ let uutf = external_lib ~js_compatible:true "uutf" V.True
 let vdf =
   external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.4")
 
+let yaml = external_lib "yaml" V.(at_least "3.1.0")
+
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith =
   external_lib
@@ -7696,6 +7698,7 @@ let _octez_scoru_wasm_debugger =
         octez_clic;
         tree_encoding;
         octez_base_unix;
+        yaml;
         (* The debugger always rely on proto_alpha, as such the client is always
            available. *)
         Protocol.(client_exn alpha);

@@ -11,6 +11,7 @@
   tezos-clic
   tezos-tree-encoding
   tezos-base.unix
+  yaml
   tezos-client-alpha
   tezos-scoru-wasm
   octez_smart_rollup_wasm_benchmark_lib
