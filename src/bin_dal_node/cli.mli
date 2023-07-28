@@ -53,4 +53,4 @@ type t = Run | Config_init
 
 (** [commands ~run] attaches a callback to each subcommands of the DAL
     node. *)
-val make : run:(t -> options -> 'res tzresult) -> 'res Cmdliner.Cmd.t
+val make : run:(t -> options -> unit Cmdliner.Term.ret) -> unit Cmdliner.Cmd.t

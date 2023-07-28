@@ -68,6 +68,17 @@ let merge
       peers = peers @ configuration.peers;
     }
 
+let wrap_with_error main_promise =
+  let open Lwt_syntax in
+  let* r = Lwt_exit.wrap_and_exit main_promise in
+  match r with
+  | Ok () ->
+      let* _ = Lwt_exit.exit_and_wait 0 in
+      Lwt.return (`Ok ())
+  | Error err ->
+      let* _ = Lwt_exit.exit_and_wait 1 in
+      Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err)
+
 let run subcommand cli_options =
   match subcommand with
   | Cli.Run ->
@@ -76,10 +87,10 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.Cli.data_dir
       in
-      Lwt_main.run @@ Lwt_exit.wrap_and_exit
+      Lwt_main.run @@ wrap_with_error
       @@ Daemon.run ~data_dir (merge cli_options)
   | Config_init ->
-      Lwt_main.run
+      Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
 
 let _ =
