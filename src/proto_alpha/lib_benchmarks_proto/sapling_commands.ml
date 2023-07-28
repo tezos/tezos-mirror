@@ -93,7 +93,7 @@ module Sapling_gen_cmd = struct
       |> lift_opt set_seed seed
     in
     generate save_to tx_count sapling_gen_options ;
-    return ()
+    return_unit
 
   let options =
     Tezos_clic.args5

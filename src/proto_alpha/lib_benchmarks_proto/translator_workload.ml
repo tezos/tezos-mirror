@@ -108,81 +108,85 @@ let workload_to_sparse_vec (trace : t) =
   Sparse_vec.String.of_list vars
 
 let data_typechecker_workload ctxt t_kind micheline_node ex_ty =
+  let open Lwt_syntax in
   let open Protocol in
   match ex_ty with
   | Script_typed_ir.Ex_ty ty ->
       let ctxt = Gas_helpers.set_limit ctxt in
       Lwt_main.run
-        ( Script_ir_translator.parse_data
-            ctxt
-            ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-            ~allow_forged:false
-            ty
-            micheline_node
-        |> Lwt.map Environment.wrap_tzresult
-        >>= fun res ->
-          match res with
-          | Ok (_res, ctxt_after) ->
-              let micheline_size = Size.of_micheline micheline_node in
-              let consumed =
-                Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
-              in
-              let trace =
-                Typechecker_workload
-                  {
-                    t_kind;
-                    code_or_data = Data;
-                    micheline_size;
-                    consumed =
-                      Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
-                  }
-              in
-              Lwt.return (Some trace)
-          | Error errors ->
-              Michelson_v1_error_reporter.report_errors
-                ~details:true
-                ~show_source:true
-                Format.err_formatter
-                errors ;
-              Format.eprintf "@." ;
-              Lwt.return None )
+        (let* res =
+           Script_ir_translator.parse_data
+             ctxt
+             ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+             ~allow_forged:false
+             ty
+             micheline_node
+           |> Lwt.map Environment.wrap_tzresult
+         in
+         match res with
+         | Ok (_res, ctxt_after) ->
+             let micheline_size = Size.of_micheline micheline_node in
+             let consumed =
+               Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
+             in
+             let trace =
+               Typechecker_workload
+                 {
+                   t_kind;
+                   code_or_data = Data;
+                   micheline_size;
+                   consumed =
+                     Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
+                 }
+             in
+             return_some trace
+         | Error errors ->
+             Michelson_v1_error_reporter.report_errors
+               ~details:true
+               ~show_source:true
+               Format.err_formatter
+               errors ;
+             Format.eprintf "@." ;
+             return_none)
 
 let code_typechecker_workload (ctxt : Protocol.Alpha_context.context)
     (t_kind : kind) (code : Protocol.Alpha_context.Script.node)
     (bef : Protocol.Script_ir_translator.ex_stack_ty) =
+  let open Lwt_syntax in
   let open Protocol in
   let ctxt = Gas_helpers.set_limit ctxt in
   let (Script_ir_translator.Ex_stack_ty stack_ty) = bef in
   Lwt_main.run
-    ( Script_ir_translator.parse_instr
-        Script_tc_context.data
-        ctxt
-        ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
-        code
-        stack_ty
-    |> Lwt.map Environment.wrap_tzresult
-    >>= fun res ->
-      match res with
-      | Ok (_res, ctxt_after) ->
-          let micheline_size = Size.of_micheline code in
-          let consumed =
-            Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
-          in
-          let trace =
-            Typechecker_workload
-              {
-                t_kind;
-                code_or_data = Code;
-                micheline_size;
-                consumed = Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
-              }
-          in
-          Lwt.return (Some trace)
-      | Error errs ->
-          Michelson_v1_error_reporter.report_errors
-            ~details:true
-            ~show_source:true
-            Format.err_formatter
-            errs ;
-          Format.eprintf "@." ;
-          Lwt.return None )
+    (let* res =
+       Script_ir_translator.parse_instr
+         Script_tc_context.data
+         ctxt
+         ~elab_conf:(Script_ir_translator_config.make ~legacy:false ())
+         code
+         stack_ty
+       |> Lwt.map Environment.wrap_tzresult
+     in
+     match res with
+     | Ok (_res, ctxt_after) ->
+         let micheline_size = Size.of_micheline code in
+         let consumed =
+           Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt_after
+         in
+         let trace =
+           Typechecker_workload
+             {
+               t_kind;
+               code_or_data = Code;
+               micheline_size;
+               consumed = Size.of_int (Z.to_int (Gas_helpers.fp_to_z consumed));
+             }
+         in
+         return_some trace
+     | Error errs ->
+         Michelson_v1_error_reporter.report_errors
+           ~details:true
+           ~show_source:true
+           Format.err_formatter
+           errs ;
+         Format.eprintf "@." ;
+         return_none)

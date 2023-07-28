@@ -902,28 +902,33 @@ module Registration_section = struct
         | Ex_stack (stack_ty, stack) -> Ex_stack (unit @$ stack_ty, ((), stack))
 
     let parse_instr rng_state node stack =
+      let open Lwt_result_syntax in
       match stack with
       | Ex_stack (stack_ty, stack) ->
           raise_if_error
             (Lwt_main.run
-               ( Execution_context.make ~rng_state ()
-               >>=? fun (ctxt, _step_constants) ->
-                 Script_ir_translator.parse_instr
-                   Script_tc_context.data
-                   ctxt
-                   ~elab_conf:
-                     (Script_ir_translator_config.make ~legacy:false ())
-                   node
-                   stack_ty
-                 >|= Environment.wrap_tzresult
-                 >>=? fun (judgement, _) ->
-                 match judgement with
-                 | Script_ir_translator.Typed descr ->
-                     let kinstr = descr.instr.apply (IHalt dummy_loc) in
-                     return
-                       (Ex_stack_and_kinstr
-                          {stack; kinstr; stack_type = descr.bef})
-                 | Script_ir_translator.Failed _ -> assert false ))
+               (let* ctxt, _step_constants =
+                  Execution_context.make ~rng_state ()
+                in
+                let* judgement, _ =
+                  let*! result =
+                    Script_ir_translator.parse_instr
+                      Script_tc_context.data
+                      ctxt
+                      ~elab_conf:
+                        (Script_ir_translator_config.make ~legacy:false ())
+                      node
+                      stack_ty
+                  in
+                  Lwt.return (Environment.wrap_tzresult result)
+                in
+                match judgement with
+                | Script_ir_translator.Typed descr ->
+                    let kinstr = descr.instr.apply (IHalt dummy_loc) in
+                    return
+                      (Ex_stack_and_kinstr
+                         {stack; kinstr; stack_type = descr.bef})
+                | Script_ir_translator.Failed _ -> assert false))
 
     open Protocol.Michelson_v1_primitives
 
@@ -1630,6 +1635,7 @@ module Registration_section = struct
   module Big_maps = struct
     let generate_big_map_and_key_in_map (cfg : Default_config.config) rng_state
         =
+      let open Lwt_result_syntax in
       let n =
         Base_samplers.sample_in_interval rng_state ~range:cfg.sampler.set_size
       in
@@ -1648,16 +1654,20 @@ module Registration_section = struct
       let big_map =
         raise_if_error
           (Lwt_main.run
-             ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
-               let big_map = Script_big_map.empty int unit_t in
-               Script_map.fold
-                 (fun k v acc ->
-                   acc >>=? fun (bm, ctxt_acc) ->
-                   Script_big_map.update ctxt_acc k v bm)
-                 map
-                 (return (big_map, ctxt))
-               >|= Environment.wrap_tzresult
-               >>=? fun (big_map, _) -> return big_map ))
+             (let* ctxt, _ = Execution_context.make ~rng_state () in
+              let big_map = Script_big_map.empty int unit_t in
+              let* big_map, _ =
+                let*! result =
+                  Script_map.fold
+                    (fun k v acc ->
+                      let* bm, ctxt_acc = acc in
+                      Script_big_map.update ctxt_acc k v bm)
+                    map
+                    (return (big_map, ctxt))
+                in
+                Lwt.return (Environment.wrap_tzresult result)
+              in
+              return big_map))
       in
       (key, big_map)
 
@@ -2860,16 +2870,21 @@ module Registration_section = struct
         ()
 
     let () =
+      let open Lwt_result_syntax in
       benchmark
         ~name:Interpreter_workload.N_IUnpack
         ~kinstr_and_stack_sampler:(fun _cfg rng_state ->
           let b =
             raise_if_error
               (Lwt_main.run
-                 ( Execution_context.make ~rng_state () >>=? fun (ctxt, _) ->
-                   Script_ir_translator.pack_data ctxt unit ()
-                   >|= Environment.wrap_tzresult
-                   >>=? fun (bytes, _) -> return bytes ))
+                 (let* ctxt, _ = Execution_context.make ~rng_state () in
+                  let* bytes, _ =
+                    let*! result =
+                      Script_ir_translator.pack_data ctxt unit ()
+                    in
+                    Lwt.return (Environment.wrap_tzresult result)
+                  in
+                  return bytes))
           in
           let kinstr = IUnpack (dummy_loc, unit, halt) in
           fun () ->
@@ -3037,6 +3052,7 @@ module Registration_section = struct
 
         let prepare_sapling_execution_environment sapling_forge_rng_seed
             sapling_transition =
+          let open Lwt_result_syntax in
           let sapling_forge_rng_state =
             Random.State.make
             @@ Option.fold
@@ -3049,15 +3065,21 @@ module Registration_section = struct
                bootstrap account match and that the transactions can be replayed. *)
           let result =
             Lwt_main.run
-              ( Execution_context.make ~rng_state:sapling_forge_rng_state ()
-              >>=? fun (ctxt, step_constants) ->
-                (* Prepare a sapling state able to replay the transition. *)
-                Sapling_generation.prepare_seeded_state sapling_transition ctxt
-                >>=? fun (_, _, _, _, ctxt, state_id) ->
-                Alpha_context.Sapling.(state_from_id ctxt (Id.parse_z state_id))
-                >|= Environment.wrap_tzresult
-                >>=? fun (state, ctxt) -> return (ctxt, state, step_constants)
-              )
+              (let* ctxt, step_constants =
+                 Execution_context.make ~rng_state:sapling_forge_rng_state ()
+               in
+               (* Prepare a sapling state able to replay the transition. *)
+               let* _, _, _, _, ctxt, state_id =
+                 Sapling_generation.prepare_seeded_state sapling_transition ctxt
+               in
+               let* state, ctxt =
+                 let*! result =
+                   Alpha_context.Sapling.(
+                     state_from_id ctxt (Id.parse_z state_id))
+                 in
+                 Lwt.return (Environment.wrap_tzresult result)
+               in
+               return (ctxt, state, step_constants))
           in
           match result with
           | Ok r -> r
