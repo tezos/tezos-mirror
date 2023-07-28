@@ -590,7 +590,7 @@ let simple_time_alloc_benchmark ?amplification ?intercept_stack ?more_tags ?salt
 (* ------------------------------------------------------------------------- *)
 (* Helpers for creating benchmarks for [Script_interpreter.next] *)
 
-let benchmark_from_continuation :
+let time_benchmark_from_continuation :
     ?amplification:int ->
     Alpha_context.context ->
     Protocol.Script_interpreter.step_constants ->
@@ -661,6 +661,70 @@ let benchmark_from_continuation :
       in
       Generator.Plain {workload; closure}
 
+let alloc_benchmark_from_continuation :
+    Alpha_context.context ->
+    Protocol.Script_interpreter.step_constants ->
+    ex_stack_and_continuation ->
+    Interpreter_workload.ir_sized_step list Generator.benchmark =
+ fun ctxt step_constants stack_cont ->
+  let ctxt = Gas_helpers.set_limit ctxt in
+  let (Ex_stack_and_cont {stack = bef_top, bef; cont; stack_type}) =
+    stack_cont
+  in
+  let workload =
+    Interpreter_workload.extract_deps_continuation
+      ctxt
+      step_constants
+      stack_type
+      cont
+      (bef_top, bef)
+  in
+  let _gas_counter, outdated_ctxt =
+    Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+  in
+  let measure () =
+    let result =
+      Lwt_main.run
+      @@ Script_interpreter.Internals.next
+           None
+           (outdated_ctxt, step_constants)
+           (Local_gas_counter 9_999_999_999)
+           stack_type
+           cont
+           bef_top
+           bef
+    in
+    Result.fold
+      ~error:(fun _ -> 0.0)
+      ~ok:(fun (stack_top, stack, _, _) ->
+        let size_after =
+          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
+        in
+        let size_before =
+          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
+        in
+
+        float_of_int (size_after - size_before))
+      result
+  in
+  Generator.Calculated {workload; measure}
+
+let benchmark_from_continuation :
+    ?amplification:int ->
+    benchmark_type ->
+    Alpha_context.context ->
+    Protocol.Script_interpreter.step_constants ->
+    ex_stack_and_continuation ->
+    Interpreter_workload.ir_sized_step list Generator.benchmark =
+ fun ?amplification benchmark_type ->
+  match benchmark_type with
+  | Time -> time_benchmark_from_continuation ?amplification
+  | Alloc ->
+      (* amplification wouldn't make sense,
+         because the measurement resolution doesn't matter for the allocation *)
+      assert (amplification = None) ;
+      alloc_benchmark_from_continuation
+
 let make_continuation_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
@@ -668,6 +732,7 @@ let make_continuation_benchmark :
     ?more_tags:string list ->
     ?check:(unit -> unit) ->
     name:Interpreter_workload.continuation_name ->
+    benchmark_type:benchmark_type ->
     cont_and_stack_sampler:
       (Default_config.config ->
       Random.State.t ->
@@ -681,6 +746,7 @@ let make_continuation_benchmark :
      ?(more_tags = [])
      ?(check = fun () -> ())
      ~name
+     ~benchmark_type
      ~cont_and_stack_sampler
      () ->
   let module B : Benchmark.S = struct
@@ -690,11 +756,14 @@ let make_continuation_benchmark :
     let tags = tags @ more_tags
 
     let models =
-      Interpreter_model.make_model Time ?amplification (Cont_name name)
+      Interpreter_model.make_model
+        benchmark_type
+        ?amplification
+        (Cont_name name)
 
     let info, name =
       info_and_name
-        ~benchmark_type:Time
+        ~benchmark_type
         ~intercept
         ?salt
         (Interpreter_workload.string_of_continuation_name name)
@@ -705,7 +774,12 @@ let make_continuation_benchmark :
 
     let benchmark cont_and_stack_sampler ctxt step_constants () =
       let stack_instr = cont_and_stack_sampler () in
-      benchmark_from_continuation ?amplification ctxt step_constants stack_instr
+      benchmark_from_continuation
+        ?amplification
+        benchmark_type
+        ctxt
+        step_constants
+        stack_instr
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
       check () ;
@@ -721,8 +795,8 @@ let make_continuation_benchmark :
   end in
   (module B : Benchmark.S)
 
-let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
-    ~name ~cont_and_stack_sampler () =
+let continuation_benchmark ?(benchmark_type = Time) ?amplification ?intercept
+    ?salt ?more_tags ?check ~name ~cont_and_stack_sampler () =
   let bench =
     make_continuation_benchmark
       ?amplification
@@ -731,10 +805,37 @@ let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
       ?more_tags
       ?check
       ~name
+      ~benchmark_type
       ~cont_and_stack_sampler
       ()
   in
-  Registration_helpers.register bench
+  Registration_helpers.register ~benchmark_type bench
+
+let continuation_time_alloc_benchmark ?amplification ?intercept ?salt ?more_tags
+    ?check ~name ~cont_and_stack_sampler () =
+  continuation_benchmark
+    ?amplification
+    ?intercept
+    ?salt
+    ?more_tags
+    ?check
+    ~name
+    ~benchmark_type:Time
+    ~cont_and_stack_sampler
+    () ;
+  continuation_benchmark
+    ?intercept
+    ?salt
+    ?more_tags
+    ?check
+    ~name
+    ~benchmark_type:Alloc
+    ~cont_and_stack_sampler
+    () ;
+  let (Model.Model codegen_model) =
+    Interpreter_model.make_time_alloc_codegen_model (Cont_name name)
+  in
+  register_model_for_code_generation codegen_model
 
 (* ------------------------------------------------------------------------- *)
 (* Sampling helpers *)
