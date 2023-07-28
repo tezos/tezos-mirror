@@ -219,7 +219,8 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
     | None -> node_ctxt.genesis_info.level
     | Some lpc -> lpc.inbox_level
   in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
+  let* head = Node_context.last_processed_head_opt node_ctxt
+  and* finalized_level = Node_context.get_finalized_level node_ctxt in
   let next_head_level =
     Option.map (fun (b : Sc_rollup_block.t) -> Int32.succ b.header.level) head
   in
@@ -250,7 +251,11 @@ let missing_commitments (node_ctxt : _ Node_context.t) =
               Int32.sub next_head_level first_published_at_level
               > sc_rollup_challenge_window_int32
         in
-        let acc = if past_curfew then acc else commitment :: acc in
+        let is_finalized = commitment.inbox_level <= finalized_level in
+        (* Only publish commitments that are finalized and not past the curfew *)
+        let acc =
+          if is_finalized && not past_curfew then commitment :: acc else acc
+        in
         (* We keep the commitment and go back to the previous one. *)
         gather acc commitment.predecessor
   in
