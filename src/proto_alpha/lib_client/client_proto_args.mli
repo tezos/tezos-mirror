@@ -101,6 +101,12 @@ val tez_param :
   ('a, full) Tezos_clic.params ->
   (Tez.t -> 'a, full) Tezos_clic.params
 
+val everything_or_tez_param :
+  name:string ->
+  desc:string ->
+  ('a, full) Tezos_clic.params ->
+  (Tez.t -> 'a, full) Tezos_clic.params
+
 val non_negative_z_parameter :
   unit -> (Z.t, #Client_context.io) Tezos_clic.parameter
 

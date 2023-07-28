@@ -1933,7 +1933,9 @@ let commands_rw () =
          replace_by_fees_arg
          successor_level_arg)
       (prefix "unstake"
-      @@ tez_param ~name:"qty" ~desc:"amount to unstake from source"
+      @@ everything_or_tez_param
+           ~name:"qty"
+           ~desc:"amount to unstake from source"
       @@ prefix "for"
       @@ Public_key_hash.source_param
            ~name:"src"

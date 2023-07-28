@@ -342,6 +342,18 @@ let tez_parameter param =
       | Some tez -> return tez
       | None -> tzfail (Bad_tez_arg (param, s)))
 
+let everything_tez_parameter param =
+  let open Lwt_result_syntax in
+  Tezos_clic.parameter (fun _ s ->
+      match s with
+      | "everything" -> return Tez.max_mutez
+      | _ -> tzfail (Bad_tez_arg (param, s)))
+
+let everything_or_tez_parameter param =
+  Tezos_clic.compose_parameters
+    (tez_parameter param)
+    (everything_tez_parameter param)
+
 let tez_arg ~default ~parameter ~doc =
   Tezos_clic.default_arg
     ~long:parameter
@@ -362,6 +374,13 @@ let tez_param ~name ~desc next =
     ~name
     ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)
+    next
+
+let everything_or_tez_param ~name ~desc next =
+  Tezos_clic.param
+    ~name
+    ~desc:(desc ^ " in \xEA\x9C\xA9 (or everything)\n" ^ tez_format)
+    (everything_or_tez_parameter name)
     next
 
 let non_negative_z_parser (cctxt : #Client_context.io) s =
@@ -714,8 +733,7 @@ let fixed_point_parameter =
   in
   let parse ~decimals p =
     if decimals >= 2 && String.length p > 0 && p.[String.length p - 1] = '%'
-    then
-      parse ~decimals:(decimals - 2) (String.sub p 0 (String.length p - 1))
+    then parse ~decimals:(decimals - 2) (String.sub p 0 (String.length p - 1))
     else parse ~decimals p
   in
   fun ~decimals ->
