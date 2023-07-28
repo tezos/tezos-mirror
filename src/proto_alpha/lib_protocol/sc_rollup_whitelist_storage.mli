@@ -37,3 +37,13 @@ val init :
   Sc_rollup_repr.t ->
   whitelist:Sc_rollup_whitelist_repr.t ->
   (Raw_context.t * int) tzresult Lwt.t
+
+(** [check_access_to_private_rollup context rollup staker_pkh] returns an error
+    if [staker_pkh] is not in the whitelist of [rollup] if the [rollup] is marked
+    as private. Returns the gas consumed by performing the call otherwise.
+    Assumes the private rollup feature is activated. *)
+val check_access_to_private_rollup :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Signature.public_key_hash ->
+  Raw_context.t tzresult Lwt.t

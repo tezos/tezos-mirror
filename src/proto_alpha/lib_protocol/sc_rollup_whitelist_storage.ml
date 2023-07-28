@@ -40,3 +40,18 @@ let init ctxt rollup_address ~whitelist =
       return (ctxt, size + size_e))
     (ctxt, 0)
     whitelist
+
+let check_access_to_private_rollup ctxt rollup staker =
+  let open Lwt_result_syntax in
+  let* ctxt, rollup_is_private = is_private ctxt rollup in
+  if rollup_is_private then
+    let* ctxt, staker_in_whitelist =
+      Storage.Sc_rollup.Whitelist.mem (ctxt, rollup) staker
+    in
+    let* () =
+      fail_when
+        (not staker_in_whitelist)
+        Sc_rollup_errors.Sc_rollup_staker_not_in_whitelist
+    in
+    return ctxt
+  else return ctxt

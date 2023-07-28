@@ -557,6 +557,14 @@ let refine_stake ctxt rollup commitment ~staker_index ~lcc ~lcc_inbox_level =
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_result_syntax in
+  let* ctxt =
+    if Constants_storage.sc_rollup_private_enable ctxt then
+      Sc_rollup_whitelist_storage.check_access_to_private_rollup
+        ctxt
+        rollup
+        staker
+    else return ctxt
+  in
   let* lcc, lcc_inbox_level, ctxt =
     Commitment_storage.last_cemented_commitment_hash_with_level ctxt rollup
   in
