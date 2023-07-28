@@ -3612,7 +3612,7 @@ module Registration_section = struct
       (*
         KNil
        *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KNil
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
