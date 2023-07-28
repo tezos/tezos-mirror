@@ -557,18 +557,75 @@ let save_code_list_as_a_module save_to code_list =
   stdout_or_file save_to (fun ppf ->
       Format.fprintf ppf "%a@." Codegen.pp_module result)
 
+let generate_code codegen_options generated_code =
+  let generated =
+    List.fold_left
+      (fun acc (destination, code) ->
+        String.Map.update
+          destination
+          (function None -> Some [code] | Some x -> Some (code :: x))
+          acc)
+      String.Map.empty
+      generated_code
+  in
+  let save_to destination =
+    Option.filter_map
+      (fun save_to ->
+        let destination =
+          Filename.remove_extension @@ Filename.basename destination
+        in
+        let dirname =
+          Filename.concat (Filename.dirname save_to) "generated_code"
+        in
+        let basename = Filename.remove_extension @@ Filename.basename save_to in
+        let basename = String.remove_prefix ~prefix:"auto_build" basename in
+        let basename_empty =
+          Option.fold ~none:true ~some:(fun x -> String.length x = 0) basename
+        in
+        let result =
+          if basename_empty then Some (destination ^ ".ml")
+          else
+            Option.map
+              (fun base -> Format.sprintf "%s_%s.ml" destination base)
+              basename
+        in
+        Option.map (Filename.concat dirname) result)
+      codegen_options.Cmdline.save_to
+  in
+  String.Map.iter
+    (fun k v -> save_code_list_as_a_module (save_to k) v)
+    generated
+
 let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
+  let exclusions =
+    Registration.all_models ()
+    |> List.filter_map (fun (name, Registration.{from; _}) ->
+           List.find_map
+             (fun Registration.{bench_name; _} ->
+               let bench : Benchmark.t option =
+                 Registration.find_benchmark bench_name
+               in
+               let open Option_syntax in
+               let* (module B : Benchmark.S) = bench in
+               match B.purpose with
+               | Benchmark.Generate_code _ -> None
+               | _ -> Some (Namespace.to_string name))
+             from)
+    |> String.Set.of_list
+  in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
-  save_code_list_as_a_module codegen_options.Cmdline.save_to
-  @@ generate_code_for_models
-       sol
-       models
-       codegen_options (* no support of exclusions for this command *)
-       ~exclusions:String.Set.empty
+  let generated =
+    generate_code_for_models
+      sol
+      models
+      codegen_options (* no support of exclusions for this command *)
+      ~exclusions
+  in
+  generate_code codegen_options generated
 
 let codegen_for_a_solution solution codegen_options ~exclusions =
   let fvs_of_codegen_model model =
@@ -584,7 +641,6 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
       (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
-
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
     List.filter (fun (_model_name, {Registration.model; _}) ->
@@ -594,11 +650,13 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
   generate_code_for_models solution codegen_models codegen_options ~exclusions
 
 let save_codegen_for_solutions solutions codegen_options ~exclusions =
-  save_code_list_as_a_module codegen_options.Cmdline.save_to
-  @@ List.concat_map
-       (fun solution ->
-         codegen_for_a_solution solution codegen_options ~exclusions)
-       solutions
+  let generated =
+    List.concat_map
+      (fun solution ->
+        codegen_for_a_solution solution codegen_options ~exclusions)
+      solutions
+  in
+  generate_code codegen_options generated
 
 let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
   let solutions = List.map Codegen.load_solution solution_fns in
@@ -949,14 +1007,11 @@ module Auto_build = struct
       [(solution_fn, solution)] ;
     solution
 
-  let codegen mkfilename solution =
+  let codegen mkfilename solution ~exclusions =
     let codegen_options =
       Cmdline.{transform = None; save_to = Some (mkfilename "_non_fp.ml")}
     in
-    save_codegen_for_solutions
-      [solution]
-      codegen_options
-      ~exclusions:String.Set.empty ;
+    save_codegen_for_solutions [solution] codegen_options ~exclusions ;
     let codegen_options =
       Cmdline.
         {
@@ -969,10 +1024,7 @@ module Auto_build = struct
           save_to = Some (mkfilename ".ml");
         }
     in
-    save_codegen_for_solutions
-      [solution]
-      codegen_options
-      ~exclusions:String.Set.empty
+    save_codegen_for_solutions [solution] codegen_options ~exclusions
 
   let cmd targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
@@ -988,7 +1040,10 @@ module Auto_build = struct
           exitf 1 "Need to specify --out-dir")
     in
     (* No non-lwt version available... *)
-    Lwt_main.run (Lwt_utils_unix.create_dir outdir) ;
+    Lwt_main.run
+      (let open Lwt_syntax in
+      let* () = Lwt_utils_unix.create_dir outdir in
+      Lwt_utils_unix.create_dir (Filename.concat outdir "generated_code")) ;
 
     let state_tbl = init_state_tbl () in
 
@@ -1046,8 +1101,24 @@ module Auto_build = struct
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
+    let exclusions =
+      Registration.all_models ()
+      |> List.filter_map (fun (name, Registration.{from; _}) ->
+             List.find_map
+               (fun Registration.{bench_name; _} ->
+                 let bench : Benchmark.t option =
+                   Registration.find_benchmark bench_name
+                 in
+                 let open Option_syntax in
+                 let* (module B : Benchmark.S) = bench in
+                 match B.purpose with
+                 | Benchmark.Generate_code _ -> None
+                 | _ -> Some (Namespace.to_string name))
+               from)
+      |> String.Set.of_list
+    in
     (* Codegen *)
-    codegen mkfilename solution
+    codegen mkfilename solution ~exclusions
 end
 
 (* -------------------------------------------------------------------------- *)

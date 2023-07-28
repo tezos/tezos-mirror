@@ -414,12 +414,30 @@ let codegen (Model.Model model) (sol : solution)
 
 let codegen_models models sol transform ~exclusions =
   List.filter_map
-    (fun (model_name, {Registration.model; _}) ->
+    (fun (model_name, {Registration.model; from}) ->
       (* Exclusion is done by the function name *)
-      let fun_name = function_name model_name in
-      if String.Set.mem fun_name exclusions then None
-      else Some (codegen model sol transform model_name))
+      let benchmarks =
+        List.filter_map
+          (fun Registration.{bench_name; _} ->
+            let open Option_syntax in
+            let* (module B : Benchmark.S) =
+              Registration.find_benchmark bench_name
+            in
+            let destination =
+              match B.purpose with Generate_code d -> Some d | _ -> None
+            in
+            destination)
+          from
+      in
+      if
+        String.Set.mem (Namespace.to_string model_name) exclusions
+        || List.is_empty benchmarks
+      then None
+      else
+        let code = codegen model sol transform model_name in
+        Some (List.map (fun destination -> (destination, code)) benchmarks))
     models
+  |> List.flatten
 
 let%expect_test "basic_printing" =
   let open Codegen in
