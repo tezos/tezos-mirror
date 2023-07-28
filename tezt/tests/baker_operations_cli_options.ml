@@ -328,11 +328,11 @@ let test_bake_singleton_operations =
     (balance1 = Tez.(balance0 - amount - fee))
       Tez.typ
       ~__LOC__
-      ~error_msg:
-        "Expected the new balance balance difference (%L) to be equal (%R)") ;
+      ~error_msg:"Expected the new balance difference (%L) to be equal (%R)") ;
   unit
 
-(* Test adding an external operations source (file) {}to a baker daemon *)
+(* Test adding an external operations source (file) to a baker
+   daemon *)
 let test_baker_external_operations =
   Protocol.register_test
     ~__FILE__
@@ -341,10 +341,15 @@ let test_baker_external_operations =
   @@ fun protocol ->
   Log.info "Init" ;
   let node_args = Node.[Synchronisation_threshold 0] in
+  (* We define minimal_block_delay and delay_increment_per_round to 1
+     as it is the lowest value that is accepted by the protocol that
+     minimizes the test duration. *)
+  let minimal_block_delay = 1 in
+  let delay_increment_per_round = 1 in
   let parameters =
     [
-      (["minimal_block_delay"], `String_of_int 1);
-      (["delay_increment_per_round"], `String_of_int 1);
+      (["minimal_block_delay"], `String_of_int minimal_block_delay);
+      (["delay_increment_per_round"], `String_of_int delay_increment_per_round);
     ]
   in
   let* parameter_file =
@@ -384,7 +389,7 @@ let test_baker_external_operations =
     (List.length pending_ops = 0)
       int
       ~__LOC__
-      ~error_msg:"Expected exactly one pending ops, got %L") ;
+      ~error_msg:"Expected exactly zero pending ops, got %L") ;
   let transfer_value = Tez.of_int 2 in
   let* () =
     Client.transfer
@@ -402,11 +407,22 @@ let test_baker_external_operations =
   (* Restart the node and add a baker daemon *)
   Log.info "Start baker" ;
   let* () = Node.run node node_args in
+  (* The baker may propose at level 4 or 5 depending on whether the
+     round 0 at level 4 has ended or not. We make sure that round 0
+     has ended by waiting the duration of round 0 (and a bit more) --
+     that is minimal_block_delay + delay_increment_per_round (2
+     second). In this way we are sure the operation will be in the
+     block (re-proposed) at level 4. *)
+  let* () =
+    Lwt_unix.sleep
+      (float_of_int (minimal_block_delay + delay_increment_per_round))
+  in
   let* _baker = Baker.init ~protocol ~operations_pool node client in
   (* Wait until we have seen enough blocks. This should not take much time. *)
   Log.info "Wait until high enough level" ;
-  let* (_ : int) = Node.wait_for_level node (level * 2) in
-  (* Check that block exactly contains the operations that we put into  our operations file *)
+  let* (_ : int) = Node.wait_for_level node (level + 1) in
+  (* Check that block exactly contains the operations that we put into
+     our operations file *)
   Log.info "Check block baked" ;
   let* block =
     RPC.Client.call client
