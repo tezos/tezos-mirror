@@ -691,32 +691,39 @@ let display_names_flag =
     ~doc:"Print names of scripts passed to this command"
     ()
 
-let fixed_point_parameter ~decimals =
-  if decimals < 0 then
-    raise (Invalid_argument "fixed_point_parameter: negative decimals")
-  else
-    let rec remove_trailing_zeroes ~right i =
-      if i < decimals then Some (String.sub right 0 decimals)
-      else if right.[i] <> '0' then None
-      else (remove_trailing_zeroes [@ocaml.tailcall]) ~right (i - 1)
+let fixed_point_parameter =
+  let rec remove_trailing_zeroes ~decimals ~right i =
+    if i < decimals then Some (String.sub right 0 decimals)
+    else if right.[i] <> '0' then None
+    else (remove_trailing_zeroes [@ocaml.tailcall]) ~decimals ~right (i - 1)
+  in
+  let parse ~decimals p =
+    let open Option_syntax in
+    let* left, right =
+      match String.split_on_char '.' p with
+      | [left; right] -> Some (left, right)
+      | [left] -> Some (left, "")
+      | _ -> None
     in
-    let parse ~left ~right =
-      let open Option_syntax in
-      let* right =
-        if String.length right > decimals then
-          remove_trailing_zeroes ~right (String.length right - 1)
-        else Some (right ^ String.make (decimals - String.length right) '0')
-      in
-      int_of_string_opt (left ^ right)
+    let* right =
+      if String.length right > decimals then
+        remove_trailing_zeroes ~decimals ~right (String.length right - 1)
+      else Some (right ^ String.make (decimals - String.length right) '0')
     in
-    fun ~name ->
+    int_of_string_opt (left ^ right)
+  in
+  let parse ~decimals p =
+    if decimals >= 2 && String.length p > 0 && p.[String.length p - 1] = '%'
+    then
+      parse ~decimals:(decimals - 2) (String.sub p 0 (String.length p - 1))
+    else parse ~decimals p
+  in
+  fun ~decimals ->
+    if decimals < 0 then
+      raise (Invalid_argument "fixed_point_parameter: negative decimals")
+    else fun ~name ->
       Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
-          match
-            match String.split_on_char '.' p with
-            | [left; right] -> parse ~left ~right
-            | [left] -> parse ~left ~right:""
-            | _ -> None
-          with
+          match parse ~decimals p with
           | Some res -> return res
           | None -> cctxt#error "Cannot read %s parameter" name)
 
