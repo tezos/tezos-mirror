@@ -927,6 +927,34 @@ let test_l2_deploy_erc20 =
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
+let ensure_block_integrity ~block_result evm_setup =
+  let* block_json =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_setup.evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters =
+            `A
+              [`String (Int32.to_string block_result.Block.number); `Bool false];
+        })
+  in
+  let block = block_json |> Evm_proxy_server.extract_result |> Block.of_json in
+  assert (block = block_result) ;
+  unit
+
+let latest_block evm_setup =
+  let* latest_block =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_setup.evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters = `A [`String "latest"; `Bool false];
+        })
+  in
+  return @@ (latest_block |> Evm_proxy_server.extract_result |> Block.of_json)
+
 type transfer_result = {
   sender_balance_before : Wei.t;
   sender_balance_after : Wei.t;
