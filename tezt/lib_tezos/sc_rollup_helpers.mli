@@ -98,6 +98,7 @@ val setup_l1 :
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?timeout:int ->
+  ?whitelist_enable:bool ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
@@ -106,6 +107,7 @@ val setup_l1 :
 val originate_sc_rollup :
   ?hooks:Process_hooks.t ->
   ?burn_cap:Tez.t ->
+  ?whitelist:string list ->
   ?alias:string ->
   ?src:string ->
   kind:string ->

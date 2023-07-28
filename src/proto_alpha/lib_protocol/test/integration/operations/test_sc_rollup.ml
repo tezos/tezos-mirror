@@ -3506,6 +3506,45 @@ let test_private_rollup_is_deactivated_by_default () =
     b
     "Invalid whitelist: must be None when the feature is deactivated"
 
+let test_private_rollup_publish_succeeds_with_whitelisted_staker () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 ~sc_rollup_private_enable:true () in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let staker_pkh = Account.pkh_of_contract_exn contract in
+  let* operation, rollup =
+    Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[staker_pkh]
+  in
+  let* b = Block.bake ~operation b in
+  let* commitment = dummy_commitment (B b) rollup in
+  let* operation = Op.sc_rollup_publish (B b) contract rollup commitment in
+  let*! _b = Block.bake ~operation b in
+  return_unit
+
+let test_private_rollup_publish_fails_with_non_whitelisted_staker () =
+  let open Lwt_result_syntax in
+  let* b, (contract1, contract2) =
+    Context.init2 ~sc_rollup_private_enable:true ()
+  in
+  let kind = Sc_rollup.Kind.Example_arith in
+  let* operation, rollup =
+    Sc_rollup_helpers.origination_op
+      (B b)
+      contract1
+      kind
+      ~whitelist:[Context.Contract.pkh contract2]
+  in
+  let* b = Block.bake ~operation b in
+  let* commitment = dummy_commitment (B b) rollup in
+  let* operation = Op.sc_rollup_publish (B b) contract1 rollup commitment in
+  let*! b = Block.bake ~operation b in
+  let* () =
+    Assert.proto_error
+      ~loc:__LOC__
+      b
+      (( = ) Sc_rollup_errors.Sc_rollup_staker_not_in_whitelist)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -3655,6 +3694,14 @@ let tests =
       "Origination fails when whitelist is set and the feature is deactivated"
       `Quick
       test_private_rollup_is_deactivated_by_default;
+    Tztest.tztest
+      "Submit a commitment with a whitelisted staker"
+      `Quick
+      test_private_rollup_publish_succeeds_with_whitelisted_staker;
+    Tztest.tztest
+      "Submit a commitment with a non-whitelisted staker"
+      `Quick
+      test_private_rollup_publish_fails_with_non_whitelisted_staker;
   ]
 
 let () =

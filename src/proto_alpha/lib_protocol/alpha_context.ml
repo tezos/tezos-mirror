@@ -58,6 +58,7 @@ module Sc_rollup = struct
   include Sc_rollup_repr
 
   module Whitelist = struct
+    include Sc_rollup_whitelist_storage
     include Sc_rollup_whitelist_repr
   end
 

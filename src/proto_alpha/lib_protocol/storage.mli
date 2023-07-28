@@ -998,6 +998,15 @@ module Sc_rollup : sig
       with type t = Raw_context.t * Sc_rollup_repr.t
        and type key = int32
        and type value = Raw_level_repr.t * Bitset.t
+
+  (** A carbonated storage for stakers (identified by their public key hashes)
+      that are able to stake on commitments. If the storage is
+      empty then the rollup is public (anyone can publish commitments for the rollup),
+      otherwise it is private (only the members of the whitelist can publish commitments). *)
+  module Whitelist :
+    Carbonated_data_set_storage
+      with type t := Raw_context.t * Sc_rollup_repr.t
+       and type elt = Signature.Public_key_hash.t
 end
 
 module Dal : sig

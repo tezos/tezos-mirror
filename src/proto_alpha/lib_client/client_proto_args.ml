@@ -777,7 +777,22 @@ module Sc_rollup_params = struct
             | Some nb_of_ticks -> return nb_of_ticks)
         | None ->
             cctxt#error "'%s' is not valid, should be a int64 value" nb_of_ticks)
+
+  let whitelist =
+    json_encoded_parameter
+      ~name:"Whitelist for private rollups"
+      Sc_rollup.Whitelist.encoding
 end
+
+let whitelist_arg =
+  Tezos_clic.arg
+    ~long:"whitelist"
+    ~short:'W'
+    ~placeholder:"whitelist"
+    ~doc:
+      "Whitelist for private rollups. Members of the whitelist are stakers \
+       that are allowed to publish commitments."
+    Sc_rollup_params.whitelist
 
 module Zk_rollup_params = struct
   let address_parameter =

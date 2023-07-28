@@ -2538,7 +2538,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart rollup."
-      (args8
+      (args9
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2546,7 +2546,8 @@ let commands_rw () =
          fee_parameter_args
          storage_limit_arg
          counter_arg
-         (Client_keys.force_switch ()))
+         (Client_keys.force_switch ())
+         whitelist_arg)
       (prefixes ["originate"; "smart"; "rollup"]
       @@ Smart_rollup_alias.Address.fresh_alias_param
            ~name:"alias"
@@ -2580,7 +2581,8 @@ let commands_rw () =
              fee_parameter,
              storage_limit,
              counter,
-             force )
+             force,
+             whitelist )
            alias
            source
            kind
@@ -2612,6 +2614,7 @@ let commands_rw () =
             ~kind
             ~boot_sector
             ~parameters_ty
+            ?whitelist
             ()
         in
         match res with

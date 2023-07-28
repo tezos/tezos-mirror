@@ -2115,6 +2115,14 @@ module Sc_rollup = struct
         let name = ["applied_outbox_messages"]
       end)
       (Bitset_and_level)
+
+  module Whitelist =
+    Make_carbonated_data_set_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["whitelist"]
+         end))
+         (Public_key_hash_index)
 end
 
 module Dal = struct

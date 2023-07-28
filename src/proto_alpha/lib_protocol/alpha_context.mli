@@ -2788,6 +2788,9 @@ module Sc_rollup : sig
   module Whitelist : sig
     type t = public_key_hash list
 
+    val init :
+      context -> Address.t -> whitelist:t -> (context * int) tzresult Lwt.t
+
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit

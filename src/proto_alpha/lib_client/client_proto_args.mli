@@ -221,7 +221,11 @@ module Sc_rollup_params : sig
 
   val number_of_ticks_parameter :
     (Sc_rollup.Number_of_ticks.t, full) Tezos_clic.parameter
+
+  val whitelist : (Sc_rollup.Whitelist.t, full) Tezos_clic.parameter
 end
+
+val whitelist_arg : (Sc_rollup.Whitelist.t option, full) Tezos_clic.arg
 
 module Zk_rollup_params : sig
   val address_parameter : (Zk_rollup.t, full) Tezos_clic.parameter
