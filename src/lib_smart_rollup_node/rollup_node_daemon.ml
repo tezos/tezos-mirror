@@ -365,7 +365,28 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         | Error err ->
             Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
       (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
-
+    let* () =
+      (* If the rollup is private and node can publish commitment check that the
+         operator is in the whitelist. *)
+      let operator =
+        Node_context.get_operator node_ctxt Configuration.Operating
+      in
+      let* whitelist =
+        Plugin.Layer1_helpers.find_whitelist
+          node_ctxt.cctxt
+          configuration.sc_rollup_address
+      in
+      match (operator, whitelist) with
+      | Some operator, Some whitelist ->
+          (* The operator's role is to publish commitments and a whitelist exists:
+             return an error if the operator is not in the whitelist. *)
+          fail_unless
+            (List.mem ~equal:Signature.Public_key_hash.equal operator whitelist)
+            Rollup_node_errors.Operator_not_in_whitelist
+      | _ ->
+          (* The rollup is public or the node is not publishing commmitment. *)
+          return_unit
+    in
     let*! () =
       Event.node_is_ready
         ~rpc_addr:configuration.rpc_addr
@@ -413,7 +434,10 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
   in
   protect start ~on_error:(function
       | Rollup_node_errors.(
-          Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _)
+          ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
+          | Operator_not_in_whitelist
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5442
+               Smart rollup node: "bailout" mode *) ))
         :: _ as e ->
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->

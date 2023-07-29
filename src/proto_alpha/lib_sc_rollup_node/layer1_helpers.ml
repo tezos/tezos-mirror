@@ -224,3 +224,13 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
     (function
       | Found_boot_sector boot_sector -> return boot_sector
       | _ -> missing_boot_sector ())
+
+let find_whitelist cctxt rollup_address =
+  Plugin.RPC.Sc_rollup.whitelist
+    (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
+    ( cctxt#chain,
+      `Head 0
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6152
+         Rollup node: investigate use cctxt#block instead of `Head 0 in RPC calls*)
+    )
+    rollup_address
