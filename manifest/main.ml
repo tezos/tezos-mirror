@@ -527,7 +527,11 @@ let pp_octez_libs_index fmt registered_octez_libs =
     | Module registered ->
         Format.fprintf pp "- {{!module-%s}%s}" registered registered
     | Page registered ->
-        Format.fprintf pp "- {{!page-%s}%s}" registered registered
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}"
+          registered
+          (String.capitalize_ascii registered)
   in
   Format.fprintf
     fmt
@@ -543,7 +547,9 @@ let pp_octez_libs_index fmt registered_octez_libs =
          | Page n1, Module n2
          | Module n1, Page n2
          | Module n1, Module n2 ->
-             String.compare n1 n2)
+             String.compare
+               (String.capitalize_ascii n1)
+               (String.capitalize_ascii n2))
        registered_octez_libs
 
 let octez_test_helpers =
