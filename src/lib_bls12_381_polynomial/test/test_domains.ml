@@ -24,8 +24,10 @@
 (*****************************************************************************)
 
 module Fr = Bls12_381.Fr
-module Fr_generation = Octez_bls12_381_polynomial.Fr_carray
-module Domain = Octez_bls12_381_polynomial.Domain.Domain_unsafe
+
+module Fr_carray = Octez_bls12_381_polynomial.Internal_for_tests.Fr_carray
+
+module Domain = Octez_bls12_381_polynomial.Internal_for_tests.Domain_unsafe
 
 let factors_naive n =
   let rec factors_aux n factor result =
@@ -65,7 +67,7 @@ let primitive_nth_root_of_unity n factorization_n =
       factorization_n
 
 let test_generator () =
-  let generator = Fr_generation.generator in
+  let generator = Fr_carray.generator in
   let factorization_n =
     (* output of {[ Fr_generation.factors_naive Z.(Bls12_381.Fr.order - one) |> List.map (fun (i,j) -> Z.to_string i, j) ]} *)
     [
@@ -99,21 +101,21 @@ let test_generator () =
 let test_build_domain () =
   let n = 19 in
   let domain_c = Domain.build n in
-  let expected_domain = Fr_generation.build_domain n in
+  let expected_domain = Fr_carray.build_domain n in
   let domain = Domain.to_array domain_c in
   assert (Array.for_all2 Fr.eq expected_domain domain)
 
 let test_build_domain_power_of_two () =
   let log = 5 in
   let domain_c = Domain.build_power_of_two log in
-  let expected_domain = Fr_generation.build_domain_power_of_two ~log in
+  let expected_domain = Fr_carray.build_domain_power_of_two ~log in
   let domain = Domain.to_array domain_c in
   assert (Array.for_all2 Fr.eq expected_domain domain)
 
 let test_domain_to_array () =
   let domain = Domain.build_power_of_two 4 in
   let domain_caml = Domain.to_array domain in
-  let domain_expected = Fr_generation.build_domain_power_of_two ~log:4 in
+  let domain_expected = Fr_carray.build_domain_power_of_two ~log:4 in
   assert (Array.for_all2 Fr.eq domain_caml domain_expected)
 
 let tests =

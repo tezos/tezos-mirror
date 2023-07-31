@@ -602,7 +602,7 @@ module type Polynomial_sig = sig
 end
 
 module type Polynomial_unsafe_sig = sig
-  include Polynomial_sig
+  include Polynomial_sig with type t = Fr_carray.t
 
   (** [to_carray p] converts [p] from type {!type:t} to type {!type:Fr_carray.t}
 
@@ -625,6 +625,8 @@ module type Polynomial_unsafe_sig = sig
 
   (** [length p] returns the length of the underlying {!type:Fr_carray.t}. *)
   val length : t -> int
+
+  val to_sparse_coefficients : t -> (scalar * int) list
 end
 
 module Polynomial_unsafe :

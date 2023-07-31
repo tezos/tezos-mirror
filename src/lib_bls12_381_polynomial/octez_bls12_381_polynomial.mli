@@ -25,6 +25,39 @@
 
 type scalar = Bls12_381.Fr.t
 
+module Internal_for_tests : sig
+  module Polynomial_unsafe :
+    Polynomial.Polynomial_unsafe_sig with type scalar = scalar
+
+  module Fr_carray : sig
+    include
+      Carray.Carray_sig with type elt = scalar and type t = Polynomial_unsafe.t
+
+    val primitive_root_of_unity : int -> scalar
+
+    val powers : int -> scalar -> scalar array
+
+    val generator : scalar
+
+    val build_domain : int -> scalar array
+
+    val build_domain_power_of_two : log:int -> scalar array
+  end
+
+  module Domain_unsafe : Domain.Domain_unsafe_sig with type scalar = scalar
+
+  module Evaluations_unsafe :
+    Evaluations.Evaluations_unsafe_sig
+      with type scalar = scalar
+       and type domain = Domain_unsafe.t
+       and type polynomial = Polynomial_unsafe.t
+
+  module Srs_unsafe :
+    Srs.S_unsafe
+      with type elt = Bls12_381.G1.t
+       and type polynomial = Polynomial_unsafe.t
+end
+
 module Domain : Domain.Domain_sig with type scalar = scalar
 
 module Polynomial : Polynomial.Polynomial_sig with type scalar = scalar

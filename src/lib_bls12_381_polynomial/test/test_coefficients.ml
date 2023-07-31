@@ -29,7 +29,7 @@ let rec non_null_int bound =
   if r = 0 then non_null_int bound else r
 
 module Scalar = Bls12_381.Fr
-module Domain = Octez_bls12_381_polynomial.Domain.Domain_unsafe
+module Domain = Octez_bls12_381_polynomial.Domain
 module Poly = Octez_bls12_381_polynomial.Polynomial
 module Evaluations = Octez_bls12_381_polynomial.Evaluations
 
@@ -52,7 +52,8 @@ let test_equal () =
   assert (Poly.(equal zero (make [|0; 0|])))
 
 let test_copy () =
-  let module C = Poly.Polynomial_unsafe in
+  let module C = Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
+  in
   let make a = C.of_dense (Array.map Scalar.of_string a) in
   let p = make [|"0"; "1"; "2"; "0"|] in
   assert (C.equal (C.copy p) p) ;

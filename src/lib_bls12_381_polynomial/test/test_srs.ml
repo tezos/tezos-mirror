@@ -25,13 +25,10 @@
 
 module Fr = Bls12_381.Fr
 module G1 = Bls12_381.G1
-module Poly = Octez_bls12_381_polynomial.Polynomial
 
-module Srs :
-  Octez_bls12_381_polynomial.Srs.S_unsafe
-    with type elt = Bls12_381.G1.t
-     and type polynomial = Poly.t =
-  Octez_bls12_381_polynomial.Srs.Make (Octez_bls12_381_polynomial.Srs.Elt_g1)
+module Poly = Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
+
+module Srs = Octez_bls12_381_polynomial.Internal_for_tests.Srs_unsafe
 
 let test_get () =
   let srs = Srs.generate_insecure 1 Fr.one in
