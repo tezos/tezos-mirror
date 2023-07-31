@@ -372,6 +372,8 @@ module type COMMON = sig
   (** [equal a b] computes the structural equality between [a] and [b]. *)
   val equal : 'a repr -> 'a repr -> bool repr t
 
+  val scalar_of_limbs : nb_bits:int -> scalar list repr -> scalar repr t
+
   (** Returns a list of Boolean variables representing the little endian
       bit decomposition of the given scalar (with the least significant bit
       on the head). *)

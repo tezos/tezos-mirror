@@ -89,9 +89,7 @@ module type LIB = sig
 
     (* [scalar_of_bytes bs] returns the scalar represented by the binary
        sequence [bs].
-       Specifically, it evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's
-       method:
-       P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
+       Specifically, it evaluates P(X) = \sum_i bᵢ Xⁱ at 2. *)
     val scalar_of_bytes : bool list repr -> scalar repr t
 
     (** [is_eq_const a k] returns whether [a] is equal to [k]. *)
@@ -583,14 +581,9 @@ module Lib (C : COMMON) = struct
 
     let mul_by_constant s x = Num.add_constant ~ql:s S.zero x
 
-    (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's method:
-       P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
     let scalar_of_bytes b =
-      let* zero = Num.zero in
-      foldM
-        (fun acc b -> add acc (scalar_of_bool b) ~ql:S.(one + one) ~qr:S.one)
-        zero
-        (List.rev (of_list b))
+      let sb = List.map scalar_of_bool (of_list b) in
+      scalar_of_limbs ~nb_bits:1 (to_list sb)
 
     let assert_eq_const l s = Num.assert_custom ~ql:S.mone ~qc:s l l l
 
@@ -856,15 +849,7 @@ module Lib (C : COMMON) = struct
       in
       ret @@ to_list (List.concat lb)
 
-    (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2^nb_bits with Horner's method:
-       P(2^nb_bits) = b₀ + 2^nb_bits (b₁+ 2^nb_bits (b₂ + 2^nb_bits (…))). *)
-    let to_scalar b =
-      let pow2_nb_bits = 1 lsl nb_bits |> S.of_int in
-      let* zero = Num.zero in
-      foldM
-        (fun acc b -> Num.add acc b ~ql:pow2_nb_bits ~qr:S.one)
-        zero
-        (List.rev (of_list b))
+    let to_scalar b = scalar_of_limbs ~nb_bits b
 
     let of_scalar ~total_nb_bits b = limbs_of_scalar ~total_nb_bits ~nb_bits b
 
