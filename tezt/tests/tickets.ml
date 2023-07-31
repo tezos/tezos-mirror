@@ -871,13 +871,38 @@ let setup_sc_enabled_node protocol ~parameters_ty =
   let* () = Client.bake_for_and_wait tezos_client in
   return (tezos_node, tezos_client, sc_rollup)
 
+let assert_sc_rollup_ticket_balance client ~sc_rollup ~ticketer ~content_type
+    ~content ~expected =
+  let data : RPC_core.data =
+    Data
+      (Ezjsonm.value_from_string
+      @@ sf
+           {|{"ticketer": "%s", "content_type": {"prim": "%s"}, "content": {"string": "%s"}}|}
+           ticketer
+           content_type
+           content)
+  in
+  let* actual =
+    RPC.Client.call client
+    @@ RPC.post_chain_block_context_smart_rollups_smart_rollup_ticket_balance
+         ~sc_rollup
+         ~data
+         ()
+  in
+  return
+  @@ Check.(
+       (actual = expected)
+         int
+         ~__LOC__
+         ~error_msg:"expected ticket amount %R, got %L")
+
 let test_send_tickets_to_sc_rollup =
   Protocol.register_regression_test
     ~__FILE__
     ~title:
       "Minting then sending tickets to smart-contract rollup should succeed \
        with appropriate ticket updates field in receipt."
-    ~tags:["client"; "michelson"]
+    ~tags:["client"; "michelson"; "sc_rollup"]
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* _node, client, sc_rollup =
@@ -905,6 +930,57 @@ let test_send_tickets_to_sc_rollup =
       client
   in
   let* () = Client.bake_for_and_wait client in
+  (* The rollup should have 1 "Ticket" ticket and 1 "Ticket2" ticket. *)
+  let* () =
+    assert_sc_rollup_ticket_balance
+      client
+      ~sc_rollup
+      ~ticketer
+      ~content_type:"string"
+      ~content:"Ticket"
+      ~expected:1
+  in
+  let* () =
+    assert_sc_rollup_ticket_balance
+      client
+      ~sc_rollup
+      ~ticketer
+      ~content_type:"string"
+      ~content:"Ticket2"
+      ~expected:1
+  in
+  (* The rollup only received tickets with:
+     - ticketer: [ticketer]
+     - content_type: string
+     - content: "Ticket" or "Ticket2"
+     Hence it should return 0 for any other kind of tickets. *)
+  let* () =
+    assert_sc_rollup_ticket_balance
+      client
+      ~sc_rollup
+      ~ticketer
+      ~content_type:"string"
+      ~content:"foobar"
+      ~expected:0
+  in
+  let* () =
+    assert_sc_rollup_ticket_balance
+      client
+      ~sc_rollup
+      ~ticketer
+      ~content_type:"int"
+      ~content:"Ticket"
+      ~expected:0
+  in
+  let* () =
+    assert_sc_rollup_ticket_balance
+      client
+      ~sc_rollup
+      ~ticketer:Constant.bootstrap2.public_key_hash
+      ~content_type:"string"
+      ~content:"Ticket"
+      ~expected:0
+  in
   unit
 
 let test_send_tickets_from_storage_to_sc_rollup =
@@ -913,7 +989,7 @@ let test_send_tickets_from_storage_to_sc_rollup =
     ~title:
       "Sending tickets from storage to smart-contract rollup should succeed \
        with appropriate ticket updates field in receipt."
-    ~tags:["client"; "michelson"]
+    ~tags:["client"; "michelson"; "sc_rollup"]
     ~supports:(Protocol.From_protocol 16)
   @@ fun protocol ->
   let* _node, client, sc_rollup =

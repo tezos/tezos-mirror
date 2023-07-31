@@ -923,6 +923,15 @@ val get_chain_block_context_smart_rollups_smart_rollup_commitment :
 val get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 
+(** RPC: [POST: chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/ticket_balance] *)
+val post_chain_block_context_smart_rollups_smart_rollup_ticket_balance :
+  ?chain:string ->
+  ?block:string ->
+  sc_rollup:string ->
+  data:data ->
+  unit ->
+  int t
+
 (** {2 Delegates RPC module } *)
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates]
