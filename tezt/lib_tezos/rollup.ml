@@ -42,6 +42,7 @@ module Dal = struct
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
 
     let from_protocol_parameters json =
+      let json = JSON.(json |-> "dal_parametric") in
       let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
       let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
       let slot_size = JSON.(json |-> "slot_size" |> as_int) in
@@ -67,7 +68,6 @@ module Dal = struct
     let from_client client =
       let* json =
         RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
-        |> Lwt.map (fun json -> JSON.(json |-> "dal_parametric"))
       in
       from_protocol_parameters json |> return
   end
