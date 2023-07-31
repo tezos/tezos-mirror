@@ -34,11 +34,6 @@ let of_delegate ctxt delegate =
   | None -> return Staking_parameters_repr.default
   | Some t -> return t
 
-let find ctxt delegate =
-  Storage.Contract.Staking_parameters.find
-    ctxt
-    (Contract_repr.Implicit delegate)
-
 let pending_updates ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   let preserved_cycles = Constants_storage.preserved_cycles ctxt in
@@ -52,9 +47,6 @@ let pending_updates ctxt delegate =
       in
       Option.map (fun param -> (cycle, param)) param_opt)
     Cycle_repr.(current_cycle ---> to_cycle)
-
-let of_delegate_for_cycle ctxt delegate cycle =
-  Storage.Pending_staking_parameters.get (ctxt, cycle) (Implicit delegate)
 
 let register_update ctxt delegate t =
   let open Lwt_result_syntax in
