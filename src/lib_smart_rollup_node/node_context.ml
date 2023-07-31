@@ -83,6 +83,9 @@ let is_bailout {mode; _} = mode = Bailout
 
 let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
 
+let can_inject {mode; _} (op_kind : Configuration.operation_kind) =
+  Configuration.can_inject mode op_kind
+
 let get_fee_parameter node_ctxt operation_kind =
   Configuration.Operation_kind_map.find operation_kind node_ctxt.fee_parameters
   |> Option.value

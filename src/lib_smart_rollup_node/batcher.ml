@@ -56,8 +56,18 @@ let inject_batch state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
+  let* l1_hash =
+    Injector.check_and_add_pending_operation
+      state.node_ctxt.mode
+      ~source:state.signer
+      operation
+  in
   let+ l1_hash =
-    Injector.add_pending_operation ~source:state.signer operation
+    match l1_hash with
+    | Some l1_hash -> return l1_hash
+    | None ->
+        let op = Injector.Inj_operation.make operation in
+        return op.hash
   in
   List.iter
     (fun msg ->

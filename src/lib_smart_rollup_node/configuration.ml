@@ -25,15 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode =
-  | Observer
-  | Accuser
-  | Bailout
-  | Batcher
-  | Maintenance
-  | Operator
-  | Custom
-
 type operation_kind =
   | Publish
   | Add_messages
@@ -41,6 +32,15 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+
+type mode =
+  | Observer
+  | Accuser
+  | Bailout
+  | Batcher
+  | Maintenance
+  | Operator
+  | Custom of operation_kind list
 
 type purpose = Operating | Batching | Cementing | Recovering
 
@@ -100,6 +100,7 @@ type t = {
 
 type error +=
   | Missing_mode_operators of {mode : string; missing_operators : string list}
+  | Empty_operation_kinds_for_custom_mode
 
 let () =
   register_error_kind
@@ -123,7 +124,19 @@ let () =
           Some (mode, missing_operators)
       | _ -> None)
     (fun (mode, missing_operators) ->
-      Missing_mode_operators {mode; missing_operators})
+      Missing_mode_operators {mode; missing_operators}) ;
+  register_error_kind
+    ~id:"sc_rollup_node.empty_operation_kinds_for_custom_mode"
+    ~title:"Empty operation kinds for custom mode"
+    ~description:
+      "Empty operation kinds are not allowed for custom modes, just like in \
+       observer mode"
+    ~pp:(fun ppf _s ->
+      Format.pp_print_string ppf "Operation kinds for custom mode are empty.")
+    `Permanent
+    Data_encoding.unit
+    (function Empty_operation_kinds_for_custom_mode -> Some () | _ -> None)
+    (fun () -> Empty_operation_kinds_for_custom_mode)
 
 let default_data_dir =
   Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node"
@@ -260,13 +273,6 @@ let max_injector_retention_period =
 let default_l1_blocks_cache_size = 64
 
 let default_l2_blocks_cache_size = 64
-
-(* For each purpose, it returns a list of associated operation kinds *)
-let operation_kinds_of_purpose = function
-  | Batching -> [Add_messages]
-  | Cementing -> [Cement]
-  | Operating -> [Publish; Refute; Timeout]
-  | Recovering -> [Recover]
 
 let string_of_operation_kind = function
   | Publish -> "publish"
@@ -489,7 +495,16 @@ let fee_parameter_encoding operation_kind =
 
 let fee_parameters_encoding = operation_kind_map_encoding fee_parameter_encoding
 
-let modes = [Observer; Batcher; Maintenance; Operator; Custom; Bailout]
+let modes =
+  [
+    Observer;
+    Accuser;
+    Bailout;
+    Batcher;
+    Maintenance;
+    Operator;
+    Custom operation_kinds;
+  ]
 
 let string_of_mode = function
   | Observer -> "observer"
@@ -498,16 +513,28 @@ let string_of_mode = function
   | Batcher -> "batcher"
   | Maintenance -> "maintenance"
   | Operator -> "operator"
-  | Custom -> "custom"
+  | Custom op_kinds ->
+      if op_kinds = [] then "custom"
+      else
+        "custom:"
+        ^ String.concat "," (List.map string_of_operation_kind op_kinds)
 
-let mode_of_string = function
+let mode_of_string s =
+  match s with
   | "observer" -> Ok Observer
   | "accuser" -> Ok Accuser
   | "bailout" -> Ok Bailout
   | "batcher" -> Ok Batcher
   | "maintenance" -> Ok Maintenance
   | "operator" -> Ok Operator
-  | "custom" -> Ok Custom
+  | "custom" -> Ok (Custom [])
+  | s when String.starts_with ~prefix:"custom:" s ->
+      let kinds = String.sub s 7 (String.length s - 7) in
+      let operation_kinds_strs = String.split_on_char ',' kinds in
+      let operation_kinds =
+        List.map operation_kind_of_string_exn operation_kinds_strs
+      in
+      Ok (Custom operation_kinds)
   | _ -> Error [Exn (Failure "Invalid mode")]
 
 let description_of_mode = function
@@ -519,21 +546,53 @@ let description_of_mode = function
   | Maintenance ->
       "Follows the chain and publishes commitments, cement and refute"
   | Operator -> "Equivalent to maintenance + batcher"
-  | Custom ->
-      "In this mode, only operations that have a corresponding operator/signer \
-       are injected"
+  | Custom op_kinds ->
+      let op_kinds_desc =
+        List.map string_of_operation_kind op_kinds |> String.concat ", "
+      in
+      Printf.sprintf
+        "In this mode, the system handles only the specific operation \
+         kinds:[%s]. This allows for tailored control and flexibility."
+        op_kinds_desc
 
 let mode_encoding =
-  Data_encoding.string_enum
-    [
-      ("observer", Observer);
-      ("accuser", Accuser);
-      ("bailout", Bailout);
-      ("batcher", Batcher);
-      ("maintenance", Maintenance);
-      ("operator", Operator);
-      ("custom", Custom);
-    ]
+  let open Data_encoding in
+  let operation_kind_encoding =
+    string_enum
+      [
+        ("publish", Publish);
+        ("add_messages", Add_messages);
+        ("cement", Cement);
+        ("timeout", Timeout);
+        ("refute", Refute);
+        ("recover", Recover);
+      ]
+  in
+  let operation_kinds_encoding = list operation_kind_encoding in
+  let constant_case mode =
+    let title = string_of_mode mode in
+    case
+      ~title
+      Json_only
+      (constant title)
+      (fun m -> if m = mode then Some () else None)
+      (fun () -> mode)
+  in
+  let custom_case =
+    case
+      ~title:"custom"
+      Json_only
+      (obj1 (req "custom" operation_kinds_encoding))
+      (function Custom operation_kinds -> Some operation_kinds | _ -> None)
+      (fun operation_kinds -> Custom operation_kinds)
+  in
+  let all_cases =
+    List.map
+      constant_case
+      [Observer; Accuser; Bailout; Batcher; Maintenance; Operator]
+    @ [custom_case]
+  in
+  def "sc_rollup_node_mode" @@ union all_cases
 
 let batcher_encoding =
   let open Data_encoding in
@@ -748,6 +807,25 @@ let encoding : t Data_encoding.t =
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false))))
 
+(* For each purpose, it returns a list of associated operation kinds *)
+let operation_kinds_of_purpose = function
+  | Batching -> [Add_messages]
+  | Cementing -> [Cement]
+  | Operating -> [Publish; Refute; Timeout]
+  | Recovering -> [Recover]
+
+(* Maps a list of operation kinds to their corresponding purposes,
+   based on their presence in the input list. *)
+let purposes_of_operation_kinds (operation_kinds : operation_kind list) :
+    purpose list =
+  List.filter
+    (fun purpose ->
+      let expected_operation_kinds = operation_kinds_of_purpose purpose in
+      List.exists
+        (fun kind -> List.mem ~equal:Stdlib.( = ) kind expected_operation_kinds)
+        operation_kinds)
+    purposes
+
 let check_mode config =
   let open Result_syntax in
   let check_purposes purposes =
@@ -779,7 +857,30 @@ let check_mode config =
   | Bailout -> narrow_purposes [Operating; Cementing; Recovering]
   | Maintenance -> narrow_purposes [Operating; Cementing]
   | Operator -> narrow_purposes [Operating; Cementing; Batching]
-  | Custom -> return config
+  | Custom operation_kinds ->
+      if operation_kinds = [] then tzfail Empty_operation_kinds_for_custom_mode
+      else narrow_purposes (purposes_of_operation_kinds operation_kinds)
+
+let purposes_of_mode mode =
+  match mode with
+  | Observer -> []
+  | Batcher -> [Batching]
+  | Accuser -> [Operating]
+  | Bailout -> [Operating; Cementing]
+  | Maintenance -> [Operating; Cementing]
+  | Operator -> [Operating; Cementing; Batching]
+  | Custom _op_kinds -> []
+
+let operation_kinds_of_mode mode =
+  match mode with
+  | Custom op_kinds -> op_kinds
+  | _ ->
+      let purposes = purposes_of_mode mode in
+      List.map operation_kinds_of_purpose purposes |> List.flatten
+
+let can_inject mode (op_kind : operation_kind) =
+  let allowed_operations = operation_kinds_of_mode mode in
+  List.mem ~equal:Stdlib.( = ) op_kind allowed_operations
 
 let refutation_player_buffer_levels = 5
 

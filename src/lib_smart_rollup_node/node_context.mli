@@ -122,6 +122,10 @@ val is_bailout : _ t -> bool
     failures planned. *)
 val is_loser : _ t -> bool
 
+(** [can_inject config op_kind] determines if a given operation kind can 
+    be injected based on the configuration settings. *)
+val can_inject : _ t -> Configuration.operation_kind -> bool
+
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
     configured for this purpose, returns the default fee parameter for this
