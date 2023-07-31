@@ -91,7 +91,7 @@ There are two channels of communication to interact with smart rollups:
 Rollups inbox
 """""""""""""
 
-The inbox is unique to all rollups and contains two kinds of messages:
+A single global inbox serves all rollups and contains two kinds of messages:
 *external* messages are pushed through a Layer 1 manager operation
 while *internal* messages are pushed by Layer 1 smart contracts or by
 the protocol itself. All messages (external and internal) pushed to
