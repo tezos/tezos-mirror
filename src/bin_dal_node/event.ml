@@ -51,14 +51,6 @@ let store_is_ready =
     ~level:Notice
     ()
 
-let rpc_server_is_ready =
-  declare_1
-    ~section
-    ~name:"dal_node_rpc_server_is_ready"
-    ~msg:"the DAL node is listening to {point}"
-    ~level:Notice
-    ("point", P2p_point.Id.encoding)
-
 let node_is_ready =
   declare_0
     ~section
@@ -215,6 +207,14 @@ let message_validation_error =
     ~pp1:Gossipsub.Worker.GS.Message_id.pp
     ("message_id", Gossipsub.message_id_encoding)
     ("validation_error", Data_encoding.string)
+
+let rpc_server_is_ready =
+  declare_1
+    ~section
+    ~name:"dal_node_rpc_server_is_ready"
+    ~msg:"RPC server is listening on {point}"
+    ~level:Notice
+    ("point", P2p_point.Id.encoding)
 
 let starting_metrics_server =
   let open Internal_event.Simple in
