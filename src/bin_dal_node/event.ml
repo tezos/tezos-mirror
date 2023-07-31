@@ -208,6 +208,14 @@ let message_validation_error =
     ("message_id", Gossipsub.message_id_encoding)
     ("validation_error", Data_encoding.string)
 
+let p2p_server_is_ready =
+  declare_1
+    ~section
+    ~name:"dal_node_p2p_server_is_ready"
+    ~msg:"P2P server is listening on {point}"
+    ~level:Notice
+    ("point", P2p_point.Id.encoding)
+
 let rpc_server_is_ready =
   declare_1
     ~section

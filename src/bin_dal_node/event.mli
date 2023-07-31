@@ -82,6 +82,8 @@ val loading_shard_data_failed : string t
 (** Validating a message received via Gossipsub/P2P failed. *)
 val message_validation_error : (Gossipsub.message_id * string) t
 
+val p2p_server_is_ready : P2p_point.Id.t t
+
 val rpc_server_is_ready : P2p_point.Id.t t
 
 (** Emitted when the metrics server starts *)

@@ -467,7 +467,8 @@ let run ~data_dir configuration_override =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
   let*! () = Event.(emit starting_node) () in
-  let* ({network_name; rpc_addr; peers; endpoint; profiles; _} as config) =
+  let* ({network_name; rpc_addr; peers; endpoint; profiles; listen_addr; _} as
+       config) =
     let*! result = Configuration_file.load ~data_dir in
     match result with
     | Ok configuration -> return (configuration_override configuration)
@@ -541,6 +542,7 @@ let run ~data_dir configuration_override =
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
+  let*! () = Event.(emit p2p_server_is_ready listen_addr) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Start daemon to resolve current protocol plugin *)
