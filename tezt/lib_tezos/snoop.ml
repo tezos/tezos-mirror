@@ -123,8 +123,8 @@ let benchmark ~bench_name ~bench_num ~nsamples ~save_to ?seed ?config_file
 
 (* Infer command *)
 
-let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
-    ~solution ?report ?graph () =
+let infer_command ~workload_data ~regression_method ~dump_csv ~solution ?report
+    ?graph () =
   let regression_method =
     match regression_method with
     | Lasso {positive} ->
@@ -143,27 +143,16 @@ let infer_command ~local_model_name ~workload_data ~regression_method ~dump_csv
     | None -> []
     | Some graph_file -> ["--dot-file"; graph_file]
   in
-  [
-    "infer";
-    "parameters";
-    "for";
-    "model";
-    local_model_name;
-    "on";
-    "data";
-    workload_data;
-    "using";
-  ]
+  ["infer"; "parameters"; "on"; "data"; workload_data; "using"]
   @ regression_method
   @ ["--dump-csv"; dump_csv; "--save-solution"; solution]
   @ report @ graph
 
-let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
-    ~dump_csv ~solution ?report ?graph snoop =
+let spawn_infer_parameters ~workload_data ~regression_method ~dump_csv ~solution
+    ?report ?graph snoop =
   spawn_command
     snoop
     (infer_command
-       ~local_model_name
        ~workload_data
        ~regression_method
        ~dump_csv
@@ -172,10 +161,9 @@ let spawn_infer_parameters ~local_model_name ~workload_data ~regression_method
        ?graph
        ())
 
-let infer_parameters ~local_model_name ~workload_data ~regression_method
-    ~dump_csv ~solution ?report ?graph snoop =
+let infer_parameters ~workload_data ~regression_method ~dump_csv ~solution
+    ?report ?graph snoop =
   spawn_infer_parameters
-    ~local_model_name
     ~workload_data
     ~regression_method
     ~dump_csv

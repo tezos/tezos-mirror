@@ -333,7 +333,7 @@ module Infer_cmd = struct
   let set_empirical_plot empirical_plot options =
     {options with display = {options.display with empirical_plot}}
 
-  let infer_handler
+  let handle_options
       ( print_problem,
         csv,
         plot,
@@ -346,22 +346,23 @@ module Infer_cmd = struct
         dot_file,
         full_plot_verbosity,
         plot_raw_workload,
-        empirical_plot ) local_model_name workload_data solver () =
-    let options =
-      default_infer_parameters_options
-      |> set_print_problem print_problem
-      |> set_csv_export csv |> set_plot plot
-      |> lift_opt set_ridge_alpha ridge_alpha
-      |> lift_opt set_lasso_alpha lasso_alpha
-      |> set_lasso_positive lasso_positive
-      |> set_report report
-      |> set_override_files override_files
-      |> set_save_solution save_solution
-      |> set_dot_file dot_file
-      |> set_full_plot_verbosity full_plot_verbosity
-      |> set_plot_raw_workload plot_raw_workload
-      |> lift_opt set_empirical_plot empirical_plot
-    in
+        empirical_plot ) =
+    default_infer_parameters_options
+    |> set_print_problem print_problem
+    |> set_csv_export csv |> set_plot plot
+    |> lift_opt set_ridge_alpha ridge_alpha
+    |> lift_opt set_lasso_alpha lasso_alpha
+    |> set_lasso_positive lasso_positive
+    |> set_report report
+    |> set_override_files override_files
+    |> set_save_solution save_solution
+    |> set_dot_file dot_file
+    |> set_full_plot_verbosity full_plot_verbosity
+    |> set_plot_raw_workload plot_raw_workload
+    |> lift_opt set_empirical_plot empirical_plot
+
+  let infer_handler opts local_model_name workload_data solver () =
+    let options = handle_options opts in
     commandline_outcome_ref :=
       Some
         (Infer {local_model_name; workload_data; solver; infer_opts = options}) ;
@@ -565,6 +566,31 @@ module Infer_cmd = struct
   let command =
     Tezos_clic.command
       ~desc:"Perform parameter inference"
+      ~group
+      options
+      params
+      infer_handler
+end
+
+module Infer_all_cmd = struct
+  include Infer_cmd
+
+  let params =
+    Tezos_clic.(
+      prefixes ["infer"; "parameters"]
+      @@ prefixes ["on"; "data"]
+      @@ string ~name:"WORKLOAD-DATA" ~desc:"Directory containing workload data"
+      @@ prefix "using" @@ regression_param @@ stop)
+
+  let infer_handler opts workload_data solver () =
+    let options = handle_options opts in
+    commandline_outcome_ref :=
+      Some (Infer_all {workload_data; solver; infer_opts = options}) ;
+    Lwt.return_ok ()
+
+  let command =
+    Tezos_clic.command
+      ~desc:"Perform parameter inference on data set"
       ~group
       options
       params
@@ -1753,6 +1779,7 @@ let all_commands =
   [
     Benchmark_cmd.command;
     Infer_cmd.command;
+    Infer_all_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
     Codegen_inferred_cmd.command;

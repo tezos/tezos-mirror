@@ -63,7 +63,6 @@ type regression_method =
 
 (** Infers parameters for a model on some benchmark data. *)
 val infer_parameters :
-  local_model_name:string ->
   workload_data:string ->
   regression_method:regression_method ->
   dump_csv:string ->
@@ -154,7 +153,7 @@ val write_config :
   benchmark:string -> bench_config:string -> file:string -> t -> unit Lwt.t
 
 (** Execute
-    [octez-snoop generate code for solutions <solution> ]
+    [octez-snoop generate code for <solutions-dir>]
     comamnd and returns its stdout output.
 
     If [fixed_point] is specified [--fixed-point <fixed_point>] option is added.
