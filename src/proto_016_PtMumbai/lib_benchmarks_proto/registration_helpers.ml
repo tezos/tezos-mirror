@@ -54,3 +54,20 @@ let register_simple_with_num (module Bench : Benchmark.Simple_with_num) =
     let tags = adjust_tags tags
   end in
   Registration.register_simple_with_num (module B)
+
+let register_as_simple_with_num (module B : Benchmark.S) =
+  let modules =
+    List.map
+      (fun (model_name, model) : (module Benchmark.Simple_with_num) ->
+        (module struct
+          include B
+
+          let name = Namespace.cons name model_name
+
+          let group = Benchmark.Group model_name
+
+          let model = model
+        end))
+      B.models
+  in
+  List.iter (fun x -> register_simple_with_num x) modules

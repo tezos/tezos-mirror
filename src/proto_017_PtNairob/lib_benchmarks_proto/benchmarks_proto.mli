@@ -86,6 +86,8 @@ module Registration : sig
   (** Registers a benchmark with a model, model names are uniformely generated
   *)
   val register : Benchmark.t -> unit
+
+  val register_as_simple_with_num : Benchmark_base.t -> unit
 end
 
 module Model : sig
