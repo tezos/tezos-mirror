@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -77,6 +78,8 @@ let is_operator node_ctxt pkh =
     node_ctxt.operators
 
 let is_accuser {mode; _} = mode = Accuser
+
+let is_bailout {mode; _} = mode = Bailout
 
 let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
 

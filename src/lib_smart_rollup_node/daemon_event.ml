@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -141,6 +142,16 @@ module Simple = struct
          commitments."
       ~level:Error
       ()
+
+  let bailout_mode =
+    declare_0
+      ~section
+      ~name:"sc_rollup_daemon_bailout_mode"
+      ~msg:
+        "Entering bailout mode: only defends and cements, does not publish any \
+         commitment."
+      ~level:Error
+      ()
 end
 
 let head_processing hash level = Simple.(emit head_processing (hash, level))
@@ -183,3 +194,5 @@ let migration ~catching_up (old_protocol, old_protocol_level)
 let error e = Simple.(emit error) e
 
 let degraded_mode () = Simple.(emit degraded_mode) ()
+
+let bailout_mode () = Simple.(emit bailout_mode) ()

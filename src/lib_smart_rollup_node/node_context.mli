@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -112,6 +113,10 @@ val is_operator : _ t -> Signature.Public_key_hash.t -> bool
 (** [is_accuser node_ctxt] returns [true] if the rollup node runs in accuser
     mode.  *)
 val is_accuser : _ t -> bool
+
+(** [is_bailout node_ctxt] returns [true] if the rollup node runs in bailout
+    mode.  *)
+val is_bailout : _ t -> bool
 
 (** [is_loser node_ctxt] returns [true] if the rollup node runs has some
     failures planned. *)

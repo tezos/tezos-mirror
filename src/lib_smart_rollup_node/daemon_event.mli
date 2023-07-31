@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -68,3 +69,7 @@ val error : tztrace -> unit Lwt.t
 (** Emit an event for when the node enters the degraded mode to only play
     refutations. *)
 val degraded_mode : unit -> unit Lwt.t
+
+(** Emit an event for when the node enters the bailout mode to only defends and 
+    cements, does not publish any new commitment. *)
+val bailout_mode : unit -> unit Lwt.t
