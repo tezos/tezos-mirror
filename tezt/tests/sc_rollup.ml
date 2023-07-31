@@ -1762,7 +1762,7 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level in
   Log.info "Starting other rollup node." ;
-  let purposes = ["publish"; "cement"; "add_messages"] in
+  let purposes = ["operating"; "cementing"; "batching"] in
   let operators =
     List.mapi
       (fun i purpose ->
@@ -5381,7 +5381,7 @@ let test_injector_auto_discard =
       Batcher
       tezos_node
       ~base_dir:(Client.base_dir client)
-      ~operators:[("add_messages", operator.alias)]
+      ~operators:[("batching", operator.alias)]
   in
   let sc_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let nb_attempts = 5 in

@@ -80,9 +80,10 @@ let is_accuser {mode; _} = mode = Accuser
 
 let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
 
-let get_fee_parameter node_ctxt purpose =
-  Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
-  |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
+let get_fee_parameter node_ctxt operation_kind =
+  Configuration.Operation_kind_map.find operation_kind node_ctxt.fee_parameters
+  |> Option.value
+       ~default:(Configuration.default_fee_parameter ~operation_kind ())
 
 let lock ~data_dir =
   let lockfile_path = Filename.concat data_dir "lock" in

@@ -399,7 +399,7 @@ module Proto_client = struct
           "Bad configuration fee_parameter.%s for %s. It must be at least %s \
            for operations of the injector to be propagated."
           name
-          (Configuration.string_of_purpose purpose)
+          (Configuration.string_of_operation_kind purpose)
           (to_string mempool_default)
       else Ok ()
     in
@@ -441,7 +441,7 @@ module Proto_client = struct
       in
       ()
     in
-    Configuration.Operator_purpose_map.iter_e check fee_parameters
+    Configuration.Operation_kind_map.iter_e check fee_parameters
 
   let checks state = check_fee_parameters state
 end

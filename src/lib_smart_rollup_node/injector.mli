@@ -34,5 +34,5 @@ type state = {
 include
   Injector_sigs.S
     with type state := state
-     and type tag := Configuration.purpose
+     and type tag := Configuration.operation_kind
      and type operation := L1_operation.t
