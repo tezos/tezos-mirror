@@ -4,7 +4,11 @@
 
 ### EVM Kernel
 
+- Kernel has an internal version. (!9579)
+
 ### EVM Node
+
+- The EVM node is in sync. with either the current or next kernel version. (!9579)
 
 ### Bug fixes
 
