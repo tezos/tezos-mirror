@@ -38,7 +38,6 @@ let shutdown_on_exit t =
 let launch (addr, port) =
   let open Lwt_syntax in
   let host = Ipaddr.V6.to_string addr in
-  let* () = Event.(emit starting_metrics_server) (host, port) in
   let* ctx = Conduit_lwt_unix.init ~src:host () in
   let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
   let mode = `TCP (`Port port) in
@@ -53,4 +52,5 @@ let launch (addr, port) =
   in
   let t = {shutdown; server} in
   let (_ : Lwt_exit.clean_up_callback_id) = shutdown_on_exit t in
+  let* () = Event.(emit metrics_server_is_ready) (host, port) in
   Lwt.return t
