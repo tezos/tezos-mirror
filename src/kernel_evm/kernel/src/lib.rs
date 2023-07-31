@@ -224,6 +224,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             host.reboot_left()?
         );
         storage::delete_reboot_flag(host)?;
+        log!(host, Info, "Read queue.");
         fetch_queue_left(host)?
     } else {
         // first kernel run of the level
