@@ -198,31 +198,13 @@ let serialization_cost_estimated_from_bytes bytes_len =
   Gas_limit_repr.atomic_step_cost
   @@ Micheline_encoding.bytes_dependent_cost (S.safe_int bytes_len)
 
-(* Cost of running [strip_locations] on a term with [size] nodes.
-   Note that [strip_locations] will reallocate a fresh Micheline tree.
-   This only depends on the total number of nodes (not the size of
-   the leaves).
-
-   The run-time cost of [strip_locations] is benchmarked by
-   [Tezos_shell_benchmarks.Micheline_benchmarks.Micheline_strip_locations].
-*)
 let cost_micheline_strip_locations size =
-  Script_repr_costs.cost_strip_locations_micheline size
+  Gas_limit_repr.atomic_step_cost
+  @@ Script_repr_costs.cost_strip_locations_micheline size
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2049
-   Plugin benchmarked gas.
-   Replace this definition, copied from [cost_michelines_strip_locations].
-*)
-(* Cost of running [strip_annotations] on a term with [size] nodes.
-   Note that [strip_annotations] will reallocate a fresh Micheline tree.
-   This only depends on the total number of nodes (not the size of
-   the leaves).
-
-   The run-time cost of [strip_annotations] is benchmarked by
-   [Script_repr_benchmarks.Script_repr_strip_annotations].
-*)
 let cost_micheline_strip_annotations size =
-  Gas_limit_repr.atomic_step_cost @@ S.mul (S.safe_int size) (S.safe_int 51)
+  Gas_limit_repr.atomic_step_cost
+  @@ Script_repr_costs.cost_strip_annotations size
 
 (* This is currently used to estimate the cost of serializing an operation. *)
 let bytes_node_cost s = serialization_cost_estimated_from_bytes (Bytes.length s)
