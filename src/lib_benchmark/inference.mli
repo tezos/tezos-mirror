@@ -85,4 +85,6 @@ val solve_problem : problem -> solver -> solution
 
 val problem_to_csv : problem -> Csv.csv
 
+val mapping_to_csv : (Free_variable.t * float) trace -> Csv.csv
+
 val solution_to_csv : solution -> Csv.csv option
