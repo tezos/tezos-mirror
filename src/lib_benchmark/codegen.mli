@@ -32,6 +32,11 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+(** [get_codegen_destinations model_info] will return 
+    all the generated code destinations in which given model is used 
+  *)
+val get_codegen_destinations : Registration.model_info -> string trace
+
 val solution_encoding : solution Data_encoding.t
 
 val pp_solution : Format.formatter -> solution -> unit

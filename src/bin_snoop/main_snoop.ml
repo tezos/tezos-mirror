@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -563,7 +564,7 @@ let generate_code codegen_options generated_code =
       (fun acc (destination, code) ->
         String.Map.update
           destination
-          (function None -> Some [code] | Some x -> Some (code :: x))
+          (function None -> Some [code] | Some x -> Some (x @ [code]))
           acc)
       String.Map.empty
       generated_code
@@ -574,13 +575,11 @@ let generate_code codegen_options generated_code =
         let destination =
           Filename.remove_extension @@ Filename.basename destination
         in
-        let dirname =
-          Filename.concat (Filename.dirname save_to) "generated_code"
-        in
+        let dirname = Filename.dirname save_to in
         let basename = Filename.remove_extension @@ Filename.basename save_to in
         let basename = String.remove_prefix ~prefix:"auto_build" basename in
         let basename_empty =
-          Option.fold ~none:true ~some:(fun x -> String.length x = 0) basename
+          Option.fold ~none:true ~some:(fun x -> String.equal x "") basename
         in
         let result =
           if basename_empty then Some (destination ^ ".ml")
@@ -596,34 +595,24 @@ let generate_code codegen_options generated_code =
     (fun k v -> save_code_list_as_a_module (save_to k) v)
     generated
 
+let get_exclusions () =
+  Registration.all_models ()
+  |> List.filter_map (fun (name, info) ->
+         let is_excluded =
+           List.is_empty @@ Codegen.get_codegen_destinations info
+         in
+         if is_excluded then Some (Namespace.to_string name) else None)
+  |> String.Set.of_list
+
 let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
-  let exclusions =
-    Registration.all_models ()
-    |> List.filter_map (fun (name, Registration.{from; _}) ->
-           List.find_map
-             (fun Registration.{bench_name; _} ->
-               let bench : Benchmark.t option =
-                 Registration.find_benchmark bench_name
-               in
-               let open Option_syntax in
-               let* (module B : Benchmark.S) = bench in
-               match B.purpose with
-               | Benchmark.Generate_code _ -> None
-               | _ -> Some (Namespace.to_string name))
-             from)
-    |> String.Set.of_list
-  in
+  let exclusions = get_exclusions () in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
   let generated =
-    generate_code_for_models
-      sol
-      models
-      codegen_options (* no support of exclusions for this command *)
-      ~exclusions
+    generate_code_for_models sol models codegen_options ~exclusions
   in
   generate_code codegen_options generated
 
@@ -634,17 +623,20 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
     let module FV = Model.Def (Costlang.Free_variables) in
     FV.model
   in
-
   let model_fvs_included_in_sol model =
     let fvs = fvs_of_codegen_model model in
     Free_variable.Set.for_all
       (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
+  let is_generate_all info =
+    if String.Set.is_empty exclusions then true
+    else not @@ List.is_empty @@ Codegen.get_codegen_destinations info
+  in
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter (fun (_model_name, {Registration.model; _}) ->
-        model_fvs_included_in_sol model)
+    List.filter (fun (_model_name, ({Registration.model; from = _} as info)) ->
+        model_fvs_included_in_sol model && is_generate_all info)
     @@ Registration.all_models ()
   in
   generate_code_for_models solution codegen_models codegen_options ~exclusions
@@ -659,8 +651,24 @@ let save_codegen_for_solutions solutions codegen_options ~exclusions =
   generate_code codegen_options generated
 
 let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
-  let solutions = List.map Codegen.load_solution solution_fns in
-  save_codegen_for_solutions solutions codegen_options ~exclusions
+  let exclusions' = get_exclusions () in
+  let is_dir, solution_dir =
+    match solution_fns with
+    | x :: [] -> (Sys.is_directory x, x)
+    | _ -> (false, "")
+  in
+  let solutions =
+    if is_dir then
+      Sys.readdir solution_dir |> Array.to_list
+      |> List.filter (fun x -> Filename.extension x = ".sol")
+      |> List.map (fun x -> Filename.concat solution_dir x)
+    else solution_fns
+  in
+  let solutions = List.map Codegen.load_solution solutions in
+  save_codegen_for_solutions
+    solutions
+    codegen_options
+    ~exclusions:(String.Set.union exclusions' exclusions)
 
 let save_solutions_in_text out_fn nsolutions =
   stdout_or_file out_fn @@ fun ppf ->
@@ -1101,22 +1109,7 @@ module Auto_build = struct
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
-    let exclusions =
-      Registration.all_models ()
-      |> List.filter_map (fun (name, Registration.{from; _}) ->
-             List.find_map
-               (fun Registration.{bench_name; _} ->
-                 let bench : Benchmark.t option =
-                   Registration.find_benchmark bench_name
-                 in
-                 let open Option_syntax in
-                 let* (module B : Benchmark.S) = bench in
-                 match B.purpose with
-                 | Benchmark.Generate_code _ -> None
-                 | _ -> Some (Namespace.to_string name))
-               from)
-      |> String.Set.of_list
-    in
+    let exclusions = get_exclusions () in
     (* Codegen *)
     codegen mkfilename solution ~exclusions
 end

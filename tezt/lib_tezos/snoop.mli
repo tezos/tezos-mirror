@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -159,7 +160,7 @@ val write_config :
     If [fixed_point] is specified [--fixed-point <fixed_point>] option is added.
 *)
 val generate_code_using_solution :
-  solution:string -> ?fixed_point:string -> t -> string Lwt.t
+  solution:string -> ?save_to:string -> ?fixed_point:string -> t -> string Lwt.t
 
 (** Execute octez-snoop check definitions of [files] *)
 val check_definitions : files:string list -> t -> unit Lwt.t

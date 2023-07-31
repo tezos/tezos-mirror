@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2022, 2023 DaiLambda, Incs. <contact@dailambad.jp>          *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -412,30 +413,37 @@ let codegen (Model.Model model) (sol : solution)
   let fun_name = function_name model_name in
   Item {comments; code = generate_let_binding fun_name expr}
 
+let get_codegen_destinations
+    Registration.{model = Model.Model (module M); from = local_models_info} =
+  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then []
+  else
+    List.filter_map
+      (fun Registration.{bench_name; _} ->
+        let open Option_syntax in
+        let* (module B : Benchmark.S) =
+          Registration.find_benchmark bench_name
+        in
+        let destination =
+          match B.purpose with Generate_code d -> Some d | _ -> None
+        in
+        destination)
+      local_models_info
+    |> List.sort_uniq String.compare
+
 let codegen_models models sol transform ~exclusions =
   List.filter_map
-    (fun (model_name, {Registration.model; from}) ->
-      (* Exclusion is done by the function name *)
-      let benchmarks =
-        List.filter_map
-          (fun Registration.{bench_name; _} ->
-            let open Option_syntax in
-            let* (module B : Benchmark.S) =
-              Registration.find_benchmark bench_name
-            in
-            let destination =
-              match B.purpose with Generate_code d -> Some d | _ -> None
-            in
-            destination)
-          from
-      in
+    (fun (model_name, ({Registration.model; from = _} as info)) ->
+      let benchmark_destinations = get_codegen_destinations info in
       if
         String.Set.mem (Namespace.to_string model_name) exclusions
-        || List.is_empty benchmarks
+        || List.is_empty benchmark_destinations
       then None
       else
         let code = codegen model sol transform model_name in
-        Some (List.map (fun destination -> (destination, code)) benchmarks))
+        Some
+          (List.map
+             (fun destination -> (destination, code))
+             benchmark_destinations))
     models
   |> List.flatten
 

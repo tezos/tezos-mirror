@@ -64,6 +64,8 @@ let csv name = sf "%s_raw.csv" name
 
 let inference_results_dir = "inference_results"
 
+let codegen_results_dir = "generated_code"
+
 let solution_csv local_model_name = sf "inferred_%s.csv" local_model_name
 
 let solution_bin local_model_name = sf "inferred_%s.sol" local_model_name
