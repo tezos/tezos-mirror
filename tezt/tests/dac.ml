@@ -313,45 +313,6 @@ let assert_state_changed ?block sc_rollup_client prev_state_hash =
     ~error_msg:"State hash has not changed (%L <> %R)" ;
   Lwt.return_unit
 
-(** This modules encapsulate tests for DAC nodes when running in legacy node.
-    It includes tests where we have two dac nodes running in
-    the legacy mode interacting with each other. As such one node normally tries
-    to mimic the coordinator and the other tries to mimic signer or observer.
-    Note that both nodes still run in the [legacy] mode, where as such there is
-    no notion of profiles. Once we have a fully working profiles, tests from this
-    module should be refactored. *)
-module Legacy = struct
-  (** [Legacy] test suite uses [v0] DAC API. *)
-
-  let test_dac_not_ready_without_protocol =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac Legacy startup not ready with unsupported protocol"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let dac_node =
-      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* GET /health/live must succeed *)
-    let* () = check_alive dac_node in
-    (* GET /health/ready must fail *)
-    let* () = check_not_ready dac_node in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-end
-
 module Coordinator = struct
   let test_dac_not_ready_without_protocol =
     Protocol.register_test
@@ -370,7 +331,7 @@ module Coordinator = struct
         ()
     in
     let dac_node =
-      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
@@ -399,8 +360,20 @@ module Observer = struct
         ~nodes_args
         ()
     in
+    let coordinator_node =
+      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
+    in
     let dac_node =
-      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+      Dac_node.create_observer
+        ?name:(Some "observer")
+        ~node
+        ~client
+        ?reveal_data_dir:(Some "observer")
+        ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
+        ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+        ~allow_v1_api:false
+        ~committee_member_rpcs:[("http://localhost", 11111)]
+        ()
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
@@ -408,6 +381,7 @@ module Observer = struct
     let* () = check_alive dac_node in
     (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
+    let* () = Dac_node.terminate coordinator_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
@@ -429,8 +403,25 @@ module Member = struct
         ~nodes_args
         ()
     in
+    let coordinator_node =
+      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
+    in
+    let* key =
+      Client.bls_gen_and_show_keys
+        ~alias:(Format.sprintf "committee-member-%d" 0)
+        client
+    in
     let dac_node =
-      Dac_node.create_legacy ~node ~client ~threshold:0 ~committee_members:[] ()
+      Dac_node.create_committee_member
+        ?name:(Some "member")
+        ~node
+        ~client
+        ?reveal_data_dir:(Some "member")
+        ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
+        ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
+        ~allow_v1_api:false
+        ~address:key.aggregate_public_key_hash
+        ()
     in
     let* _dir = Dac_node.init_config dac_node in
     let* () = run_dac dac_node in
@@ -438,12 +429,13 @@ module Member = struct
     let* () = check_alive dac_node in
     (* GET /health/ready must fail *)
     let* () = check_not_ready dac_node in
+    let* () = Dac_node.terminate coordinator_node in
     let* () = Dac_node.terminate dac_node in
     return ()
 end
 
 (** [Full_infrastructure] is a test suite consisting only of tests with the DAC
-    nodes running in non-[Legacy] modes. *)
+    nodes running. *)
 module Full_infrastructure = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5577
      Once we introduce DAC API ("v1"),  [Full_infrastructure] test suite should
@@ -2476,7 +2468,6 @@ module Tx_kernel_e2e = struct
 end
 
 let register_with_unsupported_protocol ~protocols =
-  Legacy.test_dac_not_ready_without_protocol protocols ;
   Coordinator.test_dac_not_ready_without_protocol protocols ;
   Observer.test_dac_not_ready_without_protocol protocols ;
   Member.test_dac_not_ready_without_protocol protocols

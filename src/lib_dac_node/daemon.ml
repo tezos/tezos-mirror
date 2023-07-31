@@ -74,8 +74,6 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit operating_mode operating_mode_string) in
   let* () = Page_store.ensure_reveal_data_dir_exists reveal_data_dir in
   let* ctxt = Node_context.init config cctxt in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4725
-     Stop DAC node when in Legacy mode, if threshold is not reached. *)
   let* rpc_server =
     RPC_server.start ~rpc_address ~rpc_port ~allow_v1_api ctxt
   in

@@ -33,19 +33,6 @@ module V0 : sig
       returned as a sequence of bytes. *)
   val get_preimage : string -> (Dac_node.t, string) RPC_core.t
 
-  (** [post_store_preimage cctxt ~payload] posts a
-      [payload] to "v0/store_preimage". It returns the hex encoded root page hash
-      and the raw bytes that can be used as contents of a rollup message 
-      to trigger the request of the payload in a WASM rollup. *)
-  val post_store_preimage :
-    payload:string -> (Dac_node.t, string * string) RPC_core.t
-
-  (** [get_verify_signature cctxt external_message] requests the DAC
-      node to verify the signature of the external message [external_message] via
-      the v0/verify_signature endpoint. The DAC committee of the DAC node must
-      be the same that was used to produce the [external_message]. *)
-  val get_verify_signature : string -> (Dac_node.t, bool) RPC_core.t
-
   (** [make_put_dac_member_sigature_request_body ~dac_member_pkh ~root_hash signature]
       creates a JSON body for "PUT v0/dac_member_signature". *)
   val make_put_dac_member_signature_request_body :

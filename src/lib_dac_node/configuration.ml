@@ -35,10 +35,6 @@ let default_rpc_address = "127.0.0.1"
 
 let default_rpc_port = 10832
 
-let default_dac_threshold = 0
-
-let default_dac_addresses = []
-
 let default_reveal_data_dir =
   Filename.concat
     (Filename.concat (Sys.getenv "HOME") ".tezos-smart-rollup-node")
@@ -131,82 +127,10 @@ module Observer = struct
   let name = "Observer"
 end
 
-module Legacy = struct
-  type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
-    dac_cctxt_config : host_and_port option;
-    committee_member_address_opt :
-      Tezos_crypto.Aggregate_signature.public_key_hash option;
-  }
-
-  let make ?coordinator_host_and_port threshold committee_members_addresses
-      committee_member_address_opt =
-    {
-      threshold;
-      committee_members_addresses;
-      dac_cctxt_config = coordinator_host_and_port;
-      committee_member_address_opt;
-    }
-
-  let committee_members_addresses t = t.committee_members_addresses
-
-  let threshold t = t.threshold
-
-  let dac_cctxt_config t = t.dac_cctxt_config
-
-  let committee_member_address_opt t = t.committee_member_address_opt
-
-  let host_and_port_encoding =
-    let open Data_encoding in
-    conv
-      (fun {host; port} -> (host, port))
-      (fun (host, port) -> {host; port})
-      (obj2 (req "rpc-host" string) (req "rpc-port" uint16))
-
-  let encoding =
-    Data_encoding.(
-      conv
-        (fun {
-               threshold;
-               committee_members_addresses;
-               dac_cctxt_config;
-               committee_member_address_opt;
-             } ->
-          ( threshold,
-            committee_members_addresses,
-            dac_cctxt_config,
-            committee_member_address_opt ))
-        (fun ( threshold,
-               committee_members_addresses,
-               dac_cctxt_config,
-               committee_member_address_opt ) ->
-          {
-            threshold;
-            committee_members_addresses;
-            dac_cctxt_config;
-            committee_member_address_opt;
-          })
-        (obj4
-           (dft "threshold" uint8 default_dac_threshold)
-           (dft
-              "committee_members"
-              (list Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)
-              default_dac_addresses)
-           (opt "dac_cctxt_config" host_and_port_encoding)
-           (opt
-              "committee_member_address_opt"
-              Tezos_crypto.Aggregate_signature.Public_key_hash.encoding)))
-
-  let name = "Legacy"
-end
-
 type mode =
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
 let make_coordinator committee_members =
   Coordinator (Coordinator.make committee_members)
@@ -218,15 +142,6 @@ let make_committee_member ~coordinator_rpc_address committee_member_address =
 let make_observer ~committee_rpc_addresses ?timeout coordinator_rpc_address =
   Observer
     (Observer.make ~committee_rpc_addresses ?timeout coordinator_rpc_address)
-
-let make_legacy ?coordinator_host_and_port threshold committee_members_addresses
-    committee_member_address_opt =
-  Legacy
-    (Legacy.make
-       ?coordinator_host_and_port
-       threshold
-       committee_members_addresses
-       committee_member_address_opt)
 
 type t = {
   data_dir : string;  (** The path to the DAC node data directory. *)
@@ -245,7 +160,6 @@ let mode_name t =
   | Coordinator _ -> Coordinator.name
   | Committee_member _ -> Committee_member.name
   | Observer _ -> Observer.name
-  | Legacy _ -> Legacy.name
 
 let make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode =
   {data_dir; reveal_data_dir; rpc_address; rpc_port; mode; allow_v1_api}
@@ -282,12 +196,6 @@ let mode_encoding =
           Observer.encoding
           (function Observer t -> Some t | _ -> None)
           (fun t -> Observer t);
-        case
-          ~title:Legacy.name
-          (Tag (3, Legacy.name))
-          Legacy.encoding
-          (function Legacy t -> Some t | _ -> None)
-          (fun t -> Legacy t);
       ])
 
 let encoding : t Data_encoding.t =

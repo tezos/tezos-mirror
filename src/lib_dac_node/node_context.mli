@@ -88,48 +88,11 @@ module Observer : sig
   }
 end
 
-(** [Legacy] defines a partial [Node_context.t] that is available only to
-    [Legacy] nodes, and functions that can be used to operate on such
-    mode specific partial node contexts. *)
-module Legacy : sig
-  (** The type of a [Legacy] specific partial [Node_context.t]. *)
-  type t = private {
-    committee_members : Wallet_account.Legacy.t list;
-        (** The list of [Wallet_account.Legacy] values associated with the Data
-            Availability Committee members managed by the [Coordinator] node.
-        *)
-    coordinator_cctxt : Dac_node_client.cctxt option;
-        (** An optional [Dac_node_client.cctxt] option. If defined, it
-            enables a [Legacy] node to act as if it were an [Observer], using
-            the associated [Dac_node_client.cctxt] value to send requests to
-            a [Coordinator] node.  *)
-    hash_streamer : Dac_plugin.raw_hash Data_streamer.t;
-        (** A [Dac_plugin.hash Data_streamer.t] that the [Legacy] node
-            use to advertise root hashes to other nodes *)
-    committee_member_opt : Wallet_account.Legacy.t option;
-        (** The legacy account wallet of the committee member simulated by the
-            legacy DAC node, if any. *)
-  }
-
-  (** [public_keys_opt t] returns the list of optional public keys associated
-      with the committee members of [t]. *)
-  val public_keys_opt :
-    t -> Tezos_crypto.Aggregate_signature.public_key option list
-
-  (** [secret_key_uris_opt] return the list of optional secret key URIs of the
-      committee members of [t]. *)
-  val secret_key_uris_opt : t -> Client_keys.aggregate_sk_uri option list
-
-  val committee_members :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
-end
-
 (** Operating mode specific fraction of a [Node_context.t] *)
 type mode = private
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
 (** A [ready_ctx] value contains globally needed information for a running dac
     node. It is available when the DAC plugin has been loaded. *)

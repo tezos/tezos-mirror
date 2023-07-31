@@ -46,32 +46,6 @@ let register_get_health_ready cctxt directory =
        (fun () () -> RPC_handlers.handle_get_health_ready cctxt)
 
 module V0 = struct
-  let register_post_store_preimage ctx cctxt dac_sk_uris page_store
-      hash_streamer directory =
-    directory
-    |> add_service
-         Tezos_rpc.Directory.register0
-         RPC_services.V0.post_store_preimage
-         (fun () input ->
-           RPC_handlers.V0.handle_post_store_preimage
-             ctx
-             cctxt
-             dac_sk_uris
-             page_store
-             hash_streamer
-             input)
-
-  let register_get_verify_signature dac_plugin public_keys_opt directory =
-    directory
-    |> add_service
-         Tezos_rpc.Directory.register0
-         RPC_services.V0.get_verify_signature
-         (fun external_message () ->
-           RPC_handlers.V0.handle_get_verify_signature
-             dac_plugin
-             public_keys_opt
-             external_message)
-
   let register_get_preimage dac_plugin page_store =
     add_service
       Tezos_rpc.Directory.register1
@@ -201,47 +175,6 @@ module V0 = struct
            committee_member_cctxts
            timeout
   end
-
-  module Legacy = struct
-    let register_put_dac_member_signature ctx dac_plugin rw_node_store
-        page_store =
-      add_service
-        Tezos_rpc.Directory.register0
-        RPC_services.V0.put_dac_member_signature
-        (fun () dac_member_signature ->
-          Signature_manager.Legacy.handle_put_dac_member_signature
-            ctx
-            dac_plugin
-            rw_node_store
-            page_store
-            dac_member_signature)
-
-    let dynamic_rpc_dir dac_plugin rw_store page_store cctxt legacy_node_ctxt =
-      let hash_streamer = legacy_node_ctxt.Node_context.Legacy.hash_streamer in
-      let public_keys_opt =
-        Node_context.Legacy.public_keys_opt legacy_node_ctxt
-      in
-      let secret_key_uris_opt =
-        Node_context.Legacy.secret_key_uris_opt legacy_node_ctxt
-      in
-      Tezos_rpc.Directory.empty
-      |> register_post_store_preimage
-           dac_plugin
-           cctxt
-           secret_key_uris_opt
-           page_store
-           hash_streamer
-      |> register_get_verify_signature dac_plugin public_keys_opt
-      |> register_get_preimage dac_plugin page_store
-      |> register_monitor_root_hashes hash_streamer
-      |> register_put_dac_member_signature
-           legacy_node_ctxt
-           dac_plugin
-           rw_store
-           page_store
-      |> register_get_serialized_certificate rw_store dac_plugin
-      |> register_get_certificate rw_store
-  end
 end
 
 module V1 = struct
@@ -275,7 +208,6 @@ let start ~rpc_address ~rpc_port ~allow_v1_api node_ctxt =
   let open Lwt_syntax in
   let rw_store = Node_context.get_node_store node_ctxt Store_sigs.Read_write in
   let page_store = Node_context.get_page_store node_ctxt in
-  let cctxt = Node_context.get_tezos_node_cctxt node_ctxt in
   let register_v0_dynamic_rpc dac_plugin =
     match Node_context.get_mode node_ctxt with
     | Coordinator coordinator_node_ctxt ->
@@ -292,13 +224,6 @@ let start ~rpc_address ~rpc_port ~allow_v1_api node_ctxt =
           committee_cctxts
           (Float.of_int timeout)
           page_store
-    | Legacy legacy_node_ctxt ->
-        V0.Legacy.dynamic_rpc_dir
-          dac_plugin
-          rw_store
-          page_store
-          cctxt
-          legacy_node_ctxt
   in
   let register_v1_dynamic_rpc dac_plugin =
     match Node_context.get_mode node_ctxt with
@@ -308,7 +233,6 @@ let start ~rpc_address ~rpc_port ~allow_v1_api node_ctxt =
         V1.Committee_member.dynamic_rpc_dir dac_plugin page_store
     | Observer _observer_ctxt ->
         V1.Observer.dynamic_rpc_dir dac_plugin page_store
-    | Legacy _legacy_node_ctxt -> Tezos_rpc.Directory.empty
   in
   let register_health_endpoints dir =
     dir

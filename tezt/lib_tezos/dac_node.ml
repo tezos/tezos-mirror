@@ -25,12 +25,6 @@
 (*****************************************************************************)
 
 module Parameters = struct
-  type legacy_mode_settings = {
-    threshold : int;
-    committee_members : string list;
-    committee_member_address_opt : string option;
-  }
-
   type coordinator_mode_settings = {committee_members : string list}
 
   type committee_member_mode_settings = {
@@ -47,7 +41,6 @@ module Parameters = struct
   }
 
   type mode_settings =
-    | Legacy of legacy_mode_settings
     | Coordinator of coordinator_mode_settings
     | Committee_member of committee_member_mode_settings
     | Observer of observer_mode_settings
@@ -91,7 +84,6 @@ let name dac_node = dac_node.name
 
 let mode dac_node =
   match dac_node.persistent_state.mode with
-  | Legacy _ -> "Legacy"
   | Coordinator _ -> "Coordinator"
   | Committee_member _ -> "Committee_member"
   | Observer _ -> "Observer"
@@ -139,24 +131,6 @@ let spawn_config_init dac_node =
   in
   let mode_command =
     match dac_node.persistent_state.mode with
-    | Legacy legacy_params -> (
-        [
-          "configure";
-          "as";
-          "legacy";
-          "with";
-          "data";
-          "availability";
-          "committee";
-          "members";
-        ]
-        @ legacy_params.committee_members
-        @ ["and"; "threshold"; Int.to_string legacy_params.threshold]
-        @
-        match legacy_params.committee_member_address_opt with
-        | None -> []
-        | Some committee_member_address ->
-            ["--committee-member-address"; committee_member_address])
     | Coordinator coordinator_params ->
         [
           "configure";
@@ -323,48 +297,6 @@ let create_with_endpoint ?(path = Constant.dac_node) ?name ?color ?data_dir
   in
   on_event dac_node (handle_event dac_node) ;
   dac_node
-
-let create ?path ?name ?color ?data_dir ?event_pipe ?rpc_host ?rpc_port
-    ?reveal_data_dir ~mode ~node ~client ?allow_v1_api () =
-  create_with_endpoint
-    ?path
-    ?name
-    ?color
-    ?data_dir
-    ?event_pipe
-    ?rpc_host
-    ?rpc_port
-    ?reveal_data_dir
-    ~mode
-    ~endpoint:(Client.Node node)
-    ~client
-    ?allow_v1_api
-    ()
-
-let create_legacy ?(path = Constant.dac_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = localhost) ?rpc_port ?reveal_data_dir ~threshold
-    ~committee_members ?committee_member_address ~node ~client () =
-  let mode =
-    Legacy
-      {
-        threshold;
-        committee_members;
-        committee_member_address_opt = committee_member_address;
-      }
-  in
-  create
-    ~path
-    ?name
-    ?color
-    ?data_dir
-    ?event_pipe
-    ~rpc_host
-    ?rpc_port
-    ?reveal_data_dir
-    ~mode
-    ~node
-    ~client
-    ()
 
 let create_coordinator_with_endpoint ?path ?name ?color ?data_dir ?event_pipe
     ?rpc_host ?rpc_port ?reveal_data_dir ?allow_v1_api ~committee_members

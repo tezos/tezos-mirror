@@ -82,57 +82,6 @@ module Shared_by_V0_and_V1 = struct
 end
 
 module V0 = struct
-  let handle_post_store_preimage dac_plugin cctxt dac_sk_uris page_store
-      hash_streamer data =
-    let open Lwt_result_syntax in
-    let open Pages_encoding in
-    let* root_hash =
-      let* root_hash =
-        Merkle_tree.V0.Filesystem.serialize_payload dac_plugin ~page_store data
-      in
-      let () =
-        Data_streamer.publish hash_streamer (Dac_plugin.hash_to_raw root_hash)
-      in
-      let*! () =
-        Event.emit_root_hash_pushed_to_data_streamer dac_plugin root_hash
-      in
-      return root_hash
-    in
-    let* signature, witnesses =
-      Signature_manager.Legacy.sign_root_hash
-        dac_plugin
-        cctxt
-        dac_sk_uris
-        root_hash
-    in
-    let raw_root_hash = Dac_plugin.hash_to_raw root_hash in
-    let*! external_message =
-      External_message.Default.make dac_plugin root_hash signature witnesses
-    in
-    match external_message with
-    | Ok external_message -> return @@ (raw_root_hash, external_message)
-    | Error _ -> tzfail @@ Cannot_construct_external_message
-
-  let handle_get_verify_signature dac_plugin public_keys_opt encoded_l1_message
-      =
-    let open Lwt_result_syntax in
-    let ((module Plugin) : Dac_plugin.t) = dac_plugin in
-    let external_message =
-      let open Option_syntax in
-      let* encoded_l1_message in
-      let* as_bytes = Hex.to_bytes @@ `Hex encoded_l1_message in
-      External_message.Default.of_bytes Plugin.encoding as_bytes
-    in
-    match external_message with
-    | None -> tzfail @@ Cannot_deserialize_external_message
-    | Some {root_hash; signature; witnesses} ->
-        Signature_manager.verify
-          dac_plugin
-          ~public_keys_opt
-          (Dac_plugin.hash_to_raw root_hash)
-          signature
-          witnesses
-
   let handle_monitor_root_hashes hash_streamer =
     let open Lwt_syntax in
     let stream, stopper = Data_streamer.handle_subscribe hash_streamer in

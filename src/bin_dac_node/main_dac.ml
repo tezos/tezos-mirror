@@ -95,15 +95,6 @@ let tz4_public_key_param ?(name = "bls-public-key")
   in
   Tezos_clic.param ~name ~desc tz4_public_key_parameter
 
-let committee_member_address_arg =
-  Tezos_clic.arg
-    ~long:"committee-member-address"
-    ~placeholder:"committee-member-address"
-    ~doc:
-      (Format.sprintf
-         "The commitee member address, mandatory when node is a Member.")
-    tz4_address_parameter
-
 let positive_int_parameter =
   Tezos_clic.parameter (fun _cctxt p ->
       let open Lwt_result_syntax in
@@ -119,11 +110,6 @@ let timeout ~doc =
     ~placeholder:"timeout"
     ~doc
     positive_int_parameter
-
-let threshold_param ?(name = "DAC threshold parameter")
-    ?(desc =
-      "Number of DAC member signatures required to validate a root page hash") =
-  Tezos_clic.param ~name ~desc positive_int_parameter
 
 let rpc_address_arg =
   let default = Configuration.default_rpc_address in
@@ -208,52 +194,6 @@ module Config_init = struct
         (Configuration.filename config)
     in
     return ()
-
-  let legacy_command =
-    let open Tezos_clic in
-    command
-      ~group
-      ~desc:"(Deprecated) Configure DAC node in legacy mode."
-      (args5
-         data_dir_arg
-         rpc_address_arg
-         rpc_port_arg
-         committee_member_address_arg
-         reveal_data_dir_arg)
-      (prefixes
-         [
-           "configure";
-           "as";
-           "legacy";
-           "with";
-           "data";
-           "availability";
-           "committee";
-           "members";
-         ]
-      @@ non_terminal_seq ~suffix:["and"; "threshold"] tz4_address_param
-      @@ threshold_param @@ stop)
-      (fun ( data_dir,
-             rpc_address,
-             rpc_port,
-             committee_member_address_opt,
-             reveal_data_dir )
-           committee_members_addresses
-           threshold
-           cctxt ->
-        experimental_disclaimer () ;
-        create_configuration
-          ~data_dir
-          ~reveal_data_dir
-          ~rpc_address
-          ~rpc_port
-          ~allow_v1_api:false
-            (* [Legacy] mode exists only as part of the [V0]. *)
-          (Configuration.make_legacy
-             threshold
-             committee_members_addresses
-             committee_member_address_opt)
-          cctxt)
 
   let coordinator_command =
     let open Tezos_clic in
@@ -387,12 +327,7 @@ module Config_init = struct
           cctxt)
 
   let commands =
-    [
-      legacy_command;
-      coordinator_command;
-      committee_member_command;
-      observer_command;
-    ]
+    [coordinator_command; committee_member_command; observer_command]
 end
 
 let check_network cctxt =

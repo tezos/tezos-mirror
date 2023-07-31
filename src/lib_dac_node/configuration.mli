@@ -64,42 +64,11 @@ module Observer : sig
   val default_timeout : int
 end
 
-(** Legacy specific configuration. *)
-module Legacy : sig
-  (** The type of a legacy-specific configuration mode. *)
-  type t = {
-    threshold : int;
-    committee_members_addresses :
-      Tezos_crypto.Aggregate_signature.public_key_hash list;
-    dac_cctxt_config : host_and_port option;
-    committee_member_address_opt :
-      Tezos_crypto.Aggregate_signature.public_key_hash option;
-  }
-
-  (** [committee_members_addresses t] retrieves the addresses of the committee
-     members from the legacy configuration [t].*)
-  val committee_members_addresses :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash list
-
-  (** [threshold t] retrieves the Data Availability Committee threshold from
-     the legacy configuration [t]. *)
-  val threshold : t -> int
-
-  (** [host_and_port t] retrieves the host and port of the node that serves
-     as a coordinator for the DAC, if any is specified in the legacy node
-     condiguration. *)
-  val dac_cctxt_config : t -> host_and_port option
-
-  val committee_member_address_opt :
-    t -> Tezos_crypto.Aggregate_signature.public_key_hash option
-end
-
 (** Mode specific fragment of a configuration. *)
 type mode = private
   | Coordinator of Coordinator.t
   | Committee_member of Committee_member.t
   | Observer of Observer.t
-  | Legacy of Legacy.t
 
 type t = private {
   data_dir : string;  (** The path to the DAC node data directory. *)
@@ -136,18 +105,6 @@ val make_committee_member :
     [coordinator_rpc_address]. *)
 val make_observer :
   committee_rpc_addresses:Uri.t list -> ?timeout:int -> Uri.t -> mode
-
-(** [make_legacy ?coordinator_host_and_port threshold
-    committee_members_addresses]
-    creates a new legacy configuration mode with the specified input
-    parameters. If [host_and_port] is specified, then it will use as the
-    address of the coordinator node for the Data Availability Committee. *)
-val make_legacy :
-  ?coordinator_host_and_port:host_and_port ->
-  int ->
-  Tezos_crypto.Aggregate_signature.public_key_hash trace ->
-  Tezos_crypto.Aggregate_signature.public_key_hash option ->
-  mode
 
 (** [make ~data_dir ~reveal_data_dir ~allow_v1_api rpc_address rpc_port mode]
     creates a configuration value from the specified parameters. *)

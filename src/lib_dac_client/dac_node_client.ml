@@ -61,16 +61,6 @@ module V0 = struct
   let get_preimage (cctxt : #cctxt) ~page_hash =
     cctxt#call_service RPC_services.V0.get_preimage ((), page_hash) () ()
 
-  let post_store_preimage (cctxt : #cctxt) ~payload =
-    cctxt#call_service RPC_services.V0.post_store_preimage () () payload
-
-  let get_verify_signature (cctxt : #cctxt) ~external_message =
-    cctxt#call_service
-      RPC_services.V0.get_verify_signature
-      ()
-      external_message
-      ()
-
   let put_dac_member_signature (cctxt : #cctxt) ~signature =
     cctxt#call_service RPC_services.V0.put_dac_member_signature () () signature
 

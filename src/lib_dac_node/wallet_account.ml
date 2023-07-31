@@ -75,18 +75,3 @@ module Committee_member = struct
     | None -> tzfail @@ Committee_member_cannot_sign pkh
     | Some secret_key_uri -> return {public_key_hash; secret_key_uri}
 end
-
-module Legacy = struct
-  type t = {
-    public_key_hash : Aggregate_signature.public_key_hash;
-    public_key_opt : Aggregate_signature.public_key option;
-    secret_key_uri_opt : Client_keys.aggregate_sk_uri option;
-  }
-
-  let of_committee_member_address pkh cctxt =
-    let open Lwt_result_syntax in
-    let+ public_key_hash, public_key_opt, secret_key_uri_opt =
-      Wallet_cctxt_helpers.get_keys cctxt pkh
-    in
-    {public_key_hash; public_key_opt; secret_key_uri_opt}
-end
