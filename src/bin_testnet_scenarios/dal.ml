@@ -169,7 +169,7 @@ let scenario network =
       let slot_index = key_index mod number_of_slots in
 
       Log.info
-        "publishing slot at level %d with index %d..."
+        "Publishing a slot at level %d with index %d..."
         current_level
         slot_index ;
       let* commitment =
