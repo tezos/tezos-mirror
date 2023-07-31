@@ -93,7 +93,13 @@ exports.print_bench = function (src) {
     print_list(inputs.shift())
     console.log("]")
 }
+exports.print_raw_txs = function (src) {
+    const txs = src.slice();
+    txs.forEach(element => {
+        console.log(element)
+    });
 
+}
 exports.encode_number = function (n) {
 
     let s = "00000000000000000000000000000000"

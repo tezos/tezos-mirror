@@ -32,7 +32,13 @@ npm install @ethereumjs/common @ethereumjs/tx
 ./signer.js > 100-inputs-for-proxy
 ```
 
-#Smart contracts inputs
+# 100-loops
+The file `100-loops` has been produced by a scenario in `kernel_evm/benchmarks`
+```
+node src/kernel_evm/benchmark/scripts/benchmarks/bench_loop_expensive.js raw
+```
+
+# Smart contracts inputs
 
 To deploy a solidity contract on the rollup two files are necessary:
 - the ABI (interface), in a JSON format,
@@ -43,9 +49,3 @@ standard tooling. For example [Remix](https://remix.ethereum.org/) (online IDE)
 or other tools.
 
 The contracts source code can be found in `src/kernel_evm/solidity_examples`.
-
-# 100-loops
-The file `100-loops` has been produced by a scenario in `kernel_evm/benchmarks`
-```
-node src/kernel_evm/benchmarks/scripts/benchmarks/test_loop_new_actors.js
-```
