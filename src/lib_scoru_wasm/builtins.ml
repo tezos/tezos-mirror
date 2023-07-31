@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type reveals = {
-  reveal_preimage : string -> string Lwt.t;
-  reveal_metadata : unit -> string Lwt.t;
-}
+type reveals = Wasm_pvm_state.reveal -> string Lwt.t
 
 type write_debug = Noop | Printer of (string -> unit Lwt.t)

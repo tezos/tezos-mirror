@@ -104,3 +104,10 @@ val frame_encoding : Eval.frame Tezos_tree_encoding.t
 val config_encoding : Eval.config Tezos_tree_encoding.t
 
 val buffers_encoding : Eval.buffers Tezos_tree_encoding.t
+
+module Internal_for_tests : sig
+  val reveal_encoding : Wasm_pvm_state.reveal Tezos_tree_encoding.t
+
+  val compatibility_reveal_encoding :
+    Wasm_pvm_state.Compatibility.reveal Tezos_tree_encoding.t
+end

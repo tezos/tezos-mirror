@@ -77,6 +77,36 @@ let test_module_roundtrip =
       let* () = assert_string_equal module1_str module2_str in
       assert_string_equal module2_str module3_str)
 
+let test_compatibility_reveal compat current () =
+  let open Lwt_result_syntax in
+  let*! empty_tree = empty_tree () in
+  let*! compat_tree =
+    Tree_encoding_runner.encode
+      Wasm_encoding.Internal_for_tests.compatibility_reveal_encoding
+      compat
+      empty_tree
+  in
+  let*! current_tree =
+    Tree_encoding_runner.encode
+      Wasm_encoding.Internal_for_tests.reveal_encoding
+      current
+      empty_tree
+  in
+  assert (Tree.equal compat_tree current_tree) ;
+  let*! compat' =
+    Tree_encoding_runner.decode
+      Wasm_encoding.Internal_for_tests.compatibility_reveal_encoding
+      current_tree
+  in
+  let*! current' =
+    Tree_encoding_runner.decode
+      Wasm_encoding.Internal_for_tests.reveal_encoding
+      compat_tree
+  in
+  assert (compat = compat') ;
+  assert (current = current') ;
+  return_unit
+
 (** Test serialize/deserialize an encodable values and compare trees.
 
     More formally, test that for all values, encoding, decoding and
@@ -163,6 +193,22 @@ let tests =
     test_buffers_tree;
     test_frame_tree;
     test_config_tree;
+    Tztest.tztest
+      "Reveal tree encoding compatibility: Reveal_metadata"
+      `Quick
+      (test_compatibility_reveal Reveal_metadata Wasm_pvm_state.reveal_metadata);
+    Tztest.tztest
+      "Reveal tree encoding compatibility: Reveal_raw_data"
+      `Quick
+      (test_compatibility_reveal
+         (Reveal_raw_data "some string")
+         (Wasm_pvm_state.reveal_raw_data "some string"));
+    Tztest.tztest
+      "Reveal tree encoding compatibility: Reveal_raw_data empty"
+      `Quick
+      (test_compatibility_reveal
+         (Reveal_raw_data "")
+         (Wasm_pvm_state.reveal_raw_data ""));
   ]
 
 let () =

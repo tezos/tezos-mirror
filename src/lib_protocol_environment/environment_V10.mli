@@ -116,15 +116,13 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.reveal =
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal
        and type Wasm_2_0_0.version = Tezos_scoru_wasm.Wasm_pvm_state.version
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
        and type Wasm_2_0_0.reveal_hash =
-        Tezos_scoru_wasm.Wasm_pvm_state.reveal_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_state.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.reveal_hash
        and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t

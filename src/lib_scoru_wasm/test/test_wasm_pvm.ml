@@ -1088,14 +1088,17 @@ let test_reveal_upgrade_kernel_ok ~version () =
   let* () =
     let open Wasm_pvm_state in
     match info.Wasm_pvm_state.input_request with
-    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
-        (* The PVM has reached a point where it’s asking for some
-           preimage. Since the memory is left blank, we are looking
-           for the zero hash *)
-        let zero_hash = String.make 33 '\000' in
-        assert (hash = zero_hash) ;
-        return_unit
-    | No_input_required | Input_required | Reveal_required _ -> assert false
+    | Wasm_pvm_state.Reveal_required req -> (
+        match Wasm_pvm_state.Compatibility.of_current_opt req with
+        | Some (Reveal_raw_data hash) ->
+            (* The PVM has reached a point where it’s asking for some
+               preimage. Since the memory is left blank, we are looking
+               for the zero hash *)
+            let zero_hash = String.make 33 '\x00' in
+            assert (hash = zero_hash) ;
+            return_unit
+        | _ -> assert false)
+    | No_input_required | Input_required -> assert false
   in
   let new_kernel =
     {|
@@ -1168,14 +1171,17 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~version ~binary
     let* () =
       let open Wasm_pvm_state in
       match info.Wasm_pvm_state.input_request with
-      | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
-          (* The PVM has reached a point where it’s asking for some
-             preimage. Since the memory is left blank, we are looking
-             for the zero hash *)
-          let zero_hash = String.make 33 '\000' in
-          assert (hash = zero_hash) ;
-          return_unit
-      | No_input_required | Input_required | Reveal_required _ -> assert false
+      | Wasm_pvm_state.Reveal_required req -> (
+          match Wasm_pvm_state.Compatibility.of_current_opt req with
+          | Some (Reveal_raw_data hash) ->
+              (* The PVM has reached a point where it’s asking for some
+                 preimage. Since the memory is left blank, we are looking
+                 for the zero hash *)
+              let zero_hash = String.make 33 '\000' in
+              assert (hash = zero_hash) ;
+              return_unit
+          | _ -> assert false)
+      | No_input_required | Input_required -> assert false
     in
     let*! tree = Wasm.reveal_step (Bytes.of_string preimage) tree in
     let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in

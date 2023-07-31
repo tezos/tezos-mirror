@@ -5,7 +5,12 @@ type available_memories =
 
 type reveal_destination = {base : int32; max_bytes : int32}
 
-type reveal = Reveal_raw_data of string | Reveal_metadata
+type reveal =
+  | Reveal_raw of string
+      (** The interpretation of the payload of [Reveal_raw] is delegated to
+          the consumer of the interpreter. In the context of the WASM PVM,
+          the contents is expected to be compatible with
+          [Sc_rollup_reveal_hash.encoding]. *)
 
 type ticks = Z.t
 

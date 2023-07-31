@@ -323,6 +323,28 @@ let test_output () =
         (Exn (Failure "An output proof is not valid."))
   | Error _ -> failwith "Error during proof generation"
 
+let test_reveal_compat_metadata () =
+  let open Alpha_context.Sc_rollup in
+  let open Tezos_scoru_wasm.Wasm_pvm_state in
+  let (Reveal_raw metadata_scoru_wasm) = reveal_metadata in
+  let metadata_protocol =
+    Data_encoding.Binary.to_string_exn reveal_encoding Reveal_metadata
+  in
+  Assert.equal_string ~loc:__LOC__ metadata_scoru_wasm metadata_protocol
+
+let test_reveal_compat_raw_data () =
+  let open Alpha_context.Sc_rollup in
+  let open Tezos_scoru_wasm.Wasm_pvm_state in
+  let hash = Wasm_2_0_0PVM.well_known_reveal_hash in
+  let hash_string =
+    Data_encoding.Binary.to_string_exn Sc_rollup_reveal_hash.encoding hash
+  in
+  let (Reveal_raw raw_data_scoru_wasm) = reveal_raw_data hash_string in
+  let raw_data_protocol =
+    Data_encoding.Binary.to_string_exn reveal_encoding (Reveal_raw_data hash)
+  in
+  Assert.equal_string ~loc:__LOC__ raw_data_scoru_wasm raw_data_protocol
+
 (* When snapshoting a new protocol, to fix this test, the following
    action should be done.
 
@@ -368,6 +390,14 @@ let tests =
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
     Tztest.tztest "output proofs" `Quick test_output;
+    Tztest.tztest
+      "lib_scoru_wasm reveal encoding compatibility: Reveal_metadata"
+      `Quick
+      test_reveal_compat_metadata;
+    Tztest.tztest
+      "lib_scoru_wasm reveal encoding compatibility: Reveal_raw_data"
+      `Quick
+      test_reveal_compat_raw_data;
     Tztest.tztest "protocol names consistency" `Quick test_protocol_names;
   ]
 

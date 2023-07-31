@@ -315,7 +315,7 @@ let reveal_preimage_manually retries hash =
   input_preimage retries
 
 let reveal_preimage_builtin config retries hash =
-  let (`Hex hex) = Hex.of_string hash in
+  let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
   Lwt.catch
     (fun () ->
       let path = Filename.concat config.Config.preimage_directory hex in
@@ -325,14 +325,17 @@ let reveal_preimage_builtin config retries hash =
       Lwt.return s)
     (fun _ -> reveal_preimage_manually retries hex)
 
-let reveals config =
-  Tezos_scoru_wasm.Builtins.
-    {
-      (* We retry 3 times to reveal the preimage manually, this should be
-         configurable at some point. *)
-      reveal_preimage = reveal_preimage_builtin config 3;
-      reveal_metadata = (fun () -> Lwt.return (build_metadata config));
-    }
+let reveals config request =
+  let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
+  match Wasm_2_0_0PVM.decode_reveal request with
+  | Reveal_raw_data hash -> reveal_preimage_builtin config 3 hash
+  | Reveal_metadata -> Lwt.return (build_metadata config)
+  | Request_dal_page _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6165
+         Support DAL requests in the WASM debugger. *)
+      Stdlib.failwith
+        "The kernel tried to request a DAL page, but this is not yet supported \
+         by the debugger."
 
 let write_debug =
   Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_io.printf "%s%!" msg)
@@ -594,10 +597,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let pp_input_request ppf = function
     | Wasm_pvm_state.No_input_required -> Format.fprintf ppf "Evaluating"
     | Input_required -> Format.fprintf ppf "Waiting for input"
-    | Reveal_required Reveal_metadata ->
-        Format.fprintf ppf "Waiting for metadata"
-    | Reveal_required (Reveal_raw_data hash) ->
-        Format.fprintf ppf "Waiting for reveal: %a" Hex.pp @@ Hex.of_string hash
+    | Reveal_required req ->
+        let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
+        let req = Wasm_2_0_0PVM.decode_reveal req in
+        Format.fprintf ppf "Waiting for reveal: %a" pp_reveal req
 
   (* [show_status tree] show the state of the PVM. *)
   let show_status tree =
@@ -875,30 +878,44 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let reveal_preimage config bytes tree =
     let open Lwt_syntax in
     let* info = Wasm.get_info tree in
-    match
-      ( info.Tezos_scoru_wasm.Wasm_pvm_state.input_request,
-        Option.bind bytes (fun bytes -> Hex.to_bytes (`Hex bytes)) )
-    with
-    | ( Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required (Reveal_raw_data _)),
-        Some preimage ) ->
-        Wasm.reveal_step preimage tree
-    | Reveal_required (Reveal_raw_data hash), None ->
-        Lwt.catch
-          (fun () ->
-            let* preimage = reveal_preimage_builtin config 1 hash in
-            Wasm.reveal_step (String.to_bytes preimage) tree)
-          (fun _ -> return tree)
+    match info.Tezos_scoru_wasm.Wasm_pvm_state.input_request with
+    | Reveal_required req -> (
+        match
+          ( Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
+            .decode_reveal
+              req,
+            Option.bind bytes (fun bytes -> Hex.to_bytes (`Hex bytes)) )
+        with
+        | Reveal_raw_data _, Some preimage -> Wasm.reveal_step preimage tree
+        | Reveal_raw_data hash, None ->
+            Lwt.catch
+              (fun () ->
+                let* preimage = reveal_preimage_builtin config 1 hash in
+                Wasm.reveal_step (String.to_bytes preimage) tree)
+              (fun _ -> return tree)
+        | _ ->
+            let+ () = Lwt_io.print "Error: not the expected reveal step\n%!" in
+            tree)
     | _ ->
-        let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
+        let+ () = Lwt_io.print "Error: not a reveal step\n%!" in
         tree
 
   let reveal_metadata config tree =
     let open Lwt_syntax in
     let* info = Wasm.get_info tree in
     match info.Tezos_scoru_wasm.Wasm_pvm_state.input_request with
-    | Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required Reveal_metadata) ->
-        let data = build_metadata config in
-        Wasm.reveal_step (Bytes.of_string data) tree
+    | Tezos_scoru_wasm.Wasm_pvm_state.(Reveal_required req) -> (
+        match
+          Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
+          .decode_reveal
+            req
+        with
+        | Reveal_metadata ->
+            let data = build_metadata config in
+            Wasm.reveal_step (Bytes.of_string data) tree
+        | _ ->
+            let+ () = Lwt_io.print "Error: Not the expected reveal step\n%!" in
+            tree)
     | _ ->
         let+ () = Lwt_io.print "Error: Not in a reveal step\n%!" in
         tree

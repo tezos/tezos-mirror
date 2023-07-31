@@ -2,7 +2,7 @@ type available_memories =
   | No_memories_during_init
   | Available_memories of Instance.memory_inst Instance.Vector.t
 
-type reveal = Reveal_raw_data of string | Reveal_metadata
+type reveal = Reveal_raw of string
 
 type reveal_destination = {base : int32; max_bytes : int32}
 

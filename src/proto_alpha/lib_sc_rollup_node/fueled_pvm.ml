@@ -90,45 +90,32 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     let dal_attestation_lag =
       node_ctxt.current_protocol.constants.dal.attestation_lag
     in
-    let reveal_builtins =
-      Tezos_scoru_wasm.Builtins.
-        {
-          reveal_preimage =
-            (fun hash ->
-              let*! data =
-                let*? hash =
-                  (* The payload represents the encoded [Sc_rollup_reveal_hash.t]. We must
-                     decode it properly, instead of converting it byte-for-byte. *)
-                  Result.bind_error
-                    (Data_encoding.Binary.of_string
-                       Sc_rollup_reveal_hash.encoding
-                       hash)
-                    (error_with
-                       "Bad reveal hash '%a': %a"
-                       Hex.pp
-                       (Hex.of_string hash)
-                       Data_encoding.Binary.pp_read_error)
-                in
-                get_reveal
-                  ~dac_client:node_ctxt.dac_client
-                  ~data_dir:node_ctxt.data_dir
-                  ~pvm_kind:node_ctxt.kind
-                  reveal_map
-                  hash
-              in
-              match data with
-              | Error error ->
-                  (* The [Error_wrapper] must be caught upstream and converted into a
-                     tzresult. *)
-                  Lwt.fail (Error_wrapper error)
-              | Ok data -> Lwt.return data);
-          reveal_metadata =
-            (fun () ->
-              Lwt.return
-                (Data_encoding.Binary.to_string_exn
-                   Sc_rollup.Metadata.encoding
-                   metadata));
-        }
+    let reveal_builtins request =
+      match Sc_rollup.Wasm_2_0_0PVM.decode_reveal request with
+      | Reveal_raw_data hash -> (
+          let*! data =
+            get_reveal
+              ~dac_client:node_ctxt.dac_client
+              ~data_dir:node_ctxt.data_dir
+              ~pvm_kind:node_ctxt.kind
+              reveal_map
+              hash
+          in
+          match data with
+          | Error error ->
+              (* The [Error_wrapper] must be caught upstream and converted into
+                 a tzresult. *)
+              Lwt.fail (Error_wrapper error)
+          | Ok data -> Lwt.return data)
+      | Reveal_metadata ->
+          Lwt.return
+            (Data_encoding.Binary.to_string_exn
+               Sc_rollup.Metadata.encoding
+               metadata)
+      | Request_dal_page _ ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3927
+             Support DAL in WASM PVM. *)
+          assert false
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
