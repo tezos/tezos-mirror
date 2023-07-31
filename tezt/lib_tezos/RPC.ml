@@ -1057,6 +1057,26 @@ let post_chain_block_context_smart_rollups_smart_rollup_ticket_balance
     ~data
     JSON.as_int
 
+let get_chain_block_context_smart_rollups_smart_rollup_whitelist
+    ?(chain = "main") ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "whitelist";
+    ]
+    (fun whitelist ->
+      match JSON.(as_list_opt whitelist) with
+      | Some l -> Some (List.map JSON.as_string l)
+      | None -> None)
+
 let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
   make
     GET

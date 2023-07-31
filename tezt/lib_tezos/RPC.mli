@@ -932,6 +932,10 @@ val post_chain_block_context_smart_rollups_smart_rollup_ticket_balance :
   unit ->
   int t
 
+(** RPC: [GET: chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/whitelist] *)
+val get_chain_block_context_smart_rollups_smart_rollup_whitelist :
+  ?chain:string -> ?block:string -> string -> string list option t
+
 (** {2 Delegates RPC module } *)
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates]

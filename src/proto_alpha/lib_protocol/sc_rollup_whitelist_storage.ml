@@ -55,3 +55,17 @@ let check_access_to_private_rollup ctxt rollup staker =
     in
     return ctxt
   else return ctxt
+
+let find_whitelist_uncarbonated ctxt rollup_address =
+  let open Lwt_result_syntax in
+  let* _, is_private = is_private ctxt rollup_address in
+  if is_private then
+    let*! elts =
+      Storage.Sc_rollup.Whitelist.fold_keys_unaccounted
+        (ctxt, rollup_address)
+        ~order:`Sorted
+        ~init:[]
+        ~f:(fun pkh acc -> Lwt.return (pkh :: acc))
+    in
+    return (Some elts)
+  else return None

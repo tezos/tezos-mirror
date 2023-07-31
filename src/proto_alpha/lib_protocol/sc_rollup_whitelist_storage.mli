@@ -47,3 +47,9 @@ val check_access_to_private_rollup :
   Sc_rollup_repr.t ->
   Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
+
+(** [find_whitelist_uncarbonated context rollup] returns the whitelist from the storage. *)
+val find_whitelist_uncarbonated :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Signature.public_key_hash list option tzresult Lwt.t
