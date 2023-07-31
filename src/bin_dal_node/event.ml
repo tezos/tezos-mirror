@@ -216,12 +216,12 @@ let rpc_server_is_ready =
     ~level:Notice
     ("point", P2p_point.Id.encoding)
 
-let starting_metrics_server =
+let metrics_server_is_ready =
   let open Internal_event.Simple in
   declare_2
     ~section
     ~name:"starting_metrics_server"
-    ~msg:"starting metrics server on {host}:{port}"
+    ~msg:"metrics server is listening on {host}:{port}"
     ~level:Notice
     ("host", Data_encoding.string)
     ("port", Data_encoding.uint16)

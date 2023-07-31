@@ -85,4 +85,4 @@ val message_validation_error : (Gossipsub.message_id * string) t
 val rpc_server_is_ready : P2p_point.Id.t t
 
 (** Emitted when the metrics server starts *)
-val starting_metrics_server : (string * int) t
+val metrics_server_is_ready : (string * int) t
