@@ -2466,6 +2466,15 @@ module Sc_rollup = struct
         ~input:Ticket_token.unparsed_token_encoding
         ~output:n
         RPC_path.(path_sc_rollup / "ticket_balance")
+
+    let whitelist =
+      RPC_service.get_service
+        ~description:
+          "Whitelist for private smart rollups. If the output is None then the \
+           rollup is public."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(option Sc_rollup.Whitelist.encoding)
+        RPC_path.(path_sc_rollup / "whitelist")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2476,6 +2485,10 @@ module Sc_rollup = struct
     Registration.register0 ~chunked:true S.inbox (fun ctxt () () ->
         let* inbox, _ctxt = Sc_rollup.Inbox.get_inbox ctxt in
         return inbox)
+
+  let register_whitelist () =
+    Registration.register1 ~chunked:true S.whitelist (fun ctxt address () () ->
+        Sc_rollup.Whitelist.find_whitelist_uncarbonated ctxt address)
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -2672,6 +2685,7 @@ module Sc_rollup = struct
   let register () =
     register_kind () ;
     register_inbox () ;
+    register_whitelist () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;

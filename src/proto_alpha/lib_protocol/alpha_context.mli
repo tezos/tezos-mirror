@@ -2791,6 +2791,9 @@ module Sc_rollup : sig
     val init :
       context -> Address.t -> whitelist:t -> (context * int) tzresult Lwt.t
 
+    val find_whitelist_uncarbonated :
+      context -> Address.t -> t option tzresult Lwt.t
+
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit
