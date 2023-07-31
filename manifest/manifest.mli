@@ -546,9 +546,16 @@ type preprocessor
 
 (** Make a preprocessor.
 
-    [pps ?args target] becomes a [(preprocess (pps target args))] stanza in the [dune] file.
+    [pps target] becomes a [(preprocess (pps target))] stanza in the [dune] file.
     The target's package is also added as a dependency in the [.opam] file. *)
-val pps : ?args:string list -> target -> preprocessor
+val pps : target -> preprocessor
+
+(** Apply multiple preprocessors.
+
+    [pps targets] becomes a [(preprocess (pps targets...))] stanza in the [dune]
+    file. The targets' packages are also added as dependencies in the [.opam]
+    file. *)
+val ppses : target list -> preprocessor
 
 (** Make a staged preprocessor.
 
