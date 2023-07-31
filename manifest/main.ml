@@ -2998,7 +2998,7 @@ let tezos_protocol_environment_sigs =
                  ];
                ])
        in
-       let latest_environment_number = 10 in
+       let latest_environment_number = 11 in
        List.init (latest_environment_number + 1) gen |> Dune.of_list)
 
 let octez_protocol_environment_structs =
