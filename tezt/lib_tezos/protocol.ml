@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Mumbai | Nairobi | Oxford | Alpha
+type t = Nairobi | Oxford | Alpha
 
 type constants =
   | Constants_sandbox
@@ -41,19 +41,13 @@ let constants_to_string = function
 
 let name = function
   | Alpha -> "Alpha"
-  | Mumbai -> "Mumbai"
   | Nairobi -> "Nairobi"
   | Oxford -> "Oxford"
 
-let number = function
-  | Mumbai -> 016
-  | Nairobi -> 017
-  | Oxford -> 018
-  | Alpha -> 019
+let number = function Nairobi -> 017 | Oxford -> 018 | Alpha -> 019
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Mumbai -> "proto_016_PtMumbai"
   | Nairobi -> "proto_017_PtNairob"
   | Oxford -> "proto_018_Proxford"
 
@@ -62,7 +56,6 @@ let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Mumbai -> "PtMumbai2TmsJHNGRkD8v8YDbtao7BLUC3wjASn1inAKLFCjaH1"
   | Nairobi -> "PtNairobiyssHuh87hEhfVBGCVrK3WnS8Z2FT4ymB5tAa4r1nQf"
   | Oxford -> "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef"
 
@@ -250,7 +243,6 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Mumbai -> Some Nairobi
   | Nairobi -> Some Alpha
   | Oxford -> None
   | Alpha -> None
@@ -258,10 +250,9 @@ let next_protocol = function
 let previous_protocol = function
   | Alpha -> Some Nairobi
   | Oxford -> Some Nairobi
-  | Nairobi -> Some Mumbai
-  | Mumbai -> None
+  | Nairobi -> None
 
-let all = [Mumbai; Nairobi; Oxford; Alpha]
+let all = [Nairobi; Oxford; Alpha]
 
 type supported_protocols =
   | Any_protocol

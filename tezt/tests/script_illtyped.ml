@@ -71,7 +71,7 @@ let test_ill_typecheck script error_pattern =
   |> Process.check_error ~msg:error_pattern
 
 let test_legacy_typecheck protocols =
-  [("timelock", Protocol.Until_protocol 016)]
+  [("timelock", Protocol.(Until_protocol (number Nairobi)))]
   |> List.iter @@ fun (script, supports) ->
      ( Protocol.register_test
          ~__FILE__

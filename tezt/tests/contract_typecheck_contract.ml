@@ -192,7 +192,7 @@ let test_implicit =
     | Oxford | Alpha ->
         "is not acceptable as a handle to an implicit account, whose \
          parameters type can only be unit or ticket <ty>"
-    | Mumbai | Nairobi -> "Type nat is not compatible with type unit."
+    | Nairobi -> "Type nat is not compatible with type unit."
   in
   let* () =
     check_contract_ko client tz1 (Some "a") "unit" no_entrypoint_error

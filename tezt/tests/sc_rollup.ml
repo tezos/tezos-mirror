@@ -44,7 +44,6 @@ open Sc_rollup_helpers
 let default_wasm_pvm_revision = function
   | Protocol.Alpha | Protocol.Oxford -> "2.0.0-r2"
   | Protocol.Nairobi -> "2.0.0-r1"
-  | Protocol.Mumbai -> "2.0.0"
 
 let assert_some_client_command cmd ~__LOC__ ?hooks client =
   let*! v_opt = cmd ?hooks client in
@@ -70,23 +69,13 @@ let reveal_hash_hex data =
   in
   "00" ^ hash
 
-let reveal_hash_b58_mumbai_arith data =
-  Tezos_protocol_016_PtMumbai.Protocol.Sc_rollup_reveal_hash.(
-    hash_string ~scheme:Blake2B [data] |> to_b58check)
-
 type reveal_hash = {message : string; filename : string}
 
-let reveal_hash ~protocol ~kind data =
+let reveal_hash ~protocol:_ ~kind data =
   let hex_hash = reveal_hash_hex data in
-  match (protocol, kind) with
-  | Protocol.Mumbai, "arith" ->
-      (* Only for arith PVM, the message should have the form "hash:scrrh1..."  *)
-      {
-        message = "hash:" ^ reveal_hash_b58_mumbai_arith data;
-        filename = hex_hash;
-      }
-  | _, "arith" -> {message = "hash:" ^ hex_hash; filename = hex_hash}
-  | _, _ ->
+  match kind with
+  | "arith" -> {message = "hash:" ^ hex_hash; filename = hex_hash}
+  | _ ->
       (* Not used for wasm yet. *)
       assert false
 
@@ -4362,15 +4351,12 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
                  | None -> ""
                  | Some entrypoint ->
                      Format.asprintf {| , "entrypoint" : "%s" |} entrypoint)
-                 (match protocol with
-                 | Protocol.Mumbai -> ""
-                 | _ ->
-                     Printf.sprintf
-                       {|, "kind": "%s"|}
-                       (Option.fold
-                          ~none:"untyped"
-                          ~some:(fun _ -> "typed")
-                          outbox_parameters_ty))
+                 (Printf.sprintf
+                    {|, "kind": "%s"|}
+                    (Option.fold
+                       ~none:"untyped"
+                       ~some:(fun _ -> "typed")
+                       outbox_parameters_ty))
           in
           Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;

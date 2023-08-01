@@ -84,7 +84,6 @@ let baker_stresstest =
 let baker_stresstest_apply =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number Mumbai))
     ~title:"baker stresstest with forced application"
     ~tags:["node"; "baker"; "stresstest"; "apply"]
   @@ fun protocol ->

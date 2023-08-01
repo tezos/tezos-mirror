@@ -313,127 +313,6 @@ let assert_state_changed ?block sc_rollup_client prev_state_hash =
     ~error_msg:"State hash has not changed (%L <> %R)" ;
   Lwt.return_unit
 
-module Coordinator = struct
-  let test_dac_not_ready_without_protocol =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac coordinator startup not ready with unsupported protocol"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let dac_node =
-      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* GET /health/live must succeed *)
-    let* () = check_alive dac_node in
-    (* GET /health/ready must fail *)
-    let* () = check_not_ready dac_node in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-end
-
-module Observer = struct
-  let test_dac_not_ready_without_protocol =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac Observer startup not ready with unsupported protocol"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let coordinator_node =
-      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
-    in
-    let dac_node =
-      Dac_node.create_observer
-        ?name:(Some "observer")
-        ~node
-        ~client
-        ?reveal_data_dir:(Some "observer")
-        ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-        ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-        ~allow_v1_api:false
-        ~committee_member_rpcs:[("http://localhost", 11111)]
-        ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* GET /health/live must succeed *)
-    let* () = check_alive dac_node in
-    (* GET /health/ready must fail *)
-    let* () = check_not_ready dac_node in
-    let* () = Dac_node.terminate coordinator_node in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-end
-
-module Member = struct
-  let test_dac_not_ready_without_protocol =
-    Protocol.register_test
-      ~__FILE__
-      ~title:"dac Member startup not ready with unsupported protocol"
-      ~tags:["dac"; "dac_node"]
-    @@ fun protocol ->
-    let run_dac = Dac_node.run ~wait_ready:false in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    let* node, client =
-      Client.init_with_protocol
-        `Client
-        ~protocol
-        ~event_sections_levels:[("prevalidator", `Debug)]
-        ~nodes_args
-        ()
-    in
-    let coordinator_node =
-      Dac_node.create_coordinator ~node ~client ~committee_members:[] ()
-    in
-    let* key =
-      Client.bls_gen_and_show_keys
-        ~alias:(Format.sprintf "committee-member-%d" 0)
-        client
-    in
-    let dac_node =
-      Dac_node.create_committee_member
-        ?name:(Some "member")
-        ~node
-        ~client
-        ?reveal_data_dir:(Some "member")
-        ~coordinator_rpc_host:(Dac_node.rpc_host coordinator_node)
-        ~coordinator_rpc_port:(Dac_node.rpc_port coordinator_node)
-        ~allow_v1_api:false
-        ~address:key.aggregate_public_key_hash
-        ()
-    in
-    let* _dir = Dac_node.init_config dac_node in
-    let* () = run_dac dac_node in
-    (* GET /health/live must succeed *)
-    let* () = check_alive dac_node in
-    (* GET /health/ready must fail *)
-    let* () = check_not_ready dac_node in
-    let* () = Dac_node.terminate coordinator_node in
-    let* () = Dac_node.terminate dac_node in
-    return ()
-end
-
 (** [Full_infrastructure] is a test suite consisting only of tests with the DAC
     nodes running. *)
 module Full_infrastructure = struct
@@ -2456,6 +2335,7 @@ module Tx_kernel_e2e = struct
     let custom_committee_members = [Constant.aggregate_tz4_account] in
     Dac_helper.scenario_with_full_dac_infrastructure
       ~__FILE__
+      ~supports:Protocol.(From_protocol (number Oxford))
       ~tags:["wasm"; "kernel"; "wasm_2_0_0"; "kernel_e2e"; "dac"; "full"]
       ~pvm_name:"wasm_2_0_0"
       ~committee_size:0
@@ -2466,11 +2346,6 @@ module Tx_kernel_e2e = struct
       "kernel_e2e.dac_observer_missing_pages"
       (test_tx_kernel_e2e_with_dac_observer_missing_pages commitment_period)
 end
-
-let register_with_unsupported_protocol ~protocols =
-  Coordinator.test_dac_not_ready_without_protocol protocols ;
-  Observer.test_dac_not_ready_without_protocol protocols ;
-  Member.test_dac_not_ready_without_protocol protocols
 
 (** [V1_API] is a test suite for [V1] API. *)
 module V1_API = struct
