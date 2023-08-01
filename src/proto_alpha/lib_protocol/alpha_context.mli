@@ -2789,7 +2789,7 @@ module Sc_rollup : sig
     type t = public_key_hash list
 
     val init :
-      context -> Address.t -> whitelist:t -> (context * int) tzresult Lwt.t
+      context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
 
     val find_whitelist_uncarbonated :
       context -> Address.t -> t option tzresult Lwt.t

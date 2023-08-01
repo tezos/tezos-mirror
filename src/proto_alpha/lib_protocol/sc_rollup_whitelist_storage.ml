@@ -32,18 +32,21 @@ let is_private ctxt rollup =
 
 let init ctxt rollup_address ~whitelist =
   let open Lwt_result_syntax in
-  List.fold_left_es
-    (fun (ctxt, size) e ->
-      let* ctxt, size_e =
-        (* the storage fails when there key already exists. This is
-           only to improve the UX so that it returns a cleaner
-           error. *)
-        trace Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
-        @@ Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
-      in
-      return (ctxt, size + size_e))
-    (ctxt, 0)
-    whitelist
+  let* ctxt, used_storage =
+    List.fold_left_es
+      (fun (ctxt, size) e ->
+        let* ctxt, size_e =
+          (* the storage fails when there key already exists. This is
+             only to improve the UX so that it returns a cleaner
+             error. *)
+          trace Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
+          @@ Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
+        in
+        return (ctxt, Z.add size (Z.of_int size_e)))
+      (ctxt, Z.zero)
+      whitelist
+  in
+  return (ctxt, used_storage)
 
 let check_access_to_private_rollup ctxt rollup staker =
   let open Lwt_result_syntax in
