@@ -5,10 +5,14 @@
 ### EVM Kernel
 
 - Kernel has an internal version. (!9579)
+- Improve kernel's logging from the rollup node's perspective. (!9571)
+- Adds a base gas cost of 21000 for every transaction. Note that the fees are
+  still not paid by the sender. (!9477)
 
 ### EVM Node
 
 - The EVM node is in sync. with either the current or next kernel version. (!9579)
+- Hash transactions with Keccak. (!9588)
 
 ### Bug fixes
 
@@ -20,4 +24,9 @@
 
 ### Internal
 
+- Introduce `anyhow` for error management. (!9377, !9443)
+- Interrupt execution before reaching max number of ticks. (!9214)
+- Upgrade to Kernel SDK 0.2.1 (!9417, !9526)
+- Porting benchmark framework to the EVM Kernel. (!9529, !9524, !9545)
+- Reorganized dependencies at the workspace level. (!9522)
 - Adds a storage migration stage (`stage 0`). (!9591)
