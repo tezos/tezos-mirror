@@ -14,6 +14,6 @@ ARG SSH_PUBLIC_KEY
 RUN echo $SSH_PUBLIC_KEY >> /root/.ssh/authorized_keys
 # Copy zcash params from local machine to the remote one
 ARG ZCASH_PARAMS_PATH
-COPY _opam/share/zcash-params /usr/local/share/zcash-params
+COPY $ZCASH_PARAMS_PATH /usr/local/share/zcash-params
 # We run the ssh server but not as a daemon on the port 30000
 CMD /usr/sbin/sshd -D -p 30000 -e
