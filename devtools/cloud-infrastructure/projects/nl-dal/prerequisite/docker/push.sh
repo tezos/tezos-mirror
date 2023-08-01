@@ -35,10 +35,6 @@ fi
 
 echo "$source_image"
 
-echo "Start building the docker image..."
-
-echo "Please make sure you are in the same directory as the script when you run it."
-
 # We must run docker build at the root of the project so that docker
 # can copy the zcash params into the image
 
@@ -55,6 +51,10 @@ echo "Authentificate with gcloud..."
 # Authentication for pushing to the artifact registry from gcp
 gcloud auth configure-docker "$gcp_docker_registry"
 
+echo "Start building the docker image..."
+
+echo "Please make sure you are in the same directory as the script when you run it."
+
 # Build the docker image specific to the os with the ssh public key given
 docker build -f "$current_directory/${os}.Dockerfile" \
   --build-arg "SOURCE_IMAGE=${source_image}" \
@@ -66,7 +66,7 @@ docker build -f "$current_directory/${os}.Dockerfile" \
 echo "Tag the docker image..."
 
 # Tag the image built for the artifact registry
-docker tag "$docker-image:latest" "$docker_registry_url/$docker_image:latest"
+docker tag "$docker_image:latest" "$docker_registry_url/$docker_image:latest"
 
 echo "Push the image to the registry $docker_registry_url"
 

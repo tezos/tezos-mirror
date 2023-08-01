@@ -12,6 +12,9 @@ RUN ssh-keygen -A
 ARG SSH_PUBLIC_KEY
 # The key is added to already existing keys
 RUN echo $SSH_PUBLIC_KEY >> /root/.ssh/authorized_keys
+# FIXME: https://gitlab.com/tezos/tezos/-/issues/6169
+# We may want to mount this file using a volume instead
+
 # Copy zcash params from local machine to the remote one
 ARG ZCASH_PARAMS_PATH
 COPY $ZCASH_PARAMS_PATH /usr/local/share/zcash-params
