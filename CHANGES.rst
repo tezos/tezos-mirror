@@ -354,3 +354,5 @@ Miscellaneous
 - Recommend rust version 1.64.0 instead of 1.60.0.
 
 - Sapling parameters files are installed by ``make build-deps`` via opam
+
+- Removed binaries of Mumbai (MR :gl:`!9693`)

@@ -17,7 +17,6 @@ depends: [
   "tezos-client-commands"
   "octez-smart-rollup"
   "octez-smart-rollup-node-lib"
-  "octez-smart-rollup-node-PtMumbai"
   "octez-smart-rollup-node-PtNairob"
   "octez-smart-rollup-node-Proxford"
 ]

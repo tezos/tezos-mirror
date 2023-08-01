@@ -101,9 +101,12 @@
   (select void_for_linking-tezos-protocol-plugin-015-PtLimaPt from
    (tezos-protocol-plugin-015-PtLimaPt -> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty)
    (-> void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty))
-  tezos-client-016-PtMumbai.commands-registration
-  tezos-baking-016-PtMumbai-commands.registration
-  tezos-protocol-plugin-016-PtMumbai
+  (select void_for_linking-tezos-client-016-PtMumbai-commands-registration from
+   (tezos-client-016-PtMumbai.commands-registration -> void_for_linking-tezos-client-016-PtMumbai-commands-registration.empty)
+   (-> void_for_linking-tezos-client-016-PtMumbai-commands-registration.empty))
+  (select void_for_linking-tezos-protocol-plugin-016-PtMumbai from
+   (tezos-protocol-plugin-016-PtMumbai -> void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty)
+   (-> void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty))
   tezos-client-017-PtNairob.commands-registration
   tezos-baking-017-PtNairob-commands.registration
   tezos-protocol-plugin-017-PtNairob
@@ -165,6 +168,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-client-015-PtLimaPt-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-015-PtLimaPt.empty "")
+   (write-file void_for_linking-tezos-client-016-PtMumbai-commands-registration.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-016-PtMumbai.empty "")
    (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))
