@@ -39,3 +39,10 @@ val encoding : t Data_encoding.t
     configuration of the kernel installer, and returns the corresponding set of
     instructions. *)
 val parse_yaml : string -> t tzresult
+
+(** [generate_yaml instrs] generates the YAML representation of [instrs]. *)
+val generate_yaml : t -> Yaml.yaml tzresult
+
+(** [emit_yaml instrs] generates the YAML representation of [instrs] in textual
+    format. *)
+val emit_yaml : t -> string tzresult

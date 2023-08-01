@@ -131,3 +131,33 @@ let parse_yaml yaml =
   let open Result_syntax in
   let* yaml = Yaml.yaml_of_string yaml |> map_yaml_err in
   yaml_parse_instrs yaml
+
+let generate_yaml_instr i instr =
+  match Data_encoding.Json.construct instr_encoding instr |> Yaml.of_json with
+  | Ok yaml -> Ok yaml
+  | Error _ | (exception _) ->
+      (* Note that this error shouldn't happen in practice *)
+      Result_syntax.tzfail (Installer_config_invalid_instruction i)
+
+let generate_yaml instrs =
+  let open Result_syntax in
+  let* instrs = List.rev_mapi_e generate_yaml_instr instrs in
+  (* Similarly to {yaml_parse_instrs}, `Yaml.of_json` can stack overflow on big
+     objects. As such, we first generate an empty `instructions` object then
+     patch it the instructions generated individually. *)
+  let empty_instructions = `O [("instructions", `A [])] in
+  match Yaml.of_json empty_instructions with
+  | Ok (`O ({m_members = [(name, `A sequence)]; _} as mapping)) ->
+      Ok
+        (`O
+          {
+            mapping with
+            m_members = [(name, `A {sequence with s_members = instrs})];
+          })
+  | Error (`Msg err) -> tzfail (Installer_config_yaml_error err)
+  | _ -> tzfail Installer_config_invalid
+
+let emit_yaml instrs =
+  let open Result_syntax in
+  let* yaml = generate_yaml instrs in
+  Yaml.yaml_to_string yaml |> map_yaml_err
