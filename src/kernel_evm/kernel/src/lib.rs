@@ -21,6 +21,7 @@ use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_evm_logging::{log, Level::*};
 
 use crate::inbox::KernelUpgrade;
+use crate::migration::storage_migration;
 use crate::safe_storage::{SafeStorage, TMP_PATH};
 
 use crate::blueprint::{fetch, Queue};
@@ -35,6 +36,7 @@ mod blueprint;
 mod error;
 mod inbox;
 mod indexable_storage;
+mod migration;
 mod parsing;
 mod safe_storage;
 mod simulation;
@@ -48,6 +50,11 @@ pub const CHAIN_ID: u32 = 1337;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::london();
+
+pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    log!(host, Info, "Entering stage zero.");
+    storage_migration(host)
+}
 
 /// Returns the current timestamp for the execution. Based on the last
 /// info per level read (or default timestamp if it was not set), plus the
@@ -69,6 +76,7 @@ pub fn stage_one<Host: Runtime>(
     chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
 ) -> Result<Queue, Error> {
+    log!(host, Info, "Entering stage one.");
     match &ticketer {
         Some(ref ticketer) => log!(host, Info, "Ticketer is {}.", ticketer),
         None => log!(
@@ -163,6 +171,8 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed to retrieve smart rollup address")?;
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let ticketer = read_ticketer(host);
+
+    stage_zero(host).context("Failed during stage 0")?;
 
     let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)
         .context("Failed during stage 1")?;

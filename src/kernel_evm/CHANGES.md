@@ -15,3 +15,5 @@
 ### Breaking changes
 
 ### Internal
+
+- Adds a storage migration stage (`stage 0`). (!9591)
