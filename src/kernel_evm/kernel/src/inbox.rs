@@ -344,8 +344,11 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::storage::*;
     use libsecp256k1::PublicKey;
+    use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
+    use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_mock::MockHost;
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [
@@ -354,9 +357,14 @@ mod tests {
 
     const ZERO_TX_HASH: TransactionHash = [0; TRANSACTION_HASH_SIZE];
 
+    fn smart_rollup_address() -> SmartRollupAddress {
+        SmartRollupAddress::new(SmartRollupHash(SMART_ROLLUP_ADDRESS.into()))
+    }
+
     fn input_to_bytes(smart_rollup_address: [u8; 20], input: Input) -> Vec<u8> {
         let mut buffer = Vec::new();
-        // Smart rollup address.
+        // Targetted framing protocol
+        buffer.push(0);
         buffer.extend_from_slice(&smart_rollup_address);
         match input {
             Input::SimpleTransaction(tx) => {
@@ -456,7 +464,8 @@ mod tests {
 
     #[test]
     fn parse_valid_chunked_transaction() {
-        let mut host = MockHost::default();
+        let address = smart_rollup_address();
+        let mut host = MockHost::with_address(&address);
 
         let (data, tx) = large_transaction();
 
@@ -671,6 +680,58 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        let expected_transactions = vec![Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx),
+        }];
+        assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
+    fn parse_valid_simple_transaction_framed() {
+        // Don't use zero-hash for rollup here - as the long string of zeros is still valid under the previous
+        // parsing. This won't happen in practice, though
+        let address = smart_rollup_address();
+
+        let mut host = MockHost::with_address(&address);
+
+        let tx =
+            EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
+e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
+fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+
+        let input = Input::SimpleTransaction(Box::new(Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx.clone()),
+        }));
+
+        let mut buffer = Vec::new();
+        match input {
+            Input::SimpleTransaction(tx) => {
+                // Simple transaction tag
+                buffer.push(0);
+                buffer.extend_from_slice(&tx.tx_hash);
+                let mut tx_bytes = match tx.content {
+                    Ethereum(tx) => tx.into(),
+                    _ => panic!(
+                        "Simple transaction can contain only ethereum transactions"
+                    ),
+                };
+
+                buffer.append(&mut tx_bytes)
+            }
+            _ => unreachable!("Not tested"),
+        };
+
+        let framed = ExternalMessageFrame::Targetted {
+            address,
+            contents: buffer,
+        };
+
+        host.add_external(framed);
+
         let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,

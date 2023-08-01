@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -46,16 +47,17 @@ let encode_transaction ~smart_rollup_address kind =
         "\001" ^ hash ^ number_of_chunks_bytes
     | Chunk data -> "\002" ^ data
   in
-  smart_rollup_address ^ data
+  "\000" ^ smart_rollup_address ^ data
 
 let make_evm_inbox_transactions tx_raw =
   let open Result_syntax in
   (* Maximum size describes the maximum size of [tx_raw] to fit
      in a simple transaction. *)
   let transaction_tag_size = 1 in
+  let framing_protocol_tag_size = 1 in
   let maximum_size =
-    max_input_size - smart_rollup_address_size - transaction_tag_size
-    - Ethereum_types.transaction_hash_size
+    max_input_size - framing_protocol_tag_size - smart_rollup_address_size
+    - transaction_tag_size - Ethereum_types.transaction_hash_size
   in
   let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
   if String.length tx_raw <= maximum_size then
@@ -65,8 +67,9 @@ let make_evm_inbox_transactions tx_raw =
     return (tx_hash, [tx])
   else
     let size_per_chunk =
-      max_input_size - smart_rollup_address_size - transaction_tag_size - 2
-      (* Index as u16 *) - Ethereum_types.transaction_hash_size
+      max_input_size - framing_protocol_tag_size - smart_rollup_address_size
+      - transaction_tag_size - 2 (* Index as u16 *)
+      - Ethereum_types.transaction_hash_size
     in
     let* chunks = String.chunk_bytes size_per_chunk (Bytes.of_string tx_raw) in
     let new_chunk_transaction = NewChunked (tx_hash, List.length chunks) in

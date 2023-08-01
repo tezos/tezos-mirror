@@ -5,12 +5,17 @@
 ### EVM Kernel
 
 - Fallback mechanism if stage zero fails. (!9732)
+- Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
 
 ### EVM Node
+
+- Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
 
 ### Bug fixes
 
 ### Breaking changes
+
+- External Messages must now be framed using `ExternalMessageFrame` (adds an additional prefix byte). (!9687)
 
 ### Internal
 - The kernel reboots before reaching maximum number of ticks (!9369)

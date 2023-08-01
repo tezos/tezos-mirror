@@ -1697,8 +1697,9 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
   in
   let upgrade_tag_bytes = "\003" in
   let full_external_message =
-    Hex.show @@ Hex.of_string @@ rollup_address_bytes ^ upgrade_tag_bytes
-    ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes ^ signature
+    Hex.show @@ Hex.of_string @@ "\000" ^ rollup_address_bytes
+    ^ upgrade_tag_bytes ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes
+    ^ signature
   in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
