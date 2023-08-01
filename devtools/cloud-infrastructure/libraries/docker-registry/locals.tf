@@ -1,0 +1,5 @@
+locals {
+  labels = {
+    terraform = "true"
+  }
+}
