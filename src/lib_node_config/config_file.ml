@@ -172,34 +172,6 @@ let blockchain_network_ghostnet =
         "ghostnet.visualtez.com";
       ]
 
-let blockchain_network_mumbainet =
-  make_blockchain_network
-    ~alias:"mumbainet"
-    {
-      time = Time.Protocol.of_notation_exn "2023-03-09T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLytf7aG27Ca4xZ8cG4otofaUQfUA9TdULvHC3L9fToPHBcPKDV";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_MUMBAINET_2023-03-09T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~default_bootstrap_peers:
-      ["mumbainet.teztnets.xyz"; "mumbainet.boot.ecadinfra.com"]
-
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -312,7 +284,6 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (19, blockchain_network_ghostnet);
-    (22, blockchain_network_mumbainet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
