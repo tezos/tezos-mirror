@@ -342,8 +342,8 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?rollup_node_name ?whitelist_enable ?whitelist {variant; tags; description}
-    scenario =
+    ?rollup_node_name ?whitelist_enable ?whitelist ?operator
+    {variant; tags; description} scenario =
   let tags = kind :: "rollup_node" :: tags in
   register_test
     ?supports
@@ -370,6 +370,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?boot_sector
       ?rollup_node_name
       ?whitelist
+      ?operator
       tezos_node
       tezos_client
   in
@@ -5622,6 +5623,56 @@ let test_private_rollup_non_whitelisted_staker =
               "The rollup is private and the submitter of the commitment is \
                not present in the whitelist"))
 
+let test_private_rollup_node_publish_in_whitelist =
+  let commitment_period = 3 in
+  test_full_scenario
+    ~supports:(From_protocol 019)
+    ~whitelist_enable:true
+    ~whitelist:[Constant.bootstrap1.public_key_hash]
+    ~operator:Constant.bootstrap1.alias
+    ~commitment_period
+    {
+      variant = None;
+      tags = ["whitelist"];
+      description =
+        "Rollup node publishes commitment if the operator is in the whitelist";
+    }
+    ~kind:"arith"
+  @@ fun _protocol rollup_node _rollup_client sc_rollup _tezos_node tezos_client
+    ->
+  let* () = Sc_rollup_node.run ~event_level:`Debug rollup_node sc_rollup [] in
+  let levels = commitment_period in
+  Log.info "Baking %d blocks for commitment of first message" levels ;
+  let* _new_level =
+    bake_until_lpc_updated ~at_least:levels ~timeout:5. tezos_client rollup_node
+  in
+  bake_levels levels tezos_client
+
+let test_private_rollup_node_publish_not_in_whitelist =
+  test_full_scenario
+    ~supports:(From_protocol 019)
+    ~whitelist_enable:true
+    ~whitelist:[Constant.bootstrap2.public_key_hash]
+    ~operator:Constant.bootstrap1.alias
+    {
+      variant = None;
+      tags = ["whitelist"];
+      description =
+        "Rollup node fails to start if the operator is not in the whitelist";
+    }
+    ~kind:"arith"
+  @@ fun _protocol
+             rollup_node
+             _rollup_client
+             sc_rollup
+             _tezos_node
+             _tezos_client ->
+  let node_process = Sc_rollup_node.spawn_run rollup_node sc_rollup [] in
+  Process.check_error
+    node_process
+    ~exit_code:1
+    ~msg:(rex ".*The operator is not in the whitelist.*")
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5801,7 +5852,9 @@ let register ~protocols =
   (* Both Arith and Wasm PVM tezts *)
   test_bootstrap_smart_rollup_originated protocols ;
   test_private_rollup_whitelisted_staker protocols ;
-  test_private_rollup_non_whitelisted_staker protocols
+  test_private_rollup_non_whitelisted_staker protocols ;
+  test_private_rollup_node_publish_in_whitelist protocols ;
+  test_private_rollup_node_publish_not_in_whitelist protocols
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;

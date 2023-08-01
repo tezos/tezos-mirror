@@ -74,6 +74,8 @@ type error +=
       actual : Commitment.Hash.t;
     }
 
+type error += Operator_not_in_whitelist
+
 let () =
   register_error_kind
     `Permanent
@@ -386,4 +388,15 @@ let () =
     `Permanent
     Data_encoding.unit
     (function Could_not_encode_raw_data -> Some () | _ -> None)
-    (fun () -> Could_not_encode_raw_data)
+    (fun () -> Could_not_encode_raw_data) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.operator_not_in_whitelist"
+    ~title:"The operator is not in the whitelist"
+    ~description:"The operator is not in the whitelist."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "The operator is not in the whitelist")
+    `Permanent
+    Data_encoding.unit
+    (function Operator_not_in_whitelist -> Some () | _ -> None)
+    (fun () -> Operator_not_in_whitelist)

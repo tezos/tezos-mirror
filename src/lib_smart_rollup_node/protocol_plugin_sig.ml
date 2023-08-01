@@ -194,6 +194,11 @@ module type LAYER1_HELPERS = sig
 
   val get_boot_sector :
     Block_hash.t -> _ Node_context.t -> string tzresult Lwt.t
+
+  val find_whitelist :
+    #Client_context.full ->
+    Address.t ->
+    Signature.public_key_hash list option tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)

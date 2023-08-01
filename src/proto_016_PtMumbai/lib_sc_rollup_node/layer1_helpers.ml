@@ -221,3 +221,7 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
     (function
       | Found_boot_sector boot_sector -> return boot_sector
       | _ -> missing_boot_sector ())
+
+let find_whitelist _cctxt _rollup_address :
+    Signature.public_key_hash trace option tzresult Lwt.t =
+  return None

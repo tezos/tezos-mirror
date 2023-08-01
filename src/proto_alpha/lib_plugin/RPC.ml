@@ -2707,6 +2707,9 @@ module Sc_rollup = struct
 
   let inbox ctxt block = RPC_context.make_call0 S.inbox ctxt block () ()
 
+  let whitelist ctxt block sc_rollup_address =
+    RPC_context.make_call1 S.whitelist ctxt block sc_rollup_address () ()
+
   let genesis_info ctxt block sc_rollup_address =
     RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()
 
