@@ -516,21 +516,41 @@ let assert_equal l r =
 let equal : type a. a repr -> a repr -> bool repr t =
  fun l r -> ret @@ B (eq l r)
 
+let scalar_of_limbs ~nb_bits b =
+  let sb = of_list b in
+  let powers =
+    let nb_limbs = List.length sb in
+    let base = 1 lsl nb_bits |> Z.of_int in
+    List.init nb_limbs (fun i -> S.of_z @@ Z.pow base i)
+  in
+  foldM
+    (fun acc (qr, w) -> Num.add ~qr acc w)
+    (List.hd sb)
+    List.(tl @@ combine powers sb)
+
 let bits_of_scalar ?(shift = Z.zero) ~nb_bits sx =
   let x = of_s sx |> S.to_z in
   let x = Z.add shift x in
   let sx = S (X (S.of_z x)) in
   let binary_decomposition = Utils.bool_list_of_z ~nb_bits x in
   let bits = L (List.map (fun x -> B x) binary_decomposition) in
-  let powers = List.init nb_bits (fun i -> S.of_z Z.(pow (of_int 2) i)) in
-  let sbits = List.map scalar_of_bool (of_list bits) in
   let* sum =
-    foldM
-      (fun acc (qr, w) -> Num.add ~qr acc w)
-      (List.hd sbits)
-      List.(tl @@ combine powers sbits)
+    let sbits = List.map scalar_of_bool (of_list bits) in
+    scalar_of_limbs ~nb_bits:1 (to_list sbits)
   in
   with_bool_check (equal sx sum) >* ret bits
+
+let limbs_of_scalar ?(shift = Z.zero) ~total_nb_bits ~nb_bits sx =
+  let x = of_s sx |> S.to_z in
+  let x = Z.add shift x in
+  let binary_decomposition = Utils.bool_list_of_z ~nb_bits:total_nb_bits x in
+  let nb_decomposition =
+    Utils.limbs_of_bool_list ~nb_bits binary_decomposition
+  in
+  let limbs = L (List.map (fun x -> to_s @@ S.of_int x) nb_decomposition) in
+  let sx = S (X (S.of_z x)) in
+  let* sum = scalar_of_limbs ~nb_bits limbs in
+  with_bool_check (equal sx sum) >* ret limbs
 
 let of_b (B x) = x
 

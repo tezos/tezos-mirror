@@ -89,9 +89,7 @@ module type LIB = sig
 
     (* [scalar_of_bytes bs] returns the scalar represented by the binary
        sequence [bs].
-       Specifically, it evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's
-       method:
-       P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
+       Specifically, it evaluates P(X) = \sum_i bᵢ Xⁱ at 2. *)
     val scalar_of_bytes : bool list repr -> scalar repr t
 
     (** [is_eq_const a k] returns whether [a] is equal to [k]. *)
@@ -199,10 +197,11 @@ module type LIB = sig
     end
   end
 
-  (** Module for describing operations over fixed size integers *)
   module Limbs (N : sig
     val nb_bits : int
   end) : sig
+    (* This module is a more generic version of Bytes, where each scalar
+       stores an [nb_bits]-bit number. *)
     type sl = scalar list
 
     val of_bytes : Bytes.bl repr -> sl repr t
@@ -211,26 +210,16 @@ module type LIB = sig
 
     val to_scalar : sl repr -> scalar repr t
 
-    (** [xor_lookup a b] returns the exclusive disjunction of [a] and [b].
-      This primitive uses a precomputed lookup table called "xor" ^ [nb_bits].
-    *)
+    val of_scalar : total_nb_bits:int -> scalar repr -> sl repr t
+
+    val constant : le:bool -> bytes -> sl repr t
+
     val xor_lookup : sl repr -> sl repr -> sl repr t
 
-    (** [band_lookup a b] returns the conjunction of [a] and [b].
-      This primitive uses a precomputed lookup table called "band" ^ [nb_bits].
-    *)
     val band_lookup : sl repr -> sl repr -> sl repr t
 
-    (** [bnot_lookup b] returns the negation of [b].
-      This primitive uses a precomputed lookup table called "bnot" ^ [nb_bits].
-    *)
     val bnot_lookup : sl repr -> sl repr t
 
-    (** [rotate_right_lookup x y i] returns the low [nb_bits] of
-      [rotate_right (x + y * 2 ^ nb_bits) i] where [0 < i < nb_bits].
-      This primitive uses a precomputed lookup table called
-      "rotate_right" ^ [nb_bits] ^ "_" ^ [i].
-    *)
     val rotate_right_lookup : sl repr -> int -> sl repr t
 
     val shift_right_lookup : sl repr -> int -> sl repr t
@@ -592,14 +581,9 @@ module Lib (C : COMMON) = struct
 
     let mul_by_constant s x = Num.add_constant ~ql:s S.zero x
 
-    (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2 with Horner's method:
-       P(2) = b₀ + 2 (b₁+ 2 (b₂ + 2(…))). *)
     let scalar_of_bytes b =
-      let* zero = Num.zero in
-      foldM
-        (fun acc b -> add acc (scalar_of_bool b) ~ql:S.(one + one) ~qr:S.one)
-        zero
-        (List.rev (of_list b))
+      let sb = List.map scalar_of_bool (of_list b) in
+      scalar_of_limbs ~nb_bits:1 (to_list sb)
 
     let assert_eq_const l s = Num.assert_custom ~ql:S.mone ~qc:s l l l
 
@@ -865,15 +849,15 @@ module Lib (C : COMMON) = struct
       in
       ret @@ to_list (List.concat lb)
 
-    (* Evaluates P(X) = \sum_i bᵢ Xⁱ at 2^nb_bits with Horner's method:
-       P(2^nb_bits) = b₀ + 2^nb_bits (b₁+ 2^nb_bits (b₂ + 2^nb_bits (…))). *)
-    let to_scalar b =
-      let pow2_nb_bits = 1 lsl nb_bits |> S.of_int in
-      let* zero = Num.zero in
-      foldM
-        (fun acc b -> Num.add acc b ~ql:pow2_nb_bits ~qr:S.one)
-        zero
-        (List.rev (of_list b))
+    let to_scalar b = scalar_of_limbs ~nb_bits b
+
+    let of_scalar ~total_nb_bits b = limbs_of_scalar ~total_nb_bits ~nb_bits b
+
+    let constant ~le b =
+      let bl = Utils.bitlist ~le b in
+      let limbs = Utils.limbs_of_bool_list ~nb_bits bl in
+      let* r = mapM (fun x -> Num.constant @@ S.of_int x) limbs in
+      ret @@ to_list r
 
     let xor_lookup a b =
       let* r = map2M Limb.xor_lookup (of_list a) (of_list b) in

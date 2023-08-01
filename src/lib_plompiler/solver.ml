@@ -82,6 +82,15 @@ type ed_cond_desc = {
 type bits_desc = {nb_bits : int; shift : Utils.Z.t; l : int; bits : int list}
 [@@deriving repr]
 
+type limbs_desc = {
+  total_nb_bits : int;
+  nb_bits : int;
+  shift : Utils.Z.t;
+  l : int;
+  limbs : int list;
+}
+[@@deriving repr]
+
 type pos128full_desc = {
   x0 : int;
   y0 : int;
@@ -251,6 +260,7 @@ type solver_desc =
   | Swap of swap_desc
   | Skip
   | BitsOfS of bits_desc
+  | LimbsOfS of limbs_desc
   | Poseidon128Full of pos128full_desc
   | Poseidon128Partial of pos128partial_desc
   | AnemoiRound of anemoi_desc
@@ -359,6 +369,19 @@ let solve_one trace solver =
         (fun b value -> trace.(b) <- (if value then S.one else S.zero))
         bits
         binary_decomposition
+  | LimbsOfS {total_nb_bits; nb_bits; shift; l; limbs} ->
+      let x = trace.(l) |> S.to_z in
+      let x = Z.(x + shift) in
+      let binary_decomposition =
+        Utils.bool_list_of_z ~nb_bits:total_nb_bits x
+      in
+      let nb_decomposition =
+        Utils.limbs_of_bool_list ~nb_bits binary_decomposition
+      in
+      List.iter2
+        (fun b value -> trace.(b) <- S.of_int value)
+        limbs
+        nb_decomposition
   | Updater ti -> ignore @@ Optimizer.trace_updater ti trace
   | Swap {b; x; y; u; v} ->
       let b, x, y = (trace.(b), trace.(x), trace.(y)) in

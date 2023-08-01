@@ -372,11 +372,20 @@ module type COMMON = sig
   (** [equal a b] computes the structural equality between [a] and [b]. *)
   val equal : 'a repr -> 'a repr -> bool repr t
 
+  val scalar_of_limbs : nb_bits:int -> scalar list repr -> scalar repr t
+
   (** Returns a list of Boolean variables representing the little endian
       bit decomposition of the given scalar (with the least significant bit
       on the head). *)
   val bits_of_scalar :
     ?shift:Z.t -> nb_bits:int -> scalar repr -> bool list repr t
+
+  val limbs_of_scalar :
+    ?shift:Z.t ->
+    total_nb_bits:int ->
+    nb_bits:int ->
+    scalar repr ->
+    scalar list repr t
 
   (** [with_label ~label c] adds a [label] to the Plompiler computation
       [c]. Useful for debugging and flamegraphs. *)
@@ -399,15 +408,30 @@ module type COMMON = sig
        and type 'a repr = 'a repr
        and type 'a t = 'a t
 
+  (** Module for describing operations over fixed size integers *)
   module Limb (N : sig
     val nb_bits : int
   end) : sig
+    (** [xor_lookup a b] returns the exclusive disjunction of [a] and [b].
+      This primitive uses a precomputed lookup table called "xor" ^ [nb_bits].
+    *)
     val xor_lookup : scalar repr -> scalar repr -> scalar repr t
 
+    (** [band_lookup a b] returns the conjunction of [a] and [b].
+      This primitive uses a precomputed lookup table called "band" ^ [nb_bits].
+    *)
     val band_lookup : scalar repr -> scalar repr -> scalar repr t
 
+    (** [bnot_lookup b] returns the negation of [b].
+      This primitive uses a precomputed lookup table called "bnot" ^ [nb_bits].
+    *)
     val bnot_lookup : scalar repr -> scalar repr t
 
+    (** [rotate_right_lookup x y i] returns the low [nb_bits] of
+      [rotate_right (x + y * 2 ^ nb_bits) i] where [0 < i < nb_bits].
+      This primitive uses a precomputed lookup table called
+      "rotate_right" ^ [nb_bits] ^ "_" ^ [i].
+    *)
     val rotate_right_lookup : scalar repr -> scalar repr -> int -> scalar repr t
   end
 

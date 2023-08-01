@@ -91,6 +91,14 @@ type ed_cond_desc = {
 
 type bits_desc = {nb_bits : int; shift : Z.t; l : int; bits : int list}
 
+type limbs_desc = {
+  total_nb_bits : int;
+  nb_bits : int;
+  shift : Z.t;
+  l : int;
+  limbs : int list;
+}
+
 type pos128full_desc = {
   x0 : int;
   y0 : int;
@@ -203,6 +211,7 @@ type solver_desc =
   | Swap of swap_desc
   | Skip
   | BitsOfS of bits_desc
+  | LimbsOfS of limbs_desc
   | Poseidon128Full of pos128full_desc
   | Poseidon128Partial of pos128partial_desc
   | AnemoiRound of anemoi_desc

@@ -94,14 +94,10 @@ module Op_limbs_impl (L : LIB) = struct
   let to_scalar = Limbs.to_scalar
 
   let of_scalar ~total_nb_bits x =
-    with_label ~label:"Sha2.of_scalar"
-    @@ let* x = bits_of_scalar ~nb_bits:total_nb_bits x in
-       of_bytes x
+    with_label ~label:"Sha2.of_scalar" @@ Limbs.of_scalar ~total_nb_bits x
 
   let of_constant ~le x =
-    with_label ~label:"Sha2.of_constant"
-    @@ let* x = Bytes.constant ~le x in
-       of_bytes x
+    with_label ~label:"Sha2.of_constant" @@ Limbs.constant ~le x
 end
 
 module Op_bits_impl (L : LIB) : Op with module L = L and type tl = L.Bytes.bl =

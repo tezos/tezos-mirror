@@ -1005,6 +1005,18 @@ let equal : type a. a repr -> a repr -> bool repr t =
   in
   fun a b -> with_label ~label:"Core.equal" @@ aux a b
 
+let scalar_of_limbs ~nb_bits b =
+  let sb = of_list b in
+  let powers =
+    let nb_limbs = List.length sb in
+    let base = 1 lsl nb_bits |> Z.of_int in
+    List.init nb_limbs (fun i -> S.of_z @@ Z.pow base i)
+  in
+  foldM
+    (fun acc (qr, w) -> Num.add ~qr acc w)
+    (List.hd sb)
+    List.(tl @@ combine powers sb)
+
 (* If [add_alpha], this function returns the binary decomposition of
    [l + Utils.alpha], instead of the binary decompostion of [l], where
    Utils.alpha is the difference between Scalar.order and its succeeding
@@ -1022,14 +1034,8 @@ let bits_of_scalar ?(shift = Z.zero) ~nb_bits (Scalar l) =
               bits = List.map (fun (Bool x) -> x) @@ of_list bits;
             })
      >* let* sum =
-          let powers =
-            List.init nb_bits (fun i -> S.of_z Z.(pow (of_int 2) i))
-          in
           let sbits = List.map scalar_of_bool (of_list bits) in
-          foldM
-            (fun acc (qr, w) -> Num.add ~qr acc w)
-            (List.hd sbits)
-            List.(tl @@ combine powers sbits)
+          scalar_of_limbs ~nb_bits:1 (to_list sbits)
         in
         let* l =
           if Z.(not @@ equal shift zero) then
@@ -1037,6 +1043,30 @@ let bits_of_scalar ?(shift = Z.zero) ~nb_bits (Scalar l) =
           else ret (Scalar l)
         in
         assert_equal l sum >* ret bits
+
+let limbs_of_scalar ?(shift = Z.zero) ~total_nb_bits ~nb_bits (Scalar l) =
+  with_label ~label:"Core.limbs_of_scalar"
+  @@
+  let nb_limbs = total_nb_bits / nb_bits in
+  let* limbs = fresh @@ Dummy.list nb_limbs Dummy.scalar in
+  add_solver
+    ~solver:
+      (LimbsOfS
+         {
+           total_nb_bits;
+           nb_bits;
+           shift;
+           l;
+           limbs = List.map (fun (Scalar x) -> x) @@ of_list limbs;
+         })
+  >* let* sum = scalar_of_limbs ~nb_bits limbs in
+     let* l =
+       if Z.(not @@ equal shift zero) then
+         Num.add_constant (S.of_z shift) (Scalar l)
+       else ret (Scalar l)
+     in
+     iterM (Num.range_check ~nb_bits) (of_list limbs)
+     >* assert_equal l sum >* ret limbs
 
 module Ecc = struct
   let weierstrass_add (Pair (Scalar x1, Scalar y1))
