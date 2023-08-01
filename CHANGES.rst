@@ -227,6 +227,8 @@ Node
   ``POST chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/ticket_balance``
   (MR :gl:`!9535`)
 
+- **Breaking change** Removed ``mumbainet`` network alias. (MR :gl:`!9694`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
