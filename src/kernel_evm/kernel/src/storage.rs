@@ -373,7 +373,7 @@ pub fn store_transaction_object<Host: Runtime>(
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
 const CHUNKED_TRANSACTION_NUM_CHUNKS: RefPath = RefPath::assert_from(b"/num_chunks");
 
-fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+pub fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(tx_hash);
     let raw_chunked_transaction_path: Vec<u8> = format!("/{}", hash).into();
     let chunked_transaction_path = OwnedPath::try_from(raw_chunked_transaction_path)?;
@@ -386,7 +386,7 @@ fn chunked_transaction_num_chunks_path(
     concat(chunked_transaction_path, &CHUNKED_TRANSACTION_NUM_CHUNKS).map_err(Error::from)
 }
 
-fn transaction_chunk_path(
+pub fn transaction_chunk_path(
     chunked_transaction_path: &OwnedPath,
     i: u16,
 ) -> Result<OwnedPath, Error> {
@@ -401,10 +401,8 @@ fn is_transaction_complete<Host: Runtime>(
     num_chunks: u16,
 ) -> Result<bool, Error> {
     let n_subkeys = host.store_count_subkeys(chunked_transaction_path)? as u16;
-    // `n_subkeys` includes the key `num_chunks`. The transaction is complete if
-    // number of chunks = num_chunks - 1, the last chunk is not written on disk
-    // and is kept in memory instead.
-    Ok(n_subkeys >= num_chunks)
+    // `n_subkeys` includes the key `num_chunks`
+    Ok(n_subkeys > num_chunks)
 }
 
 fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
@@ -447,7 +445,7 @@ fn store_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-fn read_transaction_chunk_data<Host: Runtime>(
+pub fn read_transaction_chunk_data<Host: Runtime>(
     host: &mut Host,
     transaction_chunk_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {
@@ -472,21 +470,12 @@ fn get_full_transaction<Host: Runtime>(
     host: &mut Host,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
-    missing_data: &[u8],
 ) -> Result<Vec<u8>, Error> {
     let mut buffer = Vec::new();
     for i in 0..num_chunks {
         let transaction_chunk_path = transaction_chunk_path(chunked_transaction_path, i)?;
-        // If the transaction is complete and a chunk doesn't exist, it means that it is
-        // the last missing chunk, that was not stored in the storage.
-        match host.store_has(&transaction_chunk_path)? {
-            None => buffer.extend_from_slice(missing_data),
-            Some(_) => {
-                let mut data =
-                    read_transaction_chunk_data(host, &transaction_chunk_path)?;
-                let _ = &mut buffer.append(&mut data);
-            }
-        }
+        let mut data = read_transaction_chunk_data(host, &transaction_chunk_path)?;
+        let _ = &mut buffer.append(&mut data);
     }
     Ok(buffer)
 }
@@ -518,16 +507,17 @@ pub fn store_transaction_chunk<Host: Runtime>(
     let num_chunks =
         chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)?;
 
+    // Store the new transaction chunk.
+    let transaction_chunk_path = transaction_chunk_path(&chunked_transaction_path, i)?;
+    store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
+
+    // If the chunk was the last one, we gather all the chunks and remove the
+    // sub elements.
     if is_transaction_complete(host, &chunked_transaction_path, num_chunks)? {
-        let data =
-            get_full_transaction(host, &chunked_transaction_path, num_chunks, &data)?;
+        let data = get_full_transaction(host, &chunked_transaction_path, num_chunks)?;
         host.store_delete(&chunked_transaction_path)?;
         Ok(Some(data))
     } else {
-        let transaction_chunk_path =
-            transaction_chunk_path(&chunked_transaction_path, i)?;
-        store_transaction_chunk_data(host, &transaction_chunk_path, data)?;
-
         Ok(None)
     }
 }
@@ -540,6 +530,23 @@ pub fn create_chunked_transaction<Host: Runtime>(
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
     let chunked_transaction_num_chunks_path =
         chunked_transaction_num_chunks_path(&chunked_transaction_path)?;
+
+    // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
+    // is at least one key, it was already created.
+    if host
+        .store_count_subkeys(&chunked_transaction_path)
+        .unwrap_or(0)
+        > 0
+    {
+        log!(
+            host,
+            Info,
+            "The chunked transaction {} already exist, ignoring the message.\n",
+            hex::encode(tx_hash)
+        );
+        return Ok(());
+    }
+
     host.store_write(
         &chunked_transaction_num_chunks_path,
         &u16::to_le_bytes(num_chunks),

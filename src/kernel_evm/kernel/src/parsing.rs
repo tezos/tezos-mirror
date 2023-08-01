@@ -67,7 +67,7 @@ pub const SIGNATURE_HASH_SIZE: usize = 64;
 
 pub const UPGRADE_NONCE_SIZE: usize = 2;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Input {
     SimpleTransaction(Box<Transaction>),
     Deposit(Deposit),

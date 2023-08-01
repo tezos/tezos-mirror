@@ -21,7 +21,7 @@ use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::log;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -60,6 +60,7 @@ pub struct KernelUpgrade {
     pub signature: [u8; SIGNATURE_HASH_SIZE],
 }
 
+#[derive(Debug, PartialEq)]
 pub struct InboxContent {
     pub kernel_upgrade: Option<KernelUpgrade>,
     pub transactions: Vec<Transaction>,
@@ -89,9 +90,28 @@ fn handle_transaction_chunk<Host: Runtime>(
     i: u16,
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error> {
+    // If the number of chunks doesn't exist in the storage, the chunked
+    // transaction wasn't created, so the chunk is ignored.
+    let num_chunks = match crate::storage::chunked_transaction_num_chunks(host, &tx_hash)
+    {
+        Ok(x) => x,
+        Err(_) => {
+            log!(
+                host,
+                Info,
+                "Ignoring chunk {} of unknown transaction {}\n",
+                i,
+                hex::encode(tx_hash)
+            );
+            return Ok(None);
+        }
+    };
+    // Checks that the transaction is not out of bounds
+    if i >= num_chunks {
+        return Ok(None);
+    }
     // Sanity check to verify that the transaction chunk uses the maximum
     // space capacity allowed.
-    let num_chunks = crate::storage::chunked_transaction_num_chunks(host, &tx_hash)?;
     if i != num_chunks - 1 && data.len() < MAX_SIZE_PER_CHUNK {
         crate::storage::remove_chunked_transaction(host, &tx_hash)?;
         return Ok(None);
@@ -224,6 +244,7 @@ pub fn read_inbox<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
+    use crate::storage::*;
     use libsecp256k1::PublicKey;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
@@ -306,6 +327,12 @@ mod tests {
         buffer
     }
 
+    fn large_transaction() -> (Vec<u8>, EthereumTransactionCommon) {
+        let data: Vec<u8> = hex::decode(["f917e180843b9aca0082520894b53dc01974176e5dff2298c5a94343c2585e3c548a021dfe1f5c5363780000b91770".to_string(), "a".repeat(12_000), "820a96a07fd9567a72223bbc8f70bd2b42011339b61044d16b5a2233534db8ca01f3e57aa03ea489c4bb2b2b52f3c1a18966881114767654c9ab61d46b1fbff78a498043c2".to_string()].join("")).unwrap();
+        let tx = EthereumTransactionCommon::from_rlp_bytes(&data).unwrap();
+        (data, tx)
+    }
+
     #[test]
     fn parse_valid_simple_transaction() {
         let mut host = MockHost::default();
@@ -335,8 +362,7 @@ mod tests {
     fn parse_valid_chunked_transaction() {
         let mut host = MockHost::default();
 
-        let data: Vec<u8> = hex::decode(["f917e180843b9aca0082520894b53dc01974176e5dff2298c5a94343c2585e3c548a021dfe1f5c5363780000b91770".to_string(), "a".repeat(12_000), "820a96a07fd9567a72223bbc8f70bd2b42011339b61044d16b5a2233534db8ca01f3e57aa03ea489c4bb2b2b52f3c1a18966881114767654c9ab61d46b1fbff78a498043c2".to_string()].join("")).unwrap();
-        let tx = EthereumTransactionCommon::from_rlp_bytes(&data).unwrap();
+        let (data, tx) = large_transaction();
 
         let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
 
@@ -359,7 +385,7 @@ mod tests {
     #[test]
     fn parse_valid_kernel_upgrade() {
         let mut host = MockHost::default();
-        crate::storage::store_kernel_upgrade_nonce(&mut host, 1).unwrap();
+        store_kernel_upgrade_nonce(&mut host, 1).unwrap();
 
         let dictator_bytes = hex::decode(
             "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01",
@@ -394,5 +420,192 @@ mod tests {
             read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
+    }
+
+    #[test]
+    // Assert that trying to create a chunked transaction has no impact. Only
+    // the first `NewChunkedTransaction` should be considered.
+    fn recreate_chunked_transaction() {
+        let mut host = MockHost::default();
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let new_chunk1 = Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks: 2,
+        };
+        let new_chunk2 = Input::NewChunkedTransaction {
+            tx_hash,
+            num_chunks: 42,
+        };
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk1,
+        )));
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk2,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
+            .expect("The number of chunks should exist");
+        // Only the first `NewChunkedTransaction` should be considered.
+        assert_eq!(num_chunks, 2);
+    }
+
+    #[test]
+    // Assert that an out of bound chunk is simply ignored and does
+    // not make the kernel fail.
+    fn out_of_bound_chunk_is_ignored() {
+        let mut host = MockHost::default();
+
+        let (data, _tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let mut inputs = make_chunked_transactions(tx_hash, data);
+        let new_chunk = inputs.remove(0);
+        let chunk = inputs.remove(0);
+
+        // Announce a chunked transaction.
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk,
+        )));
+
+        // Give a chunk with an invalid `i`.
+        let out_of_bound_i = 42;
+        let chunk = match chunk {
+            Input::TransactionChunk {
+                tx_hash,
+                i: _,
+                data,
+            } => Input::TransactionChunk {
+                tx_hash,
+                i: out_of_bound_i,
+                data,
+            },
+            _ => panic!("Expected a transaction chunk"),
+        };
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        // The out of bounds chunk should not exist.
+        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
+        let transaction_chunk_path =
+            transaction_chunk_path(&chunked_transaction_path, out_of_bound_i).unwrap();
+        if read_transaction_chunk_data(&mut host, &transaction_chunk_path).is_ok() {
+            panic!("The chunk should not exist in the storage")
+        }
+    }
+
+    #[test]
+    // Assert that an unknown chunk is simply ignored and does
+    // not make the kernel fail.
+    fn unknown_chunk_is_ignored() {
+        let mut host = MockHost::default();
+
+        let (data, _tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let mut inputs = make_chunked_transactions(tx_hash, data);
+        let chunk = inputs.remove(1);
+
+        // Extract the index of the non existing chunked transaction.
+        let index = match chunk {
+            Input::TransactionChunk { i, .. } => i,
+            _ => panic!("Expected a transaction chunk"),
+        };
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk,
+        )));
+
+        let _inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        // The unknown chunk should not exist.
+        let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
+        let transaction_chunk_path =
+            transaction_chunk_path(&chunked_transaction_path, index).unwrap();
+        if read_transaction_chunk_data(&mut host, &transaction_chunk_path).is_ok() {
+            panic!("The chunk should not exist in the storage")
+        }
+    }
+
+    #[test]
+    // Assert that a transaction is marked as complete only when each chunk
+    // is stored in the storage. That is, if a transaction chunk is sent twice,
+    // it rewrites the chunk.
+    //
+    // This serves as a non-regression test, a previous optimization made unwanted
+    // behavior for very little gain:
+    //
+    // Level 0:
+    // - New chunk of size 2
+    // - Chunk 0
+    //
+    // Level 1:
+    // - New chunk of size 2 (ignored)
+    // - Chunk 0
+    // |--> Oh great! I have the two chunks for my transaction, it is then complete!
+    // - Chunk 1
+    // |--> Fails because the chunk is unknown
+    fn transaction_is_complete_when_each_chunk_is_stored() {
+        let mut host = MockHost::default();
+
+        let (data, tx) = large_transaction();
+        let tx_hash = ZERO_TX_HASH;
+
+        let inputs = make_chunked_transactions(tx_hash, data);
+        // The test works if there are 3 inputs: new chunked of size 2, first and second
+        // chunks.
+        assert_eq!(inputs.len(), 3);
+
+        let new_chunk = inputs[0].clone();
+        let chunk0 = inputs[1].clone();
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            new_chunk,
+        )));
+
+        host.add_external(Bytes::from(input_to_bytes(
+            ZERO_SMART_ROLLUP_ADDRESS,
+            chunk0,
+        )));
+
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        assert_eq!(
+            inbox_content,
+            InboxContent {
+                kernel_upgrade: None,
+                transactions: vec![]
+            }
+        );
+
+        // On the next level, try to re-give the chunks, but this time in full:
+        for input in inputs {
+            host.add_external(Bytes::from(input_to_bytes(
+                ZERO_SMART_ROLLUP_ADDRESS,
+                input,
+            )))
+        }
+        let inbox_content =
+            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let expected_transactions = vec![Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx),
+        }];
+        assert_eq!(inbox_content.transactions, expected_transactions);
     }
 }
