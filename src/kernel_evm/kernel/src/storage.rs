@@ -809,6 +809,16 @@ pub fn read_block_in_progress<Host: Runtime>(
     BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
 }
 
+pub fn delete_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), anyhow::Error> {
+    if host.store_read(&REBOOTED, 0, 0).is_ok() {
+        host.store_delete(&EVM_BLOCK_IN_PROGRESS)
+            .context("Failed to delete Block in progress")?
+    }
+    Ok(())
+}
+
 pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     host.store_write(&REBOOTED, &[1], 0)
         .context("Failed to set reboot flag")

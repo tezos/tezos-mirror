@@ -100,6 +100,7 @@ pub fn produce<Host: Runtime>(
             &current_constants,
             tick_counter,
         );
+
         match compute(
             host,
             &mut block_in_progress,
@@ -124,6 +125,7 @@ pub fn produce<Host: Runtime>(
                     .context("Failed to finalize the block in progress")?;
                 current_block_number = new_block.number + 1;
                 current_constants = new_block.constants();
+                storage::delete_block_in_progress(host)?;
             }
         }
     }
