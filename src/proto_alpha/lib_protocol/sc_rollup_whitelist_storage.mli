@@ -62,3 +62,18 @@ val replace :
   Sc_rollup_repr.t ->
   whitelist:Sc_rollup_whitelist_repr.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [adjust_storage_space ctxt ~new_storage_size] updates the used
+    storage space for the whitelist according to
+    [new_storage_size]. The additional positive amount of unpaid
+    storage is returned. If no unpaid storage is consumed, this amount
+    is 0.
+
+    Note that when storage space for the whitelist is released we may later
+    use that space for free. For this reason, the amount returned may be less
+    than the given (positive) [storage_diff]. *)
+val adjust_storage_space :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  new_storage_size:Z.t ->
+  (Raw_context.t * Z.t) tzresult Lwt.t

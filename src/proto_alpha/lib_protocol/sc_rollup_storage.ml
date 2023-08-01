@@ -150,7 +150,14 @@ let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   let* ctxt, whitelist_size =
     let*? () = check_whitelist ctxt whitelist in
     match whitelist with
-    | Some whitelist -> Sc_rollup_whitelist_storage.init ~whitelist ctxt address
+    | Some whitelist ->
+        let* ctxt, new_storage_size =
+          Sc_rollup_whitelist_storage.init ~whitelist ctxt address
+        in
+        Sc_rollup_whitelist_storage.adjust_storage_space
+          ctxt
+          address
+          ~new_storage_size
     | None -> return (ctxt, Z.zero)
   in
   let size =

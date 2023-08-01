@@ -466,17 +466,14 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist =
             (List.is_empty whitelist)
             Sc_rollup_errors.Sc_rollup_empty_whitelist
         in
-        let* ctxt, _new_storage_size =
+        let* ctxt, new_storage_size =
           Sc_rollup.Whitelist.replace ctxt rollup ~whitelist
         in
-        (* Storage size paid diff logic in next commit *)
+        let* ctxt, paid_storage_size_diff =
+          Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size
+        in
         return
-          ( {
-              paid_storage_size_diff = Z.zero;
-              ticket_receipt = [];
-              operations = [];
-            },
-            ctxt )
+          ({paid_storage_size_diff; ticket_receipt = []; operations = []}, ctxt)
     | None ->
         (* logic implemented in a later commit *)
         return

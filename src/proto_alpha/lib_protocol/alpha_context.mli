@@ -2799,6 +2799,12 @@ module Sc_rollup : sig
     val replace :
       context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
 
+    val adjust_storage_space :
+      context ->
+      Address.t ->
+      new_storage_size:Z.t ->
+      (context * Z.t) tzresult Lwt.t
+
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit
