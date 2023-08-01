@@ -229,6 +229,8 @@ Node
 
 - **Breaking change** Removed ``mumbainet`` network alias. (MR :gl:`!9694`)
 
+- Removed Mumbai mempool plugin. (MR :gl:`!9696`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
