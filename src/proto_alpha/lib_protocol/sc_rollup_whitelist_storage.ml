@@ -82,6 +82,18 @@ let replace ctxt rollup ~whitelist =
   let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
   init ~whitelist ctxt rollup
 
+let make_public ctxt rollup =
+  let open Lwt_result_syntax in
+  let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
+  let* used_storage =
+    Storage.Sc_rollup.Whitelist_used_storage_space.find ctxt rollup
+  in
+  let used_storage = Option.value ~default:Z.zero used_storage in
+  let*! ctxt =
+    Storage.Sc_rollup.Whitelist_used_storage_space.remove ctxt rollup
+  in
+  return (ctxt, used_storage)
+
 let adjust_storage_space ctxt rollup ~new_storage_size =
   let open Lwt_result_syntax in
   let* used_storage =

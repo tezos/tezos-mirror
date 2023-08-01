@@ -63,6 +63,12 @@ val replace :
   whitelist:Sc_rollup_whitelist_repr.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
+(** [make_public context rollup] removes the whitelist of [rollup] from
+    the storage thus making the rollup public. Returns the resulting
+    context along with the freed storage space. *)
+val make_public :
+  Raw_context.t -> Sc_rollup_repr.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+
 (** [adjust_storage_space ctxt ~new_storage_size] updates the used
     storage space for the whitelist according to
     [new_storage_size]. The additional positive amount of unpaid

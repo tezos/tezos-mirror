@@ -2799,6 +2799,8 @@ module Sc_rollup : sig
     val replace :
       context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
 
+    val make_public : context -> Address.t -> (context * Z.t) tzresult Lwt.t
+
     val adjust_storage_space :
       context ->
       Address.t ->

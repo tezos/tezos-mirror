@@ -475,7 +475,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist =
         return
           ({paid_storage_size_diff; ticket_receipt = []; operations = []}, ctxt)
     | None ->
-        (* logic implemented in a later commit *)
+        let* ctxt, _freed_size = Sc_rollup.Whitelist.make_public ctxt rollup in
         return
           ( {
               paid_storage_size_diff = Z.zero;
