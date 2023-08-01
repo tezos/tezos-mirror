@@ -309,7 +309,7 @@ let empirical_data opts
   let samples = convert_workload_data workload_data in
   (* Extract name of variables and check well-formedness *)
   let variables =
-    List.rev_map (fun {workload; _} -> List.rev_map fst workload) samples
+    List.rev_map (fun {workload; _} -> List.map fst workload) samples
   in
   let variables = List.sort_uniq Stdlib.compare variables in
   match variables with
@@ -528,11 +528,22 @@ let perform_plot ~measure ~local_model_name ~problem ~solution ~plot_target
     let kind =
       match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
     in
+    (*
+      Expect the name is one of:
+      <instr_name>
+      <instr_name>/time
+      <instr_name>/alloc
+    *)
+    let rec body = function
+      | [] -> assert false
+      | "alloc" :: tl -> body tl ^ "_alloc"
+      | "time" :: tl -> body tl ^ "_time"
+      | s :: _ -> s
+    in
     let bench_name =
       match List.rev (Namespace.to_list Bench.name) with
-      | "intercept" :: name :: _ -> name ^ "__intercept"
-      | name :: _ -> name
-      | [] -> assert false
+      | "intercept" :: tl -> body tl ^ "__intercept"
+      | tl -> body tl
     in
     Filename.Infix.(
       dir
