@@ -6455,7 +6455,7 @@ let hash = Protocol.hash
         ~conflicts:[Conflicts.checkseum]
     in
     let _octez_sc_rollup_node_test =
-      only_if N.(number >= 016) @@ fun () ->
+      only_if (active && N.(number >= 016)) @@ fun () ->
       let helpers =
         private_lib
           (sf "octez_smart_rollup_node_%s_test_helpers" short_hash)
