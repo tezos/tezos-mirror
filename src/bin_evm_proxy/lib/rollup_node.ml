@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -105,34 +106,42 @@ let chunks bytes size =
   collect 0 [] |> List.rev
 
 module Durable_storage_path = struct
-  let accounts = "/evm/eth_accounts"
+  module EVM = struct
+    let root = "/evm"
 
-  let balance = "/balance"
+    let make s = root ^ s
+  end
 
-  let nonce = "/nonce"
+  let chain_id = EVM.make "/chain_id"
 
-  let code = "/code"
+  module Accounts = struct
+    let accounts = EVM.make "/eth_accounts"
 
-  let account_path (Address s) = accounts ^ "/" ^ s
+    let balance = "/balance"
 
-  let balance_path address = account_path address ^ balance
+    let nonce = "/nonce"
 
-  let nonce_path address = account_path address ^ nonce
+    let code = "/code"
 
-  let code_path address = account_path address ^ code
+    let account (Address s) = accounts ^ "/" ^ s
 
-  let number = "/number"
+    let balance address = account address ^ balance
 
-  let hash = "/hash"
+    let nonce address = account address ^ nonce
 
-  let transactions = "/transactions"
-
-  let timestamp = "/timestamp"
-
-  let chain_id = "/evm/chain_id"
+    let code address = account address ^ code
+  end
 
   module Block = struct
-    let blocks = "/evm/blocks"
+    let blocks = EVM.make "/blocks"
+
+    let number = "/number"
+
+    let hash = "/hash"
+
+    let transactions = "/transactions"
+
+    let timestamp = "/timestamp"
 
     type number = Current | Nth of Z.t
 
@@ -153,13 +162,13 @@ module Durable_storage_path = struct
   end
 
   module Transaction_receipt = struct
-    let receipts = "/evm/transactions_receipts"
+    let receipts = EVM.make "/transactions_receipts"
 
     let receipt tx_hash = receipts ^ "/" ^ tx_hash
   end
 
   module Transaction_object = struct
-    let objects = "/evm/transactions_objects"
+    let objects = EVM.make "/transactions_objects"
 
     let object_ tx_hash = objects ^ "/" ^ tx_hash
   end
@@ -258,7 +267,7 @@ module RPC = struct
 
   let balance base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.balance_path address in
+    let key = Durable_storage_path.Accounts.balance address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -267,7 +276,7 @@ module RPC = struct
 
   let nonce base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.nonce_path address in
+    let key = Durable_storage_path.Accounts.nonce address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -276,7 +285,7 @@ module RPC = struct
 
   let code base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.code_path address in
+    let key = Durable_storage_path.Accounts.code address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
