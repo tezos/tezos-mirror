@@ -313,6 +313,17 @@ struct
                 }
           | desc -> desc);
       }
+
+    let positive_int32_schema =
+      Json_schema.(
+        create
+          (element
+             (Integer
+                {
+                  multiple_of = None;
+                  minimum = Some (0., `Inclusive);
+                  maximum = Some (Int32.(to_float max_int), `Inclusive);
+                })))
   end
 
   module Time = Time.Protocol
