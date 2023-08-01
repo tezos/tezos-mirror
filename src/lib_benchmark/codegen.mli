@@ -32,10 +32,14 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+val solution_encoding : solution Data_encoding.t
+
 val pp_solution : Format.formatter -> solution -> unit
 
+(** Load a solution form a binary or JSON file *)
 val load_solution : string -> solution
 
+(** Save the given solution to binary and JSON files *)
 val save_solution : solution -> string -> unit
 
 val solution_to_csv : solution -> Csv.csv

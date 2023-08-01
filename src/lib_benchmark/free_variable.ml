@@ -33,6 +33,10 @@ let of_string = Namespace.of_string
 
 let to_string = Namespace.to_string
 
+(* We do not use [Namespace.encoding] but an encoding via string for
+   a simpler output *)
+let encoding = Data_encoding.(conv to_string of_string string)
+
 let of_namespace x = x
 
 let to_namespace x = x
@@ -47,7 +51,17 @@ module Table = Hashtbl.Make (struct
   let hash = Stdlib.Hashtbl.hash
 end)
 
-module Map = Map.Make (Namespace)
+module Map = struct
+  include Map.Make (Namespace)
+
+  let encoding a_encoding =
+    let open Data_encoding in
+    conv
+      (fun m -> List.map (fun (k, v) -> (to_string k, v)) (bindings m))
+      (fun kvs ->
+        of_seq (Seq.map (fun (k, v) -> (of_string k, v)) (List.to_seq kvs)))
+      (assoc a_encoding)
+end
 
 module Set = struct
   include Set.Make (Namespace)
