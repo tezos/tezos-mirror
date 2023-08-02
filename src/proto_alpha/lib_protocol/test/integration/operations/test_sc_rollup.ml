@@ -239,9 +239,7 @@ let sc_originate ?boot_sector ?parameters_ty block contract =
       contract
       kind
   in
-  let* incr = Incremental.begin_construction block in
-  let* incr = Incremental.add_operation incr operation in
-  let* block = Incremental.finalize_block incr in
+  let* block = Block.bake ~operation block in
   return (block, rollup)
 
 (** Initializes the context and originates a SCORU. *)
@@ -523,11 +521,8 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   let* incr = Incremental.begin_construction block in
   return (contract, incr)
 
-let hash_commitment incr commitment =
-  let open Result_syntax in
-  let ctxt = Incremental.alpha_ctxt incr in
-  let+ ctxt, hash = Sc_rollup.Commitment.hash ctxt commitment in
-  (Incremental.set_alpha_ctxt incr ctxt, hash)
+let hash_commitment commitment =
+  Sc_rollup.Commitment.hash_uncarbonated commitment
 
 let publish_commitment incr staker rollup commitment =
   let open Lwt_result_syntax in
@@ -585,7 +580,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
-  let*?@ incr, hash = hash_commitment incr commitment in
+  let hash = hash_commitment commitment in
   let* cement_op = Op.sc_rollup_cement (I incr) originator rollup in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
