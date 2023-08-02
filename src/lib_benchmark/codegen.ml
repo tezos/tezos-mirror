@@ -377,7 +377,12 @@ let make_toplevel_module structure_items =
 
 let comment ss = Comment ss
 
-let function_name model_name = "cost_" ^ Namespace.basename model_name
+let function_name model_name =
+  "cost_" ^
+  String.map (function
+      | '.' -> '_'
+      | c -> c)
+    (Namespace.basename model_name)
 
 let codegen (Model.Model model) (sol : solution)
     (transform : Costlang.transform) model_name =
