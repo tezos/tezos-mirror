@@ -1843,7 +1843,7 @@ let test_number_of_parallel_games_bounded () =
           "It should have failed with \
            [Sc_rollup_max_number_of_parallel_games_reached]"
   in
-  let* block = Incremental.begin_construction block in
+  let* incr = Incremental.begin_construction block in
   let* _block, _counter =
     List.fold_left2_es
       ~when_different_lengths:[]
@@ -1852,22 +1852,20 @@ let test_number_of_parallel_games_bounded () =
         let refutation =
           Sc_rollup.Game.Start
             {
-              player_commitment_hash =
-                Sc_rollup.Commitment.hash_uncarbonated opponent_commitment;
-              opponent_commitment_hash =
-                Sc_rollup.Commitment.hash_uncarbonated staker_commitment;
+              player_commitment_hash = hash_commitment opponent_commitment;
+              opponent_commitment_hash = hash_commitment staker_commitment;
             }
         in
         let* op =
           Op.sc_rollup_refute (I block) opponent rollup addr refutation
         in
-        let* block =
+        let* incr =
           if counter = max_number_of_parallel_games then
             Incremental.add_operation ~expect_apply_failure block op
           else Incremental.add_operation block op
         in
-        return (block, counter + 1))
-      (block, 0)
+        return (incr, counter + 1))
+      (incr, 0)
       opponents
       opponents_commitments
   in
