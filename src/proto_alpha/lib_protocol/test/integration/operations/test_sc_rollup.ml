@@ -719,42 +719,37 @@ let gen_commitments incr rollup ~predecessor ~num_commitments =
   in
   aux predecessor num_commitments []
 
-let attempt_to_recover_bond i contract ?staker rollup =
+let attempt_to_recover_bond ?policy block contract ?staker rollup =
   let open Lwt_result_syntax in
   (* Recover its own bond by default. *)
   let staker =
     match staker with
     | Some staker -> staker
-    | None -> (
-        match contract with
-        | Contract.Implicit staker -> staker
-        | _ -> assert false)
+    | None -> Account.pkh_of_contract_exn contract
   in
   let* recover_bond_op =
-    Op.sc_rollup_recover_bond (I i) contract rollup staker
+    Op.sc_rollup_recover_bond (B block) contract rollup staker
   in
-  let* i = Incremental.add_operation i recover_bond_op in
-  let* b = Incremental.finalize_block i in
-  return b
+  Block.bake ?policy ~operation:recover_bond_op block
 
-let recover_bond_not_lcc i contract rollup =
+let recover_bond_not_lcc block contract rollup =
   assert_fails_with
     ~__LOC__
-    (attempt_to_recover_bond i contract rollup)
+    (attempt_to_recover_bond block contract rollup)
     Sc_rollup_errors.Sc_rollup_not_staked_on_lcc_or_ancestor
 
-let recover_bond_not_staked i contract rollup =
+let recover_bond_not_staked block contract rollup =
   assert_fails_with
     ~__LOC__
-    (attempt_to_recover_bond i contract rollup)
+    (attempt_to_recover_bond block contract rollup)
     Sc_rollup_errors.Sc_rollup_not_staked
 
-let recover_bond_with_success i contract rollup =
+let recover_bond_with_success ?policy block contract rollup =
   let open Lwt_result_syntax in
-  let* bal_before = balances (I i) contract in
-  let* b = attempt_to_recover_bond i contract rollup in
+  let* bal_before = balances (B block) contract in
+  let* b = attempt_to_recover_bond ?policy block contract rollup in
   let* bal_after = balances (B b) contract in
-  let* constants = Context.get_constants (I i) in
+  let* constants = Context.get_constants (B b) in
   let* () =
     check_balances_evolution
       bal_before
@@ -773,36 +768,31 @@ let test_publish_cement_and_recover_bond () =
   let* block, contracts, rollup = init_and_originate Context.T2 in
   let _, contract = contracts in
   let* block = bake_blocks_until_next_inbox_level block rollup in
-  let* i = Incremental.begin_construction block in
   (* not staked yet *)
-  let* () = recover_bond_not_staked i contract rollup in
-  let* c = dummy_commitment (I i) rollup in
+  let* () = recover_bond_not_staked block contract rollup in
+  let* c = dummy_commitment (B block) rollup in
   let* operation = Op.sc_rollup_publish (B block) contract rollup c in
-  let* i = Incremental.add_operation i operation in
-  let* b = Incremental.finalize_block i in
+  let* b = Block.bake ~operation block in
   let* constants = Context.get_constants (B b) in
   let* b =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
-  let* i = Incremental.begin_construction b in
   (* stake not on LCC *)
-  let* () = recover_bond_not_lcc i contract rollup in
-  let* cement_op = Op.sc_rollup_cement (I i) contract rollup in
-  let* i = Incremental.add_operation i cement_op in
-  let* b = Incremental.finalize_block i in
-  let* i =
-    let pkh =
-      (* We forbid the stake owner from baker to correctly check the unfrozen
-         amount below. *)
-      match contract with Implicit pkh -> pkh | Originated _ -> assert false
-    in
-    Incremental.begin_construction b ~policy:(Excluding [pkh])
-  in
+  let* () = recover_bond_not_lcc b contract rollup in
+  let* cement_op = Op.sc_rollup_cement (B b) contract rollup in
+  let* b = Block.bake ~operation:cement_op b in
   (* recover bond should succeed *)
-  let* b = recover_bond_with_success i contract rollup in
-  let* i = Incremental.begin_construction b in
+  let* b =
+    recover_bond_with_success
+    (* We forbid the stake owner from baker to correctly check the
+       unfrozen amount below. *)
+      ~policy:(Excluding [Account.pkh_of_contract_exn contract])
+      b
+      contract
+      rollup
+  in
   (* not staked anymore *)
-  let* () = recover_bond_not_staked i contract rollup in
+  let* () = recover_bond_not_staked b contract rollup in
   return_unit
 
 (** [test_publish_fails_on_double_stake] creates a rollup and then
