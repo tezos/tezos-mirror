@@ -710,9 +710,9 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
   return ()
 
 (* Generates a list of cemented dummy commitments. *)
-let gen_commitments incr rollup ~predecessor ~num_commitments =
+let gen_commitments ctxt rollup ~predecessor ~num_commitments =
   let open Lwt_result_syntax in
-  let* constants = Context.get_constants (I incr) in
+  let* constants = Context.get_constants ctxt in
   let delta = constants.parametric.sc_rollup.commitment_period_in_blocks in
   let rec aux predecessor n acc =
     if n <= 0 then return (List.rev acc)
@@ -727,7 +727,7 @@ let gen_commitments incr rollup ~predecessor ~num_commitments =
           ~predecessor
           ~inbox_level
           ~compressed_state:predecessor.compressed_state
-          (I incr)
+          ctxt
           rollup
       in
       let hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
@@ -1176,10 +1176,9 @@ let test_older_cemented_commitment () =
       (Some 1)
   in
   let* max_num_stored_cemented_commitments =
-    let* incr = Incremental.begin_construction block in
-    let ctxt = Incremental.alpha_ctxt incr in
+    let* constants = Context.get_constants (B block) in
     return
-    @@ Alpha_context.Constants.max_number_of_stored_cemented_commitments ctxt
+      constants.parametric.sc_rollup.max_number_of_stored_cemented_commitments
   in
   (* Publish and cement a commitment. *)
   let* first_commitment_hash, block =
@@ -1191,9 +1190,8 @@ let test_older_cemented_commitment () =
   (* Generate a list of commitments that exceed the maximum number of stored
      ones by one. *)
   let* commitments_and_hashes =
-    let* incr = Incremental.begin_construction block in
     gen_commitments
-      incr
+      (B block)
       rollup
       ~predecessor:first_commitment
       ~num_commitments:(max_num_stored_cemented_commitments + 1)
@@ -3267,8 +3265,7 @@ let test_conflict_point_on_a_branch () =
     Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
   in
   let* commitments_and_hashes =
-    let* incr = Incremental.begin_construction block in
-    gen_commitments incr rollup ~predecessor ~num_commitments:10
+    gen_commitments (B block) rollup ~predecessor ~num_commitments:10
   in
   let commitments, _ = List.split commitments_and_hashes in
   let* block = publish_commitments block pA rollup commitments in
@@ -3318,8 +3315,7 @@ let test_agreeing_stakers_cannot_play () =
     Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
   in
   let* commitments_and_hashes =
-    let* incr = Incremental.begin_construction block in
-    gen_commitments incr rollup ~predecessor ~num_commitments:10
+    gen_commitments (B block) rollup ~predecessor ~num_commitments:10
   in
   let commitments, _ = List.split commitments_and_hashes in
   let* block = publish_commitments block pA rollup commitments in
@@ -3360,8 +3356,7 @@ let test_start_game_on_cemented_commitment () =
     Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
   in
   let* commitments_and_hashes =
-    let* incr = Incremental.begin_construction block in
-    gen_commitments incr rollup ~predecessor ~num_commitments:10
+    gen_commitments (B block) rollup ~predecessor ~num_commitments:10
   in
   (* pA and pB publishes and cements 10 commitments. *)
   let commitments, hashes = List.split commitments_and_hashes in
