@@ -1935,37 +1935,14 @@ let test_timeout () =
   let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
   (* Testing to send a timeout before it's allowed. There is one block left
      before timeout is allowed, that is, the current block. *)
-  let* (_incr : Incremental.t) =
-    let expected_block_left = 0l in
-    let expect_apply_failure = function
-      | Environment.Ecoproto_error
-          (Sc_rollup_errors.Sc_rollup_timeout_level_not_reached
-             (blocks_left, staker) as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          if blocks_left = expected_block_left && pkh1 = staker then return_unit
-          else
-            failwith
-              "It should have failed with [Sc_rollup_timeout_level_not_reached \
-               (%ld, %a)] but got [Sc_rollup_timeout_level_not_reached (%ld, \
-               %a)]"
-              expected_block_left
-              Signature.Public_key_hash.pp
-              pkh1
-              blocks_left
-              Signature.Public_key_hash.pp
-              staker
-      | _ ->
-          failwith
-            "It should have failed with [Sc_rollup_timeout_level_not_reached \
-             (%ld, %a)]"
-            expected_block_left
-            Signature.Public_key_hash.pp
-            pkh1
-    in
+  let* () =
+    let blocks_left = 0l in
     let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
-    let* incr = Incremental.begin_construction block in
-    Incremental.add_operation ~expect_apply_failure incr timeout
+    let block_res = Block.bake ~operation:timeout block in
+    assert_fails_with
+      ~__LOC__
+      block_res
+      (Sc_rollup_errors.Sc_rollup_timeout_level_not_reached (blocks_left, pkh1))
   in
   let* refute =
     let tick =
@@ -2864,26 +2841,17 @@ let test_automatically_added_internal_messages () =
     it's impossible to give a valid commitment with 0 ticks. *)
 let test_zero_tick_commitment_fails () =
   let open Lwt_result_syntax in
-  let* ctxt, contract, rollup = init_and_originate Context.T1 in
-  let* incr = Incremental.begin_construction ctxt in
-  let* commitment = dummy_commitment (I incr) rollup in
+  let* block, contract, rollup = init_and_originate Context.T1 in
+  let* commitment = dummy_commitment (B block) rollup in
   let commitment = {commitment with number_of_ticks = number_of_ticks_exn 0L} in
   let* publish_commitment =
-    Op.sc_rollup_publish (B ctxt) contract rollup commitment
+    Op.sc_rollup_publish (B block) contract rollup commitment
   in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error
-        (Sc_rollup_errors.Sc_rollup_zero_tick_commitment as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ ->
-        failwith "It should have failed with [Sc_rollup_zero_tick_commitment]"
-  in
-  let* _incr =
-    Incremental.add_operation ~expect_apply_failure incr publish_commitment
-  in
-  return_unit
+  let block_res = Block.bake ~operation:publish_commitment block in
+  assert_fails_with
+    ~__LOC__
+    block_res
+    Sc_rollup_errors.Sc_rollup_zero_tick_commitment
 
 (** [test_curfew] creates a rollup, publishes two conflicting
     commitments. Branches are expected to continue (commitment are able to be
@@ -3168,10 +3136,7 @@ let test_winner_by_forfeit () =
 
   (* Both operation fails with [Unknown staker], because pA was removed when
      it lost against B. *)
-  let* incr = Incremental.begin_construction block in
-  let* _incr = Incremental.add_operation incr pC_move in
-  let* _incr = Incremental.add_operation incr pD_timeout in
-
+  let* _block = Block.bake ~operations:[pC_move; pD_timeout] block in
   return_unit
 
 (** Test the same property as in {!test_winner_by_forfeit} but where two
@@ -3295,8 +3260,8 @@ let test_conflict_point_on_a_branch () =
       pB_pkh
     >|= Environment.wrap_tzresult
   in
-  let pA_hash = Sc_rollup.Commitment.hash_uncarbonated pA_commitment in
-  let pB_hash = Sc_rollup.Commitment.hash_uncarbonated pB_commitment in
+  let pA_hash = hash_commitment pA_commitment in
+  let pB_hash = hash_commitment pB_commitment in
   let expected_conflict =
     Sc_rollup.Commitment.Hash.(
       equal conflict_pA_hash pA_hash && equal conflict_pB_hash pB_hash)
@@ -3331,17 +3296,9 @@ let test_agreeing_stakers_cannot_play () =
         opponent_commitment_hash = agreed_commitment_hash;
       }
   in
-  let* op = Op.sc_rollup_refute (B block) pA rollup pB_pkh refutation in
-  let* incr = Incremental.begin_construction block in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_no_conflict as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_no_conflict]"
-  in
-  let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
-  return_unit
+  let* operation = Op.sc_rollup_refute (B block) pA rollup pB_pkh refutation in
+  let block_res = Block.bake ~operation block in
+  assert_fails_with ~__LOC__ block_res Sc_rollup_errors.Sc_rollup_no_conflict
 
 let test_start_game_on_cemented_commitment () =
   let open Lwt_result_syntax in
@@ -3390,27 +3347,20 @@ let test_start_game_on_cemented_commitment () =
       let* pB_against_pA =
         Op.sc_rollup_refute (B block) pB rollup pA_pkh refutation
       in
-      let expect_apply_failure = function
-        | Environment.Ecoproto_error
-            (Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment _
-            as e)
-          :: _ ->
-            Assert.test_error_encodings e ;
-            return_unit
-        | _ ->
-            failwith
-              "It should have failed with \
-               [Sc_rollup_wrong_staker_for_conflict_commitment]"
-      in
-      let* incr = Incremental.begin_construction block in
       (* Even if there is no conflict, the refutation game will reject
          it before that. This test behaves as a regression test to prevent
          to break this property. *)
-      let* (_ : Incremental.t) =
-        Incremental.add_operation ~expect_apply_failure incr pA_against_pB
+      let wrong_staker_error pkh =
+        Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment
+          (pkh, hash)
       in
-      let* (_ : Incremental.t) =
-        Incremental.add_operation ~expect_apply_failure incr pB_against_pA
+      let* () =
+        let block_res = Block.bake ~operation:pA_against_pB block in
+        assert_fails_with ~__LOC__ block_res (wrong_staker_error pA_pkh)
+      in
+      let* () =
+        let block_res = Block.bake ~operation:pB_against_pA block in
+        assert_fails_with ~__LOC__ block_res (wrong_staker_error pB_pkh)
       in
       return_unit)
     hashes
