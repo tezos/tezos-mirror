@@ -268,10 +268,9 @@ let scenario network =
         ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
         (fun fmt (status, (c, _indexes)) -> Format.fprintf fmt "%d %s" c status)
     in
+    let attested_level = string_of_int (level + lag) in
     let* metadata =
-      RPC.call
-        node
-        (RPC.get_chain_block_metadata ~block:(string_of_int (level + lag)) ())
+      RPC.call node (RPC.get_chain_block_metadata ~block:attested_level ())
     in
     let pp_array fmt a =
       for i = 0 to Array.length a - 1 do
@@ -312,12 +311,30 @@ let scenario network =
         pp_array
         node_attestation ;
     let num_published = List.length slot_headers in
+    let* ops =
+      RPC.call
+        node
+        (RPC.get_chain_block_operations_validation_pass
+           ~block:attested_level
+           ~validation_pass:0
+           ())
+    in
+    let attestations =
+      List.filter
+        (fun op ->
+          let op_type =
+            JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
+          in
+          String.equal op_type "dal_attestation")
+        (JSON.as_list ops)
+    in
     Log.info
-      "At level %d, published slots: %d, status: %a"
+      "At level %d, published slots: %d, status: %a (%d attestations)"
       level
       (List.length slot_headers)
       pp_map
-      (Map.bindings map) ;
+      (Map.bindings map)
+      (List.length attestations) ;
     return (num_published, num_attested)
   in
 
