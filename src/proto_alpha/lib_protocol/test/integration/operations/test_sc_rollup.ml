@@ -522,30 +522,14 @@ let originate_contract block ~script ~baker ~storage ~source_contract =
 let hash_commitment commitment =
   Sc_rollup.Commitment.hash_uncarbonated commitment
 
-let publish_commitment incr staker rollup commitment =
+let publish_commitment source rollup block commitment =
   let open Lwt_result_syntax in
-  let* incr =
-    if
-      (Incremental.header incr).Block_header.shell.level
-      < Raw_level.to_int32 commitment.Sc_rollup.Commitment.inbox_level
-    then
-      let* block = Incremental.finalize_block incr in
-      let* block = bake_blocks_until_inbox_level block commitment in
-      Incremental.begin_construction block
-    else return incr
-  in
-  let* operation = Op.sc_rollup_publish (I incr) staker rollup commitment in
-  let* incr = Incremental.add_operation incr operation in
-  Incremental.finalize_block incr
+  let* block = bake_blocks_until_inbox_level block commitment in
+  let* operation = Op.sc_rollup_publish (B block) source rollup commitment in
+  Block.bake ~operation block
 
-let publish_commitments block staker rollup commitments =
-  List.fold_left_es
-    (fun block commitment ->
-      let open Lwt_result_syntax in
-      let* incr = Incremental.begin_construction block in
-      publish_commitment incr staker rollup commitment)
-    block
-    commitments
+let publish_commitments block source rollup commitments =
+  List.fold_left_es (publish_commitment source rollup) block commitments
 
 let cement_commitment ?challenge_window_in_blocks block rollup staker =
   let open Lwt_result_syntax in
@@ -568,60 +552,53 @@ let cement_commitments ?challenge_window_in_blocks block rollup staker hashes =
     block
     hashes
 
-let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
+let publish_and_cement_commitment block ~originator rollup commitment =
   let open Lwt_result_wrap_syntax in
-  let* block = publish_commitment incr originator rollup commitment in
+  let* block = publish_commitment originator rollup block commitment in
   let* constants = Context.get_constants (B block) in
   let* block =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks block
   in
-  let* incr =
-    Incremental.begin_construction ~policy:Block.(By_account baker) block
-  in
   let hash = hash_commitment commitment in
-  let* cement_op = Op.sc_rollup_cement (I incr) originator rollup in
-  let* incr = Incremental.add_operation incr cement_op in
-  let* block = Incremental.finalize_block incr in
-  let* incr =
-    Incremental.begin_construction ~policy:Block.(By_account baker) block
-  in
-  return (hash, incr)
+  let* cement_op = Op.sc_rollup_cement (B block) originator rollup in
+  let* block = Block.bake ~operation:cement_op block in
+  return (hash, block)
 
-let publish_and_cement_commitments incr ~baker ~originator rollup commitments =
+let publish_and_cement_commitments block ~originator rollup commitments =
   let open Lwt_result_syntax in
   List.fold_left_es
-    (fun incr commitment ->
-      let* _hash, incr =
-        publish_and_cement_commitment incr ~baker ~originator rollup commitment
+    (fun block commitment ->
+      let* _hash, block =
+        publish_and_cement_commitment block ~originator rollup commitment
       in
-      return incr)
-    incr
+      return block)
+    block
     commitments
 
-let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
+let publish_and_cement_dummy_commitment block ~originator rollup =
   let open Lwt_result_syntax in
-  let* commitment = dummy_commitment (I incr) rollup in
-  publish_and_cement_commitment incr ~baker ~originator rollup commitment
+  let* commitment = dummy_commitment (B block) rollup in
+  publish_and_cement_commitment block ~originator rollup commitment
 
 (* Publishes repeated cemented commitments until a commitment with
    [inbox_level >= min_inbox_level] is found (such a commitment
    is also published and cemented). *)
-let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
+let publish_commitments_until_min_inbox_level block rollup ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
-  let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
+  let rec aux block hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
     let open Lwt_result_syntax in
     let level = Raw_level.to_int32 inbox_level in
-    if level >= Int32.of_int min_inbox_level then return (hash, incr)
+    if level >= Int32.of_int min_inbox_level then return (hash, block)
     else
       let* commitment =
-        dummy_commitment ~predecessor:commitment (I incr) rollup
+        dummy_commitment ~predecessor:commitment (B block) rollup
       in
-      let* hash, incr =
-        publish_and_cement_commitment incr ~baker ~originator rollup commitment
+      let* hash, block =
+        publish_and_cement_commitment block ~originator rollup commitment
       in
-      aux incr hash commitment
+      aux block hash commitment
   in
-  aux incr cemented_commitment_hash cemented_commitment
+  aux block cemented_commitment_hash cemented_commitment
 
 let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
   let open Lwt_result_syntax in
@@ -1091,9 +1068,8 @@ let test_single_transaction_batch () =
     string_ticket_token "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red"
   in
   (* Publish and cement a commitment. *)
-  let* incr = Incremental.begin_construction block in
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   (* Create an atomic batch message. *)
   let transactions =
@@ -1106,7 +1082,11 @@ let test_single_transaction_batch () =
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the self contract owns one ticket. *)
   let* _ticket_hash, incr =
-    adjust_ticket_token_balance_of_rollup (I incr) rollup red_token ~delta:Z.one
+    adjust_ticket_token_balance_of_rollup
+      (B block)
+      rollup
+      red_token
+      ~delta:Z.one
   in
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
@@ -1213,22 +1193,23 @@ let test_older_cemented_commitment () =
       (Destination.Contract (Originated ticket_receiver))
       (Some 1)
   in
-  let* incr = Incremental.begin_construction block in
   let* max_num_stored_cemented_commitments =
+    let* incr = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt incr in
     return
     @@ Alpha_context.Constants.max_number_of_stored_cemented_commitments ctxt
   in
   (* Publish and cement a commitment. *)
-  let* first_commitment_hash, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* first_commitment_hash, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   let* first_commitment =
-    Context.Sc_rollup.commitment (I incr) rollup first_commitment_hash
+    Context.Sc_rollup.commitment (B block) rollup first_commitment_hash
   in
   (* Generate a list of commitments that exceed the maximum number of stored
      ones by one. *)
   let* commitments_and_hashes =
+    let* incr = Incremental.begin_construction block in
     gen_commitments
       incr
       rollup
@@ -1236,12 +1217,13 @@ let test_older_cemented_commitment () =
       ~num_commitments:(max_num_stored_cemented_commitments + 1)
   in
   let commitments, commitment_hashes = List.split commitments_and_hashes in
-  let* incr =
-    publish_and_cement_commitments incr ~baker ~originator rollup commitments
+  let* block =
+    publish_and_cement_commitments block ~originator rollup commitments
   in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4469
      The test actually do not test the good "too old" commitment. *)
   let commitment_hashes = first_commitment_hash :: commitment_hashes in
+  let* incr = Incremental.begin_construction block in
   match commitment_hashes with
   | too_old_commitment :: stored_hashes ->
       (* Executing outbox message for the old non-stored commitment should fail. *)
@@ -1283,10 +1265,9 @@ let test_multi_transaction_batch () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   (* Ticket-token with content "red". *)
   let* red_token =
@@ -1313,7 +1294,7 @@ let test_multi_transaction_batch () =
   (* Set up the balance so that the rollup owns 10 units of red tokens. *)
   let* _ticket_hash, incr =
     adjust_ticket_token_balance_of_rollup
-      (I incr)
+      (B block)
       rollup
       red_token
       ~delta:(Z.of_int 10)
@@ -1367,14 +1348,14 @@ let test_transaction_with_invalid_type () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   let transactions = [(mutez_receiver, Entrypoint.default, "12")] in
   (* Create an atomic batch message. *)
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
+  let* incr = Incremental.begin_construction block in
   assert_fails
     ~loc:__LOC__
     ~error:Sc_rollup_operations.Sc_rollup_invalid_parameters_type
@@ -1402,14 +1383,14 @@ let test_execute_message_twice () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   (* Create an atomic batch message. *)
   let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
+  let* incr = Incremental.begin_construction block in
   (* Execute the message once - should succeed. *)
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
@@ -1456,21 +1437,21 @@ let test_execute_message_twice_different_cemented_commitments () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* first_cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* first_cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   let* predecessor =
-    Context.Sc_rollup.commitment (I incr) rollup first_cemented_commitment
+    Context.Sc_rollup.commitment (B block) rollup first_cemented_commitment
   in
-  let* commitment = dummy_commitment ~predecessor (I incr) rollup in
-  let* second_cemented_commitment, incr =
-    publish_and_cement_commitment incr ~baker ~originator rollup commitment
+  let* commitment = dummy_commitment ~predecessor (B block) rollup in
+  let* second_cemented_commitment, block =
+    publish_and_cement_commitment block ~originator rollup commitment
   in
   (* Create an atomic batch message. *)
   let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
+  let* incr = Incremental.begin_construction block in
   (* Execute the message once - should succeed. *)
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
@@ -1515,10 +1496,9 @@ let test_zero_amount_ticket () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   (* Create an atomic batch message. *)
   let transactions =
@@ -1529,6 +1509,7 @@ let test_zero_amount_ticket () =
     ]
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
+  let* incr = Incremental.begin_construction block in
   let*! result =
     execute_outbox_message_without_proof_validation
       incr
@@ -1555,17 +1536,16 @@ let test_zero_amount_ticket () =
    invalid. *)
 let test_invalid_output_proof () =
   let open Lwt_result_syntax in
-  let* block, (baker, originator) = context_init Context.T2 in
-  let baker = Context.Contract.pkh baker in
+  let* block, originator = context_init Context.T1 in
   (* Originate a rollup that accepts a list of string tickets as input. *)
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
+  let* incr = Incremental.begin_construction block in
   assert_fails
     ~loc:__LOC__
     ~error:Sc_rollup_operations.Sc_rollup_invalid_output_proof
@@ -1614,15 +1594,11 @@ let test_execute_message_override_applied_messages_slot () =
     in
     return (paid_storage_size_diff, incr)
   in
-  let* cemented_commitment = dummy_commitment (I incr) rollup in
-  let* cemented_commitment_hash, incr =
-    publish_and_cement_commitment
-      incr
-      rollup
-      ~baker
-      ~originator
-      cemented_commitment
+  let* cemented_commitment = dummy_commitment (B block) rollup in
+  let* cemented_commitment_hash, block =
+    publish_and_cement_commitment block rollup ~originator cemented_commitment
   in
+  let* incr = Incremental.begin_construction block in
   (* Execute a message. *)
   let* _, incr =
     execute_message
@@ -1631,18 +1607,19 @@ let test_execute_message_override_applied_messages_slot () =
       ~message_index:0
       ~cemented_commitment_hash
   in
+  let* block = Incremental.finalize_block incr in
   (* Publish a bunch of commitments until the inbox level of the lcc is greater
      than [max_active_levels]. *)
-  let* cemented_commitment_hash, incr =
+  let* cemented_commitment_hash, block =
     publish_commitments_until_min_inbox_level
-      incr
+      block
       rollup
-      ~baker
       ~originator
       ~min_inbox_level:(max_active_levels + 10)
       ~cemented_commitment_hash
       ~cemented_commitment
   in
+  let* incr = Incremental.begin_construction block in
   (* Execute the message again but at [max_active_levels] outbox-level. *)
   let* paid_storage_size_diff, incr =
     execute_message
@@ -1739,10 +1716,9 @@ let test_insufficient_ticket_balances () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
-  let* cemented_commitment, incr =
-    publish_and_cement_dummy_commitment incr ~baker ~originator rollup
+  let* cemented_commitment, block =
+    publish_and_cement_dummy_commitment block ~originator rollup
   in
   (* Ticket-token with content "red". *)
   let* red_token =
@@ -1771,7 +1747,7 @@ let test_insufficient_ticket_balances () =
   *)
   let* ticket_hash, incr =
     adjust_ticket_token_balance_of_rollup
-      (I incr)
+      (B block)
       rollup
       red_token
       ~delta:(Z.of_int 7)
