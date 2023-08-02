@@ -377,11 +377,16 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
 
 (* Verify that the given list of transactions and transaction operations match.
    Also checks each transaction operation for type mismatches etc. *)
-let verify_execute_outbox_message_operations block rollup ~loc ~operations
+let verify_execute_outbox_message_operations ctxt rollup ~loc ~operations
     ~expected_transactions =
   let open Lwt_result_wrap_syntax in
-  let* incr = Incremental.begin_construction block in
-  let ctxt = Incremental.alpha_ctxt incr in
+  let* incr =
+    Context.(
+      match ctxt with
+      | I incr -> return incr
+      | B block -> Incremental.begin_construction block)
+  in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
   let validate_and_extract_operation_params ctxt op =
     match op with
     | Script_typed_ir.Internal_operation
@@ -458,8 +463,11 @@ let verify_execute_outbox_message_operations block rollup ~loc ~operations
            called from %s"
           loc
   in
-  let* _ctxt, operations_data =
-    List.fold_left_map_es validate_and_extract_operation_params ctxt operations
+  let* _alpha_ctxt, operations_data =
+    List.fold_left_map_es
+      validate_and_extract_operation_params
+      alpha_ctxt
+      operations
   in
   let compare_data (d1, e1, p1) (d2, e2, p2) =
     Contract_hash.equal d1 d2
@@ -663,12 +671,19 @@ let execute_outbox_message block ~originator rollup ~output_proof
   in
   Block.bake ~operation:batch_op block
 
-let assert_ticket_token_balance ~loc block token owner expected =
+let assert_ticket_token_balance ~loc ctxt token owner expected =
   let open Lwt_result_wrap_syntax in
-  let* incr = Incremental.begin_construction block in
-  let ctxt = Incremental.alpha_ctxt incr in
+  let* incr =
+    Context.(
+      match ctxt with
+      | I incr -> return incr
+      | B block -> Incremental.begin_construction block)
+  in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
   let*@ balance, _ =
-    let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
+    let* key_hash, ctxt =
+      Ticket_balance_key.of_ex_token alpha_ctxt ~owner token
+    in
     Ticket_balance.get_balance ctxt key_hash
   in
   match (balance, expected) with
@@ -1081,7 +1096,7 @@ let test_single_transaction_batch () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      block
+      (B block)
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1090,14 +1105,14 @@ let test_single_transaction_batch () =
   let* () =
     assert_ticket_token_balance
       ~loc:__LOC__
-      block
+      (B block)
       red_token
       (Destination.Sc_rollup rollup)
       None
   in
   assert_ticket_token_balance
     ~loc:__LOC__
-    block
+    (B block)
     red_token
     (Destination.Contract (Originated ticket_receiver))
     (Some 1)
@@ -1127,7 +1142,7 @@ let test_older_cemented_commitment () =
   in
   let verify_outbox_message_execution block cemented_commitment =
     (* Set up the balance so that the self contract owns one ticket. *)
-    let* _ticket_hash, incr =
+    let* _ticket_hash, block =
       adjust_ticket_token_balance_of_rollup
         (B block)
         rollup
@@ -1143,9 +1158,9 @@ let test_older_cemented_commitment () =
       ]
     in
     let output = make_output ~outbox_level:0 ~message_index:0 transactions in
-    let* Sc_rollup_operations.{operations; _}, incr =
+    let* Sc_rollup_operations.{operations; _}, block =
       execute_outbox_message_without_proof_validation
-        incr
+        block
         rollup
         ~cemented_commitment
         output
@@ -1154,7 +1169,7 @@ let test_older_cemented_commitment () =
     let* () =
       verify_execute_outbox_message_operations
         ~loc:__LOC__
-        incr
+        (B block)
         rollup
         ~operations
         ~expected_transactions:transactions
@@ -1163,14 +1178,14 @@ let test_older_cemented_commitment () =
     let* () =
       assert_ticket_token_balance
         ~loc:__LOC__
-        incr
+        (B block)
         red_token
         (Destination.Sc_rollup rollup)
         None
     in
     assert_ticket_token_balance
       ~loc:__LOC__
-      incr
+      (B block)
       red_token
       (Destination.Contract (Originated ticket_receiver))
       (Some 1)
@@ -1269,16 +1284,16 @@ let test_multi_transaction_batch () =
   (* Create an atomic batch message. *)
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the rollup owns 10 units of red tokens. *)
-  let* _ticket_hash, incr =
+  let* _ticket_hash, block =
     adjust_ticket_token_balance_of_rollup
       (B block)
       rollup
       red_token
       ~delta:(Z.of_int 10)
   in
-  let* Sc_rollup_operations.{operations; _}, incr =
+  let* Sc_rollup_operations.{operations; _}, block =
     execute_outbox_message_without_proof_validation
-      incr
+      block
       rollup
       ~cemented_commitment
       output
@@ -1287,7 +1302,7 @@ let test_multi_transaction_batch () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      incr
+      (B block)
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1296,14 +1311,14 @@ let test_multi_transaction_batch () =
   let* () =
     assert_ticket_token_balance
       ~loc:__LOC__
-      incr
+      (B block)
       red_token
       (Destination.Sc_rollup rollup)
       None
   in
   assert_ticket_token_balance
     ~loc:__LOC__
-    incr
+    (B block)
     red_token
     (Destination.Contract (Originated ticket_receiver))
     (Some 10)
@@ -1378,7 +1393,7 @@ let test_execute_message_twice () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      block
+      (B block)
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1438,7 +1453,7 @@ let test_execute_message_twice_different_cemented_commitments () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      block
+      (B block)
       rollup
       ~operations
       ~expected_transactions:transactions
