@@ -601,7 +601,7 @@ let octez_stdlib =
   octez_lib
     "tezos-stdlib"
     ~path:"src/lib_stdlib"
-    ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
+    ~synopsis:"Yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
     ~js_compatible:true
     ~js_of_ocaml:
@@ -720,7 +720,7 @@ let octez_lwt_result_stdlib =
   octez_lib
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
-    ~synopsis:"Tezos: error-aware stdlib replacement"
+    ~synopsis:"error-aware stdlib replacement"
     ~js_compatible:true
     ~documentation:
       Dune.
@@ -781,7 +781,7 @@ let octez_error_monad =
   octez_lib
     "tezos-error-monad"
     ~path:"src/lib_error_monad"
-    ~synopsis:"Tezos: error monad"
+    ~synopsis:"Error monad"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -800,7 +800,7 @@ let octez_hacl =
   octez_lib
     "tezos-hacl"
     ~path:"src/lib_hacl"
-    ~synopsis:"Tezos: thin layer around hacl-star"
+    ~synopsis:"Thin layer around hacl-star"
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
     ~js_of_ocaml:
       [
@@ -937,8 +937,7 @@ let octez_rpc =
     "tezos-rpc"
     ~path:"src/lib_rpc"
     ~synopsis:
-      "Tezos: library of auto-documented RPCs (service and hierarchy \
-       descriptions)"
+      "Library of auto-documented RPCs (service and hierarchy descriptions)"
     ~deps:
       [
         data_encoding |> open_;
@@ -1229,8 +1228,7 @@ let octez_crypto =
   octez_lib
     "tezos-crypto"
     ~path:"src/lib_crypto"
-    ~synopsis:
-      "Tezos: library with all the cryptographic primitives used by Tezos"
+    ~synopsis:"Library with all the cryptographic primitives used by Tezos"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -1916,7 +1914,7 @@ let octez_event_logging =
   octez_lib
     "tezos-event-logging"
     ~path:"src/lib_event_logging"
-    ~synopsis:"Tezos event logging library"
+    ~synopsis:"Octez event logging library"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -1931,7 +1929,7 @@ let octez_event_logging_test_helpers =
   octez_lib
     "tezos-event-logging-test-helpers"
     ~path:"src/lib_event_logging/test_helpers"
-    ~synopsis:"Tezos: test helpers for the event logging library"
+    ~synopsis:"Test helpers for the event logging library"
     ~deps:
       [
         octez_stdlib;
@@ -1951,7 +1949,7 @@ let octez_stdlib_unix =
     "tezos-stdlib-unix"
     ~path:"src/lib_stdlib_unix"
     ~synopsis:
-      "Tezos: yet-another local-extension of the OCaml standard library \
+      "Yet-another local-extension of the OCaml standard library \
        (unix-specific fragment)"
     ~deps:
       [
@@ -2036,7 +2034,7 @@ let octez_micheline =
   octez_lib
     "tezos-micheline"
     ~path:"src/lib_micheline"
-    ~synopsis:"Tezos: internal AST and parser for the Michelson language"
+    ~synopsis:"Internal AST and parser for the Michelson language"
     ~deps:
       [
         uutf;
@@ -2073,7 +2071,7 @@ let octez_base =
   octez_lib
     "tezos-base"
     ~path:"src/lib_base"
-    ~synopsis:"Tezos: meta-package and pervasive type definitions for Tezos"
+    ~synopsis:"Meta-package and pervasive type definitions for Tezos"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -2172,7 +2170,7 @@ let octez_base_test_helpers =
   octez_lib
     "tezos-base-test-helpers"
     ~path:"src/lib_base/test_helpers"
-    ~synopsis:"Tezos: Tezos base test helpers"
+    ~synopsis:"Octez base test helpers"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2298,7 +2296,7 @@ let octez_version =
   octez_lib
     "tezos-version"
     ~path:"src/lib_version"
-    ~synopsis:"Tezos: version information generated from Git"
+    ~synopsis:"Version information generated from Git"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
     ~js_compatible:true
 
@@ -2361,7 +2359,7 @@ let octez_p2p_services =
   octez_lib
     "tezos-p2p-services"
     ~path:"src/lib_p2p_services"
-    ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-p2p`"
+    ~synopsis:"Descriptions of RPCs exported by [tezos-p2p]"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
     ~js_compatible:true
@@ -2370,7 +2368,7 @@ let octez_workers =
   octez_lib
     "tezos-workers"
     ~path:"src/lib_workers"
-    ~synopsis:"Tezos: worker library"
+    ~synopsis:"Worker library"
     ~documentation:
       Dune.[[S "package"; S "octez-libs"]; [S "mld_files"; S "tezos_workers"]]
     ~deps:
@@ -2412,7 +2410,7 @@ let octez_shell_services =
   octez_lib
     "tezos-shell-services"
     ~path:"src/lib_shell_services"
-    ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-shell`"
+    ~synopsis:"Descriptions of RPCs exported by [tezos-shell]"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -2475,7 +2473,7 @@ let octez_p2p =
   octez_lib
     "tezos-p2p"
     ~path:"src/lib_p2p"
-    ~synopsis:"Tezos: library for a pool of P2P connections"
+    ~synopsis:"Library for a pool of P2P connections"
     ~deps:
       [
         lwt_watcher;
@@ -2503,7 +2501,7 @@ let tezt_tezos =
   octez_lib
     "tezt-tezos"
     ~path:"tezt/lib_tezos"
-    ~synopsis:"Tezos test framework based on Tezt"
+    ~synopsis:"Octez test framework based on Tezt"
     ~bisect_ppx:No
     ~deps:
       [
@@ -2803,7 +2801,7 @@ let octez_context =
   octez_lib
     "tezos-context"
     ~path:"src/lib_context"
-    ~synopsis:"Tezos: on-disk context abstraction for `octez-node`"
+    ~synopsis:"On-disk context abstraction for [octez-node]"
     ~deps:[octez_context_disk; octez_context_memory]
 
 let _octez_context_tests =
@@ -3498,7 +3496,7 @@ let octez_rpc_http =
   octez_lib
     "tezos-rpc-http"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http server and client)"
+    ~synopsis:"Library of auto-documented RPCs (http server and client)"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc; resto_cohttp; uri]
     ~modules:["RPC_client_errors"; "media_type"]
 
@@ -3506,7 +3504,7 @@ let octez_rpc_http_client =
   octez_lib
     "tezos-rpc-http-client"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http client)"
+    ~synopsis:"Library of auto-documented RPCs (http client)"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3520,7 +3518,7 @@ let octez_rpc_http_client_unix =
   octez_lib
     "tezos-rpc-http-client-unix"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: unix implementation of the RPC client"
+    ~synopsis:"Unix implementation of the RPC client"
     ~deps:
       [
         octez_stdlib_unix;
@@ -3536,7 +3534,7 @@ let octez_rpc_http_server =
   octez_lib
     "tezos-rpc-http-server"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http server)"
+    ~synopsis:"Library of auto-documented RPCs (http server)"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
