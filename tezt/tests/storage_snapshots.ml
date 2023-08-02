@@ -286,7 +286,7 @@ let test_export_import_snapshots =
       (fun export_format ->
         Lwt_list.iter_s
           (fun (history_mode, nodes) ->
-            Lwt_list.iter_p
+            Lwt_list.iter_s
               (fun node ->
                 export_import_and_check node ~history_mode ~export_format)
               nodes)
