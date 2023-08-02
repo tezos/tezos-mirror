@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name testnet_experiment_tools)
+ (libraries
+  tezt
+  octez-libs.tezt-tezos
+  tezos-client-base-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-libs.tezos-stdlib-unix
+  tezos-client-alpha
+  tezos-protocol-alpha)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezos_client_base_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_protocol_alpha)
+ (modules testnet_experiment_tools))

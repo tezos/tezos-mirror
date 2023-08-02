@@ -7206,6 +7206,29 @@ let _yes_wallet_test =
       ]
     ~bisect_ppx:No
 
+let _testnet_experiment_tools =
+  private_exe
+    "testnet_experiment_tools"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~synopsis:
+      "Suite of tools to support the execution of stresstests on testnets"
+    ~bisect_ppx:No
+    ~static:false
+    ~with_macos_security_framework:true
+    ~opam:""
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos;
+        octez_client_base_unix |> open_;
+        octez_base;
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        Protocol.(client_exn alpha);
+        Protocol.(main alpha) |> open_;
+      ]
+    ~modules:["testnet_experiment_tools"]
+
 let simdal_lib =
   private_lib
     "simdal"
