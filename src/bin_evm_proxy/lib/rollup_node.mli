@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -97,6 +98,10 @@ module type S = sig
 
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
+
+  (** [kernel_version ()] returns the internal kernel version (i.e the commit hash where
+      the kernel was compiled). *)
+  val kernel_version : unit -> string tzresult Lwt.t
 
   (** [simulate_call call_info] asks the rollup to simulate a call, and returns the
       result. *)
