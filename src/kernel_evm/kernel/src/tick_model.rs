@@ -76,7 +76,7 @@ pub fn estimate_would_overflow(estimated_ticks: u64, transaction: &Transaction) 
 
 /// Initial amount for the tick accumulator, corresponding to the overhead of a
 /// block
-pub fn block_overhead_ticks() -> u64 {
+pub fn top_level_overhead_ticks() -> u64 {
     INITIALISATION_OVERHEAD
 }
 

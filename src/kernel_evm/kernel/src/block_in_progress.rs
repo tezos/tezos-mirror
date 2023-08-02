@@ -168,7 +168,7 @@ impl BlockInProgress {
             number,
             gas_price,
             transactions,
-            tick_model::block_overhead_ticks(),
+            tick_model::top_level_overhead_ticks(),
         )
     }
 

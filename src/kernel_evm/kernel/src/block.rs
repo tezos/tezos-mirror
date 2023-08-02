@@ -24,6 +24,18 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use tezos_ethereum::block::BlockConstants;
 
+/// Struct used to allow the compiler to check that the tick counter value is
+/// correctly moved and updated. Copy and Clone should NOT be derived.
+struct TickCounter {
+    c: u64,
+}
+
+impl TickCounter {
+    pub fn new(c: u64) -> Self {
+        Self { c }
+    }
+}
+
 pub enum ComputationResult {
     RebootNeeded,
     Finished,
@@ -91,7 +103,7 @@ pub fn produce<Host: Runtime>(
         init_account_storage().context("Failed to initialize EVM account storage")?;
     let mut accounts_index = init_account_index()?;
     let precompiles = precompiles::precompile_set::<Host>();
-    let mut tick_counter = tick_model::block_overhead_ticks();
+    let mut tick_counter = TickCounter::new(tick_model::top_level_overhead_ticks());
 
     for proposal in queue.proposals {
         let mut block_in_progress = bip_from_queue_element(
@@ -119,7 +131,7 @@ pub fn produce<Host: Runtime>(
                 return Ok(());
             }
             ComputationResult::Finished => {
-                tick_counter = block_in_progress.estimated_ticks;
+                tick_counter = TickCounter::new(block_in_progress.estimated_ticks);
                 let new_block = block_in_progress
                     .finalize_and_store(host)
                     .context("Failed to finalize the block in progress")?;
@@ -136,7 +148,7 @@ fn bip_from_queue_element(
     proposal: crate::blueprint::QueueElement,
     current_block_number: U256,
     constants: &BlockConstants,
-    tick_counter: u64,
+    tick_counter: TickCounter,
 ) -> BlockInProgress {
     match proposal {
         crate::blueprint::QueueElement::Blueprint(proposal) => {
@@ -146,11 +158,11 @@ fn bip_from_queue_element(
                 current_block_number,
                 constants.gas_price,
                 ring,
-                tick_counter,
+                tick_counter.c,
             )
         }
         crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
-            bip.estimated_ticks = tick_counter;
+            bip.estimated_ticks = tick_counter.c;
             bip
         }
     }
@@ -828,7 +840,7 @@ mod tests {
 
         assert_eq!(
             ticks,
-            tick_model::ticks_of_gas(21123) + tick_model::block_overhead_ticks()
+            tick_model::ticks_of_gas(21123) + tick_model::top_level_overhead_ticks()
         );
     }
 
@@ -866,7 +878,7 @@ mod tests {
         assert_eq!(
             ticks,
             tick_model::ticks_of_invalid_transaction()
-                + tick_model::block_overhead_ticks()
+                + tick_model::top_level_overhead_ticks()
         );
     }
 
