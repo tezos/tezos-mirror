@@ -619,14 +619,9 @@ let publish_commitments_until_min_inbox_level block rollup ~originator
   in
   aux block cemented_commitment_hash cemented_commitment
 
-let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
+let adjust_ticket_token_balance_of_rollup block rollup ticket_token ~delta =
   let open Lwt_result_syntax in
-  let* incr =
-    Context.(
-      match ctxt with
-      | I incr -> return incr
-      | B block -> Incremental.begin_construction block)
-  in
+  let* incr = Incremental.begin_construction block in
   let alpha_ctxt = Incremental.alpha_ctxt incr in
   let* hash, alpha_ctxt =
     Ticket_helpers.adjust_ticket_token_balance
@@ -1079,11 +1074,7 @@ let test_single_transaction_batch () =
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the self contract owns one ticket. *)
   let* _ticket_hash, block =
-    adjust_ticket_token_balance_of_rollup
-      (B block)
-      rollup
-      red_token
-      ~delta:Z.one
+    adjust_ticket_token_balance_of_rollup block rollup red_token ~delta:Z.one
   in
   let* Sc_rollup_operations.{operations; _}, block =
     execute_outbox_message_without_proof_validation
@@ -1143,11 +1134,7 @@ let test_older_cemented_commitment () =
   let verify_outbox_message_execution block cemented_commitment =
     (* Set up the balance so that the self contract owns one ticket. *)
     let* _ticket_hash, block =
-      adjust_ticket_token_balance_of_rollup
-        (B block)
-        rollup
-        red_token
-        ~delta:Z.one
+      adjust_ticket_token_balance_of_rollup block rollup red_token ~delta:Z.one
     in
     (* Create an atomic batch message. *)
     let transactions =
@@ -1286,7 +1273,7 @@ let test_multi_transaction_batch () =
   (* Set up the balance so that the rollup owns 10 units of red tokens. *)
   let* _ticket_hash, block =
     adjust_ticket_token_balance_of_rollup
-      (B block)
+      block
       rollup
       red_token
       ~delta:(Z.of_int 10)
@@ -1729,7 +1716,7 @@ let test_insufficient_ticket_balances () =
   *)
   let* ticket_hash, incr =
     adjust_ticket_token_balance_of_rollup
-      (B block)
+      block
       rollup
       red_token
       ~delta:(Z.of_int 7)
