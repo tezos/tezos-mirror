@@ -6856,7 +6856,7 @@ let hash = Protocol.hash
 
   let _015_PtLimaPt = frozen (Name.v "PtLimaPt" 015)
 
-  let _016_PtMumbai = active (Name.v "PtMumbai" 016)
+  let _016_PtMumbai = frozen (Name.v "PtMumbai" 016)
 
   let _017_PtNairob = active (Name.v "PtNairob" 017)
 

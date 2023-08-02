@@ -15,7 +15,6 @@
   tezos-client-commands
   octez-smart-rollup
   octez-smart-rollup-node-lib
-  octez_smart_rollup_node_PtMumbai
   octez_smart_rollup_node_PtNairob
   octez_smart_rollup_node_Proxford
   (select void_for_linking-octez_smart_rollup_node_alpha from
