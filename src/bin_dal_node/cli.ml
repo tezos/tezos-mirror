@@ -269,11 +269,6 @@ let make ~run =
           metrics_addr;
           peers;
         }
-      |> function
-      | Ok v -> `Ok v
-      | Error error ->
-          let str = Format.asprintf "%a" pp_print_trace error in
-          `Error (false, str)
     in
     match (bootstrap_flag, attestors @ producers) with
     | false, [] -> run None
