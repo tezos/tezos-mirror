@@ -39,6 +39,7 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?metrics_addr:string ->
   node:Node.t ->
   unit ->
   t
@@ -54,6 +55,9 @@ val rpc_port : t -> int
 
 (** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
 val listen_addr : t -> string
+
+(** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
+val metrics_addr : t -> string
 
 (** Return the endpoint of the dal node, i.e., http://rpc_host:rpc_port. *)
 val endpoint : t -> string
