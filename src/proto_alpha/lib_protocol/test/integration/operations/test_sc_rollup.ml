@@ -635,20 +635,18 @@ let execute_outbox_message_without_proof_validation incr rollup
   in
   return (res, Incremental.set_alpha_ctxt incr ctxt)
 
-let execute_outbox_message incr ~originator rollup ~output_proof
+let execute_outbox_message block ~originator rollup ~output_proof
     ~commitment_hash =
   let open Lwt_result_syntax in
   let* batch_op =
     Op.sc_rollup_execute_outbox_message
-      (I incr)
+      (B block)
       originator
       rollup
       commitment_hash
       ~output_proof
   in
-  let* incr = Incremental.add_operation incr batch_op in
-  let* block = Incremental.finalize_block incr in
-  Incremental.begin_construction block
+  Block.bake ~operation:batch_op block
 
 let assert_ticket_token_balance ~loc incr token owner expected =
   let open Lwt_result_wrap_syntax in
@@ -1545,12 +1543,11 @@ let test_invalid_output_proof () =
   let* cemented_commitment, block =
     publish_and_cement_dummy_commitment block ~originator rollup
   in
-  let* incr = Incremental.begin_construction block in
   assert_fails
     ~loc:__LOC__
     ~error:Sc_rollup_operations.Sc_rollup_invalid_output_proof
     (execute_outbox_message
-       incr
+       block
        rollup
        ~originator
        ~output_proof:"No good"
