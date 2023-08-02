@@ -161,7 +161,8 @@ let bake_timeout_period ?timeout_period_in_blocks block =
 
 (** [context_init tup] initializes a context and returns the created
     context and contracts. *)
-let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
+let context_init ?commitment_period_in_blocks
+    ?(sc_rollup_challenge_window_in_blocks = 10)
     ?(timeout_period_in_blocks = 10) ?hard_gas_limit_per_operation
     ?hard_gas_limit_per_block tup =
   Context.init_with_constants_gen
@@ -183,6 +184,12 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
           enable = true;
           arith_pvm_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          commitment_period_in_blocks =
+            Option.value
+              ~default:
+                Context.default_test_constants.sc_rollup
+                  .commitment_period_in_blocks
+              commitment_period_in_blocks;
           timeout_period_in_blocks;
         };
     }
@@ -243,11 +250,14 @@ let sc_originate ?boot_sector ?parameters_ty block contract =
   return (block, rollup)
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?boot_sector ?parameters_ty
+let init_and_originate ?boot_sector ?parameters_ty ?commitment_period_in_blocks
     ?sc_rollup_challenge_window_in_blocks tup =
   let open Lwt_result_syntax in
   let* block, contracts =
-    context_init ?sc_rollup_challenge_window_in_blocks tup
+    context_init
+      ?commitment_period_in_blocks
+      ?sc_rollup_challenge_window_in_blocks
+      tup
   in
   let contract = Context.tup_hd tup contracts in
   let* block, rollup =
@@ -800,31 +810,24 @@ let test_publish_cement_and_recover_bond () =
     that the second publish fails. *)
 let test_publish_fails_on_double_stake () =
   let open Lwt_result_syntax in
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 in
-  let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
+  let* block, contracts, rollup = init_and_originate Context.T2 in
+  let* block = bake_blocks_until_next_inbox_level block rollup in
   let _, contract = contracts in
-  let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment (I i) rollup in
+  let* commitment1 = dummy_commitment (B block) rollup in
   let commitment2 =
     {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
-  let* operation1 = Op.sc_rollup_publish (B ctxt) contract rollup commitment1 in
-  let* i = Incremental.add_operation i operation1 in
-  let* b = Incremental.finalize_block i in
-  let* operation2 = Op.sc_rollup_publish (B b) contract rollup commitment2 in
-  let* i = Incremental.begin_construction b in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error
-        (Sc_rollup_errors.Sc_rollup_staker_double_stake as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_staker_double_stake]"
+  let* operation1 =
+    Op.sc_rollup_publish (B block) contract rollup commitment1
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_apply_failure i operation2
+  let* block = Block.bake ~operation:operation1 block in
+  let* operation2 =
+    Op.sc_rollup_publish (B block) contract rollup commitment2
   in
-  return_unit
+  assert_fails_with
+    ~__LOC__
+    (Block.bake ~operation:operation2 block)
+    Sc_rollup_errors.Sc_rollup_staker_double_stake
 
 (** [test_cement_fails_on_conflict] creates a rollup and then publishes
     two different commitments. It waits 20 blocks and then attempts to
@@ -832,84 +835,69 @@ let test_publish_fails_on_double_stake () =
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
   let open Lwt_result_wrap_syntax in
-  let* ctxt, contracts, rollup = init_and_originate Context.T3 in
-  let* ctxt = bake_blocks_until_next_inbox_level ctxt rollup in
+  let* b, contracts, rollup = init_and_originate Context.T3 in
+  let* b = bake_blocks_until_next_inbox_level b rollup in
   let _, contract1, contract2 = contracts in
-  let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment (I i) rollup in
+  let* commitment1 = dummy_commitment (B b) rollup in
   let commitment2 =
     {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
-  let* operation1 =
-    Op.sc_rollup_publish (B ctxt) contract1 rollup commitment1
-  in
-  let* i = Incremental.add_operation i operation1 in
-  let* b = Incremental.finalize_block i in
+  let* operation1 = Op.sc_rollup_publish (B b) contract1 rollup commitment1 in
+  let* b = Block.bake ~operation:operation1 b in
   let* operation2 = Op.sc_rollup_publish (B b) contract2 rollup commitment2 in
-  let* i = Incremental.begin_construction b in
-  let* i = Incremental.add_operation i operation2 in
-  let* b = Incremental.finalize_block i in
+  let* b = Block.bake ~operation:operation2 b in
   let* constants = Context.get_constants (B b) in
   let* b =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
-  let* i = Incremental.begin_construction b in
-  let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
-      ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Sc_rollup_disputed]"
-  in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_apply_failure i cement_op
-  in
-  return_unit
+  let* cement_op = Op.sc_rollup_cement (B b) contract1 rollup in
+  let block_res = Block.bake ~operation:cement_op b in
+  assert_fails_with ~__LOC__ block_res Sc_rollup_errors.Sc_rollup_disputed
 
-let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
-    =
+let commit_and_cement_after_n_bloc ?expected_error b contract rollup n =
   let open Lwt_result_wrap_syntax in
-  let* block = bake_blocks_until_next_inbox_level block rollup in
-  let* i = Incremental.begin_construction block in
-  let* commitment = dummy_commitment (I i) rollup in
-  let* operation = Op.sc_rollup_publish (B block) contract rollup commitment in
-  let* i = Incremental.add_operation i operation in
-  let* b = Incremental.finalize_block i in
+  let* b = bake_blocks_until_next_inbox_level b rollup in
+  let* commitment = dummy_commitment (B b) rollup in
+  let* operation = Op.sc_rollup_publish (B b) contract rollup commitment in
+  let* b = Block.bake ~operation b in
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
-  let* i = Incremental.begin_construction b in
-  let* cement_op = Op.sc_rollup_cement (I i) contract rollup in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ?expect_apply_failure i cement_op
-  in
-  return_unit
+  let* cement_op = Op.sc_rollup_cement (B b) contract rollup in
+  let block = Block.bake ~operation:cement_op b in
+  match expected_error with
+  | Some error -> assert_fails_with ~__LOC__ block error
+  | None ->
+      let* _block = block in
+      return_unit
 
 (** [test_challenge_window_period_boundaries] checks that cementing a commitment
     without waiting for the whole challenge window period fails. Whereas,
     succeeds when the period is over. *)
 let test_challenge_window_period_boundaries () =
+  let commitment_period_in_blocks = 10 in
   let sc_rollup_challenge_window_in_blocks = 10 in
   let open Lwt_result_syntax in
-  let* ctxt, contract, rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks Context.T1
+  let* block, contract, rollup =
+    init_and_originate
+      ~commitment_period_in_blocks
+      ~sc_rollup_challenge_window_in_blocks
+      Context.T1
   in
   (* Should fail because the waiting period is not strictly greater than the
      challenge window period. *)
   let* () =
-    let expect_apply_failure = function
-      | Environment.Ecoproto_error
-          (Sc_rollup_errors.Sc_rollup_commitment_too_recent _ as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ ->
-          failwith
-            "It should have failed with [Sc_rollup_commitment_too_recent]"
+    let*? current_level = Context.get_level (B block) in
+    let level_of_cement_submit =
+      Int32.to_int (Raw_level.to_int32 current_level)
+      + commitment_period_in_blocks + sc_rollup_challenge_window_in_blocks
+      |> Int32.of_int |> Raw_level_repr.of_int32_exn
     in
+    let min_level = Raw_level_repr.succ level_of_cement_submit in
     commit_and_cement_after_n_bloc
-      ~expect_apply_failure
-      ctxt
+      ~expected_error:
+        (Sc_rollup_errors.Sc_rollup_commitment_too_recent
+           {current_level = level_of_cement_submit; min_level})
+      block
       contract
       rollup
       (sc_rollup_challenge_window_in_blocks - 1)
@@ -917,7 +905,7 @@ let test_challenge_window_period_boundaries () =
   (* Succeeds because the challenge period is over. *)
   let* () =
     commit_and_cement_after_n_bloc
-      ctxt
+      block
       contract
       rollup
       sc_rollup_challenge_window_in_blocks
