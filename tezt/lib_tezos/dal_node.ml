@@ -31,7 +31,6 @@ module Parameters = struct
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
     node : Node.t;
-    client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -173,7 +172,7 @@ let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ~node ~client () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ~node () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -192,15 +191,7 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
       ~name
       ?color
       ?event_pipe
-      {
-        data_dir;
-        rpc_host;
-        rpc_port;
-        listen_addr;
-        pending_ready = [];
-        node;
-        client;
-      }
+      {data_dir; rpc_host; rpc_port; listen_addr; pending_ready = []; node}
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node

@@ -40,7 +40,6 @@ val create :
   ?rpc_port:int ->
   ?listen_addr:string ->
   node:Node.t ->
-  client:Client.t ->
   unit ->
   t
 

@@ -120,7 +120,7 @@ let scenario network =
   in
   let* () = save ~restart:true in
   let* () = Wallet.Airdrop.distribute_money client keys in
-  let dal_node = Dal_node.create ~node ~client () in
+  let dal_node = Dal_node.create ~node () in
   let attestor_profiles =
     match network with
     | Dailynet ->
