@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -186,6 +187,18 @@ module MethodMaker (M : METHOD_DEF) :
 
   let response_ok result id = response (Ok result) id
 end
+
+module Kernel_version = MethodMaker (struct
+  type input = unit
+
+  type output = string
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.string
+
+  let method_ = "tez_kernelVersion"
+end)
 
 module Network_id = MethodMaker (struct
   type input = unit
@@ -434,6 +447,7 @@ end)
 
 let methods : (module METHOD) list =
   [
+    (module Kernel_version);
     (module Network_id);
     (module Chain_id);
     (module Accounts);

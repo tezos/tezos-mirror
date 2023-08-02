@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -100,14 +101,35 @@ let start {rpc_addr; rpc_port; debug; rollup_node_endpoint} =
   let* rollup_node_config =
     match rollup_node_endpoint with
     | Endpoint endpoint ->
-        let module Rollup_node_rpc = Rollup_node.Make (struct
+        let module Current_rollup_node_rpc = Current_rollup_node.Make (struct
           let base = endpoint
         end) in
-        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+        let module Next_rollup_node_rpc = Next_rollup_node.Make (struct
+          let base = endpoint
+        end) in
+        let* smart_rollup_address =
+          Current_rollup_node_rpc.smart_rollup_address
+        in
+        return
+          Services.
+            {
+              current_rpc =
+                (module Current_rollup_node_rpc : Current_rollup_node.S);
+              next_rpc = (module Next_rollup_node_rpc : Next_rollup_node.S);
+              smart_rollup_address;
+              kernel_version = None;
+            }
     | Mockup ->
         let* smart_rollup_address = Mockup.smart_rollup_address in
-        return ((module Mockup : Rollup_node.S), smart_rollup_address)
+        let* kernel_version = Mockup.kernel_version () in
+        return
+          Services.
+            {
+              current_rpc = (module Mockup : Current_rollup_node.S);
+              next_rpc = (module Mockup : Next_rollup_node.S);
+              smart_rollup_address;
+              kernel_version = Some kernel_version;
+            }
   in
   let directory = Services.directory rollup_node_config in
   let server =

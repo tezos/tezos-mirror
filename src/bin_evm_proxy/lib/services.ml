@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,17 @@
 
 open Tezos_rpc
 open Rpc_encodings
+
+type rollup_node_config = {
+  current_rpc : (module Current_rollup_node.S);
+  next_rpc : (module Next_rollup_node.S);
+  smart_rollup_address : string;
+  mutable kernel_version : string option;
+}
+
+(* This version is the one compatible with the latest released/deployed
+   kernel. *)
+let current_kernel_version = "75c84da3cebf0f9a45d339dea12f0a4e4786ed8f"
 
 let version_service =
   Service.get_service
@@ -77,7 +89,7 @@ let dispatch_service =
     Path.(root)
 
 let get_block ~full_transaction_object block_param
-    (module Rollup_node_rpc : Rollup_node.S) =
+    (module Rollup_node_rpc : Current_rollup_node.S) =
   match block_param with
   | Ethereum_types.(Hash_param (Block_height n)) ->
       Rollup_node_rpc.nth_block ~full_transaction_object n
@@ -85,11 +97,40 @@ let get_block ~full_transaction_object block_param
       Rollup_node_rpc.current_block ~full_transaction_object
 
 let dispatch_input
-    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
-    =
+    ({
+       current_rpc = (module Current_rollup_node_rpc : Current_rollup_node.S);
+       next_rpc = (module Next_rollup_node_rpc : Next_rollup_node.S);
+       smart_rollup_address;
+       kernel_version;
+     } as rollup_node_config) (input, id) =
   let open Lwt_result_syntax in
+  (* Since the proxy is stateless, for now, we have to check the kernel version
+     before executing any RPC. *)
+  let* kernel_version =
+    match kernel_version with
+    | Some kernel_version -> return kernel_version
+    | None ->
+        let* v =
+          let*! version = Current_rollup_node_rpc.kernel_version () in
+          match version with
+          | Ok v -> return v
+          | _ -> Next_rollup_node_rpc.kernel_version ()
+        in
+        rollup_node_config.kernel_version <- Some v ;
+        return v
+  in
+  let (module Rollup_node_rpc) =
+    if kernel_version = current_kernel_version then
+      (module Current_rollup_node_rpc : Current_rollup_node.S)
+    else (module Next_rollup_node_rpc : Next_rollup_node.S)
+  in
   let* output =
     match input with
+    (* INTERNAL RPCs *)
+    | Kernel_version.Input _ ->
+        let* kernel_version = Rollup_node_rpc.kernel_version () in
+        return (Kernel_version.Output (Ok kernel_version))
+    (* ETHEREUM JSON-RPC API *)
     | Accounts.Input _ -> return (Accounts.Output (Ok []))
     | Network_id.Input _ ->
         let* (Qty chain_id) = Rollup_node_rpc.chain_id () in
@@ -166,5 +207,5 @@ let dispatch ctx dir =
           let+ outputs = List.map_es (dispatch_input ctx) inputs in
           Batch outputs)
 
-let directory (rollup_node_config : (module Rollup_node.S) * string) =
+let directory (rollup_node_config : rollup_node_config) =
   Directory.empty |> version |> dispatch rollup_node_config
