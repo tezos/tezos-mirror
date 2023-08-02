@@ -377,9 +377,10 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
 
 (* Verify that the given list of transactions and transaction operations match.
    Also checks each transaction operation for type mismatches etc. *)
-let verify_execute_outbox_message_operations incr rollup ~loc ~operations
+let verify_execute_outbox_message_operations block rollup ~loc ~operations
     ~expected_transactions =
   let open Lwt_result_wrap_syntax in
+  let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
   let validate_and_extract_operation_params ctxt op =
     match op with
@@ -627,12 +628,14 @@ let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
       ~delta
   in
   let incr = Incremental.set_alpha_ctxt incr alpha_ctxt in
-  return (hash, incr)
+  let* block = Incremental.finalize_block incr in
+  return (hash, block)
 
 (** A version of execute outbox message that output ignores proof validation. *)
-let execute_outbox_message_without_proof_validation incr rollup
+let execute_outbox_message_without_proof_validation block rollup
     ~cemented_commitment outbox_message =
   let open Lwt_result_wrap_syntax in
+  let* incr = Incremental.begin_construction block in
   let*@ res, ctxt =
     Sc_rollup_operations.Internal_for_tests.execute_outbox_message
       (Incremental.alpha_ctxt incr)
@@ -643,7 +646,9 @@ let execute_outbox_message_without_proof_validation incr rollup
       ~cemented_commitment
       ~output_proof:"Not used"
   in
-  return (res, Incremental.set_alpha_ctxt incr ctxt)
+  let incr = Incremental.set_alpha_ctxt incr ctxt in
+  let* block = Incremental.finalize_block incr in
+  return (res, block)
 
 let execute_outbox_message block ~originator rollup ~output_proof
     ~commitment_hash =
@@ -658,8 +663,9 @@ let execute_outbox_message block ~originator rollup ~output_proof
   in
   Block.bake ~operation:batch_op block
 
-let assert_ticket_token_balance ~loc incr token owner expected =
+let assert_ticket_token_balance ~loc block token owner expected =
   let open Lwt_result_wrap_syntax in
+  let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
   let*@ balance, _ =
     let* key_hash, ctxt = Ticket_balance_key.of_ex_token ctxt ~owner token in
@@ -1057,16 +1063,16 @@ let test_single_transaction_batch () =
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the self contract owns one ticket. *)
-  let* _ticket_hash, incr =
+  let* _ticket_hash, block =
     adjust_ticket_token_balance_of_rollup
       (B block)
       rollup
       red_token
       ~delta:Z.one
   in
-  let* Sc_rollup_operations.{operations; _}, incr =
+  let* Sc_rollup_operations.{operations; _}, block =
     execute_outbox_message_without_proof_validation
-      incr
+      block
       rollup
       ~cemented_commitment
       output
@@ -1075,7 +1081,7 @@ let test_single_transaction_batch () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      incr
+      block
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1084,14 +1090,14 @@ let test_single_transaction_batch () =
   let* () =
     assert_ticket_token_balance
       ~loc:__LOC__
-      incr
+      block
       red_token
       (Destination.Sc_rollup rollup)
       None
   in
   assert_ticket_token_balance
     ~loc:__LOC__
-    incr
+    block
     red_token
     (Destination.Contract (Originated ticket_receiver))
     (Some 1)
@@ -1119,11 +1125,11 @@ let test_older_cemented_commitment () =
   let* red_token =
     string_ticket_token "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red"
   in
-  let verify_outbox_message_execution incr cemented_commitment =
+  let verify_outbox_message_execution block cemented_commitment =
     (* Set up the balance so that the self contract owns one ticket. *)
     let* _ticket_hash, incr =
       adjust_ticket_token_balance_of_rollup
-        (I incr)
+        (B block)
         rollup
         red_token
         ~delta:Z.one
@@ -1199,7 +1205,6 @@ let test_older_cemented_commitment () =
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4469
      The test actually do not test the good "too old" commitment. *)
   let commitment_hashes = first_commitment_hash :: commitment_hashes in
-  let* incr = Incremental.begin_construction block in
   match commitment_hashes with
   | too_old_commitment :: stored_hashes ->
       (* Executing outbox message for the old non-stored commitment should fail. *)
@@ -1207,12 +1212,10 @@ let test_older_cemented_commitment () =
         assert_fails
           ~loc:__LOC__
           ~error:Sc_rollup_operations.Sc_rollup_invalid_last_cemented_commitment
-          (verify_outbox_message_execution incr too_old_commitment)
+          (verify_outbox_message_execution block too_old_commitment)
       in
       (* Executing outbox message for the recent ones should succeed. *)
-      List.iter_es
-        (fun commitment -> verify_outbox_message_execution incr commitment)
-        stored_hashes
+      List.iter_es (verify_outbox_message_execution block) stored_hashes
   | _ -> failwith "Expected non-empty list of commitment hashes."
 
 let test_multi_transaction_batch () =
@@ -1331,12 +1334,11 @@ let test_transaction_with_invalid_type () =
   let transactions = [(mutez_receiver, Entrypoint.default, "12")] in
   (* Create an atomic batch message. *)
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
-  let* incr = Incremental.begin_construction block in
   assert_fails
     ~loc:__LOC__
     ~error:Sc_rollup_operations.Sc_rollup_invalid_parameters_type
     (execute_outbox_message_without_proof_validation
-       incr
+       block
        rollup
        ~cemented_commitment
        output)
@@ -1366,11 +1368,10 @@ let test_execute_message_twice () =
   (* Create an atomic batch message. *)
   let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
-  let* incr = Incremental.begin_construction block in
   (* Execute the message once - should succeed. *)
-  let* Sc_rollup_operations.{operations; _}, incr =
+  let* Sc_rollup_operations.{operations; _}, block =
     execute_outbox_message_without_proof_validation
-      incr
+      block
       rollup
       ~cemented_commitment
       output
@@ -1379,7 +1380,7 @@ let test_execute_message_twice () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      incr
+      block
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1389,7 +1390,7 @@ let test_execute_message_twice () =
     ~loc:__LOC__
     ~error:Sc_rollup_errors.Sc_rollup_outbox_message_already_applied
     (execute_outbox_message_without_proof_validation
-       incr
+       block
        rollup
        ~cemented_commitment
        output)
@@ -1427,11 +1428,10 @@ let test_execute_message_twice_different_cemented_commitments () =
   (* Create an atomic batch message. *)
   let transactions = [(string_receiver, Entrypoint.default, {|"Hello"|})] in
   let output = make_output ~outbox_level:0 ~message_index:1 transactions in
-  let* incr = Incremental.begin_construction block in
   (* Execute the message once - should succeed. *)
-  let* Sc_rollup_operations.{operations; _}, incr =
+  let* Sc_rollup_operations.{operations; _}, block =
     execute_outbox_message_without_proof_validation
-      incr
+      block
       rollup
       ~cemented_commitment:first_cemented_commitment
       output
@@ -1440,7 +1440,7 @@ let test_execute_message_twice_different_cemented_commitments () =
   let* () =
     verify_execute_outbox_message_operations
       ~loc:__LOC__
-      incr
+      block
       rollup
       ~operations
       ~expected_transactions:transactions
@@ -1450,7 +1450,7 @@ let test_execute_message_twice_different_cemented_commitments () =
     ~loc:__LOC__
     ~error:Sc_rollup_errors.Sc_rollup_outbox_message_already_applied
     (execute_outbox_message_without_proof_validation
-       incr
+       block
        rollup
        ~cemented_commitment:second_cemented_commitment
        output)
@@ -1485,10 +1485,9 @@ let test_zero_amount_ticket () =
     ]
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
-  let* incr = Incremental.begin_construction block in
   let*! result =
     execute_outbox_message_without_proof_validation
-      incr
+      block
       rollup
       ~cemented_commitment
       output
@@ -1573,16 +1572,14 @@ let test_execute_message_override_applied_messages_slot () =
   let* cemented_commitment_hash, block =
     publish_and_cement_commitment block rollup ~originator cemented_commitment
   in
-  let* incr = Incremental.begin_construction block in
   (* Execute a message. *)
-  let* _, incr =
+  let* _, block =
     execute_message
-      incr
+      block
       ~outbox_level:0
       ~message_index:0
       ~cemented_commitment_hash
   in
-  let* block = Incremental.finalize_block incr in
   (* Publish a bunch of commitments until the inbox level of the lcc is greater
      than [max_active_levels]. *)
   let* cemented_commitment_hash, block =
@@ -1594,11 +1591,10 @@ let test_execute_message_override_applied_messages_slot () =
       ~cemented_commitment_hash
       ~cemented_commitment
   in
-  let* incr = Incremental.begin_construction block in
   (* Execute the message again but at [max_active_levels] outbox-level. *)
   let* paid_storage_size_diff, incr =
     execute_message
-      incr
+      block
       ~outbox_level:max_active_levels
       ~message_index:1
       ~cemented_commitment_hash
