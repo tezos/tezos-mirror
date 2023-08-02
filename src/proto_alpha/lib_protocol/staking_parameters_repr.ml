@@ -90,6 +90,12 @@ let encoding =
 let make ~limit_of_staking_over_baking_millionth
     ~edge_of_baking_over_staking_billionth =
   match
+    let limit_of_staking_over_baking_millionth =
+      Z.to_int32 limit_of_staking_over_baking_millionth
+    in
+    let edge_of_baking_over_staking_billionth =
+      Z.to_int32 edge_of_baking_over_staking_billionth
+    in
     make
       ~limit_of_staking_over_baking_millionth
       ~edge_of_baking_over_staking_billionth
