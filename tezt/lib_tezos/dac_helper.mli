@@ -103,6 +103,7 @@ val with_fresh_rollup :
 (** Initalizes a scenario with full DAC infrastruture. See [Scenarios.full] for
     components. *)
 val scenario_with_full_dac_infrastructure :
+  ?supports:Protocol.supported_protocols ->
   ?tags:string list ->
   ?pvm_name:string ->
   ?custom_committee_members:Account.aggregate_key list ->

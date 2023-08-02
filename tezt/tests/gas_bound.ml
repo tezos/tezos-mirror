@@ -71,16 +71,12 @@ code { CAR ; DIP { NIL (list int) } ;
        DROP ; NIL operation ; PAIR }; 
 |}
 
-let test_originate_first_explosion client protocol () =
+let test_originate_first_explosion client _protocol () =
   let expected_msg =
     rex "Gas limit exceeded during typechecking or execution"
   in
   let* () = Client.typecheck_script ~scripts:[first_explosion] client in
-  let gas_limit =
-    match protocol with
-    | Protocol.Nairobi | Oxford | Alpha -> 645
-    | Mumbai -> 1479
-  in
+  let gas_limit = 645 in
   let process =
     Client.spawn_originate_contract
       ~alias:"first_explosion"

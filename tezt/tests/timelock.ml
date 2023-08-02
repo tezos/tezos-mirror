@@ -364,6 +364,7 @@ let register ~protocols =
   List.iter
     (fun (title, test_function) ->
       Protocol.register_test
+        ~supports:Protocol.(From_protocol (number Oxford))
         ~__FILE__
         ~title
         ~tags:["client"; "michelson"; "timelock"]

@@ -1,0 +1,11 @@
+RPC_REQUEST_URI: PUT $SCHEME://$HOST:$PORT/v0/dac_member_signature
+RPC_REQUEST_HEADER: Content-Type: application/json
+
+
+RPC_REQUEST_BODY: {
+  "root_hash": "00a3703854279d2f377d689163d1ec911a840d84b56c4c6f6cafdf0610394df7c6",
+  "signer_pkh": "[PUBLIC_KEY_HASH]",
+  "signature": "[AGGREGATED_SIG]"
+}
+RPC_RESPONSE_BODY: {}
+

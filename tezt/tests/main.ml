@@ -208,7 +208,10 @@ let register_protocol_tests_that_use_supports_correctly () =
   Used_paid_storage_spaces.register ~protocols ;
   Vdf_test.register ~protocols ;
   Views.register ~protocols ;
-  Zk_rollup.register ~protocols
+  Zk_rollup.register ~protocols ;
+  Tx_sc_rollup.register ~protocols ;
+  Dac.register ~protocols ;
+  Timelock.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
@@ -216,18 +219,11 @@ let register_protocol_tests_that_use_supports_correctly () =
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
   Dal.register ~protocols:[Alpha] ;
-  Dac.register ~protocols:[Alpha] ;
-  Dac.register_with_unsupported_protocol ~protocols:[Mumbai] ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
-           re-enable Mumbai when DAC is separated from Dal node. *)
   Evm_rollup.register ~protocols:[Alpha] ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4652
-         re-enable Mumbai when DAC is separated from Dal node. *)
-  Tx_sc_rollup.register ~protocols:[Alpha] ;
   Sc_sequencer.register ~protocols:[Alpha] ;
   Snoop_codegen.register ~protocols:[Alpha] ;
-  Timelock.register ~protocols:[Alpha] ;
-  Timelock_disabled.register ~protocols:[Mumbai]
+  (* This can be safely removed after Nairobi is frozen *)
+  Timelock_disabled.register ~protocols:[Nairobi]
 
 let () =
   register_protocol_independent_tests () ;
