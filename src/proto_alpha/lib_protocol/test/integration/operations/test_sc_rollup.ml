@@ -1545,8 +1545,9 @@ let test_execute_message_override_applied_messages_slot () =
       ~source_contract:originator
       ~baker
   in
-  let* constants = Context.get_constants(B block) in
-  let max_active_levels = constants.parametric.sc_rollup.max_active_outbox_levels |> Int32.to_int
+  let* constants = Context.get_constants (B block) in
+  let max_active_levels =
+    constants.parametric.sc_rollup.max_active_outbox_levels |> Int32.to_int
   in
   let execute_message incr ~outbox_level ~message_index
       ~cemented_commitment_hash =
@@ -1741,7 +1742,8 @@ let test_inbox_max_number_of_messages_per_level () =
         (Gas.Arith.integral_of_int_exn Int.(max_int / 1000))
       Context.T2
   in
-  let* block, _rollup = sc_originate block account1 in
+  (* we need to bake block because we are at the migration level and there is an additional msg in the inbox *)
+  let* block = Block.bake block in
   let max_number_of_messages_per_level =
     Constants.sc_rollup_max_number_of_messages_per_level
   in
@@ -1772,17 +1774,11 @@ let test_inbox_max_number_of_messages_per_level () =
   in
   return_unit
 
-let add_op block op =
-  let open Lwt_result_syntax in
-  let* incr = Incremental.begin_construction block in
-  let* incr = Incremental.add_operation incr op in
-  Incremental.finalize_block incr
-
 let add_publish ~rollup block account commitment =
   let open Lwt_result_syntax in
-  let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
   let* block = bake_blocks_until_inbox_level block commitment in
-  add_op block publish
+  let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
+  Block.bake ~operation:publish block
 
 (** [test_number_of_parallel_games_bounded] checks that one cannot
     play an arbitrary number of games. *)
@@ -1927,7 +1923,7 @@ let test_timeout () =
   let* start_game_op =
     Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
-  let* block = add_op block start_game_op in
+  let* block = Block.bake ~operation:start_game_op block in
   let* block = Block.bake_n (timeout_period_in_blocks - 1) block in
   let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
   (* Testing to send a timeout before it's allowed. There is one block left
@@ -1965,7 +1961,7 @@ let test_timeout () =
     let refutation = Sc_rollup.Game.(Move {choice = tick; step}) in
     Op.sc_rollup_refute (B block) account1 rollup pkh2 refutation
   in
-  let* block = add_op block refute in
+  let* block = Block.bake ~operation:refute block in
   let* pkh1_timeout, pkh2_timeout =
     let+ timeout = Context.Sc_rollup.timeout (B block) rollup pkh1 pkh2 in
     let timeout = WithExceptions.Option.get ~loc:__LOC__ timeout in
@@ -1999,7 +1995,7 @@ let start_game block rollup (first_player, commitment1) (pkh2, commitment2) =
   let* start_game_op =
     Op.sc_rollup_refute (B block) first_player rollup pkh2 refutation
   in
-  add_op block start_game_op
+  Block.bake ~operation:start_game_op block
 
 let create_conflicting_commitment block rollup first_player second_player =
   let open Lwt_result_syntax in
@@ -2092,7 +2088,7 @@ let test_draw_with_two_invalid_moves () =
     let* p1_final_move_op =
       Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
-    add_op block p1_final_move_op
+    Block.bake ~operation:p1_final_move_op block
   in
 
   (* Get the frozen bonds for the two players before the draw. *)
@@ -2155,7 +2151,7 @@ let play_conflict_until_draw block (p1, p1_pkh) p2_pkh rollup =
     let* p1_final_move_op =
       Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
-    add_op block p1_final_move_op
+    Block.bake ~operation:p1_final_move_op block
   in
 
   (* Player2 will not play and it will be timeout. *)
@@ -2296,7 +2292,7 @@ let test_dissection_during_final_move () =
     let* p1_final_move_op =
       Op.sc_rollup_refute (B block) p1 rollup p2_pkh p1_refutation
     in
-    add_op block p1_final_move_op
+    Block.bake ~operation:p1_final_move_op block
   in
 
   (* Player2 will play a dissection. *)
@@ -2306,19 +2302,11 @@ let test_dissection_during_final_move () =
   in
   let* p2_op = Op.sc_rollup_refute (B block) p2 rollup p1_pkh dumb_dissection in
   (* Dissecting is no longer accepted. *)
-  let* incr = Incremental.begin_construction block in
-  let expect_apply_failure = function
-    | Environment.Ecoproto_error
-        (Sc_rollup_game_repr.Dissecting_during_final_move as e)
-      :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should have failed with [Dissecting_during_final_move]"
-  in
-  let* (_incr : Incremental.t) =
-    Incremental.add_operation ~expect_apply_failure incr p2_op
-  in
-  return_unit
+  let block_res = Block.bake ~operation:p2_op block in
+  assert_fails_with
+    ~__LOC__
+    block_res
+    Sc_rollup_game_repr.Dissecting_during_final_move
 
 let init_arith_state ~boot_sector =
   let open Lwt_syntax in
