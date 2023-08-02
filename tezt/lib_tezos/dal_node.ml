@@ -218,6 +218,12 @@ let make_arguments node =
   [
     "--endpoint";
     Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--rpc-addr";
+    Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
+    "--net-addr";
+    listen_addr node;
+    "--metrics-addr";
+    metrics_addr node;
   ]
 
 let do_runlike_command ?env node arguments =
@@ -227,6 +233,11 @@ let do_runlike_command ?env node arguments =
     trigger_ready node None ;
     unit
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6164
+     Improve handling of arguments:
+     * unclear what should happen when two values for the same argument are given
+     * [make_arguments] seems incomplete
+     * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
   run ?env node {ready = false} arguments ~on_terminate
 
