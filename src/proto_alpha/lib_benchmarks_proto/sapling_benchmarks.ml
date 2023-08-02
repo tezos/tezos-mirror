@@ -40,7 +40,7 @@ module Apply_diff_bench : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let purpose = Benchmark.Generate_code "michelson_v1_gas"
+  let purpose = Benchmark.Generate_code "sapling_storage"
 
   let tags = ["sapling"]
 
