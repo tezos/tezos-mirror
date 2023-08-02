@@ -1545,11 +1545,8 @@ let test_execute_message_override_applied_messages_slot () =
       ~source_contract:originator
       ~baker
   in
-  let* incr = Incremental.begin_construction block in
-  let max_active_levels =
-    Int32.to_int
-      (Constants_storage.sc_rollup_max_active_outbox_levels
-         (Alpha_context.Internal_for_tests.to_raw @@ Incremental.alpha_ctxt incr))
+  let* constants = Context.get_constants(B block) in
+  let max_active_levels = constants.parametric.sc_rollup.max_active_outbox_levels |> Int32.to_int
   in
   let execute_message incr ~outbox_level ~message_index
       ~cemented_commitment_hash =
