@@ -507,9 +507,8 @@ let string_ticket_token ticketer content =
     (Ticket_token.Ex_token
        {ticketer; contents_type = Script_typed_ir.string_t; contents})
 
-let originate_contract incr ~script ~baker ~storage ~source_contract =
+let originate_contract block ~script ~baker ~storage ~source_contract =
   let open Lwt_result_syntax in
-  let* block = Incremental.finalize_block incr in
   let* contract, _, block =
     Contract_helpers.originate_contract_from_string_hash
       ~script
@@ -518,8 +517,7 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
       ~baker
       block
   in
-  let* incr = Incremental.begin_construction block in
-  return (contract, incr)
+  return (contract, block)
 
 let hash_commitment commitment =
   Sc_rollup.Commitment.hash_uncarbonated commitment
@@ -1079,11 +1077,10 @@ let test_single_transaction_batch () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
-  let* ticket_receiver, incr =
+  let* ticket_receiver, block =
     originate_contract
-      incr
+      block
       ~script:ticket_receiver
       ~storage:"{}"
       ~source_contract:originator
@@ -1094,6 +1091,7 @@ let test_single_transaction_batch () =
     string_ticket_token "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red"
   in
   (* Publish and cement a commitment. *)
+  let* incr = Incremental.begin_construction block in
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
   in
@@ -1152,11 +1150,10 @@ let test_older_cemented_commitment () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
-  let* ticket_receiver, incr =
+  let* ticket_receiver, block =
     originate_contract
-      incr
+      block
       ~script:ticket_receiver
       ~storage:"{}"
       ~source_contract:originator
@@ -1216,6 +1213,7 @@ let test_older_cemented_commitment () =
       (Destination.Contract (Originated ticket_receiver))
       (Some 1)
   in
+  let* incr = Incremental.begin_construction block in
   let* max_num_stored_cemented_commitments =
     let ctxt = Incremental.alpha_ctxt incr in
     return
@@ -1267,25 +1265,25 @@ let test_multi_transaction_batch () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
-  let* ticket_receiver, incr =
+  let* ticket_receiver, block =
     originate_contract
-      incr
+      block
       ~script:ticket_receiver
       ~storage:"{}"
       ~source_contract:originator
       ~baker
   in
   (* Originate a contract that accepts a string as input. *)
-  let* string_receiver, incr =
+  let* string_receiver, block =
     originate_contract
-      incr
+      block
       ~script:string_receiver
       ~storage:{|""|}
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
@@ -1361,15 +1359,15 @@ let test_transaction_with_invalid_type () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
-  let* mutez_receiver, incr =
+  let* mutez_receiver, block =
     originate_contract
-      incr
+      block
       ~script:mutez_receiver
       ~storage:"0"
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
@@ -1395,16 +1393,16 @@ let test_execute_message_twice () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
-  let* string_receiver, incr =
+  let* string_receiver, block =
     originate_contract
-      incr
+      block
       ~script:string_receiver
       ~storage:{|""|}
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
@@ -1449,16 +1447,16 @@ let test_execute_message_twice_different_cemented_commitments () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
-  let* string_receiver, incr =
+  let* string_receiver, block =
     originate_contract
-      incr
+      block
       ~script:string_receiver
       ~storage:{|""|}
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* first_cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
@@ -1508,16 +1506,16 @@ let test_zero_amount_ticket () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
-  let* ticket_receiver, incr =
+  let* ticket_receiver, block =
     originate_contract
-      incr
+      block
       ~script:ticket_receiver
       ~storage:"{}"
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
@@ -1586,16 +1584,16 @@ let test_execute_message_override_applied_messages_slot () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input.  *)
-  let* string_receiver, incr =
+  let* string_receiver, block =
     originate_contract
-      incr
+      block
       ~script:string_receiver
       ~storage:{|""|}
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   let max_active_levels =
     Int32.to_int
       (Constants_storage.sc_rollup_max_active_outbox_levels
@@ -1723,25 +1721,25 @@ let test_insufficient_ticket_balances () =
   let* block, rollup =
     sc_originate block originator ~parameters_ty:"list (ticket string)"
   in
-  let* incr = Incremental.begin_construction block in
   (* Originate a contract that accepts a pair of nat and ticket string input. *)
-  let* ticket_receiver, incr =
+  let* ticket_receiver, block =
     originate_contract
-      incr
+      block
       ~script:ticket_receiver
       ~storage:"{}"
       ~source_contract:originator
       ~baker
   in
   (* Originate a contract that accepts a string as input. *)
-  let* string_receiver, incr =
+  let* string_receiver, block =
     originate_contract
-      incr
+      block
       ~script:string_receiver
       ~storage:{|""|}
       ~source_contract:originator
       ~baker
   in
+  let* incr = Incremental.begin_construction block in
   (* Publish and cement a commitment. *)
   let* cemented_commitment, incr =
     publish_and_cement_dummy_commitment incr ~baker ~originator rollup
