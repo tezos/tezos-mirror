@@ -204,6 +204,8 @@ module type LIB = sig
        stores an [nb_bits]-bit number. *)
     type sl = scalar list
 
+    val input_bytes : le:bool -> bytes -> sl Input.t
+
     val of_bytes : Bytes.bl repr -> sl repr t
 
     val to_bytes : sl repr -> Bytes.bl repr t
@@ -833,6 +835,14 @@ module Lib (C : COMMON) = struct
     type sl = scalar list
 
     let nb_bits = N.nb_bits
+
+    let input_bytes ~le (b : bytes) : sl Input.t =
+      let bl = Utils.bitlist ~le b in
+      let limbs = Utils.limbs_of_bool_list ~nb_bits bl in
+      let r = List.map S.of_int limbs in
+      Input.with_assertion
+        (fun x -> iterM (Num.range_check ~nb_bits) (of_list x))
+        (Input.list (List.map Input.scalar r))
 
     let of_bytes x =
       let bl = Utils.split_exactly (of_list x) nb_bits in
