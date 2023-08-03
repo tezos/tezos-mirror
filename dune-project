@@ -152,7 +152,6 @@
 (package (name tezos-layer2-utils-018-Proxford))
 (package (name tezos-layer2-utils-alpha))
 (package (name tezos-lazy-containers-tests)(allow_empty))
-(package (name tezos-lwt-result-stdlib))
 (package (name tezos-micheline-rewriting))
 (package (name tezos-mockup))
 (package (name tezos-mockup-commands))

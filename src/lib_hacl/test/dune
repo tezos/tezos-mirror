@@ -10,7 +10,7 @@
   tezt.core
   octez-libs.tezos-stdlib
   octez-libs.tezos-error-monad
-  tezos-lwt-result-stdlib
+  octez-libs.tezos-lwt-result-stdlib
   zarith
   zarith_stubs_js
   data-encoding

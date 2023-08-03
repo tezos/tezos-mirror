@@ -3,7 +3,7 @@
 
 (library
  (name bare_functor_outputs)
- (public_name tezos-lwt-result-stdlib.bare.functor-outputs)
+ (public_name octez-libs.tezos-lwt-result-stdlib.bare.functor-outputs)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt)

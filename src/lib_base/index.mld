@@ -4,6 +4,9 @@ This is a package containing some libraries used by the Octez project.
 
 It contains the following libraries:
 
+- {{!module-Bare_functor_outputs}Bare_functor_outputs}
+- {{!module-Bare_sigs}Bare_sigs}
+- {{!module-Bare_structs}Bare_structs}
 - {{!module-Octez_bls12_381_polynomial}Octez_bls12_381_polynomial}
 - {{!module-Polynomial}Polynomial}
 - {{!module-Tezos_base}Tezos_base}
@@ -26,6 +29,7 @@ It contains the following libraries:
 - {{!module-Tezos_event_logging_test_helpers}Tezos_event_logging_test_helpers}
 - {{!module-Tezos_hacl}Tezos_hacl}
 - {{!module-Tezos_lazy_containers}Tezos_lazy_containers}
+- {{!page-tezos_lwt_result_stdlib}Tezos_lwt_result_stdlib}
 - {{!module-Tezos_micheline}Tezos_micheline}
 - {{!module-Tezos_p2p}Tezos_p2p}
 - {{!module-Tezos_p2p_services}Tezos_p2p_services}
@@ -41,5 +45,9 @@ It contains the following libraries:
 - {{!module-Tezos_tree_encoding}Tezos_tree_encoding}
 - {{!module-Tezos_version}Tezos_version}
 - {{!module-Tezos_version_parser}Tezos_version_parser}
+- {{!page-tezos_workers}Tezos_workers}
 - {{!module-Tezt_tezos}Tezt_tezos}
-- {{!page-tezos_workers}tezos_workers}
+- {{!module-Traced_functor_outputs}Traced_functor_outputs}
+- {{!module-Traced_sigs}Traced_sigs}
+- {{!module-Traced_structs}Traced_structs}
+- {{!module-Traces}Traces}

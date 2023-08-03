@@ -19,7 +19,6 @@ depends: [
   "octez-libs"
   "tezos-rust-libs" { = "1.6" }
   "tezos-sapling-parameters" { >= "1.1.0" }
-  "tezos-lwt-result-stdlib"
   "tezt" { with-test & >= "3.1.1" }
   "octez-alcotezt" {with-test}
 ]

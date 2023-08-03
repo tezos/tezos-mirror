@@ -925,6 +925,15 @@ val private_exes : string list maker
     - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
       in the [dune] file.
 
+    - [dune_with_test]: Specifies a condition for the test to be run on the dune file.
+      If set to [Only_on_64_arch], [%{arch_sixtyfour}] is added to the [enabled_if] clause.
+      If set to [Always], nothing is added to the [enabled_if] clause.
+      If set to [Never], [false] is added to the [enabled_if] clause.
+
+    - [enabled_if]: add a custom [enabled_if] clause. If both [dune_with_test] and
+      [enabled_if] are set, then logically, the resulting clause is the conjunction
+      of the two (i.e. [(and <enabled_if> <dune_with_test>)])
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
 val test :
@@ -934,6 +943,7 @@ val test :
   ?dep_globs_rec:string list ->
   ?locks:string ->
   ?enabled_if:Dune.s_expr ->
+  ?dune_with_test:with_test ->
   ?lib_deps:target list ->
   string maker
 
@@ -988,6 +998,7 @@ val tezt :
   ?dep_files:string list ->
   ?synopsis:string ->
   ?opam_with_test:with_test ->
+  ?dune_with_test:with_test ->
   ?with_macos_security_framework:bool ->
   ?flags:Flags.t ->
   ?dune:Dune.s_expr ->

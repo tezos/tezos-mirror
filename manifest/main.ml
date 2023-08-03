@@ -409,7 +409,7 @@ let tezt_core_lib =
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
-    ?dep_globs_rec ?dep_files ?opam_with_test ?synopsis
+    ?dep_globs_rec ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
     ?preprocessor_deps l =
   tezt_without_tezt_lib_dependency
@@ -426,6 +426,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec
     ?dep_files
     ?opam_with_test
+    ?dune_with_test
     ?flags
     ?dune
     ?preprocess
@@ -466,7 +467,8 @@ let registered_octez_libs : sub_lib_documentation_link list ref = ref []
 let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
     ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
-    ?release_status ?ctypes ?c_library_flags ?synopsis:_ public_name ~path =
+    ?release_status ?ctypes ?c_library_flags ?opam_with_test ?synopsis:_
+    public_name ~path =
   let name =
     let s = Option.value ~default:public_name internal_name in
     String.map
@@ -492,7 +494,7 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ~internal_name:name
     ~opam:"octez-libs"
     ~synopsis:"Octez libs"
-    ~opam_with_test:Always
+    ?opam_with_test
     ?linkall
     ?js_compatible
     ?bisect_ppx
@@ -525,7 +527,11 @@ let pp_octez_libs_index fmt registered_octez_libs =
     | Module registered ->
         Format.fprintf pp "- {{!module-%s}%s}" registered registered
     | Page registered ->
-        Format.fprintf pp "- {{!page-%s}%s}" registered registered
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}"
+          registered
+          (String.capitalize_ascii registered)
   in
   Format.fprintf
     fmt
@@ -541,7 +547,9 @@ let pp_octez_libs_index fmt registered_octez_libs =
          | Page n1, Module n2
          | Module n1, Page n2
          | Module n1, Module n2 ->
-             String.compare n1 n2)
+             String.compare
+               (String.capitalize_ascii n1)
+               (String.capitalize_ascii n2))
        registered_octez_libs
 
 let octez_test_helpers =
@@ -636,43 +644,39 @@ let _octez_stdlib_test_unix =
       ]
 
 let octez_lwt_result_stdlib_bare_functor_outputs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.bare.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/bare/functor_outputs"
     ~internal_name:"bare_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_bare_sigs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.bare.sigs"
     ~path:"src/lib_lwt_result_stdlib/bare/sigs"
     ~internal_name:"bare_sigs"
     ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_functor_outputs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_bare_structs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.bare.structs"
     ~path:"src/lib_lwt_result_stdlib/bare/structs"
     ~internal_name:"bare_structs"
     ~js_compatible:true
     ~deps:[seqes; lwt; octez_lwt_result_stdlib_bare_sigs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_functor_outputs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.traced.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/traced/functor_outputs"
     ~internal_name:"traced_functor_outputs"
     ~js_compatible:true
     ~deps:[lwt; octez_lwt_result_stdlib_bare_sigs]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_sigs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.traced.sigs"
     ~path:"src/lib_lwt_result_stdlib/traced/sigs"
     ~internal_name:"traced_sigs"
@@ -684,10 +688,9 @@ let octez_lwt_result_stdlib_traced_sigs =
         octez_lwt_result_stdlib_bare_structs;
         octez_lwt_result_stdlib_traced_functor_outputs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_traced_structs =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.traced.structs"
     ~path:"src/lib_lwt_result_stdlib/traced/structs"
     ~internal_name:"traced_structs"
@@ -698,15 +701,19 @@ let octez_lwt_result_stdlib_traced_structs =
         octez_lwt_result_stdlib_traced_sigs;
         octez_lwt_result_stdlib_bare_structs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
     ~synopsis:"Tezos: error-aware stdlib replacement"
     ~js_compatible:true
-    ~documentation:[Dune.[S "package"; S "tezos-lwt-result-stdlib"]]
+    ~documentation:
+      Dune.
+        [
+          [S "package"; S "octez-libs"];
+          [S "mld_files"; S "tezos_lwt_result_stdlib"];
+        ]
     ~deps:
       [
         lwt;
@@ -715,10 +722,9 @@ let octez_lwt_result_stdlib =
         octez_lwt_result_stdlib_traced_sigs;
         octez_lwt_result_stdlib_traced_structs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let octez_lwt_result_stdlib_examples_traces =
-  public_lib
+  octez_lib
     "tezos-lwt-result-stdlib.examples.traces"
     ~path:"src/lib_lwt_result_stdlib/examples/traces"
     ~internal_name:"traces"
@@ -728,7 +734,6 @@ let octez_lwt_result_stdlib_examples_traces =
         octez_lwt_result_stdlib_bare_structs;
         octez_lwt_result_stdlib_traced_sigs;
       ]
-    ~opam_with_test:Only_on_64_arch
 
 let _octez_lwt_result_stdlib_tests =
   tezt
@@ -746,7 +751,7 @@ let _octez_lwt_result_stdlib_tests =
       "test_fuzzing_map_against_stdlib";
     ]
     ~path:"src/lib_lwt_result_stdlib/test"
-    ~opam:"tezos-lwt-result-stdlib"
+    ~opam:"octez-libs"
     ~deps:
       [
         octez_lwt_result_stdlib |> open_;
@@ -756,7 +761,7 @@ let _octez_lwt_result_stdlib_tests =
         qcheck_alcotest;
         octez_test_helpers |> open_;
       ]
-    ~opam_with_test:Only_on_64_arch
+    ~dune_with_test:Only_on_64_arch
 
 let octez_error_monad =
   octez_lib

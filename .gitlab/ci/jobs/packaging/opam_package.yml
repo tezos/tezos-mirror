@@ -1237,13 +1237,6 @@ opam:tezos-layer2-utils-018-Proxford:
 
 # Ignoring unreleased package tezos-lazy-containers-tests.
 
-opam:tezos-lwt-result-stdlib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: tezos-lwt-result-stdlib
-
 # Ignoring unreleased package tezos-micheline-rewriting.
 
 opam:tezos-mockup:

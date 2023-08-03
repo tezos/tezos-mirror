@@ -10,7 +10,7 @@
   data-encoding
   lwt-canceler
   lwt
-  tezos-lwt-result-stdlib)
+  octez-libs.tezos-lwt-result-stdlib)
  (js_of_ocaml)
  (flags
   (:standard)

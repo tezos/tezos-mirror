@@ -3,14 +3,14 @@
 
 (library
  (name tezos_lwt_result_stdlib)
- (public_name tezos-lwt-result-stdlib)
+ (public_name octez-libs.tezos-lwt-result-stdlib)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt
-  tezos-lwt-result-stdlib.bare.sigs
-  tezos-lwt-result-stdlib.bare.structs
-  tezos-lwt-result-stdlib.traced.sigs
-  tezos-lwt-result-stdlib.traced.structs)
+  octez-libs.tezos-lwt-result-stdlib.bare.sigs
+  octez-libs.tezos-lwt-result-stdlib.bare.structs
+  octez-libs.tezos-lwt-result-stdlib.traced.sigs
+  octez-libs.tezos-lwt-result-stdlib.traced.structs)
  (js_of_ocaml))
 
-(documentation (package tezos-lwt-result-stdlib))
+(documentation (package octez-libs) (mld_files tezos_lwt_result_stdlib))

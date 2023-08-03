@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-stdlib
   octez-libs.tezos-crypto
-  tezos-lwt-result-stdlib
+  octez-libs.tezos-lwt-result-stdlib
   tezos-scoru-wasm
   data-encoding
   bls12-381
