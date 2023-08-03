@@ -54,6 +54,10 @@ val scores_to_csv_column : string * Namespace.t -> scores -> Csv.csv
 type solution = {
   mapping : (Free_variable.t * float) list;
   weights : Maths.matrix;
+  intercept_lift : float;
+      (** The diff required to overestimate all measurements by the predictions.
+          This diff should be applied to the intercept parameter
+          when this solution is for the allocation costs. *)
   scores : scores;
 }
 
