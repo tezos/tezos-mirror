@@ -322,6 +322,8 @@ let unix = external_lib ~opam:"base-unix" "unix" V.True
 
 let uri = external_lib ~js_compatible:true "uri" V.(at_least "3.1.0")
 
+let lambda_term = external_lib "lambda-term" V.(at_least "3.3.1")
+
 let utop = external_lib "utop" V.(at_least "2.8")
 
 let uutf = external_lib ~js_compatible:true "uutf" V.True
@@ -8059,6 +8061,7 @@ let _octez_scoru_wasm_debugger =
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;
         octez_version_value;
+        lambda_term;
       ]
 
 let evm_proxy_lib_prod =
