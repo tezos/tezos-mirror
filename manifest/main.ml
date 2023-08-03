@@ -457,7 +457,7 @@ let alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
-type sub_lib_documentation_entrypoint = Module | Page
+type sub_lib_documentation_entrypoint = Module | Page | Sub_lib
 
 type sub_lib = {
   name : string;
@@ -494,11 +494,19 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     | None | Some Dune.[[S "package"; S "octez-libs"]] ->
         (* In the case that the documentation stanza is only a package declaration,
            we don't want the page to be used *)
-        {
-          name = String.capitalize_ascii name;
-          synopsis;
-          documentation_type = Module;
-        }
+        if String.contains (Option.value ~default:public_name internal_name) '.'
+        then
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Sub_lib;
+          }
+        else
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Module;
+          }
     | Some _docs -> {name; synopsis; documentation_type = Page}
   in
   registered_octez_libs := registered :: !registered_octez_libs ;
@@ -546,25 +554,31 @@ let pp_octez_libs_index fmt registered_octez_libs =
   in
   let pp_registered pp = function
     | {name; synopsis = None; documentation_type = Module} ->
-        Format.fprintf pp "- {{!module-%s}%s}" name name
+        Format.fprintf pp "- {{!module-%s}%s}@." name name
     | {name; synopsis = Some synopsis; documentation_type = Module} ->
-        Format.fprintf pp "- {{!module-%s}%s}: %s" name name synopsis
+        Format.fprintf pp "- {{!module-%s}%s}: %s@." name name synopsis
     | {name; synopsis = None; documentation_type = Page} ->
-        Format.fprintf pp "- {{!page-%s}%s}" name (String.capitalize_ascii name)
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}@."
+          name
+          (String.capitalize_ascii name)
     | {name; synopsis = Some synopsis; documentation_type = Page} ->
         Format.fprintf
           pp
-          "- {{!page-%s}%s}: %s"
+          "- {{!page-%s}%s}: %s@."
           name
           (String.capitalize_ascii name)
           synopsis
+    | {documentation_type = Sub_lib; _} ->
+        (* In case it's a sub_lib, we don't link anything *) ()
   in
   Format.fprintf
     fmt
     "%s%a"
     header
     (Format.pp_print_list
-       ~pp_sep:(fun pp () -> Format.fprintf pp "@.")
+       ~pp_sep:(fun pp () -> Format.fprintf pp "")
        pp_registered)
   @@ List.sort
        (fun {name = name1; _} {name = name2; _} ->
