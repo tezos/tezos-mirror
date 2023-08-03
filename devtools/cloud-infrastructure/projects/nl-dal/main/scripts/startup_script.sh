@@ -13,9 +13,6 @@ apt install libgmp-dev curl libev-dev libhidapi-dev python3 openssh-server -y
 mkdir -p /root/.ssh
 mkdir -p /run/sshd
 
-ssh-keygen -A
-echo "<SSH_KEY_WAS_HERE>" > /root/.ssh/authorized_key;s
-
 /usr/sbin/sshd -D -p 30000 -e
 EOF
 
