@@ -1,0 +1,28 @@
+Name:		@PKG@
+Version:	@VERSION@
+Release:	@REVISION@
+Summary:	The Octez Baker daemons
+
+License:	MIT
+URL:		http://tezos.gitlab.io
+
+Packager:	@MAINT@
+Requires:	@DPKG@-node
+Source0:	@FAKESRC@
+
+%prep
+%setup -q
+
+%install
+tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
+
+%description
+The Octez Baker daemons
+
+%files
+%{_bindir}/octez-*
+%{_sysconfdir}/init.d/octez-*
+%config /etc/octez/baker.conf
+
+%post
+/usr/bin/systemctl daemon-reload
