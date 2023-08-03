@@ -625,7 +625,7 @@ let commands_ro () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_parameter))
+            (non_negative_parameter ())))
       (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
@@ -2069,13 +2069,13 @@ let commands_rw () =
               "wait until 'N' additional blocks after the operation appears in \
                the considered chain"
             ~default:"0"
-            non_negative_parameter)
+            (non_negative_parameter ()))
          (default_arg
             ~long:"check-previous"
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_parameter)
+            (non_negative_parameter ()))
          (arg
             ~long:"branch"
             ~placeholder:"block_hash"
@@ -2757,7 +2757,7 @@ let commands_rw () =
       @@ param
            ~name:"inbox_level"
            ~desc:"The inbox level for the commitment."
-           raw_level_parameter
+           (raw_level_parameter ())
       @@ prefixes ["and"; "predecessor"]
       @@ param
            ~name:"predecessor"
@@ -3255,7 +3255,7 @@ let commands_rw () =
            ~desc:
              "The publication level is the level at which the commitment is \
               expected to be included in an L1 block."
-           raw_level_parameter
+           (raw_level_parameter ())
       @@ prefixes ["with"; "proof"]
       @@ param
            ~name:"commitment proof"
