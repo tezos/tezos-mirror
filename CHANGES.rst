@@ -141,3 +141,5 @@ Data Availability Committee (DAC)
 
 Miscellaneous
 -------------
+
+- Beta scripts to build Debian and RedHat packages have been added to the tree.
