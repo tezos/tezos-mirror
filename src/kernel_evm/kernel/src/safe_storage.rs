@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_evm_logging::{log, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -12,6 +13,9 @@ use tezos_smart_rollup_host::{
     runtime::{Runtime, RuntimeError, ValueType},
     KERNEL_BOOT_PATH,
 };
+
+const BACKUP_KERNEL_BOOT_PATH: RefPath =
+    RefPath::assert_from(b"/__backup_kernel/boot.wasm");
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
@@ -161,6 +165,35 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
 }
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
+    fn backup_current_kernel(&mut self) -> Result<(), RuntimeError> {
+        // Fallback preparation detected
+        // Storing the current kernel boot path under a temporary path in
+        // order to fallback on it if something goes wrong in the upcoming
+        // upgraded kernel.
+        log!(
+            self.0,
+            Level::Info,
+            "Preparing potential fallback by backing up the current kernel."
+        );
+        self.0
+            .store_copy(&KERNEL_BOOT_PATH, &BACKUP_KERNEL_BOOT_PATH)
+    }
+
+    pub fn fallback_backup_kernel(&mut self) -> Result<(), RuntimeError> {
+        log!(
+            self.0,
+            Level::Info,
+            "Something went wrong, fallback mechanism is triggered."
+        );
+        self.0
+            .store_move(&BACKUP_KERNEL_BOOT_PATH, &KERNEL_BOOT_PATH)
+    }
+
+    fn clean_backup_kernel(&mut self) -> Result<(), RuntimeError> {
+        log!(self.0, Level::Info, "Cleaning the backup kernel.");
+        self.0.store_delete(&BACKUP_KERNEL_BOOT_PATH)
+    }
+
     pub fn promote_upgrade(&mut self) -> Result<(), RuntimeError> {
         let safe_kernel_boot_path = safe_path(&KERNEL_BOOT_PATH)?;
         match self.0.store_read(&safe_kernel_boot_path, 0, 0) {
