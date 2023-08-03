@@ -238,6 +238,18 @@ unsafe impl SmartRollupCore for MockHost {
         slice.copy_from_slice(metadata.as_slice());
         metadata.len().try_into().unwrap()
     }
+
+    #[cfg(feature = "proto-alpha")]
+    unsafe fn reveal(
+        &self,
+        _payload_addr: *const u8,
+        _payload_len: usize,
+        _destination_addr: *mut u8,
+        _max_bytes: usize,
+    ) -> i32 {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6171
+        unimplemented!("The `reveal` host function is not yet mocked.")
+    }
 }
 
 #[cfg(test)]

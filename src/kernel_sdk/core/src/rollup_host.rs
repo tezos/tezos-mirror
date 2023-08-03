@@ -120,6 +120,17 @@ unsafe impl SmartRollupCore for RollupHost {
         core::reveal_preimage(hash_addr, hash_len, destination_addr, max_bytes)
     }
 
+    #[cfg(feature = "proto-alpha")]
+    unsafe fn reveal(
+        &self,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32 {
+        core::reveal(payload_addr, payload_len, destination_addr, max_bytes)
+    }
+
     unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
         core::store_value_size(path, path_len)
     }

@@ -134,6 +134,7 @@ extern "C" {
     /// `payload_len` is the same as the one used by the Tezos protocol.
     ///
     /// Returns the size of the data loaded in memory.
+    #[cfg(feature = "proto-alpha")]
     pub fn reveal(
         payload_addr: *const u8,
         payload_len: usize,
@@ -313,6 +314,23 @@ pub unsafe trait SmartRollupCore {
     /// - `destination_addr` must point to a mutable slice of bytes with
     ///   `capacity >= max_bytes`
     unsafe fn reveal_metadata(&self, destination_addr: *mut u8, max_bytes: usize) -> i32;
+
+    /// Loads the result of a raw reveal request to memory.
+    /// If the preimage is larger than `max_bytes`, its contents is trimmed.
+    ///
+    /// # Safety
+    /// - `payload_addr` must be a ptr to a slice containing a hash.
+    /// - `payload_len` must be the length of the slice.
+    /// - `destination_addr `must point to a mutable slice of bytes with
+    ///   `capacity >= max_bytes`.
+    #[cfg(feature = "proto-alpha")]
+    unsafe fn reveal(
+        &self,
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
 }
 
 /// Information about message level & id.
