@@ -245,6 +245,8 @@ Client
 - Add ``attest for`` and ``preattest for`` commands. ``endorse for`` and
   ``preendorse for`` are now deprecated. (MR :gl:`!9494`)
 
+- **Breaking change** Removed read-write commands specific to Mumbai (MR :gl:`!9695`)
+
 Baker
 -----
 
