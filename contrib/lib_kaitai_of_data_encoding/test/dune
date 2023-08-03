@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name kaitai_of_data_encoding_test)
+ (libraries
+  yaml
+  data-encoding
+  kaitai
+  kaitai_of_data_encoding)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect)))

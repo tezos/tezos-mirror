@@ -418,6 +418,8 @@ opam:bls12-381:
 
 # Ignoring unreleased package kaitai.
 
+# Ignoring unreleased package kaitai-of-data-encoding.
+
 opam:octez-accuser-Proxford:
   extends:
     - .opam_template
