@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -182,6 +183,9 @@ module Output : sig
 
   val encoding : (output * JSONRPC.id) Data_encoding.t
 end
+
+module Kernel_version :
+  METHOD with type m_input = unit and type m_output = string
 
 module Network_id : METHOD with type m_input = unit and type m_output = string
 

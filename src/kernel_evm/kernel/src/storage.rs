@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
@@ -30,6 +31,8 @@ const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
+
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 // Size of the ticketer contract, it is encoded in base58.
@@ -763,6 +766,26 @@ pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error
         }
         Err(e) => Err(e.into()),
     }
+}
+
+pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Error> {
+    match host.store_read_all(&KERNEL_VERSION_PATH) {
+        Ok(bytes) => {
+            let kernel_version =
+                std::str::from_utf8(&bytes).map_err(|_| Error::InvalidConversion)?;
+            Ok(kernel_version.to_owned())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn store_kernel_version<Host: Runtime>(
+    host: &mut Host,
+    kernel_version: &str,
+) -> Result<(), Error> {
+    let kernel_version = kernel_version.as_bytes();
+    host.store_write_all(&KERNEL_VERSION_PATH, kernel_version)
+        .map_err(Error::from)
 }
 
 pub(crate) mod internal_for_tests {

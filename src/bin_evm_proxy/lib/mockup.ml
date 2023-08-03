@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -43,6 +44,8 @@ let qty_f = quantity_of_z
 
 (* Default chain_id for ethereum custom networks with Ganache. *)
 let chain_id () = return (qty_f (Z.of_int 1337))
+
+let kernel_version () = return "MOCKUP_KERNEL_VERSION"
 
 let net_version = chain_id
 

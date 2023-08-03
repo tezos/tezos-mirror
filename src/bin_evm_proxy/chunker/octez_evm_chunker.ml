@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -56,7 +57,7 @@ let main args =
   let open Lwt_result_syntax in
   let print_chunks smart_rollup_address s =
     let*? _, messages =
-      Rollup_node.make_encoded_messages
+      Current_rollup_node.make_encoded_messages
         ~smart_rollup_address
         (Hash (Ethereum_types.strip_0x s))
     in

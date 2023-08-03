@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -105,34 +106,44 @@ let chunks bytes size =
   collect 0 [] |> List.rev
 
 module Durable_storage_path = struct
-  let accounts = "/evm/eth_accounts"
+  module EVM = struct
+    let root = "/evm"
 
-  let balance = "/balance"
+    let make s = root ^ s
+  end
 
-  let nonce = "/nonce"
+  let chain_id = EVM.make "/chain_id"
 
-  let code = "/code"
+  let kernel_version = EVM.make "/kernel_version"
 
-  let account_path (Address s) = accounts ^ "/" ^ s
+  module Accounts = struct
+    let accounts = EVM.make "/eth_accounts"
 
-  let balance_path address = account_path address ^ balance
+    let balance = "/balance"
 
-  let nonce_path address = account_path address ^ nonce
+    let nonce = "/nonce"
 
-  let code_path address = account_path address ^ code
+    let code = "/code"
 
-  let number = "/number"
+    let account (Address s) = accounts ^ "/" ^ s
 
-  let hash = "/hash"
+    let balance address = account address ^ balance
 
-  let transactions = "/transactions"
+    let nonce address = account address ^ nonce
 
-  let timestamp = "/timestamp"
-
-  let chain_id = "/evm/chain_id"
+    let code address = account address ^ code
+  end
 
   module Block = struct
-    let blocks = "/evm/blocks"
+    let blocks = EVM.make "/blocks"
+
+    let number = "/number"
+
+    let hash = "/hash"
+
+    let transactions = "/transactions"
+
+    let timestamp = "/timestamp"
 
     type number = Current | Nth of Z.t
 
@@ -153,13 +164,13 @@ module Durable_storage_path = struct
   end
 
   module Transaction_receipt = struct
-    let receipts = "/evm/transactions_receipts"
+    let receipts = EVM.make "/transactions_receipts"
 
     let receipt tx_hash = receipts ^ "/" ^ tx_hash
   end
 
   module Transaction_object = struct
-    let objects = "/evm/transactions_objects"
+    let objects = EVM.make "/transactions_objects"
 
     let object_ tx_hash = objects ^ "/" ^ tx_hash
   end
@@ -258,7 +269,7 @@ module RPC = struct
 
   let balance base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.balance_path address in
+    let key = Durable_storage_path.Accounts.balance address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -267,7 +278,7 @@ module RPC = struct
 
   let nonce base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.nonce_path address in
+    let key = Durable_storage_path.Accounts.nonce address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -276,7 +287,7 @@ module RPC = struct
 
   let code base address =
     let open Lwt_result_syntax in
-    let key = Durable_storage_path.code_path address in
+    let key = Durable_storage_path.Accounts.code address in
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
@@ -463,6 +474,12 @@ module RPC = struct
   let chain_id base () =
     inspect_durable_and_decode base Durable_storage_path.chain_id decode_number
 
+  let kernel_version base () =
+    inspect_durable_and_decode
+      base
+      Durable_storage_path.kernel_version
+      Bytes.to_string
+
   let simulate_call base call =
     let open Lwt_result_syntax in
     let*? messages = Simulation.encode call in
@@ -538,6 +555,8 @@ module type S = sig
 
   val chain_id : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  val kernel_version : unit -> string tzresult Lwt.t
+
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
 
   val estimate_gas :
@@ -570,6 +589,8 @@ end) : S = struct
   let txpool = RPC.txpool Base.base
 
   let chain_id = RPC.chain_id Base.base
+
+  let kernel_version = RPC.kernel_version Base.base
 
   let simulate_call = RPC.simulate_call Base.base
 
