@@ -22,6 +22,7 @@ depends: [
   "tezos-benchmark-type-inference-018-Proxford" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-smart-rollup-018-Proxford" {with-test}
+  "tezt-tezos" {with-test}
   "octez-shell-libs" {with-test}
   "octez-proto-libs" {with-test}
   "octez-l2-libs" {with-test}

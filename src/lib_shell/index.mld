@@ -13,6 +13,7 @@ It contains the following libraries:
 - {{!module-Tezos_mockup_commands}Tezos_mockup_commands}: Tezos: library of auto-documented RPCs (commands)
 - {{!module-Tezos_mockup_proxy}Tezos_mockup_proxy}: Tezos: local RPCs
 - {{!module-Tezos_mockup_registration}Tezos_mockup_registration}: Tezos: protocol registration for the mockup mode
+- {{!module-Tezos_p2p}Tezos_p2p}: Library for a pool of P2P connections
 - {{!module-Tezos_p2p_test_common}Tezos_p2p_test_common}
 - {{!module-Tezos_protocol_updater}Tezos_protocol_updater}: Economic-protocol dynamic loading for `octez-node`
 - {{!module-Tezos_proxy}Tezos_proxy}: Tezos: proxy

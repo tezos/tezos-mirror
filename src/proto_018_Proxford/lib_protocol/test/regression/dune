@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-libs.tezt-tezos
+  tezt-tezos
   tezos-protocol-018-Proxford
   tezos-client-018-Proxford
   tezos-protocol-plugin-018-Proxford

@@ -10,7 +10,7 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-stdlib
-  octez-libs.tezos-p2p
+  octez-shell-libs.tezos-p2p
   octez-libs.tezos-p2p-services
   octez-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers

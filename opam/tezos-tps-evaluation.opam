@@ -21,6 +21,7 @@ depends: [
   "octez-shell-libs"
   "tezos-protocol-alpha"
   "tezt" { >= "3.1.1" }
+  "tezt-tezos"
   "uri" { >= "3.1.0" }
 ]
 build: [

@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-client-base-unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-crypto-dal
-  octez-libs.tezos-p2p
+  octez-shell-libs.tezos-p2p
   octez-libs.tezos-p2p-services)
  (flags
   (:standard)

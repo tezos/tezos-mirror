@@ -16,7 +16,7 @@
   octez-shell-libs.tezos-shell-services
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
-  octez-libs.tezos-p2p
+  octez-shell-libs.tezos-p2p
   octez-shell-libs.tezos-shell
   octez-shell-libs.tezos-store
   octez-shell-libs.tezos-store.unix-reconstruction
