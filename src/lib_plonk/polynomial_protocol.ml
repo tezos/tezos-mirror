@@ -234,7 +234,7 @@ module type S = sig
       argument containing the path location of a set of SRS files. *)
   val setup :
     setup_params:PC.Public_parameters.setup_params ->
-    srs:Bls12_381_polynomial.Srs.t * Bls12_381_polynomial.Srs.t ->
+    srs:Srs.t * Srs.t ->
     prover_public_parameters * verifier_public_parameters
 
   (** The prover function. Takes as input the [prover_public_parameters],

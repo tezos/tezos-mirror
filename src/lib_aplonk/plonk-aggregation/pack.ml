@@ -54,9 +54,7 @@ module type Aggregator = sig
   type setup_params
 
   val setup :
-    int ->
-    Bls12_381_polynomial.Srs.t ->
-    prover_public_parameters * verifier_public_parameters
+    int -> Srs.t -> prover_public_parameters * verifier_public_parameters
 
   val get_setup_params : prover_public_parameters -> setup_params
 

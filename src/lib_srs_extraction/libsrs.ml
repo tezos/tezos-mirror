@@ -26,15 +26,14 @@
 open Bls12_381
 module G1 = G1
 module G2 = G2
-module G1_carray = Bls12_381_polynomial.G1_carray
-module G2_carray = Bls12_381_polynomial.G2_carray
+module G1_carray = Octez_bls12_381_polynomial.G1_carray
+module G2_carray = Octez_bls12_381_polynomial.G2_carray
 
 module Checks = struct
-  let equality (g1_elements : Bls12_381_polynomial.G1_carray.t)
-      (g2_elements : Bls12_381_polynomial.G2_carray.t) =
+  let equality (g1_elements : G1_carray.t) (g2_elements : G2_carray.t) =
     let g1 = G1_carray.get g1_elements 0 in
     let g2 = G2_carray.get g2_elements 0 in
-    Bls12_381_polynomial.G1_carray.iteri_copy_elt
+    G1_carray.iteri_copy_elt
       (fun i g1i ->
         let g2i = G2_carray.get g2_elements i in
         let gt_element1 = Pairing.pairing g1i g2 in
@@ -95,18 +94,10 @@ module Srs = struct
       raise e
 
   let gs1_to_file gs output_file =
-    to_file
-      gs
-      output_file
-      G1.to_compressed_bytes
-      Bls12_381_polynomial.G1_carray.iter_copy_elt
+    to_file gs output_file G1.to_compressed_bytes G1_carray.iter_copy_elt
 
   let gs2_to_file gs output_file =
-    to_file
-      gs
-      output_file
-      G2.to_compressed_bytes
-      Bls12_381_polynomial.G2_carray.iter_copy_elt
+    to_file gs output_file G2.to_compressed_bytes G2_carray.iter_copy_elt
 end
 
 (** This module handles the file format of the result of powers-of-tau ceremony.
@@ -172,7 +163,7 @@ module Powers_of_tau = struct
       let size = 1 lsl power in
       let points = Array.init size (fun _i -> read ic) |> of_array in
       close_in ic ;
-      let domain = Bls12_381_polynomial.Domain.build_power_of_two power in
+      let domain = Octez_bls12_381_polynomial.Domain.build_power_of_two power in
       let points = evaluation_ecfft ~domain ~points in
       points
     with e ->
@@ -189,8 +180,8 @@ module Powers_of_tau = struct
       skip_header
       G1.size_in_bytes
       G1.of_bytes_exn
-      Bls12_381_polynomial.G1_carray.evaluation_ecfft
-      Bls12_381_polynomial.G1_carray.of_array
+      G1_carray.evaluation_ecfft
+      G1_carray.of_array
 
   let to_g2s radixfile =
     let power = power_of_radixfile radixfile in
@@ -208,6 +199,6 @@ module Powers_of_tau = struct
       skip_g2s
       G2.size_in_bytes
       G2.of_bytes_exn
-      Bls12_381_polynomial.G2_carray.evaluation_ecfft
-      Bls12_381_polynomial.G2_carray.of_array
+      G2_carray.evaluation_ecfft
+      G2_carray.of_array
 end

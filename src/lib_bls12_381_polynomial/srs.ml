@@ -305,3 +305,5 @@ module type S_unsafe = sig
 
   val of_array : elt array -> t
 end
+
+module Srs_g1_unsafe = Make (Elt_g1)

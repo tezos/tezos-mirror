@@ -28,8 +28,6 @@ open Plonk.Bls
 module Internal = struct
   open Plonk.Plookup_gate.Plookup_gate_impl (Plonk.Polynomial_protocol)
 
-  module Fr_gen = Octez_bls12_381_polynomial.Fr_carray
-
   let test_aggregation () =
     let alpha = Scalar.random () in
     let length_list = 5 in
@@ -59,8 +57,8 @@ module Internal = struct
   let test_z () =
     let n = 32 in
     let log = 5 in
-    let generator = Fr_gen.primitive_root_of_unity_power_of_two ~log in
     let domain = Domain.build_power_of_two log in
+    let generator = Domain.get domain 1 in
     let t = Array.init n (fun _ -> Scalar.random ()) in
     let f =
       Array.init (n - 1) (fun i ->

@@ -25,10 +25,16 @@
 
 module Fr = Bls12_381.Fr
 module G1 = Bls12_381.G1
-module Fr_generation = Octez_bls12_381_polynomial.Fr_carray
 module Poly = Polynomial.MakeUnivariate (Fr)
-module Domain = Octez_bls12_381_polynomial.Domain.Domain_unsafe
-module Poly_c = Octez_bls12_381_polynomial.Polynomial.Polynomial_impl
+
+module Fr_carray = Octez_bls12_381_polynomial.Internal_for_tests.Fr_carray
+
+module Domain = Octez_bls12_381_polynomial.Internal_for_tests.Domain_unsafe
+
+module Evaluations =
+  Octez_bls12_381_polynomial.Internal_for_tests.Evaluations_unsafe
+
+module Poly_c = Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
 
 let p_of_c : Poly_c.t -> Poly.t =
  fun poly -> Poly_c.to_sparse_coefficients poly |> Poly.of_coefficients
@@ -55,8 +61,11 @@ let test_get_one () =
   Helpers.must_fail (fun () -> ignore @@ Poly_c.get p 1)
 
 let test_get_random () =
-  let module Poly_c = Octez_bls12_381_polynomial.Polynomial.Polynomial_impl in
-  let module C_array = Octez_bls12_381_polynomial.Fr_carray in
+  let module Poly_c =
+    Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
+  in
+  let module C_array = Octez_bls12_381_polynomial.Internal_for_tests.Fr_carray
+  in
   let degree = 1 + Random.int 100 in
   let p = Poly_c.of_coefficients [(Fr.one, degree)] in
   assert (Poly_c.length p = degree + 1) ;
@@ -346,7 +355,7 @@ let test_linear_with_powers () =
         else Poly_c.generate_biased_random_polynomial (Random.int 100))
   in
   let coeff = Fr.random () in
-  let coeffs = Fr_generation.powers n coeff |> Array.to_list in
+  let coeffs = Fr_carray.powers n coeff |> Array.to_list in
   let res1 = Poly_c.linear polys coeffs in
   let res2 = Poly_c.linear_with_powers polys coeff in
   let expected_res =
@@ -374,7 +383,7 @@ let test_linear_with_powers_equal_length () =
         Poly_c.add p (Poly_c.generate_biased_random_polynomial 10))
   in
   let coeff = Fr.random () in
-  let coeffs = Fr_generation.powers n coeff |> Array.to_list in
+  let coeffs = Fr_carray.powers n coeff |> Array.to_list in
   let res = Poly_c.linear_with_powers polys coeff in
   let expected_res =
     List.fold_left2
@@ -436,25 +445,19 @@ let test_vectors_fft_aux =
       in
       let expected_fft_results = Array.map Fr.of_string expected_fft_results in
       let polynomial =
-        Octez_bls12_381_polynomial.Polynomial.Polynomial_unsafe.of_coefficients
+        Octez_bls12_381_polynomial.Internal_for_tests.Polynomial_unsafe
+        .of_coefficients
           points
       in
       let domain = Domain.build_power_of_two ~primitive_root log in
-      let evaluation =
-        Octez_bls12_381_polynomial.Evaluations.evaluation_fft domain polynomial
-      in
+      let evaluation = Evaluations.evaluation_fft domain polynomial in
       assert (
         Array.for_all2
           Fr.eq
           expected_fft_results
-          (Octez_bls12_381_polynomial.Evaluations.to_array evaluation)) ;
-      let ifft_results : Octez_bls12_381_polynomial.Polynomial.t =
-        Octez_bls12_381_polynomial.Evaluations.interpolation_fft
-          domain
-          evaluation
-      in
-      assert (
-        Octez_bls12_381_polynomial.Polynomial.equal polynomial ifft_results))
+          (Evaluations.to_array evaluation)) ;
+      let ifft_results = Evaluations.interpolation_fft domain evaluation in
+      assert (Poly_c.equal polynomial ifft_results))
 
 let test_vectors_fft () =
   (* Generated using {{: https://github.com/dannywillems/ocaml-polynomial} https://github.com/dannywillems/ocaml-polynomial},
@@ -685,7 +688,7 @@ let test_fft_evaluate_common length inner =
   let module Domain = Octez_bls12_381_polynomial.Domain in
   let module Poly = Octez_bls12_381_polynomial.Polynomial in
   let polynomial = Poly.generate_biased_random_polynomial length in
-  let primitive_root = Fr_generation.primitive_root_of_unity length in
+  let primitive_root = Fr_carray.primitive_root_of_unity length in
   let domain = Domain.build ~primitive_root length in
   let expected_result =
     Array.init length (fun i -> Poly.evaluate polynomial (Domain.get domain i))
@@ -739,7 +742,7 @@ let test_fft_interpolate () =
 
 let test_fft_interpolate_common length inner =
   let module Poly = Octez_bls12_381_polynomial.Polynomial in
-  let primitive_root = Fr_generation.primitive_root_of_unity length in
+  let primitive_root = Fr_carray.primitive_root_of_unity length in
   let polynomial = Poly.generate_biased_random_polynomial length in
   let result = inner ~length ~primitive_root ~polynomial in
   assert (Poly.equal polynomial result)
@@ -784,19 +787,12 @@ let test_of_dense () =
 let test_of_carray_does_not_allocate_a_full_new_carray () =
   let n = 1 + Random.int 1_000 in
   let array = Array.init n (fun _ -> Fr.random ()) in
-  let carray = Octez_bls12_381_polynomial.Fr_carray.of_array array in
-  let polynomial =
-    Octez_bls12_381_polynomial.Polynomial.Polynomial_unsafe.of_carray carray
-  in
+  let carray = Fr_carray.of_array array in
+  let polynomial = Poly_c.of_carray carray in
   let two = Fr.of_string "2" in
-  Octez_bls12_381_polynomial.Polynomial.mul_by_scalar_inplace
-    polynomial
-    two
-    polynomial ;
-  let poly_values =
-    Octez_bls12_381_polynomial.Polynomial.to_dense_coefficients polynomial
-  in
-  let carray_values = Octez_bls12_381_polynomial.Fr_carray.to_array carray in
+  Poly_c.mul_by_scalar_inplace polynomial two polynomial ;
+  let poly_values = Poly_c.to_dense_coefficients polynomial in
+  let carray_values = Fr_carray.to_array carray in
   assert (Array.for_all2 Fr.eq poly_values carray_values)
 
 let tests =

@@ -135,6 +135,12 @@ module type Domain_sig = sig
 
   (** [inverse d] returns for a domain [wⁱᵢ] its inverse domain [w⁻ⁱᵢ] *)
   val inverse : t -> scalar array
+
+  (** [to_array d] converts a C array [d] to an OCaml array *)
+  val to_array : t -> scalar array
+
+  (** [of_array d] converts an OCaml array [d] to a C array *)
+  val of_array : scalar array -> t
 end
 
 module type Domain_unsafe_sig = sig
@@ -149,12 +155,6 @@ module type Domain_unsafe_sig = sig
 
       Note: [of_carray d] doesn't create a copy of [d] *)
   val of_carray : Fr_carray.t -> t
-
-  (** [to_array d] converts a C array [d] to an OCaml array *)
-  val to_array : t -> scalar array
-
-  (** [of_array d] converts an OCaml array [d] to a C array *)
-  val of_array : scalar array -> t
 end
 
 module Domain_unsafe : Domain_unsafe_sig with type scalar = Bls12_381.Fr.t =

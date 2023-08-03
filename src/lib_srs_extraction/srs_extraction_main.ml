@@ -38,7 +38,7 @@ let extract curve source input_file output_file =
                "srs_%s_g1_%i"
                source
                (Libsrs.exact_log2
-                  (Bls12_381_polynomial.G1_carray.length g1_elements)))
+                  (Octez_bls12_381_polynomial.G1_carray.length g1_elements)))
           output_file
       in
       Srs.gs1_to_file g1_elements output_file
@@ -51,7 +51,7 @@ let extract curve source input_file output_file =
                "srs_%s_g2_%i"
                source
                (Libsrs.exact_log2
-                  (Bls12_381_polynomial.G2_carray.length g2_elements)))
+                  (Octez_bls12_381_polynomial.G2_carray.length g2_elements)))
           output_file
       in
       Srs.gs2_to_file g2_elements output_file
@@ -67,7 +67,7 @@ let check g1s_input_file g2s_input_file =
          false
          [|(* [-1] means read the whole file *) -1|]
   in
-  let open Bls12_381_polynomial in
+  let open Octez_bls12_381_polynomial in
   let g1s =
     Srs.Srs_g1.of_bigstring (bigstring_of_file g1s_input_file) |> Result.get_ok
   in

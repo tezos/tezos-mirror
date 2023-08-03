@@ -79,10 +79,7 @@ module type Public_parameters_sig = sig
 
   type setup_params = int
 
-  val setup :
-    setup_params ->
-    Bls12_381_polynomial.Srs.t * Bls12_381_polynomial.Srs.t ->
-    prover * verifier
+  val setup : setup_params -> Srs.t * Srs.t -> prover * verifier
 
   val to_bytes : int -> prover -> Bytes.t
 end

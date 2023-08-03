@@ -28,7 +28,7 @@
    degree *)
 
 module type Evaluations_sig = sig
-  include Octez_bls12_381_polynomial.Evaluations.Evaluations_sig
+  include Octez_bls12_381_polynomial.Evaluations_sig
 
   (** [size_evaluations] returns the maximum size of elements in evaluations *)
   val size_evaluations : t SMap.t -> int
@@ -77,7 +77,7 @@ module type Evaluations_sig = sig
     t
 end
 
-module Make (E : Octez_bls12_381_polynomial.Evaluations.Evaluations_sig) :
+module Make (E : Octez_bls12_381_polynomial.Evaluations_sig) :
   Evaluations_sig
     with type scalar = E.scalar
      and type domain = E.domain

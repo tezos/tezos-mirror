@@ -127,7 +127,7 @@ module type S = sig
   val setup :
     zero_knowledge:bool ->
     circuit_map ->
-    srs:Bls12_381_polynomial.Srs.t * Bls12_381_polynomial.Srs.t ->
+    srs:Srs.t * Srs.t ->
     prover_public_parameters * verifier_public_parameters
 
   (** Enrich the [prover_public_parameters] with extra application data to
