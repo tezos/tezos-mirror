@@ -34,8 +34,8 @@ val default : t
 type error += Invalid_staking_parameters
 
 val make :
-  limit_of_staking_over_baking_millionth:int32 ->
-  edge_of_baking_over_staking_billionth:int32 ->
+  limit_of_staking_over_baking_millionth:Z.t ->
+  edge_of_baking_over_staking_billionth:Z.t ->
   t tzresult
 
 val encoding : t Data_encoding.t
