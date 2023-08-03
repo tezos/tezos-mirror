@@ -377,6 +377,72 @@ let test_protocol_names () =
     = Protocol_migration Tezos_scoru_wasm.Constants.proto_alpha_name) ;
   Lwt_result_syntax.return_unit
 
+let test_reveal_host_function_can_request_dal_pages () =
+  let open Alpha_context in
+  let wasm_hex str =
+    String.concat
+      ""
+      (String.fold_right
+         (fun c hex ->
+           let x, y = Hex.of_char c in
+           Format.sprintf "\\%c%c" x y :: hex)
+         str
+         [])
+  in
+  let request_dal_module level slot_index page_index payload_addr
+      destination_addr max_bytes =
+    let payload_value =
+      Sc_rollup.Request_dal_page
+        {
+          slot_id =
+            {published_level = Raw_level.of_int32_exn level; index = slot_index};
+          page_index;
+        }
+    in
+    let payload =
+      Data_encoding.Binary.to_string_exn Sc_rollup.reveal_encoding payload_value
+    in
+    let kernel =
+      Format.sprintf
+        {|
+      (module
+        (import "smart_rollup_core" "reveal"
+          (func $reveal (param i32 i32 i32 i32) (result i32)))
+        (memory 1)
+        (data (i32.const %ld) "%s")
+        (export "mem" (memory 0))
+        (func (export "kernel_run")
+          (call $reveal (i32.const %ld) (i32.const %ld) (i32.const %ld) (i32.const %ld))))
+    |}
+        payload_addr
+        (wasm_hex payload)
+        payload_addr
+        (String.length payload |> Int32.of_int)
+        destination_addr
+        max_bytes
+    in
+    (payload_value, kernel)
+  in
+  let payload_value, kernel =
+    request_dal_module 10l Dal.Slot_index.zero 4 100l 200l 4_096l
+  in
+  let* tree = Wasm_utils.initial_tree ~version:V3 kernel in
+  let* tree = Wasm_utils.set_empty_inbox_step 0l tree in
+  let* tree =
+    Wasm_utils.eval_until_input_requested ~reveal_builtins:None tree
+  in
+  let* info = Wasm_utils.Wasm.get_info tree in
+  match info.input_request with
+  | Reveal_required (Reveal_raw payload) -> (
+      match
+        Data_encoding.Binary.of_string Sc_rollup.reveal_encoding payload
+      with
+      | Ok payload ->
+          assert (payload_value = payload) ;
+          Lwt_result_syntax.return_unit
+      | Error _ -> assert false)
+  | _ -> assert false
+
 let tests =
   [
     Tztest.tztest
@@ -399,6 +465,10 @@ let tests =
       `Quick
       test_reveal_compat_raw_data;
     Tztest.tztest "protocol names consistency" `Quick test_protocol_names;
+    Tztest.tztest
+      "reveal host function can request DAL pages"
+      `Quick
+      test_reveal_host_function_can_request_dal_pages;
   ]
 
 let () =

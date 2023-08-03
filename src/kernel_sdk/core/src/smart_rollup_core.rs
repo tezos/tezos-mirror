@@ -125,6 +125,21 @@ extern "C" {
     ///
     /// Returns the size of data read (will always be 24).
     pub fn reveal_metadata(destination_addr: *mut u8, max_bytes: usize) -> i32;
+
+    /// Loads the result of a raw reveal request to memory.
+    ///
+    /// If the result is larger than `max_bytes`, its contents is trimmed.
+    ///
+    /// The encoding of the request as stored in the buffer described by `payload_addr` and
+    /// `payload_len` is the same as the one used by the Tezos protocol.
+    ///
+    /// Returns the size of the data loaded in memory.
+    pub fn reveal(
+        payload_addr: *const u8,
+        payload_len: usize,
+        destination_addr: *mut u8,
+        max_bytes: usize,
+    ) -> i32;
 }
 
 /// Wrapper trait for `smart_rollup_core` host functions.
