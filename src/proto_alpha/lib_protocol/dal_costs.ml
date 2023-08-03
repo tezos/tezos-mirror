@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [nodes_cost ~nodes] returns the cost of having called
-    a function in {!Script_typed_ir_size} that returns [nodes], i.e.
-    [value_size], [lambda_size] and [node_size]
-*)
-val nodes_cost : nodes:Cache_memory_helpers.Nodes.t -> Gas_limit_repr.cost
+include Dal_costs_generated

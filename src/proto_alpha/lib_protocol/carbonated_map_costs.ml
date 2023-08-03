@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,12 +25,17 @@
 (*****************************************************************************)
 
 module S = Saturation_repr
-open Gas_limit_repr
+open S.Syntax
+
+(* model carbonated_map/fold *)
+(* fun size -> (50. + (24 * size)) *)
+let cost_fold size =
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  S.safe_int 50 + (v0 * S.safe_int 24)
 
 type cost = Saturation_repr.may_saturate Saturation_repr.t
-
-(** This is a good enough approximation *)
-let log2 x = S.safe_int (1 + S.numbits x)
 
 (** Collect benchmark from [Carbonated_map_benchmarks.Find_benchmark].
 
@@ -43,11 +49,13 @@ let log2 x = S.safe_int (1 + S.numbits x)
     - [traversal_overhead] is for the overhead of log2 steps walking the tree
  *)
 let find_cost ~compare_key_cost ~size =
+  (* intercept: carbonated_map/find/intercept *)
   let intercept = S.safe_int 50 in
   let size = S.safe_int size in
-  let compare_cost = log2 size *@ compare_key_cost in
-  let traversal_overhead = log2 size *@ S.safe_int 2 in
-  intercept +@ compare_cost +@ traversal_overhead
+  let compare_cost = log2 size * compare_key_cost in
+  (* traversal_overhead: carbonated_map/find/traversal_overhead *)
+  let traversal_overhead = log2 size * S.safe_int 2 in
+  intercept + compare_cost + traversal_overhead
 
 (**
     Modelling the precise overhead of update compared with [find] is tricky.
@@ -60,11 +68,11 @@ let find_cost ~compare_key_cost ~size =
     providing an overestimate by doubling the cost of [find].
   *)
 let update_cost ~compare_key_cost ~size =
-  S.safe_int 2 *@ find_cost ~compare_key_cost ~size
+  S.safe_int 2 * find_cost ~compare_key_cost ~size
 
 (** Collect benchmark from [Carbonated_map_benchmarks.Fold_benchmark].
 
     The cost of producing a list of elements is linear in the size of the map
     and does not depend on the size of the elements nor keys.
 *)
-let fold_cost ~size = S.safe_int 50 +@ (S.safe_int 24 *@ S.safe_int size)
+let fold_cost ~size = cost_fold size

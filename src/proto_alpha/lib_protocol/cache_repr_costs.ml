@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,13 +26,12 @@
 
 module S = Saturation_repr
 
-let cache_update_constant = S.safe_int 600
-
-let cache_update_coeff = S.safe_int 43
-
 (* model cache/CACHE_UPDATE *)
 let cost_CACHE_UPDATE size =
   let open S.Syntax in
   let size = S.safe_int size in
-  Gas_limit_repr.atomic_step_cost
-    (cache_update_constant + (cache_update_coeff * log2 size))
+  let v0 = log2 size in
+  S.safe_int 600 + (v0 * S.safe_int 43)
+
+let cost_CACHE_UPDATE size =
+  cost_CACHE_UPDATE size |> Gas_limit_repr.atomic_step_cost

@@ -44,10 +44,7 @@ end
 
   *)
 val consume_gas_steps :
-  Alpha_context.t ->
-  step_cost:Alpha_context.Gas.cost ->
-  num_steps:int ->
-  Alpha_context.t tzresult
+  Alpha_context.t -> num_steps:int -> Alpha_context.t tzresult
 
 (** [has_tickets_of_ty_cost ty] returns the cost of producing a [has_tickets],
     used internally in the [Ticket_scanner] module. *)

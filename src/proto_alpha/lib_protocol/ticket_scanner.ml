@@ -251,10 +251,6 @@ module Ticket_inspection = struct
 end
 
 module Ticket_collection = struct
-  let consume_gas_steps =
-    Ticket_costs.consume_gas_steps
-      ~step_cost:Ticket_costs.Constants.cost_collect_tickets_step
-
   type accumulator = ex_ticket list
 
   type 'a continuation = context -> accumulator -> 'a tzresult Lwt.t
@@ -303,7 +299,7 @@ module Ticket_collection = struct
       ret tzresult Lwt.t =
     let open Lwt_result_syntax in
     fun ctxt key_ty _set acc k ->
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:1 in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       (* This is only invoked to support any future extensions making tickets
          comparable. *)
       (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc k
@@ -321,7 +317,7 @@ module Ticket_collection = struct
     let open Lwt_result_syntax in
     fun ~include_lazy ctxt hty ty x acc k ->
       let open Script_typed_ir in
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:1 in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       match (hty, ty) with
       | False_ht, _ -> (k [@ocaml.tailcall]) ctxt acc
       | Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _) ->
@@ -419,7 +415,7 @@ module Ticket_collection = struct
       ret tzresult Lwt.t =
     let open Lwt_result_syntax in
     fun ctxt ~include_lazy el_hty el_ty elements acc k ->
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:1 in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       match elements with
       | elem :: elems ->
           (tickets_of_value [@ocaml.tailcall])
@@ -453,9 +449,9 @@ module Ticket_collection = struct
     let open Lwt_result_syntax in
     fun ~include_lazy ctxt val_hty val_ty map acc k ->
       let (module M) = Script_map.get_module map in
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:1 in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       (* Pay gas for folding over the values *)
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:M.size in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:M.size in
       let values = M.OPS.fold (fun _ v vs -> v :: vs) M.boxed [] in
       (tickets_of_list [@ocaml.tailcall])
         ~include_lazy
@@ -482,7 +478,7 @@ module Ticket_collection = struct
         (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
         acc
         k ->
-      let*? ctxt = consume_gas_steps ctxt ~num_steps:1 in
+      let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       (* Require empty overlay *)
       if Compare.Int.(size > 0) then tzfail Unsupported_non_empty_overlay
       else
