@@ -286,6 +286,13 @@ let pp_print_list pp out xs =
 let assert_equal_list ~loc eq msg pp =
   equal ~loc (List.equal eq) msg (pp_print_list pp)
 
+let assert_equal_list_opt ~loc eq msg pp =
+  equal
+    ~loc
+    (Option.equal (List.equal eq))
+    msg
+    (Format.pp_print_option (pp_print_list pp))
+
 let to_json_string encoding x =
   x
   |> Data_encoding.Json.construct encoding
