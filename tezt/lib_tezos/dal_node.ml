@@ -30,8 +30,8 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
+    metrics_addr : string;
     node : Node.t;
-    client : Client.t;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -66,6 +66,8 @@ let rpc_port dal_node = dal_node.persistent_state.rpc_port
 
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
+let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
+
 let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
 
 let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
@@ -93,6 +95,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
          Some "--net-addr";
          Some (listen_addr dal_node);
+         Some "--metrics-addr";
+         Some (metrics_addr dal_node);
          Some "--expected-pow";
          Some (string_of_float expected_pow);
          Some "--peers";
@@ -173,7 +177,7 @@ let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ~node ~client () =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -183,6 +187,11 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
   in
   let listen_addr =
     match listen_addr with
+    | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
+    | Some addr -> addr
+  in
+  let metrics_addr =
+    match metrics_addr with
     | None -> Format.sprintf "127.0.0.1:%d" @@ Port.fresh ()
     | Some addr -> addr
   in
@@ -197,9 +206,9 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
         rpc_host;
         rpc_port;
         listen_addr;
+        metrics_addr;
         pending_ready = [];
         node;
-        client;
       }
   in
   on_event dal_node (handle_event dal_node) ;
@@ -209,6 +218,12 @@ let make_arguments node =
   [
     "--endpoint";
     Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--rpc-addr";
+    Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
+    "--net-addr";
+    listen_addr node;
+    "--metrics-addr";
+    metrics_addr node;
   ]
 
 let do_runlike_command ?env node arguments =
@@ -218,6 +233,11 @@ let do_runlike_command ?env node arguments =
     trigger_ready node None ;
     unit
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6164
+     Improve handling of arguments:
+     * unclear what should happen when two values for the same argument are given
+     * [make_arguments] seems incomplete
+     * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
   run ?env node {ready = false} arguments ~on_terminate
 

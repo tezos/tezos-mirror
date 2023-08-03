@@ -179,7 +179,8 @@ module Term = struct
           ~docs
           ~doc
           ~docv:
-            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is \
+             11733)"
           ["metrics-addr"])
 
   let term process =

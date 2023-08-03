@@ -184,8 +184,8 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let make_dal_node ?peers ?attestor_profiles ?producer_profiles
-    ?bootstrap_profile tezos_node tezos_client =
-  let dal_node = Dal_node.create ~node:tezos_node ~client:tezos_client () in
+    ?bootstrap_profile tezos_node =
+  let dal_node = Dal_node.create ~node:tezos_node () in
   let* () =
     Dal_node.init_config
       ?peers
@@ -198,7 +198,7 @@ let make_dal_node ?peers ?attestor_profiles ?producer_profiles
   return dal_node
 
 let with_dal_node ?peers ?attestor_profiles ?producer_profiles
-    ?bootstrap_profile tezos_node tezos_client f key =
+    ?bootstrap_profile tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
@@ -206,7 +206,6 @@ let with_dal_node ?peers ?attestor_profiles ?producer_profiles
       ?producer_profiles
       ?bootstrap_profile
       tezos_node
-      tezos_client
   in
   f key dal_node
 
@@ -262,7 +261,7 @@ let scenario_with_layer1_and_dal_nodes ?(tags = ["layer1"]) ?custom_constants
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile node client @@ fun _key dal_node ->
+      with_dal_node ?bootstrap_profile node @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
@@ -287,7 +286,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?attestation_lag
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
-      with_dal_node node client @@ fun key dal_node ->
+      with_dal_node node @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
         scenario
@@ -1287,10 +1286,10 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   return ()
 
 let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
-    client dal_node1 =
-  let dal_node2 = Dal_node.create ~node ~client () in
-  let dal_node3 = Dal_node.create ~node ~client () in
-  let dal_node4 = Dal_node.create ~node ~client () in
+    _client dal_node1 =
+  let dal_node2 = Dal_node.create ~node () in
+  let dal_node3 = Dal_node.create ~node () in
+  let dal_node4 = Dal_node.create ~node () in
   let* () = Dal_node.init_config dal_node2 in
   let* () = Dal_node.init_config dal_node3 in
   let* () = Dal_node.init_config dal_node4 in
@@ -1480,7 +1479,7 @@ let test_dal_node_startup =
       ~nodes_args
       ()
   in
-  let dal_node = Dal_node.create ~node ~client () in
+  let dal_node = Dal_node.create ~node () in
   let* () = Dal_node.init_config dal_node in
   let* () = run_dal dal_node in
   let* () =
@@ -2327,7 +2326,7 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
   Lwt_list.mapi_s
     (fun index key_opt ->
       (* We create a new DAL node and initialize it. *)
-      let fresh_dal_node = Dal_node.create ~node:l1_node ~client:l1_client () in
+      let fresh_dal_node = Dal_node.create ~node:l1_node () in
       let* () = Dal_node.init_config fresh_dal_node in
 
       (* We connect the fresh DAL node to another node, start it and update the
@@ -2983,8 +2982,8 @@ let waiter_successful_shards_app_notification l1_committee dal_node commitment
       Test.fail "Should not happen as %s is part of the committee" pkh
 
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
-    _cryptobox node client dal_node1 =
-  let dal_node2 = Dal_node.create ~node ~client () in
+    _cryptobox node _client dal_node1 =
+  let dal_node2 = Dal_node.create ~node () in
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
   let peer_id =
@@ -3131,7 +3130,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
     client
     dal_node1
     ~mk_dal_node2:(fun _protocol _parameters ->
-      Dal_node.create ~node ~client () |> return)
+      Dal_node.create ~node () |> return)
     ~expect_app_notification:true
     ~is_first_slot_attestable:true
 
@@ -3139,7 +3138,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
 let make_invalid_dal_node protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
-  let* node2, client2, _xdal_parameters2 =
+  let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
     let parameters =
       dal_enable_param (Some true)
@@ -3149,7 +3148,7 @@ let make_invalid_dal_node protocol parameters =
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
-  let dal_node2 = Dal_node.create ~node:node2 ~client:client2 () in
+  let dal_node2 = Dal_node.create ~node:node2 () in
   return dal_node2
 
 let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
@@ -3355,14 +3354,12 @@ let test_peer_discovery_via_bootstrap_node _protocol _parameters _cryptobox node
       ~peers:[Dal_node.listen_addr dal_node1]
       ~attestor_profiles:[Constant.bootstrap1.public_key_hash]
       node
-      client
   in
   let* dal_node3 =
     make_dal_node
       ~peers:[Dal_node.listen_addr dal_node1]
       ~producer_profiles:[0]
       node
-      client
   in
   let check_conn_event_from_2_to_3 =
     check_new_connection_event
@@ -3413,7 +3410,7 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   let* () = Node.run ~patch_config node nodes_args in
   let* () = Node.wait_for_ready node in
 
-  let dal_node = Dal_node.create ~node ~client () in
+  let dal_node = Dal_node.create ~node () in
   let* () = Dal_node.init_config dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 

@@ -746,8 +746,6 @@ module Make (C : AUTOMATON_CONFIG) :
 
   include Helpers
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5148
-     Consider merging subcribe/unsubscribe with join/leave. *)
   module Subscribe = struct
     let handle topic peer =
       let open Monad.Syntax in

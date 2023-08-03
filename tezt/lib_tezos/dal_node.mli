@@ -39,8 +39,8 @@ val create :
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?listen_addr:string ->
+  ?metrics_addr:string ->
   node:Node.t ->
-  client:Client.t ->
   unit ->
   t
 
@@ -56,7 +56,16 @@ val rpc_port : t -> int
 (** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
 val listen_addr : t -> string
 
-(** Return the endpoint of the dal node, i.e., http://rpc_host:rpc_port. *)
+(** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
+val metrics_addr : t -> string
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6164
+   Maybe improve naming, see doc-string below *)
+
+(** Return the endpoint of the DAL node's RPC server, i.e.,
+    http://rpc_host:rpc_port. This should not be confused with the "endpoint"
+    argument of the DAL node (and the homonymous config file field) , which
+    refers to endpoint of L1 node. *)
 val endpoint : t -> string
 
 (** Get the data-dir of an dal node. *)

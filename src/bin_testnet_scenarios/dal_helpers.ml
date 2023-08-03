@@ -109,6 +109,7 @@ let reveal_accounts client accounts =
   let* _ =
     Lwt_list.iter_s
       (fun account ->
+        Log.info "Revealing address %s" account.Account.alias ;
         let op =
           Operation.Manager.reveal account
           |> Operation.Manager.make ~source:account
@@ -117,11 +118,15 @@ let reveal_accounts client accounts =
         return ())
       unrevealed
   in
-
-  (* wait for a level to be "sure" the operations are included *)
-  let level = Node.get_level node in
-  let* _new_level = Node.wait_for_level node (level + 1) in
-  return ()
+  if List.length unrevealed > 0 then (
+    let level = Node.get_level node in
+    Log.info
+      "Waiting for a level (namely %d) to be \"sure\" the operations are \
+       included..."
+      (level + 1) ;
+    let* _new_level = Node.wait_for_level node (level + 1) in
+    return ())
+  else return ()
 
 module Wallet = struct
   let default_wallet network =
@@ -220,7 +225,7 @@ module Wallet = struct
                keys))
         else return ()
       in
-      Log.info "Reveal wallet addresses if needed..." ;
+      Log.info "\nReveal wallet addresses if needed..." ;
       reveal_accounts client keys
   end
 

@@ -38,7 +38,7 @@ open Dal_helpers
    Use the arguments:
    - `load`: to load an existing data-dir saved (with `save`, see next) in a previous run of the script
    - `save`: to save the current data-dir after the L1 node is synced and at the end of the test
-   - `num_account=<int>`: to specify the number of slot producers
+   - `num_accounts=<int>`: to specify the number of slot producers
    - `levels`: to specify for how many levels to publish slots
 *)
 let scenario network =
@@ -60,33 +60,66 @@ let scenario network =
     "Using %d keys for slot production, publishing for %d levels"
     num_accounts
     num_levels ;
+  let key_indices = range 0 (num_accounts - 1) in
 
   let node = Node.create [] in
+  let dal_node = Dal_node.create ~node () in
   let tezt_data_dir = Node.data_dir node in
+  let tezt_dal_data_dir = Dal_node.data_dir dal_node in
   let network_name = Network.name network in
   let network_url = Format.sprintf "https://teztnets.xyz/%s" network_name in
   let network_arg = Node.Network network_url in
   let backup = Filename.get_temp_dir_name () // network_name in
+  let dal_backup = Filename.get_temp_dir_name () // (network_name ^ "-dal") in
   let load () =
     let do_load =
       match load with
       | Some () ->
-          if Sys.file_exists backup then true
+          if Sys.file_exists backup then
+            if Sys.file_exists dal_backup then true
+            else (
+              Log.info "Expected DAL data-dir %s does not exist." dal_backup ;
+              false)
           else (
-            Log.info
-              "Expected data-dir %s does not exist in current tezt workspace"
-              backup ;
+            Log.info "Expected data-dir %s does not exist." backup ;
             false)
       | None -> false
     in
     if do_load then (
       Log.info "Loading data-dir from %s in current tezt workspace..." backup ;
-      Process.run "cp" ["-rT"; backup; tezt_data_dir])
+      let* () = Process.run "cp" ["-rT"; backup; tezt_data_dir] in
+      Log.info
+        "Loading DAL data-dir from %s in current tezt workspace..."
+        dal_backup ;
+      let* () = Process.run "cp" ["-rT"; dal_backup; tezt_dal_data_dir] in
+      (* We delete the config file, because it is not useful for subsequent runs
+         and may be confusing (it contains in particular the net/rpc addresses
+         which should not be reused by mistake). *)
+      let config_file = tezt_dal_data_dir // "config.json" in
+      if Sys.file_exists config_file then Process.run "rm" [config_file]
+      else return ())
     else (
       Log.info "Initializing L1 node..." ;
-      Node.config_init
-        node
-        [network_arg; Expected_pow 26; Synchronisation_threshold 2])
+      let* () =
+        Node.config_init
+          node
+          [network_arg; Expected_pow 26; Synchronisation_threshold 2]
+      in
+      Log.info "Initializing DAL node..." ;
+      let attestor_profiles =
+        match network with
+        | Dailynet ->
+            [
+              (* the one and only delegate *)
+              "tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE";
+            ]
+        | Mondaynet -> []
+      in
+      Dal_node.init_config
+        ~expected_pow:26.
+        ~producer_profiles:key_indices
+        ~attestor_profiles
+        dal_node)
   in
   let* () = load () in
   Log.info "Run L1 node and wait for it to sync..." ;
@@ -99,7 +132,6 @@ let scenario network =
       ~endpoint:(Node node)
       ()
   in
-  let key_indices = range 0 (num_accounts - 1) in
   let aliases =
     List.map (fun i -> "slot-producer-" ^ string_of_int i) key_indices
   in
@@ -108,9 +140,13 @@ let scenario network =
     match save with
     | None -> return ()
     | Some () ->
-        Log.info "Save the current data-dir into %s..." backup ;
+        Log.info
+          "Save the current data-dirs into %s and %s..."
+          backup
+          dal_backup ;
         let* () = Node.terminate node in
         let* () = Process.run "cp" ["-rT"; tezt_data_dir; backup] in
+        let* () = Process.run "cp" ["-rT"; tezt_dal_data_dir; dal_backup] in
         if restart then (
           Log.info "Restart L1 node and wait for it to sync..." ;
           let* () = Node.run node [network_arg] in
@@ -120,20 +156,6 @@ let scenario network =
   in
   let* () = save ~restart:true in
   let* () = Wallet.Airdrop.distribute_money client keys in
-  let dal_node = Dal_node.create ~node ~client () in
-  let attestor_profiles =
-    match network with
-    | Dailynet ->
-        [(* the one and only delegate *) "tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE"]
-    | Mondaynet -> []
-  in
-  let* () =
-    Dal_node.init_config
-      ~expected_pow:26.
-      ~producer_profiles:key_indices
-      ~attestor_profiles
-      dal_node
-  in
   let* () = Dal_node.run dal_node in
   let* proto_parameters =
     RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
@@ -169,7 +191,7 @@ let scenario network =
       let slot_index = key_index mod number_of_slots in
 
       Log.info
-        "publishing slot at level %d with index %d..."
+        "Publishing a slot at level %d with index %d..."
         current_level
         slot_index ;
       let* commitment =
@@ -246,10 +268,9 @@ let scenario network =
         ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
         (fun fmt (status, (c, _indexes)) -> Format.fprintf fmt "%d %s" c status)
     in
+    let attested_level = string_of_int (level + lag) in
     let* metadata =
-      RPC.call
-        node
-        (RPC.get_chain_block_metadata ~block:(string_of_int (level + lag)) ())
+      RPC.call node (RPC.get_chain_block_metadata ~block:attested_level ())
     in
     let pp_array fmt a =
       for i = 0 to Array.length a - 1 do
@@ -290,12 +311,30 @@ let scenario network =
         pp_array
         node_attestation ;
     let num_published = List.length slot_headers in
+    let* ops =
+      RPC.call
+        node
+        (RPC.get_chain_block_operations_validation_pass
+           ~block:attested_level
+           ~validation_pass:0
+           ())
+    in
+    let attestations =
+      List.filter
+        (fun op ->
+          let op_type =
+            JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
+          in
+          String.equal op_type "dal_attestation")
+        (JSON.as_list ops)
+    in
     Log.info
-      "At level %d, published slots: %d, status: %a"
+      "At level %d, published slots: %d, status: %a (%d attestations)"
       level
       (List.length slot_headers)
       pp_map
-      (Map.bindings map) ;
+      (Map.bindings map)
+      (List.length attestations) ;
     return (num_published, num_attested)
   in
 
