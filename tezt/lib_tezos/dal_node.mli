@@ -53,20 +53,15 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an dal node. *)
 val rpc_port : t -> int
 
+(** Return the endpoint of the DAL node's RPC server, i.e.,
+    http://rpc_host:rpc_port. *)
+val rpc_endpoint : t -> string
+
 (** Get the node's point pair "address:port" given as [--net-addr] to a dal node. *)
 val listen_addr : t -> string
 
 (** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
 val metrics_addr : t -> string
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6164
-   Maybe improve naming, see doc-string below *)
-
-(** Return the endpoint of the DAL node's RPC server, i.e.,
-    http://rpc_host:rpc_port. This should not be confused with the "endpoint"
-    argument of the DAL node (and the homonymous config file field) , which
-    refers to endpoint of L1 node. *)
-val endpoint : t -> string
 
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string

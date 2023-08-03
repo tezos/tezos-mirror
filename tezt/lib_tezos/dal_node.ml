@@ -64,6 +64,9 @@ let rpc_host dal_node = dal_node.persistent_state.rpc_host
 
 let rpc_port dal_node = dal_node.persistent_state.rpc_port
 
+let rpc_endpoint dal_node =
+  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
+
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
@@ -71,9 +74,6 @@ let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
 
 let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
-
-let endpoint dal_node =
-  Printf.sprintf "http://%s:%d" (rpc_host dal_node) (rpc_port dal_node)
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
