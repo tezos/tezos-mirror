@@ -35,102 +35,15 @@ open Sha2_variants
     under "Secure hashing".
   *)
 
-module type Op = sig
-  module L : LIB
-
-  open L
-
-  type tl
-
-  val band : tl repr -> tl repr -> tl repr t
-
-  val bnot : tl repr -> tl repr t
-
-  val xor : tl repr -> tl repr -> tl repr t
-
-  val rotate_right : tl repr -> int -> tl repr t
-
-  val shift_right : tl repr -> int -> tl repr t
-
-  val of_bytes : bool list repr -> tl repr t
-
-  val to_bytes : tl repr -> bool list repr t
-
-  val to_scalar : tl repr -> scalar repr t
-
-  val of_scalar : total_nb_bits:int -> scalar repr -> tl repr t
-
-  val of_constant : le:bool -> bytes -> tl repr t
-end
-
-module Op_limbs_impl (L : LIB) = struct
-  module L = L
-  open L
-
-  module Limbs = Limbs (struct
-    let nb_bits = 4
-  end)
-
-  type tl = Limbs.tl
-
-  let xor = Limbs.xor
-
-  let band = Limbs.band
-
-  let bnot = Limbs.not
-
-  let rotate_right = Limbs.rotate_right
-
-  let shift_right = Limbs.shift_right
-
-  let of_bytes = Limbs.of_bool_list
-
-  let to_bytes = Limbs.to_bool_list
-
-  let to_scalar = Limbs.to_scalar
-
-  let of_scalar ~total_nb_bits x =
-    with_label ~label:"Sha2.of_scalar" @@ Limbs.of_scalar ~total_nb_bits x
-
-  let of_constant ~le x =
-    with_label ~label:"Sha2.of_constant" @@ Limbs.constant ~le x
-end
-
-module Op_bits_impl (L : LIB) : Op with module L = L and type tl = L.Bytes.tl =
+module MAKE
+    (L : LIB)
+    (V : VARIANT)
+    (Op : Limb_list
+            with type scalar = L.scalar
+             and type 'a repr = 'a L.repr
+             and type 'a t = 'a L.t
+             and type 'a input = 'a L.Input.t) =
 struct
-  module L = L
-  open L
-
-  type tl = Bytes.tl
-
-  let xor = Bytes.xor
-
-  let band = Bytes.band
-
-  let bnot = Bytes.not
-
-  let rotate_right = Bytes.rotate_right
-
-  let shift_right = Bytes.shift_right
-
-  let of_bytes x = ret x
-
-  let to_bytes x = ret x
-
-  let to_scalar = Num.scalar_of_bytes
-
-  let of_scalar ~total_nb_bits x = bits_of_scalar ~nb_bits:total_nb_bits x
-
-  let of_constant ~le x = Bytes.constant ~le x
-end
-
-module type Operations = functor (L : LIB) -> Op with module L = L
-
-module Op_limbs : Operations = Op_limbs_impl
-
-module Op_bits : Operations = Op_bits_impl
-
-module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
   open L
   module M64 = Gadget_mod_arith.ArithMod64 (L)
 
@@ -169,11 +82,11 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
       let* sres = M64.scalars_of_mod_int mres in
       Op.of_scalar ~total_nb_bits:V.word_size (List.hd (of_list sres))
     else
-      let* (lb : Bytes.tl repr list) = mapM Op.to_bytes lb in
+      let* (lb : Bytes.tl repr list) = mapM Op.to_bool_list lb in
       let* res =
         foldM (Bytes.add ~ignore_carry:true) (List.hd lb) (List.tl lb)
       in
-      Op.of_bytes res
+      Op.of_bool_list res
 
   let add a b = add_list [a; b]
 
@@ -188,7 +101,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
   let ch x y z =
     with_label ~label:"Sha2.Ch"
     @@ let* x_and_y = Op.band x y in
-       let* not_x = Op.bnot x in
+       let* not_x = Op.not x in
        let* not_x_and_z = Op.band not_x z in
        Op.xor x_and_y not_x_and_z
 
@@ -237,7 +150,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     with_label ~label:"Sha2.ks"
     @@ let* a =
          mapM
-           (fun s -> Op.of_constant ~le:false @@ Utils.bytes_of_hex s)
+           (fun s -> Op.constant ~le:false @@ Utils.bytes_of_hex s)
            (Array.to_list V.round_constants)
        in
        ret @@ Array.of_list a
@@ -246,7 +159,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
   let initial_hash : Op.tl repr array t =
     let* a =
       mapM
-        (fun s -> Op.of_constant ~le:false @@ Utils.bytes_of_hex s)
+        (fun s -> Op.constant ~le:false @@ Utils.bytes_of_hex s)
         (Array.to_list V.init_hash)
     in
     ret @@ Array.of_list a
@@ -297,7 +210,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* rest =
          let* res =
            mapM
-             (fun _ -> Op.of_constant ~le:false Stdlib.Bytes.empty)
+             (fun _ -> Op.constant ~le:false Stdlib.Bytes.empty)
              (List.init (V.loop_bound - 16) Fun.id)
          in
          ret @@ Array.of_list res
@@ -411,12 +324,12 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
        let rec process_blocks (acc : Op.tl repr array) i =
          if i = Array.length blocks then ret acc
          else
-           let* blocks_i = mapM Op.of_bytes (Array.to_list blocks.(i)) in
+           let* blocks_i = mapM Op.of_bool_list (Array.to_list blocks.(i)) in
            let* acc = process_one_block (Array.of_list blocks_i) acc in
            process_blocks acc (i + 1)
        in
        let* res = process_blocks initial_hash 0 in
-       let* res = mapM Op.to_bytes (Array.to_list res) in
+       let* res = mapM Op.to_bool_list (Array.to_list res) in
        let res = Array.sub (Array.of_list res) 0 V.digest_blocks in
        ret @@ Bytes.concat res
 end
@@ -427,10 +340,24 @@ module type SHA2 = functor (L : LIB) -> sig
   val digest : Bytes.tl repr -> Bytes.tl repr t
 end
 
-module SHA224 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha224) (Op_bits (L))
+module SHA224 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha224) (L.Bytes)
 
-module SHA256 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha256) (Op_bits (L))
+module SHA256 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha256) (L.Bytes)
 
-module SHA384 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha384) (Op_limbs (L))
+module SHA384 : SHA2 =
+functor
+  (L : LIB)
+  ->
+  MAKE (L) (Sha384)
+    (L.Limbs (struct
+      let nb_bits = 4
+    end))
 
-module SHA512 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha512) (Op_limbs (L))
+module SHA512 : SHA2 =
+functor
+  (L : LIB)
+  ->
+  MAKE (L) (Sha512)
+    (L.Limbs (struct
+      let nb_bits = 4
+    end))
