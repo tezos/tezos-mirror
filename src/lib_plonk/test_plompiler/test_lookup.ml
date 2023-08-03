@@ -148,7 +148,7 @@ functor
       let* a = input ~kind:`Public a in
       let* b = input b in
       let* z = input z in
-      let* z' = Limbs4.xor_lookup a b in
+      let* z' = Limbs4.xor a b in
       assert_equal z z'
 
     let bytes_of_hex = Plompiler.Utils.bytes_of_hex
@@ -199,7 +199,7 @@ functor
     let test_bnot_bytes4 b z () =
       let* b = input ~kind:`Public b in
       let* z = input z in
-      let* z' = Limbs4.bnot_lookup b in
+      let* z' = Limbs4.not b in
       assert_equal z z'
 
     let tests_bnot_bytes str input_bytes f =
@@ -219,7 +219,7 @@ functor
     let test_rotate_right4 l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let* o = Limbs4.rotate_right_lookup l i in
+      let* o = Limbs4.rotate_right l i in
       assert_equal o z
 
     let tests_rotate_right =
@@ -267,8 +267,8 @@ functor
       let* z = input z in
       (* We use this conversion to make sure that
          we do not have unused inputs *)
-      let* l = Limbs4.of_bytes l in
-      let* o = Limbs4.shift_right_lookup l i in
+      let* l = Limbs4.of_bool_list l in
+      let* o = Limbs4.shift_right l i in
       assert_equal o z
 
     let tests_shift_right =

@@ -46,17 +46,15 @@ module type Op = sig
 
   val bnot : tl repr -> tl repr t
 
-  val xor_list : tl repr list -> tl repr t
-
   val xor : tl repr -> tl repr -> tl repr t
 
   val rotate_right : tl repr -> int -> tl repr t
 
   val shift_right : tl repr -> int -> tl repr t
 
-  val of_bytes : Bytes.bl repr -> tl repr t
+  val of_bytes : bool list repr -> tl repr t
 
-  val to_bytes : tl repr -> Bytes.bl repr t
+  val to_bytes : tl repr -> bool list repr t
 
   val to_scalar : tl repr -> scalar repr t
 
@@ -73,23 +71,21 @@ module Op_limbs_impl (L : LIB) = struct
     let nb_bits = 4
   end)
 
-  type tl = Limbs.sl
+  type tl = Limbs.tl
 
-  let xor_list lb = foldM Limbs.xor_lookup (List.hd lb) (List.tl lb)
+  let xor = Limbs.xor
 
-  let xor a b = xor_list [a; b]
+  let band = Limbs.band
 
-  let band = Limbs.band_lookup
+  let bnot = Limbs.not
 
-  let bnot = Limbs.bnot_lookup
+  let rotate_right = Limbs.rotate_right
 
-  let rotate_right = Limbs.rotate_right_lookup
+  let shift_right = Limbs.shift_right
 
-  let shift_right = Limbs.shift_right_lookup
+  let of_bytes = Limbs.of_bool_list
 
-  let of_bytes = Limbs.of_bytes
-
-  let to_bytes = Limbs.to_bytes
+  let to_bytes = Limbs.to_bool_list
 
   let to_scalar = Limbs.to_scalar
 
@@ -100,16 +96,14 @@ module Op_limbs_impl (L : LIB) = struct
     with_label ~label:"Sha2.of_constant" @@ Limbs.constant ~le x
 end
 
-module Op_bits_impl (L : LIB) : Op with module L = L and type tl = L.Bytes.bl =
+module Op_bits_impl (L : LIB) : Op with module L = L and type tl = L.Bytes.tl =
 struct
   module L = L
   open L
 
-  type tl = Bytes.bl
+  type tl = Bytes.tl
 
-  let xor_list lb = foldM Bytes.xor (List.hd lb) (List.tl lb)
-
-  let xor a b = xor_list [a; b]
+  let xor = Bytes.xor
 
   let band = Bytes.band
 
@@ -175,13 +169,15 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
       let* sres = M64.scalars_of_mod_int mres in
       Op.of_scalar ~total_nb_bits:V.word_size (List.hd (of_list sres))
     else
-      let* (lb : Bytes.bl repr list) = mapM Op.to_bytes lb in
+      let* (lb : Bytes.tl repr list) = mapM Op.to_bytes lb in
       let* res =
         foldM (Bytes.add ~ignore_carry:true) (List.hd lb) (List.tl lb)
       in
       Op.of_bytes res
 
   let add a b = add_list [a; b]
+
+  let xor_list lb = foldM Op.xor (List.hd lb) (List.tl lb)
 
   (* Section 4.1.2
      use six logical functions, where each function operates on 32-bit words,
@@ -202,7 +198,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* x_and_y = Op.band x y in
        let* x_and_z = Op.band x z in
        let* y_and_z = Op.band y z in
-       Op.xor_list [x_and_y; x_and_z; y_and_z]
+       xor_list [x_and_y; x_and_z; y_and_z]
 
   (* Sum_0(x) = ROTR^{c0}(x) XOR ROTR^{c1}(x) XOR ROTR^{c2}(x) *)
   let sum_0 x =
@@ -210,7 +206,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* x0 = Op.rotate_right x V.sum_constants.(0) in
        let* x1 = Op.rotate_right x V.sum_constants.(1) in
        let* x2 = Op.rotate_right x V.sum_constants.(2) in
-       Op.xor_list [x0; x1; x2]
+       xor_list [x0; x1; x2]
 
   (* Sum_1(x) = ROTR^{c3}(x) XOR ROTR^{c4}(x) XOR ROTR^{c5}(x) *)
   let sum_1 x =
@@ -218,7 +214,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* x0 = Op.rotate_right x V.sum_constants.(3) in
        let* x1 = Op.rotate_right x V.sum_constants.(4) in
        let* x2 = Op.rotate_right x V.sum_constants.(5) in
-       Op.xor_list [x0; x1; x2]
+       xor_list [x0; x1; x2]
 
   (* Sigma_0(x) = ROTR^{d0}(x) XOR ROTR^{d1}(x) XOR SHR^{d2}(x) *)
   let sigma_0 x =
@@ -226,7 +222,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* x0 = Op.rotate_right x V.sigma_constants.(0) in
        let* x1 = Op.rotate_right x V.sigma_constants.(1) in
        let* x2 = Op.shift_right x V.sigma_constants.(2) in
-       Op.xor_list [x0; x1; x2]
+       xor_list [x0; x1; x2]
 
   (* Sigma_1(x) = ROTR^{d3}(x) XOR ROTR^{d4}(x) XOR SHR^{d5}(x) *)
   let sigma_1 x =
@@ -234,7 +230,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     @@ let* x0 = Op.rotate_right x V.sigma_constants.(3) in
        let* x1 = Op.rotate_right x V.sigma_constants.(4) in
        let* x2 = Op.shift_right x V.sigma_constants.(5) in
-       Op.xor_list [x0; x1; x2]
+       xor_list [x0; x1; x2]
 
   (* Section 4.2.2 constants *)
   let ks : Op.tl repr array t =
@@ -256,7 +252,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     ret @@ Array.of_list a
 
   (* Section 5.1.1 *)
-  let padding : Bytes.bl repr -> Bytes.bl repr t =
+  let padding : Bytes.tl repr -> Bytes.tl repr t =
    fun msg ->
     with_label ~label:"Sha2.padding"
     @@
@@ -285,7 +281,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
     ret @@ Bytes.concat [|msg; padding; binary_l|]
 
   (* Section 5.2 *)
-  let parsing : Bytes.bl repr -> Bytes.bl repr array array =
+  let parsing : Bytes.tl repr -> Bytes.tl repr array array =
    fun msg ->
     let nb_blocks = Bytes.length msg / V.block_size in
     (* Split in blocks of V.block_size bits *)
@@ -403,7 +399,7 @@ module MAKE (L : LIB) (V : VARIANT) (Op : Op with module L = L) = struct
        let* vars = step3 vars ws in
        compute_intermediate_hash vars hs
 
-  let digest : Bytes.bl repr -> L.Bytes.bl repr t =
+  let digest : Bytes.tl repr -> L.Bytes.tl repr t =
    fun blocks ->
     assert (Bytes.length blocks mod 8 = 0) ;
     with_label ~label:"Sha2.digest"
@@ -428,7 +424,7 @@ end
 module type SHA2 = functor (L : LIB) -> sig
   open L
 
-  val digest : Bytes.bl repr -> Bytes.bl repr t
+  val digest : Bytes.tl repr -> Bytes.tl repr t
 end
 
 module SHA224 : SHA2 = functor (L : LIB) -> MAKE (L) (Sha224) (Op_bits (L))
