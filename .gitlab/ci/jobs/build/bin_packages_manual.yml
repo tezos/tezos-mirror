@@ -1,0 +1,57 @@
+dpkg:amd64:
+  image: debian:bookworm
+  stage: manual
+  when: manual
+  needs: []
+  script:
+    - apt update
+    - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev
+    - wget https://sh.rustup.rs/rustup-init.sh
+    - chmod +x rustup-init.sh
+    - ./rustup-init.sh --profile minimal --default-toolchain 1.64.0 -y
+    - . $HOME/.cargo/env
+    - export OPAMYES="true"
+    - opam init --bare --disable-sandboxing
+    - make build-deps
+    - eval $(opam env)
+    - make dpkg
+  variables:
+    OCTEZ_PKGMAINTAINER: "dev@nomadic-labs.com"
+    BLST_PORTABLE: "yes"
+  tags:
+    - amd64
+  artifacts:
+    name: "dpkg-$ARCH-$CI_COMMIT_REF_SLUG"
+    paths:
+      - octez-*.deb
+    expire_in: 1 day
+    when: on_success
+
+rpm:amd64:
+  image: fedora
+  stage: manual
+  when: manual
+  needs: []
+  script:
+    - dnf update -y
+    - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env
+    - wget https://sh.rustup.rs/rustup-init.sh
+    - chmod +x rustup-init.sh
+    - ./rustup-init.sh --profile minimal --default-toolchain 1.64.0 -y
+    - . $HOME/.cargo/env
+    - export OPAMYES="true"
+    - opam init --bare --disable-sandboxing
+    - make build-deps
+    - eval $(opam env)
+    - make rpm
+  variables:
+    OCTEZ_PKGMAINTAINER: "dev@nomadic-labs.com"
+    BLST_PORTABLE: "yes"
+  tags:
+    - amd64
+  artifacts:
+    name: "rpm-$ARCH-$CI_COMMIT_REF_SLUG"
+    paths:
+      - octez-*.rpm
+    expire_in: 1 day
+    when: on_success
