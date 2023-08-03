@@ -251,8 +251,6 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~key_offset
           ~key_length)
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4369
-     Align failure mode of reveal_* functions in Fast Execution. *)
   let reveal_preimage =
     fn
       (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
