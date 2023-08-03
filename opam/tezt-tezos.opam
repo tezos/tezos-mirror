@@ -10,23 +10,15 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "caqti"
-  "caqti-dynload"
-  "caqti-lwt"
-  "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "lwt" { >= "5.7.0" }
-  "tezos-baking-alpha"
-  "tezos-client-alpha"
-  "octez-shell-libs"
-  "tezos-protocol-alpha"
   "tezt" { >= "3.1.1" }
-  "tezt-tezos"
   "uri" { >= "3.1.0" }
+  "cohttp-lwt-unix" { >= "5.2.0" }
+  "hex" { >= "1.3.0" }
+  "octez-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos TPS evaluation tool"
+synopsis: "Octez test framework based on Tezt"

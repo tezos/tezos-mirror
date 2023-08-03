@@ -212,5 +212,6 @@
 (package (name tezos-tree-encoding-test)(allow_empty))
 (package (name tezos-version))
 (package (name tezt-ethereum)(allow_empty))
+(package (name tezt-tezos))
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.

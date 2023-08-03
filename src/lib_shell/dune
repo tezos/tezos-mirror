@@ -18,7 +18,7 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-context-ops
   octez-shell-libs.tezos-shell-context
-  octez-libs.tezos-p2p
+  octez-shell-libs.tezos-p2p
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-shell-services
   octez-libs.tezos-p2p-services

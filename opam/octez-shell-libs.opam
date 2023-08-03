@@ -11,24 +11,26 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
+  "lwt-watcher" { = "0.2" }
+  "lwt-canceler" { >= "0.3" & < "0.4" }
+  "ringo" { >= "1.0.0" }
+  "aches" { >= "1.0.0" }
+  "prometheus" { >= "1.2" }
   "tezt" { >= "3.1.1" }
+  "tezt-tezos" {with-test}
   "octez-alcotezt" {with-test}
   "astring" {with-test}
   "octez-proto-libs"
   "octez-protocol-compiler"
   "lwt-exit"
   "tezos-version"
-  "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
-  "lwt-watcher" { = "0.2" }
   "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { >= "2.0.1" & < "3.0.0" }
-  "prometheus" { >= "1.2" }
   "ppx_expect"
-  "lwt-canceler" { >= "0.3" & < "0.4" }
   "uri" { >= "3.1.0" }
   "ocplib-endian"
   "fmt" { >= "0.8.7" }

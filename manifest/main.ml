@@ -2405,7 +2405,7 @@ let _octez_tooling_opam_lint =
     ~deps:[octez_tooling_opam_file_format; unix]
 
 let octez_p2p =
-  octez_lib
+  octez_shell_lib
     "tezos-p2p"
     ~path:"src/lib_p2p"
     ~synopsis:"Library for a pool of P2P connections"
@@ -2426,16 +2426,18 @@ let octez_p2p =
       ]
 
 let tezt_performance_regression =
-  octez_lib
-    "tezt-performance-regression"
+  public_lib
+    "tezt-tezos.tezt-performance-regression"
     ~path:"tezt/lib_performance_regression"
+    ~opam:"tezt-tezos"
     ~bisect_ppx:No
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
 let tezt_tezos =
-  octez_lib
+  public_lib
     "tezt-tezos"
     ~path:"tezt/lib_tezos"
+    ~opam:"tezt-tezos"
     ~synopsis:"Octez test framework based on Tezt"
     ~bisect_ppx:No
     ~deps:
@@ -2539,7 +2541,7 @@ let tezt_ethereum =
 let _tezt_self_tests =
   tezt
     ["test_michelson_script"; "test_daemon"]
-    ~opam:"octez-libs"
+    ~opam:"tezt-tezos"
     ~path:"tezt/self_tests"
     ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
 

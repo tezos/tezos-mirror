@@ -1606,3 +1606,10 @@ opam:tezos-version:
     package: tezos-version
 
 # Ignoring unreleased package tezt-ethereum.
+
+opam:tezt-tezos:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_7
+  variables:
+    package: tezt-tezos
