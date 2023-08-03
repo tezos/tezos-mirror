@@ -50,6 +50,8 @@ pub enum UpgradeProcessError {
     InvalidUpgradeNonce,
     #[error("Internal upgrade error: {0}")]
     InternalUpgrade(&'static str),
+    #[error("Fallback mechanism was triggered")]
+    Fallback,
     #[error("Missing dictator key")]
     NoDictator,
 }

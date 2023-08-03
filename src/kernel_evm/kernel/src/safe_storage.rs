@@ -200,10 +200,14 @@ impl<Host: Runtime> SafeStorage<&mut Host> {
             Ok(_) => {
                 // Upgrade detected
                 log!(self, Level::Info, "Upgrade activated.");
+                self.backup_current_kernel()?;
                 self.0.store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)
             }
             Err(_) => {
                 // No on-going upgrade detected
+                if self.0.store_read(&BACKUP_KERNEL_BOOT_PATH, 0, 0).is_ok() {
+                    self.clean_backup_kernel()?
+                };
                 Ok(())
             }
         }
