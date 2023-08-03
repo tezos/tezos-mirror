@@ -51,9 +51,7 @@ pub const CHAIN_ID: u32 = 1337;
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::london();
 
-// TODO: https://gitlab.com/tezos/tezos/-/issues/6170
-// Use a proper environment variable targetting the current commit hash.
-const KERNEL_VERSION: &str = "75c84da3cebf0f9a45d339dea12f0a4e4786ed8f";
+const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     log!(host, Info, "Entering stage zero.");
@@ -161,14 +159,10 @@ fn retrieve_smart_rollup_address<Host: Runtime>(
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     match read_kernel_version(host) {
-        Ok(_kernel_version) => {
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/6170
-            // Add the following lines when the kernel version will be set
-            // by a proper environment variable.
-            //
-            // if kernel_version != KERNEL_VERSION {
-            //     store_kernel_version(host, &kernel_version)?
-            // };
+        Ok(kernel_version) => {
+            if kernel_version != KERNEL_VERSION {
+                store_kernel_version(host, &kernel_version)?
+            };
             Ok(())
         }
         Err(_) => store_kernel_version(host, KERNEL_VERSION),
