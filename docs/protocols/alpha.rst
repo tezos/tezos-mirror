@@ -22,6 +22,9 @@ Smart Rollups
   whitelist of public key hashes. This whitelist cannot be used yet
   (the ``sc_rollup.private_enable`` flag has to be set to true). (MR :gl:`!9401`)
 
+- The ``transferring`` parameter from smart rollup client command
+  ``get proof for message <index> of outbox at level <level>`` is now optional. (MR :gl:`!9461`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
