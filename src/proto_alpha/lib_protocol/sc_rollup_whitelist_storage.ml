@@ -35,7 +35,11 @@ let init ctxt rollup_address ~whitelist =
   List.fold_left_es
     (fun (ctxt, size) e ->
       let* ctxt, size_e =
-        Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
+        (* the storage fails when there key already exists. This is
+           only to improve the UX so that it returns a cleaner
+           error. *)
+        trace Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
+        @@ Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
       in
       return (ctxt, size + size_e))
     (ctxt, 0)
