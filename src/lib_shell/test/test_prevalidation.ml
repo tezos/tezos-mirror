@@ -496,7 +496,7 @@ module Toy_filter = struct
 
     let conflict_handler _ ~existing_operation:_ ~new_operation:_ = assert false
 
-    let syntactic_check _ = `Well_formed
+    let syntactic_check _ = Lwt.return `Well_formed
   end
 end
 

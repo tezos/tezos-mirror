@@ -166,7 +166,9 @@ module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
     return {validation_info; mempool; filter_state}
 
   let pre_filter state filter_config op =
-    match Filter.Mempool.syntactic_check op.protocol with
+    let open Lwt_syntax in
+    let* status = Filter.Mempool.syntactic_check op.protocol in
+    match status with
     | `Ill_formed ->
         Lwt.return
           (`Refused

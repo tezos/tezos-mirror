@@ -46,7 +46,7 @@ module type FILTER = sig
 
     val remove : filter_state:state -> Operation_hash.t -> state
 
-    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed] Lwt.t
 
     val pre_filter :
       config ->
@@ -109,7 +109,7 @@ module No_filter (Proto : Registered_protocol.T) :
 
     let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
-    let syntactic_check _ = `Well_formed
+    let syntactic_check _ = Lwt.return `Well_formed
 
     let pre_filter _ ~filter_state:_ _ =
       Lwt.return @@ `Passed_prefilter (`Low [])

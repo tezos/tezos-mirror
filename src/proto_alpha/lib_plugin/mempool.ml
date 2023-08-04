@@ -1029,4 +1029,4 @@ let conflict_handler config : Mempool.conflict_handler =
   else if Operation.compare existing_operation new_operation < 0 then `Replace
   else `Keep
 
-let syntactic_check _ = `Well_formed
+let syntactic_check _ = Lwt.return `Well_formed
