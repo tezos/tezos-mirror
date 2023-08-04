@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -403,7 +404,7 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
   in
   spawn_command snoop command |> Process.check
 
-let generate_code_using_solution ~solution ?fixed_point snoop =
+let generate_code_using_solution ~solution ?save_to ?fixed_point snoop =
   let command =
     [
       "generate";
@@ -415,11 +416,13 @@ let generate_code_using_solution ~solution ?fixed_point snoop =
       "inferred";
       "models";
     ]
-    @ match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn]
+    @ (match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn])
+    @ match save_to with None -> [] | Some file -> ["--save-to"; file]
   in
+
   let process = spawn_command snoop command in
   let* output = Process.check_and_read_stdout process in
-  Lwt.return output
+  match save_to with None -> Lwt.return output | _ -> Lwt.return ""
 
 let check_definitions ~files snoop =
   let open Process in

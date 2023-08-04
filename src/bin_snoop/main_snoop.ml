@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023  Marigold <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -557,18 +558,63 @@ let save_code_list_as_a_module save_to code_list =
   stdout_or_file save_to (fun ppf ->
       Format.fprintf ppf "%a@." Codegen.pp_module result)
 
+let generate_code codegen_options generated_code =
+  let generated =
+    List.fold_left
+      (fun acc (destination, code) ->
+        String.Map.update
+          destination
+          (function None -> Some [code] | Some x -> Some (x @ [code]))
+          acc)
+      String.Map.empty
+      generated_code
+  in
+  let save_to destination =
+    Option.filter_map
+      (fun save_to ->
+        let destination =
+          Filename.remove_extension @@ Filename.basename destination
+        in
+        let dirname = Filename.dirname save_to in
+        let basename = Filename.remove_extension @@ Filename.basename save_to in
+        let basename = String.remove_prefix ~prefix:"auto_build" basename in
+        let basename_empty =
+          Option.fold ~none:true ~some:(fun x -> String.equal x "") basename
+        in
+        let result =
+          if basename_empty then Some (destination ^ ".ml")
+          else
+            Option.map
+              (fun base -> Format.sprintf "%s_%s.ml" destination base)
+              basename
+        in
+        Option.map (Filename.concat dirname) result)
+      codegen_options.Cmdline.save_to
+  in
+  String.Map.iter
+    (fun k v -> save_code_list_as_a_module (save_to k) v)
+    generated
+
+let get_exclusions () =
+  Registration.all_models ()
+  |> List.filter_map (fun (name, info) ->
+         let is_excluded =
+           List.is_empty @@ Codegen.get_codegen_destinations info
+         in
+         if is_excluded then Some (Namespace.to_string name) else None)
+  |> String.Set.of_list
+
 let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
+  let exclusions = get_exclusions () in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
-  save_code_list_as_a_module codegen_options.Cmdline.save_to
-  @@ generate_code_for_models
-       sol
-       models
-       codegen_options (* no support of exclusions for this command *)
-       ~exclusions:String.Set.empty
+  let generated =
+    generate_code_for_models sol models codegen_options ~exclusions
+  in
+  generate_code codegen_options generated
 
 let codegen_for_a_solution solution codegen_options ~exclusions =
   let fvs_of_codegen_model model =
@@ -577,32 +623,52 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
     let module FV = Model.Def (Costlang.Free_variables) in
     FV.model
   in
-
   let model_fvs_included_in_sol model =
     let fvs = fvs_of_codegen_model model in
     Free_variable.Set.for_all
       (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
-
+  let is_generate_all info =
+    if String.Set.is_empty exclusions then true
+    else not @@ List.is_empty @@ Codegen.get_codegen_destinations info
+  in
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter (fun (_model_name, {Registration.model; _}) ->
-        model_fvs_included_in_sol model)
+    List.filter (fun (_model_name, ({Registration.model; from = _} as info)) ->
+        model_fvs_included_in_sol model && is_generate_all info)
     @@ Registration.all_models ()
   in
   generate_code_for_models solution codegen_models codegen_options ~exclusions
 
 let save_codegen_for_solutions solutions codegen_options ~exclusions =
-  save_code_list_as_a_module codegen_options.Cmdline.save_to
-  @@ List.concat_map
-       (fun solution ->
-         codegen_for_a_solution solution codegen_options ~exclusions)
-       solutions
+  let generated =
+    List.concat_map
+      (fun solution ->
+        codegen_for_a_solution solution codegen_options ~exclusions)
+      solutions
+  in
+  generate_code codegen_options generated
 
 let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
-  let solutions = List.map Codegen.load_solution solution_fns in
-  save_codegen_for_solutions solutions codegen_options ~exclusions
+  let exclusions' = get_exclusions () in
+  let is_dir, solution_dir =
+    match solution_fns with
+    | x :: [] -> (Sys.is_directory x, x)
+    | _ -> (false, "")
+  in
+  let solutions =
+    if is_dir then
+      Sys.readdir solution_dir |> Array.to_list
+      |> List.filter (fun x -> Filename.extension x = ".sol")
+      |> List.map (fun x -> Filename.concat solution_dir x)
+    else solution_fns
+  in
+  let solutions = List.map Codegen.load_solution solutions in
+  save_codegen_for_solutions
+    solutions
+    codegen_options
+    ~exclusions:(String.Set.union exclusions' exclusions)
 
 let save_solutions_in_text out_fn nsolutions =
   stdout_or_file out_fn @@ fun ppf ->
@@ -949,14 +1015,11 @@ module Auto_build = struct
       [(solution_fn, solution)] ;
     solution
 
-  let codegen mkfilename solution =
+  let codegen mkfilename solution ~exclusions =
     let codegen_options =
       Cmdline.{transform = None; save_to = Some (mkfilename "_non_fp.ml")}
     in
-    save_codegen_for_solutions
-      [solution]
-      codegen_options
-      ~exclusions:String.Set.empty ;
+    save_codegen_for_solutions [solution] codegen_options ~exclusions ;
     let codegen_options =
       Cmdline.
         {
@@ -969,10 +1032,7 @@ module Auto_build = struct
           save_to = Some (mkfilename ".ml");
         }
     in
-    save_codegen_for_solutions
-      [solution]
-      codegen_options
-      ~exclusions:String.Set.empty
+    save_codegen_for_solutions [solution] codegen_options ~exclusions
 
   let cmd targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
@@ -988,7 +1048,10 @@ module Auto_build = struct
           exitf 1 "Need to specify --out-dir")
     in
     (* No non-lwt version available... *)
-    Lwt_main.run (Lwt_utils_unix.create_dir outdir) ;
+    Lwt_main.run
+      (let open Lwt_syntax in
+      let* () = Lwt_utils_unix.create_dir outdir in
+      Lwt_utils_unix.create_dir (Filename.concat outdir "generated_code")) ;
 
     let state_tbl = init_state_tbl () in
 
@@ -1046,8 +1109,9 @@ module Auto_build = struct
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
+    let exclusions = get_exclusions () in
     (* Codegen *)
-    codegen mkfilename solution
+    codegen mkfilename solution ~exclusions
 end
 
 (* -------------------------------------------------------------------------- *)
