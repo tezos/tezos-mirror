@@ -69,7 +69,7 @@ module type T = sig
         ill-formed operations to block block application.
 
         Should be called before the {!pre_filter}, does not need a context. *)
-    val syntactic_check : operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : operation -> [`Well_formed | `Ill_formed] Lwt.t
 
     (** Perform some light preliminary checks on the operation.
 
