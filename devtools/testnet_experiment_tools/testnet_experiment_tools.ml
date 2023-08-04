@@ -24,11 +24,61 @@
 (*****************************************************************************)
 
 open Tezt
+open Tezt_tezos
+
+let ensure_dir_exists dir =
+  Lwt.catch
+    (fun () ->
+      let* () = Lwt_utils_unix.create_dir ~perm:0o744 dir in
+      Lwt.return ())
+    (function
+      | Failure s ->
+          if String.equal s "Not a directory" then
+            Test.fail "%s exists but is not a directory." dir
+          else Test.fail "Cannot create directory %s" dir
+      | _ -> Test.fail "Cannot create directory %s" dir)
+
+let default_number_of_bakers = 10
+
+let baker_alias n = Printf.sprintf "baker_%d" n
+
+let number_of_bakers =
+  Sys.getenv_opt "BAKERS" |> Option.map int_of_string
+  |> Option.value ~default:default_number_of_bakers
+
+let generate_baker_accounts n client =
+  let rec go i =
+    if i = 0 then Lwt.return ()
+    else
+      let* () = Lwt_io.printf "." in
+      let* _alias = Client.gen_keys ~alias:(baker_alias i) client in
+      go (i - 1)
+  in
+  let* () = Lwt_io.printf "Generating accounts" in
+  let* () = go n in
+  Lwt_io.printf "\n\n"
 
 (* These tests can be run locally to generate the data needed to run a
    stresstest. *)
 module Local = struct
-  let generate_baker_accounts () = Test.fail "Not implemented"
+  let generate_baker_accounts n () =
+    let client_dir = Client_config.default_base_dir in
+    let* () =
+      Lwt_io.printf
+        "Keys will be saved in %s. You can change this by setting the \
+         TEZOS_CLIENT_DIR environment variable\n\n"
+        client_dir
+    in
+    let* () =
+      Lwt_io.printf
+        "%d baker accounts will be generated. You can change this by setting \
+         the BAKERS environment variable.\n\n"
+        number_of_bakers
+    in
+    let client = Client.create ~base_dir:client_dir () in
+    let* () = ensure_dir_exists client_dir in
+    let* () = generate_baker_accounts n client in
+    Lwt.return ()
 
   let generate_network_configuration () = Test.fail "Not implemented"
 
@@ -47,7 +97,7 @@ let () =
     ~__FILE__
     ~title:"Generate baker accounts"
     ~tags:["generate_baker_accounts"]
-    Local.generate_baker_accounts ;
+    (Local.generate_baker_accounts number_of_bakers) ;
   register
     ~__FILE__
     ~title:"Generate Network Configuration"
