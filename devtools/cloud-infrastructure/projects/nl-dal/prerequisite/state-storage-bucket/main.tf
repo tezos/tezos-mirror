@@ -1,11 +1,7 @@
-resource "google_storage_bucket" "default" {
-  name          = "${var.name}-tfstate"
-  project       = "${var.project}"
-  force_destroy = false
-  location      = "EU"
-  storage_class = "STANDARD"
-  versioning {
-    enabled = true
-  }
-  labels = local.labels
+module "google_cloud_storage" {
+  source     = "../../../../libraries/google-cloud-storage"
+
+  project = var.project
+  region     = var.region
+  name       = "${var.name}-tfstate"
 }
