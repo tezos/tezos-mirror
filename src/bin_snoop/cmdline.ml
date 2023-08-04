@@ -48,6 +48,7 @@ type benchmark_options = {
 type codegen_options = {
   transform : Fixed_point_transform.options option;
   save_to : string option;
+  split : bool;
 }
 
 (* Infer command related types *)

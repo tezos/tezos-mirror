@@ -599,7 +599,7 @@ module Codegen_cmd = struct
 
   let codegen_handler (fixed_point, save_to) solution model_name () =
     let transform = Option.map load_fixed_point_parameters fixed_point in
-    let codegen_options = {transform; save_to} in
+    let codegen_options = {transform; split = false; save_to} in
     let model_name = Namespace.of_string model_name in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
@@ -663,7 +663,7 @@ module Codegen_all_cmd = struct
 
   let codegen_all_handler (json, save_to) solution matching () =
     let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
+    let codegen_options = {transform; split = false; save_to} in
     commandline_outcome_ref :=
       Some (Codegen_all {solution; matching; codegen_options}) ;
     Lwt.return_ok ()
@@ -695,7 +695,7 @@ module Codegen_inferred_cmd = struct
 
   let codegen_inferred_handler (json, exclusions, save_to) solution () =
     let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
+    let codegen_options = {transform; split = false; save_to} in
     let exclusions =
       Option.fold
         ~none:String.Set.empty
@@ -765,18 +765,60 @@ end
 module Codegen_for_solutions_cmd = struct
   include Codegen_cmd
 
-  let codegen_for_solutions_handler (json, exclusions, save_to) solutions () =
-    let transform = Option.map load_fixed_point_parameters json in
-    let codegen_options = {transform; save_to} in
-    let exclusions =
-      Option.fold
-        ~none:String.Set.empty
-        ~some:Codegen.load_exclusions
-        exclusions
-    in
-    commandline_outcome_ref :=
-      Some (Codegen_for_solutions {solutions; codegen_options; exclusions}) ;
-    Lwt.return_ok ()
+  let split_to_dir =
+    Tezos_clic.arg
+      ~doc:
+        "Generated code is saved to \
+         DIR/<generated_code_destination>_costs_generated.ml (and \
+         __non_fp.ml)."
+      ~long:"split-to"
+      ~placeholder:"DIR"
+      (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
+
+  let save_to_arg =
+    Tezos_clic.arg
+      ~doc:
+        "Generated code is saved to FILE-NAME. Will also save code for models \
+         that dont have a codegen destination"
+      ~long:"save-to"
+      ~placeholder:"FILE-NAME"
+      (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
+
+  let exclude_arg =
+    Tezos_clic.arg
+      ~doc:"A file containing the function names to exclude for the codegen"
+      ~long:"exclude-file"
+      ~placeholder:"filename"
+      (Tezos_clic.parameter (fun (_ : unit) filename -> Lwt.return_ok filename))
+
+  let options =
+    Tezos_clic.args4
+      Codegen_cmd.fixed_point_arg
+      exclude_arg
+      save_to_arg
+      split_to_dir
+
+  let codegen_for_solutions_handler (json, exclusions, save_to, split_to_dir)
+      solutions () =
+    if Option.is_some save_to && Option.is_some split_to_dir then (
+      Format.eprintf
+        "Error: --save-to and --split-to are mutually exclusive params.@." ;
+      exit 1)
+    else
+      let transform = Option.map load_fixed_point_parameters json in
+      let split = Option.is_some split_to_dir in
+      let option = Option.to_list save_to @ Option.to_list split_to_dir in
+      let save_to = List.hd option in
+      let codegen_options = {transform; save_to; split} in
+      let exclusions =
+        Option.fold
+          ~none:String.Set.empty
+          ~some:Codegen.load_exclusions
+          exclusions
+      in
+      commandline_outcome_ref :=
+        Some (Codegen_for_solutions {solutions; codegen_options; exclusions}) ;
+      Lwt.return_ok ()
 
   let params =
     Tezos_clic.(
@@ -785,10 +827,8 @@ module Codegen_for_solutions_cmd = struct
            (string
               ~name:"SOLUTION-FILE"
               ~desc:
-                "File containing solution, as obtained using the \
+                "File or Directory containing solutions, as obtained using the \
                  --save-solution switch"))
-
-  let options = Codegen_inferred_cmd.options
 
   let command =
     Tezos_clic.command
