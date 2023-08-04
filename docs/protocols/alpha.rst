@@ -25,6 +25,10 @@ Smart Rollups
 - The ``transferring`` parameter from smart rollup client command
   ``get proof for message <index> of outbox at level <level>`` is now optional. (MR :gl:`!9461`)
 
+- Enable the latest version of the WASM PVM (``2.0.0-r3``). Existing smart
+  rollups will see their PVM automatically upgrade, and newly originated smart
+  rollups will use this version directly (MR :gl:`!9735`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
