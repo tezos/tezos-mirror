@@ -44,7 +44,7 @@ let protocols =
     ( "oxford",
       "Oxford",
       Some "/include/rpc_introduction.rst.inc",
-      "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef" );
+      "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8" );
   ]
 
 let pp_name ppf = function
