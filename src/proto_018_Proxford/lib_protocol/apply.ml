@@ -513,12 +513,6 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
   in
   let* is_delegate = Contract.is_delegate ctxt sender in
   let*? () = error_unless is_delegate Invalid_staking_parameters_sender in
-  let limit_of_staking_over_baking_millionth =
-    Z.to_int32 limit_of_staking_over_baking_millionth
-  in
-  let edge_of_baking_over_staking_billionth =
-    Z.to_int32 edge_of_baking_over_staking_billionth
-  in
   let*? t =
     Staking_parameters_repr.make
       ~limit_of_staking_over_baking_millionth

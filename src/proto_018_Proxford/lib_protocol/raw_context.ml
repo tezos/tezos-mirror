@@ -908,7 +908,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp ctxt =
+let prepare_first_block ~level ~timestamp chain_id ctxt =
   check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
   (match previous_proto with
   | Genesis param ->
@@ -1027,7 +1027,9 @@ let prepare_first_block ~level ~timestamp ctxt =
             global_limit_of_staking_over_baking = 5;
             edge_of_staking_over_delegation = 2;
             launch_ema_threshold =
-              (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l;
+              (if Chain_id.equal Constants_repr.mainnet_id chain_id then
+               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l
+              else (* 5% for testnets *) 100_000_000l);
             adaptive_rewards_params;
           }
       in

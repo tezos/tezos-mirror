@@ -98,6 +98,7 @@ type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
 val prepare_first_block :
   level:int32 ->
   timestamp:Time.t ->
+  Chain_id.t ->
   Context.t ->
   (previous_protocol * t) tzresult Lwt.t
 

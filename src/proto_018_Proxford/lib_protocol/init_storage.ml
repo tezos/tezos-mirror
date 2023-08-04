@@ -234,7 +234,7 @@ let migrate_pending_consensus_keys_for_o ctxt =
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
-  Raw_context.prepare_first_block ~level ~timestamp ctxt
+  Raw_context.prepare_first_block ~level ~timestamp chain_id ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
   ( Raw_context.Cache.set_cache_layout
