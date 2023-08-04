@@ -771,27 +771,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel-benchmark"
-version = "0.1.0"
-dependencies = [
- "evm",
- "evm-execution",
- "hex",
- "primitive-types",
- "rlp",
- "sha3",
- "tezos-smart-rollup-core",
- "tezos-smart-rollup-debug",
- "tezos-smart-rollup-encoding",
- "tezos-smart-rollup-entrypoint",
- "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
- "tezos_data_encoding",
- "tezos_ethereum",
- "thiserror",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
