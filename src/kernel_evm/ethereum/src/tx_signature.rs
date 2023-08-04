@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-use libsecp256k1::{curve::Scalar, RecoveryId, Signature};
+use hex::FromHexError;
+use libsecp256k1::{curve::Scalar, sign, Message, RecoveryId, SecretKey, Signature};
 use primitive_types::{H256, U256};
 use rlp::{DecoderError, Encodable, RlpIterator};
 use thiserror::Error;
@@ -28,6 +29,9 @@ pub enum ParityError {
 
 #[derive(Error, Debug, PartialEq, Clone)]
 pub enum TxSigError {
+    #[error("Error reading a hex string: {0}")]
+    HexError(#[from] FromHexError),
+
     #[error("Error manipulating ECDSA key: {0}")]
     ECDSAError(libsecp256k1::Error),
 
@@ -126,11 +130,18 @@ impl TxSignature {
         }
     }
 
-    pub fn reconstruct_from_legacy(
-        sig: Signature,
-        recovery_id: RecoveryId,
+    /// This function creates a signature for a legacy tx.
+    /// Legacy tx has a tricky approach for signature creation, where
+    /// `v` field of a signature carry information about `chain_id`.
+    /// For more information see https://eips.ethereum.org/EIPS/eip-155
+    pub fn sign_legacy(
+        msg: &Message,
+        string_sk: String,
         chain_id: U256,
     ) -> Result<Self, TxSigError> {
+        let hex: &[u8] = &hex::decode(string_sk)?;
+        let sk = SecretKey::parse_slice(hex)?;
+        let (sig, recovery_id) = sign(msg, &sk);
         let parity: u8 = recovery_id.into();
         let v = Self::compute_v(chain_id, parity)
             .ok_or(TxSigError::Parity(ParityError::ChainId(chain_id)))?;

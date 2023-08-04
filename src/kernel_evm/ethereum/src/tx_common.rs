@@ -11,8 +11,7 @@
 
 use std::array::TryFromSliceError;
 
-use hex::FromHexError;
-use libsecp256k1::{recover, sign, Message, PublicKey, RecoveryId, SecretKey, Signature};
+use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use sha3::{Digest, Keccak256};
@@ -28,17 +27,11 @@ use crate::{
 
 #[derive(Error, Debug, PartialEq)]
 pub enum SigError {
-    #[error("Error reading a hex string: {0}")]
-    HexError(#[from] FromHexError),
-
     #[error("Error decoding RLP encoded byte array: {0}")]
     DecoderError(#[from] DecoderError),
 
     #[error("Error extracting a slice")]
     SlicingError,
-
-    #[error("Error manipulating ECDSA key: {0}")]
-    ECDSAError(libsecp256k1::Error),
 
     #[error("Signature error: {0}")]
     TxSigError(TxSigError),
@@ -57,25 +50,6 @@ impl From<TxSigError> for SigError {
     fn from(e: TxSigError) -> Self {
         SigError::TxSigError(e)
     }
-}
-
-impl From<libsecp256k1::Error> for SigError {
-    fn from(e: libsecp256k1::Error) -> Self {
-        Self::ECDSAError(e)
-    }
-}
-
-/// produces address from a secret key
-pub fn string_to_sk_and_address(s: String) -> Result<(SecretKey, H160), SigError> {
-    let mut data: [u8; 32] = [0u8; 32];
-    hex::decode_to_slice(s, &mut data)?;
-    let sk = SecretKey::parse(&data)?;
-    let pk = PublicKey::from_secret_key(&sk);
-    let serialised = &pk.serialize()[1..];
-    let kec = Keccak256::digest(serialised);
-    let mut value: [u8; 20] = [0u8; 20];
-    value.copy_from_slice(&kec[12..]);
-    Ok((sk, value.into()))
 }
 
 /// Data common for all kind of Ethereum transactions
@@ -124,7 +98,7 @@ impl EthereumTransactionCommon {
             ..self.clone()
         };
 
-        let bytes = to_sign.to_rlp_bytes();
+        let bytes = to_sign.to_bytes();
         let hash: [u8; 32] = Keccak256::digest(bytes).into();
         Message::parse(&hash)
     }
@@ -147,7 +121,7 @@ impl EthereumTransactionCommon {
     pub fn caller(&self) -> Result<H160, SigError> {
         let mes = self.message();
         let (sig, ri) = self.signature()?;
-        let pk = recover(&mes, &sig, &ri)?;
+        let pk = recover(&mes, &sig, &ri).map_err(TxSigError::ECDSAError)?;
         let serialised = &pk.serialize()[1..];
         let kec = Keccak256::digest(serialised);
         let value: [u8; 20] = kec.as_slice()[12..].try_into()?;
@@ -158,11 +132,8 @@ impl EthereumTransactionCommon {
     ///produce a signed EthereumTransactionCommon. If the initial one was signed
     ///  you should get the same thing.
     pub fn sign_transaction(&self, string_sk: String) -> Result<Self, SigError> {
-        let hex: &[u8] = &hex::decode(string_sk)?;
-        let sk = SecretKey::parse_slice(hex)?;
         let mes = self.message();
-        let (sig, ri) = sign(&mes, &sk);
-        let signature = TxSignature::reconstruct_from_legacy(sig, ri, self.chain_id)?;
+        let signature = TxSignature::sign_legacy(&mes, string_sk, self.chain_id)?;
 
         Ok(EthereumTransactionCommon {
             signature: Some(signature),
@@ -170,22 +141,29 @@ impl EthereumTransactionCommon {
         })
     }
 
-    /// Unserialize bytes as a RLP encoded legacy transaction.
-    pub fn from_rlp_bytes(
-        bytes: &[u8],
-    ) -> Result<EthereumTransactionCommon, DecoderError> {
+    // Unserialize Ethereum tx of arbitrary version from raw bytes.
+    // This is a separate method of the tx type
+    // but not rlp::Decodable instance because after legacy
+    // version a tx encoding, strictly speaking, is not RLP list anymore,
+    // rather opaque sequence of bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<EthereumTransactionCommon, DecoderError> {
         let decoder = Rlp::new(bytes);
         EthereumTransactionCommon::decode(&decoder)
     }
 
     /// Unserialize an hex string as a RLP encoded legacy transaction.
-    pub fn from_rlp_hex(e: String) -> Result<EthereumTransactionCommon, DecoderError> {
+    pub fn from_hex(e: String) -> Result<EthereumTransactionCommon, DecoderError> {
         let tx =
             hex::decode(e).or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
-        Self::from_rlp_bytes(&tx)
+        Self::from_bytes(&tx)
     }
 
-    pub fn to_rlp_bytes(self) -> Vec<u8> {
+    // Serialize Ethereum tx of arbitrary version to raw bytes.
+    // This is a separate method of the tx type
+    // but not rlp::Encodable instance because after legacy
+    // version a tx encoding, strictly speaking, is not RLP list anymore,
+    // rather opaque sequence of bytes.
+    pub fn to_bytes(self) -> Vec<u8> {
         self.rlp_bytes().into()
     }
 }
@@ -193,7 +171,7 @@ impl EthereumTransactionCommon {
 impl From<String> for EthereumTransactionCommon {
     /// Decode a transaction in hex format. Unsafe, to be used only in tests : panics when fails
     fn from(e: String) -> Self {
-        EthereumTransactionCommon::from_rlp_hex(e).unwrap()
+        EthereumTransactionCommon::from_hex(e).unwrap()
     }
 }
 
@@ -201,7 +179,7 @@ impl TryFrom<&[u8]> for EthereumTransactionCommon {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_rlp_bytes(bytes)
+        Self::from_bytes(bytes)
     }
 }
 
@@ -289,8 +267,27 @@ impl Encodable for EthereumTransactionCommon {
 #[allow(clippy::from_over_into)]
 impl Into<Vec<u8>> for EthereumTransactionCommon {
     fn into(self) -> Vec<u8> {
-        self.to_rlp_bytes()
+        self.to_bytes()
     }
+}
+
+// Produces address from a secret key
+// Used in tests only
+pub fn string_to_sk_and_address_unsafe(
+    s: String,
+) -> (libsecp256k1::SecretKey, primitive_types::H160) {
+    use libsecp256k1::PublicKey;
+    use libsecp256k1::SecretKey;
+
+    let mut data: [u8; 32] = [0u8; 32];
+    hex::decode_to_slice(s, &mut data).unwrap();
+    let sk = SecretKey::parse(&data).unwrap();
+    let pk = PublicKey::from_secret_key(&sk);
+    let serialised = &pk.serialize()[1..];
+    let kec = Keccak256::digest(serialised);
+    let mut value: [u8; 20] = [0u8; 20];
+    value.copy_from_slice(&kec[12..]);
+    (sk, value.into())
 }
 
 // cargo test ethereum::signatures::test --features testing
@@ -402,11 +399,10 @@ mod test {
     #[test]
     fn test_caller_classic() {
         // setup
-        let (_sk, address_from_sk) = string_to_sk_and_address(
+        let (_sk, address_from_sk) = string_to_sk_and_address_unsafe(
             "4646464646464646464646464646464646464646464646464646464646464646"
                 .to_string(),
-        )
-        .unwrap();
+        );
         let encoded =
         "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83".to_string();
 
@@ -414,7 +410,7 @@ mod test {
             address_from_str("9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F").unwrap();
 
         // act
-        let transaction = EthereumTransactionCommon::from_rlp_hex(encoded).unwrap();
+        let transaction = EthereumTransactionCommon::from_hex(encoded).unwrap();
         let address = transaction.caller().unwrap();
 
         // assert
@@ -430,7 +426,7 @@ mod test {
 
         // act
         let tx = hex::decode(signing_data).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
         assert!(decoded.is_ok(), "testing the decoding went ok");
 
         // assert
@@ -445,7 +441,7 @@ mod test {
 
         // act
         let tx = hex::decode(signed_tx).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert!(decoded.is_ok(), "testing the decoding went ok");
@@ -458,7 +454,7 @@ mod test {
         let signing_data = "ec098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a764000080018080";
 
         // act
-        let encoded = expected_transaction.to_rlp_bytes();
+        let encoded = expected_transaction.to_bytes();
 
         // assert
         assert_eq!(signing_data, hex::encode(encoded));
@@ -507,7 +503,7 @@ mod test {
         let expected_encoded = "f8572e8506c50218ba8304312280843b9aca0082ffff26a0e9637495be4c216a833ef390b1f6798917c8a102ab165c5085cced7ca1f2eb3aa057854e7044a8fee7bccb6a2c32c4229dd9cbacad74350789e0ce75bf40b6f713";
 
         // act
-        let encoded = transaction.to_rlp_bytes();
+        let encoded = transaction.to_bytes();
 
         // assert
         assert_eq!(expected_encoded, hex::encode(encoded));
@@ -521,7 +517,7 @@ mod test {
 
         // act
         let tx = hex::decode(signed_tx).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert!(decoded.is_ok());
@@ -535,7 +531,7 @@ mod test {
         let signed_tx = "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83";
 
         // act
-        let encoded = expected_transaction.to_rlp_bytes();
+        let encoded = expected_transaction.to_bytes();
 
         // assert
         assert_eq!(signed_tx, hex::encode(encoded));
@@ -571,7 +567,7 @@ mod test {
 
         // act
         let tx = hex::decode(signed_data).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert_eq!(Ok(expected_transaction), decoded)
@@ -585,7 +581,7 @@ mod test {
 
         // act
         let tx = hex::decode(signed_data).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert!(decoded.is_ok(), "testing the decoding went ok");
@@ -629,7 +625,7 @@ mod test {
         // act
         let signed_data = "f903732e8506c50218ba8304312294ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b880a8db2d41b89b009b903043593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c600000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000025a0c78be9ab81c622c08f7098eefc250935365fb794dfd94aec0fea16c32adec45aa05721614264d8490c6866f110c1594151bbcc4fac43758adae644db6bc3314d06";
         let tx = hex::decode(signed_data).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert_eq!(Ok(expected_transaction), decoded);
@@ -670,7 +666,7 @@ mod test {
         let signed_data = "f903732e8506c50218ba8304312294ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b880a8db2d41b89b009b903043593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c600000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000025a0c78be9ab81c622c08f7098eefc250935365fb794dfd94aec0fea16c32adec45aa05721614264d8490c6866f110c1594151bbcc4fac43758adae644db6bc3314d06";
 
         // act
-        let encoded = expected_transaction.to_rlp_bytes();
+        let encoded = expected_transaction.to_bytes();
 
         // assert
         assert_eq!(signed_data, hex::encode(encoded));
@@ -714,7 +710,7 @@ mod test {
 
         // act
         let tx = hex::decode(signed_data).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // assert
         assert_eq!(Ok(expected_transaction), decoded);
@@ -816,7 +812,7 @@ mod test {
     fn test_caller_classic_with_chain_id() {
         let sk = "9bfc9fbe6296c8fef8eb8d6ce2ed5f772a011898c6cabe32d35e7c3e419efb1b"
             .to_string();
-        let (_sk, address) = string_to_sk_and_address(sk.clone()).unwrap();
+        let (_sk, address) = string_to_sk_and_address_unsafe(sk.clone());
         // Check that the derived address is the expected one.
         let expected_address =
             address_from_str("6471A723296395CF1Dcc568941AFFd7A390f94CE").unwrap();
@@ -824,7 +820,7 @@ mod test {
 
         // Check that the derived sender address is the expected one.
         let encoded = "f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156".to_string();
-        let transaction = EthereumTransactionCommon::from_rlp_hex(encoded).unwrap();
+        let transaction = EthereumTransactionCommon::from_hex(encoded).unwrap();
         let address = transaction.caller().unwrap();
         assert_eq!(expected_address, address);
 
@@ -1021,7 +1017,7 @@ mod test {
         // but equal to 27/28 as in "old" (before https://eips.ethereum.org/EIPS/eip-155)
         // six fields encoding
         let malformed_tx = "f86c0a8502540be400825208944bbeeb066ed09b7aed07bf39eee0460dfa261520880de0b6b3a7640000801ca0f3ae52c1ef3300f44df0bcfd1341c232ed6134672b16e35699ae3f5fe2493379a023d23d2955a239dd6f61c4e8b2678d174356ff424eac53da53e17706c43ef871".to_string();
-        let e = EthereumTransactionCommon::from_rlp_hex(malformed_tx);
+        let e = EthereumTransactionCommon::from_hex(malformed_tx);
         assert!(e.is_err());
     }
 
@@ -1029,8 +1025,8 @@ mod test {
     fn test_rlp_decode_encode_with_valid_chain_id() {
         let wellformed_tx =
     "f86a8302ae2a7b82f618948e998a00253cb1747679ac25e69a8d870b52d8898802c68af0bb140000802da0cd2d976eb691dc16a397462c828975f0b836e1b448ecb8f00d9765cf5032cecca066247d13fc2b65fd70a2931b5897fff4b3079e9587e69ac8a0036c99eb5ea927".to_string();
-        let e = EthereumTransactionCommon::from_rlp_hex(wellformed_tx.clone()).unwrap();
-        let encoded = e.to_rlp_bytes();
+        let e = EthereumTransactionCommon::from_hex(wellformed_tx.clone()).unwrap();
+        let encoded = e.to_bytes();
         assert_eq!(hex::encode(encoded), wellformed_tx);
     }
 
@@ -1053,7 +1049,7 @@ mod test {
         let signed_tx = "f901cc8086010000000000830250008080b90178608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c634300081200331ca06d851632958801b6919ba534b4b1feb1bdfaabd0d42890bce200a11ac735d58da0219b058d7169d7a4839c5cdd555b0820b545797365287a81ba409419912de7b1";
         // act
         let tx = hex::decode(signed_tx).unwrap();
-        let decoded = EthereumTransactionCommon::from_rlp_bytes(&tx);
+        let decoded = EthereumTransactionCommon::from_bytes(&tx);
 
         // sanity check
         assert_eq!(
