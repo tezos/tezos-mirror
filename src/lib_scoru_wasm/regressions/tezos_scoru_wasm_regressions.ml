@@ -277,4 +277,14 @@ let register () =
     ~versions
     ~hash_frequency:0L
     ~proof_frequency:(1L, 0L)
-    (link_kernel "store_exists" ["i32"; "i32"] ["i32"])
+    (link_kernel "store_exists" ["i32"; "i32"] ["i32"]) ;
+  register
+    ~name:"link_reveal"
+    ~fail_on_stuck:false
+    ~from_binary:false
+    ~ticks_per_snapshot:5_000L
+    ~inputs:[]
+    ~versions
+    ~hash_frequency:0L
+    ~proof_frequency:(1L, 0L)
+    (link_kernel "reveal" ["i32"; "i32"; "i32"; "i32"] ["i32"])
