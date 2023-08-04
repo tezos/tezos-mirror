@@ -16,9 +16,9 @@ ssh_public_key_file="${2}"
 bootstrap="${3}"
 
 # We ask the url of the registry to terraform.
-docker_registry_url=$(terraform -chdir=.. output --raw docker_registry_url)
+docker_registry_url=$(terraform output --raw docker_registry_url)
 
-gcp_docker_registry=$(terraform -chdir=.. output --raw gcp_docker_registry)
+gcp_docker_registry=$(terraform output --raw gcp_docker_registry)
 
 if [ -z "$ssh_public_key_file" ]; then
     echo "Error: The script should take as second argument the path towards an existing ssh public key."
