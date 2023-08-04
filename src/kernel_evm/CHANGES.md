@@ -4,6 +4,18 @@
 
 ### EVM Kernel
 
+### EVM Node
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
+
+### EVM Kernel
+
 - Kernel has an internal version. (!9579)
 - Improve kernel's logging from the rollup node's perspective. (!9571)
 - Adds a base gas cost of 21000 for every transaction. Note that the fees are
