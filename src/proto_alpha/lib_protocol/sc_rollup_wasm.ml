@@ -116,6 +116,19 @@ module V2_0_0 = struct
 
   let well_known_reveal_hash = Sc_rollup_reveal_hash.well_known_reveal_hash
 
+  let decode_reveal (Wasm_2_0_0.Reveal_raw payload) =
+    match
+      Data_encoding.Binary.of_string_opt
+        Sc_rollup_PVM_sig.reveal_encoding
+        payload
+    with
+    | Some reveal -> reveal
+    | None ->
+        (* If the kernel has tried to submit an incorrect reveal request,
+           we don’t stuck the rollup. Instead, we fallback to the
+           requesting the [well_known_reveal_hash] preimage *)
+        Reveal_raw_data well_known_reveal_hash
+
   (*
     This is the state hash of reference that both the prover of the
     node and the verifier of the protocol {!Protocol_implementation}
@@ -335,20 +348,7 @@ module V2_0_0 = struct
       match info.input_request with
       | No_input_required -> Computing
       | Input_required -> Waiting_for_input_message
-      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
-          match
-            Data_encoding.Binary.of_string_opt
-              Sc_rollup_reveal_hash.encoding
-              hash
-          with
-          | Some hash -> try_return_reveal (Reveal_raw_data hash)
-          | None ->
-              (* We do not put the machine in a stuck condition if a kind of reveal
-                 happens to not be supported. Insteadn we wait for the well known
-                 preimage. *)
-              Waiting_for_reveal (Reveal_raw_data well_known_reveal_hash))
-      | Reveal_required Wasm_2_0_0.Reveal_metadata ->
-          try_return_reveal Reveal_metadata
+      | Reveal_required req -> try_return_reveal (decode_reveal req)
 
     let is_input_state ~is_reveal_enabled =
       let open Monad.Syntax in

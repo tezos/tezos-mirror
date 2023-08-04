@@ -1267,7 +1267,7 @@ let reveal_preimage_parse_args memories args =
       let*! memory = retrieve_memory memories in
       let* hash = Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size in
       Lwt_result.return
-        (Host_funcs.(Reveal_raw_data hash), Host_funcs.{base; max_bytes})
+        (Wasm_pvm_state.reveal_raw_data hash, Host_funcs.{base; max_bytes})
   | _ -> raise Bad_input
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
@@ -1288,7 +1288,8 @@ let metadata_size = Int32.add 20l 4l
 let reveal_metadata_parse_args _memories args =
   match args with
   | Values.[Num (I32 base); Num (I32 max_bytes)] ->
-      Lwt.return (Ok (Host_funcs.Reveal_metadata, Host_funcs.{base; max_bytes}))
+      Lwt.return
+        (Ok (Wasm_pvm_state.reveal_metadata, Host_funcs.{base; max_bytes}))
   | _ -> raise Bad_input
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args

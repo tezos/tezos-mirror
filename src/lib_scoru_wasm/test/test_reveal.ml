@@ -35,6 +35,16 @@ open Tezos_scoru_wasm
 open Wasm_utils
 open Tztest_helper
 
+let test_reveal_compatibility_is_correct () =
+  assert (
+    Wasm_pvm_state.(Compatibility.of_current_opt reveal_metadata)
+    = Some Reveal_metadata) ;
+  let hash = "some hash" in
+  assert (
+    Wasm_pvm_state.(Compatibility.of_current_opt (reveal_raw_data "some hash"))
+    = Some (Reveal_raw_data hash)) ;
+  Lwt_result_syntax.return_unit
+
 let reveal_preimage_module hash hash_addr hash_size preimage_addr max_bytes =
   Format.sprintf
     {|
@@ -140,13 +150,18 @@ let test_reveal_preimage_gen ~version preimage max_bytes =
   let* () =
     let open Wasm_pvm_state in
     match info.Wasm_pvm_state.input_request with
-    | Wasm_pvm_state.Reveal_required (Reveal_raw_data reveal_hash) ->
-        (* The PVM has reached a point where it’s asking for some preimage. *)
-        assert (
-          String.equal (String.sub reveal_hash 1 Tezos_crypto.Blake2B.size) hash) ;
+    | Wasm_pvm_state.Reveal_required req -> (
+        match Wasm_pvm_state.Compatibility.of_current_opt req with
+        | Some (Reveal_raw_data reveal_hash) ->
+            (* The PVM has reached a point where it’s asking for some preimage. *)
+            assert (
+              String.equal
+                (String.sub reveal_hash 1 Tezos_crypto.Blake2B.size)
+                hash) ;
 
-        return_unit
-    | No_input_required | Input_required | Reveal_required _ -> assert false
+            return_unit
+        | _ -> assert false)
+    | No_input_required | Input_required -> assert false
   in
   let*! state = Wasm.reveal_step (Bytes.of_string preimage) state in
   let*! info = Wasm.get_info state in
@@ -207,8 +222,11 @@ let test_reveal_metadata ~version () =
   let*! info = Wasm.get_info state in
   let* () =
     match info.Wasm_pvm_state.input_request with
-    | Wasm_pvm_state.Reveal_required Reveal_metadata -> return_unit
-    | No_input_required | Input_required | Reveal_required _ -> assert false
+    | Wasm_pvm_state.Reveal_required req -> (
+        match Wasm_pvm_state.Compatibility.of_current_opt req with
+        | Some Reveal_metadata -> return_unit
+        | _ -> assert false)
+    | No_input_required | Input_required -> assert false
   in
   (* These are dummy metadata since we do not have access to the
      metadata definition in this compilation unit. *)
@@ -248,17 +266,13 @@ module Preimage_map = Map.Make (String)
 let apply_fast ?(images = Preimage_map.empty) tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
-  let reveal_builtins =
-    Tezos_scoru_wasm.Builtins.
-      {
-        reveal_preimage =
-          (fun hash ->
-            match Preimage_map.find hash images with
-            | None -> Stdlib.failwith "Failed to find preimage"
-            | Some preimage -> Lwt.return preimage);
-        reveal_metadata =
-          (fun () -> Stdlib.failwith "reveal_preimage is not available");
-      }
+  let reveal_builtins req =
+    match Wasm_pvm_state.Compatibility.of_current_opt req with
+    | Some (Reveal_raw_data hash) -> (
+        match Preimage_map.find hash images with
+        | None -> Stdlib.failwith "Failed to find preimage"
+        | Some preimage -> Lwt.return preimage)
+    | _ -> Stdlib.failwith "only reveal_preimage is available"
   in
   let+ tree =
     Wasm_utils.eval_until_input_requested
@@ -351,17 +365,23 @@ let test_fast_exec_reveal ~version () =
   Lwt_result_syntax.return_unit
 
 let tests =
-  tztests_with_all_pvms
-    [
-      ( "Test reveal_preimage with preimage length below max_bytes",
-        `Quick,
-        test_reveal_preimage_classic );
-      ( "Test reveal_preimage with preimage length above max_bytes",
-        `Quick,
-        test_reveal_preimage_above_max );
-      ("Test reveal_metadata", `Quick, test_reveal_metadata);
-      ("Test reveal_preimage with Fast Exec", `Quick, test_fast_exec_reveal);
-    ]
+  [
+    Tztest.tztest
+      "Wasm_pvm_state.Compatibility correctness"
+      `Quick
+      test_reveal_compatibility_is_correct;
+  ]
+  @ tztests_with_all_pvms
+      [
+        ( "Test reveal_preimage with preimage length below max_bytes",
+          `Quick,
+          test_reveal_preimage_classic );
+        ( "Test reveal_preimage with preimage length above max_bytes",
+          `Quick,
+          test_reveal_preimage_above_max );
+        ("Test reveal_metadata", `Quick, test_reveal_metadata);
+        ("Test reveal_preimage with Fast Exec", `Quick, test_fast_exec_reveal);
+      ]
 
 let () =
   Alcotest_lwt.run ~__FILE__ "test lib scoru wasm" [("Reveal", tests)]

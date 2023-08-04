@@ -132,18 +132,8 @@ module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
     in
     Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 
-  let reveal_builtins =
-    Tezos_scoru_wasm.Builtins.
-      {
-        reveal_preimage =
-          (fun _hash ->
-            Stdlib.failwith
-              "reveal_preimage is not available out of the box in tests");
-        reveal_metadata =
-          (fun () ->
-            Stdlib.failwith
-              "reveal_metadata is not available out of the box in tests");
-      }
+  let reveal_builtins _reveal =
+    Stdlib.failwith "reveals are not available out of the box in tests"
 
   let eval_until_stuck ?(reveal_builtins = reveal_builtins) ?write_debug
       ?(max_steps = 20000L) tree =

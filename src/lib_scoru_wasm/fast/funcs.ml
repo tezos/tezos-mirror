@@ -262,7 +262,7 @@ let make ~version ~reveal_builtins ~write_debug state =
         let* hash =
           Host_funcs.Aux.load_bytes ~memory ~addr:hash_addr ~size:hash_size
         in
-        let*! payload = reveal_builtins.Builtins.reveal_preimage hash in
+        let*! payload = reveal_builtins (Wasm_pvm_state.reveal_raw_data hash) in
         let*! result =
           Host_funcs.Aux.reveal
             ~memory
@@ -277,7 +277,7 @@ let make ~version ~reveal_builtins ~write_debug state =
       (i32 @-> i32 @-> returning1 i32)
       (fun dst max_bytes ->
         let mem = state.retrieve_mem () in
-        let* payload = reveal_builtins.reveal_metadata () in
+        let* payload = reveal_builtins Wasm_pvm_state.reveal_metadata in
         Host_funcs.Aux.reveal
           ~memory:mem
           ~dst

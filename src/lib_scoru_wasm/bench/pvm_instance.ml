@@ -53,17 +53,4 @@ module PP = struct
   let tick_label = Format.asprintf "%a" Wasm_utils.pp_state
 end
 
-module Placeholder_builtins = struct
-  let reveal_preimage _hash =
-    Stdlib.failwith "reveal_preimage is not available out of the box in tests"
-
-  let reveal_metadata () =
-    Stdlib.failwith "reveal_metadata is not available out of the box in tests"
-end
-
-let builtins =
-  Tezos_scoru_wasm.Builtins.
-    {
-      reveal_preimage = Placeholder_builtins.reveal_preimage;
-      reveal_metadata = Placeholder_builtins.reveal_metadata;
-    }
+let builtins = Wasm_utils.reveal_builtins

@@ -2960,6 +2960,10 @@ module Sc_rollup : sig
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
 
+  val reveal_encoding : reveal Data_encoding.t
+
+  val pp_reveal : Format.formatter -> reveal -> unit
+
   val is_reveal_enabled_predicate :
     Constants.Parametric.sc_rollup_reveal_activation_level -> is_reveal_enabled
 
@@ -3392,6 +3396,8 @@ module Sc_rollup : sig
     val well_known_reveal_preimage : string
 
     val well_known_reveal_hash : Sc_rollup_reveal_hash.t
+
+    val decode_reveal : Wasm_2_0_0.reveal -> reveal
 
     module type Make_wasm = module type of Wasm_2_0_0.Make
 

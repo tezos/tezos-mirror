@@ -61,11 +61,35 @@ type output_info = {
   message_index : Z.t;  (** The index of the message in the outbox. *)
 }
 
-type reveal_hash = string
-
 type reveal = Tezos_webassembly_interpreter.Host_funcs.reveal =
-  | Reveal_raw_data of reveal_hash
-  | Reveal_metadata
+  | Reveal_raw of string
+
+let reveal_raw_data_tag = '\x00'
+(* Should match the tag used for [Reveal_raw_data] in the definition of
+   [Sc_rollup_reveal_hash.encoding] *)
+
+let reveal_raw_data hash =
+  Reveal_raw Format.(sprintf "%c%s" reveal_raw_data_tag hash)
+
+let reveal_metadata_payload = "\x01"
+(* Should match the tag used for [Reveal_metadata] in the definition of
+   [Sc_rollup_reveal_hash.encoding] *)
+
+let reveal_metadata = Reveal_raw reveal_metadata_payload
+
+module Compatibility = struct
+  type reveal_hash = string
+
+  (* Reveal type used in Environment 10 and before. *)
+  type reveal = Reveal_raw_data of reveal_hash | Reveal_metadata
+
+  let of_current_opt (Reveal_raw payload) =
+    if 1 <= String.length payload && String.get payload 0 = reveal_raw_data_tag
+    then
+      Some (Reveal_raw_data (String.sub payload 1 (String.length payload - 1)))
+    else if payload = reveal_metadata_payload then Some Reveal_metadata
+    else None
+end
 
 (** Represents the state of input requests. *)
 type input_request =

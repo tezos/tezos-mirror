@@ -577,11 +577,8 @@ let compute_step_many_until ?(max_steps = 1L) ?reveal_builtins
         fun pvm_state ->
           let info = input_request pvm_state in
           match info with
-          | Reveal_required (Reveal_raw_data req) ->
-              let* res = reveal_builtins.Builtins.reveal_preimage req in
-              reveal_step (Bytes.of_string res) pvm_state
-          | Reveal_required Reveal_metadata ->
-              let* res = reveal_builtins.reveal_metadata () in
+          | Reveal_required req ->
+              let* res = reveal_builtins req in
               reveal_step (Bytes.of_string res) pvm_state
           | _ ->
               compute_step_with_host_functions

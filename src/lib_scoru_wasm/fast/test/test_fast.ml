@@ -43,26 +43,21 @@ let apply_fast ?write_debug ?(fast_should_run = true)
     ?(max_steps = Int64.max_int) counter tree =
   let open Lwt.Syntax in
   let run_counter = ref 0l in
-  let reveal_builtins =
-    Some
-      Tezos_scoru_wasm.Builtins.
-        {
-          reveal_preimage =
-            (fun hash ->
-              match Preimage_map.find hash images with
-              | None -> Stdlib.failwith "Failed to find preimage"
-              | Some preimage -> Lwt.return preimage);
-          reveal_metadata =
-            (fun () ->
-              match metadata with
-              | Some reveal -> Lwt.return reveal
-              | None -> Stdlib.failwith "reveal_preimage is not available");
-        }
+  let reveal_builtins req =
+    match Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt req with
+    | Some (Reveal_raw_data hash) -> (
+        match Preimage_map.find hash images with
+        | None -> Stdlib.failwith "Failed to find preimage"
+        | Some preimage -> Lwt.return preimage)
+    | _ -> (
+        match metadata with
+        | Some reveal -> Lwt.return reveal
+        | None -> Stdlib.failwith "reveal_metadata is not available")
   in
   let+ tree, ticks =
     run_fast
       ?write_debug
-      ?reveal_builtins
+      ~reveal_builtins
         (* We override the builtins to provide our own [reveal_preimage]
            implementation. This allows us to run Fast Exec with kernels that
            want to reveal stuff. *)
@@ -96,27 +91,32 @@ and check_reveal ?write_debug ?(images = Preimage_map.empty) ?metadata
   let open Lwt.Syntax in
   let* info = Wasm_utils.Wasm.get_info tree in
   match info.input_request with
-  | Reveal_required (Reveal_raw_data hash) -> (
-      match Preimage_map.find hash images with
-      | None -> Lwt.return tree
-      | Some preimage ->
-          let* tree =
-            Wasm_utils.Wasm.reveal_step (Bytes.of_string preimage) tree
-          in
-          (apply_slow [@tailcall])
-            ?write_debug
-            ~images
-            ?metadata
-            ~max_steps
-            tree)
-  | Reveal_required Reveal_metadata -> (
-      match metadata with
-      | None -> Stdlib.failwith "Unable to reveal metadata"
-      | Some metadata ->
-          let* tree =
-            Wasm_utils.Wasm.reveal_step (Bytes.of_string metadata) tree
-          in
-          (apply_slow [@tailcall]) ~images ~metadata ~max_steps tree)
+  | Reveal_required req -> (
+      match
+        Tezos_scoru_wasm.Wasm_pvm_state.Compatibility.of_current_opt req
+      with
+      | Some (Reveal_raw_data hash) -> (
+          match Preimage_map.find hash images with
+          | None -> Lwt.return tree
+          | Some preimage ->
+              let* tree =
+                Wasm_utils.Wasm.reveal_step (Bytes.of_string preimage) tree
+              in
+              (apply_slow [@tailcall])
+                ?write_debug
+                ~images
+                ?metadata
+                ~max_steps
+                tree)
+      | Some Reveal_metadata -> (
+          match metadata with
+          | None -> Stdlib.failwith "Unable to reveal metadata"
+          | Some metadata ->
+              let* tree =
+                Wasm_utils.Wasm.reveal_step (Bytes.of_string metadata) tree
+              in
+              (apply_slow [@tailcall]) ~images ~metadata ~max_steps tree)
+      | None -> Stdlib.failwith "unsupported reveal request")
   | _ -> Lwt.return tree
 
 (** [test_against_both ~from_binary ~kernel ~messages] test [kernel] against
@@ -793,15 +793,7 @@ let test_tx ~version () =
 
 let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let open Lwt_result_syntax in
-  let reveal_builtins =
-    Tezos_scoru_wasm.Builtins.
-      {
-        reveal_preimage =
-          (fun _ -> Stdlib.failwith "reveal_preimage is not available");
-        reveal_metadata =
-          (fun () -> Stdlib.failwith "reveal_metadata is not available");
-      }
-  in
+  let reveal_builtins = Wasm_utils.reveal_builtins in
   let*! initial_tree =
     Wasm_utils.initial_tree
       ~version
@@ -864,15 +856,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
 
 let test_check_nb_ticks ~version () =
   let open Lwt_result_syntax in
-  let reveal_builtins =
-    Tezos_scoru_wasm.Builtins.
-      {
-        reveal_preimage =
-          (fun _ -> Stdlib.failwith "reveal_preimage is not available");
-        reveal_metadata =
-          (fun () -> Stdlib.failwith "reveal_metadata is not available");
-      }
-  in
+  let reveal_builtins = Wasm_utils.reveal_builtins in
   let*! initial_tree =
     Wasm_utils.initial_tree
       ~version

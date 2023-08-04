@@ -31,9 +31,7 @@ type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
 type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
 
-type reveal_hash = string
-
-type reveal = Reveal_raw_data of reveal_hash | Reveal_metadata
+type reveal = Reveal_raw of string
 
 type input_request =
   | No_input_required
