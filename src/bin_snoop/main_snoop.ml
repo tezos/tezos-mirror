@@ -472,7 +472,7 @@ and perform_save_solution solution
   match infer_opts.save_solution with
   | None -> ()
   | Some filename ->
-      Codegen.(save_solution solution filename) ;
+      Codegen.save_solution solution filename ;
       Format.eprintf "Saved solution to %s@." filename
 
 and perform_plot measure local_model_name problem solution

@@ -211,6 +211,18 @@ type solution = {
   scores_list : ((string * Namespace.t) * Inference.scores) list;
 }
 
+let solution_encoding =
+  let open Data_encoding in
+  conv
+    (fun {map; scores_list} -> (map, scores_list))
+    (fun (map, scores_list) -> {map; scores_list})
+  @@ obj2
+       (req "map" (Free_variable.Map.encoding float))
+       (req
+          "scores_list"
+          (list
+             (tup2 (tup2 string Namespace.encoding) Inference.scores_encoding)))
+
 let pp_solution ppf solution =
   let open Format in
   let alist =
@@ -233,10 +245,10 @@ let pp_solution ppf solution =
     (List.sort (fun (k1, _) (k2, _) -> compare k1 k2) solution.scores_list) ;
   fprintf ppf "@]"
 
-let load_solution (fn : string) : solution =
+let load_solution_in_binary (fn : string) : solution =
   In_channel.with_open_bin fn Marshal.from_channel
 
-let save_solution (s : solution) (fn : string) =
+let save_solution_in_binary (s : solution) (fn : string) =
   Out_channel.with_open_bin fn @@ fun outfile -> Marshal.to_channel outfile s []
 
 let solution_to_csv {map; scores_list} =
@@ -251,6 +263,33 @@ let solution_to_csv {map; scores_list} =
       scores_list
   in
   Csv.concat csv_mapping csv_scores_list
+
+let load_solution_in_json (fn : string) : solution =
+  In_channel.with_open_text fn @@ fun ic ->
+  let s = In_channel.input_all ic in
+  let open Data_encoding.Json in
+  Result.fold
+    ~error:Stdlib.failwith
+    ~ok:(destruct solution_encoding)
+    (from_string s)
+
+let save_solution_in_json (s : solution) (fn : string) =
+  let open Data_encoding.Json in
+  let json = construct solution_encoding s in
+  Out_channel.with_open_text fn @@ fun oc ->
+  (* We cannot use [Data_encoding.Json.to_string] since it prints out
+     floats in less precision *)
+  let json : Ezjsonm.t =
+    match json with `O kvs -> `O kvs | _ -> assert false
+  in
+  Ezjsonm.(to_channel ~minify:false oc json)
+
+let load_solution (fn : string) : solution =
+  try load_solution_in_json fn with _ -> load_solution_in_binary fn
+
+let save_solution s fn =
+  save_solution_in_binary s fn ;
+  save_solution_in_json s (fn ^ ".json")
 
 let load_exclusions exclude_fn =
   (* one model name like N_IXxx_yyy__alpha per line *)

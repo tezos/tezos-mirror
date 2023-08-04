@@ -47,6 +47,8 @@ type scores = {
   tvalues : (Free_variable.t * float) list;
 }
 
+val scores_encoding : scores Data_encoding.t
+
 val pp_scores : Format.formatter -> scores -> unit
 
 val scores_to_csv_column : string * Namespace.t -> scores -> Csv.csv

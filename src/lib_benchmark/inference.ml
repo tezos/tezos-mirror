@@ -49,6 +49,16 @@ type scores = {
   tvalues : (Free_variable.t * float) list;
 }
 
+let scores_encoding =
+  let open Data_encoding in
+  conv
+    (fun {r2_score; rmse_score; tvalues} -> (r2_score, rmse_score, tvalues))
+    (fun (r2_score, rmse_score, tvalues) -> {r2_score; rmse_score; tvalues})
+  @@ obj3
+       (req "r2_score" (option float))
+       (req "rmse_score" float)
+       (req "tvalues" (list (tup2 Free_variable.encoding float)))
+
 let pp_scores ppf {r2_score; rmse_score; tvalues} =
   let scores =
     [
