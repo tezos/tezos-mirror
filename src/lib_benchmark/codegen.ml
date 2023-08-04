@@ -454,21 +454,25 @@ let get_codegen_destinations
     |> List.sort_uniq String.compare
 
 let codegen_models models sol transform ~exclusions =
-  List.filter_map
-    (fun (model_name, ({Registration.model; from = _} as info)) ->
-      let benchmark_destinations = get_codegen_destinations info in
-      if
-        String.Set.mem (Namespace.to_string model_name) exclusions
-        || List.is_empty benchmark_destinations
-      then None
-      else
-        let code = codegen model sol transform model_name in
-        Some
-          (List.map
-             (fun destination -> (destination, code))
-             benchmark_destinations))
-    models
-  |> List.flatten
+  let generate_with_exclusions model_name info =
+    let benchmark_destinations = get_codegen_destinations info in
+    if
+      String.Set.mem (Namespace.to_string model_name) exclusions
+      || List.is_empty benchmark_destinations
+    then []
+    else
+      let code = codegen info.model sol transform model_name in
+      List.map (fun destination -> (destination, code)) benchmark_destinations
+  in
+  if String.Set.is_empty exclusions then
+    List.map
+      (fun (model_name, info) ->
+        ("auto_build", codegen info.Registration.model sol transform model_name))
+      models
+  else
+    List.concat_map
+      (fun (model_name, info) -> generate_with_exclusions model_name info)
+      models
 
 let%expect_test "basic_printing" =
   let open Codegen in

@@ -1033,7 +1033,7 @@ module Auto_build = struct
     in
     save_codegen_for_solutions [solution] codegen_options ~exclusions
 
-  let cmd targets
+  let cmd ?(split = false) targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
     let exitf status fmt =
       Format.kasprintf
@@ -1047,10 +1047,7 @@ module Auto_build = struct
           exitf 1 "Need to specify --out-dir")
     in
     (* No non-lwt version available... *)
-    Lwt_main.run
-      (let open Lwt_syntax in
-      let* () = Lwt_utils_unix.create_dir outdir in
-      Lwt_utils_unix.create_dir (Filename.concat outdir "generated_code")) ;
+    Lwt_main.run (Lwt_utils_unix.create_dir outdir) ;
 
     let state_tbl = init_state_tbl () in
 
@@ -1108,7 +1105,8 @@ module Auto_build = struct
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
-    let exclusions = get_exclusions () in
+    let exclusions = if split then get_exclusions () else String.Set.empty in
+    String.Set.iter (fun x -> print_endline x) exclusions ;
     (* Codegen *)
     codegen mkfilename solution ~exclusions
 end
@@ -1143,5 +1141,5 @@ let () =
           codegen_for_solutions_cmd solutions codegen_options ~exclusions
       | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd None solutions
-      | Auto_build {targets; auto_build_options} ->
-          Auto_build.cmd targets auto_build_options)
+      | Auto_build {targets; auto_build_options; split} ->
+          Auto_build.cmd ~split targets auto_build_options)
