@@ -75,6 +75,17 @@ module Events = struct
       ~pp2:pp_print_trace
       ("peer", P2p_peer.Id.encoding)
       ("failure", trace_encoding)
+
+  let send_p2p_message =
+    declare_2
+      ~section
+      ~name:(prefix "p2p_send")
+      ~msg:"Sending to {peer} P2P message {message}"
+      ~level:Debug
+      ~pp1:P2p_peer.Id.pp
+      ~pp2:Transport_layer_interface.pp_p2p_message
+      ("peer", P2p_peer.Id.encoding)
+      ("message", Transport_layer_interface.p2p_message_encoding)
 end
 
 (** This module implements a cache of alternative peers (aka PX peers), that is,
@@ -331,6 +342,11 @@ let try_connect p2p_layer px_cache ~px_peer ~origin =
     directives to the P2P layer to connect or disconnect peers are handled. *)
 let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
   let open Lwt_syntax in
+  (* only log sending of GS control messages  *)
+  let log_sending_message = function
+    | Message_with_header _ -> false
+    | _ -> true
+  in
   let rec loop output_stream =
     let* p2p_output = Worker.Stream.pop output_stream in
     let* () =
@@ -349,8 +365,13 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer px_cache =
               Events.(emit no_connection_for_peer to_peer)
           | Some conn -> (
               let* (res : unit tzresult) =
-                wrap_p2p_message p2p_layer p2p_message
-                |> P2p.send p2p_layer conn
+                let msg = wrap_p2p_message p2p_layer p2p_message in
+                let* () =
+                  if log_sending_message p2p_message then
+                    Events.(emit send_p2p_message (to_peer, msg))
+                  else return_unit
+                in
+                P2p.send p2p_layer conn msg
               in
               match res with
               | Ok () -> return_unit

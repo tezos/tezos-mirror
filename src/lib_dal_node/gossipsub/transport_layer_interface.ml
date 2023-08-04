@@ -61,7 +61,7 @@ module P2p_message_V1 = struct
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5564
 
      DAL/GS: bound the lists/seqs in exchanged p2p messages. *)
-  let encoding =
+  let p2p_message_app_encoding =
     let open Data_encoding in
     let case ?max_length ~tag ~title encoding unwrap wrap =
       P2p_params.Encoding {tag; title; encoding; wrap; unwrap; max_length}
@@ -140,6 +140,55 @@ module P2p_message_V1 = struct
           Message_with_header {message; topic; message_id});
     ]
 
+  let p2p_message_encoding =
+    let open Data_encoding in
+    List.map
+      (fun (P2p_params.Encoding
+             {tag; title; encoding; wrap; unwrap; max_length = _}) ->
+        case (Tag tag) ~title encoding unwrap wrap)
+      p2p_message_app_encoding
+    |> union
+
+  let pp_list pp_elt =
+    Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ") pp_elt
+
+  let pp_p2p_message fmt = function
+    | Graft {topic} -> Format.fprintf fmt "Graft{topic=%a}" Types.Topic.pp topic
+    | Prune {topic; px; backoff} ->
+        Format.fprintf
+          fmt
+          "Prune{topic=%a, px=%a, backoff=%a}"
+          Types.Topic.pp
+          topic
+          (pp_list Types.Peer.pp)
+          (List.of_seq px |> List.map (fun px_peer -> px_peer.peer))
+          Types.Span.pp
+          backoff
+    | IHave {topic; message_ids} ->
+        Format.fprintf
+          fmt
+          "IHave{topic=%a, message_ids=%a}"
+          Types.Topic.pp
+          topic
+          (pp_list Types.Message_id.pp)
+          message_ids
+    | IWant {message_ids} ->
+        Format.fprintf
+          fmt
+          "IWant{message_ids=%a}"
+          (pp_list Types.Message_id.pp)
+          message_ids
+    | Subscribe {topic} ->
+        Format.fprintf fmt "Subscribe{topic=%a}" Types.Topic.pp topic
+    | Unsubscribe {topic} ->
+        Format.fprintf fmt "Unsubscribe{topic=%a}" Types.Topic.pp topic
+    | Message_with_header {message = _; message_id; topic = _} ->
+        Format.fprintf
+          fmt
+          "FullMessage{message_id=%a}"
+          Types.Message_id.pp
+          message_id
+
   let distributed_db_version = Distributed_db_version.zero
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5638
@@ -149,7 +198,7 @@ module P2p_message_V1 = struct
 
   let message_config ~network_name : p2p_message P2p_params.message_config =
     let chain_name = Distributed_db_version.Name.of_string network_name in
-    {encoding; chain_name; distributed_db_versions}
+    {encoding = p2p_message_app_encoding; chain_name; distributed_db_versions}
 end
 
 let version ~network_name =
