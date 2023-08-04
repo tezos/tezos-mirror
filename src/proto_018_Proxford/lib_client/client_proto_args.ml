@@ -342,6 +342,18 @@ let tez_parameter param =
       | Some tez -> return tez
       | None -> tzfail (Bad_tez_arg (param, s)))
 
+let everything_tez_parameter param =
+  let open Lwt_result_syntax in
+  Tezos_clic.parameter (fun _ s ->
+      match s with
+      | "everything" -> return Tez.max_mutez
+      | _ -> tzfail (Bad_tez_arg (param, s)))
+
+let everything_or_tez_parameter param =
+  Tezos_clic.compose_parameters
+    (tez_parameter param)
+    (everything_tez_parameter param)
+
 let tez_arg ~default ~parameter ~doc =
   Tezos_clic.default_arg
     ~long:parameter
@@ -362,6 +374,13 @@ let tez_param ~name ~desc next =
     ~name
     ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)
+    next
+
+let everything_or_tez_param ~name ~desc next =
+  Tezos_clic.param
+    ~name
+    ~desc:(desc ^ " in \xEA\x9C\xA9 (or everything)\n" ^ tez_format)
+    (everything_or_tez_parameter name)
     next
 
 let non_negative_z_parser (cctxt : #Client_context.io) s =
@@ -690,6 +709,61 @@ let display_names_flag =
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
+
+let fixed_point_parameter =
+  let rec remove_trailing_zeroes ~decimals ~right i =
+    if i < decimals then Some (String.sub right 0 decimals)
+    else if right.[i] <> '0' then None
+    else (remove_trailing_zeroes [@ocaml.tailcall]) ~decimals ~right (i - 1)
+  in
+  let parse ~decimals p =
+    let open Option_syntax in
+    let* left, right =
+      match String.split_on_char '.' p with
+      | [left; right] -> Some (left, right)
+      | [left] -> Some (left, "")
+      | _ -> None
+    in
+    let* right =
+      if String.length right > decimals then
+        remove_trailing_zeroes ~decimals ~right (String.length right - 1)
+      else Some (right ^ String.make (decimals - String.length right) '0')
+    in
+    int_of_string_opt (left ^ right)
+  in
+  let parse ~decimals p =
+    if decimals >= 2 && String.length p > 0 && p.[String.length p - 1] = '%'
+    then parse ~decimals:(decimals - 2) (String.sub p 0 (String.length p - 1))
+    else parse ~decimals p
+  in
+  fun ~decimals ->
+    if decimals < 0 then
+      raise (Invalid_argument "fixed_point_parameter: negative decimals")
+    else fun ~name ->
+      Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
+          match parse ~decimals p with
+          | Some res -> return res
+          | None -> cctxt#error "Cannot read %s parameter" name)
+
+let limit_of_staking_over_baking_millionth_arg =
+  Tezos_clic.arg
+    ~long:"limit-of-staking-over-baking"
+    ~placeholder:"limit"
+    ~doc:"Limit of staking over baking"
+    ((* should we check it's between 0 and 5 million? *)
+     fixed_point_parameter
+       ~decimals:6
+       ~name:"limit of staking over baking")
+
+let edge_of_baking_over_staking_billionth_arg =
+  Tezos_clic.arg
+    ~long:"edge-of-baking-over-staking"
+    ~placeholder:"edge"
+    ~doc:"Edge of baking over staking"
+    ((* TODO #6162: check it's between 0 and 1 billion *)
+     fixed_point_parameter
+       ~decimals:9
+       ~name:"edge of baking over staking")
 
 module Sc_rollup_params = struct
   let rollup_kind_parameter =

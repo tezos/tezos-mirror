@@ -1853,6 +1853,293 @@ let commands_rw () =
             successor_level ));
     command
       ~group
+      ~desc:"Stake"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefix "stake"
+      @@ tez_param ~name:"qty" ~desc:"amount staked from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg = None in
+        let entrypoint = Some Entrypoint.stake in
+        (* TODO #6162
+           (unless --force)
+              - check contract is delegated
+              - check amount is positive
+              - check contract is a baker if AI is not enabled *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:"Unstake"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefix "unstake"
+      @@ everything_or_tez_param
+           ~name:"qty"
+           ~desc:"amount to unstake from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better printer? *)
+          Some (Int64.to_string (Tez.to_mutez amount))
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.unstake in
+        (* TODO #6162
+           (unless --force)
+              - check contract is delegated
+              - check contract has stake
+              - check amount is positive
+              - check contract is a baker if AI is not enabled
+              - print a warning if effective stake is lower *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:"Finalize unstake"
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["finalize"; "unstake"]
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let contract = Contract.Implicit source in
+        let arg = None in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.finalize_unstake in
+        (* TODO #6162
+           (unless --force)
+              - check contract has finalizable unstake requests
+        *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:"Set delegate parameters"
+      (args14
+         limit_of_staking_over_baking_millionth_arg
+         edge_of_baking_over_staking_billionth_arg
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["set"; "delegate"; "parameters"; "for"]
+      @@ Public_key_hash.source_param ~name:"src" ~desc:"name of the delegate"
+      @@ stop)
+      (fun ( limit_of_staking_over_baking_millionth_opt,
+             edge_of_baking_over_staking_billionth_opt,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           source
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* limit_of_staking_over_baking_millionth =
+          match limit_of_staking_over_baking_millionth_opt with
+          | None ->
+              cctxt#error
+                "The --limit-of-staking-over-baking argument is mandatory"
+          | Some x -> return x
+        in
+        let* edge_of_baking_over_staking_billionth =
+          match edge_of_baking_over_staking_billionth_opt with
+          | None ->
+              cctxt#error
+                "The --edge-of-baking-over-staking argument is mandatory"
+          | Some x -> return x
+        in
+        let contract = Contract.Implicit source in
+        let arg =
+          (* Is there a better way? *)
+          Some
+            (Format.sprintf
+               "Pair %d %d Unit"
+               limit_of_staking_over_baking_millionth
+               edge_of_baking_over_staking_billionth)
+        in
+        let amount = Tez.zero in
+        let entrypoint = Some Entrypoint.set_delegate_parameters in
+        (* TODO #6162
+           (unless --force)
+              - check contract is a baker
+        *)
+        transfer_command
+          amount
+          contract
+          contract
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
