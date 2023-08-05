@@ -25,7 +25,6 @@ variable "zone" {
 variable "hostname" {
   type        = string
   description = "Hostname prefix for instances."
-  default     = "lin"
 }
 
 variable "target_size" {
