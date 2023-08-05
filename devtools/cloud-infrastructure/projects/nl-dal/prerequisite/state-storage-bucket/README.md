@@ -30,7 +30,7 @@ For example:
 bucket="lin-tfstate"
 ```
 
-Now
+Now run:
 
 ```shell
 terraform init
