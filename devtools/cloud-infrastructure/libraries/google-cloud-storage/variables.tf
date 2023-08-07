@@ -26,7 +26,7 @@ variable "versioning_enabled" {
 }
 
 variable "force_destroy" {
-  description = "Force destroy"
+  description = "When deleting a bucket, delete all contained objects"
   type        = bool
   default     = false
 }

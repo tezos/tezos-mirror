@@ -1,11 +1,6 @@
 # Docker
 
-Builds a docker image and pushes it to Google Docker Image Registry (Artifact Registry).
-The image will:
-
-- Store the given SSH public key in it's `.ssh/authenticated_keys`.
-- Store the zcash-params in `/usr/local/share/zcash-params`
-- Start an SSH daemon at port 30000.
+Adds the given SSH key to the docker image and pushes it to Google Docker Image Registry (Artifact Registry) using the `/devtools/cloud-infrastructure/libraries/docker-registry` library.
 
 ## How to Use
 
@@ -15,14 +10,20 @@ First initialize Terraform:
 terraform init
 ```
 
-If you want to (re)initialize the authorized_keys file in the docker image, run:
+The next step would vary depending on what you want to do.
 
-```shell
-DOCKER_BUILDKIT=1 ./push.sh <os> <ssh_public_key_file> bootstrap
-```
+### Case 1: Add your SSH public key to an existing docker image
 
-if not, run:
+Typically, this is what you would want to do, and in most instances, you should use `debian` as the value for `<os>`.
 
 ```shell
 DOCKER_BUILDKIT=1 ./push.sh <os> <ssh_public_key_file>
+```
+
+### Case 2: Initialize and push a new docker image
+
+You would want to do this if, for example, you want to create a new docker image with a separate `<os>`.
+
+```shell
+DOCKER_BUILDKIT=1 ./push.sh <os> <ssh_public_key_file> bootstrap
 ```
