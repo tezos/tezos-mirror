@@ -19,6 +19,7 @@ use crate::error::{Error, StorageError};
 use crate::parsing::UPGRADE_NONCE_SIZE;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
+use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
     TRANSACTION_HASH_SIZE,

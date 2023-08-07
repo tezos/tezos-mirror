@@ -145,3 +145,14 @@ pub fn decode_transaction_status(
     TransactionStatus::try_from(&tag)
         .map_err(|_| (DecoderError::Custom("Transaction status cannot be decoded")))
 }
+
+pub trait FromRlpBytes: Decodable {
+    fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError>;
+}
+
+impl<T: Decodable> FromRlpBytes for T {
+    fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
+        let decoder = Rlp::new(bytes);
+        Self::decode(&decoder)
+    }
+}
