@@ -3,5 +3,5 @@ module "google_cloud_storage" {
 
   project = var.project
   region  = var.region
-  name    = "${var.name}-tfstate"
+  name    = "${var.bucket}"
 }

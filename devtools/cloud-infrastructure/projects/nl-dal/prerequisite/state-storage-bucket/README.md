@@ -13,18 +13,27 @@ You only need to run this once at your initial setup.
 
 ## How to Use
 
-```shell
-terraform init
-terraform plan --var region="europe-west1" --var name="<your-name>"
-terraform apply--var region="europe-west1" --var name="<your-name>"
+Create a file named `terraform.tfvars` in this directory that contains the following single line:
+
 ```
+bucket=<bucket>
+```
+
+The `<bucket>` it is recommenced that:
+
+- It contains a string that is unique to you, like your name.
+- It ends with `-tfstate` to indicate that it is a Terraform state file.
 
 For example:
 
-```shell
-terraform init
-terraform plan --var region="europe-west1" --var name="lin"
-terraform apply --var region="europe-west1" --var name="lin"
+```
+bucket="lin-tfstate"
 ```
 
-Remember what you used of `<your-name>` as it will be needed in subsequent steps.
+Now
+
+```shell
+terraform init
+terraform plan
+terraform apply
+```

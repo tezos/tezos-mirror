@@ -7,9 +7,10 @@ variable "project" {
 variable "region" {
   description = "The GCP region"
   type        = string
+  default = "europe-west1"
 }
 
-variable "name" {
+variable "bucket" {
   description = "The name of the bucket"
   type        = string
 }
