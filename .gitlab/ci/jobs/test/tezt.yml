@@ -55,6 +55,10 @@ tezt:
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 60
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+  # Temporarily allow corrupted coverage files.
+  allow_failure:
+    exit_codes: 64
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
