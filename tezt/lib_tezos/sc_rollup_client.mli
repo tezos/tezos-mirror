@@ -170,6 +170,15 @@ type transaction = {
   parameters_ty : string option;
 }
 
+(** Same as [outbox_proof_single] without providing the outbox message *)
+val outbox_proof :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  outbox_proof option Lwt.t
+
 (** Same as [outbox_proof_single] except that the claim is about a batch
     of output transactions. *)
 val outbox_proof_batch :
@@ -180,6 +189,11 @@ val outbox_proof_batch :
   outbox_level:int ->
   transaction list ->
   outbox_proof option Lwt.t
+
+(** [encode_json_outbox_msg outbox_msg_json] returns the encoding of
+    an outbox message. *)
+val encode_json_outbox_msg :
+  ?hooks:Process.hooks -> t -> JSON.u -> string Runnable.process
 
 (** [encode_batch batch] returns the encoding of a [batch] of output
    transactions. *)

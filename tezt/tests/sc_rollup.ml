@@ -4360,15 +4360,27 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           in
           Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;
-          Sc_rollup_client.outbox_proof_single
-            sc_client
-            ?expected_error
-            ~message_index
-            ~outbox_level
-            ~destination
-            ?entrypoint
-            ~parameters
-            ?parameters_ty:outbox_parameters_ty
+          let* proof =
+            Sc_rollup_client.outbox_proof_single
+              sc_client
+              ?expected_error
+              ~message_index
+              ~outbox_level
+              ~destination
+              ?entrypoint
+              ~parameters
+              ?parameters_ty:outbox_parameters_ty
+          in
+          let* proof' =
+            Sc_rollup_client.outbox_proof
+              sc_client
+              ?expected_error
+              ~message_index
+              ~outbox_level
+          in
+          (* Test outbox_proof command with/without input transactions. *)
+          assert (proof' = proof) ;
+          return proof
       | Some _ ->
           assert (JSON.encode outbox = "[]") ;
           return None

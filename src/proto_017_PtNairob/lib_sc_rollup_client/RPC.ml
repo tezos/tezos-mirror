@@ -42,3 +42,10 @@ let get_outbox_proof cctxt serialized_output =
     ((), `Head)
     serialized_output
     ()
+
+let get_outbox cctxt block level =
+  Block_services.(make_call1 Sc_rollup_services.Block.outbox)
+    cctxt
+    block
+    level
+    ()

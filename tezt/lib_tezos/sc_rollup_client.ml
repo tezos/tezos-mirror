@@ -169,26 +169,30 @@ let json_of_batch ts =
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
-let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
-    ~outbox_level batch =
+let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level
+    transactions =
   let*? process =
     spawn_command
       ?hooks
       sc_client
-      [
-        "get";
-        "proof";
-        "for";
-        "message";
-        string_of_int message_index;
-        "of";
-        "outbox";
-        "at";
-        "level";
-        string_of_int outbox_level;
-        "transferring";
-        JSON.encode_u (json_of_batch batch);
-      ]
+      (List.concat
+         [
+           [
+             "get";
+             "proof";
+             "for";
+             "message";
+             string_of_int message_index;
+             "of";
+             "outbox";
+             "at";
+             "level";
+             string_of_int outbox_level;
+           ];
+           (match transactions with
+           | Some batch -> ["transferring"; JSON.encode_u (json_of_batch batch)]
+           | None -> []);
+         ])
   in
   match expected_error with
   | None ->
@@ -202,6 +206,16 @@ let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
       let* () = Process.check_error ~msg process in
       return None
 
+let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
+    ~outbox_level batch =
+  outbox_proof
+    ?hooks
+    ?expected_error
+    sc_client
+    (Some batch)
+    ~message_index
+    ~outbox_level
+
 let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
     sc_client ~message_index ~outbox_level ~destination ~parameters =
   outbox_proof_batch
@@ -212,12 +226,25 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint ?parameters_ty
     ~outbox_level
     [{destination; entrypoint; parameters; parameters_ty}]
 
+let outbox_proof ?hooks ?expected_error sc_client ~message_index ~outbox_level =
+  outbox_proof
+    ?hooks
+    ?expected_error
+    sc_client
+    None
+    ~message_index
+    ~outbox_level
+
+let encode_json_outbox_msg ?hooks sc_client outbox_msg =
+  spawn_command
+    ?hooks
+    sc_client
+    ["encode"; "outbox"; "message"; JSON.encode_u outbox_msg]
+  |> Runnable.map String.trim
+
 let encode_batch ?hooks ?expected_error sc_client batch =
   let runnable =
-    spawn_command
-      ?hooks
-      sc_client
-      ["encode"; "outbox"; "message"; JSON.encode_u (json_of_batch batch)]
+    encode_json_outbox_msg ?hooks sc_client (json_of_batch batch)
   in
   match expected_error with
   | None ->
