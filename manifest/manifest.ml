@@ -51,6 +51,30 @@ let pp_do_not_edit ~comment_start fmt () =
 
 let sanitize_path x = Filename.(dirname x // Filename.basename x)
 
+(* Remove duplicates from a list.
+   Items that are not removed are kept in their original order.
+   In case of duplicates, the first occurrence is kept.
+   [get_key] returns the comparison key (a string).
+   [merge] is used in case a key is present several times. *)
+let deduplicate_list ?merge get_key list =
+  let add ((list, set) as acc) item =
+    let key = get_key item in
+    if String_set.mem key set then
+      match merge with
+      | None -> acc
+      | Some merge ->
+          (* Go back and merge the previous occurrence. *)
+          let merge_if_equal previous_item =
+            if String.compare (get_key previous_item) key = 0 then
+              merge previous_item item
+            else previous_item
+          in
+          let list = List.map merge_if_equal list in
+          (list, set)
+    else (item :: list, String_set.add key set)
+  in
+  List.fold_left add ([], String_set.empty) list |> fst |> List.rev
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -486,6 +510,15 @@ module Version = struct
 
   let and_list = List.fold_left ( && ) True
 
+  let rec to_and_list c =
+    match c with
+    | True | False | Exactly _ | Different_from _ | At_least _ | More_than _
+    | At_most _ | Less_than _ | Not _ ->
+        [c]
+    | And (c1, c2) -> to_and_list c1 @ to_and_list c2
+    | Or (_, _) ->
+        invalid_arg "Version.to_and_list: passed cosntraint is not an and list"
+
   let ( || ) a b =
     match (a, b) with
     | True, _ | _, True -> True
@@ -493,6 +526,28 @@ module Version = struct
     | _ -> Or (a, b)
 
   let or_list = List.fold_left ( || ) False
+
+  let rec version_to_string = function
+    | True -> "true"
+    | False -> "false"
+    | Exactly (V x) -> Format.sprintf "= %s" x
+    | Exactly Version -> "= version"
+    | Different_from (V x) -> Format.sprintf "!= %s" x
+    | Different_from Version -> "!= version"
+    | At_least (V x) -> Format.sprintf ">= %s" x
+    | At_least Version -> ">= version"
+    | More_than (V x) -> Format.sprintf "> %s" x
+    | More_than Version -> "> version"
+    | At_most (V x) -> Format.sprintf "<= %s" x
+    | At_most Version -> "<= version"
+    | Less_than (V x) -> Format.sprintf "< %s" x
+    | Less_than Version -> "< version"
+    | Not constraints ->
+        Format.sprintf "not %s" @@ version_to_string constraints
+    | And (c1, c2) ->
+        Format.sprintf "%s && %s" (version_to_string c1) (version_to_string c2)
+    | Or (c1, c2) ->
+        Format.sprintf "%s || %s" (version_to_string c1) (version_to_string c2)
 end
 
 module Npm = struct
@@ -578,6 +633,27 @@ module Opam = struct
       invalid_arg
         ("Manifest.Opam.pp: synopsis cannot end with a period: " ^ synopsis) ;
     let depopts, depends = List.partition (fun dep -> dep.optional) depends in
+    (* Tries to dedpublicate dependencies constraints *)
+    let deduplicate_constraints_list constraints =
+      try
+        deduplicate_list
+          ~merge:(fun c1 _c2 -> c1)
+          Version.version_to_string
+          (Version.to_and_list constraints)
+        |> Version.and_list
+      with _ -> constraints
+    in
+    let depends =
+      List.map
+        (fun dep ->
+          {
+            package = dep.package;
+            with_test = dep.with_test;
+            optional = dep.optional;
+            version = deduplicate_constraints_list dep.version;
+          })
+        depends
+    in
     let depopts, conflicts =
       (* Opam documentation says this about [depopts]:
          "If you require specific versions, add a [conflicts] field with the ones
@@ -2355,30 +2431,6 @@ let generate_dune (internal : Target.internal) =
       ~private_modules:internal.private_modules
       ?js_of_ocaml:internal.js_of_ocaml
     :: documentation :: create_empty_files :: internal.dune)
-
-(* Remove duplicates from a list.
-   Items that are not removed are kept in their original order.
-   In case of duplicates, the first occurrence is kept.
-   [get_key] returns the comparison key (a string).
-   [merge] is used in case a key is present several times. *)
-let deduplicate_list ?merge get_key list =
-  let add ((list, set) as acc) item =
-    let key = get_key item in
-    if String_set.mem key set then
-      match merge with
-      | None -> acc
-      | Some merge ->
-          (* Go back and merge the previous occurrence. *)
-          let merge_if_equal previous_item =
-            if String.compare (get_key previous_item) key = 0 then
-              merge previous_item item
-            else previous_item
-          in
-          let list = List.map merge_if_equal list in
-          (list, set)
-    else (item :: list, String_set.add key set)
-  in
-  List.fold_left add ([], String_set.empty) list |> fst |> List.rev
 
 (* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released
    in the definition of its internal target [i].
