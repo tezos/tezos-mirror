@@ -1,6 +1,6 @@
 output "docker_registry_url" {
-  value = module.docker_registry.url
-  description = "URL of the Docker registry"  
+  value       = module.docker_registry.url
+  description = "URL of the Docker registry"
 }
 
 output "gcp_docker_registry" {

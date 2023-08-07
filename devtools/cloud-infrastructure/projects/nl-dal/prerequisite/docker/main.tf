@@ -1,5 +1,5 @@
 module "docker_registry" {
-  source     = "../../../../libraries/docker-registry"
+  source = "../../../../libraries/docker-registry"
 
   project_id = var.project_id
   region     = var.region
