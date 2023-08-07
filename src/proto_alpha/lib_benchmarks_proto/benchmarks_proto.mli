@@ -126,4 +126,6 @@ module Model : sig
     (int * unit) model
 
   val linear : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
+
+  val set_takes_saturation_reprs : bool -> 'a t -> 'a t
 end

@@ -46,6 +46,12 @@ module type Model_impl = sig
 
   val name : Namespace.t
 
+  (** If [true], the generated function takes
+      [Saturation_repr.may_saturate Saturation_repr.t] as arguments
+      instead of [int]s. Otherwise, the generated function takes [int]s.
+  *)
+  val takes_saturation_reprs : bool
+
   module Def (X : Costlang.S) : sig
     type model_type
 
@@ -133,6 +139,11 @@ val get_free_variable_set_of_t : _ t -> Free_variable.Set.t
 *)
 val get_free_variable_set_applied :
   'workload t -> 'workload -> Free_variable.Set.t
+
+(** Set [takes_saturation_reprs] field of the model.
+    Raises [Invalid_arg _] when the model is [Aggregate _].
+*)
+val set_takes_saturation_reprs : bool -> 'a t -> 'a t
 
 (* -------------------------------------------------------------------------- *)
 (** Commonly used abstract models

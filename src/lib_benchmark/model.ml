@@ -40,6 +40,8 @@ module type Model_impl = sig
 
   val name : Namespace.t
 
+  val takes_saturation_reprs : bool
+
   module Def (X : Costlang.S) : sig
     type model_type
 
@@ -241,6 +243,20 @@ let get_free_variable_set_applied (type workload) (model : workload t)
   let module R = M (T1) in
   T0.prj @@ T1.prj R.applied
 
+let set_takes_saturation_reprs' (type a) b ((module Model) : a model) : a model
+    =
+  let module Model' = struct
+    include Model
+
+    let takes_saturation_reprs = b
+  end in
+  (module Model')
+
+let set_takes_saturation_reprs b = function
+  | Abstract {conv; model} ->
+      Abstract {conv; model = set_takes_saturation_reprs' b model}
+  | _ -> invalid_arg "set_takes_saturation_reprs"
+
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)
 
@@ -249,6 +265,8 @@ let zero =
     type arg_type = unit
 
     let name = Namespace.root "zero"
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -268,6 +286,8 @@ let unknown_const1 ~name ~const =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -286,6 +306,8 @@ let linear ~name ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -303,6 +325,8 @@ let affine ~name ~intercept ~coeff =
     type arg_type = int * unit
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -324,6 +348,8 @@ let affine_offset ~name ~intercept ~coeff ~offset =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -344,6 +370,8 @@ let quadratic ~name ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -362,6 +390,8 @@ let nlogn ~name ~intercept ~coeff =
     type arg_type = int * unit
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -383,6 +413,8 @@ let nsqrtn_const ~name ~intercept ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -403,6 +435,8 @@ let logn ~name ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -421,6 +455,8 @@ let linear_sum ~name ~intercept ~coeff =
     type arg_type = int * (int * unit)
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -443,6 +479,8 @@ let linear_max ~name ~intercept ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -464,6 +502,8 @@ let linear_min ~name ~intercept ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -484,6 +524,8 @@ let linear_min_offset ~name ~intercept ~coeff ~offset =
     type arg_type = int * (int * unit)
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -507,6 +549,8 @@ let linear_mul ~name ~intercept ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -528,6 +572,8 @@ let bilinear ~name ~coeff1 ~coeff2 =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -548,6 +594,8 @@ let bilinear_affine ~name ~intercept ~coeff1 ~coeff2 =
     type arg_type = int * (int * unit)
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -572,6 +620,8 @@ let nlogm ~name ~intercept ~coeff =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -593,6 +643,8 @@ let n_plus_logm ~name ~intercept ~linear_coeff ~log_coeff =
     type arg_type = int * (int * unit)
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -616,6 +668,8 @@ let trilinear ~name ~coeff1 ~coeff2 ~coeff3 =
     type arg_type = int * (int * (int * unit))
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -643,6 +697,8 @@ let breakdown ~name ~coeff1 ~coeff2 ~break =
 
     let name = name
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -664,6 +720,8 @@ let breakdown2 ~name ~coeff1 ~coeff2 ~coeff3 ~break1 ~break2 =
     type arg_type = int * unit
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -687,6 +745,8 @@ let breakdown2_const ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2 =
     type arg_type = int * unit
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -712,6 +772,8 @@ let breakdown2_const_offset ~name ~coeff1 ~coeff2 ~coeff3 ~const ~break1 ~break2
     type arg_type = int * unit
 
     let name = name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -750,6 +812,9 @@ module Synthesize
   type arg_type = X.arg_type
 
   let name = Names.name
+
+  (* Use X's configuration *)
+  let takes_saturation_reprs = X.takes_saturation_reprs
 
   module Def (C : Costlang.S) = struct
     module Args = X.Def (Costlang.Arg_names)

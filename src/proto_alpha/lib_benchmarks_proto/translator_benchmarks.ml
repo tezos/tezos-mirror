@@ -604,10 +604,12 @@ module Ty_eq : Benchmark.S = struct
 
   let group = Benchmark.Group "size_translator_model"
 
-  let model =
-    Model.make
-      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:Model.affine
+  let model ~name =
+    Model.set_takes_saturation_reprs true
+    @@ Model.make
+         ~name
+         ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
+         ~model:Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     let open Lwt_result_syntax in

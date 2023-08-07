@@ -159,6 +159,8 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
       let module M = struct
         let name = name
 
+        let takes_saturation_reprs = false
+
         type arg_type = int * unit
 
         module Def (X : Costlang.S) = struct
