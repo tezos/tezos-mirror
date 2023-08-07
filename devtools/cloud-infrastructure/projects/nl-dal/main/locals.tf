@@ -16,7 +16,7 @@ locals {
   # Startup_script (max 256 kB)
   startup_script = templatefile(
     "./scripts/startup_script.sh", {
-      docker_registry_url     = var.docker_registry_url
+      docker_registry_url = var.docker_registry_url
     }
   )
 
@@ -33,9 +33,9 @@ locals {
       network_tier = local.network_tier
     }]
   ]
-  can_ip_forward       = "false"
-  static_ips           = []
-  service_port         = "80"
+  can_ip_forward = "false"
+  static_ips     = []
+  service_port   = "80"
   named_ports = [
     {
       name = "service"
@@ -52,7 +52,7 @@ locals {
   ]
 
   # image
-  source_image = "custom-cos-1690809563"
+  source_image         = "custom-cos-1690809563"
   source_image_family  = "custom-cos" # Build by Packer
   source_image_project = var.project_id
 

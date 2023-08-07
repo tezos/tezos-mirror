@@ -122,8 +122,8 @@ module "vm_instance_template_rollup" {
 }
 
 module "vm_umig_rollup" {
-  source  = "terraform-google-modules/vm/google//modules/umig"
-  version = "~> 7.9.0"
+  source             = "terraform-google-modules/vm/google//modules/umig"
+  version            = "~> 7.9.0"
   project_id         = var.project_id
   network            = local.network
   subnetwork         = local.subnetwork
