@@ -430,6 +430,26 @@ module RPC = struct
         {messages; reveal_pages = None; insight_requests}
     in
     Simulation.gas_estimation r
+
+  let is_tx_valid base tx_raw =
+    let (Hash tx_raw) = tx_raw in
+    let open Lwt_result_syntax in
+    let*? messages = Simulation.encode_tx tx_raw in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_status"];
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+      ]
+    in
+    let* r =
+      call_service
+        ~base
+        simulation
+        ()
+        ()
+        {messages; reveal_pages = None; insight_requests}
+    in
+    Simulation.is_tx_valid r
 end
 
 module type S = sig
@@ -472,6 +492,8 @@ module type S = sig
 
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
+
+  val is_tx_valid : Ethereum_types.hash -> (unit, string) result tzresult Lwt.t
 end
 
 module Make (Base : sig
@@ -508,4 +530,6 @@ end) : S = struct
   let simulate_call = RPC.simulate_call Base.base
 
   let estimate_gas = RPC.estimate_gas Base.base
+
+  let is_tx_valid = RPC.is_tx_valid Base.base
 end
