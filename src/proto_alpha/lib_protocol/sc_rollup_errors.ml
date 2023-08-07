@@ -102,6 +102,7 @@ type error +=
   | Sc_rollup_empty_whitelist
   | Sc_rollup_whitelist_disabled
   | Sc_rollup_staker_not_in_whitelist
+  | Sc_rollup_duplicated_key_in_whitelist
 
 let () =
   register_error_kind
@@ -729,4 +730,17 @@ let () =
          present in the whitelist.")
     Data_encoding.empty
     (function Sc_rollup_staker_not_in_whitelist -> Some () | _ -> None)
-    (fun () -> Sc_rollup_staker_not_in_whitelist)
+    (fun () -> Sc_rollup_staker_not_in_whitelist) ;
+  register_error_kind
+    `Temporary
+    ~id:"smart_rollup_duplicated_key_in_whitelist"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The whitelist contains twice the same key. This is forbidden and all \
+         keys in the whitelist should be disctinct.")
+    Data_encoding.empty
+    (function Sc_rollup_duplicated_key_in_whitelist -> Some () | _ -> None)
+    (fun () -> Sc_rollup_duplicated_key_in_whitelist)

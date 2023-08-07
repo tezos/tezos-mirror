@@ -183,6 +183,7 @@ let context_init ?commitment_period_in_blocks
           Context.default_test_constants.sc_rollup with
           enable = true;
           arith_pvm_enable = true;
+          private_enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
           commitment_period_in_blocks =
             Option.value
@@ -235,13 +236,14 @@ let test_disable_arith_pvm_feature_flag () =
   return_unit
 
 (** Initializes the context and originates a SCORU. *)
-let sc_originate ?boot_sector ?parameters_ty block contract =
+let sc_originate ?boot_sector ?parameters_ty ?whitelist block contract =
   let open Lwt_result_syntax in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Sc_rollup_helpers.origination_op
       ?boot_sector
       ?parameters_ty
+      ?whitelist
       (B block)
       contract
       kind
@@ -498,6 +500,20 @@ let verify_execute_outbox_message_operations ctxt rollup ~loc ~operations
     pp_data
     operations_data
     transactions_data
+
+let verify_whitelist ~loc ~expected_whitelist rollup ctxt =
+  let open Lwt_result_syntax in
+  let* found_whitelist = Context.Sc_rollup.whitelist ctxt rollup in
+  let sort_whitelist =
+    Option.map (List.sort Signature.Public_key_hash.compare)
+  in
+  let found_sorted = sort_whitelist found_whitelist in
+  let expected_sorted = sort_whitelist expected_whitelist in
+  Assert.(assert_equal_list_opt ~loc Signature.Public_key_hash.equal)
+    "whitelist"
+    Signature.Public_key_hash.pp
+    expected_sorted
+    found_sorted
 
 (* Helper function to create output used for executing outbox messages. *)
 let make_output ~outbox_level ~message_index transactions =
@@ -3415,6 +3431,20 @@ let test_private_rollup_publish_fails_with_non_whitelisted_staker () =
   in
   return_unit
 
+let test_private_rollup_whitelist_cannot_contain_key_duplication () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let account2_pkh = Account.pkh_of_contract_exn account2 in
+  let originate_with_whitelist ~whitelist block =
+    sc_originate ?whitelist block account1
+  in
+  let whitelist = Some [account2_pkh; account2_pkh] in
+  let block_rollup_res = originate_with_whitelist ~whitelist block in
+  assert_fails_with
+    ~__LOC__
+    block_rollup_res
+    Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
+
 let tests =
   [
     Tztest.tztest
@@ -3572,6 +3602,10 @@ let tests =
       "Submit a commitment with a non-whitelisted staker"
       `Quick
       test_private_rollup_publish_fails_with_non_whitelisted_staker;
+    Tztest.tztest
+      "Originate a rollup with duplicated key in the whitelist fails"
+      `Quick
+      test_private_rollup_whitelist_cannot_contain_key_duplication;
   ]
 
 let () =

@@ -439,6 +439,15 @@ module Sc_rollup = struct
       ()
       ()
 
+  let whitelist ctxt rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.whitelist
+      rpc_ctxt
+      ctxt
+      rollup
+      ()
+      ()
+
   let commitment ctxt sc_rollup hash =
     Environment.RPC_context.make_call2
       Plugin.RPC.Sc_rollup.S.commitment
