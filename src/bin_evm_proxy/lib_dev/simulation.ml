@@ -206,22 +206,30 @@ end
 
 let parse_insights decode (r : Data_encoding.json) =
   let s = Data_encoding.Json.destruct Encodings.eval_result r in
-  match s.insights with
-  | Some b :: _ -> Lwt.return_ok (decode b)
-  | _ ->
+  match decode s.insights with
+  | Some insight -> Lwt.return_ok insight
+  | None ->
       Error_monad.failwith
         "Couldn't parse insights: %s"
         (Data_encoding.Json.to_string r)
 
-let call_result =
-  parse_insights (fun b ->
+let decode_call_result bytes =
+  match bytes with
+  | Some b :: _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Hash v)
+      Some (Hash v)
+  | _ -> None
+
+let call_result json = parse_insights decode_call_result json
+
+let decode_gas_estimation bytes =
+  match bytes with
+  | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> Option.some
+  | _ -> None
 
 let gas_estimation json =
   let open Lwt_result_syntax in
-  let decode b = b |> Bytes.to_string |> Z.of_bits in
-  let* simulated_amount = parse_insights decode json in
+  let* simulated_amount = parse_insights decode_gas_estimation json in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
      remove this once the gas is accounted correctly *)
   (* minimum gas for any Ethereum transaction *)
