@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -82,7 +83,7 @@ pub fn stage_one<Host: Runtime>(
     chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<Queue, Error> {
+) -> Result<Queue, anyhow::Error> {
     log!(host, Info, "Entering stage one.");
     log!(
         host,

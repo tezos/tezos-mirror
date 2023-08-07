@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -274,7 +275,7 @@ pub fn read_inbox<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<InboxContent, Error> {
+) -> Result<InboxContent, anyhow::Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
