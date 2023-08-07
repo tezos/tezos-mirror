@@ -617,7 +617,7 @@ let commands_ro () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_parameter))
+            (non_negative_parameter ())))
       (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
