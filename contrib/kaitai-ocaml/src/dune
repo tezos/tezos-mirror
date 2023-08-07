@@ -3,6 +3,7 @@
 
 (library
  (name kaitai)
+ (public_name kaitai)
  (instrumentation (backend bisect_ppx))
  (libraries
   yaml))

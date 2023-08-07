@@ -416,6 +416,8 @@ opam:bls12-381:
 
 # Ignoring unreleased package internal-devtools.
 
+# Ignoring unreleased package kaitai.
+
 opam:octez-accuser-Proxford:
   extends:
     - .opam_template

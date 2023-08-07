@@ -7997,7 +7997,12 @@ let octez_scoru_wasm_regressions =
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let kaitai =
-  private_lib ~opam:"" "kaitai" ~path:"contrib/kaitai-ocaml/src" ~deps:[yaml]
+  public_lib
+    ~opam:"kaitai"
+    "kaitai"
+    ~path:"contrib/kaitai-ocaml/src"
+    ~deps:[yaml]
+    ~synopsis:"OCaml library for reading Kaitai spec files"
 
 (* We use a private-lib with inline-tests in order to run the tests normally,
    but without placing all the code for the tests within the main kaitai
