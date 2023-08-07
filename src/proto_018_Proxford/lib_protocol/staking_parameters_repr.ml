@@ -90,9 +90,23 @@ let encoding =
 let make ~limit_of_staking_over_baking_millionth
     ~edge_of_baking_over_staking_billionth =
   match
-    make
-      ~limit_of_staking_over_baking_millionth
-      ~edge_of_baking_over_staking_billionth
+    if
+      Compare.Z.(limit_of_staking_over_baking_millionth < Z.zero)
+      || Compare.Z.(edge_of_baking_over_staking_billionth < Z.zero)
+      || not (Z.fits_int32 edge_of_baking_over_staking_billionth)
+    then Error ()
+    else
+      let limit_of_staking_over_baking_millionth =
+        if Z.fits_int32 limit_of_staking_over_baking_millionth then
+          Z.to_int32 limit_of_staking_over_baking_millionth
+        else Int32.max_int
+      in
+      let edge_of_baking_over_staking_billionth =
+        Z.to_int32 edge_of_baking_over_staking_billionth
+      in
+      make
+        ~limit_of_staking_over_baking_millionth
+        ~edge_of_baking_over_staking_billionth
   with
   | Error () -> Result_syntax.tzfail Invalid_staking_parameters
   | Ok _ as ok -> ok

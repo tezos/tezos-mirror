@@ -337,14 +337,14 @@ Full description
   <div id="GET_..--block_idoutput.json" class="GET_..--block_id tabcontent">
     <pre>
     { /* block_info_encoding_v1 */
-      "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
       "chain_id": $Chain_id,
       "hash": $block_hash,
       "header": $raw_block_header,
       "metadata"?: $block_header_metadata,
       "operations": [ [ $operation ... ] ... ] }
     || { /* block_info_encoding_v0 */
-         "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+         "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
          "chain_id": $Chain_id,
          "hash": $block_hash,
          "header": $raw_block_header,
@@ -3378,8 +3378,8 @@ Full description
       /* A block identifier (Base58Check-encoded) */
       $unistring
     $block_header_metadata:
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
-        "next_protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
+        "next_protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "test_chain_status": $test_chain_status,
         "max_operations_ttl": integer ∈ [-2^30, 2^30],
         "max_operation_data_length": integer ∈ [-2^30, 2^30],
@@ -3455,8 +3455,8 @@ Full description
         "consumed_milligas": $positive_bignum,
         "dal_attestation"?: $bignum }
     $block_header_metadata_with_legacy_attestation_name:
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
-        "next_protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
+        "next_protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "test_chain_status": $test_chain_status,
         "max_operations_ttl": integer ∈ [-2^30, 2^30],
         "max_operation_data_length": integer ∈ [-2^30, 2^30],
@@ -3562,7 +3562,7 @@ Full description
            "annots"?: [ $unistring ... ] }
     $operation:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -3570,14 +3570,14 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
            "contents": [ $018-Proxford.operation.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -3585,7 +3585,7 @@ Full description
              [ $018-Proxford.operation.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -3593,7 +3593,7 @@ Full description
            "signature"?: $Signature.V1 }
     $operation_with_legacy_attestation_name:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -3602,7 +3602,7 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -3610,7 +3610,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -3618,7 +3618,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -24347,7 +24347,7 @@ Full description
     { /* Shell header
          Block header's shell-related content. It contains information such as
          the block level, its predecessor and timestamp. */
-      "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
       "chain_id": $Chain_id,
       "hash": $block_hash,
       "level": integer ∈ [-2^31-1, 2^31],
@@ -24571,7 +24571,7 @@ Full description
             </div>
   <div id="GET_..--block_id--header--protocol_dataoutput.json" class="GET_..--block_id--header--protocol_data tabcontent">
     <pre>
-    { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+    { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
       "payload_hash": $value_hash,
       "payload_round": integer ∈ [-2^31-1, 2^31],
       "proof_of_work_nonce": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
@@ -25053,7 +25053,7 @@ Full description
   <div id="POST_..--block_id--helpers--preapply--blockinput.json" class="POST_..--block_id--helpers--preapply--block tabcontent">
     <pre>
     { "protocol_data":
-        { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
           "payload_hash": $value_hash,
           "payload_round": integer ∈ [-2^31-1, 2^31],
           "proof_of_work_nonce": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
@@ -26037,13 +26037,13 @@ Full description
            "annots"?: [ $unistring ... ] }
     $next_operation:
       /* An operation's shell header. */
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "branch": $block_hash,
         "contents": [ $018-Proxford.operation.alpha.contents ... ],
         "signature"?: $Signature.V1 }
     $next_operation_with_legacy_attestation_name:
       /* An operation's shell header. */
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "branch": $block_hash,
         "contents":
           [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
@@ -29603,13 +29603,13 @@ Full description
            "annots"?: [ $unistring ... ] }
     $next_operation:
       /* An operation's shell header. */
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "branch": $block_hash,
         "contents": [ $018-Proxford.operation.alpha.contents ... ],
         "signature"?: $Signature.V1 }
     $next_operation_with_legacy_attestation_name:
       /* An operation's shell header. */
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "branch": $block_hash,
         "contents":
           [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
@@ -40881,8 +40881,8 @@ Full description
       /* A block identifier (Base58Check-encoded) */
       $unistring
     $block_header_metadata:
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
-        "next_protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
+        "next_protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "test_chain_status": $test_chain_status,
         "max_operations_ttl": integer ∈ [-2^30, 2^30],
         "max_operation_data_length": integer ∈ [-2^30, 2^30],
@@ -40958,8 +40958,8 @@ Full description
         "consumed_milligas": $positive_bignum,
         "dal_attestation"?: $bignum }
     $block_header_metadata_with_legacy_attestation_name:
-      { "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
-        "next_protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+      { "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
+        "next_protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "test_chain_status": $test_chain_status,
         "max_operations_ttl": integer ∈ [-2^30, 2^30],
         "max_operation_data_length": integer ∈ [-2^30, 2^30],
@@ -46244,7 +46244,7 @@ Full description
            "annots"?: [ $unistring ... ] }
     $operation:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -46252,14 +46252,14 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
            "contents": [ $018-Proxford.operation.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -46267,7 +46267,7 @@ Full description
              [ $018-Proxford.operation.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -46275,7 +46275,7 @@ Full description
            "signature"?: $Signature.V1 }
     $operation_with_legacy_attestation_name:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -46284,7 +46284,7 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -46292,7 +46292,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -46300,7 +46300,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -55476,7 +55476,7 @@ Full description
            "annots"?: [ $unistring ... ] }
     $operation:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -55484,14 +55484,14 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
            "contents": [ $018-Proxford.operation.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -55499,7 +55499,7 @@ Full description
              [ $018-Proxford.operation.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -55507,7 +55507,7 @@ Full description
            "signature"?: $Signature.V1 }
     $operation_with_legacy_attestation_name:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -55516,7 +55516,7 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -55524,7 +55524,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -55532,7 +55532,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -64694,7 +64694,7 @@ Full description
            "annots"?: [ $unistring ... ] }
     $operation:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -64702,14 +64702,14 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
            "contents": [ $018-Proxford.operation.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -64717,7 +64717,7 @@ Full description
              [ $018-Proxford.operation.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -64725,7 +64725,7 @@ Full description
            "signature"?: $Signature.V1 }
     $operation_with_legacy_attestation_name:
       { /* An operation's shell header. */
-        "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+        "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
         "chain_id": $Chain_id,
         "hash": $Operation_hash,
         "branch": $block_hash,
@@ -64734,7 +64734,7 @@ Full description
         "signature"?: $Signature.V1,
         "metadata": "too large" }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -64742,7 +64742,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.contents ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
@@ -64750,7 +64750,7 @@ Full description
              [ $018-Proxford.operation_with_legacy_attestation_name.alpha.operation_contents_and_result ... ],
            "signature"?: $Signature.V1 }
       || { /* An operation's shell header. */
-           "protocol": "ProxfordZNRgFcnNcXRSN4rtHAMFpu4w7FNjyx49pjQVU6Ww4ef",
+           "protocol": "ProxfordSW2S7fvchT1Zgj2avb5UES194neRyYVXoaDGvF9egt8",
            "chain_id": $Chain_id,
            "hash": $Operation_hash,
            "branch": $block_hash,
