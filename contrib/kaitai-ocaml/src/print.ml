@@ -84,7 +84,18 @@ let to_yaml (t : ClassSpec.t) =
            "seq",
            sequence
              (t.seq
-             |> List.map (fun v -> mapping [("id", scalar v.AttrSpec.id)])) );
+             |> List.map (fun v ->
+                    mapping
+                      (("id", scalar v.AttrSpec.id)
+                      ::
+                      (* We only add "type" to Yaml if not [AnyType].
+                         TODO: This is only correct if [AnyType] means no type? *)
+                      (if v.AttrSpec.dataType = AnyType then []
+                      else
+                        [
+                          ( "type",
+                            scalar (DataType.to_string v.AttrSpec.dataType) );
+                        ])))) );
        ])
 
 let print t =

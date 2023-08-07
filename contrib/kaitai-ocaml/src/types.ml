@@ -179,6 +179,11 @@ module DataType = struct
   }
 
   type t = data_type
+
+  let to_string = function
+    | NumericType (Int_type (Int1Type {signed})) ->
+        if signed then "s1" else "u1"
+    | _ -> failwith "not supported"
 end
 
 module DocSpec = struct
