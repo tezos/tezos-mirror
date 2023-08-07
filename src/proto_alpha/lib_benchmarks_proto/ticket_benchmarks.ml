@@ -89,7 +89,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Group "compare_tickets"
+  let group = Benchmark.Group "tickets"
 
   let model =
     Model.make
@@ -141,7 +141,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Group "compare_tickets"
+  let group = Benchmark.Group "tickets"
 
   let model =
     Model.make
@@ -200,7 +200,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "tickets"
 
   let make_bench_helper rng_state config () =
     let open Result_syntax in
@@ -247,7 +247,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let purpose = Benchmark.Generate_code "ticket"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "tickets"
 
   let make_bench_helper rng_state config () =
     let open Script_typed_ir in

@@ -129,6 +129,8 @@ module Micheline_common = struct
     [("micheline", model_size name); ("micheline_bytes", model_bytes name)]
 end
 
+let group = Benchmark.Group "script_repr"
+
 module Encoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
   include Micheline_common
@@ -199,6 +201,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Encoding_micheline)
 
 module Decoding_micheline : Benchmark.S = struct
@@ -275,6 +278,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Decoding_micheline)
 
 module Timestamp = struct

@@ -172,7 +172,7 @@ module List_key_values_benchmark_boilerplate = struct
   let workload_to_vector {size} =
     Sparse_vec.String.of_list [("size", float_of_int size)]
 
-  let group = Benchmark.Group "list_key_values"
+  let group = Benchmark.Group "storage_costs"
 
   let model =
     Model.make

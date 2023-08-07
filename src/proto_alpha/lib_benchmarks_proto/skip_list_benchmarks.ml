@@ -57,7 +57,7 @@ module Next : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "skip_list"
 
   let config_encoding =
     let open Data_encoding in
@@ -111,7 +111,7 @@ module Hash_cell : Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "skip_list"
 
   include Skip_list
   module Hash = Sc_rollup_inbox_repr.Hash

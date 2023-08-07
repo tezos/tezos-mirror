@@ -137,7 +137,7 @@ module Cache_update_benchmark : Benchmarks_proto.Benchmark.S = struct
 
   let module_filename = __FILE__
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "cache_repr"
 
   let purpose = Benchmark.Generate_code "cache_repr"
 

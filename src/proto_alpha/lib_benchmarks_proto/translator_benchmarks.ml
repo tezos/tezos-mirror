@@ -33,6 +33,8 @@ Tezos_shell_benchmarks.Encoding_benchmarks_helpers.Make (struct
   let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
 
+let group = Benchmark.Group "script_ir_translator"
+
 module Size = Gas_input_size
 
 let ns = Translator_model.ns
@@ -76,10 +78,8 @@ module Default_boilerplate = struct
 
   let make_models t_kind code_or_data =
     [
-      ( "gas_translator_model",
-        Translator_model.gas_based_model t_kind code_or_data );
-      ( "size_translator_model",
-        Translator_model.size_based_model t_kind code_or_data );
+      ("gas_model", Translator_model.gas_based_model t_kind code_or_data);
+      ("size_model", Translator_model.size_based_model t_kind code_or_data);
     ]
 end
 
@@ -270,6 +270,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Typechecking_data)
 
 module Unparsing_data : Benchmark.S = struct
@@ -360,6 +361,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Unparsing_data)
 
 module Typechecking_code : Benchmark.S = struct
@@ -442,6 +444,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Typechecking_code)
 
 module Unparsing_code : Benchmark.S = struct
@@ -534,6 +537,7 @@ end
 
 let () =
   Benchmarks_proto.Registration.register_as_simple_with_num
+    ~group
     (module Unparsing_code)
 
 let rec check_printable_ascii v i =
