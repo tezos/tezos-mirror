@@ -2096,15 +2096,21 @@ let send_raw_transaction_request raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
 let send_raw_transaction proxy_server raw_tx =
-  let* transaction_hash =
+  let* response =
     Evm_proxy_server.call_evm_rpc
       proxy_server
       (send_raw_transaction_request raw_tx)
   in
   let hash =
-    transaction_hash |> Evm_proxy_server.extract_result |> JSON.as_string
+    response |> Evm_proxy_server.extract_result |> JSON.as_string_opt
   in
-  return hash
+  let error_message =
+    response |> Evm_proxy_server.extract_error_message |> JSON.as_string_opt
+  in
+  match (hash, error_message) with
+  | Some hash, _ -> return (Ok hash)
+  | _, Some error_code -> return (Error error_code)
+  | _ -> failwith "invalid response from eth_sendRawTransaction"
 
 let test_rpc_sendRawTransaction =
   Protocol.register_test
@@ -2119,6 +2125,7 @@ let test_rpc_sendRawTransaction =
     Lwt_list.map_p
       (fun (tx_raw, _) ->
         let* hash = send_raw_transaction evm_proxy_server tx_raw in
+        let hash = Result.get_ok hash in
         return hash)
       txs
   in
@@ -2333,6 +2340,54 @@ let test_deposit_dailynet =
   (* Check the balance in the EVM rollup. *)
   check_balance ~receiver ~endpoint amount_mutez
 
+let test_rpc_sendRawTransaction_nonce_too_low =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "nonce"]
+    ~title:"Returns an error if the nonce is too low"
+  @@ fun protocol ->
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  (* Nonce: 0 *)
+  let raw_tx =
+    "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
+  in
+  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let transaction_hash = Result.get_ok result in
+  let* _ =
+    wait_for_application
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash)
+      ()
+  in
+  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let error_message = Result.get_error result in
+  Check.(
+    ((error_message = "Nonce too low.") string)
+      ~error_msg:"The transaction should fail") ;
+  unit
+
+let test_rpc_sendRawTransaction_nonce_too_high =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "nonce"]
+    ~title:"Returns an error if the nonce is too high."
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  (* Nonce: 1 *)
+  let raw_tx =
+    "0xf86c01825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a95a0a349864bedc9b84aea88cda197e96538c62c242286ead58eb7180a611f850237a01206525ff16ae5b708ee02b362f9b4d7565e0d7e9b4c536d7ef7dec81cda3ac7"
+  in
+  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let error_message = Result.get_error result in
+  Check.(
+    ((error_message = "Nonce too high.") string)
+      ~error_msg:"The transaction should fail") ;
+  unit
+
 let test_deposit_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
@@ -2466,7 +2521,9 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_failing_migration protocols ;
   test_check_kernel_upgrade_nonce protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_deposit_dailynet protocols
+  test_deposit_dailynet protocols ;
+  test_rpc_sendRawTransaction_nonce_too_low protocols ;
+  test_rpc_sendRawTransaction_nonce_too_high protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;

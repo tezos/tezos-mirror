@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -190,6 +191,8 @@ let batch_evm_rpc proxy_server requests =
   RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run
 
 let extract_result json = JSON.(json |-> "result")
+
+let extract_error_message json = JSON.(json |-> "error" |-> "message")
 
 let fetch_contract_code evm_proxy_server contract_address =
   let* code =
