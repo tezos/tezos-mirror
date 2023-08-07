@@ -103,6 +103,7 @@ type error +=
   | Sc_rollup_whitelist_disabled
   | Sc_rollup_staker_not_in_whitelist
   | Sc_rollup_duplicated_key_in_whitelist
+  | Sc_rollup_is_public
 
 let () =
   register_error_kind
@@ -743,4 +744,16 @@ let () =
          keys in the whitelist should be disctinct.")
     Data_encoding.empty
     (function Sc_rollup_duplicated_key_in_whitelist -> Some () | _ -> None)
-    (fun () -> Sc_rollup_duplicated_key_in_whitelist)
+    (fun () -> Sc_rollup_duplicated_key_in_whitelist) ;
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_rollup_is_public"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The rollup is public, no update whitelist message can be executed.")
+    Data_encoding.empty
+    (function Sc_rollup_is_public -> Some () | _ -> None)
+    (fun () -> Sc_rollup_is_public)

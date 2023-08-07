@@ -76,3 +76,8 @@ let find_whitelist_uncarbonated ctxt rollup_address =
     in
     return (Some elts)
   else return None
+
+let replace ctxt rollup ~whitelist =
+  let open Lwt_result_syntax in
+  let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
+  init ~whitelist ctxt rollup
