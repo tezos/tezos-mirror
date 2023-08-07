@@ -2139,6 +2139,19 @@ module Sc_rollup = struct
         let name = ["whitelist_use_bytes"]
       end)
       (Encoding.Z)
+
+  module Last_whitelist_update =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["last_whitelist_update"]
+      end)
+      (struct
+        type t = Raw_level_repr.t * Z.t
+
+        let encoding =
+          Data_encoding.(tup2 Raw_level_repr.encoding Data_encoding.z)
+      end)
 end
 
 module Dal = struct

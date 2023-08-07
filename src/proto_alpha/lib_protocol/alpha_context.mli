@@ -2810,6 +2810,17 @@ module Sc_rollup : sig
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit
+
+    val find_last_whitelist_update :
+      context ->
+      Sc_rollup_repr.t ->
+      (context * (Raw_level.t * Z.t) option) tzresult Lwt.t
+
+    val set_last_whitelist_update :
+      context ->
+      Sc_rollup_repr.t ->
+      Raw_level.t * Z.t ->
+      (context * Z.t) tzresult Lwt.t
   end
 
   module Staker : sig

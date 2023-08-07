@@ -26,11 +26,60 @@
 
 open Alpha_context
 
+type ('a, 'b) error_container = {given : 'a; last_update : 'b}
+
+type last_whitelist_update = {message_index : Z.t; outbox_level : Raw_level.t}
+
+let last_whitelist_update_encoding =
+  Data_encoding.(
+    conv
+      (fun {message_index; outbox_level} -> (message_index, outbox_level))
+      (fun (message_index, outbox_level) -> {message_index; outbox_level})
+      (obj2 (req "message_index" n) (req "outbox_level" Raw_level.encoding)))
+
+type outdated_whitelist_update =
+  | Outdated_message_index of (Z.t, last_whitelist_update) error_container
+  | Outdated_outbox_level of
+      (Raw_level.t, last_whitelist_update) error_container
+
+let outdated_whitelist_update_encoding =
+  Data_encoding.(
+    union
+      [
+        case
+          ~title:"outdated_message_index"
+          (Tag 0)
+          (obj2
+             (req "message_index" n)
+             (req "last_whitelist_update" last_whitelist_update_encoding))
+          (function
+            | Outdated_message_index {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_message_index {given; last_update});
+        case
+          ~title:"outdated_outbox_level"
+          (Tag 1)
+          (obj2
+             (req "outbox_level" Raw_level.encoding)
+             (req "last_whitelist_update" last_whitelist_update_encoding))
+          (function
+            | Outdated_outbox_level {given; last_update} ->
+                Some (given, last_update)
+            | _ -> None)
+          (fun (given, last_update) ->
+            Outdated_outbox_level {given; last_update});
+      ])
+
 type error +=
   | (* Permanent *) Sc_rollup_invalid_parameters_type
   | (* Permanent *) Sc_rollup_invalid_last_cemented_commitment
   | (* Permanent *) Sc_rollup_invalid_output_proof
   | (* Permanent *) Sc_rollup_invalid_outbox_level
+  | (* Permanent *)
+      Sc_rollup_outdated_whitelist_update of
+      outdated_whitelist_update
 
 type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
@@ -79,7 +128,42 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Sc_rollup_invalid_outbox_level -> Some () | _ -> None)
-    (fun () -> Sc_rollup_invalid_outbox_level)
+    (fun () -> Sc_rollup_invalid_outbox_level) ;
+  let description = "Outdated whitelist update" in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_outdated_whitelist_update"
+    ~title:description
+    ~description
+    ~pp:
+      (fun ppf -> function
+        | Outdated_message_index {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got message index %a at outbox level %a, while the lastest \
+               whitelist update occurred with message index %a."
+              description
+              Z.pp_print
+              given
+              Z.pp_print
+              last_update.message_index
+              Raw_level.pp
+              last_update.outbox_level
+        | Outdated_outbox_level {given; last_update} ->
+            Format.fprintf
+              ppf
+              "%s: got outbox level %a, while the current outbox level is %a \
+               with message index %a."
+              description
+              Raw_level.pp
+              given
+              Raw_level.pp
+              last_update.outbox_level
+              Z.pp_print
+              last_update.message_index)
+    outdated_whitelist_update_encoding
+    (function Sc_rollup_outdated_whitelist_update e -> Some e | _ -> None)
+    (fun e -> Sc_rollup_outdated_whitelist_update e)
 
 type origination_result = {
   address : Sc_rollup.Address.t;
@@ -454,7 +538,8 @@ let execute_outbox_message_transaction ctxt ~transactions ~rollup =
   in
   return ({paid_storage_size_diff; ticket_receipt; operations}, ctxt)
 
-let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist =
+let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
+    ~outbox_level ~message_index =
   let open Lwt_result_syntax in
   let* ctxt, is_private = Sc_rollup.Whitelist.is_private ctxt rollup in
   if is_private then
@@ -466,14 +551,56 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist =
             (List.is_empty whitelist)
             Sc_rollup_errors.Sc_rollup_empty_whitelist
         in
+        let* ctxt, last_whitelist_update =
+          Sc_rollup.Whitelist.find_last_whitelist_update ctxt rollup
+        in
+        let* () =
+          match last_whitelist_update with
+          | None -> return_unit
+          | Some (latest_outbox_level, latest_message_index) ->
+              let last_update =
+                {
+                  message_index = latest_message_index;
+                  outbox_level = latest_outbox_level;
+                }
+              in
+              (* Do not apply whitelist update if a previous whitelist update
+                 occurred with a greater message index for a given outbox level,
+                 or with a greater outbox level. *)
+              let* () =
+                fail_when
+                  (Raw_level.(latest_outbox_level = outbox_level)
+                  && Compare.Z.(latest_message_index >= message_index))
+                  (Sc_rollup_outdated_whitelist_update
+                     (Outdated_message_index
+                        {given = message_index; last_update}))
+              in
+              fail_when
+                Raw_level.(outbox_level < latest_outbox_level)
+                (Sc_rollup_outdated_whitelist_update
+                   (Outdated_outbox_level {given = outbox_level; last_update}))
+        in
         let* ctxt, new_storage_size =
           Sc_rollup.Whitelist.replace ctxt rollup ~whitelist
+        in
+        let* ctxt, size_diff =
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6186
+             Do not consider storage diffs for small updates to the storage. *)
+          Sc_rollup.Whitelist.set_last_whitelist_update
+            ctxt
+            rollup
+            (outbox_level, message_index)
         in
         let* ctxt, paid_storage_size_diff =
           Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size
         in
         return
-          ({paid_storage_size_diff; ticket_receipt = []; operations = []}, ctxt)
+          ( {
+              paid_storage_size_diff = Z.add paid_storage_size_diff size_diff;
+              ticket_receipt = [];
+              operations = [];
+            },
+            ctxt )
     | None ->
         let* ctxt, _freed_size = Sc_rollup.Whitelist.make_public ctxt rollup in
         return
@@ -531,7 +658,12 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
     | Sc_rollup_management_protocol.Whitelist_update whitelist ->
         let is_enabled = Constants.sc_rollup_private_enable ctxt in
         if is_enabled then
-          execute_outbox_message_whitelist_update ctxt ~rollup ~whitelist
+          execute_outbox_message_whitelist_update
+            ctxt
+            ~rollup
+            ~whitelist
+            ~outbox_level
+            ~message_index
         else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
   in
   (* Record that the message for the given level has been applied. This fails

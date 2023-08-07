@@ -1021,6 +1021,13 @@ module Sc_rollup : sig
       with type t = Raw_context.t
        and type key = Sc_rollup_repr.t
        and type value = Z.t
+
+  (** Outbox level and message of the latest whitelist update of a given rollup. *)
+  module Last_whitelist_update :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = Raw_context.t
+       and type key = Sc_rollup_repr.t
+       and type value = Raw_level_repr.t * Z.t
 end
 
 module Dal : sig
