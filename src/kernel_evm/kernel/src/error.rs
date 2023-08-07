@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
@@ -26,6 +27,8 @@ pub enum TransferError {
     CumulativeGasUsedOverflow,
     #[error("Transaction error: invalid address format {0}")]
     InvalidAddressFormat(Utf8Error),
+    #[error("Transaction error: invalid chain id {expected} but got {actual}")]
+    InvalidChainId { expected: U256, actual: U256 },
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]
