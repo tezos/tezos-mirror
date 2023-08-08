@@ -82,7 +82,7 @@ let high_watermark_switch =
   Tezos_clic.switch
     ~doc:
       "high watermark restriction\n\
-       Stores the highest level signed for blocks and endorsements for each \
+       Stores the highest level signed for blocks and attestations for each \
        address, and forbids to sign a level and round that are inferior or \
        equal afterwards, except for the exact same input data."
     ~short:'W'
