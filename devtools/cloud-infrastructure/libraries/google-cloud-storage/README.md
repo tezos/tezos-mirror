@@ -19,7 +19,7 @@ Creates a google cloud storage bucket.
 module "google_cloud_storage" {
   source     = "../../../../libraries/google-cloud-storage" # relative path to this module
 
-  project = <your-project-id>
+  project_id = <your-project-id>
   region     = <region>
   name       = <name-of-bucket>
 }

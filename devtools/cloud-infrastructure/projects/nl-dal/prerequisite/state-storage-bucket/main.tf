@@ -1,7 +1,7 @@
 module "google_cloud_storage" {
   source = "../../../../libraries/google-cloud-storage"
 
-  project = var.project
-  region  = var.region
-  name    = "${var.bucket}"
+  project_id = var.project_id
+  region     = var.region
+  name       = var.bucket
 }
