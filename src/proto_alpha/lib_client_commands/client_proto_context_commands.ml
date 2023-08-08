@@ -1890,7 +1890,9 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Stake"
+      ~desc:
+        "Stake the given amount for the source. The source must be a delegator \
+         to be allowed to stake."
       (args12
          fee_arg
          dry_run_switch
@@ -1955,7 +1957,13 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Unstake"
+      ~desc:
+        "Unstake the given amount. If \"everything\" is given as amount, \
+         unstakes everything from the staking balance. Unstaked tez remains \
+         frozen for a set amount of cycles (the slashing period) after the \
+         operation. Once this period is over, the operation \"finalize \
+         unstake\" must be called for the funds to appear in the liquid \
+         balance."
       (args12
          fee_arg
          dry_run_switch
@@ -2028,7 +2036,9 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Finalize unstake"
+      ~desc:
+        "Transfer all the finalizable unstaked funds of the source to their \
+         liquid balance."
       (args12
          fee_arg
          dry_run_switch
