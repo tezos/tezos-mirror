@@ -518,12 +518,12 @@ let cost_N_ITicket = S.safe_int 10
 let cost_N_ITotal_voting_power = S.safe_int 450
 
 (* model N_IUncomb *)
-(* Approximating 23.875723 + 3.944710 (x - 2) term *)
+(* Approximating 28.3868998848 + 3.86737178572 (x - 2) term *)
 let cost_N_IUncomb size =
   let open S_syntax in
   let size = S.safe_int size in
   let v0 = S.sub size (S.safe_int 2) in
-  S.safe_int 25 + (S.safe_int 4 * v0)
+  S.safe_int 30 + (S.safe_int 4 * v0)
 
 (* model N_IUnpair *)
 let cost_N_IUnpair = S.safe_int 10
