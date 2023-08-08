@@ -743,7 +743,14 @@ let fixed_point_parameter =
       Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
           match parse ~decimals p with
           | Some res -> return res
-          | None -> cctxt#error "Cannot read %s parameter" name)
+          | None ->
+              cctxt#error
+                "Cannot read %s parameter: expecting a fixed point number with \
+                 at most %d decimals, or a fixed point number with at most %d \
+                 decimals followed by a %% sign."
+                name
+                decimals
+                (decimals - 2))
 
 let limit_of_staking_over_baking_millionth_arg =
   Tezos_clic.arg
