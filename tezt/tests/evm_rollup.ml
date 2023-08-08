@@ -1619,6 +1619,18 @@ let test_deposit_fa12 =
          Eth_account.bootstrap_accounts.(0).address) ;
   unit
 
+let get_kernel_boot_wasm ~sc_rollup_client =
+  let*! kernel_boot_opt =
+    Sc_rollup_client.inspect_durable_state_value
+      sc_rollup_client
+      ~pvm_kind:"wasm_2_0_0"
+      ~operation:Sc_rollup_client.Value
+      ~key:Durable_storage_path.kernel_boot_wasm
+  in
+  match kernel_boot_opt with
+  | Some boot_wasm -> return boot_wasm
+  | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
+
 let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
     ~base_installee ~installee ?dictator ~private_key protocol =
   let* {
@@ -1688,20 +1700,11 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
     Hex.show @@ Hex.of_string @@ rollup_address_bytes ^ upgrade_tag_bytes
     ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes ^ signature
   in
-  let get_kernel_boot_wasm () =
-    let*! kernel_boot_wasm_after_upgrade_opt =
-      Sc_rollup_client.inspect_durable_state_value
-        sc_rollup_client
-        ~pvm_kind:"wasm_2_0_0"
-        ~operation:Sc_rollup_client.Value
-        ~key:Durable_storage_path.kernel_boot_wasm
-    in
-    match kernel_boot_wasm_after_upgrade_opt with
-    | Some boot_wasm -> return boot_wasm
-    | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
+  let* kernel_boot_wasm_before_upgrade =
+    get_kernel_boot_wasm ~sc_rollup_client
   in
   let* expected_kernel_boot_wasm =
-    if should_fail then get_kernel_boot_wasm ()
+    if should_fail then return kernel_boot_wasm_before_upgrade
     else
       return @@ Hex.show @@ Hex.of_string
       @@ read_file (project_root // base_installee // (installee ^ ".wasm"))
@@ -1714,10 +1717,18 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
       ~sender:Constant.bootstrap1.public_key_hash
       ~hex_msg:full_external_message
   in
-  let* kernel_boot_wasm_after_upgrade = get_kernel_boot_wasm () in
+  let* kernel_boot_wasm_after_upgrade =
+    get_kernel_boot_wasm ~sc_rollup_client
+  in
   Check.((expected_kernel_boot_wasm = kernel_boot_wasm_after_upgrade) string)
     ~error_msg:(sf "Unexpected `boot.wasm`.") ;
-  return (sc_rollup_node, node, client, evm_proxy_server)
+  return
+    ( sc_rollup_node,
+      sc_rollup_client,
+      node,
+      client,
+      evm_proxy_server,
+      kernel_boot_wasm_before_upgrade )
 
 let test_kernel_upgrade_to_debug =
   Protocol.register_test
@@ -1747,7 +1758,7 @@ let test_kernel_upgrade_evm_to_evm =
   let base_installee = "./" in
   let installee = "evm_kernel" in
   let dictator = Eth_account.bootstrap_accounts.(0) in
-  let* sc_rollup_node, node, client, evm_proxy_server =
+  let* sc_rollup_node, _, node, client, evm_proxy_server, _ =
     gen_test_kernel_upgrade
       ~base_installee
       ~installee
@@ -1845,6 +1856,46 @@ let test_kernel_upgrade_no_dictator =
   in
   unit
 
+let test_kernel_upgrade_failing_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["migration"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
+  @@ fun protocol ->
+  let base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let installee = "failed_migration" in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
+  let* ( sc_rollup_node,
+         sc_rollup_client,
+         node,
+         client,
+         evm_proxy_server,
+         original_kernel_boot_wasm ) =
+    gen_test_kernel_upgrade
+      ~base_installee
+      ~installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
+  in
+  (* Fallback mechanism is triggered, no block is produced at that level. *)
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  let* kernel_after_migration_failed = get_kernel_boot_wasm ~sc_rollup_client in
+  (* The upgrade succeeded, but the fallback mechanism was activated, so the kernel
+     after the upgrade/migration is still the previous one. *)
+  Check.((original_kernel_boot_wasm = kernel_after_migration_failed) string)
+    ~error_msg:(sf "Unexpected `boot.wasm` after migration failed.") ;
+  (* We ensure that the fallback mechanism went well by checking if the
+     kernel still produces blocks since it has booted back to the previous,
+     original kernel. *)
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  check_block_progression
+    ~sc_rollup_node
+    ~node
+    ~client
+    ~endpoint
+    ~expected_block_level:2
+
 let send_raw_transaction_request raw_tx =
   Evm_proxy_server.
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
@@ -1920,6 +1971,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_nonce protocols ;
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_dictator protocols ;
+  test_kernel_upgrade_failing_migration protocols ;
   test_rpc_sendRawTransaction protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
