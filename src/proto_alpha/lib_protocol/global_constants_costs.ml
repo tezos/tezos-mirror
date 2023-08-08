@@ -24,16 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Global_constants_costs_generated
 open S.Syntax
 
+(* generated code is not usable: the model lacks intercept *)
 (* model global_constants_storage/expr_to_address_in_context *)
 (* Approximating 200 + 1.266960 * number of bytes *)
 let cost_expr_to_address_in_context size =
   let v0 = S.safe_int size in
   S.safe_int 200 + (v0 + (v0 lsr 2))
 
-(* Unfortunatelly codegen cannot create 4095 but 4096 *)
+(* generated code is not usable: the coeff 4095 is not generatable *)
 (* model global_constants_storage/expand_constant_branch *)
 (* fun size -> (4095. * size) *)
 let cost_expand_constant_branch size =
@@ -42,9 +43,9 @@ let cost_expand_constant_branch size =
   let v0 = size in
   v0 * S.safe_int 4095
 
+(* generated code is not usable: a different model is used *)
 (* model global_constants_storage/expand_no_constant_branch *)
 (* Approximating 100 + 4.639474 * n*log(n) *)
-(* Model expression is different ... *)
 let cost_expand_no_constant_branch size =
   let size = S.safe_int size in
   let v0 = size * log2 size in

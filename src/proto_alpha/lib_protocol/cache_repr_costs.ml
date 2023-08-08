@@ -24,8 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Cache_repr_costs_generated
 
+(* generated code is not usable: the model is different *)
 (* model cache/CACHE_UPDATE *)
 let cost_CACHE_UPDATE size =
   let open S.Syntax in

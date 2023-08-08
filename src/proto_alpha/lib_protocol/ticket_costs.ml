@@ -25,31 +25,7 @@
 (*****************************************************************************)
 
 open Alpha_context
-module S = Saturation_repr
-
-(* model tickets/COLLECT_TICKETS_STEP *)
-(* fun size -> (0. + (80. * size)) *)
-let cost_COLLECT_TICKETS_STEP size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  v0 * S.safe_int 80
-
-(* We cannot use the generated version because of the argument type *)
-(* model tickets/TYPE_HAS_TICKETS *)
-(* fun size -> 10 + 6 * size *)
-let cost_TYPE_HAS_TICKETS size =
-  let open S.Syntax in
-  let v0 = size in
-  S.safe_int 10 + (v0 * S.safe_int 6)
-
-(* model tickets/COMPARE_TICKET_HASH *)
-(* 10. *)
-let cost_COMPARE_TICKET_HASH = S.safe_int 10
-
-(* model tickets/COMPARE_CONTRACT *)
-(* 10. *)
-let cost_COMPARE_CONTRACT = S.safe_int 10
+include Ticket_costs_generated
 
 module Constants = struct
   let cost_collect_tickets_step = cost_COLLECT_TICKETS_STEP 1

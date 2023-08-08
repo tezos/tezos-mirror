@@ -146,10 +146,12 @@ module Hash_cell : Benchmark.S = struct
     Sparse_vec.String.of_list
       [("nb_backpointers", float_of_int nb_backpointers)]
 
-  let model =
-    Model.make
-      ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
-      ~model:Model.affine
+  let model ~name =
+    Model.set_takes_saturation_reprs true
+    @@ Model.make
+         ~name
+         ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
+         ~model:Model.affine
 
   let create_benchmark ~rng_state conf =
     (* Since the model we want to infer is logarithmic in

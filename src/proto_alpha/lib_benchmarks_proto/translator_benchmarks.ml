@@ -822,10 +822,12 @@ module Unparse_type_benchmark : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let model =
-    Model.make
-      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+  let model ~name =
+    Model.set_takes_saturation_reprs true
+    @@ Model.make
+         ~name
+         ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
+         ~model:Model.affine
 end
 
 let () = Registration.register (module Unparse_type_benchmark)

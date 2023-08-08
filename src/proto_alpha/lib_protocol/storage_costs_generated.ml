@@ -9,6 +9,9 @@
 module S = Saturation_repr
 open S.Syntax
 
-(* model dal/Dal_publish_slot_header *)
-(* 16300000. *)
-let cost_Dal_publish_slot_header = S.safe_int 16300000
+(* model storage/List_key_values/intercept *)
+(* fun size -> (470. + (117. * size)) *)
+let cost_intercept size =
+  let size = S.safe_int size in
+  let v0 = size in
+  S.safe_int 470 + (v0 * S.safe_int 118)

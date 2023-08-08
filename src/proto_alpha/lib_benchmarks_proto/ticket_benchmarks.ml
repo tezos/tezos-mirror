@@ -222,8 +222,12 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     | Error trace ->
         raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
-  let model =
-    Model.make ~conv:(function {nodes} -> (nodes, ())) ~model:Model.affine
+  let model ~name =
+    Model.set_takes_saturation_reprs true
+    @@ Model.make
+         ~conv:(function {nodes} -> (nodes, ()))
+         ~model:Model.affine
+         ~name
 end
 
 let () = Registration.register (module Has_tickets_type_benchmark)
