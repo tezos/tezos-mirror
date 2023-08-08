@@ -595,7 +595,7 @@ let ir_model instr_or_cont =
       | N_IOpt_map_some -> const1_model name |> m)
   | Cont_name cont -> (
       match cont with
-      | N_KNil -> const1_model name |> m
+      | N_KNil -> (const1_model, const1_model) |> m2 name
       | N_KCons -> const1_model name |> m
       | N_KReturn -> const1_model name |> m
       | N_KView_exit -> const1_model name |> m
