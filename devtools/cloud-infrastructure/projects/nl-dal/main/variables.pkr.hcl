@@ -13,11 +13,11 @@ variable "zone" {
 variable "docker_registry_url" {
   type        = string
   description = "Google docker image registry (artifact registry) URL to authenticate with"
-  default     = "europe-docker.pkg.dev"
+  default     = "europe-west1-docker.pkg.dev"
 }
 
 variable "container_image_name" {
   type        = string
   description = "The docker image"
-  default     = "blob"
+  default = "nl-dal/docker-registry/debian-tezos"
 }
