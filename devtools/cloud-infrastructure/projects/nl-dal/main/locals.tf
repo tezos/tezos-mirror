@@ -1,6 +1,6 @@
 locals {
   /* instance */
-  machine_type         = "c2-standard-4" #"t2d-standard-16" # "n2-standard-32"
+  machine_type         = var.machine_type
   minimum_cpu_platform = "AMD Milan"
   labels               = {}
   tags                 = []

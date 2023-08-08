@@ -27,6 +27,12 @@ variable "hostname" {
   description = "Hostname prefix for instances."
 }
 
+variable "machine_type" {
+  type = string
+  description = "Machine type of the VM instance."
+  default = "c2-standard-4"
+}
+
 variable "target_size" {
   type        = string
   description = "The target number of running instances for this managed or unmanaged instance group. This value should always be explicitly set unless this resource is attached to an autoscaler, in which case it should never be set."
