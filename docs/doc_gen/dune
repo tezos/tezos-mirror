@@ -4,9 +4,9 @@
  (libraries octez-libs.tezos-base
             octez-libs.tezos-rpc
             octez-libs.tezos-stdlib-unix
-            tezos-shell
+            octez-shell-libs.tezos-shell
             octez-libs.tezos-rpc-http-server
-            tezos-protocol-updater
+            octez-shell-libs.tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-embedded-protocol-genesis
             tezos-embedded-protocol-016-PtMumbai
