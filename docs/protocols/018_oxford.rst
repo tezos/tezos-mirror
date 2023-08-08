@@ -19,6 +19,8 @@ It requires protocol environment V10, compared to V9 for Nairobi.
 
 - Expose encoding with legacy attestation name. (MR :gl:`!8620`)
 
+- Expose skip list structure. (MR :gl:`!8993`)
+
 Smart Rollups
 -------------
 
@@ -45,15 +47,24 @@ Smart Rollups
 - Add one new host function to the WASM PVM: ``store_exists`` (MR :gl:`!9204`).
 
 - Remove dead refutation games at migration time. A game is dead if both players
-  are no longer staking. (MMR :gl:`!8975`)
+  are no longer staking. (MR :gl:`!8975`)
 
 - Reduce cost for internal transaction to smart rollup (MR :gl:`!9284`)
+
+- Remove dead refutation games at migration time. A game is dead if both players
+  are no longer staking. (MR :gl:`!8975`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
+Partial reveal preimage (MRs :gl:`!9029`, :gl:`!9177`, :gl:`!9291`, :gl:`!9453`)
+
 Data Availability Layer (ongoing)
 ---------------------------------
+
+Gossipsub (MR :gl:`!9123`)
+
+Node consolidation (MRs :gl:`!9280`, :gl:`!9300`, :gl:`!9320`, :gl:`!9496`)
 
 Adaptive Issuance (ongoing)
 ----------------------------
@@ -79,19 +90,34 @@ When the feature flag is enabled, the following extra changes happen:
 
 - Denunciation rewards computation updated to depend on ``limit_of_staking_over_baking``. (MR :gl:`!8939`)
 
-- EMA and launch cycle. (MRs :gl:`!8967`, :gl:`!9002`, :gl:`!9025`, :gl:`!9058`)
+- EMA and launch cycle. (MRs :gl:`!8967`, :gl:`!9002`, :gl:`!9025`, :gl:`!9058`, :gl:`!9071`, :gl:`!9074`,
+  :gl:`!9087`)
 
-- Staking and deposits. (MRs :gl:`!8940`, :gl:`!8957`, :gl:`!8958`, :gl:`!8965`, :gl:`!8966`, :gl:`!8973`,
-  :gl:`!9000`, :gl:`!9014`, :gl:`!9018`, :gl:`!9022`, :gl:`!9023`, :gl:`!9031`, :gl:`!9033`, :gl:`!9039`,
-  :gl:`!9040`, :gl:`!9052`, :gl:`!9054`, :gl:`!9055`, :gl:`!9069`)
+- Staking, deposits and supply. (MRs :gl:`!8940`, :gl:`!8957`, :gl:`!8958`, :gl:`!8965`, :gl:`!8966`, :gl:`!8973`,
+  :gl:`!9000`, :gl:`!9014`, :gl:`!9015`, :gl:`!9018`, :gl:`!9022`, :gl:`!9023`, :gl:`!9031`, :gl:`!9033`, :gl:`!9039`,
+  :gl:`!9040`, :gl:`!9044`, :gl:`!9052`, :gl:`!9054`, :gl:`!9055`, :gl:`!9069`, :gl:`!9089`, :gl:`!9091`,
+  :gl:`!9093`, :gl:`!9241`, :gl:`!9277`, :gl:`!9298`, :gl:`!9299`, :gl:`!9301`, :gl:`!9303`, :gl:`!9304`,
+  :gl:`!9312`, :gl:`!9319`, :gl:`!9330`, :gl:`!9351`, :gl:`!9365`, :gl:`!9321`, :gl:`!9367`, :gl:`!9376`,
+  :gl:`!9383`, :gl:`!9386`, :gl:`!9387`, :gl:`!9403`, :gl:`!9406`, :gl:`!9407`, :gl:`!9408`, :gl:`!9420`,
+  :gl:`!9456`, :gl:`!9482`, :gl:`!9498`, :gl:`!9499`, :gl:`!9511`, :gl:`!9513`, :gl:`!9523`, :gl:`!9531`,
+  :gl:`!9533`, :gl:`!9537`, :gl:`!9539`, :gl:`!9543`, :gl:`!9544`, :gl:`!9547`, :gl:`!9564`, :gl:`!9577`,
+  :gl:`!9611`)
 
-- New RPCs introduced: total supply, total frozen stake, launch cycle.
-  (MRs :gl:`!8982`, :gl:`!8995`, :gl:`!8997`, :gl:`!9057`)
+- New RPCs introduced: total supply, rewards, total frozen stake, inflation, launch cycle, unstaked frozen deposits, unstaked requests, staking parameters
+  (MRs :gl:`!8982`, :gl:`!8983`, :gl:`!8995`, :gl:`!8997`, :gl:`!9057`, :gl:`!9243`, :gl:`!9409`, :gl:`!9419`)
 
 Gas improvements
 ----------------
 
-- Gas model improved for origination function. (MR :gl:`!9020`)
+- Gas model improved for smart rollups origination. (MR :gl:`!9020`)
+
+- Gas parameters related to ``Comb`` instruction updated. (MR :gl:`!9046`)
+
+- More accurate gas model for integer division. (MR :gl:`!8666`)
+
+- Improved gas model for type comparison with ``TY_EQ``. (MR :gl:`!9121`)
+
+- Improved gas model for ``Michelson_v1_gas_costs.cost_N_KMap_enter_body``. (MR :gl:`!9283`)
 
 Breaking Changes
 ----------------
@@ -136,6 +162,8 @@ Breaking Changes
   ``double_endorsing_evidences_seen`` from the mempool's ``operation_state``
   encoding has been renamed ``preattestations_seen``, ``attestation_seen`` and
   ``double_attesting_evidences_seen``. (MR :gl:`!9440`)
+
+- ``endorsement`` renamed to ``attestation`` in the protocol codebase. (MRs :gl:`!9362`, :gl:`!9364`, :gl:`!9425`)
 
 RPC Changes
 -----------
@@ -238,6 +266,8 @@ Internal
 - Michelson: refactor management of metadata in ty smart constructors. (MR :gl:`!8420`)
 
 - Michelson: remove unused deprecated tx_rollup_l2_address type. (MR :gl:`!8546`)
+
+- Michelson: type of ``cost_UNPARSE_TYPE`` changed to match with the other cost functions in ``michelson_v1_gas_costs.ml``. (MR :gl:`!7529`)
 
 - Rename ``source`` into ``sender``. (MR :gl:`!7373`)
 
