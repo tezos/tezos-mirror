@@ -382,3 +382,76 @@ end
 
 let auto_write_to_file =
   (module Auto_write_to_file : DRIVER with type config = string * lod)
+
+module Auto_write_to_json_file = struct
+  type nonrec state = state ref * time * output ref
+
+  type config = string * lod
+
+  let kind = Auto_write_to_file
+
+  let create (fn, lod) = (ref (empty lod), time (), ref (Closed fn))
+
+  let time _ = time ()
+
+  let record (state, _, _) lod id = state := record !state lod id
+
+  let aggregate (state, _, _) lod id = state := aggregate !state lod id
+
+  let report (state, _, _) =
+    match !state.stack with
+    | Toplevel {aggregated; recorded}
+      when StringMap.cardinal aggregated > 0 || recorded <> [] ->
+        state := empty !state.max_lod ;
+        let report = {aggregated; recorded = List.rev recorded} in
+        Some (apply_lod !state.max_lod report)
+    | _ -> None
+
+  let may_write_to_json ((_, _, output) as state) =
+    match report state with
+    | None -> ()
+    | Some report ->
+        let ppf =
+          match !output with
+          | Open (_, _, ppf) -> ppf
+          | Closed fn ->
+              let fp = open_out fn in
+              let ppf = Format.formatter_of_out_channel fp in
+              output := Open (fn, fp, ppf) ;
+              ppf
+        in
+        let encoded_report =
+          Data_encoding.Json.construct Profiler.report_encoding report
+        in
+        Data_encoding.Json.pp ppf encoded_report
+
+  let inc ((s, _, _) as state) report =
+    s := inc !s report ;
+    may_write_to_json state
+
+  let mark ((s, _, _) as state) id =
+    s := mark !s Terse id ;
+    may_write_to_json state
+
+  let stamp ((s, _, _) as state) id =
+    s := stamp !s id ;
+    may_write_to_json state
+
+  let span ((s, _, _) as state) d id =
+    s := span !s Terse d id ;
+    may_write_to_json state
+
+  let stop ((s, _, _) as state) =
+    s := stop !s ;
+    may_write_to_json state
+
+  let close (_, _, output) =
+    match !output with
+    | Open (fn, fp, _) ->
+        close_out fp ;
+        output := Closed fn
+    | Closed _ -> ()
+end
+
+let auto_write_to_json_file =
+  (module Auto_write_to_json_file : DRIVER with type config = string * lod)
