@@ -33,6 +33,12 @@ open Client_keys
 let get_balance (rpc : #rpc_context) ~chain ~block contract =
   Alpha_services.Contract.balance rpc (chain, block) contract
 
+let get_staked_balance (rpc : #rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.staked_balance rpc (chain, block) contract
+
+let get_full_balance (rpc : #rpc_context) ~chain ~block contract =
+  Alpha_services.Contract.full_balance rpc (chain, block) contract
+
 let get_storage (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
   Plugin.RPC.Contract.get_storage_normalized
     rpc

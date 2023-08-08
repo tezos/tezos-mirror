@@ -231,7 +231,7 @@ let commands_ro () =
         return_unit);
     command
       ~group
-      ~desc:"Get the balance of a contract."
+      ~desc:"Get the liquid balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
@@ -240,6 +240,43 @@ let commands_ro () =
         let open Lwt_result_syntax in
         let* amount =
           get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+        in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the staked balance of a contract."
+      no_options
+      (prefixes ["get"; "staked"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_staked_balance
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        let amount = Option.value ~default:Tez.zero amount in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the full balance of a contract."
+      no_options
+      (prefixes ["get"; "full"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_full_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         in
         let*! () =
           cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
