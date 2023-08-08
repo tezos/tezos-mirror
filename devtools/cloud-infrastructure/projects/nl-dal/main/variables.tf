@@ -1,7 +1,7 @@
 variable "project_url" {
   type        = string
   description = "GitLab - The HTTPS address of the project"
-  default     = "https://gitlab.com/trili/wasm-demo"
+  default     = "https://gitlab.com/tezos/tezos/"
 }
 
 variable "project_id" {
@@ -24,16 +24,16 @@ variable "zone" {
 
 variable "hostname" {
   type        = string
-  description = "Hostname prefix for instances."
+  description = "Hostname prefix for instances. Different hostnames are used to facilitate the concurrent execution of independent experiments. This ensures that resources remain distinct and non-conflicting for each experiment."
 }
 
 variable "machine_type" {
-  type = string
+  type        = string
   description = "Machine type of the VM instance."
-  default = "c2-standard-4"
+  default     = "c2-standard-4"
 }
 
-variable "target_size" {
+variable "num_instances" {
   type        = string
   description = "The target number of running instances for this managed or unmanaged instance group. This value should always be explicitly set unless this resource is attached to an autoscaler, in which case it should never be set."
   default     = 1

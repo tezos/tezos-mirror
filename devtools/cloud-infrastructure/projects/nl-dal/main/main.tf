@@ -63,7 +63,7 @@ resource "google_compute_firewall" "this" {
   }
   allow {
     protocol = "tcp"
-    ports    = ["30001-30999"]
+    ports    = ["30001-30999"] # Opened for the experiment. Will be routed to the docker container.
   }
   allow {
     protocol = "tcp"
@@ -75,7 +75,7 @@ resource "google_compute_firewall" "this" {
 }
 
 resource "google_compute_address" "this" {
-  count        = var.target_size
+  count        = var.num_instances
   name         = format("address-%s-%02d", var.hostname, count.index + 1)
   address_type = "EXTERNAL"
   network_tier = local.network_tier
@@ -83,14 +83,14 @@ resource "google_compute_address" "this" {
 }
 
 resource "google_compute_address" "internal" {
-  count        = var.target_size
+  count        = var.num_instances
   name         = format("internal-address-%s-%02d", var.hostname, count.index + 1)
   address_type = "INTERNAL"
   subnetwork   = local.subnetwork
   region       = var.region
 }
 
-module "vm_instance_template_rollup" {
+module "vm_instance_template" {
   source  = "terraform-google-modules/vm/google//modules/instance_template"
   version = "~> 7.9.0"
 
@@ -121,7 +121,7 @@ module "vm_instance_template_rollup" {
   additional_disks = local.additional_disks
 }
 
-module "vm_umig_rollup" {
+module "vm_umig" {
   source             = "terraform-google-modules/vm/google//modules/umig"
   version            = "~> 7.9.0"
   project_id         = var.project_id
@@ -130,24 +130,9 @@ module "vm_umig_rollup" {
   subnetwork_project = local.subnetwork_project
   hostname           = var.hostname
   static_ips         = google_compute_address.internal.*.address
-  num_instances      = var.target_size
-  instance_template  = module.vm_instance_template_rollup.self_link
+  num_instances      = var.num_instances
+  instance_template  = module.vm_instance_template.self_link
   named_ports        = local.named_ports
   region             = var.region
   access_config      = local.access_config
 }
-
-# module "monitoring" {
-#   source             = "./modules/tf-gcp-europe-monitoring"
-#   project_url        = var.project_url
-#   project_id         = var.project_id
-#   region             = var.region
-#   instance_zone      = module.vm_umig.available_zones[0] # Use the first available zone
-#   monitored_zones    = module.vm_umig.available_zones
-#   gcp_creds          = var.gcp_creds
-#   prom_graf_user     = var.prom_graf_user
-#   prom_graf_password = var.prom_graf_password
-#   network            = local.network
-#   subnetwork         = local.subnetwork
-#   subnetwork_project = local.subnetwork_project
-# }
