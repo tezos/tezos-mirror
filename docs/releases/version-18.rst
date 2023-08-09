@@ -62,3 +62,8 @@ You can also install Octez using Opam by running ``opam install octez``.
    Octez is now composed of less packages, containing the former packages as sub-libraries.
 
    For more details, see :doc:`the OCaml API <../api/api-inline>`.
+
+Changelog
+---------
+
+- `Version 18.0~rc1 <../CHANGES.html#version-18-0-rc1>`_
