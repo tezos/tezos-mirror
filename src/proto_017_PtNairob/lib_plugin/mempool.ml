@@ -535,14 +535,52 @@ let check_minimal_weight config state ~fee ~gas_limit op =
             (`Branch_delayed
               [Environment.wrap_tzerror (Fees_too_low_for_mempool required_fee)])
 
+let output_encoding =
+  let open Data_encoding in
+  obj3
+    (req "outbox_level" Environment.Bounded.Non_negative_int32.encoding)
+    (req "message_index" n)
+    (req "message" Variable.string)
+
 let output_proof_encoding =
   let open Data_encoding in
   obj3
     (req
        "output_proof"
-       Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding)
+       Tezos_context_helpers.Context.Proof_encoding.Merkle_proof_encoding.V2
+       .Tree2
+       .tree_proof_encoding)
     (req "output_proof_state" Sc_rollup.State_hash.encoding)
-    (req "output_proof_output" Variable.bytes)
+    (req "output_proof_output" output_encoding)
+
+module Tree = struct
+  open Environment
+  include Context.Tree
+
+  type tree = Context.tree
+
+  type t = Context.t
+
+  type key = string list
+
+  type value = bytes
+end
+
+module Wasm_machine = Environment.Wasm_2_0_0.Make (Tree)
+
+let discard_wasm_output_proof_early output_proof outbox_level message_index
+    output =
+  let open Lwt_syntax in
+  let+ result =
+    Environment.Context.verify_tree_proof output_proof (fun tree ->
+        let* output =
+          Wasm_machine.get_output {outbox_level; message_index} tree
+        in
+        return (tree, output))
+  in
+  match result with
+  | Ok (_, Some expected_output) -> not (expected_output = output)
+  | _ -> false
 
 let kinded_hash_to_state_hash = function
   | `Value hash | `Node hash ->
@@ -557,13 +595,25 @@ let is_invalid_op : type t. t manager_operation -> bool Lwt.t =
         Data_encoding.Binary.of_string_opt output_proof_encoding output_proof
       with
       | None -> return_true
-      | Some (output_proof, output_proof_state, _) ->
-          Lwt.return
-          @@ not
-               (Sc_rollup.State_hash.equal
-                  output_proof_state
-                  (kinded_hash_to_state_hash
-                     output_proof.Environment.Context.Proof.before)))
+      | Some
+          ( output_proof,
+            output_proof_state,
+            (outbox_level, message_index, output) ) ->
+          let* discard_wasm_proof =
+            discard_wasm_output_proof_early
+              output_proof
+              outbox_level
+              message_index
+              output
+          in
+          let state_is_correct =
+            Sc_rollup.State_hash.equal
+              output_proof_state
+              (kinded_hash_to_state_hash
+                 output_proof.Environment.Context.Proof.before)
+          in
+          let is_invalid = (not state_is_correct) || discard_wasm_proof in
+          return is_invalid)
   | _ -> return_false
 
 let rec contains_invalid_op : type t. t Kind.manager contents_list -> bool Lwt.t
