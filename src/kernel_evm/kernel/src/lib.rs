@@ -10,7 +10,8 @@ use primitive_types::U256;
 use storage::{
     read_chain_id, read_kernel_version, read_last_info_per_level_timestamp,
     read_last_info_per_level_timestamp_stats, read_ticketer, store_chain_id,
-    store_kernel_upgrade_nonce, store_kernel_version,
+    store_kernel_upgrade_nonce, store_kernel_version, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -57,6 +58,7 @@ const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     log!(host, Info, "Entering stage zero.");
+    init_storage_versioning(host)?;
     storage_migration(host)
 }
 
@@ -168,6 +170,13 @@ fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
             Ok(())
         }
         Err(_) => store_kernel_version(host, KERNEL_VERSION),
+    }
+}
+
+fn init_storage_versioning<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
+        Ok(_) => Ok(()),
+        Err(_) => store_storage_version(host, STORAGE_VERSION),
     }
 }
 

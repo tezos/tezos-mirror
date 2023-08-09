@@ -27,7 +27,7 @@ use tezos_ethereum::wei::Wei;
 use primitive_types::{H160, H256, U256};
 
 pub const STORAGE_VERSION: u64 = 0;
-const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const SMART_ROLLUP_ADDRESS: RefPath =
     RefPath::assert_from(b"/metadata/smart_rollup_address");
@@ -758,11 +758,6 @@ pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error
             let slice_of_bytes: [u8; 8] =
                 bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
             Ok(u64::from_le_bytes(slice_of_bytes))
-        }
-        Err(RuntimeError::PathNotFound) => {
-            // It's safe to have a default storage version especially for fresh
-            // kernel that had 0 upgrade/migration yet.
-            Ok(STORAGE_VERSION)
         }
         Err(e) => Err(e.into()),
     }
