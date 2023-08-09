@@ -37,6 +37,7 @@ let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
         reception_times = [];
         timestamp;
         nonce = None;
+        cycle_info = None;
       }
     acc
 
@@ -55,6 +56,7 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
               reception_times;
               timestamp;
               nonce;
+              cycle_info;
             } ->
           Some
             Teztale_lib.Data.Block.
@@ -67,6 +69,7 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
                   {source; application_time; validation_time} :: reception_times;
                 timestamp;
                 nonce;
+                cycle_info;
               }
       | None -> None)
     acc
