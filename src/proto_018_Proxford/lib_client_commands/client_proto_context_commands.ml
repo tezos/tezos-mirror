@@ -231,7 +231,7 @@ let commands_ro () =
         return_unit);
     command
       ~group
-      ~desc:"Get the balance of a contract."
+      ~desc:"Get the liquid balance of a contract."
       no_options
       (prefixes ["get"; "balance"; "for"]
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
@@ -240,6 +240,43 @@ let commands_ro () =
         let open Lwt_result_syntax in
         let* amount =
           get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
+        in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the staked balance of a contract."
+      no_options
+      (prefixes ["get"; "staked"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_staked_balance
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        let amount = Option.value ~default:Tez.zero amount in
+        let*! () =
+          cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the full balance of a contract."
+      no_options
+      (prefixes ["get"; "full"; "balance"; "for"]
+      @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* amount =
+          get_full_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         in
         let*! () =
           cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
@@ -1853,7 +1890,9 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Stake"
+      ~desc:
+        "Stake the given amount for the source. The source must be a delegator \
+         to be allowed to stake."
       (args12
          fee_arg
          dry_run_switch
@@ -1918,7 +1957,13 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Unstake"
+      ~desc:
+        "Unstake the given amount. If \"everything\" is given as amount, \
+         unstakes everything from the staking balance. Unstaked tez remains \
+         frozen for a set amount of cycles (the slashing period) after the \
+         operation. Once this period is over, the operation \"finalize \
+         unstake\" must be called for the funds to appear in the liquid \
+         balance."
       (args12
          fee_arg
          dry_run_switch
@@ -1991,7 +2036,9 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Finalize unstake"
+      ~desc:
+        "Transfer all the finalizable unstaked funds of the source to their \
+         liquid balance."
       (args12
          fee_arg
          dry_run_switch

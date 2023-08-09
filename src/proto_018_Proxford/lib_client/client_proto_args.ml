@@ -743,14 +743,28 @@ let fixed_point_parameter =
       Tezos_clic.parameter (fun (cctxt : #Client_context.full) p ->
           match parse ~decimals p with
           | Some res -> return res
-          | None -> cctxt#error "Cannot read %s parameter" name)
+          | None ->
+              cctxt#error
+                "Cannot read %s parameter: expecting a fixed point number with \
+                 at most %d decimals, or a fixed point number with at most %d \
+                 decimals followed by a %% sign."
+                name
+                decimals
+                (decimals - 2))
 
 let limit_of_staking_over_baking_millionth_arg =
   Tezos_clic.arg
     ~long:"limit-of-staking-over-baking"
     ~placeholder:"limit"
-    ~doc:"Limit of staking over baking"
-    ((* should we check it's between 0 and 5 million? *)
+    ~doc:
+      "Limits the total amount of stake for the source's delegators as a \
+       proportion of the source's own stake. Any amount exceeding this limit \
+       is considered as delegation in the stake of the delegate. The value \
+       should be between 0 and 5 (default 0 if not set). If this parameter is \
+       0, as is the default, any staking operation from the source's \
+       delegators are forbidden and will fail (unstaking operations are still \
+       allowed)."
+    ((* TODO #6162: should we check it's between 0 and 5 million? *)
      fixed_point_parameter
        ~decimals:6
        ~name:"limit of staking over baking")
@@ -759,7 +773,12 @@ let edge_of_baking_over_staking_billionth_arg =
   Tezos_clic.arg
     ~long:"edge-of-baking-over-staking"
     ~placeholder:"edge"
-    ~doc:"Edge of baking over staking"
+    ~doc:
+      "Sets the portion of the rewards issued to the delegate that should be \
+       transfered to its liquid balance. The rest is issued to its stakers \
+       (itself included), proportionally to their stake. Value should be \
+       between 0 and 1. If not set, default value is 1: all rewards given to \
+       the source are issued to their liquid balance."
     ((* TODO #6162: check it's between 0 and 1 billion *)
      fixed_point_parameter
        ~decimals:9
