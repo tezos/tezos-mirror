@@ -2,7 +2,8 @@ ARG SOURCE_IMAGE
 FROM $SOURCE_IMAGE:latest
 # openssh-server is needed for sshd
 # python3 is not strictly needed but could be used to run an html server for example
-RUN apt update && apt install libgmp-dev curl libev-dev libhidapi-dev python3 openssh-server -y
+# netbase is needed to handle transport services
+RUN apt update && apt install netbase libgmp-dev curl libev-dev libhidapi-dev python3 openssh-server -y
 # This directory is necessary for running sshd
 RUN mkdir -p /run/sshd
 # A server ssh also requires a key. We generate one for all the main schemes
