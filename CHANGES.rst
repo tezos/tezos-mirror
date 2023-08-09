@@ -231,6 +231,9 @@ Node
 
 - Removed Mumbai mempool plugin. (MR :gl:`!9696`)
 
+- Operations posting invalid WASM proofs are now discarded earlier by the
+  Nairobi mempool plugin. (MR :gl:`!`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
