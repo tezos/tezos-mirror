@@ -7826,7 +7826,6 @@ let _octez_scoru_wasm_debugger =
            available. *)
         Protocol.(client_exn alpha);
         octez_scoru_wasm;
-        octez_scoru_wasm_benchmark;
         octez_scoru_wasm_helpers |> open_;
         octez_webassembly_interpreter |> open_;
         octez_webassembly_interpreter_extra |> open_;

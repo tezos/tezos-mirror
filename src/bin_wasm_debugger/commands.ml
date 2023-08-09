@@ -39,7 +39,6 @@ type profile_options = {collapse : bool; with_time : bool; no_reboot : bool}
 
 (* Possible commands for the REPL. *)
 type commands =
-  | Bench
   | Time of commands
   | Show_inbox
   | Show_outbox of int32
@@ -223,10 +222,6 @@ let rec commands_docs =
       parse =
         (fun command -> match command with ["stop"] -> Some Stop | _ -> None);
       documentation = "stop: Stops the execution of the current session.";
-    };
-    {
-      parse = (function ["bench"] -> Some Bench | _ -> None);
-      documentation = "bench: Benchmarking tool.";
     };
     {
       parse =
@@ -625,29 +620,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let*! () = show_status tree in
     return (tree, inboxes, level)
 
-  let bench config tree =
-    let open Lwt_syntax in
-    let action =
-      Octez_smart_rollup_wasm_benchmark_lib.Scenario.exec_slow
-        ~reveal_builtins:(reveals config)
-    in
-    let step =
-      Octez_smart_rollup_wasm_benchmark_lib.Scenario.make_scenario_step
-        ""
-        action
-    in
-    let eval = Octez_smart_rollup_wasm_benchmark_lib.Scenario.apply_step step in
-    let* benchmark, tree = eval tree in
-    let* () =
-      Lwt_io.printf
-        "%s\n%!"
-        (Format.asprintf
-           "%a"
-           Octez_smart_rollup_wasm_benchmark_lib.Data.pp_analysis
-           benchmark)
-    in
-    return tree
-
   (* [show_inbox tree] prints the current input buffer and the number of messages
      it contains. *)
   let show_inbox tree =
@@ -945,18 +917,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       return (tree, inboxes, level)
     in
     let rec go = function
-      | Bench ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5615
-             let*! tree = bench config tree in
-             return ~tree ()
-          *)
-          let*! () =
-            Lwt_io.printf
-              "This command is temporarily unavailable.\n\
-               See https://gitlab.com/tezos/tezos/-/issues/5615\n\
-               %!"
-          in
-          return ()
       | Time cmd ->
           let t = Time.System.now () in
           let* res = go cmd in
