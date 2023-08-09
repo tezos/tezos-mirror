@@ -1774,7 +1774,7 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level in
   Log.info "Starting other rollup node." ;
-  let purposes = ["operating"; "cementing"; "batching"] in
+  let purposes = [Sc_rollup_node.Operating; Cementing; Batching] in
   let operators =
     List.mapi
       (fun i purpose ->
@@ -2978,10 +2978,10 @@ let test_cement_ignore_commitment ~kind =
   @@ fun protocol _sc_rollup_node _sc_rollup_client sc_rollup node client ->
   let sc_rollup_node =
     Sc_rollup_node.create
-      Custom
+      (Custom [Sc_rollup_node.Publish])
       node
       ~base_dir:(Client.base_dir client)
-      ~operators:[("publish", Constant.bootstrap1.alias)]
+      ~operators:[(Sc_rollup_node.Operating, Constant.bootstrap1.alias)]
     (* Don't cement commitments *)
   in
   let* () =
@@ -5440,7 +5440,7 @@ let test_injector_auto_discard =
       Batcher
       tezos_node
       ~base_dir:(Client.base_dir client)
-      ~operators:[("batching", operator.alias)]
+      ~operators:[(Sc_rollup_node.Batching, operator.alias)]
   in
   let sc_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let nb_attempts = 5 in
@@ -6061,6 +6061,28 @@ let bailout_mode_not_publish ~kind =
   in
   unit
 
+let custom_mode_empty_operation_kinds ~kind =
+  test_l1_scenario
+    ~kind
+    {
+      variant = None;
+      tags = ["mode"; "custom"];
+      description = "custom mode has empty operation kinds";
+    }
+  @@ fun _protocol sc_rollup tezos_node tezos_client ->
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      (Custom [])
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~default_operator:Constant.bootstrap1.alias
+  in
+  let process = Sc_rollup_node.spawn_run sc_rollup_node sc_rollup [] in
+  Process.check_error
+    process
+    ~exit_code:1
+    ~msg:(rex "Operation kinds for custom mode are empty.")
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -6184,6 +6206,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
   bailout_mode_not_publish ~kind protocols ;
+  custom_mode_empty_operation_kinds ~kind protocols ;
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.

@@ -32,9 +32,13 @@
 (** Smart contract rollup node states. *)
 type t
 
+type purpose = Operating | Batching | Cementing
+
+type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+
 type mode =
   | Batcher
-  | Custom
+  | Custom of operation_kind list
   | Maintenance
   | Observer
   | Operator
@@ -80,7 +84,7 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?operators:(string * string) list ->
+  ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
   mode ->
@@ -98,7 +102,7 @@ val create_with_endpoint :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?operators:(string * string) list ->
+  ?operators:(purpose * string) list ->
   ?default_operator:string ->
   ?dal_node:Dal_node.t ->
   mode ->
@@ -125,6 +129,8 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
+
+val string_of_purpose : purpose -> string
 
 (** Wait until an sc node terminates and check its status.
 

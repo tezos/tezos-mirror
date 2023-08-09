@@ -26,9 +26,13 @@
 
 type 'a known = Unknown | Known of 'a
 
+type purpose = Operating | Batching | Cementing
+
+type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+
 type mode =
   | Batcher
-  | Custom
+  | Custom of operation_kind list
   | Maintenance
   | Observer
   | Operator
@@ -39,7 +43,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     base_dir : string;
-    operators : (string * string) list;
+    operators : (purpose * string) list;
     default_operator : string option;
     rpc_host : string;
     rpc_port : int;
@@ -61,25 +65,57 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
+let string_of_operation_kind = function
+  | Publish -> "publish"
+  | Add_messages -> "add_messages"
+  | Cement -> "cement"
+  | Timeout -> "timeout"
+  | Refute -> "refute"
+
+let operation_kind_of_string = function
+  | "publish" -> Some Publish
+  | "add_messages" -> Some Add_messages
+  | "cement" -> Some Cement
+  | "timeout" -> Some Timeout
+  | "refute" -> Some Refute
+  | _ -> None
+
+let operation_kind_of_string_exn s =
+  match operation_kind_of_string s with
+  | Some p -> p
+  | None -> invalid_arg ("operation_kind_of_string " ^ s)
+
 let string_of_mode = function
   | Observer -> "observer"
   | Batcher -> "batcher"
   | Maintenance -> "maintenance"
   | Operator -> "operator"
-  | Custom -> "custom"
+  | Custom op_kinds ->
+      if op_kinds = [] then "custom"
+      else
+        "custom:"
+        ^ String.concat "," (List.map string_of_operation_kind op_kinds)
   | Accuser -> "accuser"
   | Bailout -> "bailout"
 
 let mode_of_string s =
-  match String.lowercase_ascii s with
-  | "observer" -> Observer
-  | "batcher" -> Batcher
-  | "maintenance" -> Maintenance
-  | "operator" -> Operator
-  | "custom" -> Custom
-  | "accuser" -> Accuser
-  | "bailout" -> Bailout
-  | _ -> invalid_arg (Format.sprintf "%S is not an existing mode" s)
+  match String.split_on_char ':' s with
+  | ["custom"; kinds] ->
+      let operation_kinds_strs = String.split_on_char ',' kinds in
+      let operation_kinds =
+        List.map operation_kind_of_string_exn operation_kinds_strs
+      in
+      Custom operation_kinds
+  | _ -> (
+      match String.lowercase_ascii s with
+      | "observer" -> Observer
+      | "accuser" -> Accuser
+      | "bailout" -> Bailout
+      | "batcher" -> Batcher
+      | "maintenance" -> Maintenance
+      | "operator" -> Operator
+      | "custom" -> Custom []
+      | _ -> invalid_arg (Format.sprintf "%S is not an existing mode" s))
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
@@ -117,17 +153,52 @@ let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = sc_node.persistent_state.base_dir
 
+let purposes = [Operating; Batching; Cementing]
+
+let string_of_purpose = function
+  | Operating -> "operating"
+  | Batching -> "batching"
+  | Cementing -> "cementing"
+
+(* For each purpose, it returns a list of associated operation kinds *)
+let operation_kinds_of_purpose = function
+  | Batching -> [Add_messages]
+  | Cementing -> [Cement]
+  | Operating -> [Publish; Refute; Timeout]
+
+(* Map a list of operation kinds to their corresponding purposes,
+   based on their presence in the input list. *)
+let purposes_of_operation_kinds (operation_kinds : operation_kind list) :
+    purpose list =
+  purposes
+  |> List.filter (fun purpose ->
+         List.exists
+           (fun kind -> List.mem kind (operation_kinds_of_purpose purpose))
+           operation_kinds)
+
+(* Extracts operators from node state, handling custom mode, and
+   formats them as "purpose:operator". Includes default operator if present. *)
 let operators_params sc_node =
   let acc =
     match sc_node.persistent_state.default_operator with
     | None -> []
     | Some operator -> [operator]
   in
+  let operators =
+    match sc_node.persistent_state.mode with
+    | Custom op_kinds ->
+        (* Filter the operators based on the custom mode's operation kinds *)
+        let applicable_purposes = purposes_of_operation_kinds op_kinds in
+        List.filter
+          (fun (purpose, _) -> List.mem purpose applicable_purposes)
+          sc_node.persistent_state.operators
+    | _ -> sc_node.persistent_state.operators
+  in
   List.fold_left
     (fun acc (purpose, operator) ->
-      String.concat ":" [purpose; operator] :: acc)
+      (string_of_purpose purpose ^ ":" ^ operator) :: acc)
     acc
-    sc_node.persistent_state.operators
+    operators
 
 let make_arguments node =
   [
