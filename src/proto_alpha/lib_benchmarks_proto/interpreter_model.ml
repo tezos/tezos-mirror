@@ -569,25 +569,23 @@ let ir_model instr_or_cont =
       | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
       | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update
       | N_IMap_get_and_update | N_IBig_map_get_and_update ->
-          nlogm_model name |> m
-      | N_IConcat_string -> concat_model name |> m
-      | N_IConcat_string_pair -> linear_sum_model name |> m
-      | N_ISlice_string -> affine_model name |> m
+          (nlogm_model, nlogm_model) |> m2 name
+      | N_IConcat_string -> (concat_model, concat_model) |> m2 name
+      | N_IConcat_string_pair -> (linear_sum_model, linear_sum_model) |> m2 name
+      | N_ISlice_string -> (affine_model, affine_model) |> m2 name
       | N_IString_size -> (const1_model, const1_model) |> m2 name
-      | N_IConcat_bytes -> concat_model name |> m
-      | N_IConcat_bytes_pair -> linear_sum_model name |> m
-      | N_ISlice_bytes -> affine_model name |> m
+      | N_IConcat_bytes -> (concat_model, concat_model) |> m2 name
+      | N_IConcat_bytes_pair -> (linear_sum_model, linear_sum_model) |> m2 name
+      | N_ISlice_bytes -> (affine_model, affine_model) |> m2 name
       | N_IBytes_size -> (const1_model, const1_model) |> m2 name
-      | N_IOr_bytes -> linear_max_model name |> m
-      | N_IAnd_bytes -> linear_min_model name |> m
-      | N_IXor_bytes -> linear_max_model name |> m
-      | N_INot_bytes -> affine_model name |> m
-      | N_ILsl_bytes -> lsl_bytes_model name |> m
-      | N_ILsr_bytes -> lsr_bytes_model name |> m
-      | N_IBytes_nat -> affine_model name |> m
-      | N_INat_bytes -> affine_model name |> m
-      | N_IBytes_int -> affine_model name |> m
-      | N_IInt_bytes -> affine_model name |> m
+      | N_IOr_bytes -> (linear_max_model, linear_max_model) |> m2 name
+      | N_IAnd_bytes -> (linear_min_model, linear_min_model) |> m2 name
+      | N_IXor_bytes -> (linear_max_model, linear_max_model) |> m2 name
+      | N_INot_bytes -> (affine_model, affine_model) |> m2 name
+      | N_ILsl_bytes -> (lsl_bytes_model, lsl_bytes_model) |> m2 name
+      | N_ILsr_bytes -> (lsr_bytes_model, lsr_bytes_model) |> m2 name
+      | N_IBytes_nat | N_INat_bytes | N_IBytes_int | N_IInt_bytes ->
+          (affine_model, affine_model) |> m2 name
       | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
       | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
           (linear_max_model, linear_max_model) |> m2 name
