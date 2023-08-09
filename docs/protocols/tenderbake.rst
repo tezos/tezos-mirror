@@ -6,6 +6,8 @@ Tenderbake
 This page contains a summary of the changes brought by the Tenderbake merge request (:gl:`!3738`).
 Please refer to :doc:`the documentation<../alpha/consensus>` and to this `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_ for an overview of the Tenderbake consensus algorithm and its motivation.
 
+Note that the notion of "attestation" was called "endorsement" at the time when Tenderbake was introduced. Hence, this page still uses the old term, which has been renamed only later.
+
 Protocol
 --------
 
