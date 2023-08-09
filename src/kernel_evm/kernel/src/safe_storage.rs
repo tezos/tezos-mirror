@@ -199,6 +199,7 @@ impl<Host: Runtime> SafeStorage<&mut Host> {
         match self.0.store_read(&safe_kernel_boot_path, 0, 0) {
             Ok(_) => {
                 // Upgrade detected
+                log!(self, Level::Info, "Upgrade activated.");
                 self.0.store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)
             }
             Err(_) => {
