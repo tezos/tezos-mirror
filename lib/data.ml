@@ -194,6 +194,8 @@ module Block = struct
     validation_time : Time.System.t option;
   }
 
+  type cycle_info = {cycle : int32; cycle_position : int32}
+
   type t = {
     hash : Block_hash.t;
     predecessor : Block_hash.t option;
@@ -202,6 +204,7 @@ module Block = struct
     timestamp : Time.Protocol.t;
     reception_times : reception list;
     nonce : unit option;
+    cycle_info : cycle_info option;
   }
 
   let reception_encoding =
@@ -216,6 +219,13 @@ module Block = struct
          (opt "application" Time.System.encoding)
          (opt "validation" Time.System.encoding))
 
+  let cycle_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {cycle; cycle_position} -> (cycle, cycle_position))
+      (fun (cycle, cycle_position) -> {cycle; cycle_position})
+      (obj2 (req "cycle" int32) (req "cycle_position" int32))
+
   let encoding =
     let open Data_encoding in
     conv
@@ -227,17 +237,35 @@ module Block = struct
              reception_times;
              timestamp;
              nonce;
+             cycle_info;
            } ->
-        (hash, predecessor, delegate, round, reception_times, timestamp, nonce))
+        ( hash,
+          predecessor,
+          delegate,
+          round,
+          reception_times,
+          timestamp,
+          nonce,
+          cycle_info ))
       (fun ( hash,
              predecessor,
              delegate,
              round,
              reception_times,
              timestamp,
-             nonce ) ->
-        {hash; predecessor; delegate; round; reception_times; timestamp; nonce})
-      (obj7
+             nonce,
+             cycle_info ) ->
+        {
+          hash;
+          predecessor;
+          delegate;
+          round;
+          reception_times;
+          timestamp;
+          nonce;
+          cycle_info;
+        })
+      (obj8
          (req "hash" Block_hash.encoding)
          (opt "predecessor" Block_hash.encoding)
          (dft
@@ -247,7 +275,16 @@ module Block = struct
          (dft "round" int32 0l)
          (dft "reception_times" (list reception_encoding) [])
          (dft "timestamp" Time.Protocol.encoding Time.Protocol.epoch)
-         (opt "nonce" unit))
+         (opt "nonce" unit)
+         (opt "cycle_info" cycle_info_encoding))
+end
+
+module Cycle = struct
+  type t = {cycle : int32; cycle_position : int32}
+
+  let encoding =
+    let open Data_encoding in
+    obj2 (req "cycle" int32) (req "cycle_position" int32)
 end
 
 type t = {

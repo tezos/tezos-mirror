@@ -95,6 +95,7 @@ let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
              block.timestamp,
              block.reception_times,
              block.delegate,
+             block.cycle_info,
              endos @ preendos ))
   | Mempool (level, ops) -> Some (Mempool (None, level, ops))
   | Rights (_, _) -> None

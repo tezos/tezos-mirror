@@ -267,7 +267,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
         unknown
 
 let dump_included_in_block path block_level block_hash block_predecessor
-    block_round timestamp reception_times baker consensus_ops =
+    block_round timestamp reception_times baker cycle_info consensus_ops =
   let open Lwt.Infix in
   (let endorsements_level = Int32.pred block_level in
    let filename = filename_of_level path endorsements_level in
@@ -320,6 +320,7 @@ let dump_included_in_block path block_level block_hash block_predecessor
             reception_times;
             timestamp;
             nonce = None;
+            cycle_info;
           }
         :: infos.Data.blocks
       in
@@ -479,6 +480,7 @@ type chunk =
       * Time.Protocol.t
       * Data.Block.reception list
       * Tezos_crypto.Signature.Public_key_hash.t
+      * Data.Block.cycle_info option
       * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
@@ -493,6 +495,7 @@ let dump prefix = function
         timestamp,
         reception_times,
         baker,
+        cycle_info,
         block_info ) ->
       dump_included_in_block
         prefix
@@ -503,6 +506,7 @@ let dump prefix = function
         timestamp
         reception_times
         baker
+        cycle_info
         block_info
   | Mempool (unaccurate, level, items) ->
       dump_received prefix ?unaccurate level items
@@ -525,6 +529,7 @@ let add_block ~level (block, (endos, preendos)) =
             block.timestamp,
             block.reception_times,
             block.delegate,
+            block.cycle_info,
             endos @ preendos )))
 
 (* not used *)

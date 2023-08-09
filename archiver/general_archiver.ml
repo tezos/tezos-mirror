@@ -83,7 +83,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
-  let block_info_data (delegate, timestamp, round, hash, predecessor)
+  let block_info_data (delegate, timestamp, round, hash, predecessor) cycle_info
       reception_times =
     Data.Block.
       {
@@ -93,19 +93,20 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         hash;
         predecessor;
         nonce = None;
+        cycle_info;
         reception_times;
       }
 
-  let block_data cctx ((_, _, _, hash, _) as info) reception_times =
+  let block_data cctx ((_, _, _, hash, _) as info) cycle_info reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
-      ( block_info_data info reception_times,
+      ( block_info_data info cycle_info reception_times,
         split_endorsements_preendorsements operations )
 
   let block_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     let* block_info = Services.get_block_info cctx level in
-    block_data cctx block_info []
+    block_data cctx block_info None []
 
   let () = Protocol_hash.Table.add block_machine Services.hash block_of
 
@@ -118,6 +119,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     return
       ( block_info_data
           (delegate, timestamp, round, hash, predecessor)
+          None
           reception_times,
         ([], []) )
 
@@ -131,11 +133,14 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
-    let* delegate, (_, _) = Services.baker_and_cycle cctx hash in
+    let* delegate, (cycle, cycle_position) =
+      Services.baker_and_cycle cctx hash
+    in
     let predecessor = Some header.Block_header.shell.Block_header.predecessor in
     block_data
       cctx
       (delegate, timestamp, round, hash, predecessor)
+      (Some {cycle; cycle_position})
       reception_times
 
   let () =
