@@ -22,7 +22,6 @@ use tezos_ethereum::block::L2Block;
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
-    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::wei::Wei;
 
@@ -48,9 +47,6 @@ const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
-const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
-const BLOCK_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
-const BLOCK_TIMESTAMP: RefPath = RefPath::assert_from(b"/timestamp");
 
 const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/transactions_receipts");
@@ -86,7 +82,7 @@ const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
 const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 
 /// Subpath where transactions are indexed
-const TRANSACTIONS_INDEX: RefPath = BLOCK_TRANSACTIONS;
+const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
@@ -200,39 +196,31 @@ pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256,
     Ok(U256::from_little_endian(&buffer))
 }
 
-fn read_nth_block_transactions<Host: Runtime>(
+fn store_rlp<T: Encodable, Host: Runtime>(
+    src: &T,
     host: &mut Host,
-    block_path: &OwnedPath,
-) -> Result<Vec<TransactionHash>, Error> {
-    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
-
-    let transactions_bytes = host.store_read_all(&path)?;
-
-    Ok(transactions_bytes
-        .chunks(TRANSACTION_HASH_SIZE)
-        .filter_map(|tx_hash_bytes: &[u8]| -> Option<TransactionHash> {
-            tx_hash_bytes.try_into().ok()
-        })
-        .collect::<Vec<TransactionHash>>())
+    path: &OwnedPath,
+) -> Result<(), Error> {
+    let bytes = src.rlp_bytes();
+    host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
-fn read_nth_block_timestamp<Host: Runtime>(
+fn read_rlp<T: Decodable, Host: Runtime>(
     host: &mut Host,
-    block_path: &OwnedPath,
-) -> Result<Timestamp, Error> {
-    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
-    read_timestamp_path(host, &path)
+    path: &OwnedPath,
+) -> Result<T, Error> {
+    let bytes = host.store_read_all(path)?;
+    FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
 }
 
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let number = read_current_block_number(host)?;
     let block_path = block_path(number)?;
-    let transactions = read_nth_block_transactions(host, &block_path)?;
-    let timestamp = read_nth_block_timestamp(host, &block_path)?;
-    Ok(L2Block::new(number, transactions, timestamp))
+    let block = read_rlp(host, &block_path)?;
+    Ok(block)
 }
 
-fn store_block_number<Host: Runtime>(
+fn store_current_block_number<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
     block_number: U256,
@@ -244,36 +232,6 @@ fn store_block_number<Host: Runtime>(
         .map_err(Error::from)
 }
 
-fn store_block_hash<Host: Runtime>(
-    host: &mut Host,
-    block_path: &OwnedPath,
-    block_hash: &H256,
-) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCK_HASH)?;
-    host.store_write(&path, block_hash.as_bytes(), 0)
-        .map_err(Error::from)
-}
-
-fn store_block_transactions<Host: Runtime>(
-    host: &mut Host,
-    block_path: &OwnedPath,
-    block_transactions: &[TransactionHash],
-) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCK_TRANSACTIONS)?;
-    let block_transactions = &block_transactions.concat()[..];
-    host.store_write_all(&path, block_transactions)
-        .map_err(Error::from)
-}
-
-fn store_block_timestamp<Host: Runtime>(
-    host: &mut Host,
-    block_path: &OwnedPath,
-    timestamp: &Timestamp,
-) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCK_TIMESTAMP)?;
-    store_timestamp_path(host, &path, timestamp)
-}
-
 fn store_block<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
@@ -281,11 +239,7 @@ fn store_block<Host: Runtime>(
 ) -> Result<(), Error> {
     let mut index = init_blocks_index()?;
     index_block(host, &block.hash, &mut index)?;
-
-    store_block_number(host, block_path, block.number)?;
-    store_block_hash(host, block_path, &block.hash)?;
-    store_block_transactions(host, block_path, &block.transactions)?;
-    store_block_timestamp(host, block_path, &block.timestamp)
+    store_rlp(block, host, block_path)
 }
 
 pub fn store_block_by_number<Host: Runtime>(
@@ -302,7 +256,7 @@ fn store_current_block_nodebug<Host: Runtime>(
 ) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
     // We only need to store current block's number so we avoid the storage of duplicate informations.
-    store_block_number(host, &current_block_path, block.number)?;
+    store_current_block_number(host, &current_block_path, block.number)?;
     // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
     store_block_by_number(host, block)
 }
