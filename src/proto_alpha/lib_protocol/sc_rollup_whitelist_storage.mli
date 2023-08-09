@@ -36,7 +36,7 @@ val init :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   whitelist:Sc_rollup_whitelist_repr.t ->
-  (Raw_context.t * int) tzresult Lwt.t
+  (Raw_context.t * Z.t) tzresult Lwt.t
 
 (** [check_access_to_private_rollup context rollup staker_pkh] returns an error
     if [staker_pkh] is not in the whitelist of [rollup] if the [rollup] is marked
@@ -53,3 +53,33 @@ val find_whitelist_uncarbonated :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Signature.public_key_hash list option tzresult Lwt.t
+
+(** [replace context rollup ~whitelist] replaces the whitelist of
+    [rollup] in the storage by [whitelist]. Returns the resulting
+    context along with the used storage space. *)
+val replace :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  whitelist:Sc_rollup_whitelist_repr.t ->
+  (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [make_public context rollup] removes the whitelist of [rollup] from
+    the storage thus making the rollup public. Returns the resulting
+    context along with the freed storage space. *)
+val make_public :
+  Raw_context.t -> Sc_rollup_repr.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [adjust_storage_space ctxt ~new_storage_size] updates the used
+    storage space for the whitelist according to
+    [new_storage_size]. The additional positive amount of unpaid
+    storage is returned. If no unpaid storage is consumed, this amount
+    is 0.
+
+    Note that when storage space for the whitelist is released we may later
+    use that space for free. For this reason, the amount returned may be less
+    than the given (positive) [storage_diff]. *)
+val adjust_storage_space :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  new_storage_size:Z.t ->
+  (Raw_context.t * Z.t) tzresult Lwt.t

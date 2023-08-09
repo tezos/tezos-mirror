@@ -1007,6 +1007,20 @@ module Sc_rollup : sig
     Carbonated_data_set_storage
       with type t := Raw_context.t * Sc_rollup_repr.t
        and type elt = Signature.Public_key_hash.t
+
+  (** Maximal space available for the whitelist without needing to burn new fees. *)
+  module Whitelist_paid_storage_space :
+    Indexed_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Z.t
+       and type t = Raw_context.t
+
+  (** Current storage space in bytes used by the whitelist. *)
+  module Whitelist_used_storage_space :
+    Indexed_data_storage
+      with type t = Raw_context.t
+       and type key = Sc_rollup_repr.t
+       and type value = Z.t
 end
 
 module Dal : sig

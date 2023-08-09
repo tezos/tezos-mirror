@@ -2123,6 +2123,22 @@ module Sc_rollup = struct
            let name = ["whitelist"]
          end))
          (Public_key_hash_index)
+
+  module Whitelist_paid_storage_space =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["whitelist_paid_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Whitelist_used_storage_space =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["whitelist_use_bytes"]
+      end)
+      (Encoding.Z)
 end
 
 module Dal = struct

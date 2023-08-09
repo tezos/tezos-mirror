@@ -32,18 +32,21 @@ let is_private ctxt rollup =
 
 let init ctxt rollup_address ~whitelist =
   let open Lwt_result_syntax in
-  List.fold_left_es
-    (fun (ctxt, size) e ->
-      let* ctxt, size_e =
-        (* the storage fails when there key already exists. This is
-           only to improve the UX so that it returns a cleaner
-           error. *)
-        trace Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
-        @@ Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
-      in
-      return (ctxt, size + size_e))
-    (ctxt, 0)
-    whitelist
+  let* ctxt, used_storage =
+    List.fold_left_es
+      (fun (ctxt, size) e ->
+        let* ctxt, size_e =
+          (* the storage fails when there key already exists. This is
+             only to improve the UX so that it returns a cleaner
+             error. *)
+          trace Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
+          @@ Storage.Sc_rollup.Whitelist.init (ctxt, rollup_address) e
+        in
+        return (ctxt, Z.add size (Z.of_int size_e)))
+      (ctxt, Z.zero)
+      whitelist
+  in
+  return (ctxt, used_storage)
 
 let check_access_to_private_rollup ctxt rollup staker =
   let open Lwt_result_syntax in
@@ -73,3 +76,50 @@ let find_whitelist_uncarbonated ctxt rollup_address =
     in
     return (Some elts)
   else return None
+
+let replace ctxt rollup ~whitelist =
+  let open Lwt_result_syntax in
+  let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
+  init ~whitelist ctxt rollup
+
+let make_public ctxt rollup =
+  let open Lwt_result_syntax in
+  let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
+  let* used_storage =
+    Storage.Sc_rollup.Whitelist_used_storage_space.find ctxt rollup
+  in
+  let used_storage = Option.value ~default:Z.zero used_storage in
+  let*! ctxt =
+    Storage.Sc_rollup.Whitelist_used_storage_space.remove ctxt rollup
+  in
+  return (ctxt, used_storage)
+
+let adjust_storage_space ctxt rollup ~new_storage_size =
+  let open Lwt_result_syntax in
+  let* used_storage =
+    Storage.Sc_rollup.Whitelist_used_storage_space.find ctxt rollup
+  in
+  let used_storage = Option.value ~default:Z.zero used_storage in
+  let storage_diff = Z.sub new_storage_size used_storage in
+  if Compare.Z.(storage_diff = Z.zero) then return (ctxt, Z.zero)
+  else
+    let*! ctxt =
+      Storage.Sc_rollup.Whitelist_used_storage_space.add
+        ctxt
+        rollup
+        new_storage_size
+    in
+    let* paid_storage =
+      Storage.Sc_rollup.Whitelist_paid_storage_space.find ctxt rollup
+    in
+    let paid_storage = Option.value ~default:Z.zero paid_storage in
+    let diff = Z.sub new_storage_size paid_storage in
+    if Compare.Z.(Z.zero < diff) then
+      let*! ctxt =
+        Storage.Sc_rollup.Whitelist_paid_storage_space.add
+          ctxt
+          rollup
+          new_storage_size
+      in
+      return (ctxt, diff)
+    else return (ctxt, Z.zero)

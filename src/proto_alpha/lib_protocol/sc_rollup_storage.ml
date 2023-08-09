@@ -150,14 +150,23 @@ let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
   let* ctxt, whitelist_size =
     let*? () = check_whitelist ctxt whitelist in
     match whitelist with
-    | Some whitelist -> Sc_rollup_whitelist_storage.init ~whitelist ctxt address
-    | None -> return (ctxt, 0)
+    | Some whitelist ->
+        let* ctxt, new_storage_size =
+          Sc_rollup_whitelist_storage.init ~whitelist ctxt address
+        in
+        Sc_rollup_whitelist_storage.adjust_storage_space
+          ctxt
+          address
+          ~new_storage_size
+    | None -> return (ctxt, Z.zero)
   in
   let size =
-    Z.of_int
-      (origination_size + stored_kind_size + addresses_size + param_ty_size
-     + pvm_kind_size + genesis_info_size_diff + commitment_size_diff
-     + whitelist_size)
+    Z.(
+      add
+        (of_int
+           (origination_size + stored_kind_size + addresses_size + param_ty_size
+          + pvm_kind_size + genesis_info_size_diff + commitment_size_diff))
+        whitelist_size)
   in
   return (size, genesis_info.commitment_hash, ctxt)
 

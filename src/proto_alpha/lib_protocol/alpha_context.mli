@@ -2789,10 +2789,23 @@ module Sc_rollup : sig
     type t = public_key_hash list
 
     val init :
-      context -> Address.t -> whitelist:t -> (context * int) tzresult Lwt.t
+      context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
+
+    val is_private : context -> Address.t -> (context * bool) tzresult Lwt.t
 
     val find_whitelist_uncarbonated :
       context -> Address.t -> t option tzresult Lwt.t
+
+    val replace :
+      context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
+
+    val make_public : context -> Address.t -> (context * Z.t) tzresult Lwt.t
+
+    val adjust_storage_space :
+      context ->
+      Address.t ->
+      new_storage_size:Z.t ->
+      (context * Z.t) tzresult Lwt.t
 
     val encoding : t Data_encoding.t
 
@@ -3170,6 +3183,7 @@ module Sc_rollup : sig
         | Atomic_transaction_batch_typed of {
             transactions : typed_transaction list;
           }
+        | Whitelist_update of Whitelist.t option
 
       val pp : Format.formatter -> t -> unit
 

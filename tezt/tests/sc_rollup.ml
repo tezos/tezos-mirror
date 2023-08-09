@@ -57,6 +57,20 @@ let get_last_stored_commitment =
 let get_last_published_commitment =
   assert_some_client_command Sc_rollup_client.last_published_commitment
 
+let get_outbox_proof ?hooks ?expected_error ~__LOC__ sc_rollup ~message_index
+    ~outbox_level =
+  let* proof =
+    Sc_rollup_client.outbox_proof
+      ?hooks
+      ?expected_error
+      sc_rollup
+      ~message_index
+      ~outbox_level
+  in
+  match proof with
+  | Some v -> return v
+  | None -> failwith (Format.asprintf "Unexpected [None] at %s" __LOC__)
+
 (* Number of levels needed to process a head as finalized. This value should
    be the same as `node_context.block_finality_time`, where `node_context` is
    the `Node_context.t` used by the rollup node. For Tenderbake, the
@@ -5671,6 +5685,127 @@ let test_private_rollup_node_publish_not_in_whitelist =
     ~exit_code:1
     ~msg:(rex ".*The operator is not in the whitelist.*")
 
+let test_rollup_whitelist_update ~kind =
+  let commitment_period = 2 and challenge_window = 5 in
+  let whitelist = [Constant.bootstrap1.public_key_hash] in
+  test_full_scenario
+    {variant = None; tags = ["whitelist"]; description = "whitelist"}
+    ~kind
+    ~whitelist_enable:true
+    ~whitelist
+    ~supports:(From_protocol 019)
+    ~commitment_period
+    ~challenge_window
+    ~operator:Constant.bootstrap1.public_key_hash
+  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
+  let* () = Sc_rollup_node.run rollup_node rollup_addr [] in
+  let*! payload_index0 =
+    Sc_rollup_client.encode_json_outbox_msg rollup_client
+    @@ `O
+         [
+           ( "whitelist",
+             `A
+               [
+                 `String Constant.bootstrap1.public_key_hash;
+                 `String Constant.bootstrap2.public_key_hash;
+               ] );
+         ]
+  in
+  let*! payload_index1 =
+    Sc_rollup_client.encode_json_outbox_msg rollup_client
+    @@ `O [("whitelist", `Null)]
+  in
+  let* () =
+    send_text_messages
+      ~hooks
+      ~format:`Hex
+      client
+      [payload_index0; payload_index1]
+  in
+  let outbox_level = Node.get_level node in
+  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
+  let* () =
+    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
+  in
+  let* outbox =
+    Runnable.run @@ Sc_rollup_client.outbox ~outbox_level rollup_client
+  in
+  let*! commitment = Sc_rollup_client.last_published_commitment rollup_client in
+  let Sc_rollup_client.{commitment_and_hash = {commitment; _}; _} =
+    Option.get commitment
+  in
+  (* Bootstrap2 attempts to publish a commitments while not present in the whitelist. *)
+  let*? process =
+    publish_commitment
+      ~src:Constant.bootstrap2.alias
+      ~commitment
+      client
+      rollup_addr
+  in
+  let* output_err =
+    Process.check_and_read_stderr ~expect_failure:true process
+  in
+  (* The attempt at publishing a commitment fails. *)
+  Check.(
+    (output_err
+    =~ rex
+         ".*The rollup is private and the submitter of the commitment is not \
+          present in the whitelist.*")
+      ~error_msg:"Expected output \"%L\" to match expression \"%R\".") ;
+  Log.info "Outbox is %s" (JSON.encode outbox) ;
+  (* Execute the first outbox message that updates the whitelist [payload_index0]
+     to add Bootstrap2. *)
+  let* {commitment_hash; proof} =
+    get_outbox_proof rollup_client ~__LOC__ ~message_index:0 ~outbox_level
+  in
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Bootstrap2 attempts to publish a commitments while not present in the whitelist,
+     once again. *)
+  let*! () =
+    publish_commitment
+      ~src:Constant.bootstrap2.alias
+      ~commitment
+      client
+      rollup_addr
+  in
+  (* The above operation succeeds. *)
+  (* Execute the second outbox message that updates the whitelist [payload_index1]
+     and set it to [None]. *)
+  let* {commitment_hash; proof} =
+    get_outbox_proof rollup_client ~__LOC__ ~message_index:1 ~outbox_level
+  in
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let*! () =
+    publish_commitment
+      ~src:Constant.bootstrap3.alias
+      ~commitment
+      client
+      rollup_addr
+  in
+  (* The rollup being public anyone can publish a commitment so the above operation
+     succeeds. *)
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5852,7 +5987,8 @@ let register ~protocols =
   test_private_rollup_whitelisted_staker protocols ;
   test_private_rollup_non_whitelisted_staker protocols ;
   test_private_rollup_node_publish_in_whitelist protocols ;
-  test_private_rollup_node_publish_not_in_whitelist protocols
+  test_private_rollup_node_publish_not_in_whitelist protocols ;
+  test_rollup_whitelist_update ~kind:"wasm_2_0_0" protocols
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
