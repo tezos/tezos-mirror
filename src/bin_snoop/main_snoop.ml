@@ -555,8 +555,7 @@ let generate_code_for_models sol models codegen_options ~exclusions =
 
 let save_code_list_as_a_module save_to code_list =
   let result = Codegen.make_toplevel_module code_list in
-  stdout_or_file save_to (fun ppf ->
-      Format.fprintf ppf "%a@." Codegen.pp_module result)
+  stdout_or_file save_to (fun ppf -> Codegen.pp_module ppf result)
 
 let generate_code codegen_options generated_code =
   let generated =
