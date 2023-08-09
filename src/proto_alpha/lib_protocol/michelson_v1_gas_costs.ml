@@ -474,20 +474,24 @@ let cost_N_IMap_get_and_update' size1 size2 =
 
 let cost_N_IConcat_string_precheck length =
   (* we set the precheck to be slightly more expensive than cost_N_IList_iter *)
-  S.mul (S.safe_int length) (S.safe_int 10)
+  let open S.Syntax in
+  let length = S.safe_int length in
+  length * S.safe_int 10
 
 (* This is the cost of allocating a string and blitting existing ones into it. *)
 let cost_N_IConcat_string total_bytes =
-  S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+  let open S.Syntax in
+  S.safe_int 100 + (total_bytes lsr 1)
 
 (* Same story as Concat_string. *)
 let cost_N_IConcat_bytes total_bytes =
-  S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
+  let open S.Syntax in
+  S.safe_int 100 + (total_bytes lsr 1)
 
 (* A partially carbonated instruction,
    so its model does not correspond to this function *)
 (* Cost of Unpack pays two integer comparisons, and a Bytes slice *)
-let cost_N_IUnpack bytes =
+let cost_N_IUnpack total_bytes =
   let open S.Syntax in
-  let bytes = S.safe_int bytes in
-  S.safe_int 260 + (bytes lsr 1)
+  let total_bytes = S.safe_int total_bytes in
+  S.safe_int 260 + (total_bytes lsr 1)
