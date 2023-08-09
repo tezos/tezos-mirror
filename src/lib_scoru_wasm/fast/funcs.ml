@@ -284,6 +284,30 @@ let make ~version ~reveal_builtins ~write_debug state =
           ~max_bytes
           ~payload:(Bytes.of_string payload))
   in
+  let reveal_raw =
+    fn
+      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
+      (fun payload_addr payload_size destination_addr max_bytes ->
+        Lwt.map (Result.fold ~ok:Fun.id ~error:Fun.id)
+        @@ with_mem
+        @@ fun memory ->
+        let open Lwt_result_syntax in
+        let* reveal =
+          Host_funcs.Aux.load_bytes
+            ~memory
+            ~addr:payload_addr
+            ~size:payload_size
+        in
+        let*! payload = reveal_builtins (Reveal_raw reveal) in
+        let*! result =
+          Host_funcs.Aux.reveal
+            ~memory
+            ~dst:destination_addr
+            ~max_bytes
+            ~payload:(Bytes.of_string payload)
+        in
+        return result)
+  in
 
   let base =
     [
@@ -311,7 +335,7 @@ let make ~version ~reveal_builtins ~write_debug state =
     ]
   in
   let v2 = v1 @ [("store_exists", store_exists)] in
-  let v3 = v2 in
+  let v3 = v2 @ [("reveal", reveal_raw)] in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []

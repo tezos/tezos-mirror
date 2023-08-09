@@ -1294,6 +1294,37 @@ let reveal_metadata_parse_args _memories args =
 
 let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args
 
+let reveal_raw_name = "tezos_reveal"
+
+let reveal_raw_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let reveal_raw_parse_args memories args =
+  match args with
+  | Values.
+      [
+        Num (I32 payload_addr);
+        Num (I32 payload_size);
+        Num (I32 destination_addr);
+        Num (I32 max_bytes);
+      ] ->
+      let open Lwt_result_syntax in
+      let*! memory = retrieve_memory memories in
+      let* payload =
+        Aux.load_bytes ~memory ~addr:payload_addr ~size:payload_size
+      in
+      Lwt_result.return
+        ( Host_funcs.(Reveal_raw payload),
+          Host_funcs.{base = destination_addr; max_bytes} )
+  | _ -> raise Bad_input
+
+let reveal_raw = Host_funcs.Reveal_func reveal_raw_parse_args
+
 let store_write_name = "tezos_write_read"
 
 let store_write_type =
@@ -1359,6 +1390,11 @@ let lookup_opt ~version name =
     | Wasm_pvm_state.V0 | V1 -> None
     | V2 | V3 -> Some (ExternFunc (HostFunc (ty, name)))
   in
+  let v3_and_above ty name =
+    match version with
+    | Wasm_pvm_state.V0 | V1 | V2 -> None
+    | V3 -> Some (ExternFunc (HostFunc (ty, name)))
+  in
   match name with
   | "read_input" ->
       Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
@@ -1395,6 +1431,7 @@ let lookup_opt ~version name =
       v1_and_above store_get_hash_type store_get_hash_name
   | "store_create" -> v1_and_above store_create_type store_create_name
   | "store_exists" -> v2_and_above store_exists_type store_exists_name
+  | "reveal" -> v3_and_above reveal_raw_type reveal_raw_name
   | _ -> None
 
 let lookup ~version name =
@@ -1458,7 +1495,10 @@ let registry_V2 ~write_debug =
 
 let registry_V2_noop = registry_V2 ~write_debug:Noop
 
-let base_V3 = base_V2
+let base_V3 =
+  Host_funcs.(
+    base_V2
+    |> with_host_function ~global_name:reveal_raw_name ~implem:reveal_raw)
 
 let registry_V3 ~write_debug =
   Host_funcs.(base_V3 |> with_write_debug ~write_debug |> construct)
