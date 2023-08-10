@@ -30,7 +30,7 @@ let ensure_dir_exists dir =
   Lwt.catch
     (fun () ->
       let* () = Lwt_utils_unix.create_dir ~perm:0o744 dir in
-      Lwt.return ())
+      Lwt.return_unit)
     (function
       | Failure s ->
           if String.equal s "Not a directory" then
@@ -48,10 +48,10 @@ let number_of_bakers =
 
 let generate_baker_accounts n client =
   let rec go i =
-    if i = 0 then Lwt.return ()
+    if i = 0 then Lwt.return_unit
     else
-      let* () = Lwt_io.printf "." in
       let* _alias = Client.gen_keys ~alias:(baker_alias i) client in
+      let* () = Lwt_io.printf "." in
       go (i - 1)
   in
   let* () = Lwt_io.printf "Generating accounts" in
@@ -78,7 +78,7 @@ module Local = struct
     let client = Client.create ~base_dir:client_dir () in
     let* () = ensure_dir_exists client_dir in
     let* () = generate_baker_accounts n client in
-    Lwt.return ()
+    Lwt.return_unit
 
   let generate_network_configuration () = Test.fail "Not implemented"
 
