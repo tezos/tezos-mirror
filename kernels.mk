@@ -37,8 +37,12 @@ sequenced_kernel.wasm:
 	@cp src/kernel_sequencer/target/wasm32-unknown-unknown/release/examples/sequenced_kernel.wasm $@
 	@wasm-strip $@
 
-tx_kernel.wasm::
+.PHONY: tx_demo_collector
+tx_demo_collector:
 	@make -C src/kernel_tx_demo build
+	@cp src/kernel_tx_demo/target/$(NATIVE_TARGET)/release/tx-demo-collector .
+
+tx_kernel.wasm: tx_demo_collector
 	@cp src/kernel_tx_demo/target/wasm32-unknown-unknown/release/tx_kernel.wasm $@
 
 .PHONY: build

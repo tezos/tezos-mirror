@@ -1,0 +1,11 @@
+[package]
+name = "tx-demo-collector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { version = "1", features = ["backtrace"] }
+ctrlc = "3"
+notify = "5.0.0"
+clap = { version = "4", features = ["derive"] }
+websocket = "0.26.5"
