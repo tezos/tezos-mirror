@@ -284,6 +284,9 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         }
         Err(e) => {
             if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
+                // All the changes from the failed migration are reverted.
+                host.revert()
+                    .expect("The kernel failed to delete the temporary directory");
                 host.fallback_backup_kernel()
                     .expect("Fallback mechanism failed");
             } else {
