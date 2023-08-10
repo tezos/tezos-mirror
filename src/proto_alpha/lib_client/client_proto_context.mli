@@ -126,6 +126,22 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.val-staked_balance}. *)
+val get_staked_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Tez.t option tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.val-full_balance}. *)
+val get_full_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract.t ->
+  Tez.t tzresult Lwt.t
+
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_ticket_balance}. *)
 val get_contract_ticket_balance :
   #Protocol_client_context.rpc_context ->

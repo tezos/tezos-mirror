@@ -247,6 +247,10 @@ Client
 
 - **Breaking change** Removed read-write commands specific to Mumbai (MR :gl:`!9695`)
 
+- Added new client commands related to the new staking mechanisms:
+  ``stake``, ``unstake``, ``finalize unstake``, ``set delegate parameters``,
+  ``get full balance`` and ``get staked balance``. (MR :gl:`!9642`)
+
 Baker
 -----
 

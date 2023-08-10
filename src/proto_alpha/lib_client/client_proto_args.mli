@@ -101,6 +101,12 @@ val tez_param :
   ('a, full) Tezos_clic.params ->
   (Tez.t -> 'a, full) Tezos_clic.params
 
+val everything_or_tez_param :
+  name:string ->
+  desc:string ->
+  ('a, full) Tezos_clic.params ->
+  (Tez.t -> 'a, full) Tezos_clic.params
+
 val non_negative_z_parameter :
   unit -> (Z.t, #Client_context.io) Tezos_clic.parameter
 
@@ -216,6 +222,12 @@ val display_names_flag : (bool, full) Tezos_clic.arg
 val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 
 val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg
+
+val limit_of_staking_over_baking_millionth_arg :
+  (int option, full) Tezos_clic.arg
+
+val edge_of_baking_over_staking_billionth_arg :
+  (int option, full) Tezos_clic.arg
 
 module Sc_rollup_params : sig
   val rollup_kind_parameter : (Sc_rollup.Kind.t, full) Tezos_clic.parameter
