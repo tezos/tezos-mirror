@@ -24,7 +24,8 @@
   test_lwt_pipe
   test_circular_buffer
   test_circular_buffer_fuzzy
-  test_hash_queue_lwt))
+  test_hash_queue_lwt
+  test_lwt_utils))
 
 (executable
  (name main)
