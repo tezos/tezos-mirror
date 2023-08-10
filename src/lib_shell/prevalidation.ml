@@ -176,7 +176,9 @@ module MakeAbstract
     create_aux ~old_state chain_store head timestamp
 
   let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
-    match Proto.Plugin.syntactic_check op.protocol with
+    let open Lwt_syntax in
+    let* status = Proto.Plugin.syntactic_check op.protocol in
+    match status with
     | `Ill_formed ->
         Lwt.return
           (`Refused

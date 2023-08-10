@@ -44,7 +44,7 @@ module type T = sig
     val flush :
       info -> head:Tezos_base.Block_header.shell_header -> info tzresult Lwt.t
 
-    val syntactic_check : operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : operation -> [`Well_formed | `Ill_formed] Lwt.t
 
     val pre_filter :
       info ->
@@ -104,7 +104,7 @@ module No_plugin (Proto : Registered_protocol.T) :
 
     let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
-    let syntactic_check _ = `Well_formed
+    let syntactic_check _ = Lwt.return `Well_formed
 
     let pre_filter _ _ _ = Lwt.return @@ `Passed_prefilter (`Low [])
 

@@ -266,43 +266,99 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
   let resources = Q.max size_ratio gas_ratio in
   (Q.(fee_f / resources), resources)
 
+let output_encoding =
+  let open Data_encoding in
+  obj3
+    (req "outbox_level" Environment.Bounded.Non_negative_int32.encoding)
+    (req "message_index" n)
+    (req "message" Variable.string)
+
 let output_proof_encoding =
   let open Data_encoding in
   obj3
     (req
        "output_proof"
-       Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding)
+       Tezos_context_helpers.Context.Proof_encoding.Merkle_proof_encoding.V2
+       .Tree2
+       .tree_proof_encoding)
     (req "output_proof_state" Sc_rollup.State_hash.encoding)
-    (req "output_proof_output" Variable.bytes)
+    (req "output_proof_output" output_encoding)
+
+module Tree = struct
+  open Environment
+  include Context.Tree
+
+  type tree = Context.tree
+
+  type t = Context.t
+
+  type key = string list
+
+  type value = bytes
+end
+
+module Wasm_machine = Environment.Wasm_2_0_0.Make (Tree)
+
+let discard_wasm_output_proof_early output_proof outbox_level message_index
+    output =
+  let open Lwt_syntax in
+  let+ result =
+    Environment.Context.verify_tree_proof output_proof (fun tree ->
+        let* output =
+          Wasm_machine.get_output {outbox_level; message_index} tree
+        in
+        return (tree, output))
+  in
+  match result with
+  | Ok (_, Some expected_output) -> not (expected_output = output)
+  | _ -> false
 
 let kinded_hash_to_state_hash = function
   | `Value hash | `Node hash ->
       Sc_rollup.State_hash.context_hash_to_state_hash hash
 
-let is_invalid_op : type t. t manager_operation -> bool = function
+let is_invalid_op : type t. t manager_operation -> bool Lwt.t =
+  let open Lwt_syntax in
+  function
   | Sc_rollup_execute_outbox_message
       {rollup = _; cemented_commitment = _; output_proof} -> (
       match
         Data_encoding.Binary.of_string_opt output_proof_encoding output_proof
       with
-      | None -> true
-      | Some (output_proof, output_proof_state, _) ->
-          not
-            (Sc_rollup.State_hash.equal
-               output_proof_state
-               (kinded_hash_to_state_hash
-                  output_proof.Environment.Context.Proof.before)))
-  | _ -> false
+      | None -> return_true
+      | Some
+          ( output_proof,
+            output_proof_state,
+            (outbox_level, message_index, output) ) ->
+          let* discard_wasm_proof =
+            discard_wasm_output_proof_early
+              output_proof
+              outbox_level
+              message_index
+              output
+          in
+          let state_is_correct =
+            Sc_rollup.State_hash.equal
+              output_proof_state
+              (kinded_hash_to_state_hash
+                 output_proof.Environment.Context.Proof.before)
+          in
+          let is_invalid = (not state_is_correct) || discard_wasm_proof in
+          return is_invalid)
+  | _ -> return_false
 
-let rec contains_invalid_op : type t. t Kind.manager contents_list -> bool =
-  function
+let rec contains_invalid_op : type t. t Kind.manager contents_list -> bool Lwt.t
+    = function
   | Single (Manager_operation {operation; _}) -> is_invalid_op operation
   | Cons (Manager_operation {operation; _}, rest) ->
-      is_invalid_op operation || contains_invalid_op rest
+      let open Lwt_syntax in
+      let* is_invalid = is_invalid_op operation in
+      if not is_invalid then contains_invalid_op rest else return_true
 
 let syntactic_check
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
+  let open Lwt_syntax in
   match contents with
   | Single (Failing_noop _)
   | Single (Preendorsement _)
@@ -317,11 +373,13 @@ let syntactic_check
   | Single (Vdf_revelation _)
   | Single (Drain_delegate _)
   | Single (Ballot _) ->
-      `Well_formed
+      Lwt.return `Well_formed
   | Single (Manager_operation _) as op ->
-      if contains_invalid_op op then `Ill_formed else `Well_formed
+      let* is_invalid = contains_invalid_op op in
+      if is_invalid then return `Ill_formed else return `Well_formed
   | Cons (Manager_operation _, _) as op ->
-      if contains_invalid_op op then `Ill_formed else `Well_formed
+      let* is_invalid = contains_invalid_op op in
+      if is_invalid then return `Ill_formed else return `Well_formed
 
 let pre_filter_manager :
     type t.

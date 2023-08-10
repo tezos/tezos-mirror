@@ -72,7 +72,7 @@ val flush : info -> head:Block_header.shell_header -> info tzresult Lwt.t
 
     Should be called before the {!pre_filter}, does not need a context. *)
 val syntactic_check :
-  Protocol.Alpha_context.packed_operation -> [`Well_formed | `Ill_formed]
+  Protocol.Alpha_context.packed_operation -> [`Well_formed | `Ill_formed] Lwt.t
 
 (** Perform some preliminary checks on an operation.
 
