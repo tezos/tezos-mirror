@@ -211,7 +211,7 @@ mod tests {
     ) -> Option<Result<PrecompileOutcome, EthereumError>> {
         let caller = H160::from_low_u64_be(118u64);
         let mut mock_runtime = MockHost::default();
-        let block = BlockConstants::first_block(U256::zero());
+        let block = BlockConstants::first_block(U256::zero(), U256::one());
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
         let config = Config::london();

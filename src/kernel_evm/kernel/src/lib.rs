@@ -124,11 +124,12 @@ fn produce_and_upgrade<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
     kernel_upgrade: KernelUpgrade,
+    chain_id: U256,
 ) -> Result<(), anyhow::Error> {
     // Since a kernel upgrade was detected, in case an error is thrown
     // by the block production, we exceptionally "recover" from it and
     // still process the kernel upgrade.
-    if let Err(e) = block::produce(host, queue) {
+    if let Err(e) = block::produce(host, queue, chain_id) {
         log!(
             host,
             Error,
@@ -149,13 +150,14 @@ fn produce_and_upgrade<Host: Runtime>(
 pub fn stage_two<Host: Runtime>(
     host: &mut Host,
     queue: Queue,
+    chain_id: U256,
 ) -> Result<(), anyhow::Error> {
     log!(host, Info, "Entering stage two.");
     let kernel_upgrade = queue.kernel_upgrade.clone();
     if let Some(kernel_upgrade) = kernel_upgrade {
-        produce_and_upgrade(host, queue, kernel_upgrade)
+        produce_and_upgrade(host, queue, kernel_upgrade, chain_id)
     } else {
-        block::produce(host, queue)
+        block::produce(host, queue, chain_id)
     }
 }
 
@@ -216,6 +218,7 @@ fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Err
 }
 
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let queue = if storage::was_rebooted(host)? {
         // kernel was rebooted
         log!(
@@ -238,7 +241,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
                     retrieve_chain_id(host).context("Failed to retrieve chain id")?;
                 let ticketer = read_ticketer(host);
                 let admin = read_admin(host);
-
                 stage_one(host, smart_rollup_address, chain_id, ticketer, admin)
                     .context("Failed during stage 1")?
             }
@@ -246,7 +248,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         }
     };
 
-    stage_two(host, queue).context("Failed during stage 2")
+    stage_two(host, queue, chain_id).context("Failed during stage 2")
 }
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");

@@ -42,7 +42,7 @@ impl BlockConstants {
     /// Return the first block of the chain (genisis).
     /// TODO find suitable values for gas_limit et.c.
     /// To be done in <https://gitlab.com/tezos/tezos/-/milestones/114>.
-    pub fn first_block(timestamp: U256) -> Self {
+    pub fn first_block(timestamp: U256, chain_id: U256) -> Self {
         Self {
             gas_price: U256::one(),
             number: U256::zero(),
@@ -51,7 +51,7 @@ impl BlockConstants {
             difficulty: U256::zero(),
             gas_limit: 1u64,
             base_fee_per_gas: U256::one(),
-            chain_id: U256::zero(),
+            chain_id,
         }
     }
 }
@@ -107,7 +107,7 @@ impl L2Block {
         }
     }
 
-    pub fn constants(&self) -> BlockConstants {
+    pub fn constants(&self, chain_id: U256) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         BlockConstants {
             gas_price: U256::one(),
@@ -117,7 +117,7 @@ impl L2Block {
             difficulty: self.difficulty,
             gas_limit: self.gas_limit,
             base_fee_per_gas: U256::one(),
-            chain_id: U256::zero(),
+            chain_id,
         }
     }
 }
