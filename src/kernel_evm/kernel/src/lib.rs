@@ -10,7 +10,8 @@ use primitive_types::U256;
 use storage::{
     read_chain_id, read_kernel_version, read_last_info_per_level_timestamp,
     read_last_info_per_level_timestamp_stats, read_ticketer, store_chain_id,
-    store_kernel_upgrade_nonce, store_kernel_version,
+    store_kernel_upgrade_nonce, store_kernel_version, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -26,8 +27,10 @@ use crate::safe_storage::{SafeStorage, TMP_PATH};
 
 use crate::blueprint::{fetch, Queue};
 use crate::error::Error;
+use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{read_smart_rollup_address, store_smart_rollup_address};
 use crate::upgrade::upgrade_kernel;
+use crate::Error::UpgradeError;
 
 mod apply;
 mod block;
@@ -55,6 +58,7 @@ const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     log!(host, Info, "Entering stage zero.");
+    init_storage_versioning(host)?;
     storage_migration(host)
 }
 
@@ -169,6 +173,13 @@ fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     }
 }
 
+fn init_storage_versioning<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
+        Ok(_) => Ok(()),
+        Err(_) => store_storage_version(host, STORAGE_VERSION),
+    }
+}
+
 fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     match read_chain_id(host) {
         Ok(chain_id) => Ok(chain_id),
@@ -181,13 +192,12 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
 }
 
 pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    stage_zero(host)?;
+    set_kernel_version(host)?;
     let smart_rollup_address = retrieve_smart_rollup_address(host)
         .context("Failed to retrieve smart rollup address")?;
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
     let ticketer = read_ticketer(host);
-    set_kernel_version(host)?;
-
-    stage_zero(host).context("Failed during stage 0")?;
 
     let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)
         .context("Failed during stage 1")?;
@@ -239,20 +249,25 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
                 .expect("The kernel failed to promote the temporary directory")
         }
         Err(e) => {
-            log_error(host.0, &e).expect("The kernel failed to write the error");
-            log!(host, Error, "The kernel produced an error: {:?}", e);
-            log!(
-                host,
-                Error,
-                "The temporarily modified durable storage is discarded"
-            );
+            if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
+                host.fallback_backup_kernel()
+                    .expect("Fallback mechanism failed");
+            } else {
+                log_error(host.0, &e).expect("The kernel failed to write the error");
+                log!(host, Error, "The kernel produced an error: {:?}", e);
+                log!(
+                    host,
+                    Error,
+                    "The temporarily modified durable storage is discarded"
+                );
 
-            // TODO: https://gitlab.com/tezos/tezos/-/issues/5766
-            // If an input is consumed then an error happens, the input
-            // will be lost, this cannot happen in production.
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/5766
+                // If an input is consumed then an error happens, the input
+                // will be lost, this cannot happen in production.
 
-            host.revert()
-                .expect("The kernel failed to delete the temporary directory")
+                host.revert()
+                    .expect("The kernel failed to delete the temporary directory")
+            }
         }
     }
 }

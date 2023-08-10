@@ -4,6 +4,8 @@
 
 ### EVM Kernel
 
+- Fallback mechanism if stage zero fails. (!9732)
+
 ### EVM Node
 
 ### Bug fixes
@@ -20,6 +22,7 @@
 - Improve kernel's logging from the rollup node's perspective. (!9571)
 - Adds a base gas cost of 21000 for every transaction. Note that the fees are
   still not paid by the sender. (!9477)
+- Adds a storage migration stage (`stage 0`). (!9591)
 
 ### EVM Node
 
@@ -41,4 +44,3 @@
 - Upgrade to Kernel SDK 0.2.1 (!9417, !9526)
 - Porting benchmark framework to the EVM Kernel. (!9529, !9524, !9545)
 - Reorganized dependencies at the workspace level. (!9522)
-- Adds a storage migration stage (`stage 0`). (!9591)

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::error::Error;
+use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -13,14 +14,21 @@ use tezos_smart_rollup_host::runtime::Runtime;
 //   needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
-pub fn storage_migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    // TODO: https://gitlab.com/tezos/tezos/-/issues/6154
-    // Upgrade back to the previous kernel if the migration fails.
+fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?
+    }
+    Ok(())
+}
+
+pub fn storage_migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    if migration(host).is_err() {
+        // Something went wrong during the migration.
+        // The fallback mechanism is triggered to retrograde to the previous kernel.
+        Err(Error::UpgradeError(Fallback))?
     }
     Ok(())
 }
