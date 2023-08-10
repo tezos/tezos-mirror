@@ -123,3 +123,14 @@ let adjust_storage_space ctxt rollup ~new_storage_size =
       in
       return (ctxt, diff)
     else return (ctxt, Z.zero)
+
+let find_last_whitelist_update = Storage.Sc_rollup.Last_whitelist_update.find
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/6186
+    Do not consider storage diffs for small updates to the storage. *)
+let set_last_whitelist_update ctxt rollup update =
+  let open Lwt_result_syntax in
+  let* ctxt, diff_size, _ =
+    Storage.Sc_rollup.Last_whitelist_update.add ctxt rollup update
+  in
+  return (ctxt, Z.of_int diff_size)

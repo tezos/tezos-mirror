@@ -5806,6 +5806,131 @@ let test_rollup_whitelist_update ~kind =
      succeeds. *)
   unit
 
+let test_rollup_whitelist_outdated_update ~kind =
+  let commitment_period = 2 and challenge_window = 5 in
+  let whitelist =
+    [Constant.bootstrap1.public_key_hash; Constant.bootstrap2.public_key_hash]
+  in
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["whitelist"];
+      description = "outdated whitelist update";
+    }
+    ~kind
+    ~whitelist_enable:true
+    ~whitelist
+    ~supports:(From_protocol 019)
+    ~commitment_period
+    ~challenge_window
+  @@ fun _protocol rollup_node rollup_client rollup_addr node client ->
+  let* () = Sc_rollup_node.run rollup_node rollup_addr [] in
+  let*! payload =
+    Sc_rollup_client.encode_json_outbox_msg rollup_client
+    @@ `O [("whitelist", `A [`String Constant.bootstrap1.public_key_hash])]
+  in
+  let*! payload2 =
+    Sc_rollup_client.encode_json_outbox_msg rollup_client
+    @@ `O
+         [
+           ( "whitelist",
+             `A
+               [
+                 `String Constant.bootstrap1.public_key_hash;
+                 `String Constant.bootstrap2.public_key_hash;
+               ] );
+         ]
+  in
+  (* Execute whitelist update with outdated message index. *)
+  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
+  let outbox_level = Node.get_level node in
+  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
+  let* () =
+    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
+  in
+  let* {commitment_hash; proof} =
+    get_outbox_proof rollup_client ~__LOC__ ~message_index:1 ~outbox_level
+  in
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~fee:(Tez.of_mutez_int 1358)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  (* Outdated message index. *)
+  let* {commitment_hash; proof} =
+    get_outbox_proof rollup_client ~__LOC__ ~message_index:0 ~outbox_level
+  in
+  let {value = process; _} =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~fee:(Tez.of_mutez_int 1498)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex ".*Outdated whitelist update: got message index")
+      process
+  in
+
+  (* Execute whitelist update with outdated outbox level. *)
+  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
+  let outbox_level = Node.get_level node in
+  let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
+  let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
+  let* () =
+    repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
+  in
+  let message_index = 0 in
+  let* {commitment_hash; proof} =
+    get_outbox_proof
+      rollup_client
+      ~__LOC__
+      ~message_index
+      ~outbox_level:(outbox_level + 1)
+  in
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~fee:(Tez.of_mutez_int 1391)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* {commitment_hash; proof} =
+    get_outbox_proof rollup_client ~__LOC__ ~message_index ~outbox_level
+  in
+  let {value = process; _} =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~fee:(Tez.of_mutez_int 1498)
+      ~rollup:rollup_addr
+      ~src:Constant.bootstrap3.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  Process.check_error
+    ~msg:(rex ".*Outdated whitelist update: got outbox level")
+    process
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -5988,7 +6113,8 @@ let register ~protocols =
   test_private_rollup_non_whitelisted_staker protocols ;
   test_private_rollup_node_publish_in_whitelist protocols ;
   test_private_rollup_node_publish_not_in_whitelist protocols ;
-  test_rollup_whitelist_update ~kind:"wasm_2_0_0" protocols
+  test_rollup_whitelist_update ~kind:"wasm_2_0_0" protocols ;
+  test_rollup_whitelist_outdated_update ~kind:"wasm_2_0_0" protocols
 
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;

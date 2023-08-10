@@ -83,3 +83,22 @@ val adjust_storage_space :
   Sc_rollup_repr.t ->
   new_storage_size:Z.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [find_last_whitelist_update ctxt rollup] returns the pair (outbox level,
+    message index) of the latest message of update to the whitelist. Returns
+    None if no whitelist update has been applied. The returned context accounts
+    for the gas consumption of the storage's update. *)
+val find_last_whitelist_update :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Raw_context.t * (Raw_level_repr.t * Z.t) option) tzresult Lwt.t
+
+(** [set_last_whitelist_update ctxt rollup (outbox_level, message_index)] set
+    the outbox level and message index of the latest message of update to the
+    whitelist. Returns the new context, and the difference from the old (maybe 0)
+    to the new size of the underlying storage. *)
+val set_last_whitelist_update :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Raw_level_repr.t * Z.t ->
+  (Raw_context.t * Z.t) tzresult Lwt.t
