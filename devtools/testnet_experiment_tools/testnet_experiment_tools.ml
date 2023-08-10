@@ -47,6 +47,13 @@ let number_of_bakers =
   Sys.getenv_opt bakers |> Option.map int_of_string
   |> Option.value ~default:default_number_of_bakers
 
+let default_gen_keys_dir = "/tmp/gen_keys_dir"
+
+let gen_keys_dir_name = "GEN_KEYS_DIR"
+
+let gen_keys_dir =
+  Sys.getenv_opt gen_keys_dir_name |> Option.value ~default:default_gen_keys_dir
+
 let generate_baker_accounts n client =
   let rec generate_baker_account i =
     if i = 0 then Lwt.return_unit
@@ -63,12 +70,12 @@ let generate_baker_accounts n client =
    stresstest. *)
 module Local = struct
   let generate_baker_accounts n () =
-    let client_dir = Client_config.default_base_dir in
+    let client_dir = gen_keys_dir in
     let* () =
       Lwt_io.printf
         "Keys will be saved in %s. You can change this by setting the \
-         TEZOS_CLIENT_DIR environment variable\n\n"
-        client_dir
+         GEN_KEYS_DIR environment variable\n\n"
+        default_gen_keys_dir
     in
     let* () =
       Lwt_io.printf
