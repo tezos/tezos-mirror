@@ -579,7 +579,7 @@ opam:octez-plompiler:
 opam:octez-plonk:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: octez-plonk
 
@@ -658,12 +658,7 @@ opam:octez-smart-rollup-node-lib:
 
 # Ignoring unreleased package octez-smart-rollup-wasm-benchmark.
 
-opam:octez-smart-rollup-wasm-benchmark-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
-  variables:
-    package: octez-smart-rollup-wasm-benchmark-lib
+# Ignoring unreleased package octez-smart-rollup-wasm-benchmark-lib.
 
 opam:octez-smart-rollup-wasm-debugger:
   extends:
@@ -1300,7 +1295,7 @@ opam:tezos-protocol-003-PsddFKi3:
 opam:tezos-protocol-004-Pt24m4xi:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-004-Pt24m4xi
 

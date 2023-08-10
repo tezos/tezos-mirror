@@ -15,7 +15,6 @@ depends: [
   "yaml" { >= "3.1.0" }
   "tezos-client-alpha"
   "tezos-scoru-wasm"
-  "octez-smart-rollup-wasm-benchmark-lib"
   "tezos-scoru-wasm-helpers"
   "tezos-webassembly-interpreter"
   "tezos-webassembly-interpreter-extra"
