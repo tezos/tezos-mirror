@@ -20,6 +20,7 @@ const { spawn } = require('child_process');
 const { execSync } = require('child_process');
 const external = require("./lib/external")
 const path = require('node:path')
+const { timestamp } = require("./lib/timestamp")
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const RUN_INSTALLER_COMMAND = external.bin('src/kernel_sdk/target/release/smart-rollup-installer')
@@ -27,6 +28,7 @@ const EVM_INSTALLER_KERNEL_PATH = 'evm_installer.wasm';
 const PREIMAGE_DIR = 'preimages';
 const SETUP_FILE_PATH = external.resource('src/kernel_evm/config/benchmarking.yaml')
 const EVM_KERNEL_PATH = external.resource('src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm')
+const OUTPUT_DIRECTORY = external.output()
 
 
 function sumArray(arr) {
@@ -188,10 +190,18 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     return rows;
 }
 
+
+function output_filename() {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${timestamp()}.csv` })
+}
+
+// Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
     var fields = ["benchmark_name", "gas_cost", "run_transaction_ticks", "signature_verification_ticks", "store_transaction_object_ticks", "interpreter_init_ticks", "interpreter_decode_ticks", "fetch_blueprint_ticks", "kernel_run_ticks", "unaccounted_ticks"];
-    fs.writeFileSync('benchmark_result.csv', fields.join(",") + "\n");
+    let output = output_filename();
+    console.log(`Output in ${output}`);
+    fs.writeFileSync(output, fields.join(",") + "\n");
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
@@ -200,7 +210,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         build_benchmark_scenario(benchmark_script);
         run_benchmark_result = await run_benchmark("transactions.json");
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
-        fs.appendFileSync('benchmark_result.csv', benchmark_log.map(row => row.join(",")).join("\n") + "\n");
+        fs.appendFileSync(output, benchmark_log.map(row => row.join(",")).join("\n") + "\n");
     }
     console.log("Benchmarking complete");
     execSync("rm transactions.json");

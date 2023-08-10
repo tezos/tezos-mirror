@@ -41,4 +41,5 @@ const output = function () {
     }
 
 }
+
 module.exports = { bin, resource, output }
