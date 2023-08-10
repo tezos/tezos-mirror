@@ -3,6 +3,12 @@
 Changelog
 '''''''''
 
+Version 17.3
+============
+
+- Operations posting invalid WASM proofs are now discarded earlier by the
+  Nairobi mempool plugin. (MR :gl:`!9768`)
+
 Version 17.2
 ============
 
