@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 use crate::indexable_storage::IndexableStorage;
+use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use libsecp256k1::PublicKey;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -14,9 +15,10 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 
+use crate::block_in_progress::BlockInProgress;
 use crate::error::{Error, StorageError};
 use crate::parsing::UPGRADE_NONCE_SIZE;
-use rlp::Encodable;
+use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::block::L2Block;
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionReceipt, TransactionStatus,
@@ -41,6 +43,12 @@ const TICKETER_SIZE: usize = 36;
 const DICTATOR_KEY: RefPath = RefPath::assert_from(b"/dictator_key");
 // Size of the dictator public key in full length.
 const DICTATOR_KEY_SIZE: usize = 65;
+
+// Path to the block in progress, used between reboots
+const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
+
+// flag denoting reboot
+const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
 const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
@@ -783,6 +791,48 @@ pub fn store_kernel_version<Host: Runtime>(
         .map_err(Error::from)
 }
 
+pub fn store_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+    block: &BlockInProgress,
+) -> Result<(), anyhow::Error> {
+    host.store_write_all(&EVM_BLOCK_IN_PROGRESS, &block.rlp_bytes())
+        .context("Failed to store BlockInProgress")
+}
+
+pub fn read_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+) -> Result<BlockInProgress, anyhow::Error> {
+    let bytes = host
+        .store_read_all(&EVM_BLOCK_IN_PROGRESS)
+        .context("Failed to read stored BlockInProgress")?;
+    let decoder = Rlp::new(bytes.as_slice());
+    BlockInProgress::decode(&decoder).context("Failed to decode stored BlockInProgress")
+}
+
+pub fn delete_block_in_progress<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), anyhow::Error> {
+    if host.store_read(&REBOOTED, 0, 0).is_ok() {
+        host.store_delete(&EVM_BLOCK_IN_PROGRESS)
+            .context("Failed to delete Block in progress")?
+    }
+    Ok(())
+}
+
+pub fn add_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    host.store_write(&REBOOTED, &[1], 0)
+        .context("Failed to set reboot flag")
+}
+
+pub fn delete_reboot_flag<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    host.store_delete(&REBOOTED)
+        .context("Failed to delete reboot flag")
+}
+
+pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
+    Ok(host.store_read(&REBOOTED, 0, 0).is_ok())
+}
+
 pub(crate) mod internal_for_tests {
     use super::*;
 
@@ -821,5 +871,30 @@ pub(crate) mod internal_for_tests {
         let bytes = host.store_read_all(&receipt_path)?;
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tezos_smart_rollup_mock::MockHost;
+
+    use super::*;
+    #[test]
+    fn test_reboot_flag() {
+        let mut host = MockHost::default();
+
+        add_reboot_flag(&mut host).expect("Should have been able to set flag");
+
+        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
+
+        delete_reboot_flag(&mut host).expect("Should have been able to delete flag");
+
+        assert!(
+            !was_rebooted(&mut host).expect("should not have failed without reboot flag")
+        );
+
+        add_reboot_flag(&mut host).expect("Should have been able to set flag");
+
+        assert!(was_rebooted(&mut host).expect("should have found reboot flag"));
     }
 }

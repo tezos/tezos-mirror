@@ -17,8 +17,10 @@ use crate::tick_model;
 use crate::upgrade::check_dictator_signature;
 use crate::Error;
 use primitive_types::{H160, U256};
+use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*};
@@ -32,12 +34,84 @@ pub struct Deposit {
     pub receiver: H160,
 }
 
+impl Encodable for Deposit {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(3);
+        stream.append(&self.amount);
+        stream.append(&self.gas_price);
+        stream.append(&self.receiver);
+    }
+}
+
+impl Decodable for Deposit {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 3 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
+        let gas_price: U256 = decode_field(&next(&mut it)?, "gas_price")?;
+        let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+        Ok(Deposit {
+            amount,
+            gas_price,
+            receiver,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransactionContent {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
 }
 
+const ETHEREUM_TX_TAG: u8 = 1;
+const DEPOSIT_TX_TAG: u8 = 2;
+
+impl Encodable for TransactionContent {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match &self {
+            TransactionContent::Ethereum(eth) => {
+                stream.append(&ETHEREUM_TX_TAG);
+                eth.rlp_append(stream)
+            }
+            TransactionContent::Deposit(dep) => {
+                stream.append(&DEPOSIT_TX_TAG);
+                dep.rlp_append(stream)
+            }
+        }
+    }
+}
+
+impl Decodable for TransactionContent {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let tag: u8 = decoder.at(0)?.as_val()?;
+        let tx = decoder.at(1)?;
+        match tag {
+            DEPOSIT_TX_TAG => {
+                let deposit = Deposit::decode(&tx)?;
+                Ok(Self::Deposit(deposit))
+            }
+            ETHEREUM_TX_TAG => {
+                let eth = EthereumTransactionCommon::decode(&tx)?;
+                Ok(Self::Ethereum(eth))
+            }
+            _ => Err(DecoderError::Custom("Unknown transaction tag.")),
+        }
+    }
+}
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub tx_hash: TransactionHash,
@@ -50,6 +124,30 @@ impl Transaction {
     pub fn estimate_ticks(&self) -> u64 {
         // all details of tick model stay in the same module
         tick_model::estimate_ticks_for_transaction(self)
+    }
+}
+
+impl Encodable for Transaction {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append_iter(self.tx_hash);
+        stream.append(&self.content);
+    }
+}
+
+impl Decodable for Transaction {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let tx_hash: TransactionHash = decode_tx_hash(next(&mut it)?)?;
+        let content: TransactionContent =
+            decode_field(&next(&mut it)?, "Transaction content")?;
+        Ok(Transaction { tx_hash, content })
     }
 }
 

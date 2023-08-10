@@ -95,14 +95,23 @@ pub fn stage_one<Host: Runtime>(
     // if rebooted, don't fetch inbox
     let queue = fetch(host, smart_rollup_address, chain_id, ticketer)?;
 
-    for (i, blueprint) in queue.proposals.iter().enumerate() {
-        log!(
-            host,
-            Info,
-            "Blueprint {} contains {} transactions.",
-            i,
-            blueprint.transactions.len()
-        );
+    for (i, queue_elt) in queue.proposals.iter().enumerate() {
+        match queue_elt {
+            blueprint::QueueElement::Blueprint(b) => log!(
+                host,
+                Info,
+                "Blueprint {} contains {} transactions.",
+                i,
+                b.transactions.len()
+            ),
+            blueprint::QueueElement::BlockInProgress(bip) => log!(
+                host,
+                Info,
+                "Block in progress {} has {} transactions left.",
+                i,
+                bip.queue_length()
+            ),
+        }
     }
 
     Ok(queue)
@@ -191,16 +200,41 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
-    stage_zero(host)?;
-    set_kernel_version(host)?;
-    let smart_rollup_address = retrieve_smart_rollup_address(host)
-        .context("Failed to retrieve smart rollup address")?;
-    let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-    let ticketer = read_ticketer(host);
+fn fetch_queue_left<Host: Runtime>(host: &mut Host) -> Result<Queue, anyhow::Error> {
+    let mut queue = Queue::new();
+    // fetch rest of queue
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/5873
+    // reload the queue
 
-    let queue = stage_one(host, smart_rollup_address, chain_id, ticketer)
-        .context("Failed during stage 1")?;
+    // fetch Bip
+    let bip = storage::read_block_in_progress(host)?;
+    queue.proposals = vec![blueprint::QueueElement::BlockInProgress(bip)];
+    Ok(queue)
+}
+
+pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+    let queue = if storage::was_rebooted(host)? {
+        // kernel was rebooted
+        log!(
+            host,
+            Info,
+            "Kernel was rebooted. Reboot left: {}\n",
+            host.reboot_left()?
+        );
+        storage::delete_reboot_flag(host)?;
+        fetch_queue_left(host)?
+    } else {
+        // first kernel run of the level
+        stage_zero(host)?;
+        set_kernel_version(host)?;
+        let smart_rollup_address = retrieve_smart_rollup_address(host)
+            .context("Failed to retrieve smart rollup address")?;
+        let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
+        let ticketer = read_ticketer(host);
+
+        stage_one(host, smart_rollup_address, chain_id, ticketer)
+            .context("Failed during stage 1")?
+    };
 
     stage_two(host, queue).context("Failed during stage 2")
 }

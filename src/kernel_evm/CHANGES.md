@@ -13,6 +13,7 @@
 ### Breaking changes
 
 ### Internal
+- The kernel reboots before reaching maximum number of ticks (!9369)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
