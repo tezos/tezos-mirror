@@ -630,6 +630,7 @@ let _octez_stdlib_test_unix =
       "test_circular_buffer";
       "test_circular_buffer_fuzzy";
       "test_hash_queue_lwt";
+      "test_lwt_utils";
     ]
     ~path:"src/lib_stdlib/test-unix"
     ~opam:"octez-libs"
