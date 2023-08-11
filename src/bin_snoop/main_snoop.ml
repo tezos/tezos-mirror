@@ -1106,7 +1106,6 @@ module Auto_build = struct
       infer ~outdir mkfilename measurements providers infer_parameters
     in
     let exclusions = if split then get_exclusions () else String.Set.empty in
-    String.Set.iter (fun x -> print_endline x) exclusions ;
     (* Codegen *)
     codegen mkfilename solution ~exclusions
 end
