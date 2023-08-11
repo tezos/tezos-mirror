@@ -3,16 +3,22 @@
 #
 # SPDX-License-Identifier: MIT
 
+NATIVE_TARGET ?=
+ifneq ($(NATIVE_TARGET),)
+NATIVE_OPT := --target "$(NATIVE_TARGET)"
+endif
+
 .PHONY: all
 all: build test check
 
 .PHONY: build
 build:
-	@cargo build --target wasm32-unknown-unknown --release
+	@cargo build --target wasm32-unknown-unknown --release -p tx_kernel
+	@cargo build $(NATIVE_OPT) --release -p tx-demo-collector
 
 .PHONY: build-deps
 build-deps:
-	@rustup target add wasm32-unknown-unknown
+	@rustup target add wasm32-unknown-unknown $(NATIVE_TARGET)
 
 .PHONY: build-dev-deps
 build-dev-deps: build-deps
