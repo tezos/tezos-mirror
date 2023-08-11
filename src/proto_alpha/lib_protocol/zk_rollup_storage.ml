@@ -112,8 +112,8 @@ let add_to_pending ctxt rollup ops =
     List.iter_e
       (fun (op, _ticket_hash_opt) ->
         if Compare.Int.(op.op_code >= acc.static.nb_ops || op.op_code < 0) then
-          error @@ Zk_rollup_invalid_op_code op.op_code
-        else ok ())
+          Result_syntax.tzfail @@ Zk_rollup_invalid_op_code op.op_code
+        else Result_syntax.return_unit)
       ops
   in
   let* ctxt, pl = Storage.Zk_rollup.Pending_list.get ctxt rollup in
@@ -190,9 +190,8 @@ let pending_length =
 let head =
   let open Zk_rollup_repr in
   function
-  | Empty _ -> error Zk_rollup_pending_list_too_short
-  | Pending {next_index; length} ->
-      Result_syntax.return Int64.(sub next_index (of_int length))
+  | Empty _ -> Result_syntax.tzfail Zk_rollup_pending_list_too_short
+  | Pending {next_index; length} -> Ok Int64.(sub next_index (of_int length))
 
 let next_index =
   let open Zk_rollup_repr in

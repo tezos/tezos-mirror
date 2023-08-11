@@ -65,10 +65,11 @@ module Address = struct
       (fun () -> Error_zk_rollup_address_generation)
 
   let from_nonce nonce =
+    let open Result_syntax in
     Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce
     |> function
-    | None -> error Error_zk_rollup_address_generation
-    | Some nonce -> ok @@ hash_bytes [nonce]
+    | None -> tzfail Error_zk_rollup_address_generation
+    | Some nonce -> return @@ hash_bytes [nonce]
 
   let of_b58data = function H.Data h -> Some h | _ -> None
 end
