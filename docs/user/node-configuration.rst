@@ -19,8 +19,8 @@ obtained using the following command::
 
 .. _node-conf-file:
 
-Configuration file
-------------------
+Node configuration file
+-----------------------
 
 Parameters in the configuration file can be specified in two different ways:
 
