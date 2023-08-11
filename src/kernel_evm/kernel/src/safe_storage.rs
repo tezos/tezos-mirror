@@ -143,6 +143,18 @@ impl<Host: Runtime> Runtime for SafeStorage<&mut Host> {
         self.0.reveal_metadata()
     }
 
+    #[cfg(all(feature = "alloc", feature = "proto-alpha"))]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.0
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
+    }
+
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
         self.0.last_run_aborted()
     }
