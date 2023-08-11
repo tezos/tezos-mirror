@@ -2508,7 +2508,7 @@ let test_reboot =
     ~tags:["evm"; "reboot"; "loop"]
     ~title:"Check that the kernel can handle too many txs for a single run"
   @@ fun protocol ->
-  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+  let* {evm_proxy_server; sc_rollup_node; node; client; sc_rollup_client; _} =
     setup_past_genesis ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
@@ -2540,6 +2540,18 @@ let test_reboot =
   | Block.Hash hashes ->
       Check.((List.length hashes = List.length requests) int)
         ~error_msg:"Expected %R transactions in the latest block, got %L") ;
+  let*! tick_number = Sc_rollup_client.ticks sc_rollup_client in
+  let max_tick =
+    Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
+  in
+  Check.((tick_number > Z.to_int max_tick) int)
+    ~error_msg:
+      "Expected %L to be greater than %R, max nb of ticks per kernel run" ;
+  (* a single run can't do more than 11_000_000_000 / 2000 gas units *)
+  (* TODO: #6278
+     RPC to fetch tick model / tick per gas *)
+  Check.((block_with_many_txs.gasUsed > 5500000l) int32)
+    ~error_msg:"Expected gas used %L to be superior to %R" ;
   unit
 
 let register_evm_proxy_server ~protocols =

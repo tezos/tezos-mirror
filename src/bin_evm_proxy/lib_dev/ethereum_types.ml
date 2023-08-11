@@ -572,12 +572,14 @@ let block_from_rlp bytes =
           Value hash;
           Value parent_hash;
           List transactions;
+          Value gas_used;
           Value timestamp;
         ]) ->
       let (Qty number) = decode_number number in
       let hash = decode_block_hash hash in
       let parent_hash = decode_block_hash parent_hash in
       let transactions = TxHash (decode_list decode_hash transactions) in
+      let gas_used = decode_number gas_used in
       let timestamp = decode_number timestamp in
       {
         number = Some (Block_height number);
@@ -597,12 +599,12 @@ let block_from_rlp bytes =
         extraData = "";
         size = Qty Z.zero;
         gasLimit = Qty Z.zero;
-        gasUsed = Qty Z.zero;
+        gasUsed = gas_used;
         timestamp;
         transactions;
         uncles = [];
       }
-  | _ -> raise (Invalid_argument "Expected a List of 5 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 6 elements")
 
 let block_encoding =
   let open Data_encoding in
