@@ -4,6 +4,7 @@
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -5931,6 +5932,110 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~msg:(rex ".*Outdated whitelist update: got outbox level")
     process
 
+(** This test uses the rollup node, first it is running in an
+    Operator mode, it bakes some blocks, then terminate. Then we
+    restart the node in a Bailout mode, and make sure that there are
+    no new commitments have been published *)
+let bailout_mode_not_publish ~kind =
+  let operator = Constant.bootstrap1.public_key_hash in
+  let commitment_period = 5 in
+  let challenge_window = 5 in
+  test_full_scenario
+    {
+      tags = ["node"; "mode"; "bailout"];
+      variant = None;
+      description = "rollup node - bailout mode does not publish";
+    }
+    ~kind
+    ~operator
+    ~mode:Operator
+    ~challenge_window
+    ~commitment_period
+  @@ fun _protocol
+             sc_rollup_node
+             sc_rollup_client
+             sc_rollup
+             _tezos_node
+             tezos_client ->
+  (* Run the rollup node in Operator mode, bake some blocks until
+     a commitment is published *)
+  let* () =
+    Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup []
+  in
+  let* _level =
+    bake_until_lpc_updated
+      ~at_least:commitment_period
+      tezos_client
+      sc_rollup_node
+  in
+  let* published_commitment_before =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
+  in
+  let* staked_on_commitment =
+    get_staked_on_commitment ~sc_rollup ~staker:operator tezos_client
+  in
+  Log.info "Check that the LPC is equal to the staked commitment onchain." ;
+  let () =
+    Check.(
+      published_commitment_before.commitment_and_hash.hash
+      = staked_on_commitment)
+      Check.string
+      ~error_msg:"Last published commitment is not latest commitment staked on."
+  in
+  (* Terminate the rollup of Operator mode and restart it with the Bailout mode *)
+  let* () =
+    Sc_rollup_node.run
+      ~restart:true
+      ~event_level:`Debug
+      sc_rollup_node
+      sc_rollup
+      []
+      ~mode:Bailout
+  in
+  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
+  (* The challenge window is neded to compute the correct number of block before
+     cementation, we also add 2 times of commitment period to make sure
+     no commit are published. *)
+  let* () =
+    repeat
+      ((2 * commitment_period) + challenge_window)
+      (fun () -> Client.bake_for_and_wait tezos_client)
+  in
+  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:100. in
+  let* published_commitment_after =
+    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
+  in
+  let* lcc_hash, _level =
+    Sc_rollup_helpers.last_cemented_commitment_hash_with_level
+      ~sc_rollup
+      tezos_client
+  in
+  Log.info "Check the LCC is the same." ;
+  let () =
+    Check.(lcc_hash = published_commitment_before.commitment_and_hash.hash)
+      Check.string
+      ~error_msg:
+        "Published commitment is not the same as the cemented commitment hash."
+  in
+  Log.info "Check the last published commitment is the same as before." ;
+  let () =
+    Check.(
+      published_commitment_after.commitment_and_hash.hash
+      = published_commitment_before.commitment_and_hash.hash)
+      Check.string
+      ~error_msg:"Last published commitment have been updated."
+  in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  Log.info "Client submits the recover_bond operation." ;
+  let*! () =
+    Client.Sc_rollup.submit_recover_bond
+      ~rollup:sc_rollup
+      ~src:operator
+      ~staker:operator
+      tezos_client
+  in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -6000,6 +6105,12 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_commitment_scenario
+    ~extra_tags:["modes"; "bailout"]
+    ~variant:"bailout_does_not_publish"
+    (mode_publish Bailout false)
+    protocols
+    ~kind ;
+  test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
     ~variant:"node_use_proto_param"
@@ -6047,6 +6158,8 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_cement_ignore_commitment ~kind [Nairobi; Alpha] ;
+  bailout_mode_not_publish ~kind protocols ;
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.
      test_reinject_failed_commitment protocols ~kind ; *)
@@ -6109,6 +6222,7 @@ let register ~protocols =
   register ~kind:"arith" ~protocols ;
   (* Both Arith and Wasm PVM tezts *)
   test_bootstrap_smart_rollup_originated protocols ;
+  (* Private rollup node *)
   test_private_rollup_whitelisted_staker protocols ;
   test_private_rollup_non_whitelisted_staker protocols ;
   test_private_rollup_node_publish_in_whitelist protocols ;

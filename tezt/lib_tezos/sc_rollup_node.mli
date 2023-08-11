@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,7 +32,14 @@
 (** Smart contract rollup node states. *)
 type t
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
+type mode =
+  | Batcher
+  | Custom
+  | Maintenance
+  | Observer
+  | Operator
+  | Accuser
+  | Bailout
 
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
 val mode_of_string : string -> mode
@@ -135,9 +143,12 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     emit (see {!Daemon}). [legacy] (by default [false]) must be set if we want
     to use the legacy [run] command of the node (which requires a config file to
     exist). If [wait_ready] is [false], tezt does not wait for the node to be
-    ready. *)
+    ready. If [restart] is [true], it will stop and restart the node if it is already
+    running. *)
 val run :
   ?legacy:bool ->
+  ?restart:bool ->
+  ?mode:mode ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?loser_mode:string ->

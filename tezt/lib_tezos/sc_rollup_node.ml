@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +26,14 @@
 
 type 'a known = Unknown | Known of 'a
 
-type mode = Batcher | Custom | Maintenance | Observer | Operator | Accuser
+type mode =
+  | Batcher
+  | Custom
+  | Maintenance
+  | Observer
+  | Operator
+  | Accuser
+  | Bailout
 
 module Parameters = struct
   type persistent_state = {
@@ -60,6 +68,7 @@ let string_of_mode = function
   | Operator -> "operator"
   | Custom -> "custom"
   | Accuser -> "accuser"
+  | Bailout -> "bailout"
 
 let mode_of_string s =
   match String.lowercase_ascii s with
@@ -69,6 +78,7 @@ let mode_of_string s =
   | "operator" -> Operator
   | "custom" -> Custom
   | "accuser" -> Accuser
+  | "bailout" -> Bailout
   | _ -> invalid_arg (Format.sprintf "%S is not an existing mode" s)
 
 let check_error ?exit_code ?msg sc_node =
@@ -367,23 +377,34 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
     arguments
     ~on_terminate
 
-let run ?(legacy = false) ?event_level ?event_sections_levels ?loser_mode node
-    rollup_address extra_arguments =
+let run ?(legacy = false) ?(restart = false) ?mode ?event_level
+    ?event_sections_levels ?loser_mode node rollup_address extra_arguments =
+  let* () =
+    if restart then
+      let* () = terminate node in
+      return ()
+    else return ()
+  in
   let cmd =
     if legacy then
       let args = legacy_node_args ?loser_mode node rollup_address in
       ["run"] @ args @ extra_arguments
     else
-      let mode, args = node_args ?loser_mode node rollup_address in
-      ["run"; mode] @ args @ extra_arguments
+      let default_mode, args = node_args ?loser_mode node rollup_address in
+      let final_mode =
+        match mode with Some m -> string_of_mode m | None -> default_mode
+      in
+      ["run"; final_mode] @ args @ extra_arguments
   in
   do_runlike_command ?event_level ?event_sections_levels node cmd
 
-let run ?legacy ?event_level ?event_sections_levels ?loser_mode
+let run ?legacy ?restart ?mode ?event_level ?event_sections_levels ?loser_mode
     ?(wait_ready = true) node rollup_address arguments =
   let* () =
     run
       ?legacy
+      ?restart
+      ?mode
       ?event_level
       ?event_sections_levels
       ?loser_mode
