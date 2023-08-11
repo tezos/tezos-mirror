@@ -1880,6 +1880,18 @@ let test_kernel_upgrade_failing_migration =
   in
   (* Fallback mechanism is triggered, no block is produced at that level. *)
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  (* We make sure that we can't read under the tmp file, after migration failed,
+     everything is reverted. *)
+  let*! tmp_dummy =
+    Sc_rollup_client.inspect_durable_state_value
+      sc_rollup_client
+      ~pvm_kind:"wasm_2_0_0"
+      ~operation:Sc_rollup_client.Value
+      ~key:"/tmp/__dummy"
+  in
+  (match tmp_dummy with
+  | Some _ -> failwith "Nothing should be readable under the temporary dir."
+  | None -> ()) ;
   let* kernel_after_migration_failed = get_kernel_boot_wasm ~sc_rollup_client in
   (* The upgrade succeeded, but the fallback mechanism was activated, so the kernel
      after the upgrade/migration is still the previous one. *)
