@@ -2,13 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
+// const { ChartConfiguration } = require('chart')
+const fs = require('fs');
+
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
-const BASE_GAS = 21000
 const RUN_TRANSACTION_OVERHEAD = 560_000
-const CREATE_STORAGE_CUTOFF = 600_000
 
-module.exports = { init_analysis, check_result, processRecord }
+module.exports = { init_analysis, check_result, process_record }
 
 function init_analysis() {
     let empty = {
@@ -33,6 +36,7 @@ function init_analysis() {
 
 function print_analysis(infos) {
     const tickPerGas = infos.total_ticks_tx / infos.total_gas
+    console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`Overall tick per gas: ~${tickPerGas.toFixed()}`)
     console.info(`Tick per gas: ${pp_avg_max(infos.tick_per_gas)}`)
@@ -44,11 +48,23 @@ function print_analysis(infos) {
     console.info(`Benchmark run infos`)
     console.info(`Number of tx: ${infos.signatures.length}`)
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
+    console.info(`Number of transfers: ${infos.nb_transfer}`)
+    console.info(`Number of create: ${infos.nb_create}`)
+    console.info(`Number of call: ${infos.nb_call}`)
+    console.info(`-------------------------------------------------------`)
+
 }
 
-function processRecord(record, acc) {
+function process_record(record, acc) {
     if (is_transaction(record)) process_transaction_record(record, acc)
     else process_bench_record(record, acc)
+}
+
+function process_bench_record(record, acc) {
+    if (!isNaN(record.interpreter_decode_ticks)) acc.init = record.interpreter_decode_ticks
+    if (!isNaN(record.interpreter_init_ticks)) acc.decode = record.interpreter_init_ticks
+    if (!isNaN(record.interpreter_decode_ticks)) acc.nb_kernel_run += 1
+    if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
 }
 
 function process_transaction_record(record, acc) {
@@ -60,38 +76,21 @@ function process_transaction_record(record, acc) {
 
 function process_transfer(record, acc) {
     acc.run_transaction_overhead.push(record.run_transaction_ticks)
+    acc.nb_transfer++
 }
 
 function process_create(record, acc) {
+    acc.nb_create++
 
 }
 
 function process_call(record, acc) {
+    acc.nb_call++
     let gas = record.gas_cost - BASE_GAS
     let ticks = record.run_transaction_ticks - RUN_TRANSACTION_OVERHEAD
     acc.total_gas += gas
     acc.total_ticks_tx += ticks
     acc.tick_per_gas.push(ticks / gas)
-}
-
-function process_bench_record(record, acc) {
-    if (!isNaN(record.interpreter_decode_ticks)) acc.init = record.interpreter_decode_ticks
-    if (!isNaN(record.interpreter_init_ticks)) acc.decode = record.interpreter_init_ticks
-    if (!isNaN(record.interpreter_decode_ticks)) acc.nb_kernel_run += 1
-    if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
-}
-
-function is_transfer(record) {
-    return record.gas_cost == 21000
-}
-function is_create(record) {
-    return record.store_transaction_object_ticks > CREATE_STORAGE_CUTOFF
-}
-
-function is_transaction(record) {
-    return !(isNaN(record.gas_cost)
-        || isNaN(record.run_transaction_ticks)
-        || isNaN(record.signature_verification_ticks))
 }
 
 function check_result(infos) {

@@ -5,9 +5,10 @@
 // usage: node check_csv.js data.csv
 
 let fs = require('fs')
-let { init_analysis, check_result, processRecord } = require("./lib/analysis")
+let analysis = require("./analysis/analysis")
+let graphs = require("./analysis/graph")
 let { parse } = require('csv-parse')
-const internal = require('stream')
+
 var args = process.argv.slice(2)
 
 if (args.length == 0) {
@@ -23,7 +24,8 @@ const cast_value = function (value, context) {
     return parseInt(value)
 }
 const processFile = async () => {
-    const acc = init_analysis()
+    const acc = analysis.init_analysis()
+    const graph_acc = graphs.init_graphs()
     const parser = fs
         .createReadStream(`${__dirname}/${filename}`)
         .pipe(parse({
@@ -34,13 +36,15 @@ const processFile = async () => {
         }))
     for await (const record of parser) {
         // Work with each record
-        processRecord(record, acc)
+        analysis.process_record(record, acc)
+        graphs.process_record(record, graph_acc)
     }
-    return acc
+    return { analysis: acc, graphs: graph_acc }
 }
 
 (async () => {
     const infos = await processFile()
-    let exit_status = check_result(infos)
+    let exit_status = analysis.check_result(infos.analysis)
+    await graphs.draw_tick_per_gas(infos.graphs)
     process.exit(exit_status)
 })()
