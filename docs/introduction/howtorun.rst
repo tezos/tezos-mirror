@@ -196,6 +196,8 @@ However, it is safe (and actually necessary) to temporarily run two bakers just 
 
    It is possible to bake and attest using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
+The baker uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
 Accuser
 ~~~~~~~
 
@@ -214,6 +216,7 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
    octez-accuser-alpha run
 
+The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 
 Docker
 ~~~~~~

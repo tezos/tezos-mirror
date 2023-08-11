@@ -26,6 +26,8 @@ A useful command to debug a node that is not syncing is:
 
    octez-admin-client p2p stat
 
+The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
 .. _tezos_binaries_signals_and_exit_codes:
 
 Octez binaries: signals and exit codes

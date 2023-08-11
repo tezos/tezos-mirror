@@ -525,7 +525,7 @@ processes the inbox of each level.
 
 Notice that distinct Layer 1 addresses could be used for the Layer 1
 operations issued by the rollup node simply by editing the
-configuration file to set different addresses for ``publish``,
+:ref:`configuration file <rollup_node_config_file_alpha>` to set different addresses for ``publish``,
 ``add_messages``, ``cement``, and ``refute``.
 
 In addition, a rollup node can run under different modes:
@@ -577,10 +577,12 @@ operations which are injected by the rollup node in each mode.
 .. [*] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
 
+.. _rollup_node_config_file_alpha:
+
 Configuration file
 """"""""""""""""""
 
-The rollup node can also be configured with the following command that
+The rollup node can also be configured via one configuration file stored in its own data directory, with the following command that
 uses the same arguments as the ``run`` command:
 
 .. code:: sh
@@ -590,7 +592,9 @@ uses the same arguments as the ``run`` command:
                     with operators "${OPERATOR_ADDR}" \
                     --data-dir "${ROLLUP_NODE_DIR}"
 
-This creates a configuration file:
+where ``${OCLIENT_DIR}`` must be the directory of the client, containing all the keys used by the rollup node, i.e. ``${OPERATOR_ADDR}``.
+
+This creates a smart rollup node configuration file:
 
 ::
 
