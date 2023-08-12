@@ -105,11 +105,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
 let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
-  let* () =
-    Node_context.save_level
-      node_ctxt
-      {Layer1.hash = head.hash; level = head.level}
-  and* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
+  let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
@@ -183,6 +179,11 @@ let rec process_head ({node_ctxt; _} as state) ~catching_up
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
+  let* () =
+    Node_context.save_level
+      node_ctxt
+      {Layer1.hash = head.hash; level = head.level}
+  in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
   unless (already_processed || is_before_origination node_ctxt head)
   @@ fun () ->

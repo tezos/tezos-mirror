@@ -84,6 +84,11 @@ let rec process_head (daemon_components : (module Daemon_components.S))
     (node_ctxt : _ Node_context.t) ~catching_up (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
+  let* () =
+    Node_context.save_level
+      node_ctxt
+      {Layer1.hash = head.hash; level = head.level}
+  in
   let* already_processed = Node_context.is_processed node_ctxt head.hash in
   unless (already_processed || before_origination node_ctxt head) @@ fun () ->
   let*! () = Daemon_event.head_processing head.hash head.level in
@@ -99,11 +104,7 @@ let rec process_head (daemon_components : (module Daemon_components.S))
         process_head daemon_components node_ctxt ~catching_up:true predecessor
       in
       let* ctxt = previous_context node_ctxt ~predecessor in
-      let* () =
-        Node_context.save_level
-          node_ctxt
-          {Layer1.hash = head.hash; level = head.level}
-      and* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
+      let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
       let* inbox_hash, inbox, inbox_witness, messages =
         Inbox.process_head node_ctxt ~predecessor head
       in

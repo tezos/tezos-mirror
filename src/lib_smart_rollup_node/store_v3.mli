@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -23,40 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = V0 | V1 | V2 | V3
-
-let pp ppf v =
-  Format.pp_print_string ppf
-  @@ match v with V0 -> "v0" | V1 -> "v1" | V2 -> "v2" | V3 -> "v3"
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3)
-    (function
-      | 0 -> V0
-      | 1 -> V1
-      | 2 -> V2
-      | 3 -> V3
-      | v -> Format.ksprintf Stdlib.failwith "Unsupported store version %d" v)
-    (obj1 (req "store_version" int31))
-
-let path ~dir = Filename.concat dir "version"
-
-let read_version_file ~dir =
-  let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let filename = path ~dir in
-  let*! exists = Lwt_unix.file_exists filename in
-  if not exists then return_none
-  else
-    let* json = Lwt_utils_unix.Json.read_file filename in
-    return_some (Data_encoding.Json.destruct encoding json)
-
-let write_version_file ~dir version =
-  let open Lwt_result_syntax in
-  protect @@ fun () ->
-  let filename = path ~dir in
-  let*! () = Lwt_utils_unix.create_dir dir in
-  let json = Data_encoding.Json.construct encoding version in
-  Lwt_utils_unix.Json.write_file filename json
+include module type of struct
+  include Store_v2
+end

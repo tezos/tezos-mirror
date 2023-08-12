@@ -436,3 +436,35 @@ module V2_migrations = struct
         let final_actions = final_actions
       end)
 end
+
+module V3_migrations = struct
+  let levels_store_location ~storage_dir =
+    let open Filename.Infix in
+    storage_dir // "levels_to_hashes"
+
+  let recompute_level (v3_store : _ Store_v3.t) (l2_block : Sc_rollup_block.t) =
+    Store.Levels_to_hashes.add
+      ~flush:true
+      v3_store.levels_to_hashes
+      l2_block.header.level
+      l2_block.header.block_hash
+
+  let final_actions ~storage_dir ~tmp_dir _ _ =
+    let open Lwt_result_syntax in
+    let*! () = Lwt_utils_unix.remove_dir (levels_store_location ~storage_dir) in
+    let*! () =
+      Lwt_unix.rename
+        (levels_store_location ~storage_dir:tmp_dir)
+        (levels_store_location ~storage_dir)
+    in
+    return_unit
+
+  module From_v2 =
+    Make (Store_v2) (Store_v3)
+      (struct
+        let migrate_block_action _v2_store v3_store l2_block =
+          recompute_level v3_store l2_block
+
+        let final_actions = final_actions
+      end)
+end
