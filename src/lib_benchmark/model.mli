@@ -164,6 +164,12 @@ val zero : unit model
 val unknown_const1 : name:Namespace.t -> const:Free_variable.t -> unit model
 
 (** Model ignores the arguments.
+    [fun n -> const]
+*)
+val unknown_const1_skip1 :
+  name:Namespace.t -> const:Free_variable.t -> (int * unit) model
+
+(** Model ignores the arguments.
     [fun n m -> const]
 *)
 val unknown_const1_skip2 :

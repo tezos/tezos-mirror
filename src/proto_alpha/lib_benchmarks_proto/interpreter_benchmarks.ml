@@ -336,6 +336,10 @@ let benchmark_from_kinstr_and_stack :
       assert (amplification = None) ;
       alloc_benchmark_from_kinstr_and_stack
 
+let time_and_alloc (f : benchmark_type -> unit) =
+  f Time ;
+  f Alloc
+
 let make_benchmark :
     ?amplification:int ->
     ?intercept:bool ->
@@ -1203,25 +1207,29 @@ module Registration_section = struct
 
     let () =
       let pair n = Micheline.(Prim (0, I_PAIR, [Int (0, Z.of_int n)], [])) in
-      benchmark
-        ~name:Interpreter_workload.N_IComb
-        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
-          let width =
-            Base_samplers.(
-              sample_in_interval
-                rng_state
-                ~range:{min = 2; max = cfg.comb.max_depth})
-          in
-          let node = pair width in
-          parse_instr rng_state node long_stack)
-        () ;
+      ( time_and_alloc @@ fun benchmark_type ->
+        benchmark
+          ~benchmark_type
+          ~name:Interpreter_workload.N_IComb
+          ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
+            let width =
+              Base_samplers.(
+                sample_in_interval
+                  rng_state
+                  ~range:{min = 2; max = cfg.comb.max_depth})
+            in
+            let node = pair width in
+            parse_instr rng_state node long_stack)
+          () ) ;
       benchmark
         ~name:Interpreter_workload.N_IComb
         ~intercept:true
         ~kinstr_and_stack_sampler:(fun _ rng_state () ->
           let node = pair 2 in
           parse_instr rng_state node long_stack)
-        ()
+        () ;
+      register_time_alloc_codegen_model
+        (Instr_name Interpreter_workload.N_IComb)
 
     let rec make_comb_stack (comb_width : int) (depth : int) acc =
       if depth = 0 then
@@ -1250,21 +1258,23 @@ module Registration_section = struct
       let unpair n =
         Micheline.(Prim (0, I_UNPAIR, [Int (0, Z.of_int n)], []))
       in
-      benchmark
-        ~name:Interpreter_workload.N_IUncomb
-        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
-          let width =
-            Base_samplers.(
-              sample_in_interval
-                rng_state
-                ~range:{min = 2; max = cfg.comb.max_depth - 2})
-          in
-          let node = unpair width in
-          let stack =
-            make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
-          in
-          parse_instr rng_state node stack)
-        () ;
+      ( time_and_alloc @@ fun benchmark_type ->
+        benchmark
+          ~benchmark_type
+          ~name:Interpreter_workload.N_IUncomb
+          ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
+            let width =
+              Base_samplers.(
+                sample_in_interval
+                  rng_state
+                  ~range:{min = 2; max = cfg.comb.max_depth - 2})
+            in
+            let node = unpair width in
+            let stack =
+              make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
+            in
+            parse_instr rng_state node stack)
+          () ) ;
       benchmark
         ~name:Interpreter_workload.N_IUncomb
         ~intercept:true
@@ -1275,29 +1285,33 @@ module Registration_section = struct
             make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
           in
           parse_instr rng_state node stack)
-        ()
+        () ;
+      register_time_alloc_codegen_model
+        (Instr_name Interpreter_workload.N_IUncomb)
 
     let () =
       let comb_get n = Micheline.(Prim (0, I_GET, [Int (0, Z.of_int n)], [])) in
-      benchmark
-        ~name:Interpreter_workload.N_IComb_get
-        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
-          let width =
-            Base_samplers.(
-              sample_in_interval
-                rng_state
-                ~range:{min = 2; max = cfg.comb.max_depth - 2})
-          in
-          let index =
-            Base_samplers.(
-              sample_in_interval rng_state ~range:{min = 0; max = width})
-          in
-          let node = comb_get index in
-          let stack =
-            make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
-          in
-          parse_instr rng_state node stack)
-        () ;
+      ( time_and_alloc @@ fun benchmark_type ->
+        benchmark
+          ~benchmark_type
+          ~name:Interpreter_workload.N_IComb_get
+          ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
+            let width =
+              Base_samplers.(
+                sample_in_interval
+                  rng_state
+                  ~range:{min = 2; max = cfg.comb.max_depth - 2})
+            in
+            let index =
+              Base_samplers.(
+                sample_in_interval rng_state ~range:{min = 0; max = width})
+            in
+            let node = comb_get index in
+            let stack =
+              make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
+            in
+            parse_instr rng_state node stack)
+          () ) ;
       benchmark
         ~name:Interpreter_workload.N_IComb_get
         ~intercept:true
@@ -1305,47 +1319,56 @@ module Registration_section = struct
           let node = comb_get 0 in
           let stack = make_comb_stack 2 1 (Ex_stack (unit @$ bot, ((), eos))) in
           parse_instr rng_state node stack)
-        ()
+        () ;
+
+      register_time_alloc_codegen_model
+        (Instr_name Interpreter_workload.N_IComb_get)
 
     let () =
       let comb_set n =
         Micheline.(Prim (0, I_UPDATE, [Int (0, Z.of_int n)], []))
       in
-      benchmark
-        ~name:Interpreter_workload.N_IComb_set
-        ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
-          let width =
-            Base_samplers.(
-              sample_in_interval
-                rng_state
-                ~range:{min = 2; max = cfg.comb.max_depth - 2})
-          in
-          let index =
-            Base_samplers.(
-              sample_in_interval rng_state ~range:{min = 0; max = width})
-          in
-          let node = comb_set index in
-          let stack =
-            let (Ex_stack (stack_ty, stack)) =
-              make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
+      ( time_and_alloc @@ fun benchmark_type ->
+        benchmark
+          ~benchmark_type
+          ~name:Interpreter_workload.N_IComb_set
+          ~kinstr_and_stack_sampler:(fun cfg rng_state () ->
+            let width =
+              Base_samplers.(
+                sample_in_interval
+                  rng_state
+                  ~range:{min = 2; max = cfg.comb.max_depth - 2})
             in
-            Ex_stack (unit @$ stack_ty, ((), stack))
-          in
-          parse_instr rng_state node stack)
-        () ;
-      benchmark
-        ~name:Interpreter_workload.N_IComb_set
-        ~intercept:true
-        ~kinstr_and_stack_sampler:(fun _ rng_state () ->
-          let node = comb_set 0 in
-          let stack =
-            let (Ex_stack (stack_ty, stack)) =
-              make_comb_stack 2 1 (Ex_stack (unit @$ bot, ((), eos)))
+            let index =
+              Base_samplers.(
+                sample_in_interval rng_state ~range:{min = 0; max = width})
             in
-            Ex_stack (unit @$ stack_ty, ((), stack))
-          in
-          parse_instr rng_state node stack)
-        ()
+            let node = comb_set index in
+            let stack =
+              let (Ex_stack (stack_ty, stack)) =
+                make_comb_stack width 1 (Ex_stack (unit @$ bot, ((), eos)))
+              in
+              Ex_stack (unit @$ stack_ty, ((), stack))
+            in
+            parse_instr rng_state node stack)
+          () ;
+        benchmark
+          ~benchmark_type
+          ~name:Interpreter_workload.N_IComb_set
+          ~intercept:true
+          ~kinstr_and_stack_sampler:(fun _ rng_state () ->
+            let node = comb_set 0 in
+            let stack =
+              let (Ex_stack (stack_ty, stack)) =
+                make_comb_stack 2 1 (Ex_stack (unit @$ bot, ((), eos)))
+              in
+              Ex_stack (unit @$ stack_ty, ((), stack))
+            in
+            parse_instr rng_state node stack)
+          () ) ;
+
+      register_time_alloc_codegen_model
+        (Instr_name Interpreter_workload.N_IComb_set)
 
     let () =
       let dup n = Micheline.(Prim (0, I_DUP, [Int (0, Z.of_int n)], [])) in
@@ -2845,51 +2868,47 @@ module Registration_section = struct
         ~kinstr:(ICompare (dummy_loc, String_t, halt))
         ()
 
-    let () =
-      let (Model.Model codegen_model) =
-        Interpreter_model.make_time_alloc_codegen_model (Instr_name N_ICompare)
-      in
-      register_model_for_code_generation codegen_model
+    let () = register_time_alloc_codegen_model (Instr_name N_ICompare)
   end
 
   module Comparators = struct
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IEq
         ~stack_type:(int @$ bot)
         ~kinstr:(IEq (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_INeq
         ~stack_type:(int @$ bot)
         ~kinstr:(INeq (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ILt
         ~stack_type:(int @$ bot)
         ~kinstr:(ILt (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IGt
         ~stack_type:(int @$ bot)
         ~kinstr:(IGt (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ILe
         ~stack_type:(int @$ bot)
         ~kinstr:(ILe (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IGe
         ~stack_type:(int @$ bot)
         ~kinstr:(IGe (dummy_loc, halt))
@@ -3005,18 +3024,17 @@ module Registration_section = struct
         ~kinstr:(ILevel (dummy_loc, halt))
         ()
 
-    let check_signature (algo : Signature.algo) ~for_intercept =
-      let name =
-        match algo with
-        | Signature.Ed25519 -> Interpreter_workload.N_ICheck_signature_ed25519
-        | Signature.Secp256k1 ->
-            Interpreter_workload.N_ICheck_signature_secp256k1
-        | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
-        | Signature.Bls -> Interpreter_workload.N_ICheck_signature_bls
-      in
+    let name_of_algo = function
+      | Signature.Ed25519 -> Interpreter_workload.N_ICheck_signature_ed25519
+      | Signature.Secp256k1 -> Interpreter_workload.N_ICheck_signature_secp256k1
+      | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
+      | Signature.Bls -> Interpreter_workload.N_ICheck_signature_bls
+
+    let check_signature (algo : Signature.algo) ~benchmark_type ~for_intercept =
       benchmark_with_stack_sampler
+        ~benchmark_type
         ~intercept:for_intercept
-        ~name
+        ~name:(name_of_algo algo)
         ~stack_type:(public_key @$ signature @$ bytes @$ bot)
         ~kinstr:(ICheck_signature (dummy_loc, halt))
         ~stack_sampler:(fun cfg rng_state ->
@@ -3035,8 +3053,10 @@ module Registration_section = struct
         ()
 
     let check_signature algo =
-      check_signature algo ~for_intercept:true ;
-      check_signature algo ~for_intercept:false
+      check_signature algo ~benchmark_type:Time ~for_intercept:true ;
+      check_signature algo ~benchmark_type:Time ~for_intercept:false ;
+      check_signature algo ~benchmark_type:Alloc ~for_intercept:false ;
+      register_time_alloc_codegen_model (Instr_name (name_of_algo algo))
 
     let () = check_signature Signature.Ed25519
 
@@ -3088,43 +3108,88 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~benchmark_type:Time
         ~name:Interpreter_workload.N_IBlake2b
         ~intercept_stack:(Environment.Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
         ~kinstr:(IBlake2b (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_IBlake2b
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(IBlake2b (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_IBlake2b)
 
     let () =
       simple_benchmark
+        ~benchmark_type:Time
         ~name:Interpreter_workload.N_ISha256
         ~intercept_stack:(Environment.Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
         ~kinstr:(ISha256 (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_ISha256
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(ISha256 (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_ISha256)
 
     let () =
       simple_benchmark
+        ~benchmark_type:Time
         ~name:Interpreter_workload.N_ISha512
         ~intercept_stack:(Environment.Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
         ~kinstr:(ISha512 (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_ISha512
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(ISha512 (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_ISha512)
 
     let () =
       simple_benchmark
+        ~benchmark_type:Time
         ~name:Interpreter_workload.N_IKeccak
         ~intercept_stack:(Environment.Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
         ~kinstr:(IKeccak (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_IKeccak
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(IKeccak (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_IKeccak)
 
     let () =
       simple_benchmark
+        ~benchmark_type:Time
         ~name:Interpreter_workload.N_ISha3
         ~intercept_stack:(Environment.Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
         ~kinstr:(ISha3 (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_ISha3
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(ISha3 (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_ISha3)
 
     let () =
       simple_time_alloc_benchmark
@@ -3426,7 +3491,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_z_fr
         ~stack_type:(bls12_381_fr @$ int @$ bot)
@@ -3448,7 +3513,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr_z
         ~stack_type:(int @$ bls12_381_fr @$ bot)
@@ -3504,12 +3569,22 @@ module Registration_section = struct
     let () =
       let (Ty_ex_c p) = pair bls12_381_g1 bls12_381_g2 in
       simple_benchmark
+        ~benchmark_type:Time
         ~check
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
         ~intercept_stack:(Script_list.empty, eos)
         ~stack_type:(list p @$ bot)
         ~kinstr:(IPairing_check_bls12_381 (dummy_loc, halt))
-        ()
+        () ;
+      (* no intercept for alloc *)
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~check
+        ~name:Interpreter_workload.N_IPairing_check_bls12_381
+        ~stack_type:(list p @$ bot)
+        ~kinstr:(IPairing_check_bls12_381 (dummy_loc, halt))
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_IPairing_check_bls12_381)
   end
 
   module Tickets = struct
