@@ -204,19 +204,26 @@ module Patch_T (Proto : T) : T = struct
     | `Well_formed ->
         Proto.validate_operation ?check_signature validation_state oph op
 
-  module Plugin = struct
-    include Proto.Plugin
+  module Mempool = struct
+    include Proto.Mempool
 
-    let pre_filter info config op =
+    let add_operation ?check_signature ?conflict_handler validation_info
+        mempool_state (oph, op) =
       let open Lwt_syntax in
       let* status = Proto.Plugin.syntactic_check op in
       match status with
       | `Ill_formed ->
-          Lwt.return
-            (`Refused
-              (Error_monad.TzTrace.make
-                 (Error_monad.error_of_fmt "Ill-formed operation filtered")))
-      | `Well_formed -> Proto.Plugin.pre_filter info config op
+          Lwt.return_error
+            (Proto.Mempool.Validation_error
+               (TzTrace.make
+                  (Error_monad.error_of_fmt "Ill-formed operation filtered")))
+      | `Well_formed ->
+          Proto.Mempool.add_operation
+            ?check_signature
+            ?conflict_handler
+            validation_info
+            mempool_state
+            (oph, op)
   end
 end
 
