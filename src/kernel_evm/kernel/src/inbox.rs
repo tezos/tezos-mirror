@@ -344,17 +344,27 @@ mod tests {
     use crate::inbox::TransactionContent::Ethereum;
     use crate::storage::*;
     use libsecp256k1::PublicKey;
+    use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
+    use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_mock::MockHost;
 
-    const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
+    const SMART_ROLLUP_ADDRESS: [u8; 20] = [
+        20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    ];
 
     const ZERO_TX_HASH: TransactionHash = [0; TRANSACTION_HASH_SIZE];
 
+    fn smart_rollup_address() -> SmartRollupAddress {
+        SmartRollupAddress::new(SmartRollupHash(SMART_ROLLUP_ADDRESS.into()))
+    }
+
     fn input_to_bytes(smart_rollup_address: [u8; 20], input: Input) -> Vec<u8> {
         let mut buffer = Vec::new();
-        // Smart rollup address.
+        // Targetted framing protocol
+        buffer.push(0);
         buffer.extend_from_slice(&smart_rollup_address);
         match input {
             Input::SimpleTransaction(tx) => {
@@ -442,13 +452,9 @@ mod tests {
             content: Ethereum(tx.clone()),
         }));
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            input,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -458,21 +464,18 @@ mod tests {
 
     #[test]
     fn parse_valid_chunked_transaction() {
-        let mut host = MockHost::default();
+        let address = smart_rollup_address();
+        let mut host = MockHost::with_address(&address);
 
         let (data, tx) = large_transaction();
 
         let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
 
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(
-                ZERO_SMART_ROLLUP_ADDRESS,
-                input,
-            )))
+            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -509,13 +512,14 @@ mod tests {
         };
         let input = Input::Upgrade(kernel_upgrade.clone());
 
+        let zero_smart_rollup_address = [0; 20];
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            zero_smart_rollup_address,
             input,
         )));
 
         let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+            read_inbox(&mut host, zero_smart_rollup_address, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
@@ -537,16 +541,15 @@ mod tests {
         };
 
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            SMART_ROLLUP_ADDRESS,
             new_chunk1,
         )));
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            SMART_ROLLUP_ADDRESS,
             new_chunk2,
         )));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -568,10 +571,7 @@ mod tests {
         let chunk = inputs.remove(0);
 
         // Announce a chunked transaction.
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            new_chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
         // Give a chunk with an invalid `i`.
         let out_of_bound_i = 42;
@@ -587,13 +587,9 @@ mod tests {
             },
             _ => panic!("Expected a transaction chunk"),
         };
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -622,13 +618,9 @@ mod tests {
             _ => panic!("Expected a transaction chunk"),
         };
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -671,18 +663,11 @@ mod tests {
         let new_chunk = inputs[0].clone();
         let chunk0 = inputs[1].clone();
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            new_chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk0,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         assert_eq!(
             inbox_content,
             InboxContent {
@@ -693,13 +678,61 @@ mod tests {
 
         // On the next level, try to re-give the chunks, but this time in full:
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(
-                ZERO_SMART_ROLLUP_ADDRESS,
-                input,
-            )))
+            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+
+        let expected_transactions = vec![Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx),
+        }];
+        assert_eq!(inbox_content.transactions, expected_transactions);
+    }
+
+    #[test]
+    fn parse_valid_simple_transaction_framed() {
+        // Don't use zero-hash for rollup here - as the long string of zeros is still valid under the previous
+        // parsing. This won't happen in practice, though
+        let address = smart_rollup_address();
+
+        let mut host = MockHost::with_address(&address);
+
+        let tx =
+            EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
+e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
+fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+
+        let input = Input::SimpleTransaction(Box::new(Transaction {
+            tx_hash: ZERO_TX_HASH,
+            content: Ethereum(tx.clone()),
+        }));
+
+        let mut buffer = Vec::new();
+        match input {
+            Input::SimpleTransaction(tx) => {
+                // Simple transaction tag
+                buffer.push(0);
+                buffer.extend_from_slice(&tx.tx_hash);
+                let mut tx_bytes = match tx.content {
+                    Ethereum(tx) => tx.into(),
+                    _ => panic!(
+                        "Simple transaction can contain only ethereum transactions"
+                    ),
+                };
+
+                buffer.append(&mut tx_bytes)
+            }
+            _ => unreachable!("Not tested"),
+        };
+
+        let framed = ExternalMessageFrame::Targetted {
+            address,
+            contents: buffer,
+        };
+
+        host.add_external(framed);
+
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),

@@ -16,7 +16,9 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::{
     contract::Contract,
-    inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer},
+    inbox::{
+        ExternalMessageFrame, InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer,
+    },
     michelson::{ticket::UnitTicket, MichelsonBytes, MichelsonInt, MichelsonPair},
 };
 use tezos_smart_rollup_host::input::Message;
@@ -58,7 +60,8 @@ const TRANSACTION_CHUNK_TAG: u8 = 2;
 const KERNEL_UPGRADE_TAG: u8 = 3;
 
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
-            - 20 // Smart rollup address size
+            - 1 // ExternalMessageFrame tag
+            - 20 // Smart rollup address size (ExternalMessageFrame::Targetted)
             - 1  // Transaction chunk tag
             - 2  // Number of chunks (u16)
             - 32; // Transaction hash size
@@ -168,18 +171,18 @@ impl InputResult {
     }
 
     // External message structure :
-    // EXTERNAL_TAG 1B / ROLLUP_ADDRESS 20B / MESSAGE_TAG 1B / DATA
+    // EXTERNAL_TAG 1B / FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
     fn parse_external(input: &[u8], smart_rollup_address: &[u8]) -> Self {
-        // Next 20 bytes is the targeted smart rollup address.
-        let remaining = {
-            let (target_smart_rollup_address, remaining) = parsable!(split_at(input, 20));
-
-            if target_smart_rollup_address == smart_rollup_address {
-                remaining
-            } else {
-                return InputResult::Unparsable;
+        // Compatibility with framing protocol for external messages
+        let remaining = match ExternalMessageFrame::parse(input) {
+            Ok(ExternalMessageFrame::Targetted { address, contents })
+                if address.hash().as_ref() == smart_rollup_address =>
+            {
+                contents
             }
+            _ => return InputResult::Unparsable,
         };
+
         let (transaction_tag, remaining) = parsable!(remaining.split_first());
         match *transaction_tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
