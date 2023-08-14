@@ -43,8 +43,14 @@ let parsed_string_encoding =
    alternative encoding for {Sc_rollup_inbox_message_repr.t} that only encodes
    `Internal Transfer` and `External`. In the case of `Internal Transfer`, only
    the Micheline payload is mandatory, the other field are taken from the
-   default one if they are missing. *)
-let input_encoding default_sender default_source default_destination =
+   default one if they are missing.
+
+   It can also take already serialized messages, if the input does not belong
+   to the two cases above. This allows to inject arbitrary messages in
+   the rollup. *)
+let input_encoding default_sender default_source default_destination :
+    [< `Inbox_message of Sc_rollup.Inbox_message.t | `Serialized of string]
+    Data_encoding.encoding =
   let open Data_encoding in
   union
     [
@@ -63,23 +69,37 @@ let input_encoding default_sender default_source default_destination =
               Sc_rollup_repr.Address.encoding
               default_destination))
         (function
-          | Sc_rollup.Inbox_message.(
-              Internal (Transfer {payload; sender; source; destination})) ->
+          | `Inbox_message
+              Sc_rollup.Inbox_message.(
+                Internal (Transfer {payload; sender; source; destination})) ->
               Some (payload, sender, source, destination)
           | _ -> None)
         (fun (payload, sender, source, destination) ->
-          Internal (Transfer {payload; sender; source; destination}));
+          `Inbox_message
+            (Internal (Transfer {payload; sender; source; destination})));
       case
         (Tag 1)
         ~title:"External"
         (obj1 (req "external" string))
         (function
-          | Sc_rollup.Inbox_message.External msg ->
+          | `Inbox_message (Sc_rollup.Inbox_message.External msg) ->
               let (`Hex msg) = Hex.of_string msg in
               Some msg
-          | Internal _ -> None)
+          | _ -> None)
         (fun msg ->
-          External (Hex.to_string (`Hex msg) |> Option.value ~default:""));
+          `Inbox_message
+            (External (Hex.to_string (`Hex msg) |> Option.value ~default:"")));
+      case
+        (Tag 2)
+        ~title:"Serialized"
+        (obj1 (req "serialized" string))
+        (function
+          | `Serialized msg ->
+              let (`Hex msg) = Hex.of_string msg in
+              Some msg
+          | _ -> None)
+        (fun msg ->
+          `Serialized (Hex.to_string (`Hex msg) |> Option.value ~default:""));
     ]
 
 (* Represent a set of inboxes, i.e. a set of set of inputs. The position of an
@@ -107,11 +127,13 @@ let parse_inboxes inputs Config.{sender; source; destination; _} =
       List.map_es
         (fun inputs ->
           List.map_es
-            (fun input ->
-              Protocol.Alpha_context.Sc_rollup.Inbox_message.(
-                serialize input
-                |> Result.map unsafe_to_string
-                |> Environment.wrap_tzresult |> Lwt.return))
+            (function
+              | `Inbox_message input ->
+                  Protocol.Alpha_context.Sc_rollup.Inbox_message.(
+                    serialize input
+                    |> Result.map unsafe_to_string
+                    |> Environment.wrap_tzresult |> Lwt.return)
+              | `Serialized input -> Lwt.return_ok input)
             inputs)
         full_inputs
   | Error e -> Error_monad.failwith "%s" e
