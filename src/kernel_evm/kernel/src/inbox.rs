@@ -348,7 +348,9 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_smart_rollup_mock::MockHost;
 
-    const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
+    const SMART_ROLLUP_ADDRESS: [u8; 20] = [
+        20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    ];
 
     const ZERO_TX_HASH: TransactionHash = [0; TRANSACTION_HASH_SIZE];
 
@@ -442,13 +444,9 @@ mod tests {
             content: Ethereum(tx.clone()),
         }));
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            input,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -465,14 +463,10 @@ mod tests {
         let inputs = make_chunked_transactions(ZERO_TX_HASH, data);
 
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(
-                ZERO_SMART_ROLLUP_ADDRESS,
-                input,
-            )))
+            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -509,13 +503,14 @@ mod tests {
         };
         let input = Input::Upgrade(kernel_upgrade.clone());
 
+        let zero_smart_rollup_address = [0; 20];
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            zero_smart_rollup_address,
             input,
         )));
 
         let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+            read_inbox(&mut host, zero_smart_rollup_address, None).unwrap();
         let expected_upgrade = Some(kernel_upgrade);
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
@@ -537,16 +532,15 @@ mod tests {
         };
 
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            SMART_ROLLUP_ADDRESS,
             new_chunk1,
         )));
         host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
+            SMART_ROLLUP_ADDRESS,
             new_chunk2,
         )));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -568,10 +562,7 @@ mod tests {
         let chunk = inputs.remove(0);
 
         // Announce a chunked transaction.
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            new_chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
         // Give a chunk with an invalid `i`.
         let out_of_bound_i = 42;
@@ -587,13 +578,9 @@ mod tests {
             },
             _ => panic!("Expected a transaction chunk"),
         };
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -622,13 +609,9 @@ mod tests {
             _ => panic!("Expected a transaction chunk"),
         };
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -671,18 +654,11 @@ mod tests {
         let new_chunk = inputs[0].clone();
         let chunk0 = inputs[1].clone();
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            new_chunk,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, new_chunk)));
 
-        host.add_external(Bytes::from(input_to_bytes(
-            ZERO_SMART_ROLLUP_ADDRESS,
-            chunk0,
-        )));
+        host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         assert_eq!(
             inbox_content,
             InboxContent {
@@ -693,13 +669,9 @@ mod tests {
 
         // On the next level, try to re-give the chunks, but this time in full:
         for input in inputs {
-            host.add_external(Bytes::from(input_to_bytes(
-                ZERO_SMART_ROLLUP_ADDRESS,
-                input,
-            )))
+            host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content =
-            read_inbox(&mut host, ZERO_SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
