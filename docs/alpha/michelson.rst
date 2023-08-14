@@ -1027,28 +1027,6 @@ only the ``address`` part will be taken.
 ``operation``, ``big_map`` and ``sapling_state`` and ``ticket`` types are forbidden for the ``'return`` type.
 
 
-Here is an example using views, consisting of two contracts.
-The first contract defines two views at toplevel that are named ``add_v`` and ``mul_v``.
-
-::
-
-    { parameter nat;
-      storage nat;
-      code { CAR; NIL operation ; PAIR };
-      view "add_v" nat nat { UNPAIR; ADD };
-      view "mul_v" nat nat { UNPAIR; MUL };
-    }
-
-
-The second contract calls the ``add_v`` view of the above contract and obtains a result immediately.
-
-::
-
-    { parameter (pair nat address) ;
-      storage nat ;
-      code { CAR ; UNPAIR; VIEW "add_v" nat ;
-             IF_SOME { } { FAIL }; NIL operation; PAIR }; }
-
 Macros
 ------
 
@@ -2226,6 +2204,31 @@ using the Coq proof assistant.
                      # Change set of signatures
                      DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;
        PAIR }
+
+Views
+~~~~~
+
+Here is an example using views, consisting of two contracts.
+The first contract defines two views at toplevel that are named ``add_v`` and ``mul_v``.
+
+::
+
+    { parameter nat;
+      storage nat;
+      code { CAR; NIL operation ; PAIR };
+      view "add_v" nat nat { UNPAIR; ADD };
+      view "mul_v" nat nat { UNPAIR; MUL };
+    }
+
+
+The second contract calls the ``add_v`` view of the above contract and obtains a result immediately.
+
+::
+
+    { parameter (pair nat address) ;
+      storage nat ;
+      code { CAR ; UNPAIR; VIEW "add_v" nat ;
+             IF_SOME { } { FAIL }; NIL operation; PAIR }; }
 
 
 
