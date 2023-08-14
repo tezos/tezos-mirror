@@ -56,7 +56,7 @@ val start : unit -> unit Lwt.t
 
 (** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
-    {!Inbox.add_all_messages}. *)
+    {!Sc_rollup.Inbox.add_all_messages}. *)
 val add_messages :
   is_first_block:bool ->
   predecessor_timestamp:Timestamp.time ->

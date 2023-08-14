@@ -42,7 +42,7 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
     The function returns [Dal_slot_not_found_in_store] if no entry is found in
     the store for the given ID (i.e. no page is registered with or without content).
 
-    If the returned value is [Some pages]], the slot whose ID is given is
+    If the returned value is [Some pages], the slot whose ID is given is
     supposed to be confirmed and [pages] correspond to the pages of the slot.
     Otherwise [None] is returned.
 
