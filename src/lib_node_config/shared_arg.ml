@@ -568,7 +568,7 @@ module Term = struct
 
   let bootstrap_threshold =
     let doc =
-      "[DEPRECATED: use synchronisation_threshold instead] The number of peers \
+      "[DEPRECATED: use synchronisation-threshold instead] The number of peers \
        to synchronize with before declaring the node bootstrapped."
     in
     Arg.(
