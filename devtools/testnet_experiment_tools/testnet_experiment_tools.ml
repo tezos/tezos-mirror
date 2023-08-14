@@ -47,7 +47,11 @@ let number_of_bakers =
   Sys.getenv_opt bakers |> Option.map int_of_string
   |> Option.value ~default:default_number_of_bakers
 
-let default_gen_keys_dir = "/tmp/gen_keys_dir"
+let default_gen_keys_dir =
+  let base_dir = Filename.temp_file ~temp_dir:"/tmp" "" "" in
+  let _ = Lwt_unix.unlink base_dir in
+  let _ = Lwt_unix.mkdir base_dir 0o700 in
+  base_dir
 
 let gen_keys_dir_name = "GEN_KEYS_DIR"
 
