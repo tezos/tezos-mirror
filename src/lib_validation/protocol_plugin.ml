@@ -193,6 +193,24 @@ let validation_plugin_not_found =
     ~pp1:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+type error += Ill_formed_operation of Operation_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validation.plugin.ill_formed_operation"
+    ~title:"Ill_formed_operation"
+    ~description:"Ill-formed operation filtered"
+    ~pp:(fun ppf oph ->
+      Format.fprintf
+        ppf
+        "Ill-formed operation filtered: %a."
+        Operation_hash.pp
+        oph)
+    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
+    (function Ill_formed_operation oph -> Some oph | _ -> None)
+    (fun oph -> Ill_formed_operation oph)
+
 module Patch_T (Proto : T) : T = struct
   include Proto
 
@@ -200,7 +218,7 @@ module Patch_T (Proto : T) : T = struct
     let open Lwt_syntax in
     let* status = Proto.Plugin.syntactic_check op in
     match status with
-    | `Ill_formed -> failwith "Ill-formed operation filtered"
+    | `Ill_formed -> Lwt_result_syntax.tzfail (Ill_formed_operation oph)
     | `Well_formed ->
         Proto.validate_operation ?check_signature validation_state oph op
 
@@ -215,8 +233,7 @@ module Patch_T (Proto : T) : T = struct
       | `Ill_formed ->
           Lwt.return_error
             (Proto.Mempool.Validation_error
-               (TzTrace.make
-                  (Error_monad.error_of_fmt "Ill-formed operation filtered")))
+               (TzTrace.make (Ill_formed_operation oph)))
       | `Well_formed ->
           Proto.Mempool.add_operation
             ?check_signature
