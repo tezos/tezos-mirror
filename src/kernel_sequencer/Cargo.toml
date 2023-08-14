@@ -50,6 +50,9 @@ version = "0.2.0"
 version = "0.5.0"
 default-features = false
 
+[dev-dependencies.hex]
+version = "0.4.3"
+
 [features]
 default = []
 

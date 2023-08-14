@@ -201,11 +201,13 @@ let test_delayed_inbox_consumed =
   let expected_sequences =
     List.map (fun (delayed_inbox_prefix, delayed_inbox_suffix) ->
         Format.sprintf
-          "Received a sequence message Sequence { nonce: 0, \
-           delayed_messages_prefix: %d, delayed_messages_suffix: %d, messages: \
-           [], signature: \
+          "Received a sequence message UnverifiedSigned { body: Framed { \
+           destination: SmartRollupAddress { hash: SmartRollupHash(\"%s\") }, \
+           payload: Sequence(Sequence { nonce: 0, delayed_messages_prefix: %d, \
+           delayed_messages_suffix: %d, messages: [] }) }, signature: \
            Signature(\"edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q\") \
-           } targeting our rollup"
+           }"
+          (Sc_rollup_repr.Address.to_b58check sc_rollup_address)
           delayed_inbox_prefix
           delayed_inbox_suffix)
     @@ [(4, 1); (7, 1)]
