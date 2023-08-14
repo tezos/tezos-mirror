@@ -589,8 +589,8 @@ let simple_benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
     intercept_stack
 
 let simple_time_alloc_benchmark_with_stack_sampler ?amplification
-    ?intercept_stack ?salt ?more_tags ?check ~name ~stack_type ~kinstr
-    ~stack_sampler () =
+    ?intercept_stack ?(alloc_intercept = true) ?salt ?more_tags ?check ~name
+    ~stack_type ~kinstr ~stack_sampler () =
   simple_benchmark_with_stack_sampler
     ~benchmark_type:Time
     ?amplification
@@ -605,7 +605,7 @@ let simple_time_alloc_benchmark_with_stack_sampler ?amplification
     () ;
   simple_benchmark_with_stack_sampler
     ~benchmark_type:Alloc
-    ?intercept_stack
+    ?intercept_stack:(if alloc_intercept then intercept_stack else None)
     ?salt
     ?more_tags
     ?check
@@ -1603,6 +1603,7 @@ module Registration_section = struct
         ~stack_type:(int @$ set int @$ unit @$ bot)
         ~kinstr:(ISet_mem (dummy_loc, halt))
         ~intercept_stack:(Script_int.zero, (Script_set.empty int, ((), eos)))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 1) ;
           let n =
@@ -1758,6 +1759,7 @@ module Registration_section = struct
         ~intercept_stack:
           (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1776,6 +1778,7 @@ module Registration_section = struct
         ~intercept_stack:
           (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1895,6 +1898,7 @@ module Registration_section = struct
         ~intercept_stack:
           (let map = Script_big_map.empty int unit in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1913,6 +1917,7 @@ module Registration_section = struct
         ~intercept_stack:
           (let map = Script_big_map.empty int unit in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))

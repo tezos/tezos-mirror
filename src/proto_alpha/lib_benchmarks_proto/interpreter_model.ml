@@ -161,6 +161,29 @@ let ediv_nat_alloc name =
   end in
   (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
+let get_mem_alloc_const_model name =
+  let const = fv (sf "%s_const" name) in
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = ns name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = Model.arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun (_size1 : size repr) ->
+        lam ~name:"size2" @@ fun (_size1 : size repr) -> free ~name:const
+    end
+  end in
+  (module M : Model.Model_impl with type arg_type = int * (int * unit))
+
 let update_alloc_model name =
   let const = fv (sf "%s_const" name) in
   let coeff = fv (sf "%s_coeff" name) in
@@ -591,8 +614,10 @@ let ir_model instr_or_cont =
       | N_IUnpair | N_IVoting_power | N_ITotal_voting_power | N_IList_size
       | N_ISet_size | N_IMap_size | N_ISapling_empty_state ->
           (const1_model, const1_model) |> m2 name
-      | N_ISet_mem | N_ISet_update | N_IMap_mem | N_IMap_get | N_IMap_update
-      | N_IBig_map_mem | N_IBig_map_get | N_IBig_map_update
+      | N_ISet_mem | N_IMap_mem | N_IMap_get | N_IBig_map_mem | N_IBig_map_get
+        ->
+          (nlogm_model, get_mem_alloc_const_model) |> m2 name
+      | N_ISet_update | N_IMap_update | N_IBig_map_update
       | N_IMap_get_and_update | N_IBig_map_get_and_update ->
           (nlogm_model, update_alloc_model) |> m2 name
       | N_IConcat_string -> (concat_model, concat_model) |> m2 name
