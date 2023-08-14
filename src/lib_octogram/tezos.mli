@@ -42,6 +42,14 @@ type 'uri start_octez_node = {
   rpc_port : string option;
 }
 
+(** This job bakes the activation block. *)
+type 'uri activate_protocol = {
+  endpoint : 'uri;  (** Node endpoint *)
+  path_client : 'uri;  (** Where to find the client. *)
+  protocol : string;  (** Which protocol to activate *)
+  parameter_file : 'uri;  (** The path to the protocol file that will be used. *)
+}
+
 type 'uri client_base_args = {path_client : 'uri; endpoint : 'uri}
 
 type 'uri wait_for_bootstrapped = 'uri client_base_args
