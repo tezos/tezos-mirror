@@ -68,7 +68,7 @@ let assert_fails ~loc ?error m =
           Stdlib.failwith msg
       | _, None ->
           (* Any error is ok. *)
-          return ())
+          return_unit)
 
 let assert_equal_z ~loc x y =
   Assert.equal ~loc Z.equal "Compare Z.t" Z.pp_print x y
@@ -710,7 +710,7 @@ let assert_ticket_token_balance ~loc ctxt token owner expected =
   | Some b, None ->
       failwith "%s: Expected no balance but got some %d" loc (Z.to_int b)
   | None, Some b -> failwith "%s: Expected balance %d but got none" loc b
-  | None, None -> return ()
+  | None, None -> return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~__LOC__ k expected_err =
@@ -754,7 +754,7 @@ let check_balances_evolution bal_before {liquid; frozen} ~action =
   in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_liquid liquid in
   let* () = Assert.equal_tez ~loc:__LOC__ expected_frozen frozen in
-  return ()
+  return_unit
 
 (* Generates a list of cemented dummy commitments. *)
 let gen_commitments ctxt rollup ~predecessor ~num_commitments =
@@ -1926,7 +1926,7 @@ let test_number_of_parallel_games_bounded () =
       opponents
       opponents_commitments
   in
-  return ()
+  return_unit
 
 (** [test_timeout] test multiple cases of the timeout logic.
 - Test to timeout a player before it's allowed and fails.
@@ -2097,19 +2097,18 @@ let init_with_conflict () =
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 let dumb_proof ~choice =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let context_arith_pvm = Arith_pvm.make_empty_context () in
   let empty = Arith_pvm.make_empty_state () in
   let*! arith_state = Arith_pvm.initial_state ~empty in
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
   let input = Sc_rollup_helpers.make_external_input "c4c4" in
-  let* pvm_step =
+  let*@ pvm_step =
     Arith_pvm.produce_proof
       context_arith_pvm
       ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
       (Some input)
       arith_state
-    >|= Environment.wrap_tzresult
   in
   let pvm_step =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -2652,20 +2651,19 @@ let full_history_inbox (genesis_predecessor_timestamp, genesis_predecessor)
     payloads_per_levels
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let open Sc_rollup_helpers in
   let Sc_rollup_helpers.Node_inbox.{payloads_histories; history; inbox} =
     full_history_inbox
   in
   let history_proof = Sc_rollup.Inbox.old_levels_messages inbox in
   (* Create an inclusion proof of the inbox message at [(l, n)]. *)
-  let* proof, _ =
+  let*@ proof, _ =
     Sc_rollup.Inbox.produce_proof
       ~get_payloads_history:(get_payloads_history payloads_histories)
       ~get_history:(get_history history)
       history_proof
       (l, n)
-    >|= Environment.wrap_tzresult
   in
   let*? inbox_message_verified =
     Sc_rollup.Inbox.verify_proof (l, n) snapshot proof
@@ -3104,18 +3102,17 @@ let init_with_4_conflicts () =
   return (block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh))
 
 let start_refutation_game_op block rollup (p1, p1_pkh) p2_pkh =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* ctxt =
     let+ incr = Incremental.begin_construction block in
     Incremental.alpha_ctxt incr
   in
-  let* (p1_point, p2_point), _ctxt =
+  let*@ (p1_point, p2_point), _ctxt =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup
       p1_pkh
       p2_pkh
-    >|= Environment.wrap_tzresult
   in
   let refutation =
     Sc_rollup.Game.Start
@@ -3258,7 +3255,7 @@ let test_winner_by_forfeit_with_draw () =
   return_unit
 
 let test_conflict_point_on_a_branch () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* block, (pA, pB), rollup =
     init_and_originate ~sc_rollup_challenge_window_in_blocks:1000 Context.T2
   in
@@ -3286,19 +3283,18 @@ let test_conflict_point_on_a_branch () =
       } )
   in
   let* block = publish_commitments block pB rollup [pB_commitment] in
-  let* ( ( {commitment = _; hash = conflict_pA_hash},
-           {commitment = _; hash = conflict_pB_hash} ),
-         _ctxt ) =
-    let* ctxt =
-      let+ incr = Incremental.begin_construction block in
-      Incremental.alpha_ctxt incr
-    in
+  let* ctxt =
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let*@ ( ( {commitment = _; hash = conflict_pA_hash},
+            {commitment = _; hash = conflict_pB_hash} ),
+          _ctxt ) =
     Sc_rollup.Refutation_storage.Internal_for_tests.get_conflict_point
       ctxt
       rollup
       pA_pkh
       pB_pkh
-    >|= Environment.wrap_tzresult
   in
   let pA_hash = hash_commitment pA_commitment in
   let pB_hash = hash_commitment pB_commitment in

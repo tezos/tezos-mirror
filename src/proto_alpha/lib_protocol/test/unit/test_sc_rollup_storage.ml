@@ -220,7 +220,7 @@ let originate_rollup_and_deposit_with_three_stakers () =
     By convention, context is passed linearly as [ctxt].  This takes a context
     argument to allow this.
 *)
-let assert_true _ctxt = return ()
+let assert_true _ctxt = return_unit
 
 (** Assert that the computation fails with the given message. *)
 let assert_fails_with ~loc k expected_err =
@@ -2293,7 +2293,7 @@ module Stake_storage_tests = struct
         (record ctxt rollup 15 42)
         Sc_rollup_errors.Sc_rollup_outbox_level_expired
     in
-    return ()
+    return_unit
 
   (** Test storage outbox size diff. Note that these tests depend on the constant.
     [sc_rollup_max_outbox_messages_per_level] which controls the maximum size
@@ -2341,7 +2341,7 @@ module Stake_storage_tests = struct
        bitset with a smaller one. Hence we get a negative size diff. *)
     let*@ size_diff, _ctxt = record ctxt rollup (level + max_active_levels) 0 in
     let* () = Assert.equal_int ~loc:__LOC__ (Z.to_int size_diff) (-14) in
-    return ()
+    return_unit
 
   let test_get_cemented_commitments_with_levels_of_missing_rollup () =
     assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->

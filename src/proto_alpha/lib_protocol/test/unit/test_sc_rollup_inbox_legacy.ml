@@ -109,12 +109,14 @@ let populate_inboxes level history inbox inboxes list_of_messages =
 let inbox = Sc_rollup_helpers.dumb_init_repr
 
 let setup_inbox_with_messages list_of_payloads f =
+  let open Lwt_result_syntax in
   let inbox = inbox first_level in
   let history = History.empty ~capacity:10000L in
-  populate_inboxes first_level history inbox [] list_of_payloads
-  >>?= fun (payloads_histories, witness, history, inbox, inboxes) ->
+  let*? payloads_histories, witness, history, inbox, inboxes =
+    populate_inboxes first_level history inbox [] list_of_payloads
+  in
   match witness with
-  | None -> fail (err "setup_inbox_with_messages called with no messages")
+  | None -> tzfail (err "setup_inbox_with_messages called with no messages")
   | Some tree -> f payloads_histories tree history inbox inboxes
 
 (* An external message is prefixed with a tag whose length is one byte, and
@@ -124,8 +126,10 @@ let encode_external_message message =
   Bytes.of_string (prefix ^ message)
 
 let check_payload messages external_message =
-  Environment.Context.Tree.find messages ["payload"] >>= function
-  | None -> fail (err "No payload in messages")
+  let open Lwt_result_syntax in
+  let*! payload_opt = Environment.Context.Tree.find messages ["payload"] in
+  match payload_opt with
+  | None -> tzfail (err "No payload in messages")
   | Some payload ->
       let expected_payload = encode_external_message external_message in
       fail_unless
@@ -227,7 +231,7 @@ let fail_with_proof_error_msg errors fail_msg =
       errors
   in
   let msg = Option.(msg |> map (fun s -> ": " ^ s) |> value ~default:"") in
-  fail (err (fail_msg ^ msg))
+  Lwt_result_syntax.tzfail (err (fail_msg ^ msg))
 
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
@@ -268,15 +272,15 @@ let init_inboxes_histories_with_different_capacities
     populate_inboxes first_level history inbox [] messages
   in
   (* Here, we have `~capacity:0L`. So no history is kept *)
-  mk_history ~capacity:0L () >>?= fun no_history ->
+  let*? no_history = mk_history ~capacity:0L () in
   (* Here, we set a [default_capacity] supposed to be greater than [nb_levels],
      and keep the default [next_index]. This history will serve as a witeness *)
-  mk_history ~capacity:default_capacity () >>?= fun big_history ->
+  let*? big_history = mk_history ~capacity:default_capacity () in
   (* Here, we choose a small capacity supposed to be smaller than [nb_levels] to
      cover cases where the history is full and older elements should be removed.
      We also set a non-default [next_index] value to cover cases where the
      incremented index may overflow or is negative. *)
-  mk_history ~next_index ~capacity:small_capacity () >>?= fun small_history ->
+  let*? small_history = mk_history ~next_index ~capacity:small_capacity () in
   return (no_history, small_history, big_history)
 
 (** In this test, we mainly check that the number of entries in histories
@@ -332,7 +336,7 @@ let test_history_length
       Int64.(default_capacity > of_int len)
       (err default_capacity len ~exact:true)
   in
-  return ()
+  return_unit
 
 (** In this test, we check that for two inboxes of the same content, the entries
     of the history with the lower capacity, taken in the insertion order, is a
