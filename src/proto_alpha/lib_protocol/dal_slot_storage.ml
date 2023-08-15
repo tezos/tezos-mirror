@@ -46,33 +46,40 @@ let compute_attested_slot_headers ctxt seen_slot_headers =
     seen_slot_headers
 
 let get_slot_headers_history ctxt =
-  Storage.Dal.Slot.History.find ctxt >|=? function
+  let open Lwt_result_syntax in
+  let+ slots_history = Storage.Dal.Slot.History.find ctxt in
+  match slots_history with
   | None -> Dal_slot_repr.History.genesis
   | Some slots_history -> slots_history
 
 let update_skip_list ctxt ~confirmed_slot_headers =
-  get_slot_headers_history ctxt >>=? fun slots_history ->
-  Lwt.return
-  @@ Dal_slot_repr.History.add_confirmed_slot_headers_no_cache
-       slots_history
-       confirmed_slot_headers
-  >>=? fun slots_history ->
-  Storage.Dal.Slot.History.add ctxt slots_history >|= ok
+  let open Lwt_result_syntax in
+  let* slots_history = get_slot_headers_history ctxt in
+  let*? slots_history =
+    Dal_slot_repr.History.add_confirmed_slot_headers_no_cache
+      slots_history
+      confirmed_slot_headers
+  in
+  let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
+  return ctxt
 
 let finalize_pending_slot_headers ctxt =
+  let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
   match Raw_level_repr.(sub raw_level dal.attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some level_attested -> (
-      Storage.Dal.Slot.Headers.find ctxt level_attested >>=? function
+      let* seen_slots = Storage.Dal.Slot.Headers.find ctxt level_attested in
+      match seen_slots with
       | None -> return (ctxt, Dal_attestation_repr.empty)
       | Some seen_slots ->
           let rev_attested_slot_headers, attestation =
             compute_attested_slot_headers ctxt seen_slots
           in
           let attested_slot_headers = List.rev rev_attested_slot_headers in
-          update_skip_list ctxt ~confirmed_slot_headers:attested_slot_headers
-          >>=? fun ctxt ->
-          Storage.Dal.Slot.Headers.remove ctxt level_attested >>= fun ctxt ->
+          let* ctxt =
+            update_skip_list ctxt ~confirmed_slot_headers:attested_slot_headers
+          in
+          let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
           return (ctxt, attestation))

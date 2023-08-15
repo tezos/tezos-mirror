@@ -35,7 +35,7 @@ let assert_dal_feature_enabled ctxt =
 let shards ctxt ~level =
   let open Lwt_result_syntax in
   let open Dal.Attestation in
-  assert_dal_feature_enabled ctxt >>?= fun () ->
+  let*? () = assert_dal_feature_enabled ctxt in
   let level = Level.from_raw ctxt level in
   (* We do not cache this committee. This function being used by RPCs
      to know the DAL committee at some particular level. *)
