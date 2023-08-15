@@ -48,23 +48,28 @@ let hash_bytes_cost bytes =
   S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
 
 let hash_of_node ctxt node =
-  Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
-  >>? fun ctxt ->
+  let open Result_syntax in
+  let* ctxt =
+    Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
+  in
   let node = Micheline.strip_locations node in
-  Result.of_option
-    ~error:(Error_monad.trace_of_error Failed_to_hash_node)
-    (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
-  >>? fun bytes ->
-  Raw_context.consume_gas ctxt (hash_bytes_cost bytes) >|? fun ctxt ->
+  let* bytes =
+    Result.of_option
+      ~error:(Error_monad.trace_of_error Failed_to_hash_node)
+      (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
+  in
+  let+ ctxt = Raw_context.consume_gas ctxt (hash_bytes_cost bytes) in
   ( Ticket_hash_repr.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes],
     ctxt )
 
 let hash_of_node_uncarbonated node =
+  let open Result_syntax in
   let node = Micheline.strip_locations node in
-  Result.of_option
-    ~error:(Error_monad.trace_of_error Failed_to_hash_node)
-    (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
-  >|? fun bytes ->
+  let+ bytes =
+    Result.of_option
+      ~error:(Error_monad.trace_of_error Failed_to_hash_node)
+      (Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node)
+  in
   Ticket_hash_repr.of_script_expr_hash @@ Script_expr_hash.hash_bytes [bytes]
 
 let make ctxt ~ticketer ~ty ~contents ~owner =

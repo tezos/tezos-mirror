@@ -116,6 +116,7 @@ module Ticket_token_map = struct
 
    *)
   let add ctxt ~ticket_token ~destination ~(amount : Ticket_amount.t) map =
+    let open Result_syntax in
     Ticket_token_map.update
       ctxt
       ticket_token
@@ -124,41 +125,53 @@ module Ticket_token_map = struct
         | None ->
             (* Create a new map with a single contract-and amount pair. *)
             let map = Destination_map.singleton destination amount in
-            ok (Some map, ctxt)
+            return (Some map, ctxt)
         | Some destination_map ->
             (* Update the inner contract map *)
             let update ctxt prev_amt_opt =
               match prev_amt_opt with
               | Some (prev_amount : Ticket_amount.t) ->
-                  Gas.consume
-                    ctxt
-                    Script_int.(
-                      Ticket_costs.add_int_cost
-                        (prev_amount :> n num)
-                        (amount :> n num))
-                  >|? fun ctxt ->
+                  let+ ctxt =
+                    Gas.consume
+                      ctxt
+                      Script_int.(
+                        Ticket_costs.add_int_cost
+                          (prev_amount :> n num)
+                          (amount :> n num))
+                  in
                   (Some (Ticket_amount.add prev_amount amount), ctxt)
-              | None -> ok (Some amount, ctxt)
+              | None -> return (Some amount, ctxt)
             in
-            Destination_map.update ctxt destination update destination_map
-            >|? fun (destination_map, ctxt) -> (Some destination_map, ctxt))
+            let+ destination_map, ctxt =
+              Destination_map.update ctxt destination update destination_map
+            in
+            (Some destination_map, ctxt))
       map
 end
 
 let tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters =
-  Ticket_scanner.type_has_tickets ctxt parameters_ty
-  >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value ~include_lazy:true ctxt has_tickets parameters
-  >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
+  let open Lwt_result_syntax in
+  let*? has_tickets, ctxt =
+    Ticket_scanner.type_has_tickets ctxt parameters_ty
+  in
+  let* tickets, ctxt =
+    Ticket_scanner.tickets_of_value
+      ~include_lazy:true
+      ctxt
+      has_tickets
+      parameters
+  in
+  return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
 let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   (* Extract any tickets from the storage. Note that if the type of the contract
      storage does not contain tickets, storage is not scanned. *)
-  Ticket_scanner.type_has_tickets ctxt storage_type
-  >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
-  >|=? fun (tickets, ctxt) ->
+  let open Lwt_result_syntax in
+  let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt storage_type in
+  let+ tickets, ctxt =
+    Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
+  in
   let destination = Destination.Contract (Originated preorigination) in
   (Some {tickets; destination}, ctxt)
 
@@ -249,9 +262,10 @@ let add_transfer_to_token_map ctxt token_map {destination; tickets} =
     tickets
 
 let ticket_token_map_of_operations ctxt ops =
+  let open Lwt_result_syntax in
   List.fold_left_es
     (fun (token_map, ctxt) op ->
-      tickets_of_operation ctxt op >>=? fun (res, ctxt) ->
+      let* res, ctxt = tickets_of_operation ctxt op in
       match res with
       | Some ticket_trans ->
           add_transfer_to_token_map ctxt token_map ticket_trans
@@ -261,26 +275,29 @@ let ticket_token_map_of_operations ctxt ops =
 
 (** Traverses a list of operations and scans for tickets. *)
 let ticket_diffs_of_operations ctxt operations =
-  ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
+  let open Lwt_result_syntax in
+  let* token_map, ctxt = ticket_token_map_of_operations ctxt operations in
   Ticket_token_map.fold_e
     ctxt
     (fun ctxt acc ticket_token destination_map ->
       (* Calculate the total amount of outgoing units for the current
          ticket-token. *)
-      Destination_map.fold_e
-        ctxt
-        (fun ctxt total_amount _destination (amount : Ticket_amount.t) ->
-          Gas.consume
-            ctxt
-            Script_int.(
-              Ticket_costs.add_int_cost total_amount (amount :> n num))
-          >|? fun ctxt ->
-          (Script_int.(add_n total_amount (amount :> n num)), ctxt))
-        Script_int.zero_n
-        destination_map
-      >>? fun (total_amount, ctxt) ->
-      Destination_map.to_list ctxt destination_map
-      >|? fun (destinations, ctxt) ->
+      let open Result_syntax in
+      let* total_amount, ctxt =
+        Destination_map.fold_e
+          ctxt
+          (fun ctxt total_amount _destination (amount : Ticket_amount.t) ->
+            let+ ctxt =
+              Gas.consume
+                ctxt
+                Script_int.(
+                  Ticket_costs.add_int_cost total_amount (amount :> n num))
+            in
+            (Script_int.(add_n total_amount (amount :> n num)), ctxt))
+          Script_int.zero_n
+          destination_map
+      in
+      let+ destinations, ctxt = Destination_map.to_list ctxt destination_map in
       ({ticket_token; total_amount; destinations} :: acc, ctxt))
     []
     token_map
