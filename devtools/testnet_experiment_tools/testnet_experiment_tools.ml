@@ -60,14 +60,14 @@ let gen_keys_dir =
 
 let generate_baker_accounts n client =
   let rec generate_baker_account i =
-    if i = 0 then Lwt.return_unit
+    if i < 0 then Lwt.return_unit
     else
       let* _alias = Client.gen_keys ~alias:(baker_alias i) client in
       let* () = Lwt_io.printf "." in
       generate_baker_account (i - 1)
   in
   let* () = Lwt_io.printf "Generating accounts" in
-  let* () = generate_baker_account n in
+  let* () = generate_baker_account (n - 1) in
   Lwt_io.printf "\n\n"
 
 (* These tests can be run locally to generate the data needed to run a
