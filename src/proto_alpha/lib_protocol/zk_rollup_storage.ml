@@ -188,10 +188,12 @@ let pending_length =
   function Empty _ -> 0 | Pending {length; _} -> length
 
 let head =
+  let open Result_syntax in
   let open Zk_rollup_repr in
   function
-  | Empty _ -> Result_syntax.tzfail Zk_rollup_pending_list_too_short
-  | Pending {next_index; length} -> Ok Int64.(sub next_index (of_int length))
+  | Empty _ -> tzfail Zk_rollup_pending_list_too_short
+  | Pending {next_index; length} ->
+      return Int64.(sub next_index (of_int length))
 
 let next_index =
   let open Zk_rollup_repr in
