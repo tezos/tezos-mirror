@@ -299,8 +299,58 @@ let sc_rollup_commands () =
     dump_metrics;
   ]
 
-let select_commands _ctxt _ =
-  Lwt_result_syntax.return
-    (sc_rollup_commands () @ Client_helpers_commands.commands ())
+let select_commands _ctxt _ = Lwt_result_syntax.return (sc_rollup_commands ())
 
-let () = Client_main_run.run (module Daemon_config) ~select_commands
+let global_options () =
+  let open Client_config in
+  Tezos_clic.args11
+    (base_dir_arg ())
+    (no_base_dir_warnings_switch ())
+    (timings_switch ())
+    (log_requests_switch ())
+    (better_errors ())
+    (addr_arg ())
+    (port_arg ())
+    (tls_switch ())
+    (endpoint_arg ())
+    (remote_signer_arg ())
+    (password_filename_arg ())
+
+module Daemon_node_config = struct
+  type t =
+    string option
+    * bool
+    * bool
+    * bool
+    * bool
+    * string option
+    * int option
+    * bool
+    * Uri.t option
+    * Uri.t option
+    * string option
+
+  let global_options = global_options
+
+  let parse_config_args = Client_config.parse_config_args
+
+  let default_chain = Client_config.default_chain
+
+  let default_block = Client_config.default_block
+
+  let default_base_dir = Client_config.default_base_dir
+
+  let default_media_type = Daemon_config.default_media_type
+
+  let other_registrations = None
+
+  let default_daily_logs_path = None
+
+  let logger = None
+
+  let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
+      ~other_commands ~require_auth:_ =
+    other_commands
+end
+
+let () = Client_main_run.run (module Daemon_node_config) ~select_commands
