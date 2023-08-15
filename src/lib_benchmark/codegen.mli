@@ -82,6 +82,9 @@ val pp_code : Format.formatter -> code -> unit
 
 val pp_module : Format.formatter -> module_ -> unit
 
+(** Get the function name of [code] if it has *)
+val get_name_of_code : code -> string option
+
 module Parser : sig
   (** [get_cost_functions fn] extracts the cost function names of
       OCaml source file [fn]. *)
