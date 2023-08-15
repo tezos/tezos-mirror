@@ -57,7 +57,7 @@ let main args =
   let open Lwt_result_syntax in
   let print_chunks smart_rollup_address s =
     let*? _, messages =
-      Current_rollup_node.make_encoded_messages
+      Next_rollup_node.make_encoded_messages
         ~smart_rollup_address
         (Hash (Ethereum_types.strip_0x s))
     in
