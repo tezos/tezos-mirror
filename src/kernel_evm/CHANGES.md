@@ -50,3 +50,5 @@
 - Upgrade to Kernel SDK 0.2.1 (!9417, !9526)
 - Porting benchmark framework to the EVM Kernel. (!9529, !9524, !9545)
 - Reorganized dependencies at the workspace level. (!9522)
+- Refactor `TransactionCommon` and transactions' signatures modules. (!9590)
+
