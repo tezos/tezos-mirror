@@ -249,6 +249,8 @@ let setup_deposit_contracts ~admin client protocol =
 
   return {fa12 = fa12_address; bridge = bridge_address}
 
+let default_bootstrap_account_balance = Wei.of_eth_int 9999
+
 let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
@@ -266,7 +268,8 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
         (Array.fold_left
            (fun acc Eth_account.{address; _} ->
              let value =
-               Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
+               Wei.(to_le_bytes default_bootstrap_account_balance)
+               |> Hex.of_bytes |> Hex.show
              in
              let to_ = Durable_storage_path.balance address in
              Set {value; to_} :: acc)
@@ -527,7 +530,7 @@ let test_rpc_getBalance =
       ~account:Eth_account.bootstrap_accounts.(0).address
       ~endpoint:evm_proxy_server_endpoint
   in
-  Check.((balance = Wei.of_eth_int 9999) Wei.typ)
+  Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
