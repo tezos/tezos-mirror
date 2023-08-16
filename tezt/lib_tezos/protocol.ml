@@ -243,12 +243,12 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Nairobi -> Some Alpha
-  | Oxford -> None
+  | Nairobi -> Some Oxford
+  | Oxford -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Nairobi
+  | Alpha -> Some Oxford
   | Oxford -> Some Nairobi
   | Nairobi -> None
 

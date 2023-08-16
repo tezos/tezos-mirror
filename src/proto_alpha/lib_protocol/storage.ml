@@ -123,13 +123,6 @@ module Tenderbake = struct
           (req "predecessor_payload" Block_payload_hash.encoding))
   end
 
-  module Endorsement_branch =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["endorsement_branch"]
-      end)
-      (Branch)
-
   module Attestation_branch =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

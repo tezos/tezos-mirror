@@ -352,6 +352,7 @@ let check_attestations_in_block ~protocol ~level ~expected_count client =
   let* consensus_operations =
     RPC.Client.call client
     @@ RPC.get_chain_block_operations_validation_pass
+         ~version:"1"
          ~block:(string_of_int level)
          ~validation_pass:0 (* consensus operations pass *)
          ()
@@ -727,7 +728,10 @@ let wait_for_qc_at_level level baker =
       if !level_seen then Some () else None)
 
 let get_block_at_level level client =
-  RPC.(Client.call client (get_chain_block ~block:(string_of_int level) ()))
+  RPC.(
+    Client.call
+      client
+      (get_chain_block ~version:"1" ~block:(string_of_int level) ()))
 
 let test_forked_migration_bakers ~migrate_from ~migrate_to =
   Test.register
