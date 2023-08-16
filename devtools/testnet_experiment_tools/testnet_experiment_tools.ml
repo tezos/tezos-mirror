@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testnet experiment tools
+   ------------------------
+   Invocation:
+     dune exec devtools/testnet_experiment_tools/testnet_experiment_tools.exe
+   Requirements:
+     GEN_KEYS_DIR - sets the directory to output generated keys.
+                    Defaults to /tmp/<unique dir>
+     BAKERS       - sets the number of baker keys to generate. Defaults to 10.
+   Description: This file contains scripts to generate config information
+                towards bootstrapping an experimental test network.
+*)
+
 open Tezt
 open Tezt_tezos
 
@@ -79,7 +91,7 @@ module Local = struct
       Lwt_io.printf
         "Keys will be saved in %s. You can change this by setting the \
          GEN_KEYS_DIR environment variable\n\n"
-        default_gen_keys_dir
+        client_dir
     in
     let* () =
       Lwt_io.printf
