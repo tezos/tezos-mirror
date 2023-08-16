@@ -299,6 +299,13 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ()
   in
   let* state = create_state cctxt ~config ~current_proposal delegates in
+  (* Make sure the operation worker is populated to avoid empty blocks
+     being proposed. *)
+  let* () =
+    Operation_worker.retrieve_pending_operations
+      cctxt
+      state.global_state.operation_worker
+  in
   let* _ =
     match state.level_state.elected_block with
     | Some _ -> propose_at_next_level ~minimal_timestamp state
