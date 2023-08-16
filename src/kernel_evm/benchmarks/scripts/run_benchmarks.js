@@ -118,7 +118,7 @@ async function analyze_profiler_output(path) {
 
     kernel_run_ticks = await get_ticks(path, "kernel_run");
     run_transaction_ticks = await get_ticks(path, "run_transaction");
-    signature_verification_ticks = await get_ticks(path, "tezos_ethereum10signatures");
+    signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
     store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
