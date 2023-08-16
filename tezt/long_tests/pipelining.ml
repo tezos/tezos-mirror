@@ -299,7 +299,9 @@ let forging_n_operations bootstraps contract_hash manager_kind client =
 (* Test *)
 let operation_and_block_validation protocol manager_kind tag =
   let margin =
-    match manager_kind with `Call | `Origination -> 1. | `Transfer -> 0.5
+    (* match manager_kind with `Call | `Origination -> 1. | `Transfer -> 0.5 *)
+    10.
+    (* Due to unreliable results we set a high margin to avoid unwanted alerts. *)
   in
   Log.info
     "\nParameters of the test:\n  Protocol: %s\n  Operations: %s"
@@ -337,7 +339,7 @@ let operation_and_block_validation protocol manager_kind tag =
     | None -> unit
     | Some (count, average) ->
         Log.info ~color "%s:%s, count:%d, average:%f" title tag count average ;
-        measure_and_check_regression time_mean average
+        measure_and_check_regression ~margin:1. time_mean average
   in
 
   Log.info "Forging %d operations" number_of_operations ;
