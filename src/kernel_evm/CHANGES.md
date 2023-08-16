@@ -10,6 +10,7 @@
 ### EVM Node
 
 - Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
+- Add arguments to enable CORS headers. (!9753)
 
 ### Bug fixes
 
