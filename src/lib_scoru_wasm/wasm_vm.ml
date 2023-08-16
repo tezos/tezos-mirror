@@ -30,7 +30,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
   | Nairobi -> V1
   | Oxford -> V2
-  | Proto_alpha -> V2
+  | Proto_alpha -> V3
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
