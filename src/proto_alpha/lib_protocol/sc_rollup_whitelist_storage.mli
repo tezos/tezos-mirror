@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Sc_rollup_whitelist_repr
+
 (** [is_private context rollup] returns true if and only if the [rollup]
     is private, along with the new context accounting for the gas consumption
     of the function call. *)
@@ -35,7 +37,7 @@ val is_private :
 val init :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  whitelist:Sc_rollup_whitelist_repr.t ->
+  whitelist:t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
 (** [check_access_to_private_rollup context rollup staker_pkh] returns an error
@@ -60,7 +62,7 @@ val find_whitelist_uncarbonated :
 val replace :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  whitelist:Sc_rollup_whitelist_repr.t ->
+  whitelist:t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
 (** [make_public context rollup] removes the whitelist of [rollup] from
