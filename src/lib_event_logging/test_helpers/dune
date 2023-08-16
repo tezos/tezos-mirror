@@ -10,7 +10,7 @@
   data-encoding
   octez-libs.tezos-error-monad
   octez-libs.tezos-event-logging
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

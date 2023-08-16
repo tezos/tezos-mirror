@@ -12,18 +12,18 @@
   tezos-store.shared
   octez-libs.tezos-context
   tezos-context-ops
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   tezos-protocol-updater
   octez-libs.tezos-p2p
   octez-libs.tezos-p2p-services
-  tezos-requester
+  octez-libs.tezos-requester
   tezos-shell
   octez-libs.tezos-shell-services
   tezos-embedded-protocol-demo-noops
   octez-libs.tezos-stdlib-unix
   tezos-validation
   octez-libs.tezos-event-logging-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-alcotezt
   tezos-version.value)
  (library_flags (:standard -linkall))

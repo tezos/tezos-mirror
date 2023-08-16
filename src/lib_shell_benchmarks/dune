@@ -12,7 +12,7 @@
   tezos-benchmark
   octez-libs.tezos-crypto
   octez-libs.tezos-context
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   octez-libs.tezos-micheline)
  (library_flags (:standard -linkall))
  (flags

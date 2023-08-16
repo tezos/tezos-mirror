@@ -8,7 +8,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-protocol-018-Proxford
   tezos-client-018-Proxford
   tezos-client-commands

@@ -16,16 +16,12 @@ depends: [
   "prometheus" { >= "1.2" }
   "octez-libs"
   "tezos-store"
-  "tezos-protocol-environment"
   "tezos-context-ops"
-  "tezos-shell-context"
   "tezos-protocol-updater"
-  "tezos-requester"
   "tezos-validation"
   "lwt-exit"
   "tezt" { with-test & >= "3.1.1" }
   "tezos-embedded-protocol-demo-noops" {with-test}
-  "tezos-test-helpers" {with-test}
   "octez-alcotezt" {with-test}
   "tezos-version" {with-test}
 ]

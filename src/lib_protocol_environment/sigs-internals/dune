@@ -3,5 +3,5 @@
 
 (library
  (name tezos_protocol_environment_sigs_internals)
- (public_name tezos-protocol-environment.sigs-internals)
+ (public_name octez-libs.tezos-protocol-environment.sigs-internals)
  (instrumentation (backend bisect_ppx)))

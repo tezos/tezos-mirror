@@ -8,11 +8,11 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-stdlib
   octez-libs.tezos-stdlib-unix
-  tezos-requester
+  octez-libs.tezos-requester
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))
@@ -38,7 +38,7 @@
 
 (rule
  (alias runtest)
- (package tezos-requester)
+ (package octez-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

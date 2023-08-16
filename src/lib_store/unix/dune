@@ -12,10 +12,10 @@
   index
   irmin-pack
   tezos-store.shared
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   octez-libs.tezos-context
   tezos-context-ops
-  tezos-shell-context
+  octez-libs.tezos-shell-context
   tezos-validation
   tezos-protocol-updater
   octez-libs.tezos-stdlib-unix

@@ -6,7 +6,7 @@
  (public_name tezos-protocol-017-PtNairob.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_017_PtNairob))
 
@@ -284,8 +284,8 @@
  (public_name tezos-protocol-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs
   tezos-protocol-017-PtNairob.raw)
  (flags
   (:standard)
@@ -573,8 +573,8 @@
  (public_name tezos-protocol-017-PtNairob.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs
   tezos-protocol-017-PtNairob)
  (flags
   (:standard)
@@ -592,8 +592,8 @@
 (library
  (name tezos_protocol_017_PtNairob_functor)
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs)
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -867,7 +867,7 @@
  (libraries
   tezos-protocol-017-PtNairob
   tezos-protocol-updater
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 

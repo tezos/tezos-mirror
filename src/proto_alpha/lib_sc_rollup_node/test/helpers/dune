@@ -10,7 +10,7 @@
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-client-alpha
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   qcheck-core
   logs.lwt

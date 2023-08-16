@@ -8,9 +8,9 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-tree-encoding
-  tezos-webassembly-interpreter
+  octez-libs.tezos-webassembly-interpreter
   octez-libs.tezos-lazy-containers
-  tezos-scoru-wasm
+  octez-libs.tezos-scoru-wasm
   tezos-wasmer)
  (flags
   (:standard)

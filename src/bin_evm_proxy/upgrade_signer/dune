@@ -7,7 +7,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-clic
+  octez-libs.tezos-clic
   evm_proxy_lib)
  (flags
   (:standard)

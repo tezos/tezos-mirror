@@ -9,10 +9,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   octez-libs.tezos-rpc
   octez-libs.tezos-shell-services
-  tezos-sapling
+  octez-libs.tezos-sapling
   uri)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

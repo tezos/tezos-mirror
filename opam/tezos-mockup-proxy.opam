@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-client-base"
-  "tezos-protocol-environment"
   "resto-cohttp-self-serving-client" { >= "1.2" }
   "uri" { >= "3.1.0" }
 ]

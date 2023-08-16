@@ -11,8 +11,8 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-context.disk
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
-  tezos-scoru-wasm
+  octez-libs.tezos-test-helpers
+  octez-libs.tezos-scoru-wasm
   qcheck-alcotest
   octez-alcotezt
   tezos-scoru-wasm-helpers

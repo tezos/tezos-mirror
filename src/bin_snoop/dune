@@ -10,7 +10,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-benchmark
   tezos-benchmark-examples
   tezos-shell-benchmarks

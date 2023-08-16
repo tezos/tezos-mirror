@@ -3,7 +3,7 @@
 
 (library
  (name tezos_gossipsub)
- (public_name tezos-gossipsub)
+ (public_name octez-libs.tezos-gossipsub)
  (instrumentation (backend bisect_ppx))
  (libraries
   ringo

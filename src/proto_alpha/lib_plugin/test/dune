@@ -10,7 +10,7 @@
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-base.unix
   octez-alcotezt
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline

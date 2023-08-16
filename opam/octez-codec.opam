@@ -14,7 +14,6 @@ depends: [
   "octez-libs"
   "tezos-client-base-unix"
   "tezos-client-base"
-  "tezos-clic"
   "tezos-signer-services"
   "tezos-version"
 ]

@@ -10,8 +10,8 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
   octez-libs.tezos-shell-services
-  tezos-protocol-environment
-  tezos-shell-context
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-shell-context
   octez-protocol-compiler.registerer
   octez-protocol-compiler.native
   octez-libs.tezos-context

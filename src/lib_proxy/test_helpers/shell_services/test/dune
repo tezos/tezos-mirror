@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-libs.tezos-shell-services
   tezos_proxy_test_helpers_shell_services
   qcheck-alcotest

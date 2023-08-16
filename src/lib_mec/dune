@@ -3,7 +3,7 @@
 
 (library
  (name mec)
- (public_name octez-mec)
+ (public_name octez-libs.octez-mec)
  (instrumentation (backend bisect_ppx))
  (libraries
   alcotest

@@ -5,7 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   tezt
   str
   bls12-381

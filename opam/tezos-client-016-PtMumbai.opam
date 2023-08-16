@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs"
-  "tezos-clic"
   "tezos-client-base"
   "tezos-protocol-016-PtMumbai"
   "tezos-mockup-registration"
@@ -21,7 +20,6 @@ depends: [
   "tezos-protocol-plugin-016-PtMumbai"
   "tezos-smart-rollup-016-PtMumbai"
   "uri" { >= "3.1.0" }
-  "tezos-protocol-environment"
   "tezos-mockup"
   "tezos-mockup-commands"
   "tezos-client-commands"

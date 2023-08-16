@@ -16,8 +16,6 @@ depends: [
   "octez-libs" {with-test}
   "tezos-scoru-wasm-helpers" {with-test}
   "tezos-scoru-wasm-test-helpers" {with-test}
-  "tezos-test-helpers" {with-test}
-  "tezos-scoru-wasm" {with-test}
   "tezos-scoru-wasm-fast" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}

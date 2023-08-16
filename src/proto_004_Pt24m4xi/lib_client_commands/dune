@@ -6,10 +6,10 @@
  (public_name tezos-client-004-Pt24m4xi.commands)
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-protocol-004-Pt24m4xi
   octez-libs.tezos-stdlib-unix
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-004-Pt24m4xi
@@ -33,9 +33,9 @@
  (public_name tezos-client-004-Pt24m4xi.commands-registration)
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   tezos-protocol-004-Pt24m4xi
-  tezos-protocol-environment
+  octez-libs.tezos-protocol-environment
   octez-libs.tezos-shell-services
   tezos-client-base
   tezos-client-004-Pt24m4xi

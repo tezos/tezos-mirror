@@ -17,10 +17,8 @@ depends: [
   "tezos-benchmark-type-inference-alpha"
   "tezos-shell-benchmarks"
   "tezos-alpha-test-helpers"
-  "tezos-sapling"
   "tezos-client-alpha"
   "tezos-protocol-plugin-alpha"
-  "tezos-protocol-environment"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

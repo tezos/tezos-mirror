@@ -12,7 +12,7 @@
   octez-libs.tezos-base.unix
   tezos-client-base-unix
   tezos-client-base
-  tezos-clic
+  octez-libs.tezos-clic
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-event-logging
   tezos-signer-services

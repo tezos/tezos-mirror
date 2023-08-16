@@ -10,7 +10,7 @@
   tezos-protocol-alpha
   octez_smart_rollup_sequencer
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

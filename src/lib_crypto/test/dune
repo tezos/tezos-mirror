@@ -17,7 +17,7 @@
   data-encoding
   octez-alcotezt
   qcheck-alcotest
-  tezos-test-helpers)
+  octez-libs.tezos-test-helpers)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

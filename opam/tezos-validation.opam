@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-context-ops"
-  "tezos-shell-context"
   "tezos-protocol-updater"
   "tezos-version"
 ]

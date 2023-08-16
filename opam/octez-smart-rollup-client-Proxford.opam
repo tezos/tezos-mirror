@@ -19,7 +19,6 @@ depends: [
   "octez-smart-rollup"
   "tezos-smart-rollup-018-Proxford"
   "tezos-smart-rollup-layer2-018-Proxford"
-  "tezos-clic"
   "tezos-version"
 ]
 build: [

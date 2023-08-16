@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-srs-extraction
+  octez-libs.octez-srs-extraction
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -19,7 +19,7 @@
 
 (rule
  (alias runtest)
- (package octez-srs-extraction)
+ (package octez-libs)
  (deps srs_zcash_g1_5 phase1radix2m5)
  (action
   (progn
@@ -35,7 +35,7 @@
 
 (rule
  (alias runtest)
- (package octez-srs-extraction)
+ (package octez-libs)
  (deps srs_zcash_g2_5 phase1radix2m5)
  (action
   (progn
@@ -51,13 +51,13 @@
 
 (rule
  (alias runtest)
- (package octez-srs-extraction)
+ (package octez-libs)
  (deps srs_zcash_g1_5 srs_zcash_g2_5)
  (action (run ../srs_extraction_main.exe check srs_zcash_g1_5 srs_zcash_g2_5)))
 
 (rule
  (alias runtest)
- (package octez-srs-extraction)
+ (package octez-libs)
  (deps srs_filecoin_g1_6 srs_filecoin_g2_6)
  (action
   (run ../srs_extraction_main.exe check srs_filecoin_g1_6 srs_filecoin_g2_6)))
@@ -72,7 +72,7 @@
 
 (rule
  (alias runtest)
- (package octez-srs-extraction)
+ (package octez-libs)
  (deps phase1radix2m5)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))

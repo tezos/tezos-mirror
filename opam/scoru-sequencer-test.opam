@@ -14,7 +14,6 @@ depends: [
   "octez-libs" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-smart-rollup-sequencer" {with-test}
-  "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
 ]

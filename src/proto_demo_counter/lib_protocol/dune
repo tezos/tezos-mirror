@@ -6,7 +6,7 @@
  (public_name tezos-protocol-demo-counter.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_demo_counter))
 
@@ -47,8 +47,8 @@
  (public_name tezos-protocol-demo-counter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs
   tezos-protocol-demo-counter.raw)
  (flags
   (:standard)
@@ -94,8 +94,8 @@
  (public_name tezos-protocol-demo-counter.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs
   tezos-protocol-demo-counter)
  (flags
   (:standard)
@@ -113,8 +113,8 @@
 (library
  (name tezos_protocol_demo_counter_functor)
  (libraries
-  tezos-protocol-environment
-  tezos-protocol-environment.sigs)
+  octez-libs.tezos-protocol-environment
+  octez-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -146,7 +146,7 @@
  (libraries
   tezos-protocol-demo-counter
   tezos-protocol-updater
-  tezos-protocol-environment)
+  octez-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 

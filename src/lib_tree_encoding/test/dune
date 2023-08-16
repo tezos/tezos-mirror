@@ -11,8 +11,8 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-context.disk
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
-  tezos-webassembly-interpreter
+  octez-libs.tezos-test-helpers
+  octez-libs.tezos-webassembly-interpreter
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

@@ -11,7 +11,7 @@
   tezos-client-018-Proxford
   tezos-protocol-018-Proxford
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))

@@ -17,10 +17,8 @@ depends: [
   "tezos-benchmark-type-inference-018-Proxford"
   "tezos-shell-benchmarks"
   "tezos-018-Proxford-test-helpers"
-  "tezos-sapling"
   "tezos-client-018-Proxford"
   "tezos-protocol-plugin-018-Proxford"
-  "tezos-protocol-environment"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

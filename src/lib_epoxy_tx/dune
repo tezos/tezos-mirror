@@ -3,11 +3,11 @@
 
 (library
  (name epoxy_tx)
- (public_name octez-epoxy-tx)
+ (public_name octez-libs.octez-epoxy-tx)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-plompiler
+  octez-libs.octez-plompiler
   hex
   stdint
-  octez-plonk
-  octez-mec))
+  octez-libs.octez-plonk
+  octez-libs.octez-mec))

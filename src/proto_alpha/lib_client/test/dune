@@ -11,7 +11,7 @@
   tezos-client-alpha
   tezos-protocol-alpha
   octez-libs.tezos-base-test-helpers
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))

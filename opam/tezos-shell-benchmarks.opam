@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-benchmark"
-  "tezos-shell-context"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

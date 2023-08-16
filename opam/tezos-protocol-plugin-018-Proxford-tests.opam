@@ -13,7 +13,6 @@ depends: [
   "tezt" { with-test & >= "3.1.1" }
   "octez-libs" {with-test}
   "octez-alcotezt" {with-test}
-  "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezos-protocol-plugin-018-Proxford" {with-test}
   "tezos-protocol-018-Proxford" {with-test}

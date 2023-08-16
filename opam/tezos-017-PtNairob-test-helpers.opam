@@ -11,13 +11,10 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "qcheck-alcotest" { >= "0.20" }
-  "tezos-test-helpers"
   "octez-libs"
   "tezos-protocol-017-PtNairob"
   "tezos-client-017-PtNairob"
-  "tezos-protocol-environment"
   "tezos-protocol-plugin-017-PtNairob"
-  "octez-plompiler"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

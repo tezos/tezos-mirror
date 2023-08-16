@@ -17,10 +17,8 @@ depends: [
   "tezos-benchmark-type-inference-017-PtNairob"
   "tezos-shell-benchmarks"
   "tezos-017-PtNairob-test-helpers"
-  "tezos-sapling"
   "tezos-client-017-PtNairob"
   "tezos-protocol-plugin-017-PtNairob"
-  "tezos-protocol-environment"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

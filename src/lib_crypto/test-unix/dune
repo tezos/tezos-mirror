@@ -16,7 +16,7 @@
   octez-alcotezt
   lwt.unix
   qcheck-alcotest
-  tezos-test-helpers)
+  octez-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

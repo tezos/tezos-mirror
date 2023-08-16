@@ -11,7 +11,7 @@
   tezos-protocol-018-Proxford
   qcheck-alcotest
   tezos-client-018-Proxford
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   tezos-018-Proxford-test-helpers
   octez-libs.tezos-base-test-helpers
   tezos-protocol-plugin-018-Proxford)

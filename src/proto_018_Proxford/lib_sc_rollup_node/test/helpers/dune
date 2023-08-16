@@ -10,7 +10,7 @@
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
   tezos-client-018-Proxford
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   qcheck-alcotest
   qcheck-core
   logs.lwt

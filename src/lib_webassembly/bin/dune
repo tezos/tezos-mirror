@@ -5,7 +5,7 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-webassembly-interpreter
+  octez-libs.tezos-webassembly-interpreter
   tezos-webassembly-interpreter-extra
   lwt.unix
   octez-libs.tezos-tree-encoding

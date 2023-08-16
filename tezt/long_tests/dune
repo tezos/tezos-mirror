@@ -2,7 +2,7 @@
  (name main)
  (libraries tezt
             octez-libs.tezt-tezos
-            tezt-performance-regression
+            octez-libs.tezt-performance-regression
             octez-libs.tezos-lwt-result-stdlib
             tezos-alpha-test-helpers
             octez-libs.tezos-micheline
@@ -12,7 +12,7 @@
             tezos-time-measurement
             data-encoding
             octez-libs.tezos-event-logging
-	    tezos-test-helpers
+	    octez-libs.tezos-test-helpers
             )
  (flags (:standard
           -open Tezt

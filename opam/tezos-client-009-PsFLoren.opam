@@ -12,13 +12,11 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs"
-  "tezos-clic"
   "tezos-client-base"
   "tezos-protocol-009-PsFLoren"
   "tezos-signer-backends"
   "tezos-protocol-plugin-009-PsFLoren"
   "uri" { >= "3.1.0" }
-  "tezos-protocol-environment"
   "tezos-client-commands"
   "tezos-client-base-unix"
 ]

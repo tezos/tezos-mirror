@@ -14,7 +14,7 @@
   octez-alcotezt
   qcheck-alcotest
   octez-libs.octez-bls12-381-polynomial
-  tezos-test-helpers)
+  octez-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

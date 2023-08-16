@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-clic
+  octez-libs.tezos-clic
   octez-libs.tezos-shell-services
   tezos-client-base
   tezos-protocol-alpha

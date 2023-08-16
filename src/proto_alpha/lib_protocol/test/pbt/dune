@@ -11,7 +11,7 @@
   tezos-client-alpha
   tezos-protocol-alpha
   octez-libs.tezos-context.merkle_proof_encoding
-  tezos-test-helpers
+  octez-libs.tezos-test-helpers
   tezos-alpha-test-helpers
   octez-alcotezt
   qcheck-alcotest
