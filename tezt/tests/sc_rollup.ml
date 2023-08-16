@@ -3177,7 +3177,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let restart_promise =
     (* Reset node when detecting certain events *)
     Lwt_list.iter_p
-      (fun (event, delay) ->
+      (fun (event, delay, restart_mode) ->
         let* () =
           Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
         in
@@ -3189,6 +3189,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
             (current_level + delay)
         in
         let* () = Sc_rollup_node.terminate sc_rollup_node in
+        let sc_rollup_node =
+          match restart_mode with
+          | Some mode -> Sc_rollup_node.change_node_mode sc_rollup_node mode
+          | None -> sc_rollup_node
+        in
         let* _ = run_honest_node sc_rollup_node in
         unit)
       reset_honest_on
@@ -3370,7 +3375,7 @@ let test_refutation protocols ~kind =
               80,
               [],
               [],
-              [("sc_rollup_node_conflict_detected.v0", 2)],
+              [("sc_rollup_node_conflict_detected.v0", 2, None)],
               [],
               `Priority_honest ) );
           ( "degraded_new",
@@ -3497,6 +3502,25 @@ let test_accuser protocols =
     ~commitment_period:10
     ~variant:"pvm_proof_2"
     (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], [], `Priority_honest)
+    protocols
+
+(** Run one of the refutation tests in bailout mode instead of using a
+    full operator. *)
+let test_bailout_refutation protocols =
+  test_refutation_scenario
+    ~kind:"arith"
+    ~mode:Operator
+    ~challenge_window:10
+    ~commitment_period:10
+    ~variant:"bailout_mode_defends_its_commitment"
+    ( ["5 2 1"],
+      inputs_for 10,
+      80,
+      [],
+      [],
+      [("sc_rollup_node_publish_commitment.v0", 2, Some Bailout)],
+      [],
+      `Priority_honest )
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
@@ -6155,6 +6179,7 @@ let register ~protocols =
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
   test_accuser protocols ;
+  test_bailout_refutation protocols ;
   test_injector_auto_discard protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;

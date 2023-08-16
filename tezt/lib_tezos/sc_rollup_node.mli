@@ -270,3 +270,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
     node. *)
 val change_node_and_restart :
   ?event_level:Daemon.Level.default_level -> t -> string -> Node.t -> unit Lwt.t
+
+(** Change the rollup mode. This does not terminate nor restart the
+    node. Change will take effect when the node is run/restart. *)
+val change_node_mode : t -> mode -> t
