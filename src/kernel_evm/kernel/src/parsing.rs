@@ -9,7 +9,7 @@ use crate::inbox::{Deposit, KernelUpgrade, Transaction, TransactionContent};
 use primitive_types::{H160, U256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::{
-    signatures::EthereumTransactionCommon, transaction::TransactionHash,
+    transaction::TransactionHash, tx_common::EthereumTransactionCommon,
     wei::eth_from_mutez,
 };
 use tezos_evm_logging::{log, Level::*};

@@ -9,10 +9,11 @@ use evm_execution::account_storage::{account_path, EthereumAccountStorage};
 use evm_execution::handler::ExecutionOutcome;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
+use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -62,24 +63,10 @@ impl Transaction {
         }
     }
 
-    fn v(&self) -> U256 {
+    fn signature(&self) -> Option<TxSignature> {
         match &self.content {
-            TransactionContent::Deposit(_) => U256::zero(),
-            TransactionContent::Ethereum(transaction) => transaction.v,
-        }
-    }
-
-    fn r(&self) -> H256 {
-        match &self.content {
-            TransactionContent::Deposit(_t) => H256::zero(),
-            TransactionContent::Ethereum(transaction) => transaction.r,
-        }
-    }
-
-    fn s(&self) -> H256 {
-        match &self.content {
-            TransactionContent::Deposit(_) => H256::zero(),
-            TransactionContent::Ethereum(transaction) => transaction.s,
+            TransactionContent::Deposit(_) => None,
+            TransactionContent::Ethereum(transaction) => transaction.signature.clone(),
         }
     }
 }
@@ -102,9 +89,7 @@ pub struct TransactionObjectInfo {
     pub to: Option<H160>,
     pub index: u32,
     pub value: U256,
-    pub v: U256,
-    pub r: H256,
-    pub s: H256,
+    pub signature: Option<TxSignature>,
 }
 
 #[inline(always)]
@@ -141,9 +126,7 @@ fn make_object_info(
         to: transaction.to(),
         index,
         value: transaction.value(),
-        v: transaction.v(),
-        r: transaction.r(),
-        s: transaction.s(),
+        signature: transaction.signature(),
     }
 }
 

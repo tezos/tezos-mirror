@@ -188,10 +188,11 @@ mod tests {
     use std::collections::VecDeque;
     use std::ops::Rem;
     use std::str::FromStr;
-    use tezos_ethereum::signatures::EthereumTransactionCommon;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TRANSACTION_HASH_SIZE,
     };
+    use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_ethereum::tx_signature::TxSignature;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> QueueElement {
@@ -260,9 +261,7 @@ mod tests {
             to,
             value,
             data,
-            v,
-            r,
-            s,
+            signature: Some(TxSignature::new(v, r, s).unwrap()),
         }
     }
 
@@ -313,9 +312,7 @@ mod tests {
             to: None,
             value,
             data,
-            v: U256::one(),
-            r: H256::zero(),
-            s: H256::zero(),
+            signature: None,
         };
 
         tx.sign_transaction(private_key.to_string()).unwrap()
@@ -1047,9 +1044,7 @@ mod tests {
             to,
             value,
             data: vec![],
-            v: U256::one(),
-            r: H256::zero(),
-            s: H256::zero(),
+            signature: None,
         };
 
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446

@@ -21,8 +21,8 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
-use tezos_ethereum::signatures::EthereumTransactionCommon;
 use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -218,7 +218,7 @@ fn handle_transaction_chunk<Host: Runtime>(
     // if `data` was the missing chunk.
     if let Some(data) = crate::storage::store_transaction_chunk(host, &tx_hash, i, data)?
     {
-        if let Ok(tx) = EthereumTransactionCommon::from_rlp_bytes(&data) {
+        if let Ok(tx) = EthereumTransactionCommon::from_bytes(&data) {
             let content = TransactionContent::Ethereum(tx);
             return Ok(Some(Transaction { tx_hash, content }));
         }
@@ -437,7 +437,7 @@ mod tests {
 
     fn large_transaction() -> (Vec<u8>, EthereumTransactionCommon) {
         let data: Vec<u8> = hex::decode(["f917e180843b9aca0082520894b53dc01974176e5dff2298c5a94343c2585e3c548a021dfe1f5c5363780000b91770".to_string(), "a".repeat(12_000), "820a96a07fd9567a72223bbc8f70bd2b42011339b61044d16b5a2233534db8ca01f3e57aa03ea489c4bb2b2b52f3c1a18966881114767654c9ab61d46b1fbff78a498043c2".to_string()].join("")).unwrap();
-        let tx = EthereumTransactionCommon::from_rlp_bytes(&data).unwrap();
+        let tx = EthereumTransactionCommon::from_bytes(&data).unwrap();
         (data, tx)
     }
 
@@ -446,7 +446,7 @@ mod tests {
         let mut host = MockHost::default();
 
         let tx =
-            EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
+            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
         let input = Input::SimpleTransaction(Box::new(Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx.clone()),
@@ -698,7 +698,7 @@ mod tests {
         let mut host = MockHost::with_address(&address);
 
         let tx =
-            EthereumTransactionCommon::from_rlp_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
+            EthereumTransactionCommon::from_bytes(&hex::decode("f86d80843b9aca00825208940b52d4d3be5d18a7ab5\
 e4476a2f5382bbf2b38d888016345785d8a000080820a95a0d9ef1298c18c88604e3f08e14907a17dfa81b1dc6b37948abe189d8db5cb8a43a06\
 fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwrap();
 

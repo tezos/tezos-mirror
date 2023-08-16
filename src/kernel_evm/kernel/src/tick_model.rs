@@ -4,7 +4,7 @@
 
 use crate::{apply::TransactionReceiptInfo, inbox::Transaction};
 use evm::Config;
-use tezos_ethereum::signatures::EthereumTransactionCommon;
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
 
 ///////////////////////////////////////////////////////////////////////////////
 /// TICK MODEL CONSTANTS
