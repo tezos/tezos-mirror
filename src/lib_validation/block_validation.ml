@@ -871,8 +871,9 @@ module Make (Filter : Shell_plugin.FILTER) = struct
               {shell = op.raw.shell; protocol_data = op.protocol_data}
             in
             let open Lwt_result_syntax in
+            let*! status = Filter.Mempool.syntactic_check operation in
             let* validation_state =
-              match Filter.Mempool.syntactic_check operation with
+              match status with
               | `Ill_formed -> failwith "Ill-formed operation filtered"
               | `Well_formed ->
                   Proto.validate_operation pv.validation_state op.hash operation
@@ -1252,7 +1253,8 @@ module Make (Filter : Shell_plugin.FILTER) = struct
         (fun state ops ->
           List.fold_left_es
             (fun state (oph, op) ->
-              match Filter.Mempool.syntactic_check op with
+              let*! status = Filter.Mempool.syntactic_check op in
+              match status with
               | `Ill_formed -> failwith "Ill-formed operation filtered"
               | `Well_formed ->
                   let* state = Proto.validate_operation state oph op in

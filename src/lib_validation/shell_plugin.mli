@@ -64,7 +64,7 @@ module type FILTER = sig
         ill-formed operations to block block application.
 
         Should be called before the {!pre_filter}, does not need a context. *)
-    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed]
+    val syntactic_check : Proto.operation -> [`Well_formed | `Ill_formed] Lwt.t
 
     (** [pre_filter config ~filter_state operation_data]
         is called on arrival of an operation and after a flush of
