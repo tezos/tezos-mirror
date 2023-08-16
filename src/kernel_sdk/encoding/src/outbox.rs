@@ -20,6 +20,8 @@ use tezos_data_encoding::nom::NomReader;
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use crate::michelson::Michelson;
+#[cfg(feature = "proto-alpha")]
+use crate::public_key_hash::PublicKeyHash;
 
 /// Outbox message, sent by the kernel as tezos-encoded bytes.
 ///
@@ -27,7 +29,12 @@ use crate::michelson::Michelson;
 #[derive(Debug, PartialEq, Eq, HasEncoding, NomReader, BinWriter)]
 pub enum OutboxMessage<Expr: Michelson> {
     /// List of outbox transactions that must succeed together.
+    #[encoding(tag = 0)]
     AtomicTransactionBatch(OutboxMessageTransactionBatch<Expr>),
+    /// Only keys in the whitelist are allowed to stake and publish a commitment.
+    #[cfg(feature = "proto-alpha")]
+    #[encoding(tag = 2)]
+    WhitelistUpdate(OutboxMessageWhitelistUpdate),
 }
 
 /// A batch of [`OutboxMessageTransaction`].
@@ -87,6 +94,68 @@ pub struct OutboxMessageTransaction<Expr: Michelson> {
     pub entrypoint: Entrypoint,
 }
 
+/// Whitelist update, part of the outbox message.
+/// The keys in the whitelist are allowed to stake and publish a commitment.
+/// The whitelist is either Some (non empty list), or None (remove the whitelist,
+/// allowing anyone to stake/publish commitments).
+///
+/// Encoded as:
+/// `(opt "whitelist" Sc_rollup_whitelist_repr.encoding)`
+/// where
+/// `encoding = Data_encoding.(list Signature.Public_key_hash.encoding)`
+#[cfg(feature = "proto-alpha")]
+#[derive(Debug, PartialEq, Eq, HasEncoding, BinWriter, NomReader)]
+pub struct OutboxMessageWhitelistUpdate {
+    /// The new contents of the whitelist
+    #[encoding(dynamic, list)]
+    pub whitelist: Option<Vec<PublicKeyHash>>,
+}
+
+/// Kinds of invalid whitelists
+#[cfg(feature = "proto-alpha")]
+#[derive(Debug, PartialEq, Eq)]
+pub enum InvalidWhitelist {
+    /// If the provided whitelist is the empty list
+    EmptyWhitelist,
+    /// Duplicated keys
+    DuplicatedKeys,
+}
+
+#[cfg(feature = "proto-alpha")]
+fn has_unique_elements<T>(iter: T) -> bool
+where
+    T: IntoIterator,
+    T::Item: Eq + Ord,
+{
+    let mut uniq = std::collections::BTreeSet::new();
+    iter.into_iter().all(move |x| uniq.insert(x))
+}
+
+/// Returns `Err` on empty list, to not accidentally set the whitelist to
+/// None, thereby making the rollup public.
+#[cfg(feature = "proto-alpha")]
+impl TryFrom<Option<Vec<PublicKeyHash>>> for OutboxMessageWhitelistUpdate {
+    type Error = InvalidWhitelist;
+
+    fn try_from(whitelist: Option<Vec<PublicKeyHash>>) -> Result<Self, Self::Error> {
+        match whitelist {
+            Some(mut list) => {
+                if list.is_empty() {
+                    return Err(InvalidWhitelist::EmptyWhitelist);
+                };
+                if !has_unique_elements(&mut list) {
+                    Err(InvalidWhitelist::DuplicatedKeys)
+                } else {
+                    Ok(Self {
+                        whitelist: Some(list),
+                    })
+                }
+            }
+            None => Ok(Self { whitelist: None }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::michelson::ticket::StringTicket;
@@ -95,6 +164,10 @@ mod test {
 
     // first byte is union tag (currently always `0`, next four are list size of batch)
     const ENCODED_OUTBOX_MESSAGE_PREFIX: [u8; 5] = [0, 0, 0, 0, 152];
+
+    // first byte is union tag (currently always `2`)
+    #[cfg(feature = "proto-alpha")]
+    const ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX: [u8; 1] = [2];
 
     const ENCODED_TRANSACTION_ONE: [u8; 74] = [
         7, 7, // Prim pair tags
@@ -134,12 +207,38 @@ mod test {
         b'a', b'n', b'o', b't', b'h', b'e', b'r', // Entrypoint name
     ];
 
+    // To display the encoding from OCaml:
+    // Format.asprintf "%a"
+    // Binary_schema.pp
+    // (Binary.describe (list Tezos_crypto.Signature.Public_key_hash.encoding))
+    #[cfg(feature = "proto-alpha")]
+    const ENCODED_WHITELIST_UPDATE: [u8; 47] = [
+        0xff, // provide whitelist (0x0 for none)
+        0x0, 0x0, 0x0, 0x2a, // # bytes in next field
+        // sequence of public_key_hash (21 bytes, 8-bit tag)
+        // tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+        0x0, // Ed25519 (tag 0)
+        0x2, 0x29, 0x8c, 0x3, 0xed, 0x7d, 0x45, 0x4a, 0x10, 0x1e, 0xb7, 0x2, 0x2b, 0xc9,
+        0x5f, 0x7e, 0x5f, 0x41, 0xac, 0x78,
+        // tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+        0x0, // Ed25519 (tag 0)
+        0xe7, 0x67, 0xf, 0x32, 0x3, 0x81, 0x7, 0xa5, 0x9a, 0x2b, 0x9c, 0xfe, 0xfa, 0xe3,
+        0x6e, 0xa2, 0x1f, 0x5a, 0xa6, 0x3c,
+    ];
+
     #[test]
     fn encode_transaction() {
         let mut bin = vec![];
         transaction_one().bin_write(&mut bin).unwrap();
-
         assert_eq!(&ENCODED_TRANSACTION_ONE, bin.as_slice());
+    }
+
+    #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn encode_whitelist_update() {
+        let mut bin = vec![];
+        whitelist().bin_write(&mut bin).unwrap();
+        assert_eq!(&ENCODED_WHITELIST_UPDATE, bin.as_slice());
     }
 
     #[test]
@@ -153,6 +252,16 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn decode_whitelist_update() {
+        let (remaining, decoded) =
+            OutboxMessageWhitelistUpdate::nom_read(ENCODED_WHITELIST_UPDATE.as_slice())
+                .unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(whitelist(), decoded);
+    }
+
+    #[test]
     fn encode_outbox_message() {
         let mut expected = ENCODED_OUTBOX_MESSAGE_PREFIX.to_vec();
         expected.extend_from_slice(ENCODED_TRANSACTION_ONE.as_slice());
@@ -161,6 +270,21 @@ mod test {
         let message = OutboxMessage::AtomicTransactionBatch(
             vec![transaction_one(), transaction_two()].into(),
         );
+
+        let mut bin = vec![];
+        message.bin_write(&mut bin).unwrap();
+
+        assert_eq!(expected, bin);
+    }
+
+    #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn encode_outbox_message_whitelist() {
+        let mut expected = ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX.to_vec();
+        expected.extend_from_slice(ENCODED_WHITELIST_UPDATE.as_slice());
+
+        let message: OutboxMessage<StringTicket> =
+            OutboxMessage::WhitelistUpdate(whitelist());
 
         let mut bin = vec![];
         message.bin_write(&mut bin).unwrap();
@@ -185,10 +309,40 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn decode_outbox_message_whitelist() {
+        let mut bytes = ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX.to_vec();
+        bytes.extend_from_slice(ENCODED_WHITELIST_UPDATE.as_slice());
+
+        let expected: OutboxMessage<StringTicket> =
+            OutboxMessage::WhitelistUpdate(whitelist());
+
+        let (remaining, message) = OutboxMessage::nom_read(bytes.as_slice()).unwrap();
+
+        assert!(remaining.is_empty());
+        assert_eq!(expected, message);
+    }
+
+    #[test]
     fn decode_outbox_message_err_on_invalid_prefix() {
         let mut bytes = ENCODED_OUTBOX_MESSAGE_PREFIX.to_vec();
         // prefix too long, missing message
         bytes.extend_from_slice(ENCODED_TRANSACTION_ONE.as_slice());
+        // garbage (to be ignored) tail
+        bytes.extend_from_slice([10; 1000].as_slice());
+
+        assert!(matches!(
+            OutboxMessage::<StringTicket>::nom_read(bytes.as_slice()),
+            Err(_)
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn decode_outbox_message_whitelist_err_on_invalid_prefix() {
+        let mut bytes = ENCODED_OUTBOX_MESSAGE_PREFIX.to_vec();
+        // prefix too long, missing message
+        bytes.extend_from_slice(ENCODED_WHITELIST_UPDATE.as_slice());
         // garbage (to be ignored) tail
         bytes.extend_from_slice([10; 1000].as_slice());
 
@@ -232,5 +386,47 @@ mod test {
             destination,
             entrypoint,
         }
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    fn whitelist() -> OutboxMessageWhitelistUpdate {
+        let whitelist = Some(vec![
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+            PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+        ]);
+        OutboxMessageWhitelistUpdate { whitelist }
+    }
+
+    #[test]
+    #[cfg(feature = "proto-alpha")]
+    fn tryfrom_whitelist() {
+        let addr =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        let l1 = Some(vec![addr.clone(), addr.clone()]);
+        let w1: Result<OutboxMessageWhitelistUpdate, _> = l1.try_into();
+        assert_eq!(
+            w1.expect_err("Expected Err(InvalidWhitelist::DuplicatedKeys)"),
+            InvalidWhitelist::DuplicatedKeys
+        );
+        let l2 = Some(vec![]);
+        let w2: Result<OutboxMessageWhitelistUpdate, _> = l2.try_into();
+        assert_eq!(
+            w2.expect_err("Expected Err(InvalidWhitelist::EmptyWhitelist)"),
+            InvalidWhitelist::EmptyWhitelist
+        );
+        let l3 = None;
+        let w3: Result<OutboxMessageWhitelistUpdate, _> = l3.try_into();
+        assert_eq!(
+            w3.expect("Expected Ok(message)"),
+            (OutboxMessageWhitelistUpdate { whitelist: None })
+        );
+        let l4 = Some(vec![addr.clone()]);
+        let w4: Result<OutboxMessageWhitelistUpdate, _> = l4.clone().try_into();
+        assert_eq!(
+            w4.expect("Expected Ok(message)"),
+            (OutboxMessageWhitelistUpdate {
+                whitelist: l4.clone()
+            })
+        );
     }
 }

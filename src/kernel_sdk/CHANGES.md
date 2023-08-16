@@ -8,6 +8,8 @@
   unreleased protocols.
 - Add `Runtime::reveal_dal_page` to let a kernel request pages from Tezos’ Data
   Availability Layer (DAL).
+- Add a new case `WhitelistUpdate(OutboxMessageWhitelistUpdate)` to the
+  `OutboxMessage<Expr: Michelson>` encoding, behind the `proto-alpha` feature flag.
 
 ### Installer client/kernel
 
