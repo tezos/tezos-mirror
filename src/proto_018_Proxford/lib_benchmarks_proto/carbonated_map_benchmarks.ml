@@ -221,6 +221,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
         let name = name
 
+        let takes_saturation_reprs = false
+
         module Def (L : Costlang.S) = struct
           type model_type = L.size -> L.size
 

@@ -97,6 +97,8 @@ let division_cost name =
   let module M = struct
     type arg_type = int * (int * unit)
 
+    let takes_saturation_reprs = false
+
     module Def (X : Costlang.S) = struct
       open X
 
@@ -125,6 +127,8 @@ let addlogadd name =
     type arg_type = int * (int * unit)
 
     let name = ns name
+
+    let takes_saturation_reprs = false
 
     module Def (X : Costlang.S) = struct
       open X
@@ -232,6 +236,8 @@ module Models = struct
     let module M = struct
       type arg_type = int * (int * unit)
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -262,6 +268,8 @@ module Models = struct
     let module M = struct
       type arg_type = int * (int * unit)
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -286,6 +294,8 @@ module Models = struct
   let branching_model ~case_0 ~case_1 name =
     let module M = struct
       type arg_type = int * unit
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
@@ -314,6 +324,8 @@ module Models = struct
   let join_tickets_model name =
     let module M = struct
       type arg_type = int * (int * (int * (int * unit)))
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
@@ -351,6 +363,8 @@ module Models = struct
     let coeff = fv (sf "%s_coeff" name) in
     let module M = struct
       type arg_type = int * (int * unit)
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X

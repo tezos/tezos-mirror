@@ -157,17 +157,20 @@ let open_m =
   let open Codegen_helpers in
   Str.open_ (Opn.mk (Mod.ident (loc_ident "S.Syntax")))
 
-(* let name size1 size2 ... =
-     let open S.Syntax in
-     let size1 = S.safe_int size1 in
-     let size2 = S.safe_int size2 in
-     ...
-     expr
+(* [let name size1 size2 ... =
+      let open S.Syntax in
+      let size1 = S.safe_int size1 in
+      let size2 = S.safe_int size2 in
+      ...
+      expr
+   ]
+
+   If [takes_saturation_reprs=true], skips [let sizeN = S.safe_int sizeN in]
 *)
 let generate_let_binding =
   let open Ast_helper in
   let open Codegen_helpers in
-  fun name expr ->
+  fun ~takes_saturation_reprs name expr ->
     let args, expr = detach_funcs expr in
     let used_vars =
       let vs = ref [] in
@@ -182,18 +185,20 @@ let generate_let_binding =
       !vs
     in
     let expr =
-      List.fold_left
-        (fun e arg ->
-          if List.mem ~equal:String.equal arg used_vars then
-            let var = ident arg in
-            let patt = pvar arg in
-            Exp.let_
-              Nonrecursive
-              [Vb.mk patt (call (saturated "safe_int") [var])]
-              e
-          else e)
-        expr
-        args
+      if takes_saturation_reprs then expr
+      else
+        List.fold_left
+          (fun e arg ->
+            if List.mem ~equal:String.equal arg used_vars then
+              let var = ident arg in
+              let patt = pvar arg in
+              Exp.let_
+                Nonrecursive
+                [Vb.mk patt (call (saturated "safe_int") [var])]
+                e
+            else e)
+          expr
+          args
     in
     let expr = restore_funcs ~used_vars (args, expr) in
     Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
@@ -409,6 +414,7 @@ let codegen (Model.Model model) (sol : solution)
       (Impl)
   in
   let module M = (val model) in
+  let takes_saturation_reprs = M.takes_saturation_reprs in
   let comments =
     let module Sub =
       Costlang.Subst
@@ -424,7 +430,11 @@ let codegen (Model.Model model) (sol : solution)
   let module M = M.Def (Subst_impl) in
   let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
   let fun_name = function_name model_name in
-  Item {comments; code = generate_let_binding fun_name expr}
+  Item
+    {
+      comments;
+      code = generate_let_binding ~takes_saturation_reprs fun_name expr;
+    }
 
 let get_codegen_destinations
     Registration.{model = Model.Model (module M); from = local_models_info} =
@@ -468,7 +478,7 @@ let%expect_test "basic_printing" =
     let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
     let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
@@ -484,7 +494,7 @@ let%expect_test "anonymous_int_literals" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> x + y + int 42 + int 43
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
@@ -500,7 +510,7 @@ let%expect_test "let_bound_lambda" =
     let_ ~name:"incr" (lam ~name:"x" (fun x -> x + int 1)) @@ fun incr ->
     app incr x + app incr y
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
@@ -516,7 +526,7 @@ let%expect_test "ill_typed_higher_order" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> app incr x + app incr y
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
@@ -530,7 +540,7 @@ let%expect_test "if_conditional_operator" =
     lam ~name:"x" @@ fun x ->
     lam ~name:"y" @@ fun y -> if_ (lt x y) y x
   in
-  let item = generate_let_binding "name" term in
+  let item = generate_let_binding ~takes_saturation_reprs:false "name" term in
   Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
@@ -544,7 +554,14 @@ let%expect_test "module_generation" =
     make_toplevel_module
       [
         Item
-          {comments = ["comment"]; code = generate_let_binding "func_name" term};
+          {
+            comments = ["comment"];
+            code =
+              generate_let_binding
+                ~takes_saturation_reprs:false
+                "func_name"
+                term;
+          };
       ]
   in
   Format.printf "%a" pp_module module_ ;
@@ -565,6 +582,23 @@ let%expect_test "module_generation" =
     let func_name x =
       let x = S.safe_int x in
       x |}]
+
+(* Same as "basic_printing", but no [S.safe_int] conversions for [x] and [y] *)
+let%expect_test "takes_saturation_reprs" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
+    let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
+  in
+  let item = generate_let_binding ~takes_saturation_reprs:true "name" term in
+  Format.printf "%a" Pprintast.structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let tmp1 = S.safe_int 42 in
+      let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
 
 (* Module to get the name of cost functions manually/automatically defined
    in a source file *)

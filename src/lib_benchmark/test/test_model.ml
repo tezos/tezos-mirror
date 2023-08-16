@@ -42,6 +42,8 @@ let test_synthesize () =
 
       let name = Namespace.of_string "x"
 
+      let takes_saturation_reprs = false
+
       module Def (X : Costlang.S) = struct
         open X
 
@@ -63,6 +65,8 @@ let test_synthesize () =
       type arg_type = int * (int * unit)
 
       let name = Namespace.of_string "y"
+
+      let takes_saturation_reprs = false
 
       module Def (X : Costlang.S) = struct
         open X
