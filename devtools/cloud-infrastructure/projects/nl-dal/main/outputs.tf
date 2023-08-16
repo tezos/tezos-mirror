@@ -10,10 +10,10 @@ output "tags" {
 
 output "ssh_addresses" {
   description = "Instances addresses"
-  value       = google_compute_address.this.*.address
+  value       = google_compute_address.this[*].address
 }
 
 output "internal_addresses" {
   description = "Instances addresses"
-  value       = google_compute_address.internal.*.address
+  value       = google_compute_address.internal[*].address
 }

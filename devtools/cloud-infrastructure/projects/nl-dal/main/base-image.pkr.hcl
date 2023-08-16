@@ -15,7 +15,7 @@ build {
 
   provisioner "shell" {
     inline = [templatefile("./scripts/install_script.sh", {
-      docker_registry_url = var.docker_registry_url
+      docker_registry_url  = var.docker_registry_url
       container_image_name = var.container_image_name
     })]
     execute_command = "{{.Vars}} bash '{{.Path}}'"

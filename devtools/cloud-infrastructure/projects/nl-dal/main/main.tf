@@ -61,7 +61,7 @@ resource "google_compute_firewall" "this" {
     protocol = "tcp"
     ports    = ["30001-30999"] # Opened for the experiment. Will be routed to the docker container.
   }
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = ["0.0.0.0/0"] # Allow incoming traffic from all IPv4 source addresses to the specified open ports.
   # source_tags   = []
   # target_tags   = []
 }
@@ -121,7 +121,7 @@ module "vm_umig" {
   subnetwork         = local.subnetwork
   subnetwork_project = local.subnetwork_project
   hostname           = var.hostname
-  static_ips         = google_compute_address.internal.*.address
+  static_ips         = google_compute_address.internal[*].address
   num_instances      = var.num_instances
   instance_template  = module.vm_instance_template.self_link
   named_ports        = local.named_ports

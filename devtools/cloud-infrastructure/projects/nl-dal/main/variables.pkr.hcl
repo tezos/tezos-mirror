@@ -17,7 +17,7 @@ variable "docker_registry_url" {
 }
 
 variable "container_image_name" {
-  type = string
+  type        = string
   description = "The docker image"
-  default = "blob"
+  default     = "blob"
 }

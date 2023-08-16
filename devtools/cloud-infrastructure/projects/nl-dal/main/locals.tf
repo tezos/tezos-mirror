@@ -1,9 +1,10 @@
 locals {
   /* instance */
-  machine_type         = var.machine_type
-  minimum_cpu_platform = "AMD Milan"
-  labels               = {}
-  tags                 = []
+  machine_type = var.machine_type
+  labels = {
+    terraform = "true"
+  }
+  tags         = []
   metadata = {
     terraform           = "true"
     project_url         = var.project_url
@@ -34,7 +35,6 @@ locals {
     }]
   ]
   can_ip_forward = "false"
-  static_ips     = []
   named_ports = [
     {
       name = "ssh"
