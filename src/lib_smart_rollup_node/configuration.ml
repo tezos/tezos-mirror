@@ -25,7 +25,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
+type mode =
+  | Observer
+  | Accuser
+  | Bailout
+  | Batcher
+  | Maintenance
+  | Operator
+  | Custom
 
 type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
 
@@ -467,11 +474,12 @@ let fee_parameter_encoding operation_kind =
 
 let fee_parameters_encoding = operation_kind_map_encoding fee_parameter_encoding
 
-let modes = [Observer; Batcher; Maintenance; Operator; Custom]
+let modes = [Observer; Batcher; Maintenance; Operator; Custom; Bailout]
 
 let string_of_mode = function
   | Observer -> "observer"
   | Accuser -> "accuser"
+  | Bailout -> "bailout"
   | Batcher -> "batcher"
   | Maintenance -> "maintenance"
   | Operator -> "operator"
@@ -480,6 +488,7 @@ let string_of_mode = function
 let mode_of_string = function
   | "observer" -> Ok Observer
   | "accuser" -> Ok Accuser
+  | "bailout" -> Ok Bailout
   | "batcher" -> Ok Batcher
   | "maintenance" -> Ok Maintenance
   | "operator" -> Ok Operator
@@ -490,6 +499,7 @@ let description_of_mode = function
   | Observer -> "Only follows the chain, reconstructs and interprets inboxes"
   | Accuser ->
       "Only publishes commitments for conflicts and play refutation games"
+  | Bailout -> "Only defends and cements, does not publish any new commitments"
   | Batcher -> "Accepts transactions in its queue and batches them on the L1"
   | Maintenance ->
       "Follows the chain and publishes commitments, cement and refute"
@@ -503,6 +513,7 @@ let mode_encoding =
     [
       ("observer", Observer);
       ("accuser", Accuser);
+      ("bailout", Bailout);
       ("batcher", Batcher);
       ("maintenance", Maintenance);
       ("operator", Operator);
@@ -742,6 +753,7 @@ let check_mode config =
   | Observer -> narrow_purposes []
   | Batcher -> narrow_purposes [Batching]
   | Accuser -> narrow_purposes [Operating]
+  | Bailout -> narrow_purposes [Operating; Cementing]
   | Maintenance -> narrow_purposes [Operating; Cementing]
   | Operator -> narrow_purposes [Operating; Cementing; Batching]
   | Custom -> return config

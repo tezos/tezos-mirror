@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -287,8 +288,8 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
 let on_publish_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Operating in
-  if Node_context.is_accuser node_ctxt then
-    (* Accuser does not publish all commitments *)
+  if Node_context.is_accuser node_ctxt || Node_context.is_bailout node_ctxt then
+    (* Accuser and Bailout do not publish all commitments *)
     return_unit
   else
     match operator with
