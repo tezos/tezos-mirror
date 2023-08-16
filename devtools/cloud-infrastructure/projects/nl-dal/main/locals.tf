@@ -35,12 +35,7 @@ locals {
   ]
   can_ip_forward = "false"
   static_ips     = []
-  service_port   = "80"
   named_ports = [
-    {
-      name = "service"
-      port = local.service_port
-    },
     {
       name = "ssh"
       port = "22"

@@ -59,15 +59,7 @@ resource "google_compute_firewall" "this" {
   }
   allow {
     protocol = "tcp"
-    ports    = [local.service_port]
-  }
-  allow {
-    protocol = "tcp"
     ports    = ["30001-30999"] # Opened for the experiment. Will be routed to the docker container.
-  }
-  allow {
-    protocol = "tcp"
-    ports    = ["50000"]
   }
   source_ranges = ["0.0.0.0/0"]
   # source_tags   = []
