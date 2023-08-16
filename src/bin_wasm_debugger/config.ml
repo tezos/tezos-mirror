@@ -33,14 +33,18 @@ let default_destination = Protocol.Alpha_context.Sc_rollup.Address.zero
 
 let default_preimage_directory = "preimage"
 
+let default_kernel_debug = false
+
 type config = {
   sender : Protocol.Contract_hash.t;
   source : Tezos_crypto.Signature.public_key_hash;
   destination : Protocol.Alpha_context.Sc_rollup.t;
   preimage_directory : string;
+  kernel_debug : bool;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
     ?(destination = default_destination)
-    ?(preimage_directory = default_preimage_directory) () =
-  {sender; source; destination; preimage_directory}
+    ?(preimage_directory = default_preimage_directory)
+    ?(kernel_debug = default_kernel_debug) () =
+  {sender; source; destination; preimage_directory; kernel_debug}

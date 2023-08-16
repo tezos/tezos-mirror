@@ -206,13 +206,29 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       ~placeholder:"VERSION"
       version_parameter
 
+  let no_kernel_debug_flag =
+    let open Tezos_clic in
+    switch ~doc:"Hides the kernel debug messages." ~long:"no-kernel-debug" ()
+
   let global_options =
     Tezos_clic.(
-      args5 wasm_arg input_arg rollup_arg preimage_directory_arg version_arg)
+      args6
+        wasm_arg
+        input_arg
+        rollup_arg
+        preimage_directory_arg
+        version_arg
+        no_kernel_debug_flag)
 
   let dispatch args =
     let open Lwt_result_syntax in
-    let* (wasm_file, inputs, rollup_arg, preimage_directory, version), _ =
+    let* ( ( wasm_file,
+             inputs,
+             rollup_arg,
+             preimage_directory,
+             version,
+             no_kernel_debug_flag ),
+           _ ) =
       Tezos_clic.parse_global_options global_options () args
     in
     let version =
@@ -221,7 +237,13 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
           Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.current_version
         version
     in
-    let config = Config.config ?destination:rollup_arg ?preimage_directory () in
+    let config =
+      Config.config
+        ?destination:rollup_arg
+        ?preimage_directory
+        ~kernel_debug:(not no_kernel_debug_flag)
+        ()
+    in
     let*? wasm_file =
       match wasm_file with
       | Some wasm_file -> Ok wasm_file
