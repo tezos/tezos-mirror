@@ -193,25 +193,79 @@ let validation_plugin_not_found =
     ~pp1:Protocol_hash.pp
     ("protocol_hash", Protocol_hash.encoding)
 
+type error += Ill_formed_operation of Operation_hash.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validation.plugin.ill_formed_operation"
+    ~title:"Ill_formed_operation"
+    ~description:"Ill-formed operation filtered"
+    ~pp:(fun ppf oph ->
+      Format.fprintf
+        ppf
+        "Ill-formed operation filtered: %a."
+        Operation_hash.pp
+        oph)
+    Data_encoding.(obj1 (req "operation_hash" Operation_hash.encoding))
+    (function Ill_formed_operation oph -> Some oph | _ -> None)
+    (fun oph -> Ill_formed_operation oph)
+
+module Patch_T (Proto : T) : T = struct
+  include Proto
+
+  let validate_operation ?check_signature validation_state oph op =
+    let open Lwt_syntax in
+    let* status = Proto.Plugin.syntactic_check op in
+    match status with
+    | `Ill_formed -> Lwt_result_syntax.tzfail (Ill_formed_operation oph)
+    | `Well_formed ->
+        Proto.validate_operation ?check_signature validation_state oph op
+
+  module Mempool = struct
+    include Proto.Mempool
+
+    let add_operation ?check_signature ?conflict_handler validation_info
+        mempool_state (oph, op) =
+      let open Lwt_syntax in
+      let* status = Proto.Plugin.syntactic_check op in
+      match status with
+      | `Ill_formed ->
+          Lwt.return_error
+            (Proto.Mempool.Validation_error
+               (TzTrace.make (Ill_formed_operation oph)))
+      | `Well_formed ->
+          Proto.Mempool.add_operation
+            ?check_signature
+            ?conflict_handler
+            validation_info
+            mempool_state
+            (oph, op)
+  end
+end
+
 let proto_with_validation_plugin ~block_hash protocol_hash =
   let open Lwt_result_syntax in
-  match Protocol_hash.Table.find validation_plugin_table protocol_hash with
-  | Some proto_with_plugin -> return proto_with_plugin
-  | None -> (
-      match Registered_protocol.get protocol_hash with
-      | None ->
-          tzfail
-            (Block_validator_errors.Unavailable_protocol
-               {block = block_hash; protocol = protocol_hash})
-      | Some (module Proto : Registered_protocol.T) ->
-          let*! () =
-            match Proto.environment_version with
-            | V0 ->
-                (* This is normal for protocols Genesis and 000
-                   because they don't have a plugin. *)
-                Lwt.return_unit
-            | _ ->
-                Internal_event.Simple.(emit validation_plugin_not_found)
-                  protocol_hash
-          in
-          return (module No_plugin (Proto) : T))
+  let* (module Proto_with_plugin) =
+    match Protocol_hash.Table.find validation_plugin_table protocol_hash with
+    | Some proto_with_plugin -> return proto_with_plugin
+    | None -> (
+        match Registered_protocol.get protocol_hash with
+        | None ->
+            tzfail
+              (Block_validator_errors.Unavailable_protocol
+                 {block = block_hash; protocol = protocol_hash})
+        | Some (module Proto : Registered_protocol.T) ->
+            let*! () =
+              match Proto.environment_version with
+              | V0 ->
+                  (* This is normal for protocols Genesis and 000
+                     because they don't have a plugin. *)
+                  Lwt.return_unit
+              | _ ->
+                  Internal_event.Simple.(emit validation_plugin_not_found)
+                    protocol_hash
+            in
+            return (module No_plugin (Proto) : T))
+  in
+  return (module Patch_T (Proto_with_plugin) : T)

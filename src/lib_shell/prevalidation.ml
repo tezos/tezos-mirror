@@ -176,16 +176,7 @@ module MakeAbstract
     create_aux ~old_state chain_store head timestamp
 
   let pre_filter state (filter_config, (_ : Prevalidator_bounding.config)) op =
-    let open Lwt_syntax in
-    let* status = Proto.Plugin.syntactic_check op.protocol in
-    match status with
-    | `Ill_formed ->
-        Lwt.return
-          (`Refused
-            (Error_monad.TzTrace.make
-               (Error_monad.error_of_fmt "Ill-formed operation filtered")))
-    | `Well_formed ->
-        Proto.Plugin.pre_filter state.plugin_info filter_config op.protocol
+    Proto.Plugin.pre_filter state.plugin_info filter_config op.protocol
 
   type error_classification = Prevalidator_classification.error_classification
 

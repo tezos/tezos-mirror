@@ -896,16 +896,12 @@ module Make (Proto : Protocol_plugin.T) = struct
               {shell = op.raw.shell; protocol_data = op.protocol_data}
             in
             let open Lwt_result_syntax in
-            let*! status = Proto.Plugin.syntactic_check operation in
             let* validation_state =
-              match status with
-              | `Ill_formed -> failwith "Ill-formed operation filtered"
-              | `Well_formed ->
-                  Proto.validate_operation
-                    ~check_signature:op.check_signature
-                    pv.validation_state
-                    op.hash
-                    operation
+              Proto.validate_operation
+                ~check_signature:op.check_signature
+                pv.validation_state
+                op.hash
+                operation
             in
             let* application_state, receipt =
               Proto.apply_operation pv.application_state op.hash operation
@@ -1286,11 +1282,7 @@ module Make (Proto : Protocol_plugin.T) = struct
         (fun state ops ->
           List.fold_left_es
             (fun state (oph, op, check_signature) ->
-              let*! status = Proto.Plugin.syntactic_check op in
-              match status with
-              | `Ill_formed -> failwith "Ill-formed operation filtered"
-              | `Well_formed ->
-                  Proto.validate_operation ~check_signature state oph op)
+              Proto.validate_operation ~check_signature state oph op)
             state
             ops)
         state
