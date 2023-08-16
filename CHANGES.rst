@@ -351,6 +351,8 @@ Smart Rollup WASM Debugger
 - Allow serialized messages in inputs: ``{ "serialized": "01..." }``, instead
   of only external and internal transfers. This allows to inject arbitrary
   messages in the rollup. (MR :gl:`!9613`)
+- Added flag ``--no-kernel-debug`` to deactivate the kernel debug messages. (MR
+  :gl:`!9813`)
 
 Data Availability Committee (DAC)
 ----------------------------------

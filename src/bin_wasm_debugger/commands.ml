@@ -332,8 +332,10 @@ let reveals config request =
         "The kernel tried to request a DAL page, but this is not yet supported \
          by the debugger."
 
-let write_debug =
-  Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_io.printf "%s%!" msg)
+let write_debug config =
+  if config.Config.kernel_debug then
+    Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_io.printf "%s%!" msg)
+  else Tezos_scoru_wasm.Builtins.Noop
 
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   module Prof = Profiling.Make (Wasm_utils)
@@ -341,10 +343,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
 
   (* [compute_step tree] is a wrapper around [Wasm_pvm.compute_step] that also
      returns the number of ticks elapsed (whi is always 1). *)
-  let compute_step tree =
+  let compute_step config tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
-        let+ tree = Wasm.compute_step_with_debug ~write_debug tree in
+        let+ tree =
+          Wasm.compute_step_with_debug ~write_debug:(write_debug config) tree
+        in
         (tree, 1L))
 
   (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
@@ -352,7 +356,10 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     property that the memory hasn't been flushed yet and can be inspected. *)
   let eval_to_result config tree =
     trap_exn (fun () ->
-        eval_to_result ~write_debug ~reveal_builtins:(reveals config) tree)
+        eval_to_result
+          ~write_debug:(write_debug config)
+          ~reveal_builtins:(reveals config)
+          tree)
 
   (* [eval_kernel_run tree] evals up to the end of the current `kernel_run` (or
      starts a new one if already at snapshot point). *)
@@ -363,7 +370,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let* tree, _ =
           Wasm_fast.compute_step_many
             ~reveal_builtins:(reveals config)
-            ~write_debug
+            ~write_debug:(write_debug config)
             ~stop_at_snapshot:true
             ~max_steps:Int64.max_int
             tree
@@ -382,7 +389,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           eval_until_input_requested
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
-            ~write_debug
+            ~write_debug:(write_debug config)
             ~max_steps:Int64.max_int
             tree
         in
@@ -450,7 +457,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            %!" ;
         let+ tree, ticks, graph =
           Prof.eval_and_profile
-            ~write_debug
+            ~write_debug:(write_debug config)
             ~reveal_builtins:(reveals config)
             ~with_time
             ~no_reboot
@@ -527,7 +534,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       return (tree, count, inboxes, level)
     in
     match step with
-    | Tick -> return' (compute_step tree)
+    | Tick -> return' (compute_step config tree)
     | Result -> return' (eval_to_result config tree)
     | Kernel_run -> return' (eval_kernel_run config tree)
     | Inbox -> (
