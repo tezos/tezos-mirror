@@ -945,30 +945,28 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cryptobox_parameters;
           }
       in
+      (* When stitching from Oxford and after, [Raw_level_repr.root]
+         should be replaced by the previous value, that is
+         [c.reveal_activation_level.*]. *)
       let reveal_activation_level :
           Constants_parametric_repr.sc_rollup_reveal_activation_level =
         {
           raw_data = {blake2B = Raw_level_repr.root};
           metadata = Raw_level_repr.root;
           dal_page =
-            (* For the protocol activating the DAL one should replace
-               the expression below by
-               [Raw_level_repr.of_int32_exn (Int32.succ level)].
-
-               For a protocol for which the DAL is already activated
-               the expression below should be changed to
-               [c.sc_rollup.reveal_activation_level.dal_page]. *)
-            (if dal.feature_enable then
-             (* First level of the protocol with dal activated. *)
-             Raw_level_repr.of_int32_exn (Int32.succ level)
+            (if c.dal.feature_enable then Raw_level_repr.root
+            else if dal.feature_enable then
+              (* First level of the protocol with dal activated. *)
+              Raw_level_repr.of_int32_exn (Int32.succ level)
             else
-              (* Deactivate the reveal if the dal is not enabled. *)
-              (* https://gitlab.com/tezos/tezos/-/issues/5968
-                 Encoding error with Raw_level
+              (* Deactivate the reveal if the dal is not enabled.
+
+                 assert (not (c.dal.feature_enable || dal.feature_enable))
 
                  We set the activation level to [pred max_int] to deactivate
                  the feature. The [pred] is needed to not trigger an encoding
-                 exception with the value [Int32.int_min] (see tezt/tests/mockup.ml). *)
+                 exception with the value [Int32.int_min] (see
+                 tezt/tests/mockup.ml). *)
               Raw_level_repr.of_int32_exn Int32.(pred max_int));
         }
       in
