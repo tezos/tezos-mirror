@@ -79,6 +79,11 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- A new bailout mode that solely cements and defends existing
+  commitments without publishing new ones. Recovers bonds when
+  possible, after which the node exits gracefully. (MR :gl:`!9721`, MR
+  :gl:`!9817`, MR :gl:`!9835`)
+
 Smart Rollup client
 -------------------
 
