@@ -826,7 +826,8 @@ end
 
 module Auto_build_cmd = struct
   let build_options
-      ( destination_directory,
+      ( split,
+        destination_directory,
         nsamples,
         bench_number,
         print_problem,
@@ -853,10 +854,10 @@ module Auto_build_cmd = struct
         bench_number = Option.value bench_number ~default:opts.bench_number;
       }
     in
-    {destination_directory; infer_parameters; measure_options}
+    (split, {destination_directory; infer_parameters; measure_options})
 
   let handler opts bench_names () =
-    let auto_build_options = build_options opts in
+    let split, auto_build_options = build_options opts in
     let benchmarks =
       List.map
         (fun s ->
@@ -869,7 +870,8 @@ module Auto_build_cmd = struct
         bench_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Benchmarks benchmarks; auto_build_options}) ;
+      Some
+        (Auto_build {targets = Benchmarks benchmarks; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -885,8 +887,17 @@ module Auto_build_cmd = struct
       ~placeholder:"directory"
       (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
 
+  let switch =
+    Tezos_clic.switch
+      ~doc:
+        "Switch indicating that generated code should be split into submodules \
+         defined by Benchmark's generated code destination "
+      ~long:"split"
+      ()
+
   let options =
-    Tezos_clic.args9
+    Tezos_clic.args10
+      switch
       destination_directory_arg
       Benchmark_cmd.Options.nsamples_arg
       Benchmark_cmd.Options.bench_number_arg
@@ -910,7 +921,7 @@ end
 
 module Auto_build_for_models_cmd = struct
   let handler opts model_names () =
-    let auto_build_options = Auto_build_cmd.build_options opts in
+    let split, auto_build_options = Auto_build_cmd.build_options opts in
     let models =
       List.map
         (fun s ->
@@ -923,7 +934,7 @@ module Auto_build_for_models_cmd = struct
         model_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Models models; auto_build_options}) ;
+      Some (Auto_build {targets = Models models; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -945,7 +956,7 @@ end
 
 module Auto_build_for_parameters_cmd = struct
   let handler opts parameter_names () =
-    let auto_build_options = Auto_build_cmd.build_options opts in
+    let split, auto_build_options = Auto_build_cmd.build_options opts in
     let parameters =
       List.map
         (fun s ->
@@ -958,7 +969,8 @@ module Auto_build_for_parameters_cmd = struct
         parameter_names
     in
     commandline_outcome_ref :=
-      Some (Auto_build {targets = Parameters parameters; auto_build_options}) ;
+      Some
+        (Auto_build {targets = Parameters parameters; split; auto_build_options}) ;
     Lwt.return_ok ()
 
   let params =

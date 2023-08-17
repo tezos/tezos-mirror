@@ -117,6 +117,7 @@ type command =
   | Codegen_check_definitions of {files : string list}
   | Solution_print of string list
   | Auto_build of {
+      split : bool;
       targets : auto_build_targets;
       auto_build_options : auto_build_options;
     }
