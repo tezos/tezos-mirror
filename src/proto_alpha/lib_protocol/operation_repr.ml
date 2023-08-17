@@ -476,7 +476,7 @@ type error += Contents_list_error of string (* `Permanent *)
 let of_list l =
   match of_list_internal l with
   | Ok contents -> Ok contents
-  | Error s -> error @@ Contents_list_error s
+  | Error s -> Result_syntax.tzfail @@ Contents_list_error s
 
 let tx_rollup_operation_tag_offset = 150
 
@@ -1679,6 +1679,7 @@ module Encoding = struct
     (packed_contents, prefix)
 
   let protocol_data_binary_encoding =
+    let open Result_syntax in
     conv_with_guard
       (fun (Operation_data {contents; signature}) ->
         let contents_list =
@@ -1699,7 +1700,6 @@ module Encoding = struct
         in
         (contents_and_signature_prefix, sig_suffix))
       (fun (contents_and_signature_prefix, suffix) ->
-        let open Result_syntax in
         let* Contents_list contents, prefix =
           of_contents_and_signature_prefix contents_and_signature_prefix
         in
@@ -1929,13 +1929,15 @@ let unsigned_operation_length (type kind)
     (shell, Contents_list protocol_data.contents)
 
 let check_signature (type kind) key chain_id (op : kind operation) =
+  let open Result_syntax in
   let serialized_operation = serialize_unsigned_operation op in
   let check ~watermark signature =
-    if Signature.check ~watermark key signature serialized_operation then Ok ()
-    else error Invalid_signature
+    if Signature.check ~watermark key signature serialized_operation then
+      return_unit
+    else tzfail Invalid_signature
   in
   match op.protocol_data.signature with
-  | None -> error Missing_signature
+  | None -> tzfail Missing_signature
   | Some signature ->
       let watermark =
         match op.protocol_data.contents with

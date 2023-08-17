@@ -101,9 +101,10 @@ let of_string str =
   | Some str -> of_non_empty_string str
 
 let of_string_strict ~loc str =
+  let open Result_syntax in
   match of_string str with
-  | Too_long -> error (Name_too_long str)
-  | Got_default -> error (Unexpected_default loc)
+  | Too_long -> tzfail (Name_too_long str)
+  | Got_default -> tzfail (Unexpected_default loc)
   | Ok name -> Ok name
 
 let of_string_strict' str =
@@ -116,9 +117,10 @@ let of_string_strict_exn str =
   match of_string_strict' str with Ok v -> v | Error err -> invalid_arg err
 
 let of_annot_strict ~loc a =
+  let open Result_syntax in
   match of_non_empty_string a with
-  | Too_long -> error (Name_too_long (a :> string))
-  | Got_default -> error (Unexpected_default loc)
+  | Too_long -> tzfail (Name_too_long (a :> string))
+  | Got_default -> tzfail (Unexpected_default loc)
   | Ok name -> Ok name
 
 let of_annot_lax_opt a =
@@ -135,12 +137,12 @@ let of_string_lax_opt str =
 
 let of_string_lax str =
   match of_string_lax_opt str with
-  | None -> error (Name_too_long str)
+  | None -> Result_syntax.tzfail (Name_too_long str)
   | Some name -> Ok name
 
 let of_annot_lax a =
   match of_non_empty_string a with
-  | Too_long -> error (Name_too_long (a :> string))
+  | Too_long -> Result_syntax.tzfail (Name_too_long (a :> string))
   | Got_default -> Ok default
   | Ok name -> Ok name
 
