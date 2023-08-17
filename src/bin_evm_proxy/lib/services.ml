@@ -36,7 +36,7 @@ type rollup_node_config = {
 
 (* This version is the one compatible with the latest released/deployed
    kernel. *)
-let current_kernel_version = "75c84da3cebf0f9a45d339dea12f0a4e4786ed8f"
+let current_kernel_version = "4c111dcae061bea6c3616429a0ea1262ce6c174f"
 
 let version_service =
   Service.get_service
