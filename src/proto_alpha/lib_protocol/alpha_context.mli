@@ -2811,6 +2811,13 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
+    type last_whitelist_update = {
+      message_index : Z.t;
+      outbox_level : Raw_level.t;
+    }
+
+    val last_whitelist_update_encoding : last_whitelist_update Data_encoding.t
+
     val find_last_whitelist_update :
       context ->
       Sc_rollup_repr.t ->
