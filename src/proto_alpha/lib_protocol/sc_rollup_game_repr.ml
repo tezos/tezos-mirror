@@ -881,20 +881,12 @@ let cost_play ~step ~choice =
          mgas for the cost of executing a tick.
 
       *)
-      let open Saturation_repr in
-      (* model N_IBlake2b *)
-      (* Approximating 1.120804 x term *)
-      let cost_N_IBlake2b size =
-        let open Syntax in
-        let v0 = safe_int size in
-        safe_int 430 + v0 + (v0 lsr 3)
-      in
       let overapproximated_hashing_size =
         2 * Constants_repr.max_operation_data_length
       in
       let scale10 x = Saturation_repr.(mul (safe_int 10) x) in
       scale10 @@ Gas_limit_repr.atomic_step_cost
-      @@ cost_N_IBlake2b overapproximated_hashing_size
+      @@ Michelson_v1_gas_costs.cost_N_IBlake2b overapproximated_hashing_size
 
 let play kind dal_parameters ~dal_attestation_lag ~stakers metadata game ~step
     ~choice ~is_reveal_enabled =

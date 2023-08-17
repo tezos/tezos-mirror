@@ -945,7 +945,8 @@ module Cost_of = struct
     let bls12_381_fr = atomic_step_cost cost_ENCODING_BLS_FR
 
     let unparse_type ty =
-      atomic_step_cost @@ cost_UNPARSE_TYPE @@ Script_typed_ir.ty_size ty
+      atomic_step_cost @@ cost_UNPARSE_TYPE
+      @@ Script_typed_ir.(Type_size.to_int @@ ty_size ty)
 
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 

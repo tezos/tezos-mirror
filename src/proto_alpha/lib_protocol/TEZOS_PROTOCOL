@@ -41,6 +41,7 @@
         "Constants_repr",
         "Fitness_repr",
         "Level_repr",
+        "Script_repr_costs",
         "Script_repr",
         "Cache_memory_helpers",
         "Seed_repr",
@@ -55,6 +56,9 @@
         "Dal_slot_index_repr",
         "Dal_slot_repr",
         "Dal_attestation_repr",
+
+        "Michelson_v1_gas_costs_generated",
+        "Michelson_v1_gas_costs",
 
         "Sc_rollup_repr",
         "Sc_rollup_metadata_repr",
@@ -121,6 +125,7 @@
         "Storage_functors",
         "Storage",
 
+        "Global_constants_costs",
         "Ticket_hash_builder",
         "Constants_storage",
         "Level_storage",
@@ -128,10 +133,12 @@
         "Seed_storage",
         "Contract_manager_storage",
         "Delegate_activation_storage",
+        "Sapling_storage_costs",
         "Sapling_storage",
         "Lazy_storage_diff",
         "Commitment_storage",
         "Voting_period_storage",
+        "Cache_repr_costs",
         "Cache_repr",
 
         "Zk_rollup_storage",
@@ -171,7 +178,6 @@
         "Legacy_script_patches",
         "Sapling_validator",
 
-        "Global_constants_costs",
         "Global_constants_storage",
         "Sc_rollup_staker_index_storage",
         "Sc_rollup_commitment_storage",
@@ -207,8 +213,6 @@
         "Gas_input_size",
         "Script_typed_ir_size",
         "Script_typed_ir_size_costs",
-        "Michelson_v1_gas_costs_generated",
-        "Michelson_v1_gas_costs",
         "Michelson_v1_gas",
         "Operation_costs",
         "Script_tc_context",

@@ -24,8 +24,6 @@
 (*****************************************************************************)
 
 module Cache_costs = struct
-  module S = Saturation_repr
-
   (* Computed by typing the contract
      "{parameter unit; storage unit; code FAILWITH}"
      and evaluating
@@ -34,20 +32,12 @@ module Cache_costs = struct
   let minimal_size_of_typed_contract_in_bytes = 688
 
   let approximate_cardinal bytes =
-    S.safe_int (bytes / minimal_size_of_typed_contract_in_bytes)
-
-  let log2 x = S.safe_int (1 + S.numbits x)
-
-  let cache_update_constant = S.safe_int 600
-
-  let cache_update_coeff = S.safe_int 43
+    bytes / minimal_size_of_typed_contract_in_bytes
 
   (* Cost of calling [Environment_cache.update]. *)
-  (* model cache/CACHE_UPDATE *)
   let cache_update ~cache_size_in_bytes =
     let approx_card = approximate_cardinal cache_size_in_bytes in
-    Gas_limit_repr.atomic_step_cost
-      S.(add cache_update_constant (mul cache_update_coeff (log2 approx_card)))
+    Cache_repr_costs.cost_CACHE_UPDATE approx_card
 
   (* Cost of calling [Environment_cache.find].
      This overapproximates [cache_find] slightly. *)
