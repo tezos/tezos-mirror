@@ -111,6 +111,21 @@ val sign :
 (** [hash t client] returns the hash of the operation  *)
 val hash : t -> Client.t -> [`OpHash of string] Lwt.t
 
+(** Returns the size (in bytes) of the operation.
+
+    @param protocol Allows using the operation encoding rather than
+    using the [forge_operations] RPC to compute the hexadecimal
+    representation of the operation.
+
+    @param signature Allows to manually set the signature of the
+    operation. When omitted, the operation is correctly signed using {!sign}. *)
+val byte_size :
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  int Lwt.t
+
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
    extracted from the [Client]. If a node cannot be extracted, the
@@ -646,6 +661,13 @@ val conflict_error_with_needed_fee : rex
 
     Captures [hash] and [fee]. *)
 val rejected_by_full_mempool_with_needed_fee : rex
+
+(** Matches the message produced by
+    [Rejected_by_full_mempool {hash; needed_fee_in_mutez = None}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [hash]. *)
+val rejected_by_full_mempool_no_possible_fee : rex
 
 (** Calls {!inject_and_capture2_stderr} and checks that the second
     captured group is [expected_fee].
