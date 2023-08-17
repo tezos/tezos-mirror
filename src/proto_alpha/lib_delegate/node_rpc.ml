@@ -44,9 +44,7 @@ let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
 
 let inject_operation cctxt ~chain operation =
   let encoded_op =
-    Data_encoding.Binary.to_bytes_exn
-      Operation.encoding_with_legacy_attestation_name
-      operation
+    Data_encoding.Binary.to_bytes_exn Operation.encoding operation
   in
   Shell_services.Injection.operation cctxt ~async:true ~chain encoded_op
 
@@ -150,7 +148,7 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
         let parse_op (raw_op : Tezos_base.Operation.t) =
           let protocol_data =
             Data_encoding.Binary.of_bytes_exn
-              Operation.protocol_data_encoding_with_legacy_attestation_name
+              Operation.protocol_data_encoding
               raw_op.proto
           in
           {shell = raw_op.shell; protocol_data}

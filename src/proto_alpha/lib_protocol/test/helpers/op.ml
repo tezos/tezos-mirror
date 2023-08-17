@@ -34,7 +34,7 @@ let pack_operation ctxt signature contents =
 let sign ?(watermark = Signature.Generic_operation) sk branch contents =
   let unsigned =
     Data_encoding.Binary.to_bytes_exn
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   let signature = Some (Signature.sign ~watermark sk unsigned) in
