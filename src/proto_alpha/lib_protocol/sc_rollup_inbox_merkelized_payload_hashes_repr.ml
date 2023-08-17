@@ -187,16 +187,16 @@ let verify_proof inclusion_proof =
   let open Result_syntax in
   let* cell =
     match inclusion_proof with
-    | cell :: _ -> ok cell
-    | [] -> error (Merkelized_payload_hashes_proof_error "proof is empty")
+    | cell :: _ -> return cell
+    | [] -> tzfail (Merkelized_payload_hashes_proof_error "proof is empty")
   in
   let rec aux (hash_map, ptr_list) = function
-    | [] -> error (Merkelized_payload_hashes_proof_error "proof is empty")
+    | [] -> tzfail (Merkelized_payload_hashes_proof_error "proof is empty")
     | [target] ->
         let target_ptr = hash target in
         let hash_map = Hash.Map.add target_ptr target hash_map in
         let ptr_list = List.rev (target_ptr :: ptr_list) in
-        ok (hash_map, ptr_list, target, target_ptr)
+        return (hash_map, ptr_list, target, target_ptr)
     | merkelized :: tail ->
         let ptr = hash merkelized in
         aux (Hash.Map.add ptr merkelized hash_map, ptr :: ptr_list) tail

@@ -181,82 +181,84 @@ let rec validate_ty :
     a Script_typed_ir.entrypoints_node ->
     ret continuation ->
     ret tzresult =
- fun ty {nested = nested_entrypoints; at_node} k ->
-  let open Script_typed_ir in
-  match at_node with
-  | Some {name = _; original_type_expr = _} ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
-         We currently don't support entrypoints as the entrypoint information
-         for L1 to L2 messages is not propagated to the rollup. *)
-      error Sc_rollup_invalid_parameters_type
-  | None -> (
-      match ty with
-      (* Valid primitive types. *)
-      | Unit_t -> (k [@ocaml.tailcall]) ()
-      | Int_t -> (k [@ocaml.tailcall]) ()
-      | Nat_t -> (k [@ocaml.tailcall]) ()
-      | Signature_t -> (k [@ocaml.tailcall]) ()
-      | String_t -> (k [@ocaml.tailcall]) ()
-      | Bytes_t -> (k [@ocaml.tailcall]) ()
-      | Key_hash_t -> (k [@ocaml.tailcall]) ()
-      | Key_t -> (k [@ocaml.tailcall]) ()
-      | Timestamp_t -> (k [@ocaml.tailcall]) ()
-      | Address_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
-      | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
-      | Bool_t -> (k [@ocaml.tailcall]) ()
-      | Never_t -> (k [@ocaml.tailcall]) ()
-      | Chain_id_t -> (k [@ocaml.tailcall]) ()
-      (* Valid collection types. *)
-      | Ticket_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Option_t (ty, _, _) ->
-          (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
-      | Pair_t (ty1, ty2, _, _) ->
-          (* Entrypoints may not be nested in pairs, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            no_entrypoints
-            no_entrypoints
-            k
-      | Or_t (ty1, ty2, _, _) ->
-          let entrypoints_l, entrypoints_r =
-            match nested_entrypoints with
-            | Entrypoints_None -> (no_entrypoints, no_entrypoints)
-            | Entrypoints_Or {left; right} -> (left, right)
-          in
-          (validate_two_tys [@ocaml.tailcall])
-            ty1
-            ty2
-            entrypoints_l
-            entrypoints_r
-            k
-      | Map_t (key_ty, val_ty, _) ->
-          (* Entrypoints may not be nested in maps, hence the no_entrypoints
-             value. *)
-          (validate_two_tys [@ocaml.tailcall])
-            key_ty
-            val_ty
-            no_entrypoints
-            no_entrypoints
-            k
-      (* Invalid types. *)
-      | Mutez_t -> error Sc_rollup_invalid_parameters_type
-      | Big_map_t (_key_ty, _val_ty, _) ->
-          error Sc_rollup_invalid_parameters_type
-      | Contract_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_t _ -> error Sc_rollup_invalid_parameters_type
-      | Sapling_transaction_deprecated_t _ ->
-          error Sc_rollup_invalid_parameters_type
-      | Sapling_state_t _ -> error Sc_rollup_invalid_parameters_type
-      | Operation_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_t -> error Sc_rollup_invalid_parameters_type
-      | Chest_key_t -> error Sc_rollup_invalid_parameters_type
-      | Lambda_t (_, _, _) -> error Sc_rollup_invalid_parameters_type)
+  let open Result_syntax in
+  fun ty {nested = nested_entrypoints; at_node} k ->
+    let open Script_typed_ir in
+    match at_node with
+    | Some {name = _; original_type_expr = _} ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4023
+           We currently don't support entrypoints as the entrypoint information
+           for L1 to L2 messages is not propagated to the rollup. *)
+        tzfail Sc_rollup_invalid_parameters_type
+    | None -> (
+        match ty with
+        (* Valid primitive types. *)
+        | Unit_t -> (k [@ocaml.tailcall]) ()
+        | Int_t -> (k [@ocaml.tailcall]) ()
+        | Nat_t -> (k [@ocaml.tailcall]) ()
+        | Signature_t -> (k [@ocaml.tailcall]) ()
+        | String_t -> (k [@ocaml.tailcall]) ()
+        | Bytes_t -> (k [@ocaml.tailcall]) ()
+        | Key_hash_t -> (k [@ocaml.tailcall]) ()
+        | Key_t -> (k [@ocaml.tailcall]) ()
+        | Timestamp_t -> (k [@ocaml.tailcall]) ()
+        | Address_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g1_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_g2_t -> (k [@ocaml.tailcall]) ()
+        | Bls12_381_fr_t -> (k [@ocaml.tailcall]) ()
+        | Bool_t -> (k [@ocaml.tailcall]) ()
+        | Never_t -> (k [@ocaml.tailcall]) ()
+        | Chain_id_t -> (k [@ocaml.tailcall]) ()
+        (* Valid collection types. *)
+        | Ticket_t (ty, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Set_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Option_t (ty, _, _) ->
+            (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | List_t (ty, _) -> (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
+        | Pair_t (ty1, ty2, _, _) ->
+            (* Entrypoints may not be nested in pairs, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              no_entrypoints
+              no_entrypoints
+              k
+        | Or_t (ty1, ty2, _, _) ->
+            let entrypoints_l, entrypoints_r =
+              match nested_entrypoints with
+              | Entrypoints_None -> (no_entrypoints, no_entrypoints)
+              | Entrypoints_Or {left; right} -> (left, right)
+            in
+            (validate_two_tys [@ocaml.tailcall])
+              ty1
+              ty2
+              entrypoints_l
+              entrypoints_r
+              k
+        | Map_t (key_ty, val_ty, _) ->
+            (* Entrypoints may not be nested in maps, hence the no_entrypoints
+               value. *)
+            (validate_two_tys [@ocaml.tailcall])
+              key_ty
+              val_ty
+              no_entrypoints
+              no_entrypoints
+              k
+        (* Invalid types. *)
+        | Mutez_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Big_map_t (_key_ty, _val_ty, _) ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Contract_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_transaction_deprecated_t _ ->
+            tzfail Sc_rollup_invalid_parameters_type
+        | Sapling_state_t _ -> tzfail Sc_rollup_invalid_parameters_type
+        | Operation_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Chest_key_t -> tzfail Sc_rollup_invalid_parameters_type
+        | Lambda_t (_, _, _) -> tzfail Sc_rollup_invalid_parameters_type)
 
 and validate_two_tys :
     type a ac b bc ret.
@@ -276,16 +278,16 @@ let validate_parameters_ty :
     (a, ac) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
     context tzresult =
- fun ctxt parameters_ty entrypoints ->
   let open Result_syntax in
-  let* ctxt =
-    Gas.consume
-      ctxt
-      (Sc_rollup_costs.is_valid_parameters_ty_cost
-         ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
-  in
-  let+ () = validate_ty parameters_ty entrypoints ok in
-  ctxt
+  fun ctxt parameters_ty entrypoints ->
+    let* ctxt =
+      Gas.consume
+        ctxt
+        (Sc_rollup_costs.is_valid_parameters_ty_cost
+           ~ty_size:Script_typed_ir.(ty_size parameters_ty |> Type_size.to_int))
+    in
+    let+ () = validate_ty parameters_ty entrypoints return in
+    ctxt
 
 let validate_untyped_parameters_ty ctxt parameters_ty =
   let open Result_syntax in
@@ -425,8 +427,8 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     match
       Data_encoding.Binary.of_string_opt PVM.output_proof_encoding output_proof
     with
-    | Some x -> ok x
-    | None -> error Sc_rollup_invalid_output_proof
+    | Some x -> Ok x
+    | None -> Result_syntax.tzfail Sc_rollup_invalid_output_proof
   in
   (* Verify that the states match. *)
   let* {Sc_rollup.Commitment.compressed_state; _}, ctxt =

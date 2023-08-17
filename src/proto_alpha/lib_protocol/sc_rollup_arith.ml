@@ -1743,8 +1743,8 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
   module Internal_for_tests = struct
     let insert_failure state =
-      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
       let open Lwt_syntax in
+      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
       let* n = Tree.length state ["failures"] in
       add n
   end
@@ -1774,7 +1774,7 @@ module Protocol_implementation = Make (struct
 
   let produce_proof _context _state _f =
     (* Can't produce proof without full context*)
-    Lwt.return None
+    Lwt.return_none
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash

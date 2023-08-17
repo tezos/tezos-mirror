@@ -458,10 +458,9 @@ module Index = struct
       match String.split_on_char '-' s with
       | [a; b] -> (
           match both_of_b58check_opt (a, b) with
-          | Some stakers -> ok stakers
-          | None ->
-              Result.error (Format.sprintf "Invalid game index notation %s" s))
-      | _ -> Result.error (Format.sprintf "Invalid game index notation %s" s)
+          | Some stakers -> Ok stakers
+          | None -> Error (Format.sprintf "Invalid game index notation %s" s))
+      | _ -> Error (Format.sprintf "Invalid game index notation %s" s)
     in
     RPC_arg.make ~descr ~name:"game_index" ~construct ~destruct ()
 
@@ -689,7 +688,7 @@ let find_choice dissection tick =
   let rec traverse states =
     match states with
     | ({state_hash = _; tick = state_tick} as curr) :: next :: others ->
-        if Sc_rollup_tick_repr.(tick = state_tick) then return (curr, next)
+        if Sc_rollup_tick_repr.(tick = state_tick) then Ok (curr, next)
         else traverse (next :: others)
     | _ -> tzfail (Dissection_choice_not_found tick)
   in
@@ -768,7 +767,7 @@ let validity_final_move ~pvm ~dal_parameters ~dal_attestation_lag ~first_move
         check_proof_distance_is_one
           ~start_tick:start_chunk.tick
           ~stop_tick:stop_chunk.tick
-      else ok ()
+      else Result_syntax.return_unit
     in
     let*? () =
       check_proof_start_state
