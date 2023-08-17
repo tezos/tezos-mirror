@@ -8,7 +8,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1000 --arg 'Pair (Pair "[SMART_ROLLUP_HASH]" "[PUBLIC_KEY_HASH]") (Pair 450 "Hello, Ticket!")'
 Node is bootstrapped.
-Estimated gas: 2330.188 units (will add 100 for safety)
+Estimated gas: 2329.834 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -19,13 +19,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000607
+    Fee to the baker: ꜩ0.000606
     Expected counter: 3
-    Gas limit: 2431
+    Gas limit: 2430
     Storage limit: 87 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000607
-      payload fees(the block proposer) ....... +ꜩ0.000607
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000606
+      payload fees(the block proposer) ....... +ꜩ0.000606
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -36,7 +36,7 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 205 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 2223.161
+      Consumed gas: 2222.807
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -130,7 +130,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 8735.404 units (will add 100 for safety)
+Estimated gas: 8734.854 units (will add 100 for safety)
 Estimated storage: 230 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -143,7 +143,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.002212
     Expected counter: 8
-    Gas limit: 8836
+    Gas limit: 8835
     Storage limit: 250 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.002212
@@ -153,7 +153,7 @@ This sequence of operations was run:
       Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart output message execution was successfully applied
       Paid storage size diff: 72 bytes
-      Consumed gas: 5084.057
+      Consumed gas: 5083.630
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.018
         storage fees ........................... +ꜩ0.018
@@ -175,7 +175,7 @@ This sequence of operations was run:
             { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
           Storage size: 175 bytes
           Paid storage size diff: 53 bytes
-          Consumed gas: 1209.015
+          Consumed gas: 1208.974
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.01325
             storage fees ........................... +ꜩ0.01325
@@ -197,7 +197,7 @@ This sequence of operations was run:
               Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
           Storage size: 228 bytes
           Paid storage size diff: 53 bytes
-          Consumed gas: 1217.242
+          Consumed gas: 1217.201
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.01325
             storage fees ........................... +ꜩ0.01325
@@ -220,7 +220,7 @@ This sequence of operations was run:
               Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
           Storage size: 280 bytes
           Paid storage size diff: 52 bytes
-          Consumed gas: 1225.057
+          Consumed gas: 1225.016
           Balance updates:
             [PUBLIC_KEY_HASH] ... -ꜩ0.013
             storage fees ........................... +ꜩ0.013
