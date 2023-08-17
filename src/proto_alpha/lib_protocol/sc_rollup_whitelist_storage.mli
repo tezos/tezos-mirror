@@ -93,7 +93,7 @@ val adjust_storage_space :
 val find_last_whitelist_update :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  (Raw_context.t * (Raw_level_repr.t * Z.t) option) tzresult Lwt.t
+  (Raw_context.t * last_whitelist_update option) tzresult Lwt.t
 
 (** [set_last_whitelist_update ctxt rollup (outbox_level, message_index)] set
     the outbox level and message index of the latest message of update to the
@@ -102,5 +102,5 @@ val find_last_whitelist_update :
 val set_last_whitelist_update :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Raw_level_repr.t * Z.t ->
+  last_whitelist_update ->
   (Raw_context.t * Z.t) tzresult Lwt.t

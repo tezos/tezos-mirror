@@ -555,14 +555,12 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
         let* () =
           match last_whitelist_update with
           | None -> return_unit
-          | Some (latest_outbox_level, latest_message_index) ->
-              let last_update =
-                Sc_rollup.Whitelist.
-                  {
-                    message_index = latest_message_index;
-                    outbox_level = latest_outbox_level;
-                  }
-              in
+          | Some
+              (Sc_rollup.Whitelist.
+                 {
+                   message_index = latest_message_index;
+                   outbox_level = latest_outbox_level;
+                 } as last_update) ->
               (* Do not apply whitelist update if a previous whitelist update
                  occurred with a greater message index for a given outbox level,
                  or with a greater outbox level. *)
@@ -588,7 +586,7 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
           Sc_rollup.Whitelist.set_last_whitelist_update
             ctxt
             rollup
-            (outbox_level, message_index)
+            {outbox_level; message_index}
         in
         let* ctxt, paid_storage_size_diff =
           Sc_rollup.Whitelist.adjust_storage_space ctxt rollup ~new_storage_size

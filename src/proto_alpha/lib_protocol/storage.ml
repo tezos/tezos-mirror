@@ -2140,10 +2140,9 @@ module Sc_rollup = struct
         let name = ["last_whitelist_update"]
       end)
       (struct
-        type t = Raw_level_repr.t * Z.t
+        type t = Sc_rollup_whitelist_repr.last_whitelist_update
 
-        let encoding =
-          Data_encoding.(tup2 Raw_level_repr.encoding Data_encoding.z)
+        let encoding = Sc_rollup_whitelist_repr.last_whitelist_update_encoding
       end)
 end
 
