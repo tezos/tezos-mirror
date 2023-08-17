@@ -249,6 +249,8 @@ let setup_deposit_contracts ~admin client protocol =
 
   return {fa12 = fa12_address; bridge = bridge_address}
 
+let default_bootstrap_account_balance = Wei.of_eth_int 9999
+
 let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
@@ -266,7 +268,8 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
         (Array.fold_left
            (fun acc Eth_account.{address; _} ->
              let value =
-               Wei.(to_le_bytes @@ of_eth_int 9999) |> Hex.of_bytes |> Hex.show
+               Wei.(to_le_bytes default_bootstrap_account_balance)
+               |> Hex.of_bytes |> Hex.show
              in
              let to_ = Durable_storage_path.balance address in
              Set {value; to_} :: acc)
@@ -286,7 +289,9 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
   | [] -> None
   | res -> Some res
 
-let setup_evm_kernel ?config
+type kernel_installee = {base_installee : string; installee : string}
+
+let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ?dictator
@@ -318,12 +323,17 @@ let setup_evm_kernel ?config
   in
   (* Start a rollup node *)
   let* boot_sector =
+    let base_installee, installee =
+      match kernel_installee with
+      | Some {base_installee; installee} -> (base_installee, installee)
+      | None -> ("./", "evm_kernel")
+    in
     prepare_installer_kernel
-      ~base_installee:"./"
+      ~base_installee
       ~preimages_dir:
         (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0")
       ?config
-      "evm_kernel"
+      installee
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -375,12 +385,14 @@ let setup_evm_kernel ?config
       deposit_addresses;
     }
 
-let setup_past_genesis ?originator_key ?rollup_operator_key ~deposit_admin
-    protocol =
+let setup_past_genesis ?dictator ?kernel_installee ?originator_key
+    ?rollup_operator_key ~deposit_admin protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
+      ?kernel_installee
       ?originator_key
       ?rollup_operator_key
+      ?dictator
       ~deposit_admin
       protocol
   in
@@ -527,7 +539,7 @@ let test_rpc_getBalance =
       ~account:Eth_account.bootstrap_accounts.(0).address
       ~endpoint:evm_proxy_server_endpoint
   in
-  Check.((balance = Wei.of_eth_int 9999) Wei.typ)
+  Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -924,44 +936,176 @@ let test_l2_deploy_erc20 =
   let* () = check_nb_in_storage ~evm_setup ~address ~nth:0 ~expected:100 in
   unit
 
-let transfer ?data protocol =
-  let* ({evm_proxy_server; _} as full_evm_setup) =
-    setup_past_genesis ~deposit_admin:None protocol
+(* TODO: add internal parameters here (e.g the kernel version) *)
+type config_result = {chain_id : int64}
+
+let config_setup evm_setup =
+  let web3_clientVersion =
+    Evm_proxy_server.{method_ = "web3_clientVersion"; parameters = `A []}
   in
-  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let chain_id =
+    Evm_proxy_server.{method_ = "eth_chainId"; parameters = `Null}
+  in
+  let* results =
+    Evm_proxy_server.batch_evm_rpc
+      evm_setup.evm_proxy_server
+      [web3_clientVersion; chain_id]
+  in
+  match JSON.as_list results with
+  | [web3_clientVersion; chain_id] ->
+      (* We don't need to return the web3_clientVersion because,
+         it might change after the upgrade.
+         The only thing that we need to look out for is,
+         are we able to retrieve it and deserialize it. *)
+      let _sanity_check = JSON.(web3_clientVersion |-> "result" |> as_string) in
+      return {chain_id = JSON.(chain_id |-> "result" |> as_int64)}
+  | _ -> Test.fail "Unexpected result from batching two requests"
+
+let ensure_config_setup_integrity ~config_result evm_setup =
+  let* upcoming_config_setup = config_setup evm_setup in
+  assert (config_result = upcoming_config_setup) ;
+  unit
+
+let ensure_block_integrity ~block_result evm_setup =
+  let* block_json =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_setup.evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters =
+            `A
+              [`String (Int32.to_string block_result.Block.number); `Bool false];
+        })
+  in
+  let block = block_json |> Evm_proxy_server.extract_result |> Block.of_json in
+  assert (block = block_result) ;
+  unit
+
+let latest_block evm_setup =
+  let* latest_block =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_setup.evm_proxy_server
+        {
+          method_ = "eth_getBlockByNumber";
+          parameters = `A [`String "latest"; `Bool false];
+        })
+  in
+  return @@ (latest_block |> Evm_proxy_server.extract_result |> Block.of_json)
+
+type transfer_result = {
+  sender_balance_before : Wei.t;
+  sender_balance_after : Wei.t;
+  sender_nonce_before : int64;
+  sender_nonce_after : int64;
+  value : Wei.t;
+  tx_hash : string;
+  tx_object : Transaction.transaction_object;
+  tx_receipt : Transaction.transaction_receipt;
+  receiver_balance_before : Wei.t;
+  receiver_balance_after : Wei.t;
+}
+
+let get_tx_object ~endpoint ~tx_hash =
+  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash in
+  match tx_object with
+  | Some tx_object -> return tx_object
+  | None -> Test.fail "The transaction object of %s should be available" tx_hash
+
+let get_transaction_receipt ~full_evm_setup ~tx_hash =
+  let* json =
+    Evm_proxy_server.call_evm_rpc
+      full_evm_setup.evm_proxy_server
+      {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
+  in
+  return JSON.(json |-> "result" |> Transaction.transaction_receipt_of_json)
+
+let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
+    full_evm_setup =
+  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
   let balance account = Eth_cli.balance ~account ~endpoint in
+  let* sender_balance = balance sender.Eth_account.address in
+  assert (sender_balance = transfer_result.sender_balance_after) ;
+  let* receiver_balance = balance receiver.Eth_account.address in
+  assert (receiver_balance = transfer_result.receiver_balance_after) ;
+  let* sender_nonce =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  assert (sender_nonce = transfer_result.sender_nonce_after) ;
+  let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
+  assert (tx_object = transfer_result.tx_object) ;
+  let* tx_receipt =
+    get_transaction_receipt ~full_evm_setup ~tx_hash:transfer_result.tx_hash
+  in
+  assert (tx_receipt = transfer_result.tx_receipt) ;
+  unit
+
+let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
+  let endpoint = Evm_proxy_server.endpoint full_evm_setup.evm_proxy_server in
+  let balance account = Eth_cli.balance ~account ~endpoint in
+  let* sender_balance_before = balance sender.Eth_account.address in
+  let* receiver_balance_before = balance receiver.Eth_account.address in
+  let* sender_nonce_before =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  let* tx_hash = send ~sender ~receiver ~value ?data full_evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx:tx_hash in
+  let* sender_balance_after = balance sender.address in
+  let* receiver_balance_after = balance receiver.address in
+  let* sender_nonce_after =
+    get_transaction_count full_evm_setup.evm_proxy_server sender.address
+  in
+  let* tx_object = get_tx_object ~endpoint ~tx_hash in
+  let* tx_receipt = get_transaction_receipt ~full_evm_setup ~tx_hash in
+  return
+    {
+      sender_balance_before;
+      sender_balance_after;
+      sender_nonce_before;
+      sender_nonce_after;
+      value;
+      tx_hash;
+      tx_object;
+      tx_receipt;
+      receiver_balance_before;
+      receiver_balance_after;
+    }
+
+let transfer ?data protocol =
+  let* full_evm_setup = setup_past_genesis ~deposit_admin:None protocol in
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
-  let* sender_balance = balance sender.address in
-  let* receiver_balance = balance receiver.address in
-  let* sender_nonce = get_transaction_count evm_proxy_server sender.address in
-  (* We always send less than the balance, to ensure it always works. *)
-  let value = Wei.(sender_balance - one) in
-  let* tx = send ~sender ~receiver ~value ?data full_evm_setup in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  let* new_sender_balance = balance sender.address in
-  let* new_receiver_balance = balance receiver.address in
-  let* new_sender_nonce =
-    get_transaction_count evm_proxy_server sender.address
+  let* {
+         sender_balance_before;
+         sender_balance_after;
+         sender_nonce_before;
+         sender_nonce_after;
+         value;
+         tx_object;
+         receiver_balance_before;
+         receiver_balance_after;
+         _;
+       } =
+    make_transfer
+      ?data
+      ~value:Wei.(default_bootstrap_account_balance - one)
+      ~sender
+      ~receiver
+      full_evm_setup
   in
-  Check.(Wei.(new_sender_balance = sender_balance - value) Wei.typ)
+  Check.(Wei.(sender_balance_after = sender_balance_before - value) Wei.typ)
     ~error_msg:
       "Unexpected sender balance after transfer, should be %R, but got %L" ;
-  Check.(Wei.(new_receiver_balance = receiver_balance + value) Wei.typ)
+  Check.(Wei.(receiver_balance_after = receiver_balance_before + value) Wei.typ)
     ~error_msg:
       "Unexpected receiver balance after transfer, should be %R, but got %L" ;
-  Check.((new_sender_nonce = Int64.succ sender_nonce) int64)
+  Check.((sender_nonce_after = Int64.succ sender_nonce_before) int64)
     ~error_msg:
       "Unexpected sender nonce after transfer, should be %R, but got %L" ;
   (* Perform some sanity checks on the transaction object produced by the
      kernel. *)
-  let* tx_object = Eth_cli.transaction_get ~endpoint ~tx_hash:tx in
-  let tx_object =
-    match tx_object with
-    | Some tx_object -> tx_object
-    | None -> Test.fail "The transaction object of %s should be available" tx
-  in
   Check.((tx_object.from = sender.address) string)
     ~error_msg:"Unexpected transaction's sender" ;
   Check.((tx_object.to_ = Some receiver.address) (option string))
@@ -1631,8 +1775,8 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
-    ~base_installee ~installee ?dictator ~private_key protocol =
+let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
+    ?(nonce = 2) ~base_installee ~installee ?dictator ~private_key protocol =
   let* {
          node;
          client;
@@ -1642,7 +1786,9 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
          evm_proxy_server;
          _;
        } =
-    setup_evm_kernel ?dictator ~deposit_admin:None protocol
+    match evm_setup with
+    | Some evm_setup -> return evm_setup
+    | None -> setup_evm_kernel ?dictator ~deposit_admin:None protocol
   in
   let sc_rollup_address =
     Option.value ~default:sc_rollup_address rollup_address
@@ -1696,10 +1842,28 @@ let gen_test_kernel_upgrade ?rollup_address ?(should_fail = false) ?(nonce = 2)
          (String.to_bytes message_to_sign)
   in
   let upgrade_tag_bytes = "\003" in
+  let* framing_protocol_target_byte =
+    let kernel_version_rpc =
+      Evm_proxy_server.{method_ = "tez_kernelVersion"; parameters = `Null}
+    in
+    let* kernel_version =
+      let* result =
+        Evm_proxy_server.call_evm_rpc evm_proxy_server kernel_version_rpc
+      in
+      return JSON.(result |-> "result" |> as_string)
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6203
+       Whenever the version is strictly superior to:
+       4c111dcae061bea6c3616429a0ea1262ce6c174f
+       alway return "\000". *)
+    if kernel_version = "4c111dcae061bea6c3616429a0ea1262ce6c174f" then
+      return ""
+    else return "\000"
+  in
   let full_external_message =
-    Hex.show @@ Hex.of_string @@ "\000" ^ rollup_address_bytes
-    ^ upgrade_tag_bytes ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes
-    ^ signature
+    Hex.show @@ Hex.of_string @@ framing_protocol_target_byte
+    ^ rollup_address_bytes ^ upgrade_tag_bytes ^ upgrade_nonce_bytes
+    ^ preimage_root_hash_bytes ^ signature
   in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
@@ -1949,6 +2113,94 @@ let test_rpc_sendRawTransaction =
     ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
   unit
 
+type storage_migration_results = {
+  transfer_result : transfer_result;
+  block_result : Block.t;
+  config_result : config_result;
+}
+
+(* This is the test generator that will trigger the sanity checks for migration
+   tests.
+   Note that:
+   - it uses the latest version of the ghostnet EVM rollup as a starter kernel.
+   - the upgrade of the kernel during the test will always target the latest one
+     on master.
+   - everytime a new path/rpc/object is stored in the kernel, a new sanity check
+     MUST be generated. *)
+let gen_kernel_migration_test ~dictator ~scenario_prior ~scenario_after
+    ~protocol =
+  let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
+  let current_kernel_installee = "ghostnet_evm_kernel" in
+  let* evm_setup =
+    setup_past_genesis
+      ~dictator:dictator.Eth_account.public_key
+      ~kernel_installee:
+        {
+          base_installee = current_kernel_base_installee;
+          installee = current_kernel_installee;
+        }
+      ~deposit_admin:None
+      protocol
+  in
+  (* Load the EVM rollup's storage and sanity check results. *)
+  let* sanity_check = scenario_prior ~evm_setup in
+  (* Upgrade the kernel. *)
+  let next_kernel_base_installee = "./" in
+  let next_kernel_installee = "evm_kernel" in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup
+      ~base_installee:next_kernel_base_installee
+      ~installee:next_kernel_installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
+  in
+  (* Check the values after the upgrade with [sanity_check] results. *)
+  scenario_after ~evm_setup ~sanity_check
+
+let test_kernel_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade succeed with potential migration(s)."
+  @@ fun protocol ->
+  let sender, receiver =
+    (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
+  in
+  let scenario_prior ~evm_setup =
+    let* transfer_result =
+      make_transfer
+        ~value:Wei.(default_bootstrap_account_balance - one)
+        ~sender
+        ~receiver
+        evm_setup
+    in
+    let* block_result = latest_block evm_setup in
+    let* config_result = config_setup evm_setup in
+    return {transfer_result; block_result; config_result}
+  in
+  let scenario_after ~evm_setup ~sanity_check =
+    let* () =
+      ensure_transfer_result_integrity
+        ~sender
+        ~receiver
+        ~transfer_result:sanity_check.transfer_result
+        evm_setup
+    in
+    let* () =
+      ensure_block_integrity ~block_result:sanity_check.block_result evm_setup
+    in
+    ensure_config_setup_integrity
+      ~config_result:sanity_check.config_result
+      evm_setup
+  in
+  gen_kernel_migration_test
+    ~dictator:sender
+    ~scenario_prior
+    ~scenario_after
+    ~protocol
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -1985,6 +2237,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_dictator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
-  test_rpc_sendRawTransaction protocols
+  test_rpc_sendRawTransaction protocols ;
+  test_kernel_migration protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols
