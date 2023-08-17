@@ -163,7 +163,7 @@ module Pp : S with type 'a repr = string and type size = string = struct
 
   let lam ~name f = Format.asprintf "fun %s -> %s" name (f name)
 
-  let app f arg = Format.asprintf "(%s) %s" f arg
+  let app f arg = Format.asprintf "((%s) %s)" f arg
 
   let let_ ~name m f = Format.asprintf "let %s = %s in %s" name m (f name)
 
@@ -628,7 +628,7 @@ functor
 
     let false_ = {repr = X.false_; hash = -1; tag = fresh ()}
 
-    let true_ = {repr = X.false_; hash = -1; tag = fresh ()}
+    let true_ = {repr = X.true_; hash = -1; tag = fresh ()}
 
     let float (f : float) =
       insert_if_not_present (fun () -> X.float f) (Float_tag {f})
