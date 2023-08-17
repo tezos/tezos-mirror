@@ -248,4 +248,5 @@ Platform developers are also provided reference materials for internal APIs of O
 
    releases/releases
    releases/version-17
+   releases/version-18
    releases/history

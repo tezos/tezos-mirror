@@ -21,6 +21,8 @@ is available at https://gitlab.com/tezos/tezos.
 
 The current release of Octez is :doc:`../releases/version-17`.
 
+A release candidate for the next version :doc:`../releases/version-18` is also available.
+
 For installing instructions, see :doc:`./howtoget`.
 
 .. _tezos_community:
