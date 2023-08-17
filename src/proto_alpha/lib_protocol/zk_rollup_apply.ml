@@ -85,14 +85,17 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
 (** [parse_ticket ~ticketer ~contents ~ty ctxt] reconstructs a ticket from
     individual parts submitted as part of a Zk_rollup_publish operation. *)
 let parse_ticket ~ticketer ~contents ~ty ctxt =
-  Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
-  >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
-  Script_ir_translator.parse_comparable_data
-    ctxt
-    contents_type
-    (Micheline.root contents)
-  >>=? fun (contents, ctxt) ->
-  return @@ (ctxt, Ticket_token.Ex_token {ticketer; contents_type; contents})
+  let open Lwt_result_syntax in
+  let*? Ex_comparable_ty contents_type, ctxt =
+    Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+  in
+  let* contents, ctxt =
+    Script_ir_translator.parse_comparable_data
+      ctxt
+      contents_type
+      (Micheline.root contents)
+  in
+  return (ctxt, Ticket_token.Ex_token {ticketer; contents_type; contents})
 
 let publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops =
   let open Lwt_result_syntax in
