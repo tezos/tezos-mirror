@@ -1135,7 +1135,7 @@ module Registration_section = struct
 
     let () =
       let dig n = Micheline.(Prim (0, I_DIG, [Int (0, Z.of_int n)], [])) in
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDig
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dig (sample_depth rng_state) in
@@ -1154,7 +1154,7 @@ module Registration_section = struct
 
     let () =
       let dug n = Micheline.(Prim (0, I_DUG, [Int (0, Z.of_int n)], [])) in
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDug
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dug (sample_depth rng_state) in
@@ -1175,7 +1175,7 @@ module Registration_section = struct
     let () =
       let nop = Micheline.Seq (0, []) in
       let dip n = Micheline.(Prim (0, I_DIP, [Int (0, Z.of_int n); nop], [])) in
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDipN
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dip (sample_depth rng_state) in
@@ -1194,7 +1194,7 @@ module Registration_section = struct
 
     let () =
       let drop n = Micheline.(Prim (0, I_DROP, [Int (0, Z.of_int n)], [])) in
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDropN
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = drop (sample_depth rng_state) in
@@ -1349,13 +1349,13 @@ module Registration_section = struct
 
     let () =
       let dup n = Micheline.(Prim (0, I_DUP, [Int (0, Z.of_int n)], [])) in
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDupN
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
           let node = dup (1 + sample_depth rng_state) in
           parse_instr rng_state node long_stack)
         () ;
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IDupN
         ~intercept:true
         ~kinstr_and_stack_sampler:(fun _cfg rng_state () ->
@@ -1515,7 +1515,7 @@ module Registration_section = struct
           IList_enter_body (empty case) ->
           IHalt
          *)
-        benchmark_with_fixed_stack
+        time_alloc_benchmark_with_fixed_stack
           ~name:Interpreter_workload.N_IList_map
           ~stack:(Script_list.empty, ((), eos))
           ~stack_type:(list unit @$ unit @$ bot)
@@ -2246,14 +2246,14 @@ module Registration_section = struct
 
   module Tez = struct
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAdd_tez
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(IAdd_tez (dummy_loc, halt))
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISub_tez
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(ISub_tez (dummy_loc, halt))
@@ -2272,7 +2272,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISub_tez_legacy
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(ISub_tez_legacy (dummy_loc, halt))
@@ -2338,7 +2338,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IEdiv_tez
         ~stack_type:(mutez @$ mutez @$ bot)
         ~kinstr:(IEdiv_tez (dummy_loc, halt))
@@ -2381,7 +2381,7 @@ module Registration_section = struct
     let zero_n = Script_int.zero_n
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IIs_nat
         ~stack_type:(int @$ bot)
         ~kinstr:(IIs_nat (dummy_loc, halt))
@@ -2396,7 +2396,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IAbs_int
         ~stack_type:(int @$ bot)
         ~kinstr:(IAbs_int (dummy_loc, halt))
@@ -3040,7 +3040,7 @@ module Registration_section = struct
         ()
 
     let () =
-      benchmark
+      time_alloc_benchmark
         ~name:Interpreter_workload.N_IPack
         ~kinstr_and_stack_sampler:(fun _cfg _rng_state ->
           let kinstr = IPack (dummy_loc, unit, halt) in
@@ -3859,7 +3859,7 @@ module Registration_section = struct
         List.rev singleton
         KNil
        *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KList_enter_body
         ~salt:"_singleton_list"
@@ -3880,7 +3880,7 @@ module Registration_section = struct
         {List.rev n elements} -> next
         KNil
       *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KList_enter_body
         ~salt:"_terminal"
@@ -3902,7 +3902,7 @@ module Registration_section = struct
         {List.rev singleton} -> next
         KNil
       *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~intercept:true
         ~name:Interpreter_workload.N_KList_enter_body
@@ -3925,7 +3925,7 @@ module Registration_section = struct
         {List.rev 1 element} -> next
         KNil
       *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~intercept:true
         ~name:Interpreter_workload.N_KList_exit_body
@@ -3954,7 +3954,7 @@ module Registration_section = struct
         KMap_enter_body (empty case) -> next
         KNil
        *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KMap_enter_body
         ~salt:"_empty"
@@ -3977,7 +3977,7 @@ module Registration_section = struct
         KMap_enter_body (empty case) -> next
         KNil
        *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KMap_enter_body
         ~salt:"_singleton"
@@ -3997,7 +3997,7 @@ module Registration_section = struct
         KMap_enter_body (empty case) -> next
         KNil
        *)
-      continuation_benchmark
+      continuation_time_alloc_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_KMap_exit_body
         ~cont_and_stack_sampler:(fun cfg rng_state ->
