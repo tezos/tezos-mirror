@@ -43,7 +43,7 @@ let check_proto_error ~loc ~exp f trace =
   let*? proto_trace =
     List.map_e
       (function
-        | Environment.Ecoproto_error e -> ok e
+        | Environment.Ecoproto_error e -> Ok e
         | e ->
             error_with
               "At %s, expected protocol error %s, got non-protocol error %a in \
@@ -293,21 +293,20 @@ let test_transfer_non_zero_amount_via_entrypoint () =
 
 (* Now, transfer with a zero-amount and check that the inbox has been updated correctly. *)
 let test_transfer_works () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* b, c, contract, rollup = context_init "int" in
   let* inbox_before = Context.Sc_rollup.inbox (B b) in
   let* expected_inbox_after =
     let* inc = Incremental.begin_construction b in
     let ctxt = Incremental.alpha_ctxt inc in
     let payload = Expr.from_string "42" in
-    let* ctxt =
+    let*@ ctxt =
       Sc_rollup.Inbox.add_deposit
         ctxt
         ~destination:rollup
         ~payload
         ~sender:contract
         ~source:(Context.Contract.pkh c)
-      >|= Environment.wrap_tzresult
     in
     let incr = Incremental.set_alpha_ctxt inc ctxt in
     let* block = Incremental.finalize_block incr in
@@ -355,7 +354,7 @@ let test_transfer_zero_amount_ticket () =
 
 (* Transfer of a non-zero-amount ticket works and the balance table is correctly updated. *)
 let test_transfer_non_zero_amount_ticket () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* b, c, contract, rollup = context_init "ticket string" in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* b =
@@ -369,19 +368,17 @@ let test_transfer_non_zero_amount_ticket () =
     in
     let* inc = Incremental.begin_construction b in
     let ctxt = Incremental.alpha_ctxt inc in
-    let* ticket_key_for_contract, ctxt =
+    let*@ ticket_key_for_contract, ctxt =
       Ticket_balance_key.of_ex_token
         ctxt
         ~owner:(Destination.Contract (Originated contract))
         ticket_token
-      >|= Environment.wrap_tzresult
     in
-    let* ticket_key_for_rollup, _ctxt =
+    let*@ ticket_key_for_rollup, _ctxt =
       Ticket_balance_key.of_ex_token
         ctxt
         ~owner:(Destination.Sc_rollup rollup)
         ticket_token
-      >|= Environment.wrap_tzresult
     in
     return (ticket_key_for_contract, ticket_key_for_rollup, ctxt)
   in
