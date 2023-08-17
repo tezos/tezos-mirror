@@ -19,7 +19,9 @@
 - External Messages must now be framed using `ExternalMessageFrame` (adds an additional prefix byte). (!9687)
 
 ### Internal
+
 - The kernel reboots before reaching maximum number of ticks (!9369)
+- Refactor `TransactionCommon` and transactions' signatures modules. (!9590)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
@@ -51,5 +53,5 @@
 - Upgrade to Kernel SDK 0.2.1 (!9417, !9526)
 - Porting benchmark framework to the EVM Kernel. (!9529, !9524, !9545)
 - Reorganized dependencies at the workspace level. (!9522)
-- Refactor `TransactionCommon` and transactions' signatures modules. (!9590)
+
 
