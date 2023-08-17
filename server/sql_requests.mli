@@ -72,6 +72,9 @@ val maybe_insert_block :
     [`Zero] )
   Caqti_request.t
 
+val maybe_insert_cycle :
+  (int32 (* id *) * int32 (* level *), unit, [`Zero]) Caqti_request.t
+
 val insert_received_operation :
   ( (Ptime.t
     * Tezos_error_monad.TzCore.error list option

@@ -107,8 +107,10 @@ let create_endorsing_rights =
   \   UNIQUE (level, delegate))"
 
 let create_cycles =
-  "CREATE TABLE IF NOT EXISTS cycle(id INTEGER PRIMARY KEY, level UNIQUE \
-   INTEGER NOT NULL) WITHOUT ROWID"
+  "CREATE TABLE IF NOT EXISTS cycles(\n\
+  \   id INTEGER PRIMARY KEY,\n\
+  \   level INTEGER NOT NULL,\n\
+  \   UNIQUE (level))"
 
 let create_endorsing_rights_level_idx =
   "CREATE INDEX IF NOT EXISTS endorsing_rights_level_idx ON \
@@ -283,6 +285,10 @@ let maybe_insert_block =
      DO UPDATE SET (timestamp, level, round, predecessor, baker) = \
      (EXCLUDED.timestamp, EXCLUDED.level, EXCLUDED.round, \
      EXCLUDED.predecessor, EXCLUDED.baker) WHERE True"
+
+let maybe_insert_cycle =
+  Caqti_request.Infix.(Caqti_type.(tup2 int32 int32 ->. unit))
+    "INSERT INTO cycle (id, level) VALUES (?, ?) ON CONFLICT DO NOTHING"
 
 let insert_received_operation =
   Caqti_request.Infix.(
