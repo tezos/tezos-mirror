@@ -3414,9 +3414,9 @@ let test_origination_fails_with_empty_whitelist () =
     b
     "Invalid whitelist: whitelist cannot be empty"
 
-let test_private_rollup_is_deactivated_by_default () =
+let test_private_rollup_can_be_deactivated () =
   let open Lwt_result_syntax in
-  let* b, contract = Context.init1 () in
+  let* b, contract = Context.init1 ~sc_rollup_private_enable:false () in
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, _rollup =
     Sc_rollup_helpers.origination_op (B b) contract kind ~whitelist:[]
@@ -3765,9 +3765,9 @@ let tests =
       `Quick
       test_origination_fails_with_empty_whitelist;
     Tztest.tztest
-      "Origination fails when whitelist is set and the feature is deactivated"
+      "Origination can be deactivated"
       `Quick
-      test_private_rollup_is_deactivated_by_default;
+      test_private_rollup_can_be_deactivated;
     Tztest.tztest
       "Submit a commitment with a whitelisted staker"
       `Quick
