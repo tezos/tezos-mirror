@@ -3480,13 +3480,13 @@ let test_private_rollup_whitelist_cannot_contain_key_duplication () =
     block_rollup_res
     Sc_rollup_errors.Sc_rollup_duplicated_key_in_whitelist
 
-let update_whitelist ?(message_index = 0)
+let update_whitelist ?(message_index = 1)
     ~(genesis_info : Sc_rollup.Commitment.genesis_info) block rollup
     updated_whitelist =
   let open Lwt_result_syntax in
   let output =
     make_whitelist_update_output
-      ~outbox_level:0
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
       ~message_index
       updated_whitelist
   in
@@ -3605,7 +3605,7 @@ let test_whitelist_update_make_rollup_public () =
   let* block =
     update_whitelist
       ~genesis_info
-      ~message_index:1
+      ~message_index:2
       block
       rollup
       updated_whitelist
