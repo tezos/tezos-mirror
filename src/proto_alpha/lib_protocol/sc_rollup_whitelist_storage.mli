@@ -38,6 +38,7 @@ val init :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   whitelist:t ->
+  origination_level:Raw_level_repr.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
 (** [check_access_to_private_rollup context rollup staker_pkh] returns an error
@@ -86,14 +87,14 @@ val adjust_storage_space :
   new_storage_size:Z.t ->
   (Raw_context.t * Z.t) tzresult Lwt.t
 
-(** [find_last_whitelist_update ctxt rollup] returns the pair (outbox level,
+(** [get_last_whitelist_update ctxt rollup] returns the pair (outbox level,
     message index) of the latest message of update to the whitelist. Returns
     None if no whitelist update has been applied. The returned context accounts
     for the gas consumption of the storage's update. *)
-val find_last_whitelist_update :
+val get_last_whitelist_update :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  (Raw_context.t * last_whitelist_update option) tzresult Lwt.t
+  (Raw_context.t * last_whitelist_update) tzresult Lwt.t
 
 (** [set_last_whitelist_update ctxt rollup (outbox_level, message_index)] set
     the outbox level and message index of the latest message of update to the

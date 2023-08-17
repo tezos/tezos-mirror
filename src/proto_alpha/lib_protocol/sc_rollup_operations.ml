@@ -549,33 +549,29 @@ let execute_outbox_message_whitelist_update (ctxt : t) ~rollup ~whitelist
             (List.is_empty whitelist)
             Sc_rollup_errors.Sc_rollup_empty_whitelist
         in
-        let* ctxt, last_whitelist_update =
-          Sc_rollup.Whitelist.find_last_whitelist_update ctxt rollup
+        let* ( ctxt,
+               (Sc_rollup.Whitelist.
+                  {
+                    message_index = latest_message_index;
+                    outbox_level = latest_outbox_level;
+                  } as last_update) ) =
+          Sc_rollup.Whitelist.get_last_whitelist_update ctxt rollup
+        in
+        (* Do not apply whitelist update if a previous whitelist update
+           occurred with a greater message index for a given outbox level,
+           or with a greater outbox level. *)
+        let* () =
+          fail_when
+            (Raw_level.(latest_outbox_level = outbox_level)
+            && Compare.Z.(latest_message_index >= message_index))
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_message_index {given = message_index; last_update}))
         in
         let* () =
-          match last_whitelist_update with
-          | None -> return_unit
-          | Some
-              (Sc_rollup.Whitelist.
-                 {
-                   message_index = latest_message_index;
-                   outbox_level = latest_outbox_level;
-                 } as last_update) ->
-              (* Do not apply whitelist update if a previous whitelist update
-                 occurred with a greater message index for a given outbox level,
-                 or with a greater outbox level. *)
-              let* () =
-                fail_when
-                  (Raw_level.(latest_outbox_level = outbox_level)
-                  && Compare.Z.(latest_message_index >= message_index))
-                  (Sc_rollup_outdated_whitelist_update
-                     (Outdated_message_index
-                        {given = message_index; last_update}))
-              in
-              fail_when
-                Raw_level.(outbox_level < latest_outbox_level)
-                (Sc_rollup_outdated_whitelist_update
-                   (Outdated_outbox_level {given = outbox_level; last_update}))
+          fail_when
+            Raw_level.(outbox_level < latest_outbox_level)
+            (Sc_rollup_outdated_whitelist_update
+               (Outdated_outbox_level {given = outbox_level; last_update}))
         in
         let* ctxt, new_storage_size =
           Sc_rollup.Whitelist.replace ctxt rollup ~whitelist

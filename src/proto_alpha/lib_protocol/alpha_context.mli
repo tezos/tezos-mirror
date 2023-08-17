@@ -2789,7 +2789,11 @@ module Sc_rollup : sig
     type t = public_key_hash list
 
     val init :
-      context -> Address.t -> whitelist:t -> (context * Z.t) tzresult Lwt.t
+      context ->
+      Address.t ->
+      whitelist:t ->
+      origination_level:Raw_level.t ->
+      (context * Z.t) tzresult Lwt.t
 
     val is_private : context -> Address.t -> (context * bool) tzresult Lwt.t
 
@@ -2818,10 +2822,10 @@ module Sc_rollup : sig
 
     val last_whitelist_update_encoding : last_whitelist_update Data_encoding.t
 
-    val find_last_whitelist_update :
+    val get_last_whitelist_update :
       context ->
       Sc_rollup_repr.t ->
-      (context * last_whitelist_update option) tzresult Lwt.t
+      (context * last_whitelist_update) tzresult Lwt.t
 
     val set_last_whitelist_update :
       context ->

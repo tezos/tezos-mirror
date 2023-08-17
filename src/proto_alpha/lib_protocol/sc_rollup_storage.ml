@@ -152,7 +152,11 @@ let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
     match whitelist with
     | Some whitelist ->
         let* ctxt, new_storage_size =
-          Sc_rollup_whitelist_storage.init ~whitelist ctxt address
+          Sc_rollup_whitelist_storage.init
+            ~whitelist
+            ctxt
+            address
+            ~origination_level:genesis_info.level
         in
         Sc_rollup_whitelist_storage.adjust_storage_space
           ctxt
