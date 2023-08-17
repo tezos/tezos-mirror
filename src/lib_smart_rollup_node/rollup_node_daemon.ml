@@ -431,6 +431,10 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
           fatal_error_exit e
       | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
           handle_preimage_not_found e
+      | Rollup_node_errors.Exit_bond_recovered_bailout_mode :: [] ->
+          let*! () = Daemon_event.exit_bailout_mode () in
+          let*! _ = Lwt_exit.exit_and_wait 0 in
+          return_unit
       | e -> error_to_degraded_mode e)
 
 module Internal_for_tests = struct

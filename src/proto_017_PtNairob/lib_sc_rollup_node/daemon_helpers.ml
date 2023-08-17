@@ -273,6 +273,18 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
           (Sc_rollup_proto_types.Dal.Slot_header.to_octez slot_header)
       in
       return_unit
+  (* If the node is in bailout mode and the bond of the operator has
+     been recovered then initiate an exit from bailout mode and
+     gracefully shut down the process. Otherwise, no action is
+     taken. *)
+  | Sc_rollup_recover_bond {staker; _}, Sc_rollup_recover_bond_result _
+    when Node_context.is_bailout node_ctxt -> (
+      match Node_context.get_operator node_ctxt Operating with
+      | Some operating_pkh ->
+          fail_when
+            Signature.Public_key_hash.(operating_pkh = staker)
+            Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
+      | _ -> return_unit)
   | _, _ ->
       (* Other manager operations *)
       return_unit
