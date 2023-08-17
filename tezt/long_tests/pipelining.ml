@@ -373,30 +373,6 @@ let operation_and_block_validation protocol manager_kind tag =
     10.
     (* Due to unreliable results we set a high margin to avoid unwanted alerts. *)
   in
-  Log.info
-    "\nParameters of the test:\n  Protocol: %s\n  Operations: %s"
-    (Protocol.name protocol)
-    (manager_kind_to_string manager_kind) ;
-  let number_of_operations =
-    number_of_operation_from_manager_kind manager_kind
-  in
-  Log.info
-    "Initialise node and client with %d bootstrap accounts with protocol %s"
-    number_of_operations
-    (Protocol.name protocol) ;
-  let* client, node, additional_bootstraps =
-    init_node_client_with_protocol number_of_operations protocol
-  in
-  let* () =
-    revealing_additional_bootstrap_accounts
-      additional_bootstraps
-      number_of_operations
-      protocol
-      node
-      client
-  in
-  let* contract_hash, lvl = originate_contract ~protocol client node in
-
   let color = Log.Color.FG.green in
   let tags = [(tag, tag)] in
   let measure_and_check_regression ?margin time f =
@@ -419,7 +395,39 @@ let operation_and_block_validation protocol manager_kind tag =
         measure_and_check_regression ~margin:1. time_mean average
   in
 
-  Log.info "Forging %d operations" number_of_operations ;
+  Log.info
+    "\nParameters of the test:\n  Protocol: %s\n  Operations: %s"
+    (Protocol.name protocol)
+    (manager_kind_to_string manager_kind) ;
+  let number_of_operations =
+    number_of_operation_from_manager_kind manager_kind
+  in
+  Log.info
+    "Initialise node and client with %d additional bootstrap accounts with \
+     protocol %s"
+    number_of_operations
+    (Protocol.name protocol) ;
+  let* client, node, additional_bootstraps =
+    init_node_client_with_protocol number_of_operations protocol
+  in
+
+  Log.info "Revealing the %d additional bootstrap accounts" number_of_operations ;
+  let* () =
+    revealing_additional_bootstrap_accounts
+      additional_bootstraps
+      number_of_operations
+      protocol
+      node
+      client
+  in
+
+  Log.info "Originate toy contract" ;
+  let* contract_hash, lvl = originate_contract ~protocol client node in
+
+  Log.info
+    "Forging %d %s operations"
+    number_of_operations
+    (manager_kind_to_string manager_kind) ;
   let* ops =
     forging_n_operations
       ~contract_hash
