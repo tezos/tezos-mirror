@@ -1842,10 +1842,28 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
          (String.to_bytes message_to_sign)
   in
   let upgrade_tag_bytes = "\003" in
+  let* framing_protocol_target_byte =
+    let kernel_version_rpc =
+      Evm_proxy_server.{method_ = "tez_kernelVersion"; parameters = `Null}
+    in
+    let* kernel_version =
+      let* result =
+        Evm_proxy_server.call_evm_rpc evm_proxy_server kernel_version_rpc
+      in
+      return JSON.(result |-> "result" |> as_string)
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6203
+       Whenever the version is strictly superior to:
+       4c111dcae061bea6c3616429a0ea1262ce6c174f
+       alway return "\000". *)
+    if kernel_version = "4c111dcae061bea6c3616429a0ea1262ce6c174f" then
+      return ""
+    else return "\000"
+  in
   let full_external_message =
-    Hex.show @@ Hex.of_string @@ "\000" ^ rollup_address_bytes
-    ^ upgrade_tag_bytes ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes
-    ^ signature
+    Hex.show @@ Hex.of_string @@ framing_protocol_target_byte
+    ^ rollup_address_bytes ^ upgrade_tag_bytes ^ upgrade_nonce_bytes
+    ^ preimage_root_hash_bytes ^ signature
   in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
