@@ -283,10 +283,7 @@ module Manager_result = struct
           (Tag 0)
           (obj9
              (opt "storage" Script.expr_encoding)
-             (dft
-                "balance_updates"
-                Receipt.balance_updates_encoding_with_legacy_attestation_name
-                [])
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
              (dft "ticket_updates" Ticket_receipt.encoding [])
              (dft "originated_contracts" (list Contract.originated_encoding) [])
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -370,10 +367,7 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
         (obj6
-           (dft
-              "balance_updates"
-              Receipt.balance_updates_encoding_with_legacy_attestation_name
-              [])
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.originated_encoding) [])
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
@@ -427,10 +421,7 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.register_global_constant_case
       ~encoding:
         (obj4
-           (dft
-              "balance_updates"
-              Receipt.balance_updates_encoding_with_legacy_attestation_name
-              [])
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
@@ -455,10 +446,7 @@ module Manager_result = struct
         Data_encoding.(
           obj2
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []))
+            (dft "balance_updates" Receipt.balance_updates_encoding []))
       ~select:(function
         | Successful_manager_result (Delegation_result _ as op) -> Some op
         | _ -> None)
@@ -490,10 +478,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj2
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               [])
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Increase_paid_storage_result _ as op) ->
@@ -512,9 +497,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj4
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
@@ -572,9 +555,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj4
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (req "originated_zk_rollup" Zk_rollup.Address.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "size" z))
@@ -599,9 +580,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj3
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "size" z))
       ~select:(function
@@ -623,9 +602,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj3
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -645,9 +622,7 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
       ~encoding:
         (obj5
-           (req
-              "balance_updates"
-              Receipt.balance_updates_encoding_with_legacy_attestation_name)
+           (req "balance_updates" Receipt.balance_updates_encoding)
            (req "address" Sc_rollup.Address.encoding)
            (req "genesis_commitment_hash" Sc_rollup.Commitment.Hash.encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
@@ -727,9 +702,7 @@ module Manager_result = struct
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "staked_hash" Sc_rollup.Commitment.Hash.encoding)
            (req "published_at_level" Raw_level.encoding)
-           (req
-              "balance_updates"
-              Receipt.balance_updates_encoding_with_legacy_attestation_name))
+           (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_publish_result _ as op) ->
             Some op
@@ -752,9 +725,7 @@ module Manager_result = struct
           obj3
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "game_status" Sc_rollup.Game.status_encoding)
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name))
+            (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_refute_result _ as op) -> Some op
         | _ -> None)
@@ -773,9 +744,7 @@ module Manager_result = struct
         (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "game_status" Sc_rollup.Game.status_encoding)
-           (req
-              "balance_updates"
-              Receipt.balance_updates_encoding_with_legacy_attestation_name))
+           (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_timeout_result _ as op) ->
             Some op
@@ -796,9 +765,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj4
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (req "ticket_updates" Ticket_receipt.encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
@@ -839,9 +806,7 @@ module Manager_result = struct
       ~encoding:
         Data_encoding.(
           obj2
-            (req
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name)
+            (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Sc_rollup_recover_bond_result _ as op) ->
@@ -1021,10 +986,7 @@ module Encoding = struct
   let consensus_result_encoding power_name =
     let open Data_encoding in
     obj4
-      (dft
-         "balance_updates"
-         Receipt.balance_updates_encoding_with_legacy_attestation_name
-         [])
+      (dft "balance_updates" Receipt.balance_updates_encoding [])
       (req "delegate" Signature.Public_key_hash.encoding)
       (req (Format.asprintf "%s_power" power_name) int31)
       (req "consensus_key" Signature.Public_key_hash.encoding)
@@ -1173,11 +1135,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.seed_nonce_revelation_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Seed_nonce_revelation_result _ as op) -> Some op
@@ -1196,11 +1154,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.vdf_revelation_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Vdf_revelation_result _ as op) -> Some op
@@ -1218,11 +1172,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_attestation_evidence_result _ as op) ->
@@ -1242,11 +1192,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_attestation_evidence_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_attestation_evidence_result _ as op) ->
@@ -1266,11 +1212,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preendorsement_evidence_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_preattestation_evidence_result _ as op) ->
@@ -1291,11 +1233,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_preattestation_evidence_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_preattestation_evidence_result _ as op) ->
@@ -1316,11 +1254,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_baking_evidence_result _ as op) -> Some op
@@ -1339,11 +1273,7 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.activate_account_case;
         encoding =
-          obj1
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               []);
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Activate_account_result _ as op) -> Some op
@@ -1396,10 +1326,7 @@ module Encoding = struct
         encoding =
           Data_encoding.(
             obj2
-              (dft
-                 "balance_updates"
-                 Receipt.balance_updates_encoding_with_legacy_attestation_name
-                 [])
+              (dft "balance_updates" Receipt.balance_updates_encoding [])
               (dft "allocated_destination_contract" bool false));
         select =
           (function
@@ -1429,10 +1356,7 @@ module Encoding = struct
         op_case = Operation.Encoding.Case op_case;
         encoding =
           obj3
-            (dft
-               "balance_updates"
-               Receipt.balance_updates_encoding_with_legacy_attestation_name
-               [])
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "operation_result" res_case.t)
             (dft
                "internal_operation_results"
