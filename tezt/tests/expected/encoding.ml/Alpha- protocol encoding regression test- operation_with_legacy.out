@@ -1,5 +1,5 @@
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -12,7 +12,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a804c55cf02dbeecc978d9c84625dcae72bb77ea4fbd41f98b15efc63fa893d61d7d6eee4a2ce9427ac466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a804c55cf02dbeecc978d9c84625dcae72bb77ea4fbd41f98b15efc63fa893d61d7d6eee4a2ce9427ac466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a804c55cf02dbeecc978d9c84625dcae72bb77ea4fbd41f98b15efc63fa893d61d7d6eee4a2ce9427ac466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "activate_account",
@@ -21,31 +21,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
-  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
-  "contents": [
-    {
-      "kind": "attestation",
-      "level": 1331,
-      "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
-      "round": 0,
-      "slot": 0
-    }
-  ],
-  "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
-}'
-0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
-
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
-{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
-  "contents":
-    [ { "kind": "attestation", "slot": 0, "level": 1331, "round": 0,
-        "block_payload_hash":
-          "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" } ],
-  "signature":
-    "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
-
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -60,7 +36,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8060002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c0066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8060002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c0066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8060002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c0066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "ballot", "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -70,7 +46,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -86,7 +62,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4010066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4010066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4010066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "delegation",
@@ -96,7 +72,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -113,7 +89,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7866804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7866804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86e0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7866804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "delegation",
@@ -124,31 +100,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
-  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
-  "contents": [
-    {
-      "kind": "attestation",
-      "level": 1331,
-      "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
-      "round": 0,
-      "slot": 0
-    }
-  ],
-  "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
-}'
-0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
-
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
-{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
-  "contents":
-    [ { "kind": "attestation", "slot": 0, "level": 1331, "round": 0,
-        "block_payload_hash":
-          "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" } ],
-  "signature":
-    "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
-
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -197,7 +149,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a803000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a803000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a803000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c000000f100000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00442e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c000000000000000000000000000000000000000000000000000000000000000000000000101895ca00000000000166804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "double_baking_evidence",
@@ -236,15 +188,15 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
-      "kind": "double_preattestation_evidence",
+      "kind": "double_endorsement_evidence",
       "op1": {
         "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
         "operations": {
-          "kind": "preattestation",
+          "kind": "endorsement",
           "level": 1331,
           "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
           "round": 0,
@@ -255,7 +207,63 @@
       "op2": {
         "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
         "operations": {
-          "kind": "preattestation",
+          "kind": "endorsement",
+          "level": 1331,
+          "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
+          "round": 0,
+          "slot": 0
+        },
+        "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
+      }
+    }
+  ],
+  "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8020000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c0000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8020000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c0000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "double_endorsement_evidence",
+        "op1":
+          { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+            "operations":
+              { "kind": "endorsement", "slot": 0, "level": 1331, "round": 0,
+                "block_payload_hash":
+                  "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+            "signature":
+              "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" },
+        "op2":
+          { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+            "operations":
+              { "kind": "endorsement", "slot": 0, "level": 1331, "round": 0,
+                "block_payload_hash":
+                  "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+            "signature":
+              "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" } } ],
+  "signature":
+    "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
+
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "double_preendorsement_evidence",
+      "op1": {
+        "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+        "operations": {
+          "kind": "preendorsement",
+          "level": 1331,
+          "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
+          "round": 0,
+          "slot": 0
+        },
+        "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
+      },
+      "op2": {
+        "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+        "operations": {
+          "kind": "preendorsement",
           "level": 1331,
           "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
           "round": 0,
@@ -269,14 +277,14 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8070000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c0000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8070000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c0000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8070000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c0000008b0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
-    [ { "kind": "double_preattestation_evidence",
+    [ { "kind": "double_preendorsement_evidence",
         "op1":
           { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
             "operations":
-              { "kind": "preattestation", "slot": 0, "level": 1331,
+              { "kind": "preendorsement", "slot": 0, "level": 1331,
                 "round": 0,
                 "block_payload_hash":
                   "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
@@ -285,7 +293,7 @@
         "op2":
           { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
             "operations":
-              { "kind": "preattestation", "slot": 0, "level": 1331,
+              { "kind": "preendorsement", "slot": 0, "level": 1331,
                 "round": 0,
                 "block_payload_hash":
                   "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
@@ -294,7 +302,31 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "endorsement",
+      "level": 1331,
+      "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
+      "round": 0,
+      "slot": 0
+    }
+  ],
+  "signature": "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ"
+}'
+0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81500000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+{ "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents":
+    [ { "kind": "endorsement", "slot": 0, "level": 1331, "round": 0,
+        "block_payload_hash":
+          "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" } ],
+  "signature":
+    "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
+
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -366,7 +398,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86d0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401af9105ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7800000020020000001b050003680501056303680502020000000a03160346053d036d03420000000e020000000901000000047465737466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86d0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401af9105ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7800000020020000001b050003680501056303680502020000000a03160346053d036d03420000000e020000000901000000047465737466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86d0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401af9105ff0002298c03ed7d454a101eb7022bc95f7e5f41ac7800000020020000001b050003680501056303680502020000000a03160346053d036d03420000000e020000000901000000047465737466804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "origination",
@@ -390,11 +422,11 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
-      "kind": "preattestation",
+      "kind": "preendorsement",
       "level": 1331,
       "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
       "round": 0,
@@ -405,16 +437,16 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a81400000000053300000000000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
-    [ { "kind": "preattestation", "slot": 0, "level": 1331, "round": 0,
+    [ { "kind": "preendorsement", "slot": 0, "level": 1331, "round": 0,
         "block_payload_hash":
           "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" } ],
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -431,7 +463,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8050002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf000000407663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8050002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf000000407663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8050002298c03ed7d454a101eb7022bc95f7e5f41ac78000002cf000000407663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c7663cf120f3dc8189d5dc7d4d7a0483bcc53f3f18e700f5a2f5076aa8b9dc55c66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "proposals",
@@ -442,7 +474,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -459,7 +491,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86b0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86b0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86b0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "reveal", "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
@@ -470,7 +502,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -483,7 +515,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80100000533000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80100000533000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a80100000533000000000000000000000000000000000000000000000000000000000000000066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "seed_nonce_revelation", "level": 1331,
@@ -492,7 +524,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -510,7 +542,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4019703000002298c03ed7d454a101eb7022bc95f7e5f41ac780066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4019703000002298c03ed7d454a101eb7022bc95f7e5f41ac780066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d4019703000002298c03ed7d454a101eb7022bc95f7e5f41ac780066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "transaction",
@@ -521,7 +553,7 @@
   "signature":
     "sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ" }
 
-./octez-codec encode alpha.operation_with_attestation from '{
+./octez-codec encode alpha.operation_with_legacy_attestation_name from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents": [
     {
@@ -547,7 +579,7 @@
 }'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d40197030138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffff06616374696f6e000000070200000002034f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 
-./octez-codec decode alpha.operation_with_attestation from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d40197030138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffff06616374696f6e000000070200000002034f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
+./octez-codec decode alpha.operation_with_legacy_attestation_name from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86c0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d40197030138560805b4c8d7b7fbbafad5c59dbfa3878ca70500ffff06616374696f6e000000070200000002034f66804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c
 { "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
   "contents":
     [ { "kind": "transaction",

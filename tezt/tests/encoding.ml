@@ -82,11 +82,16 @@ let iter_sample_s base_path func =
 
 (** The given sample must be included in registered encodings. These can be
     found with [octez-codec list encodings]. *)
-let check_protocol_sample_encoding ?supports sample =
+let check_protocol_sample_encoding ?title ?supports sample =
+  let title, tags =
+    match title with
+    | None -> (sample, sample_as_tags sample)
+    | Some title -> (title, sample_as_tags title)
+  in
   Protocol.register_regression_test
     ~__FILE__
-    ~title:(sf "protocol encoding regression test: %s" sample)
-    ~tags:(["encoding"; "protocol"] @ sample_as_tags sample)
+    ~title:(sf "protocol encoding regression test: %s" title)
+    ~tags:(["encoding"; "protocol"] @ tags)
     ~uses:(fun _protocol -> [Constant.octez_codec])
     ~uses_node:false
     ~uses_client:false
@@ -117,8 +122,8 @@ let check_shell_sample_encoding sample =
   iter_sample_s base_path @@ fun file -> check_sample ~name:sample ~file
 
 let check_samples protocols =
-  let protocol_sample ?supports name =
-    check_protocol_sample_encoding ?supports name protocols
+  let protocol_sample ?title ?supports name =
+    check_protocol_sample_encoding ?title ?supports name protocols
   in
   check_shell_sample_encoding "network_version" ;
   protocol_sample "block_header" ;
@@ -134,13 +139,21 @@ let check_samples protocols =
   protocol_sample "operation.internal" ;
   protocol_sample "operation" ;
   protocol_sample
-    ~supports:Protocol.(From_protocol 18)
+    ~supports:Protocol.(Between_protocols (18, 18))
     "operation_with_attestation" ;
+  protocol_sample
+    ~title:"operation_with_legacy"
+    ~supports:Protocol.(From_protocol 19)
+    "operation_with_legacy_attestation_name" ;
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
   protocol_sample
-    ~supports:Protocol.(From_protocol 18)
+    ~supports:Protocol.(Between_protocols (18, 18))
     "operation_with_attestation.unsigned" ;
+  protocol_sample
+    ~title:"operation_with_legacy.unsigned"
+    ~supports:Protocol.(From_protocol 19)
+    "operation_with_legacy_attestation_name.unsigned" ;
   protocol_sample "period" ;
   protocol_sample "raw_level" ;
   protocol_sample "seed" ;
