@@ -138,18 +138,24 @@ let () =
     (fun () -> Expression_too_large)
 
 let get context hash =
-  Storage.Global_constants.Map.find context hash >>=? fun (context, value) ->
+  let open Lwt_result_syntax in
+  let* context, value = Storage.Global_constants.Map.find context hash in
   match value with
   | None -> tzfail Nonexistent_global
   | Some value -> return (context, value)
 
 let expr_to_address_in_context context expr =
+  let open Result_syntax in
   let lexpr = Script_repr.lazy_expr expr in
-  Raw_context.consume_gas context @@ Script_repr.force_bytes_cost lexpr
-  >>? fun context ->
-  Script_repr.force_bytes lexpr >>? fun b ->
-  Raw_context.consume_gas context @@ Gas_costs.expr_to_address_in_context_cost b
-  >|? fun context -> (context, Script_expr_hash.hash_bytes [b])
+  let* context =
+    Raw_context.consume_gas context @@ Script_repr.force_bytes_cost lexpr
+  in
+  let* b = Script_repr.force_bytes lexpr in
+  let+ context =
+    Raw_context.consume_gas context
+    @@ Gas_costs.expr_to_address_in_context_cost b
+  in
+  (context, Script_expr_hash.hash_bytes [b])
 
 let node_too_large node =
   let node_size = Script_repr.Micheline_size.of_node node in
@@ -164,50 +170,60 @@ let expand_node context node =
   (* We charge for traversing the top-level node at the beginning.
      Inside the loop, we charge for traversing each new constant
      that gets expanded. *)
-  Raw_context.consume_gas
-    context
-    (Gas_costs.expand_no_constants_branch_cost node)
-  >>?= fun context ->
-  bottom_up_fold_cps
-    (* We carry a Boolean representing whether we
-       had to do any expansions or not. *)
-    (context, Expr_hash_map.empty, false)
-    node
-    (fun (context, _, did_expansion) node ->
-      return (context, node, did_expansion))
-    (fun (context, map, did_expansion) node k ->
-      match node with
-      | Prim (_, H_constant, args, annot) -> (
-          (* Charge for validating the b58check hash. *)
-          Raw_context.consume_gas context Gas_costs.expand_constants_branch_cost
-          >>?= fun context ->
-          match (args, annot) with
-          (* A constant Prim should always have a single String argument,
-              being a properly formatted hash. *)
-          | [String (_, address)], [] -> (
-              match Script_expr_hash.of_b58check_opt address with
-              | None -> tzfail Badly_formed_constant_expression
-              | Some hash -> (
-                  match Expr_hash_map.find hash map with
-                  | Some node ->
-                      (* Charge traversing the newly retrieved node *)
-                      Raw_context.consume_gas
-                        context
-                        (Gas_costs.expand_no_constants_branch_cost node)
-                      >>?= fun context -> k (context, map, true) node
-                  | None ->
-                      get context hash >>=? fun (context, expr) ->
-                      (* Charge traversing the newly retrieved node *)
-                      let node = root expr in
-                      Raw_context.consume_gas
-                        context
-                        (Gas_costs.expand_no_constants_branch_cost node)
-                      >>?= fun context ->
-                      k (context, Expr_hash_map.add hash node map, true) node))
-          | _ -> tzfail Badly_formed_constant_expression)
-      | Int _ | String _ | Bytes _ | Prim _ | Seq _ ->
-          k (context, map, did_expansion) node)
-  >>=? fun (context, node, did_expansion) ->
+  let open Lwt_result_syntax in
+  let*? context =
+    Raw_context.consume_gas
+      context
+      (Gas_costs.expand_no_constants_branch_cost node)
+  in
+  let* context, node, did_expansion =
+    bottom_up_fold_cps
+      (* We carry a Boolean representing whether we
+         had to do any expansions or not. *)
+      (context, Expr_hash_map.empty, false)
+      node
+      (fun (context, _, did_expansion) node ->
+        return (context, node, did_expansion))
+      (fun (context, map, did_expansion) node k ->
+        match node with
+        | Prim (_, H_constant, args, annot) -> (
+            (* Charge for validating the b58check hash. *)
+            let*? context =
+              Raw_context.consume_gas
+                context
+                Gas_costs.expand_constants_branch_cost
+            in
+            match (args, annot) with
+            (* A constant Prim should always have a single String argument,
+                being a properly formatted hash. *)
+            | [String (_, address)], [] -> (
+                match Script_expr_hash.of_b58check_opt address with
+                | None -> tzfail Badly_formed_constant_expression
+                | Some hash -> (
+                    match Expr_hash_map.find hash map with
+                    | Some node ->
+                        (* Charge traversing the newly retrieved node *)
+                        let*? context =
+                          Raw_context.consume_gas
+                            context
+                            (Gas_costs.expand_no_constants_branch_cost node)
+                        in
+                        k (context, map, true) node
+                    | None ->
+                        let* context, expr = get context hash in
+                        (* Charge traversing the newly retrieved node *)
+                        let node = root expr in
+                        let*? context =
+                          Raw_context.consume_gas
+                            context
+                            (Gas_costs.expand_no_constants_branch_cost node)
+                        in
+                        k (context, Expr_hash_map.add hash node map, true) node)
+                )
+            | _ -> tzfail Badly_formed_constant_expression)
+        | Int _ | String _ | Bytes _ | Prim _ | Seq _ ->
+            k (context, map, did_expansion) node)
+  in
   if did_expansion then
     (* Gas charged during expansion is at least proportional to the size of the
        resulting node so the execution time of [node_too_large] is already
@@ -217,7 +233,8 @@ let expand_node context node =
   else return (context, node)
 
 let expand context expr =
-  expand_node context (root expr) >|=? fun (context, node) ->
+  let open Lwt_result_syntax in
+  let+ context, node = expand_node context (root expr) in
   (context, strip_locations node)
 
 (** Computes the maximum depth of a Micheline node. Fails
@@ -226,7 +243,7 @@ let expand context expr =
 let check_depth node =
   let rec advance node depth k =
     if Compare.Int.(depth > Constants_repr.max_allowed_global_constant_depth)
-    then error Expression_too_deep
+    then Result_syntax.tzfail Expression_too_deep
     else
       match node with
       | Int _ | String _ | Bytes _ | Prim (_, _, [], _) | Seq (_, []) ->
@@ -249,16 +266,19 @@ let register context value =
 
      Though the stored expression is the unexpanded version.
   *)
-  expand_node context (root value) >>=? fun (context, node) ->
+  let open Lwt_result_syntax in
+  let* context, node = expand_node context (root value) in
   (* We do not need to carbonate [check_depth]. [expand_node] and
      [Storage.Global_constants.Map.init] are already carbonated
      with gas at least proportional to the size of the expanded node
      and the computation cost of [check_depth] is of the same order. *)
-  check_depth node >>?= fun (_depth : int) ->
-  expr_to_address_in_context context value >>?= fun (context, key) ->
-  trace Expression_already_registered
-  @@ Storage.Global_constants.Map.init context key value
-  >|=? fun (context, size) -> (context, key, Z.of_int size)
+  let*? (_depth : int) = check_depth node in
+  let*? context, key = expr_to_address_in_context context value in
+  let+ context, size =
+    trace Expression_already_registered
+    @@ Storage.Global_constants.Map.init context key value
+  in
+  (context, key, Z.of_int size)
 
 module Internal_for_tests = struct
   let node_too_large = node_too_large
