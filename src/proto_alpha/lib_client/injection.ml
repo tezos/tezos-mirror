@@ -226,7 +226,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       hash_pp [Signature.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
-      Operation.unsigned_encoding_with_legacy_attestation_name
+      Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
   item (fun ppf () ->
