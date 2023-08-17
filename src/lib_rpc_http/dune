@@ -24,11 +24,13 @@
   octez-libs.resto-cohttp-client
   octez-libs.rpc
   octez-libs.rpc-http)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_rpc_http)
- (modules RPC_client))
+ (modules RPC_client RPC_profiler))
 
 (library
  (name tezos_rpc_http_client_unix)

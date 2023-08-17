@@ -70,7 +70,8 @@ let may_start_profiler baking_dir =
           Tezos_base_unix.Simple_profiler.auto_write_to_txt_file
           Filename.Infix.((baking_dir // name) ^ "_profiling.txt", max_lod)
       in
-      Baking_profiler.init profiler_maker
+      Baking_profiler.init profiler_maker ;
+      RPC_profiler.init profiler_maker
   | _ -> ()
 
 module Baker = struct
