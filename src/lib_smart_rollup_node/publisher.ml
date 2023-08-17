@@ -285,6 +285,16 @@ let publish_commitment (node_ctxt : _ Node_context.t) ~source
   let* _hash = Injector.add_pending_operation ~source publish_operation in
   return_unit
 
+let inject_recover_bond (node_ctxt : _ Node_context.t) ~source
+    (staker : Signature.Public_key_hash.t) =
+  let open Lwt_result_syntax in
+  let recover_operation =
+    L1_operation.Recover_bond {rollup = node_ctxt.rollup_address; staker}
+  in
+  let*! () = Commitment_event.recover_bond staker in
+  let* _hash = Injector.add_pending_operation ~source recover_operation in
+  return_unit
+
 let on_publish_commitments (node_ctxt : state) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Operating in
@@ -294,7 +304,7 @@ let on_publish_commitments (node_ctxt : state) =
   else
     match operator with
     | None ->
-        (* Configured to not publish commitments *)
+        (* No known operator we can recover bond for. *)
         return_unit
     | Some source ->
         let* commitments = missing_commitments node_ctxt in
@@ -312,6 +322,18 @@ let publish_single_commitment node_ctxt
   | Some source ->
       when_ (commitment.inbox_level > lcc.level) @@ fun () ->
       publish_commitment node_ctxt ~source commitment
+
+let recover_bond node_ctxt =
+  let open Lwt_result_syntax in
+  let operator = Node_context.get_operator node_ctxt Operating in
+  let recovery_operator = Node_context.get_operator node_ctxt Recovering in
+  match operator with
+  | None ->
+      (* No known operator to recover bond for. *)
+      return_unit
+  | Some committer ->
+      let source = Option.value recovery_operator ~default:committer in
+      inject_recover_bond node_ctxt ~source committer
 
 (* Commitments can only be cemented after [sc_rollup_challenge_window] has
    passed since they were first published. *)

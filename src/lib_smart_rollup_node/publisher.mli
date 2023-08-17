@@ -60,6 +60,12 @@ val process_head :
 val publish_single_commitment :
   _ Node_context.t -> Commitment.t -> unit tzresult Lwt.t
 
+(** [recover_bond node_ctxt] publishes a recover bond operator for the
+    Operating key. The submitter is either the operator or another
+    address depending of the rollup node configuration. This function
+    is intended to be used by the {e bailout} mode. *)
+val recover_bond : _ Node_context.t -> unit tzresult Lwt.t
+
 (** Initialize worker for publishing and cementing commitments. *)
 val init : _ Node_context.t -> unit tzresult Lwt.t
 
