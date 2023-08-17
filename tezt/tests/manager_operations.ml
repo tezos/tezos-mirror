@@ -949,7 +949,7 @@ module Deserialisation = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract protocol nodes.main in
-    let size_kB = 20 in
+    let size_kB = 21 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
     (* This is specific to this contract, obtained empirically *)
@@ -963,7 +963,7 @@ module Deserialisation = struct
       inject_call_with_bytes
         ~protocol
         ~contract
-        ~size_kB:20
+        ~size_kB
         ~gas_limit:(min_deserialization_gas + gas_for_the_rest - 1)
         (* Enough gas to deserialize or to do the rest, but not to do both *)
         nodes.main.client
