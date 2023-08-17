@@ -183,7 +183,12 @@ let init_node_client_with_protocol number_of_additional_bootstrap protocol =
     Client.stresstest_gen_keys number_of_additional_bootstrap client
   in
   let additional_bootstrap_accounts =
-    List.map (fun x -> (x, Some 500_000_000, true)) additional_bootstrap_account
+    List.map
+      (fun x -> (x, Some 500_000_000, false))
+      additional_bootstrap_account
+    (* Starting with Oxford, bootstrap delegates have part of their balance
+       frozen. To avoid having account with none available balance we don't use
+       revealed bootstrap account and we reveal them later on. *)
   in
   let* parameter_file =
     Protocol.write_parameter_file
@@ -194,7 +199,7 @@ let init_node_client_with_protocol number_of_additional_bootstrap protocol =
   let* () =
     Client.activate_protocol_and_wait ~parameter_file ~protocol ~node client
   in
-  return (client, node)
+  return (client, node, additional_bootstrap_account)
 
 (** Originate the contract and bake a block to apply the origination *)
 let originate_contract ~protocol client node =
@@ -214,18 +219,23 @@ let originate_contract ~protocol client node =
     client] create an {Operation_core.t} value that can be use by the
     [inject_operations] RPCs.
 
-    - If [manager_kind] if [`Transfer] a transfer from [source] to
+    - If [manager_kind] is [`Reveal], a reveal of [source] is forged
+
+    - If [manager_kind] is [`Transfer] a transfer from [source] to
       [bootstrap1] is forged
 
-    - If [manager_kind] if [`Call] a call to [contract_hash] is forged with an
+    - If [manager_kind] is [`Call] a call to [contract_hash] is forged with an
       argument that make the operation consume approximately ~1M of gas unit.
 
-    - If [manager_kind] if [`Origination] an origination of a big contract is
+    - If [manager_kind] is [`Origination] an origination of a big contract is
       forged. *)
 let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
     client =
   let operation =
     match manager_kind with
+    | `Reveal ->
+        Operation.Manager.make ~source ~counter
+        @@ Operation.Manager.reveal source
     | `Transfer ->
         Operation.Manager.make ~source ~counter
         @@ Operation.Manager.transfer
@@ -304,6 +314,58 @@ let forging_n_operations ?contract_hash bootstraps manager_kind client =
         client)
     bootstraps
 
+let revealing_additional_bootstrap_accounts additional_bootstraps
+    number_of_operations protocol node client =
+  let* ops = forging_n_operations additional_bootstraps `Reveal client in
+  let* op_hashes =
+    Operation.inject_operations
+      ~use_tmp_file:true
+      ~protocol:Protocol.Alpha
+      ~force:false
+      ops
+      client
+  in
+  Check.(List.length op_hashes = number_of_operations)
+    Check.int
+    ~error_msg:"Expected %R forged operations. Got %L" ;
+
+  let bake_and_get_ophs () =
+    let* _lvl =
+      bake_for ~wait_for_flush:true ~empty:false ~protocol node client
+    in
+    let* block_ophs =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_operation_hashes_of_validation_pass 3
+    in
+    return block_ophs
+  in
+
+  (* Reveal operations cost more than simple transfers, we may need to bake 2
+     blocks to reveal all additional accounts. *)
+  let* block_ophs =
+    let rec aux block_ophs_acc () =
+      let* block_ophs = bake_and_get_ophs () in
+      let block_ophs = List.rev_append block_ophs block_ophs_acc in
+      let* mempool = Mempool.get_mempool client in
+      if List.length mempool.validated <> 0 then aux block_ophs ()
+      else return block_ophs
+    in
+    aux [] ()
+  in
+  Check.(List.length block_ophs = number_of_operations)
+    Check.int
+    ~error_msg:"Expected %R operations in the block. Got %L" ;
+
+  let op_hashes = List.map (fun (`OpHash oph) -> oph) op_hashes in
+  if
+    not
+      (List.for_all2
+         String.equal
+         (List.sort String.compare op_hashes)
+         (List.sort String.compare block_ophs))
+  then Test.fail ~__LOC__ "Block does not contains all reveal operation" ;
+  unit
+
 (* Test *)
 let operation_and_block_validation protocol manager_kind tag =
   let margin =
@@ -322,10 +384,17 @@ let operation_and_block_validation protocol manager_kind tag =
     "Initialise node and client with %d bootstrap accounts with protocol %s"
     number_of_operations
     (Protocol.name protocol) ;
-  let* client, node =
+  let* client, node, additional_bootstraps =
     init_node_client_with_protocol number_of_operations protocol
   in
-  let additional_bootstraps = Client.additional_bootstraps client in
+  let* () =
+    revealing_additional_bootstrap_accounts
+      additional_bootstraps
+      number_of_operations
+      protocol
+      node
+      client
+  in
   let* contract_hash, lvl = originate_contract ~protocol client node in
 
   let color = Log.Color.FG.green in
