@@ -861,7 +861,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Nairobi_017
+type previous_protocol = Genesis of Parameters_repr.t | Oxford_018
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -873,7 +873,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "nairobi_017") then return (Nairobi_017, ctxt)
+       else if Compare.String.(s = "oxford_018") then return (Oxford_018, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string Constants_repr.version_value)
@@ -908,7 +908,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
    encoding directly in a way which is compatible with the previous
    protocol. However, by doing so, you do not change the value of
    these constants inside the context. *)
-let prepare_first_block ~level ~timestamp chain_id ctxt =
+let prepare_first_block ~level ~timestamp _chain_id ctxt =
   check_and_update_protocol_version ctxt >>=? fun (previous_proto, ctxt) ->
   (match previous_proto with
   | Genesis param ->
@@ -924,7 +924,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Nairobi_017 ->
+  | Oxford_018 ->
       get_previous_protocol_constants ctxt >>= fun c ->
       let cryptobox_parameters =
         {
@@ -951,10 +951,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
       let reveal_activation_level :
           Constants_parametric_repr.sc_rollup_reveal_activation_level =
         {
-          raw_data = {blake2B = Raw_level_repr.root};
-          metadata = Raw_level_repr.root;
+          raw_data =
+            {blake2B = c.sc_rollup.reveal_activation_level.raw_data.blake2B};
+          metadata = c.sc_rollup.reveal_activation_level.metadata;
           dal_page =
-            (if c.dal.feature_enable then Raw_level_repr.root
+            (if c.dal.feature_enable then
+             c.sc_rollup.reveal_activation_level.dal_page
             else if dal.feature_enable then
               (* First level of the protocol with dal activated. *)
               Raw_level_repr.of_int32_exn (Int32.succ level)
@@ -1001,71 +1003,56 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             enable = c.zk_rollup.enable;
             origination_size = c.zk_rollup.origination_size;
             min_pending_to_process = c.zk_rollup.min_pending_to_process;
-            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
+            max_ticket_payload_size = c.zk_rollup.max_ticket_payload_size;
+          }
+      in
+
+      let issuance_weights =
+        Constants_parametric_repr.
+          {
+            base_total_issued_per_minute =
+              c.issuance_weights.base_total_issued_per_minute;
+            baking_reward_fixed_portion_weight =
+              c.issuance_weights.baking_reward_fixed_portion_weight;
+            baking_reward_bonus_weight =
+              c.issuance_weights.baking_reward_bonus_weight;
+            attesting_reward_weight = c.issuance_weights.attesting_reward_weight;
+            liquidity_baking_subsidy_weight =
+              c.issuance_weights.liquidity_baking_subsidy_weight;
+            seed_nonce_revelation_tip_weight =
+              c.issuance_weights.seed_nonce_revelation_tip_weight;
+            vdf_revelation_tip_weight =
+              c.issuance_weights.vdf_revelation_tip_weight;
           }
       in
 
       let adaptive_rewards_params =
         Constants_parametric_repr.
           {
-            issuance_ratio_min = Q.(5 // 10000) (* 0.05% *);
-            issuance_ratio_max = Q.(1 // 20) (* 5% *);
-            max_bonus = 50_000_000_000_000L (* 5% *);
+            issuance_ratio_min =
+              c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_min;
+            issuance_ratio_max =
+              c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
+            max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
             growth_rate =
-              115_740_740L
-              (* 0.01 * [bonus_unit] / second_per_day
-                 For each % and each day, grows the bonus by 0.01% *);
-            center_dz = Q.(1 // 2) (* 50% *);
-            radius_dz = Q.(1 // 50) (* 2% *);
+              c.adaptive_issuance.adaptive_rewards_params.growth_rate;
+            center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
+            radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
           }
       in
 
       let adaptive_issuance =
         Constants_parametric_repr.
           {
-            global_limit_of_staking_over_baking = 5;
-            edge_of_staking_over_delegation = 2;
-            launch_ema_threshold =
-              (if Chain_id.equal Constants_repr.mainnet_id chain_id then
-               (* 80% of the max ema (which is 2 billion) *) 1_600_000_000l
-              else (* 5% for testnets *) 100_000_000l);
+            global_limit_of_staking_over_baking =
+              c.adaptive_issuance.global_limit_of_staking_over_baking;
+            edge_of_staking_over_delegation =
+              c.adaptive_issuance.edge_of_staking_over_delegation;
+            launch_ema_threshold = c.adaptive_issuance.launch_ema_threshold;
             adaptive_rewards_params;
           }
       in
 
-      let issuance_weights =
-        let c_gen =
-          Constants_repr.Generated.generate
-            ~consensus_committee_size:c.consensus_committee_size
-        in
-        c_gen.issuance_weights
-      in
-
-      let percentage_of_frozen_deposits_slashed_per_double_attestation =
-        100
-        * c.ratio_of_frozen_deposits_slashed_per_double_attestation.numerator
-        / c.ratio_of_frozen_deposits_slashed_per_double_attestation.denominator
-      in
-      let percentage_of_frozen_deposits_slashed_per_double_baking =
-        let double_baking_punishment_times_100 =
-          Int64.mul 100L (Tez_repr.to_mutez c.double_baking_punishment)
-        in
-        let percentage_rounded_down =
-          Int64.div
-            double_baking_punishment_times_100
-            (Tez_repr.to_mutez c.minimal_stake)
-        in
-        Int64.to_int percentage_rounded_down
-      in
-      let limit_of_delegation_over_baking =
-        (100 / c.frozen_deposits_percentage) - 1
-      in
-      let minimal_frozen_stake =
-        Tez_repr.(
-          div_exn
-            (mul_exn c.minimal_stake (limit_of_delegation_over_baking + 1))
-            100)
-      in
       let constants =
         Constants_parametric_repr.
           {
@@ -1079,7 +1066,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             minimal_stake = c.minimal_stake;
-            minimal_frozen_stake;
+            minimal_frozen_stake = c.minimal_frozen_stake;
             vdf_difficulty = c.vdf_difficulty;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
@@ -1098,9 +1085,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             consensus_threshold = c.consensus_threshold;
             minimal_participation_ratio = c.minimal_participation_ratio;
             max_slashing_period = c.max_slashing_period;
-            limit_of_delegation_over_baking;
-            percentage_of_frozen_deposits_slashed_per_double_baking;
-            percentage_of_frozen_deposits_slashed_per_double_attestation;
+            limit_of_delegation_over_baking = c.limit_of_delegation_over_baking;
+            percentage_of_frozen_deposits_slashed_per_double_baking =
+              c.percentage_of_frozen_deposits_slashed_per_double_baking;
+            percentage_of_frozen_deposits_slashed_per_double_attestation =
+              c.percentage_of_frozen_deposits_slashed_per_double_attestation;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
             testnet_dictator = c.testnet_dictator;
             initial_seed = c.initial_seed;
