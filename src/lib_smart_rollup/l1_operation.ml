@@ -33,6 +33,7 @@ type t =
       refutation : Game.refutation;
     }
   | Timeout of {rollup : Address.t; stakers : Game.index}
+  | Recover_bond of {rollup : Address.t; staker : Signature.Public_key_hash.t}
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -95,6 +96,16 @@ let encoding : t Data_encoding.t =
            (function
              | Timeout {rollup; stakers} -> Some (rollup, stakers) | _ -> None)
            (fun (rollup, stakers) -> Timeout {rollup; stakers});
+         case
+           5
+           "recover"
+           (obj2
+              (req "rollup" Address.encoding)
+              (req "staker" Signature.Public_key_hash.encoding))
+           (function
+             | Recover_bond {rollup; staker} -> Some (rollup, staker)
+             | _ -> None)
+           (fun (rollup, staker) -> Recover_bond {rollup; staker});
        ]
 
 let pp ppf = function
@@ -149,7 +160,8 @@ let pp ppf = function
         Signature.Public_key_hash.pp
         opponent
   | Timeout {rollup = _; stakers = _} -> Format.fprintf ppf "timeout"
+  | Recover_bond {rollup = _; staker = _} -> Format.fprintf ppf "recover"
 
 let unique = function
   | Add_messages _ | Cement _ -> false
-  | Publish _ | Refute _ | Timeout _ -> true
+  | Publish _ | Refute _ | Timeout _ | Recover_bond _ -> true

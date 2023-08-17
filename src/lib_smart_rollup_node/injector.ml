@@ -79,6 +79,7 @@ module Parameters :
     | Publish _ -> Publish
     | Timeout _ -> Timeout
     | Refute _ -> Refute
+    | Recover_bond _ -> Recover
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in
