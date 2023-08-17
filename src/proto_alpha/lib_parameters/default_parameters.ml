@@ -327,6 +327,7 @@ let constants_test =
   in
   {
     constants_mainnet with
+    sc_rollup = {constants_mainnet.sc_rollup with private_enable = true};
     dal =
       Constants.Parametric.
         {
