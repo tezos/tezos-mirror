@@ -39,7 +39,7 @@ let new_address ctxt =
     Raw_context.consume_gas ctxt Sc_rollup_costs.Constants.cost_serialize_nonce
   in
   match Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce with
-  | None -> error Sc_rollup_address_generation
+  | None -> tzfail Sc_rollup_address_generation
   | Some nonce_bytes ->
       let bytes_len = Bytes.length nonce_bytes in
       let+ ctxt =
@@ -192,9 +192,9 @@ let kind ctxt address =
   | None -> tzfail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
 let list_unaccounted ctxt =
-  let open Lwt_syntax in
-  let+ res = Store.PVM_kind.keys_unaccounted ctxt in
-  Result.return res
+  let open Lwt_result_syntax in
+  let*! res = Store.PVM_kind.keys_unaccounted ctxt in
+  return res
 
 let genesis_info ctxt rollup =
   let open Lwt_result_syntax in

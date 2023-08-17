@@ -156,7 +156,7 @@ let serialize_pvm_step (type state proof output)
   let (module PVM) = pvm in
   match Data_encoding.Binary.to_string_opt PVM.proof_encoding proof with
   | Some p -> return p
-  | None -> error (Sc_rollup_proof_check "Cannot serialize proof")
+  | None -> tzfail (Sc_rollup_proof_check "Cannot serialize proof")
 
 let unserialize_pvm_step (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation)
@@ -165,7 +165,7 @@ let unserialize_pvm_step (type state proof output)
   let (module PVM) = pvm in
   match Data_encoding.Binary.of_string_opt PVM.proof_encoding proof with
   | Some p -> return p
-  | None -> error (Sc_rollup_proof_check "Cannot unserialize proof")
+  | None -> tzfail (Sc_rollup_proof_check "Cannot unserialize proof")
 
 let serialized_encoding = Data_encoding.string Hex
 
@@ -216,11 +216,11 @@ let proof_error reason =
 
 let check p reason =
   let open Lwt_result_syntax in
-  if p then return () else proof_error reason
+  if p then return_unit else proof_error reason
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-  | None -> error Sc_rollup_invalid_serialized_inbox_proof
+  | None -> Result_syntax.tzfail Sc_rollup_invalid_serialized_inbox_proof
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 

@@ -68,10 +68,10 @@ let add_messages ctxt messages =
   return ctxt
 
 let serialize_external_messages ctxt external_messages =
+  let open Result_syntax in
   let open Sc_rollup_inbox_message_repr in
   List.fold_left_map_e
     (fun ctxt message ->
-      let open Result_syntax in
       (* Pay gas for serializing an external message. *)
       let* ctxt =
         let bytes_len = String.length message in

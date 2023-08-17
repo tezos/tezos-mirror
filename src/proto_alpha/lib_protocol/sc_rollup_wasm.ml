@@ -369,10 +369,10 @@ module V2_0_0 = struct
       result_of (get_status ~is_reveal_enabled)
 
     let get_outbox outbox_level state =
+      let open Lwt_syntax in
       let outbox_level_int32 =
         Raw_level_repr.to_int32_non_negative outbox_level
       in
-      let open Lwt_syntax in
       let rec aux outbox message_index =
         let output =
           Wasm_2_0_0.{outbox_level = outbox_level_int32; message_index}
@@ -687,8 +687,8 @@ module V2_0_0 = struct
 
     module Internal_for_tests = struct
       let insert_failure state =
-        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let open Lwt_syntax in
+        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
         let* n = Tree.length state ["failures"] in
         add n
     end
@@ -723,7 +723,7 @@ module V2_0_0 = struct
 
         let produce_proof _context _state _f =
           (* Can't produce proof without full context*)
-          Lwt.return None
+          Lwt.return_none
 
         let kinded_hash_to_state_hash = function
           | `Value hash | `Node hash ->
