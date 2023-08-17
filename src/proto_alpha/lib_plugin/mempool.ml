@@ -246,9 +246,7 @@ let size_of_operation op =
   (WithExceptions.Option.get ~loc:__LOC__
   @@ Data_encoding.Binary.fixed_length
        Tezos_base.Operation.shell_header_encoding)
-  + Data_encoding.Binary.length
-      Operation.protocol_data_encoding_with_legacy_attestation_name
-      op
+  + Data_encoding.Binary.length Operation.protocol_data_encoding op
 
 (** Returns the weight and resources consumption of an operation. The weight
       corresponds to the one implemented by the baker, to decide which operations

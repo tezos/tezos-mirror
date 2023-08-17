@@ -62,9 +62,7 @@ let encoding : t Data_encoding.t =
        (req
           "operations"
           (Operation_hash.Map.encoding
-             (dynamic_size
-                ~kind:`Uint30
-                Operation.encoding_with_legacy_attestation_name)))
+             (dynamic_size ~kind:`Uint30 Operation.encoding)))
 
 let init ctxt chain_id ~predecessor_level ~predecessor_round ~predecessor_hash :
     validation_info * t =

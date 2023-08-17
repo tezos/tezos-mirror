@@ -97,18 +97,10 @@ let ordered_pool_encoding =
     (fun (consensus, votes, anonymous, managers) ->
       {consensus; votes; anonymous; managers})
     (obj4
-       (req
-          "ordered_consensus"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
-       (req
-          "ordered_votes"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
-       (req
-          "ordered_anonymouns"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
-       (req
-          "ordered_managers"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))))
+       (req "ordered_consensus" (list (dynamic_size Operation.encoding)))
+       (req "ordered_votes" (list (dynamic_size Operation.encoding)))
+       (req "ordered_anonymouns" (list (dynamic_size Operation.encoding)))
+       (req "ordered_managers" (list (dynamic_size Operation.encoding))))
 
 type payload = {
   votes_payload : packed_operation list;
@@ -127,15 +119,9 @@ let payload_encoding =
     (fun (votes_payload, anonymous_payload, managers_payload) ->
       {votes_payload; anonymous_payload; managers_payload})
     (obj3
-       (req
-          "votes_payload"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
-       (req
-          "anonymous_payload"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name)))
-       (req
-          "managers_payload"
-          (list (dynamic_size Operation.encoding_with_legacy_attestation_name))))
+       (req "votes_payload" (list (dynamic_size Operation.encoding)))
+       (req "anonymous_payload" (list (dynamic_size Operation.encoding)))
+       (req "managers_payload" (list (dynamic_size Operation.encoding))))
 
 let pp_payload fmt {votes_payload; anonymous_payload; managers_payload} =
   Format.fprintf
