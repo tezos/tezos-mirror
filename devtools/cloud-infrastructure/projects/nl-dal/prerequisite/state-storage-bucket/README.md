@@ -19,7 +19,7 @@ Create a file named `terraform.tfvars` in this directory that contains the follo
 bucket=<bucket>
 ```
 
-The `<bucket>` it is recommenced that:
+Recommendation for `<bucket>`:
 
 - It contains a string that is unique to you, like your name.
 - It ends with `-tfstate` to indicate that it is a Terraform state file.
@@ -30,7 +30,7 @@ For example:
 bucket="lin-tfstate"
 ```
 
-Now
+Now run:
 
 ```shell
 terraform init
