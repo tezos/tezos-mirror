@@ -71,6 +71,7 @@ module Parameters :
     | Cement -> 1
     | Timeout -> 1
     | Refute -> 1
+    | Recover -> 1
 
   let operation_tag : Operation.t -> Tag.t = function
     | Add_messages _ -> Add_messages
