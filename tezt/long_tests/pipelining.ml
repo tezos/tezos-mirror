@@ -210,7 +210,7 @@ let originate_contract ~protocol client node =
   let* lvl = bake_for ~wait_for_flush:true ~empty:false ~protocol node client in
   return (contract_hash, lvl)
 
-(** [forging_operation manager_kind ~source ~branch ~counter contract_hash
+(** [forging_operation ?contract_hash manager_kind ~source ~branch ~counter
     client] create an {Operation_core.t} value that can be use by the
     [inject_operations] RPCs.
 
@@ -222,8 +222,8 @@ let originate_contract ~protocol client node =
 
     - If [manager_kind] if [`Origination] an origination of a big contract is
       forged. *)
-let forging_operation manager_kind ~source ~branch ~counter contract_hash client
-    =
+let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
+    client =
   let operation =
     match manager_kind with
     | `Transfer ->
@@ -232,16 +232,24 @@ let forging_operation manager_kind ~source ~branch ~counter contract_hash client
              ~dest:Account.Bootstrap.keys.(1)
              ~amount:1
              ()
-    | `Call ->
+    | `Call -> (
         (* Magical constant that makes the contract consume around 850K gas unit *)
         let arg = `O [("int", `String "8206473")] in
-        Operation.Manager.make ~source ~counter ~fee:850_000 ~gas_limit:850_000
-        @@ Operation.Manager.call
-             ~amount:0
-             ~entrypoint:"default"
-             ~arg
-             ~dest:contract_hash
-             ()
+        match contract_hash with
+        | None ->
+            Test.fail "Contract hash should be given to craft Call operations"
+        | Some contract_hash ->
+            Operation.Manager.make
+              ~source
+              ~counter
+              ~fee:850_000
+              ~gas_limit:850_000
+            @@ Operation.Manager.call
+                 ~amount:0
+                 ~entrypoint:"default"
+                 ~arg
+                 ~dest:contract_hash
+                 ())
     | `Origination ->
         let contract =
           Format.asprintf
@@ -275,7 +283,7 @@ let forging_operation manager_kind ~source ~branch ~counter contract_hash client
   in
   Operation.Manager.operation ~branch ~signer:source [operation] client
 
-let forging_n_operations bootstraps contract_hash manager_kind client =
+let forging_n_operations ?contract_hash bootstraps manager_kind client =
   (* explicitly anchor the forged operations on the first block *)
   let* branch =
     RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"0" ()
@@ -288,11 +296,11 @@ let forging_n_operations bootstraps contract_hash manager_kind client =
   Lwt_list.map_s
     (fun source ->
       forging_operation
+        ?contract_hash
         manager_kind
         ~source
         ~counter
         ~branch
-        contract_hash
         client)
     bootstraps
 
@@ -344,7 +352,11 @@ let operation_and_block_validation protocol manager_kind tag =
 
   Log.info "Forging %d operations" number_of_operations ;
   let* ops =
-    forging_n_operations additional_bootstraps contract_hash manager_kind client
+    forging_n_operations
+      ~contract_hash
+      additional_bootstraps
+      manager_kind
+      client
   in
 
   Log.info "Injecting %d operations" number_of_operations ;
