@@ -169,7 +169,7 @@ Example tests:
 References:
  - :doc:`Section in Tezos Developer Documentation on Tezt <tezt>`
  - `General API documentation <https://nomadic-labs.gitlab.io/tezt/dev/tezt/Tezt/index.html>`__
- - :package-api:`Octez-specific API documentation <octez-libs/Tezt_tezos/index.html>`
+ - :package-api:`Octez-specific API documentation <tezt-tezos/Tezt_tezos/index.html>`
 
 .. _long_tezt_section:
 

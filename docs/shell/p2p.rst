@@ -17,7 +17,7 @@ The P2P layer is comprised of a pool of connections, a set of
 operations on those connections, and a set of workers following the
 worker pattern pervasively used in the codebase.
 
-The P2P layer is packaged in :package-api:`tezos-p2p <octez-libs/Tezos_p2p/index.html>`, which has
+The P2P layer is packaged in :package-api:`tezos-p2p <octez-shell-libs/Tezos_p2p/index.html>`, which has
 documentation for all modules.
 
 General operation
