@@ -5,5 +5,3 @@ ocaml-check:
   needs: [trigger]
   script:
     - dune build @check
-    - git apply src/bin_tps_evaluation/lift_limits.patch
-    - dune build @check src/bin_tps_evaluation
