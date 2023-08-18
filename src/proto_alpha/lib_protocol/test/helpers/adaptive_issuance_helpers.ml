@@ -92,7 +92,25 @@ let balance_pp fmt
     Q.pp_print
     pool_pseudo
 
-let balance_update_pp fmt (a, b) =
+let balance_update_pp fmt
+    ( {
+        liquid = a_liquid;
+        bonds = a_bonds;
+        staked = a_staked;
+        unstaked_frozen = a_unstaked_frozen;
+        unstaked_finalizable = a_unstaked_finalizable;
+        pool_tez = a_pool_tez;
+        pool_pseudo = a_pool_pseudo;
+      },
+      {
+        liquid = b_liquid;
+        bonds = b_bonds;
+        staked = b_staked;
+        unstaked_frozen = b_unstaked_frozen;
+        unstaked_finalizable = b_unstaked_finalizable;
+        pool_tez = b_pool_tez;
+        pool_pseudo = b_pool_pseudo;
+      } ) =
   Format.fprintf
     fmt
     "{@;\
@@ -105,67 +123,103 @@ let balance_update_pp fmt (a, b) =
      pool_pseudo : %a -> %a@]@;\
      }@."
     Tez.pp
-    a.liquid
+    a_liquid
     Tez.pp
-    b.liquid
+    b_liquid
     Tez.pp
-    a.bonds
+    a_bonds
     Tez.pp
-    b.bonds
+    b_bonds
     Q.pp_print
-    a.staked
+    a_staked
     Q.pp_print
-    b.staked
+    b_staked
     Tez.pp
-    a.unstaked_frozen
+    a_unstaked_frozen
     Tez.pp
-    b.unstaked_frozen
+    b_unstaked_frozen
     Tez.pp
-    a.unstaked_finalizable
+    a_unstaked_finalizable
     Tez.pp
-    b.unstaked_finalizable
+    b_unstaked_finalizable
     Tez.pp
-    a.pool_tez
+    a_pool_tez
     Tez.pp
-    b.pool_tez
+    b_pool_tez
     Q.pp_print
-    a.pool_pseudo
+    a_pool_pseudo
     Q.pp_print
-    b.pool_pseudo
+    b_pool_pseudo
 
-let assert_balance_equal ~loc a b =
+let assert_balance_equal ~loc
+    {
+      liquid = a_liquid;
+      bonds = a_bonds;
+      staked = a_staked;
+      unstaked_frozen = a_unstaked_frozen;
+      unstaked_finalizable = a_unstaked_finalizable;
+      pool_tez = a_pool_tez;
+      pool_pseudo = a_pool_pseudo;
+    }
+    {
+      liquid = b_liquid;
+      bonds = b_bonds;
+      staked = b_staked;
+      unstaked_frozen = b_unstaked_frozen;
+      unstaked_finalizable = b_unstaked_finalizable;
+      pool_tez = b_pool_tez;
+      pool_pseudo = b_pool_pseudo;
+    } =
   let open Lwt_result_syntax in
-  let* () = Assert.equal_tez ~loc a.liquid b.liquid in
-  let* () = Assert.equal_tez ~loc a.bonds b.bonds in
+  let* () = Assert.equal_tez ~loc a_liquid b_liquid in
+  let* () = Assert.equal_tez ~loc a_bonds b_bonds in
   let* () =
-    Assert.equal ~loc Q.equal "Assert equal staked" Q.pp_print a.staked b.staked
+    Assert.equal ~loc Q.equal "Assert equal staked" Q.pp_print a_staked b_staked
   in
-  let* () = Assert.equal_tez ~loc a.unstaked_frozen b.unstaked_frozen in
+  let* () = Assert.equal_tez ~loc a_unstaked_frozen b_unstaked_frozen in
   let* () =
-    Assert.equal_tez ~loc a.unstaked_finalizable b.unstaked_finalizable
+    Assert.equal_tez ~loc a_unstaked_finalizable b_unstaked_finalizable
   in
-  let* () = Assert.equal_tez ~loc a.pool_tez b.pool_tez in
+  let* () = Assert.equal_tez ~loc a_pool_tez b_pool_tez in
   let* () =
     Assert.equal
       ~loc
       Q.equal
       "Assert equal pool pseudotokens"
       Q.pp_print
-      a.pool_pseudo
-      b.pool_pseudo
+      a_pool_pseudo
+      b_pool_pseudo
   in
   return_unit
 
-let balance_add bbd1 bbd2 =
+let balance_add
+    {
+      liquid = bbd1_liquid;
+      bonds = bbd1_bonds;
+      staked = bbd1_staked;
+      unstaked_frozen = bbd1_unstaked_frozen;
+      unstaked_finalizable = bbd1_unstaked_finalizable;
+      pool_tez = bbd1_pool_tez;
+      pool_pseudo = bbd1_pool_pseudo;
+    }
+    {
+      liquid = bbd2_liquid;
+      bonds = bbd2_bonds;
+      staked = bbd2_staked;
+      unstaked_frozen = bbd2_unstaked_frozen;
+      unstaked_finalizable = bbd2_unstaked_finalizable;
+      pool_tez = bbd2_pool_tez;
+      pool_pseudo = bbd2_pool_pseudo;
+    } =
   let open Lwt_result_syntax in
-  let* liquid = Tez.(bbd1.liquid + bbd2.liquid) in
-  let* bonds = Tez.(bbd1.bonds + bbd2.bonds) in
-  let staked = Q.add bbd1.staked bbd2.staked in
-  let pool_pseudo = Q.add bbd1.pool_pseudo bbd2.pool_pseudo in
-  let* pool_tez = Tez.(bbd1.pool_tez + bbd2.pool_tez) in
-  let* unstaked_frozen = Tez.(bbd1.unstaked_frozen + bbd2.unstaked_frozen) in
+  let* liquid = Tez.(bbd1_liquid + bbd2_liquid) in
+  let* bonds = Tez.(bbd1_bonds + bbd2_bonds) in
+  let staked = Q.add bbd1_staked bbd2_staked in
+  let pool_pseudo = Q.add bbd1_pool_pseudo bbd2_pool_pseudo in
+  let* pool_tez = Tez.(bbd1_pool_tez + bbd2_pool_tez) in
+  let* unstaked_frozen = Tez.(bbd1_unstaked_frozen + bbd2_unstaked_frozen) in
   let* unstaked_finalizable =
-    Tez.(bbd1.unstaked_finalizable + bbd2.unstaked_finalizable)
+    Tez.(bbd1_unstaked_finalizable + bbd2_unstaked_finalizable)
   in
   return
     {
@@ -179,16 +233,34 @@ let balance_add bbd1 bbd2 =
     }
 
 (* Will raise an error if one of the tez field in bbd1 is less than the same field in bbd2 *)
-let balance_sub bbd1 bbd2 =
+let balance_sub
+    {
+      liquid = bbd1_liquid;
+      bonds = bbd1_bonds;
+      staked = bbd1_staked;
+      unstaked_frozen = bbd1_unstaked_frozen;
+      unstaked_finalizable = bbd1_unstaked_finalizable;
+      pool_tez = bbd1_pool_tez;
+      pool_pseudo = bbd1_pool_pseudo;
+    }
+    {
+      liquid = bbd2_liquid;
+      bonds = bbd2_bonds;
+      staked = bbd2_staked;
+      unstaked_frozen = bbd2_unstaked_frozen;
+      unstaked_finalizable = bbd2_unstaked_finalizable;
+      pool_tez = bbd2_pool_tez;
+      pool_pseudo = bbd2_pool_pseudo;
+    } =
   let open Lwt_result_syntax in
-  let* liquid = Tez.(bbd1.liquid - bbd2.liquid) in
-  let* bonds = Tez.(bbd1.bonds - bbd2.bonds) in
-  let staked = Q.sub bbd1.staked bbd2.staked in
-  let pool_pseudo = Q.sub bbd1.pool_pseudo bbd2.pool_pseudo in
-  let* pool_tez = Tez.(bbd1.pool_tez - bbd2.pool_tez) in
-  let* unstaked_frozen = Tez.(bbd1.unstaked_frozen - bbd2.unstaked_frozen) in
+  let* liquid = Tez.(bbd1_liquid - bbd2_liquid) in
+  let* bonds = Tez.(bbd1_bonds - bbd2_bonds) in
+  let staked = Q.sub bbd1_staked bbd2_staked in
+  let pool_pseudo = Q.sub bbd1_pool_pseudo bbd2_pool_pseudo in
+  let* pool_tez = Tez.(bbd1_pool_tez - bbd2_pool_tez) in
+  let* unstaked_frozen = Tez.(bbd1_unstaked_frozen - bbd2_unstaked_frozen) in
   let* unstaked_finalizable =
-    Tez.(bbd1.unstaked_finalizable - bbd2.unstaked_finalizable)
+    Tez.(bbd1_unstaked_finalizable - bbd2_unstaked_finalizable)
   in
   return
     {
