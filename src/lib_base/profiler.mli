@@ -92,6 +92,8 @@ val report_encoding : report Data_encoding.t
 
 type (_, _) kind = ..
 
+type file_format = Plain_text | Json
+
 module type DRIVER = sig
   (** Parameters to launch an instance of the driver. *)
   type config

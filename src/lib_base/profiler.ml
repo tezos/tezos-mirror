@@ -124,6 +124,8 @@ let report_encoding =
 
 type (_, _) kind = ..
 
+type file_format = Plain_text | Json
+
 module type DRIVER = sig
   type config
 

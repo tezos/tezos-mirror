@@ -310,7 +310,7 @@ type output =
   | Closed of string
   | Open of string * out_channel * Format.formatter
 
-type nonrec auto_writer_state = {
+type auto_writer_state = {
   mutable profiler_state : state;
   mutable output : output;
   time : time;
@@ -319,11 +319,13 @@ type nonrec auto_writer_state = {
 type (_, _) Profiler.kind +=
   | Auto_write_to_file : (string * lod, auto_writer_state) Profiler.kind
 
-let make_driver ~writer =
+let make_driver ~file_format =
   (module struct
     type nonrec state = auto_writer_state
 
     type config = string * lod
+
+    let file_format = file_format
 
     let kind = Auto_write_to_file
 
@@ -350,7 +352,7 @@ let make_driver ~writer =
     let may_write ({time = t0; output; _} as state) =
       match report state with
       | None -> ()
-      | Some report ->
+      | Some report -> (
           let ppf =
             match output with
             | Open (_, _, ppf) -> ppf
@@ -360,7 +362,13 @@ let make_driver ~writer =
                 state.output <- Open (fn, fp, ppf) ;
                 ppf
           in
-          Format.fprintf ppf "%a%!" (writer ~t0) report
+          match file_format with
+          | Plain_text -> Format.fprintf ppf "%a%!" (pp_report ~t0) report
+          | Json ->
+              let encoded_report =
+                Data_encoding.Json.construct Profiler.report_encoding report
+              in
+              Data_encoding.Json.pp ppf encoded_report)
 
     let inc state report =
       state.profiler_state <- inc state.profiler_state report ;
@@ -391,11 +399,6 @@ let make_driver ~writer =
   end : DRIVER
     with type config = string * lod)
 
-let auto_write_to_file = make_driver ~writer:(fun ~t0 -> pp_report ~t0)
+let auto_write_to_file = make_driver ~file_format:Profiler.Plain_text
 
-let auto_write_to_json_file =
-  make_driver ~writer:(fun ~t0:_ ppf report ->
-      let encoded_report =
-        Data_encoding.Json.construct Profiler.report_encoding report
-      in
-      Data_encoding.Json.pp ppf encoded_report)
+let auto_write_to_json_file = make_driver ~file_format:Profiler.Json
