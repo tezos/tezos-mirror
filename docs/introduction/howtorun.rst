@@ -88,6 +88,10 @@ that is, their own balance plus their delegated balance.
 A :ref:`minimal active stake<def_minimal_stake>` of 6kꜩ
 is required for participating in consensus and in governance.
 
+.. warning::
+
+  Starting with :doc:`Protocol Oxford <../protocols/018_oxford>`, the staking mechanism changes, see :doc:`../alpha/adaptive_issuance`. The rest of this page assumes the current staking mechanism in the active protocol.
+
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active
 stake during the last 7 cycles). A delegate is
