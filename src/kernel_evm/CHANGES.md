@@ -12,6 +12,7 @@
   L1 smart contract. It will consider upgrades messages coming from a specific
   address defined in its storage. (!9927)
 - Adds a new type of message in simulation mode, to verify that a transaction is valid by checking if the nonce is neither too low nor too high. (!9679)
+- Simulate if a transaction has a correct chain id. (!9752)
 
 ### EVM Node
 
@@ -20,6 +21,7 @@
 - Add an optional `mode` argument to switch from the proxy on production
   to the one on development. (!9940)
 - `eth_sendRawTransaction` checks that the nonce of the transaction is neither too low nor too high. (!9679)
+- `eth_sendRawTransaction` checks if the chain id is correct. (!9752)
 
 ### Bug fixes
 
