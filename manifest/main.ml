@@ -457,10 +457,16 @@ let alcotezt =
     ~deps:[tezt_core_lib]
   |> open_
 
-type sub_lib_documentation_link = Module of string | Page of string
+type sub_lib_documentation_entrypoint = Module | Page | Sub_lib
+
+type sub_lib = {
+  name : string;
+  synopsis : string option;
+  documentation_type : sub_lib_documentation_entrypoint;
+}
 
 (* List of the registered sublibraries of octez-libs *)
-let registered_octez_libs : sub_lib_documentation_link list ref = ref []
+let registered_octez_libs : sub_lib list ref = ref []
 
 (* Registers [public_name] as a sublibrary of the [octez-libs] package.
 
@@ -471,7 +477,7 @@ let registered_octez_libs : sub_lib_documentation_link list ref = ref []
 let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
     ?documentation ?conflicts ?flags ?time_measurement_ppx ?deps ?dune ?modules
     ?linkall ?js_compatible ?bisect_ppx ?preprocess ?opam_only_deps ?cram
-    ?release_status ?ctypes ?opam_with_test ?c_library_flags ?synopsis:_ ~path
+    ?release_status ?ctypes ?c_library_flags ?opam_with_test ?synopsis ~path
     public_name =
   let name =
     let s = Option.value ~default:public_name internal_name in
@@ -485,19 +491,43 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
   in
   let registered =
     match documentation with
-    | None -> Module (String.capitalize_ascii name)
-    | Some (docs : Dune.s_expr) when docs = [Dune.[S "package"; S "octez-libs"]]
-      ->
-        (* In that specific case, we don't want the page to be used *)
-        Module (String.capitalize_ascii name)
-    | Some _docs -> Page name
+    | None | Some Dune.[[S "package"; S "octez-libs"]] ->
+        (* In the case that the documentation stanza is only a package declaration,
+           we don't want the page to be used *)
+        if String.contains (Option.value ~default:public_name internal_name) '.'
+        then
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Sub_lib;
+          }
+        else
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Module;
+          }
+    | Some _docs -> {name; synopsis; documentation_type = Page}
   in
-  registered_octez_libs := registered :: !registered_octez_libs ;
+
+  if
+    List.exists
+      (fun registered -> String.equal registered.name name)
+      !registered_octez_libs
+  then
+    invalid_arg
+      (Format.sprintf
+         "octez-libs already contains a library that would have the same \
+          internal name, %s, as %s"
+         (Option.value ~default:public_name internal_name)
+         name)
+  else registered_octez_libs := registered :: !registered_octez_libs ;
   public_lib
     ("octez-libs." ^ public_name)
     ~internal_name:name
     ~opam:"octez-libs"
-    ~synopsis:"Octez libs"
+    ~synopsis:
+      "A package that contains multiple base libraries used by the Octez suite"
     ?opam_with_test
     ?linkall
     ?js_compatible
@@ -530,37 +560,43 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
 (* Prints all the registered octez libraries as a documentation index *)
 let pp_octez_libs_index fmt registered_octez_libs =
   let header =
-    "{0 Octez-libs: octez libraries}\n\n\
+    "{0 Octez-libs: Octez libraries}\n\n\
      This is a package containing some libraries used by the Octez project.\n\n\
      It contains the following libraries:\n\n"
   in
   let pp_registered pp = function
-    | Module registered ->
-        Format.fprintf pp "- {{!module-%s}%s}" registered registered
-    | Page registered ->
+    | {name; synopsis = None; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}@." name name
+    | {name; synopsis = Some synopsis; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}: %s@." name name synopsis
+    | {name; synopsis = None; documentation_type = Page} ->
         Format.fprintf
           pp
-          "- {{!page-%s}%s}"
-          registered
-          (String.capitalize_ascii registered)
+          "- {{!page-%s}%s}@."
+          name
+          (String.capitalize_ascii name)
+    | {name; synopsis = Some synopsis; documentation_type = Page} ->
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}: %s@."
+          name
+          (String.capitalize_ascii name)
+          synopsis
+    | {documentation_type = Sub_lib; _} ->
+        (* In case it's a sub_lib, we don't link anything *) ()
   in
   Format.fprintf
     fmt
     "%s%a"
     header
     (Format.pp_print_list
-       ~pp_sep:(fun pp () -> Format.fprintf pp "@.")
+       ~pp_sep:(fun pp () -> Format.fprintf pp "")
        pp_registered)
   @@ List.sort
-       (fun lib1 lib2 ->
-         match (lib1, lib2) with
-         | Page n1, Page n2
-         | Page n1, Module n2
-         | Module n1, Page n2
-         | Module n1, Module n2 ->
-             String.compare
-               (String.capitalize_ascii n1)
-               (String.capitalize_ascii n2))
+       (fun {name = name1; _} {name = name2; _} ->
+         String.compare
+           (String.capitalize_ascii name1)
+           (String.capitalize_ascii name2))
        registered_octez_libs
 
 let octez_test_helpers =
@@ -595,7 +631,7 @@ let octez_stdlib =
   octez_lib
     "tezos-stdlib"
     ~path:"src/lib_stdlib"
-    ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
+    ~synopsis:"Yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
     ~js_compatible:true
     ~js_of_ocaml:
@@ -714,7 +750,7 @@ let octez_lwt_result_stdlib =
   octez_lib
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
-    ~synopsis:"Tezos: error-aware stdlib replacement"
+    ~synopsis:"error-aware stdlib replacement"
     ~js_compatible:true
     ~documentation:
       Dune.
@@ -775,7 +811,7 @@ let octez_error_monad =
   octez_lib
     "tezos-error-monad"
     ~path:"src/lib_error_monad"
-    ~synopsis:"Tezos: error monad"
+    ~synopsis:"Error monad"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -794,7 +830,7 @@ let octez_hacl =
   octez_lib
     "tezos-hacl"
     ~path:"src/lib_hacl"
-    ~synopsis:"Tezos: thin layer around hacl-star"
+    ~synopsis:"Thin layer around hacl-star"
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
     ~js_of_ocaml:
       [
@@ -931,8 +967,7 @@ let octez_rpc =
     "tezos-rpc"
     ~path:"src/lib_rpc"
     ~synopsis:
-      "Tezos: library of auto-documented RPCs (service and hierarchy \
-       descriptions)"
+      "Library of auto-documented RPCs (service and hierarchy descriptions)"
     ~deps:
       [
         data_encoding |> open_;
@@ -1223,8 +1258,7 @@ let octez_crypto =
   octez_lib
     "tezos-crypto"
     ~path:"src/lib_crypto"
-    ~synopsis:
-      "Tezos: library with all the cryptographic primitives used by Tezos"
+    ~synopsis:"Library with all the cryptographic primitives used by Tezos"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -1910,7 +1944,7 @@ let octez_event_logging =
   octez_lib
     "tezos-event-logging"
     ~path:"src/lib_event_logging"
-    ~synopsis:"Tezos event logging library"
+    ~synopsis:"Octez event logging library"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -1925,7 +1959,7 @@ let octez_event_logging_test_helpers =
   octez_lib
     "tezos-event-logging-test-helpers"
     ~path:"src/lib_event_logging/test_helpers"
-    ~synopsis:"Tezos: test helpers for the event logging library"
+    ~synopsis:"Test helpers for the event logging library"
     ~deps:
       [
         octez_stdlib;
@@ -1945,7 +1979,7 @@ let octez_stdlib_unix =
     "tezos-stdlib-unix"
     ~path:"src/lib_stdlib_unix"
     ~synopsis:
-      "Tezos: yet-another local-extension of the OCaml standard library \
+      "Yet-another local-extension of the OCaml standard library \
        (unix-specific fragment)"
     ~deps:
       [
@@ -2030,7 +2064,7 @@ let octez_micheline =
   octez_lib
     "tezos-micheline"
     ~path:"src/lib_micheline"
-    ~synopsis:"Tezos: internal AST and parser for the Michelson language"
+    ~synopsis:"Internal AST and parser for the Michelson language"
     ~deps:
       [
         uutf;
@@ -2067,7 +2101,7 @@ let octez_base =
   octez_lib
     "tezos-base"
     ~path:"src/lib_base"
-    ~synopsis:"Tezos: meta-package and pervasive type definitions for Tezos"
+    ~synopsis:"Meta-package and pervasive type definitions for Tezos"
     ~deps:
       [
         octez_stdlib |> open_;
@@ -2166,7 +2200,7 @@ let octez_base_test_helpers =
   octez_lib
     "tezos-base-test-helpers"
     ~path:"src/lib_base/test_helpers"
-    ~synopsis:"Tezos: Tezos base test helpers"
+    ~synopsis:"Octez base test helpers"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2292,7 +2326,7 @@ let octez_version =
   octez_lib
     "tezos-version"
     ~path:"src/lib_version"
-    ~synopsis:"Tezos: version information generated from Git"
+    ~synopsis:"Version information generated from Git"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
     ~js_compatible:true
 
@@ -2355,7 +2389,7 @@ let octez_p2p_services =
   octez_lib
     "tezos-p2p-services"
     ~path:"src/lib_p2p_services"
-    ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-p2p`"
+    ~synopsis:"Descriptions of RPCs exported by [tezos-p2p]"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc]
     ~linkall:true
     ~js_compatible:true
@@ -2364,7 +2398,7 @@ let octez_workers =
   octez_lib
     "tezos-workers"
     ~path:"src/lib_workers"
-    ~synopsis:"Tezos: worker library"
+    ~synopsis:"Worker library"
     ~documentation:
       Dune.[[S "package"; S "octez-libs"]; [S "mld_files"; S "tezos_workers"]]
     ~deps:
@@ -2406,7 +2440,7 @@ let octez_shell_services =
   octez_lib
     "tezos-shell-services"
     ~path:"src/lib_shell_services"
-    ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-shell`"
+    ~synopsis:"Descriptions of RPCs exported by [tezos-shell]"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -2469,7 +2503,7 @@ let octez_p2p =
   octez_lib
     "tezos-p2p"
     ~path:"src/lib_p2p"
-    ~synopsis:"Tezos: library for a pool of P2P connections"
+    ~synopsis:"Library for a pool of P2P connections"
     ~deps:
       [
         lwt_watcher;
@@ -2497,7 +2531,7 @@ let tezt_tezos =
   octez_lib
     "tezt-tezos"
     ~path:"tezt/lib_tezos"
-    ~synopsis:"Tezos test framework based on Tezt"
+    ~synopsis:"Octez test framework based on Tezt"
     ~bisect_ppx:No
     ~deps:
       [
@@ -2797,7 +2831,7 @@ let octez_context =
   octez_lib
     "tezos-context"
     ~path:"src/lib_context"
-    ~synopsis:"Tezos: on-disk context abstraction for `octez-node`"
+    ~synopsis:"On-disk context abstraction for [octez-node]"
     ~deps:[octez_context_disk; octez_context_memory]
 
 let _octez_context_tests =
@@ -3492,7 +3526,7 @@ let octez_rpc_http =
   octez_lib
     "tezos-rpc-http"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http server and client)"
+    ~synopsis:"Library of auto-documented RPCs (http server and client)"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc; resto_cohttp; uri]
     ~modules:["RPC_client_errors"; "media_type"]
 
@@ -3500,7 +3534,7 @@ let octez_rpc_http_client =
   octez_lib
     "tezos-rpc-http-client"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http client)"
+    ~synopsis:"Library of auto-documented RPCs (http client)"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3514,7 +3548,7 @@ let octez_rpc_http_client_unix =
   octez_lib
     "tezos-rpc-http-client-unix"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: unix implementation of the RPC client"
+    ~synopsis:"Unix implementation of the RPC client"
     ~deps:
       [
         octez_stdlib_unix;
@@ -3530,7 +3564,7 @@ let octez_rpc_http_server =
   octez_lib
     "tezos-rpc-http-server"
     ~path:"src/lib_rpc_http"
-    ~synopsis:"Tezos: library of auto-documented RPCs (http server)"
+    ~synopsis:"Library of auto-documented RPCs (http server)"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
