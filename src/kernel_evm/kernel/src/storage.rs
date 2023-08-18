@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
@@ -294,7 +295,7 @@ pub fn store_simulation_result<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_simulation_gas<Host: Runtime>(
+pub fn store_evaluation_gas<Host: Runtime>(
     host: &mut Host,
     result: u64,
 ) -> Result<(), Error> {

@@ -25,15 +25,15 @@ pub const SIMULATION_SIMPLE_TAG: u8 = 1;
 pub const SIMULATION_CREATE_TAG: u8 = 2;
 // SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
-/// Maximum gas used by the simulation. Bounded to limit DOS on the rollup node
+/// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
 /// Is used as default value if no gas is set.
-pub const MAX_SIMULATION_GAS: u64 = 1_000_000_000u64;
+pub const MAX_EVALUATION_GAS: u64 = 1_000_000_000u64;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
 ///
 /// They are transmitted in RLP encoded form, in messages of the form\
-/// `\parsing::SIMULATION_TAG \SIMULATION_SIMPLE_TAG \<rlp encoded Simulation>`\
+/// `\parsing::SIMULATION_TAG \SIMULATION_SIMPLE_TAG \<rlp encoded Evaluation>`\
 /// or in chunks if they are bigger than what the inbox can receive, with a
 /// first message giving the number of chunks\
 /// `\parsing::SIMULATION_TAG \SIMULATION_CREATE_TAG \XXXX`
@@ -41,11 +41,11 @@ pub const MAX_SIMULATION_GAS: u64 = 1_000_000_000u64;
 /// chunks:\
 /// `\parsing::SIMULATION_TAG \SIMULATION_CHUNK_TAG \XXXX \<bytes>`\
 /// where `XXXX` is the number of the chunk over 2 bytes, and the rest is a
-/// chunk of the rlp encoded simulation.
+/// chunk of the rlp encoded evaluation.
 ///
 /// Ethereum doc: https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Simulation {
+pub struct Evaluation {
     /// (optional) The address the transaction is sent from.\
     /// Encoding: 20 bytes or empty (0x80)
     pub from: Option<H160>,
@@ -68,14 +68,14 @@ pub struct Simulation {
     pub data: Vec<u8>,
 }
 
-impl Simulation {
+impl Evaluation {
     /// Unserialize bytes as RLP encoded data.
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Simulation, DecoderError> {
+    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
         let decoder = Rlp::new(bytes);
-        Simulation::decode(&decoder)
+        Evaluation::decode(&decoder)
     }
 
-    /// Execute the simulation
+    /// Execute the evaluation
     pub fn run<Host: Runtime>(&self, host: &mut Host) -> Result<ExecutionOutcome, Error> {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
@@ -94,8 +94,8 @@ impl Simulation {
             self.from.unwrap_or(default_caller),
             self.data.clone(),
             self.gas
-                .map(|gas| u64::max(gas, MAX_SIMULATION_GAS))
-                .or(Some(MAX_SIMULATION_GAS)), // gas could be omitted
+                .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
+                .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
             self.value,
         )
         .map_err(Error::Simulation)?;
@@ -103,7 +103,7 @@ impl Simulation {
     }
 }
 
-impl Decodable for Simulation {
+impl Decodable for Evaluation {
     fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
         // the proxynode works preferably with little endian
         let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
@@ -137,7 +137,7 @@ impl Decodable for Simulation {
     }
 }
 
-impl TryFrom<&[u8]> for Simulation {
+impl TryFrom<&[u8]> for Evaluation {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
@@ -149,9 +149,9 @@ impl TryFrom<&[u8]> for Simulation {
 enum Input {
     #[default]
     Unparsable,
-    SimpleSimulation(Simulation),
-    NewChunkedSimulation(u16),
-    SimulationChunk {
+    Simple(Evaluation),
+    NewChunked(u16),
+    Chunk {
         i: u16,
         data: Vec<u8>,
     },
@@ -160,19 +160,19 @@ enum Input {
 impl Input {
     fn parse_new_chunk_simulation(bytes: &[u8]) -> Self {
         let num_chunks = u16::from_le_bytes(parsable!(bytes.try_into().ok()));
-        Self::NewChunkedSimulation(num_chunks)
+        Self::NewChunked(num_chunks)
     }
 
     fn parse_simulation_chunk(bytes: &[u8]) -> Self {
         let (num, remaining) = parsable!(parsing::split_at(bytes, 2));
         let i = u16::from_le_bytes(num.try_into().unwrap());
-        Self::SimulationChunk {
+        Self::Chunk {
             i,
             data: remaining.to_vec(),
         }
     }
     fn parse_simple_simulation(bytes: &[u8]) -> Self {
-        Input::SimpleSimulation(parsable!(bytes.try_into().ok()))
+        Input::Simple(parsable!(bytes.try_into().ok()))
     }
 
     // Internal custom message structure :
@@ -199,11 +199,11 @@ impl Input {
 fn read_chunks<Host: Runtime>(
     host: &mut Host,
     num_chunks: u16,
-) -> Result<Simulation, Error> {
+) -> Result<Evaluation, Error> {
     let mut buffer: Vec<u8> = Vec::new();
     for n in 0..num_chunks {
         match read_input(host)? {
-            Input::SimulationChunk { i, data } => {
+            Input::Chunk { i, data } => {
                 if i != n {
                     return Err(Error::InvalidConversion);
                 } else {
@@ -223,12 +223,12 @@ fn read_input<Host: Runtime>(host: &mut Host) -> Result<Input, Error> {
     }
 }
 
-fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
+fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Evaluation, Error> {
     // we just received simulation tag
     // next message is either a simulation or the nb of chunks needed
     match read_input(host)? {
-        Input::SimpleSimulation(s) => Ok(s),
-        Input::NewChunkedSimulation(num_chunks) => {
+        Input::Simple(s) => Ok(s),
+        Input::NewChunked(num_chunks) => {
             // loop to find the chunks
             read_chunks(host, num_chunks)
         }
@@ -242,7 +242,7 @@ pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error
     let outcome = simulation.run(host)?;
     log!(host, Debug, "outcome={:?} ", outcome);
     storage::store_simulation_status(host, outcome.is_success)?;
-    storage::store_simulation_gas(host, outcome.gas_used)?;
+    storage::store_evaluation_gas(host, outcome.gas_used)?;
     storage::store_simulation_result(host, outcome.result)
 }
 
@@ -256,9 +256,9 @@ mod tests {
 
     use super::*;
 
-    impl Simulation {
+    impl Evaluation {
         /// Unserialize an hex string as RLP encoded data.
-        pub fn from_rlp(e: String) -> Result<Simulation, DecoderError> {
+        pub fn from_rlp(e: String) -> Result<Evaluation, DecoderError> {
             let tx = hex::decode(e)
                 .or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
             Self::from_rlp_bytes(&tx)
@@ -275,7 +275,7 @@ mod tests {
         let input_string =
             "da8094353535353535353535353535353535353535353580808080".to_string();
         let address = address_of_str("3535353535353535353535353535353535353535");
-        let expected = Simulation {
+        let expected = Evaluation {
             from: None,
             to: address,
             gas: None,
@@ -284,12 +284,12 @@ mod tests {
             data: vec![],
         };
 
-        let simulation = Simulation::from_rlp(input_string);
+        let evaluation = Evaluation::from_rlp(input_string);
 
-        assert!(simulation.is_ok(), "Simulation input should be decodable");
+        assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
             expected,
-            simulation.unwrap(),
+            evaluation.unwrap(),
             "The decoded result is not the one expected"
         );
     }
@@ -301,7 +301,7 @@ mod tests {
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
-        let expected = Simulation {
+        let expected = Evaluation {
             from,
             to,
             gas: Some(11111),
@@ -310,12 +310,12 @@ mod tests {
             data,
         };
 
-        let simulation = Simulation::from_rlp(input_string);
+        let evaluation = Evaluation::from_rlp(input_string);
 
-        assert!(simulation.is_ok(), "Simulation input should be decodable");
+        assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
             expected,
-            simulation.unwrap(),
+            evaluation.unwrap(),
             "The decoded result is not the one expected"
         );
     }
@@ -366,8 +366,8 @@ mod tests {
         let mut host = MockHost::default();
         let new_address = create_contract(&mut host);
 
-        // run simulation num
-        let simulation = Simulation {
+        // run evaluation num
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -375,9 +375,9 @@ mod tests {
             gas: Some(10000),
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
-        assert!(outcome.is_ok(), "simulation should have succeeded");
+        assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
@@ -386,7 +386,7 @@ mod tests {
         );
 
         // run simulation get
-        let simulation = Simulation {
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -394,25 +394,25 @@ mod tests {
             gas: Some(10000),
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
             outcome.result,
-            "simulation result should be 0"
+            "evaluation result should be 0"
         );
     }
 
     #[test]
-    fn simulation_result_no_gas() {
+    fn evaluation_result_no_gas() {
         // setup
         let mut host = MockHost::default();
         let new_address = create_contract(&mut host);
 
-        // run simulation num
-        let simulation = Simulation {
+        // run evaluation num
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -420,14 +420,14 @@ mod tests {
             gas: None,
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
-        assert!(outcome.is_ok(), "simulation should have succeeded");
+        assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
             outcome.result,
-            "simulation result should be 0"
+            "evaluation result should be 0"
         );
     }
 
@@ -436,7 +436,7 @@ mod tests {
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
-        let expected = Simulation {
+        let expected = Evaluation {
             from,
             to,
             gas: Some(11111),
@@ -453,7 +453,7 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::SimpleSimulation(expected),
+            Input::Simple(expected),
             parsed,
             "should have been parsed as complete simulation"
         );
@@ -468,7 +468,7 @@ mod tests {
         let to = Some(new_address);
         let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();
         let gas = Some(11111);
-        let expected = Simulation {
+        let expected = Evaluation {
             from: None,
             to,
             gas,
@@ -484,14 +484,14 @@ mod tests {
 
         let parsed = Input::parse(&encoded);
         assert_eq!(
-            Input::SimpleSimulation(expected),
+            Input::Simple(expected),
             parsed,
             "should have been parsed as complete simulation"
         );
 
-        if let Input::SimpleSimulation(s) = parsed {
-            let res = s.run(&mut host).expect("simulation should run");
-            assert!(res.is_success, "simulation should have succeeded");
+        if let Input::Simple(e) = parsed {
+            let res = e.run(&mut host).expect("evaluation should run");
+            assert!(res.is_success, "evaluation should have succeeded");
         } else {
             panic!("Parsing failed")
         }
@@ -506,7 +506,7 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::NewChunkedSimulation(42),
+            Input::NewChunked(42),
             parsed,
             "should have parsed start of chunked simulation"
         );
@@ -519,7 +519,7 @@ mod tests {
         input.extend(i.to_le_bytes());
         input.extend(hex::decode("aaaaaa").unwrap());
 
-        let expected = Input::SimulationChunk {
+        let expected = Input::Chunk {
             i: 20,
             data: vec![170u8; 3],
         };
