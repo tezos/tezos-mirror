@@ -7053,6 +7053,17 @@ let _gas_parameter_diff =
     ~static:false
     ~bisect_ppx:No
 
+let _benchmark_tools_purge_disk_cache =
+  public_exe
+    "purge_disk_cache"
+    ~path:"devtools/benchmarks-tools/purge_disk_cache"
+    ~synopsis:"Internal dev tools"
+    ~internal_name:"purge_disk_cache"
+    ~opam:"internal-devtools"
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:No
+
 let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
 
 let get_contracts_lib =

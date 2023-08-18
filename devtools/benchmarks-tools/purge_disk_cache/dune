@@ -1,0 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name purge_disk_cache)
+ (public_name purge_disk_cache)
+ (package internal-devtools))
