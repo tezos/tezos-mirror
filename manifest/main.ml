@@ -509,7 +509,19 @@ let octez_lib ?internal_name ?js_of_ocaml ?inline_tests ?foreign_stubs
           }
     | Some _docs -> {name; synopsis; documentation_type = Page}
   in
-  registered_octez_libs := registered :: !registered_octez_libs ;
+
+  if
+    List.exists
+      (fun registered -> String.equal registered.name name)
+      !registered_octez_libs
+  then
+    invalid_arg
+      (Format.sprintf
+         "octez-libs already contains a library that would have the same \
+          internal name, %s, as %s"
+         (Option.value ~default:public_name internal_name)
+         name)
+  else registered_octez_libs := registered :: !registered_octez_libs ;
   public_lib
     ("octez-libs." ^ public_name)
     ~internal_name:name
