@@ -135,7 +135,7 @@ let balance_update_pp fmt (a, b) =
 
 let assert_balance_equal ~loc a b =
   let open Lwt_result_syntax in
-  let* () = Assert.equal_tez ~loc a.liquid a.liquid in
+  let* () = Assert.equal_tez ~loc a.liquid b.liquid in
   let* () = Assert.equal_tez ~loc a.bonds b.bonds in
   let* () =
     Assert.equal ~loc Q.equal "Assert equal staked" Q.pp_print a.staked b.staked
