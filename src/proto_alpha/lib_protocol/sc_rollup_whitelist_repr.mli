@@ -28,3 +28,14 @@ type t = Signature.Public_key_hash.t list
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
+
+(** This type is used in the `Storage.Last_whitelist_update. It is the
+    latest whitelist update message executed in the L1. It is used to
+    prevent user to execute whitelist update in unchronological
+    order. *)
+type last_whitelist_update = {
+  message_index : Z.t;
+  outbox_level : Raw_level_repr.t;
+}
+
+val last_whitelist_update_encoding : last_whitelist_update Data_encoding.t

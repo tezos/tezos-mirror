@@ -31,3 +31,17 @@ let pp =
   Format.pp_print_list
     ~pp_sep:Format.pp_print_space
     Signature.Public_key_hash.pp_short
+
+type last_whitelist_update = {
+  message_index : Z.t;
+  outbox_level : Raw_level_repr.t;
+}
+
+let last_whitelist_update_encoding =
+  Data_encoding.(
+    conv
+      (fun {message_index; outbox_level} -> (message_index, outbox_level))
+      (fun (message_index, outbox_level) -> {message_index; outbox_level})
+      (obj2
+         (req "message_index" n)
+         (req "outbox_level" Raw_level_repr.encoding)))

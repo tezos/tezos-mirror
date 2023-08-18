@@ -30,7 +30,7 @@ let is_private ctxt rollup =
   in
   return (ctxt, not rollup_is_public)
 
-let init ctxt rollup_address ~whitelist =
+let init_whitelist ctxt rollup_address ~whitelist =
   let open Lwt_result_syntax in
   let* ctxt, used_storage =
     List.fold_left_es
@@ -45,6 +45,17 @@ let init ctxt rollup_address ~whitelist =
         return (ctxt, Z.add size (Z.of_int size_e)))
       (ctxt, Z.zero)
       whitelist
+  in
+  return (ctxt, used_storage)
+
+let init ctxt rollup_address ~whitelist ~origination_level =
+  let open Lwt_result_syntax in
+  let* ctxt, used_storage = init_whitelist ctxt rollup_address ~whitelist in
+  let* ctxt, _whitelist_update_storage =
+    Storage.Sc_rollup.Last_whitelist_update.init
+      ctxt
+      rollup_address
+      {outbox_level = origination_level; message_index = Z.zero}
   in
   return (ctxt, used_storage)
 
@@ -80,7 +91,7 @@ let find_whitelist_uncarbonated ctxt rollup_address =
 let replace ctxt rollup ~whitelist =
   let open Lwt_result_syntax in
   let* ctxt = Storage.Sc_rollup.Whitelist.clear (ctxt, rollup) in
-  init ~whitelist ctxt rollup
+  init_whitelist ~whitelist ctxt rollup
 
 let make_public ctxt rollup =
   let open Lwt_result_syntax in
@@ -124,7 +135,7 @@ let adjust_storage_space ctxt rollup ~new_storage_size =
       return (ctxt, diff)
     else return (ctxt, Z.zero)
 
-let find_last_whitelist_update = Storage.Sc_rollup.Last_whitelist_update.find
+let get_last_whitelist_update = Storage.Sc_rollup.Last_whitelist_update.get
 
 (** TODO: https://gitlab.com/tezos/tezos/-/issues/6186
     Do not consider storage diffs for small updates to the storage. *)
