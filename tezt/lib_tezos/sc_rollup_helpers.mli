@@ -95,6 +95,7 @@ val prepare_installer_kernel_gen :
     returns the L1 node and client. *)
 val setup_l1 :
   ?bootstrap_smart_rollups:Protocol.bootstrap_smart_rollup list ->
+  ?bootstrap_contracts:Protocol.bootstrap_contract list ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?timeout:int ->

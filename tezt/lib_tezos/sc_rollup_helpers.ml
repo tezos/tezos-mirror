@@ -177,8 +177,8 @@ let make_bool_parameter name = function
   | None -> []
   | Some value -> [([name], `Bool value)]
 
-let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
-    ?timeout ?whitelist_enable protocol =
+let setup_l1 ?bootstrap_smart_rollups ?bootstrap_contracts ?commitment_period
+    ?challenge_window ?timeout ?whitelist_enable protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -190,7 +190,11 @@ let setup_l1 ?bootstrap_smart_rollups ?commitment_period ?challenge_window
   in
   let base = Either.right (protocol, None) in
   let* parameter_file =
-    Protocol.write_parameter_file ?bootstrap_smart_rollups ~base parameters
+    Protocol.write_parameter_file
+      ?bootstrap_smart_rollups
+      ?bootstrap_contracts
+      ~base
+      parameters
   in
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]

@@ -39,6 +39,9 @@ let pvm_kind = "wasm_2_0_0"
 
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
+let bridge_path () =
+  Base.(project_root // "src/kernel_evm/l1_bridge/evm_bridge.tz")
+
 type deposit_addresses = {fa12 : string; bridge : string}
 
 type full_evm_setup = {
@@ -231,7 +234,6 @@ let setup_deposit_contracts ~admin client protocol =
   let* () = Client.bake_for_and_wait client in
 
   (* Originates the bridge. *)
-  let prg = Base.(project_root // "src/kernel_evm/l1_bridge/evm_bridge.tz") in
   let* bridge_address =
     Client.originate_contract
       ~alias:"evm-bridge"
@@ -239,7 +241,7 @@ let setup_deposit_contracts ~admin client protocol =
       ~src:Constant.bootstrap1.public_key_hash
       ~init:
         (sf {|(Pair (Pair "%s" "%s") None)|} admin.public_key_hash fa12_address)
-      ~prg
+      ~prg:(bridge_path ())
       ~burn_cap:Tez.one
       client
   in
@@ -2196,6 +2198,130 @@ let test_kernel_migration =
     ~scenario_after
     ~protocol
 
+let test_deposit_dailynet =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "deposit"; "dailynet"]
+    ~title:"deposit on dailynet"
+  @@ fun protocol ->
+  let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
+  let fa12_address = "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW" in
+  let rollup_address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf" in
+
+  let mockup_client = Client.create_with_mode Mockup in
+  let make_bootstrap_contract ~address ~code ~storage ?typecheck () =
+    let* code_json = Client.convert_script_to_json ~script:code mockup_client in
+    let* storage_json =
+      Client.convert_data_to_json ~data:storage ?typecheck mockup_client
+    in
+    let script : Ezjsonm.value =
+      `O [("code", code_json); ("storage", storage_json)]
+    in
+    return
+      Protocol.
+        {delegate = None; amount = Tez.of_int 0; script; hash = Some address}
+  in
+
+  (* Creates the FA1.2 contract with only approve and transfer that approves and
+     transfers anything. *)
+  let* fa12_contract =
+    make_bootstrap_contract
+      ~address:fa12_address
+      ~code:
+        {|{ parameter (or (pair %approve address nat) (pair %transfer address address nat)) ;
+  storage unit ;
+  code { CAR ; IF_LEFT { DROP } { DROP } ; UNIT ; NIL operation ; PAIR } }|}
+      ~storage:"Unit"
+      ()
+  in
+  (* Creates the bridge contract initialized with the FA1.2 contract and the rollup
+     address. *)
+  let* bridge_contract =
+    make_bootstrap_contract
+      ~address:bridge_address
+      ~code:(bridge_path ())
+      ~storage:
+        (sf
+           {|Pair (Pair "tz1R4EjaQqeBhBP2dztahpkzHTZ61PSssqkh" "%s") (Some "%s")|}
+           fa12_address
+           rollup_address)
+      ~typecheck:"pair (pair address address) (option address)"
+      ()
+  in
+
+  (* Creates the EVM rollup that listens to the bootstrap smart contract bridge. *)
+  let* {
+         bootstrap_smart_rollup = evm;
+         smart_rollup_node_data_dir;
+         smart_rollup_node_extra_args;
+       } =
+    setup_bootstrap_smart_rollup
+      ~name:"evm"
+      ~address:rollup_address
+      ~parameters_ty:"pair (pair bytes (ticket unit)) (pair nat bytes)"
+      ~base_installee:"./"
+      ~installee:"evm_kernel"
+      ~config:
+        (`Path Base.(project_root // "src/kernel_evm/config/dailynet.yaml"))
+      ()
+  in
+
+  (* Setup a chain where the EVM rollup, the FA1.2 contract and the bridge
+     are all originated. *)
+  let* node, client =
+    setup_l1
+      ~bootstrap_smart_rollups:[evm]
+      ~bootstrap_contracts:[fa12_contract; bridge_contract]
+      protocol
+  in
+
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Operator
+      node
+      ~data_dir:smart_rollup_node_data_dir
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:Constant.bootstrap1.public_key_hash
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () =
+    Sc_rollup_node.run
+      sc_rollup_node
+      rollup_address
+      smart_rollup_node_extra_args
+  in
+
+  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+
+  (* Deposit tokens to the EVM rollup. *)
+  let amount_cmutez = 100_000_000 in
+  let amount_ctez = 100 in
+
+  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap2.public_key_hash
+      ~receiver:bridge_address
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+
+  (* Check the balance in the EVM rollup. *)
+  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
+    ~error_msg:
+      (sf
+         "Expected balance of %s should be %%R, but got %%L"
+         Eth_account.bootstrap_accounts.(0).address) ;
+
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2233,6 +2359,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_no_dictator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_kernel_migration protocols
+  test_kernel_migration protocols ;
+  test_deposit_dailynet protocols
 
 let register ~protocols = register_evm_proxy_server ~protocols

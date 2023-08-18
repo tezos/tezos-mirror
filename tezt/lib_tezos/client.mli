@@ -2462,7 +2462,7 @@ val convert_script_to_json :
 
 (** Convert the given Michelson constant to JSON string. *)
 val convert_data_to_json :
-  ?endpoint:endpoint -> data:string -> t -> JSON.u Lwt.t
+  ?endpoint:endpoint -> data:string -> ?typecheck:string -> t -> JSON.u Lwt.t
 
 (** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t
