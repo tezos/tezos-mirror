@@ -11,6 +11,7 @@
 - The kernel can no longer be administrated by a L2 dictator key, instead by a
   L1 smart contract. It will consider upgrades messages coming from a specific
   address defined in its storage. (!9927)
+- Adds a new type of message in simulation mode, to verify that a transaction is valid by checking if the nonce is neither too low nor too high. (!9679)
 
 ### EVM Node
 
@@ -18,6 +19,7 @@
 - Add arguments to enable CORS headers. (!9753)
 - Add an optional `mode` argument to switch from the proxy on production
   to the one on development. (!9940)
+- `eth_sendRawTransaction` checks that the nonce of the transaction is neither too low nor too high. (!9679)
 
 ### Bug fixes
 
