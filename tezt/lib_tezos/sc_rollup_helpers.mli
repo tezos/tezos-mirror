@@ -133,3 +133,35 @@ val genesis_commitment :
     [smart_rollup_node]. *)
 val call_rpc :
   smart_rollup_node:Sc_rollup_node.t -> service:string -> JSON.t Lwt.t
+
+(** Bootstrap smart rollup setup information.*)
+type bootstrap_smart_rollup_setup = {
+  bootstrap_smart_rollup : Protocol.bootstrap_smart_rollup;
+      (** The bootstrap smart rollup to add in the parameter files. *)
+  smart_rollup_node_data_dir : string;
+      (** The data dir to use for the smart rollup node, where the smart
+          rollup preimages are available. *)
+  smart_rollup_node_extra_args : string list;
+      (** The extra arguments needed by the smart rollup node when the smart
+          rollup is a bootstrap smart rollup. *)
+}
+
+(** [setup_bootstrap_smart_rollup ?name ~address ?parameters_ty ?base_installee
+    ~installee ?config ()] creates a {!bootstrap_smart_rollup_setup} that can
+    be used to run a bootstrap smart rollup.
+
+    [name] is the smart rollup node data-dir's name. Defaults to ["smart-rollup"].
+    [address] is the smart rollup address.
+    [parameters_ty] is the smart rollup type. Defaults to ["string"].
+    [base_installee] is the directory where [installee] (the kernel) can be found.
+    [config] is the optional smart rollup installer configuration, see {!prepare_installer_kernel}.
+*)
+val setup_bootstrap_smart_rollup :
+  ?name:string ->
+  address:string ->
+  ?parameters_ty:string ->
+  ?base_installee:string ->
+  installee:string ->
+  ?config:[< `Config of Installer_kernel_config.t | `Path of string] ->
+  unit ->
+  bootstrap_smart_rollup_setup Lwt.t

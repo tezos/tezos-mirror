@@ -258,3 +258,46 @@ let call_rpc ~smart_rollup_node ~service =
   in
   let*! response = RPC.Curl.get url in
   return response
+
+type bootstrap_smart_rollup_setup = {
+  bootstrap_smart_rollup : Protocol.bootstrap_smart_rollup;
+  smart_rollup_node_data_dir : string;
+  smart_rollup_node_extra_args : string list;
+}
+
+let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
+    ?(parameters_ty = "string") ?base_installee ~installee ?config () =
+  (* Create a temporary directory to store the preimages. *)
+  let smart_rollup_node_data_dir = Temp.dir (name ^ "-data-dir") in
+
+  (* Create the installer boot sector. *)
+  let* boot_sector =
+    prepare_installer_kernel
+      ?base_installee
+      ~preimages_dir:(Filename.concat smart_rollup_node_data_dir "wasm_2_0_0")
+      ?config
+      installee
+  in
+
+  (* Create a temporary file with the boot sector, which needs to
+     be given to the smart rollup node when the rollup is a bootstrap
+     smart rollup. *)
+  let boot_sector_file = Filename.temp_file "boot-sector" ".hex" in
+  let () = write_file boot_sector_file ~contents:boot_sector in
+
+  (* Convert the parameters ty to a JSON representation. *)
+  let* parameters_ty =
+    let client = Client.create_with_mode Client.Mockup in
+    Client.convert_data_to_json ~data:parameters_ty client
+  in
+
+  let bootstrap_smart_rollup : Protocol.bootstrap_smart_rollup =
+    {address; pvm_kind = "wasm_2_0_0"; boot_sector; parameters_ty}
+  in
+
+  return
+    {
+      bootstrap_smart_rollup;
+      smart_rollup_node_data_dir;
+      smart_rollup_node_extra_args = ["--boot-sector-file"; boot_sector_file];
+    }
