@@ -627,6 +627,26 @@ let generate_code_for_models sol models codegen_options ~exclusions =
   let transform = code_transform codegen_options in
   Codegen.codegen_models models sol transform ~exclusions
 
+(* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
+let convert_costs_file_name path =
+  let open Option_syntax in
+  let dir = Filename.dirname path in
+  let base = Filename.remove_extension @@ Filename.basename path in
+  let suffix = "_costs_generated" in
+  let+ prefix = String.remove_suffix ~suffix base in
+  let fn = Format.asprintf "%s_costs.ml" prefix in
+  Filename.concat dir fn
+
+let get_defined_cost_function_list save_to =
+  let open Option_syntax in
+  let* costs_file = convert_costs_file_name save_to in
+  let+ costs_file =
+    if Sys.file_exists costs_file then Some costs_file else None
+  in
+  let () = Format.eprintf "Detected %s\n" costs_file in
+  let res = Codegen.Parser.get_cost_functions costs_file in
+  match res with Ok cost_fun_list -> cost_fun_list | Error err -> raise err
+
 let save_code_list_as_a_module save_to code_list =
   let result = Codegen.make_toplevel_module code_list in
   stdout_or_file save_to (fun ppf -> Codegen.pp_module ppf result)
@@ -670,8 +690,30 @@ let generate_code codegen_options generated_code =
       (make_destination destination_module)
       codegen_options.Cmdline.save_to
   in
+  let filter_defined_cost_function dest codes =
+    (* Filter [cost_*] functions which is already defined in "*_costs.ml" file *)
+    let fun_list =
+      let open Option_syntax in
+      let* split_to_dir =
+        if codegen_options.split then codegen_options.save_to else None
+      in
+      let generated_file = Filename.(concat split_to_dir (basename dest)) in
+      get_defined_cost_function_list generated_file
+    in
+    match fun_list with
+    | None -> codes
+    | Some fun_list ->
+        List.filter
+          (fun code ->
+            match Codegen.get_name_of_code code with
+            | None -> true
+            | Some name -> not @@ List.mem ~equal:String.equal name fun_list)
+          codes
+  in
   String.Map.iter
-    (fun k v -> save_code_list_as_a_module (save_to k) v)
+    (fun k v ->
+      let v = filter_defined_cost_function k v in
+      save_code_list_as_a_module (save_to k) v)
     generated
 
 let get_exclusions () =
