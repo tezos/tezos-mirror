@@ -102,6 +102,27 @@ let accuser_publish_commitment_when_refutable node_ctxt ~other rollup
       assert (Octez_smart_rollup.Address.(node_ctxt.rollup_address = rollup)) ;
       Publisher.publish_single_commitment node_ctxt our_commitment
 
+(** If in bailout mode and when the operator is not staked on any
+    commitment, the bond is recovered. *)
+let maybe_recover_bond node_ctxt =
+  let open Lwt_result_syntax in
+  if Node_context.is_bailout node_ctxt then
+    let operating_pkh = Node_context.get_operator node_ctxt Operating in
+    match operating_pkh with
+    | None -> return_unit
+    | Some operating_pkh -> (
+        let* staked_on_commitment =
+          RPC.Sc_rollup.staked_on_commitment
+            (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+            (node_ctxt.cctxt#chain, `Head 0)
+            (Sc_rollup_proto_types.Address.of_octez node_ctxt.rollup_address)
+            operating_pkh
+        in
+        match staked_on_commitment with
+        | None -> Publisher.recover_bond node_ctxt
+        | Some _ (* operator still staked on something *) -> return_unit)
+  else return_unit
+
 (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
@@ -216,6 +237,7 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
             inbox_level)
         else Lwt.return_unit
       in
+      let* () = maybe_recover_bond node_ctxt in
       return_unit
   | ( Sc_rollup_refute _,
       Sc_rollup_refute_result {game_status = Ended end_status; _} )
