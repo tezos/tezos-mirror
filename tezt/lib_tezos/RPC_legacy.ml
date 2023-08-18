@@ -87,4 +87,23 @@ module Curl = struct
           ])
     in
     Runnable.{value = process; run = parse url}
+
+  let post_raw ?runner ?(args = []) url data =
+    let process =
+      Process.spawn
+        ?runner
+        "curl"
+        (args
+        @ [
+            "-X";
+            "POST";
+            "-H";
+            "Content-Type: application/json";
+            "-s";
+            url;
+            "-d";
+            JSON.encode data;
+          ])
+    in
+    Runnable.{value = process; run = Process.check_and_read_stdout}
 end

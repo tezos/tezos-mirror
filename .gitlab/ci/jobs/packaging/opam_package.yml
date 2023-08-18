@@ -632,6 +632,8 @@ opam:octez-smart-rollup-wasm-debugger:
 
 # Ignoring unreleased package octez-wasmer-test.
 
+# Ignoring unreleased package octogram.
+
 # Ignoring unreleased package scoru-sequencer-test.
 
 opam:tezos-017-PtNairob-test-helpers:

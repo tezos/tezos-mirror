@@ -1,0 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octogram)
+ (public_name octogram)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt
+  octez-libs.tezt-tezos
+  jingoo
+  dmap)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax))

@@ -30,6 +30,7 @@ depends: [
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
+  "dmap"
   "dune-configurator"
   "eqaf"
   "ezjsonm" { >= "1.1.0" }
@@ -44,6 +45,7 @@ depends: [
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
+  "jingoo"
   "json-data-encoding" { >= "0.12" & < "0.13" }
   "ledgerwallet-tezos" { >= "0.3.0" }
   "logs"

@@ -37,6 +37,7 @@ octez-proxy-server
 octez-signer
 octez-smart-rollup-node*
 octez-smart-rollup-client-*
+octogram
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
