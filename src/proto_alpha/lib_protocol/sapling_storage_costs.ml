@@ -24,11 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module S = Saturation_repr
+
 (* model sapling/SAPLING_APPLY_DIFF *)
+(* fun size1 -> fun size2 -> 1300000 + 5000 * size1 + 55000 * size2 *)
 let cost_SAPLING_APPLY_DIFF size1 size2 =
-  let open Saturation_repr in
-  add
-    (safe_int 1_300_000)
-    (add
-       (scale_fast (mul_safe_of_int_exn 5_000) (safe_int size1))
-       (scale_fast (mul_safe_of_int_exn 55_000) (safe_int size2)))
+  let open S.Syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
+  let v1 = size1 in
+  let v2 = size2 in
+  S.safe_int 1300000 + (S.safe_int 5000 * v1) + (S.safe_int 55000 * v2)

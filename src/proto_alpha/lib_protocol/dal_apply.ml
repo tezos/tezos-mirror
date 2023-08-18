@@ -105,9 +105,7 @@ let validate_publish_slot_header ctxt _operation =
 let apply_publish_slot_header ctxt operation =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Result_syntax in
-  let* ctxt =
-    Gas.consume ctxt Dal_costs_generated.cost_Dal_publish_slot_header
-  in
+  let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_slot_header in
   let number_of_slots = Dal.number_of_slots ctxt in
   let* cryptobox = Dal.make ctxt in
   let current_level = (Level.current ctxt).level in

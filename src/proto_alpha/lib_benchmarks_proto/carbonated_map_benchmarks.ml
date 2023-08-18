@@ -210,12 +210,10 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
        [intercept + (log2 size * compare_cost) + (log2 size * traversal_overhead)]
      *)
-    let find_model ?intercept ?traversal_overhead name =
+    let find_model name =
       let open Tezos_benchmark in
-      let traversal_overhead =
-        Option.value ~default:(ns "traversal_overhead") traversal_overhead
-      in
-      let intercept = Option.value ~default:fv_intercept intercept in
+      let traversal_overhead = ns "traversal_overhead" in
+      let intercept = fv_intercept in
       let module M = struct
         type arg_type = int * unit
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -42,12 +43,13 @@ let write_access ~written_bytes =
   Gas_limit_repr.atomic_step_cost
     (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
 
-let list_key_values_step_cost = Saturation_repr.safe_int 117
+(* model storage/List_key_values *)
+(* fun size -> (470. + (117. * size)) *)
+let cost_List_key_values size =
+  let module S = Saturation_repr in
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  S.safe_int 470 + (v0 * S.safe_int 117)
 
-let list_key_values_intercept = Saturation_repr.safe_int 470
-
-let list_key_values_traverse ~size =
-  Saturation_repr.(
-    add
-      list_key_values_intercept
-      (mul (safe_int size) list_key_values_step_cost))
+let list_key_values_traverse ~size = cost_List_key_values size

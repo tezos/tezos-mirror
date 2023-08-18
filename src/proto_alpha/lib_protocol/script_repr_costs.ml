@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 DaiLambda, Inc., <contact@dailambda.jp>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -62,8 +63,12 @@ let cost_ENCODING_MICHELINE_bytes size =
    [Tezos_shell_benchmarks.Micheline_benchmarks.Micheline_strip_locations].
 *)
 (* model micheline/strip_locations_micheline *)
+(* fun size -> (51. * size) *)
 let cost_strip_locations_micheline size =
-  S.mul (S.safe_int size) (S.safe_int 51)
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  v0 * S.safe_int 51
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2049
    Plugin benchmarked gas.
@@ -73,9 +78,11 @@ let cost_strip_locations_micheline size =
    Note that [strip_annotations] will reallocate a fresh Micheline tree.
    This only depends on the total number of nodes (not the size of
    the leaves).
-
-   The run-time cost of [strip_annotations] is benchmarked by
-   [Script_repr_benchmarks.Script_repr_strip_annotations].
 *)
 (* model script_repr/strip_annotations *)
-let cost_strip_annotations size = S.mul (S.safe_int size) (S.safe_int 51)
+(* fun size -> (51. * size) *)
+let cost_strip_annotations size =
+  let open S.Syntax in
+  let size = S.safe_int size in
+  let v0 = size in
+  v0 * S.safe_int 51
