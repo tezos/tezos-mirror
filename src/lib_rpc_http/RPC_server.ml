@@ -113,7 +113,6 @@ module Acl = struct
               "GET /chains/*/blocks/*/operations/**";
               "GET /chains/*/blocks/*/operations_metadata_hash";
               "GET /chains/*/blocks/*/protocols";
-              "GET /chains/*/blocks/*/required_endorsements";
               "GET /chains/*/blocks/*/votes/**";
               "GET /chains/*/chain_id";
               "GET /chains/*/checkpoint";
@@ -141,7 +140,6 @@ module Acl = struct
               "GET /protocols/*/environment";
               "GET /version";
               "POST /chains/*/blocks/*/context/contracts/*/big_map_get";
-              "POST /chains/*/blocks/*/endorsing_power";
               "POST /injection/operation";
             ];
       }
