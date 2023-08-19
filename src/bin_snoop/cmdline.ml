@@ -95,6 +95,11 @@ type command =
       solver : string;
       infer_opts : infer_parameters_options;
     }
+  | Infer_all of {
+      workload_data : string;
+      solver : string;
+      infer_opts : infer_parameters_options;
+    }
   | Codegen of {
       solution : string;
       model_name : Namespace.t;

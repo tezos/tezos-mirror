@@ -124,6 +124,17 @@ let rec infer_cmd local_model_name workload_data solver infer_opts =
         workload_data ;
       exit 1
 
+and infer_all_cmd workload_data solver infer_opts =
+  Pyinit.pyinit () ;
+  let file_stats = Unix.stat workload_data in
+  match file_stats.st_kind with
+  | S_DIR ->
+      (* User specified a directory. Automatically process all workload data in that directory. *)
+      infer_all_cmd_full_auto workload_data solver infer_opts
+  | _ ->
+      Format.eprintf "Error: %s is not a directory.@." workload_data ;
+      exit 1
+
 and infer_cmd_one_shot local_model_name workload_data solver
     (infer_opts : Cmdline.infer_parameters_options) =
   let measure = Measure.load ~filename:workload_data in
@@ -220,6 +231,69 @@ and infer_cmd_full_auto local_model_name workload_data solver
        solution
        ~solver
        infer_opts
+
+and infer_all_cmd_full_auto workload_data solver
+    (infer_opts : Cmdline.infer_parameters_options) =
+  let map_file ~local_model_name =
+    let local_model_name =
+      String.split_on_char '/' local_model_name |> String.concat "__"
+    in
+    fun original_name ->
+      let extension = Filename.extension original_name in
+      Format.sprintf
+        "%s_%s%s"
+        (Filename.remove_extension original_name)
+        local_model_name
+        extension
+  in
+  let workload_files = get_all_workload_data_files workload_data in
+  let local_model_names =
+    List.concat_map
+      (fun filename ->
+        match Measure.load ~filename with
+        | Measure.Measurement (b, _) ->
+            let module B : Benchmark.S = (val b) in
+            List.map fst B.models)
+      workload_files
+    |> List.filter (fun x -> x <> "*")
+    |> List.sort_uniq String.compare
+  in
+  List.iter
+    (fun local_model_name ->
+      let remap_file = Option.map (map_file ~local_model_name) in
+      let infer_opts =
+        {
+          infer_opts with
+          csv_export = remap_file infer_opts.csv_export;
+          dot_file = remap_file infer_opts.dot_file;
+          save_solution = remap_file infer_opts.save_solution;
+          report =
+            (match infer_opts.report with
+            | Cmdline.ReportToFile x ->
+                ReportToFile (map_file ~local_model_name x)
+            | _ as x -> x);
+        }
+      in
+      let graph, measurements =
+        Dep_graph.load_workload_files ~local_model_name workload_files
+      in
+      if Dep_graph.Graph.is_empty graph then (
+        Format.eprintf "Empty dependency graph.@." ;
+        exit 1) ;
+      Option.iter
+        (fun filename -> Dep_graph.Graph.save_graphviz graph filename)
+        infer_opts.dot_file ;
+      Format.eprintf "Performing topological run@." ;
+      let solution = Dep_graph.Graph.to_sorted_list graph in
+
+      ignore
+      @@ infer_for_measurements
+           ~local_model_name
+           measurements
+           solution
+           ~solver
+           infer_opts)
+    (List.sort_uniq String.compare local_model_names)
 
 (* If [local_model_name] is specified, the inference is restricted only to
    the models with [local_model_name]. *)
@@ -1152,6 +1226,8 @@ let () =
           benchmark_cmd bench_name bench_opts
       | Infer {local_model_name; workload_data; solver; infer_opts} ->
           infer_cmd local_model_name workload_data solver infer_opts
+      | Infer_all {workload_data; solver; infer_opts} ->
+          infer_all_cmd workload_data solver infer_opts
       | Codegen {solution; model_name; codegen_options} ->
           codegen_cmd solution model_name codegen_options
       | Codegen_all {solution; matching; codegen_options} ->

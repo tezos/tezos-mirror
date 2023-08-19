@@ -66,14 +66,13 @@ let inference_results_dir = "inference_results"
 
 let codegen_results_dir = "generated_code"
 
-let solution_csv local_model_name = sf "inferred_%s.csv" local_model_name
+let solution_csv = "inferred.csv"
 
-let solution_bin local_model_name = sf "inferred_%s.sol" local_model_name
+let solution_bin = "inferred.sol"
 
-let report_tex local_model_name = sf "report_%s.tex" local_model_name
+let report_tex = "report.tex"
 
-let dep_graph local_model_name = sf "graph_%s.dot" local_model_name
-
+let dep_graph = "graph.dot"
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
 
@@ -159,3 +158,18 @@ let unlink_if_present file =
           Log.info "Removing existing %s" file ;
           try Unix.unlink file with Unix.Unix_error (Unix.ENOENT, _, _) -> ())
       | _ -> Test.fail "%s is not a regular file" file)
+
+let rec cleanup dir =
+  let root = working_dir // dir in
+  match classify_dirname root with
+  | Does_not_exist -> create_dir root
+  | Exists_and_is_not_a_dir ->
+      unlink_if_present root ;
+      cleanup dir
+  | Exists ->
+      let _ =
+        Sys.readdir root
+        |> Array.iter (fun x -> Sys.remove (Filename.concat root x))
+      in
+      Sys.rmdir root ;
+      cleanup dir

@@ -24,21 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rec cleanup () =
-  let codegen_root = Files.(working_dir // codegen_results_dir) in
-  match Files.classify_dirname codegen_root with
-  | Files.Does_not_exist -> Files.create_dir codegen_root
-  | Exists_and_is_not_a_dir ->
-      Files.unlink_if_present codegen_root ;
-      cleanup ()
-  | Exists ->
-      let _ =
-        Sys.readdir codegen_root
-        |> Array.iter (fun x -> Sys.remove (Filename.concat codegen_root x))
-      in
-      Sys.rmdir codegen_root ;
-      cleanup ()
-
 let prepare_fp_json inference_root =
   let fn = inference_root // "fp.json" in
   Base.write_file
@@ -57,8 +42,8 @@ let main () =
   Log.info "Entering Perform_codegen.main" ;
   let snoop = Snoop.create () in
   let inference_root = Files.(working_dir // inference_results_dir) in
+  let* () = Files.(cleanup codegen_results_dir) in
   let fp_json_fn = prepare_fp_json inference_root in
-  let* () = cleanup () in
   let open Lwt.Syntax in
   let solution_fn = inference_root in
   let* _ =
