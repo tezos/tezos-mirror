@@ -26,6 +26,8 @@
 (** Protocols we may want to test with. *)
 type t = Nairobi | Oxford | Alpha
 
+val encoding : t Data_encoding.t
+
 (** Protocol parameters.
 
     These values denote which file to use from the ["parameters"] directory. *)
