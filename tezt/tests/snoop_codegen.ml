@@ -35,17 +35,16 @@ let generate_code_using_solution_test () =
   @@ fun () ->
   let open Lwt.Syntax in
   let snoop = Snoop.create () in
-  let* res =
-    Snoop.generate_code_using_solution
+  let outfn = Temp.file "codegen.ml" in
+  close_out @@ open_out outfn ;
+  let* _ =
+    Snoop.generate_code_for_solutions
       ~solution:"tezt/tests/snoop_codegen/lsl_bytes.sol"
       ~fixed_point:"tezt/tests/snoop_codegen/fp.json"
+      ~save_to:outfn
       snoop
   in
-  let outfn = Temp.file "codegen.ml" in
-  let oc = open_out outfn in
-  output_string oc res ;
-  close_out oc ;
-  let diff = Diff.files outfn "tezt/tests/snoop_codegen/lsl_bytes.ml.expect" in
+  let diff = Diff.files "tezt/tests/snoop_codegen/lsl_bytes.ml.expect" outfn in
   if diff.different then (
     Diff.log ~level:Error diff ;
     assert false)

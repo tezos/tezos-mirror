@@ -404,20 +404,13 @@ let write_config ~(benchmark : string) ~(bench_config : string) ~(file : string)
   in
   spawn_command snoop command |> Process.check
 
-let generate_code_using_solution ~solution ?save_to ?fixed_point snoop =
+let generate_code_for_solutions ~solution ?save_to ?split_to ?fixed_point snoop
+    =
   let command =
-    [
-      "generate";
-      "code";
-      "using";
-      "solution";
-      solution;
-      "for";
-      "inferred";
-      "models";
-    ]
+    ["generate"; "code"; "for"; "solutions"; solution]
     @ (match fixed_point with None -> [] | Some fn -> ["--fixed-point"; fn])
-    @ match save_to with None -> [] | Some file -> ["--save-to"; file]
+    @ (match save_to with None -> [] | Some file -> ["--save-to"; file])
+    @ match split_to with None -> [] | Some dir -> ["--split-to"; dir]
   in
 
   let process = spawn_command snoop command in

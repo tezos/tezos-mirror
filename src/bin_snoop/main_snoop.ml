@@ -568,26 +568,32 @@ let generate_code codegen_options generated_code =
       String.Map.empty
       generated_code
   in
-  let save_to destination =
-    Option.filter_map
-      (fun save_to ->
-        let destination =
-          Filename.remove_extension @@ Filename.basename destination
-        in
-        let dirname = Filename.dirname save_to in
-        let basename = Filename.remove_extension @@ Filename.basename save_to in
-        let basename = String.remove_prefix ~prefix:"auto_build" basename in
-        let basename_empty =
-          Option.fold ~none:true ~some:(fun x -> String.equal x "") basename
-        in
-        let result =
-          if basename_empty then Some (destination ^ ".ml")
-          else
-            Option.map
-              (fun base -> Format.sprintf "%s_%s.ml" destination base)
-              basename
-        in
-        Option.map (Filename.concat dirname) result)
+  let make_destination destination_module save_to =
+    let is_split = codegen_options.Cmdline.split in
+    let dirname, destination =
+      if not is_split then
+        ( Filename.dirname save_to,
+          Filename.remove_extension @@ Filename.basename save_to )
+      else (
+        (match Sys.is_directory save_to with
+        | true -> ()
+        | false ->
+            Sys.remove save_to ;
+            Sys.mkdir save_to 0o777
+        | exception Sys_error _ -> Sys.mkdir save_to 0o777) ;
+        ( save_to,
+          Filename.remove_extension @@ Filename.basename destination_module ))
+    in
+    let suffix =
+      if Option.is_some codegen_options.Cmdline.transform then String.empty
+      else "__non_fp"
+    in
+    let result = Format.sprintf "%s%s.ml" destination suffix in
+    Filename.concat dirname result
+  in
+  let save_to destination_module =
+    Option.map
+      (make_destination destination_module)
       codegen_options.Cmdline.save_to
   in
   String.Map.iter
@@ -649,8 +655,8 @@ let save_codegen_for_solutions solutions codegen_options ~exclusions =
   in
   generate_code codegen_options generated
 
-let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
-  let exclusions' = get_exclusions () in
+let codegen_for_solutions_cmd ?(build_all = false) solution_fns codegen_options
+    ~exclusions =
   let is_dir, solution_dir =
     match solution_fns with
     | x :: [] -> (Sys.is_directory x, x)
@@ -663,11 +669,24 @@ let codegen_for_solutions_cmd solution_fns codegen_options ~exclusions =
       |> List.map (fun x -> Filename.concat solution_dir x)
     else solution_fns
   in
+  let exclusions' =
+    if codegen_options.Cmdline.split then
+      String.Set.union exclusions @@ get_exclusions ()
+    else String.Set.empty
+  in
   let solutions = List.map Codegen.load_solution solutions in
-  save_codegen_for_solutions
-    solutions
-    codegen_options
-    ~exclusions:(String.Set.union exclusions' exclusions)
+  save_codegen_for_solutions solutions codegen_options ~exclusions:exclusions' ;
+  if build_all then
+    let transform =
+      Option.fold
+        ~none:(Some Fixed_point_transform.default_options)
+        ~some:(fun _ -> None)
+        codegen_options.transform
+    in
+    save_codegen_for_solutions
+      solutions
+      {codegen_options with transform}
+      ~exclusions:exclusions'
 
 let save_solutions_in_text out_fn nsolutions =
   stdout_or_file out_fn @@ fun ppf ->
@@ -1014,9 +1033,9 @@ module Auto_build = struct
       [(solution_fn, solution)] ;
     solution
 
-  let codegen mkfilename solution ~exclusions =
+  let codegen ~split mkfilename solution ~exclusions =
     let codegen_options =
-      Cmdline.{transform = None; save_to = Some (mkfilename "_non_fp.ml")}
+      Cmdline.{transform = None; save_to = Some (mkfilename ".ml"); split}
     in
     save_codegen_for_solutions [solution] codegen_options ~exclusions ;
     let codegen_options =
@@ -1029,6 +1048,7 @@ module Auto_build = struct
                 max_relative_error = 0.5;
               };
           save_to = Some (mkfilename ".ml");
+          split;
         }
     in
     save_codegen_for_solutions [solution] codegen_options ~exclusions
@@ -1099,15 +1119,17 @@ module Auto_build = struct
 
     (* Inference and codegen *)
     Pyinit.pyinit () ;
-
     let mkfilename ext = Filename.concat outdir "auto_build" ^ ext in
     (* Infernece *)
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
     let exclusions = if split then get_exclusions () else String.Set.empty in
+    let mkfilename ext =
+      if split then outdir else Filename.concat outdir "auto_build" ^ ext
+    in
     (* Codegen *)
-    codegen mkfilename solution ~exclusions
+    codegen ~split mkfilename solution ~exclusions
 end
 
 (* -------------------------------------------------------------------------- *)
@@ -1137,7 +1159,11 @@ let () =
       | Codegen_inferred {solution; codegen_options; exclusions} ->
           codegen_for_solutions_cmd [solution] codegen_options ~exclusions
       | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
-          codegen_for_solutions_cmd solutions codegen_options ~exclusions
+          codegen_for_solutions_cmd
+            ~build_all:true
+            solutions
+            codegen_options
+            ~exclusions
       | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd None solutions
       | Auto_build {targets; auto_build_options; split} ->
