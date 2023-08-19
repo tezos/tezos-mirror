@@ -30,6 +30,12 @@ open Encoding_benchmarks_helpers.Make (struct
 
   let purpose = Benchmark.Generate_code "michelson_v1_gas"
 end)
+
+module No_codegen = Encoding_benchmarks_helpers.Make (struct
+  let file = __FILE__
+
+  let purpose = Benchmark.Other_purpose "Not used for codegen"
+end)
 (* ------------------------------------------------------------------------- *)
 
 module Make_elliptic_curve_encoding_benchmarks (A : sig
@@ -88,7 +94,7 @@ struct
   let () = Registration.register_simple_with_num public_key_hash_to_b58check
 
   let secret_key_encoding =
-    make_encode_fixed_size
+    No_codegen.make_encode_fixed_size
       ~name:("ENCODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Tezos_crypto.Signature.Public_key_hash.encoding
       ~generator:Sampler.pkh
@@ -97,7 +103,7 @@ struct
   let () = Registration.register_simple_with_num secret_key_encoding
 
   let secret_key_to_b58check =
-    make_encode_fixed_size_to_string
+    No_codegen.make_encode_fixed_size_to_string
       ~name:("B58CHECK_ENCODING_SECRET_KEY_" ^ algo_name)
       ~to_string:Tezos_crypto.Signature.Secret_key.to_b58check
       ~generator:Sampler.sk
@@ -164,7 +170,7 @@ struct
   let () = Registration.register_simple_with_num public_key_hash_from_b58check
 
   let secret_key_decoding =
-    make_decode_fixed_size
+    No_codegen.make_decode_fixed_size
       ~name:("DECODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Tezos_crypto.Signature.Secret_key.encoding
       ~generator:Sampler.sk
@@ -173,7 +179,7 @@ struct
   let () = Registration.register_simple_with_num secret_key_decoding
 
   let secret_key_from_b58check =
-    make_decode_fixed_size_from_string
+    No_codegen.make_decode_fixed_size_from_string
       ~name:("B58CHECK_DECODING_SECRET_KEY_" ^ algo_name)
       ~to_string:Tezos_crypto.Signature.Secret_key.to_b58check
       ~from_string:Tezos_crypto.Signature.Secret_key.of_b58check_exn
