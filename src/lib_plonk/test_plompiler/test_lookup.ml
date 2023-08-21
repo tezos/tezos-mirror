@@ -112,20 +112,21 @@ functor
       let* a = input ~kind:`Public a in
       let* b = input b in
       let* z = input z in
-      let* a = Limbs4.of_bytes a in
-      let* b = Limbs4.of_bytes b in
       let* z' = Limbs4.xor_lookup a b in
-      let* z' = Limbs4.to_bytes z' in
       assert_equal z z'
 
     let bytes_of_hex = Plompiler.Utils.bytes_of_hex
 
-    let tests_xor_bytes str f =
+    let bool_list_input_bytes x = Bytes.input_bytes ~le:false x
+
+    let limb_list_input_bytes4 x = Limbs4.input_bytes ~le:false x
+
+    let tests_xor_bytes str input_bytes f =
       List.map
         (fun (valid, a, b, o) ->
-          let a = Bytes.(input_bytes ~le:false @@ bytes_of_hex a) in
-          let b = Bytes.(input_bytes ~le:false @@ bytes_of_hex b) in
-          let o = Bytes.(input_bytes ~le:false @@ bytes_of_hex o) in
+          let a = input_bytes @@ bytes_of_hex a in
+          let b = input_bytes @@ bytes_of_hex b in
+          let o = input_bytes @@ bytes_of_hex o in
           test ~valid ~name:("Bool.test_xor_bytes" ^ str) @@ f a b o)
         [
           (true, "00", "00", "00");
@@ -162,16 +163,14 @@ functor
     let test_bnot_bytes4 b z () =
       let* b = input ~kind:`Public b in
       let* z = input z in
-      let* b = Limbs4.of_bytes b in
       let* z' = Limbs4.bnot_lookup b in
-      let* z' = Limbs4.to_bytes z' in
       assert_equal z z'
 
-    let tests_bnot_bytes str f =
+    let tests_bnot_bytes str input_bytes f =
       List.map
         (fun (valid, b, o) ->
-          let b = Bytes.(input_bytes ~le:false @@ bytes_of_hex b) in
-          let o = Bytes.(input_bytes ~le:false @@ bytes_of_hex o) in
+          let b = input_bytes @@ bytes_of_hex b in
+          let o = input_bytes @@ bytes_of_hex o in
           test ~valid ~name:("Bool.test_bnot_bytes" ^ str) @@ f b o)
         [
           (true, "00", "FF");
@@ -184,16 +183,14 @@ functor
     let test_rotate_right4 l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let* l = Limbs4.of_bytes l in
       let* o = Limbs4.rotate_right_lookup l i in
-      let* o = Limbs4.to_bytes o in
       assert_equal o z
 
     let tests_rotate_right =
       List.map
         (fun (i, a, b) ->
-          let a = Bytes.input_bytes ~le:false @@ Stdlib.Bytes.of_string a in
-          let b = Bytes.input_bytes ~le:false @@ Stdlib.Bytes.of_string b in
+          let a = limb_list_input_bytes4 @@ Stdlib.Bytes.of_string a in
+          let b = limb_list_input_bytes4 @@ Stdlib.Bytes.of_string b in
           test ~valid:true ~name:"Bytes.test_rotate_right4"
           @@ test_rotate_right4 a i b)
         [
@@ -232,16 +229,17 @@ functor
     let test_shift_right4 l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
+      (* We use this conversion to make sure that
+         we do not have unused inputs *)
       let* l = Limbs4.of_bytes l in
       let* o = Limbs4.shift_right_lookup l i in
-      let* o = Limbs4.to_bytes o in
       assert_equal o z
 
     let tests_shift_right =
       List.map
         (fun (i, a, b) ->
-          let a = Bytes.input_bytes ~le:false @@ bytes_of_hex a in
-          let b = Bytes.input_bytes ~le:false @@ bytes_of_hex b in
+          let a = bool_list_input_bytes @@ bytes_of_hex a in
+          let b = limb_list_input_bytes4 @@ bytes_of_hex b in
           test ~valid:true ~name:"Bytes.test_shift_right4"
           @@ test_shift_right4 a i b)
         [
@@ -258,11 +256,11 @@ functor
 
     let tests =
       tests_bor @ tests_bor_bytes @ tests_xor
-      @ tests_xor_bytes "1" test_xor_bytes
-      @ tests_xor_bytes "4" test_xor_bytes4
+      @ tests_xor_bytes "1" bool_list_input_bytes test_xor_bytes
+      @ tests_xor_bytes "4" limb_list_input_bytes4 test_xor_bytes4
       @ tests_bnot
-      @ tests_bnot_bytes "1" test_bnot_bytes
-      @ tests_bnot_bytes "4" test_bnot_bytes4
+      @ tests_bnot_bytes "1" bool_list_input_bytes test_bnot_bytes
+      @ tests_bnot_bytes "4" limb_list_input_bytes4 test_bnot_bytes4
       @ tests_rotate_right @ tests_shift_right
   end
 
