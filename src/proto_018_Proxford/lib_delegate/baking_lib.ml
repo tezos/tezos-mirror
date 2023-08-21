@@ -391,7 +391,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
-let bake_using_automaton config state heads_stream =
+let bake_using_automaton ~count config state heads_stream =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let* initial_event = first_automaton_event state in
@@ -403,7 +403,8 @@ let bake_using_automaton config state heads_stream =
   in
   let stop_on_next_level_block = function
     | New_head_proposal proposal ->
-        Compare.Int32.(proposal.block.shell.level >= Int32.succ current_level)
+        Compare.Int32.(
+          proposal.block.shell.level >= Int32.(add current_level (of_int count)))
     | _ -> false
   in
   let* event_opt =
@@ -419,7 +420,7 @@ let bake_using_automaton config state heads_stream =
   | Some (New_head_proposal proposal) ->
       let*! () =
         cctxt#message
-          "Block %a (%ld) injected"
+          "Last injected block: %a (level %ld)"
           Block_hash.pp
           proposal.block.hash
           proposal.block.shell.level
@@ -428,7 +429,8 @@ let bake_using_automaton config state heads_stream =
   | _ -> cctxt#error "Baking loop unexpectedly ended"
 
 (* attest the latest proposal and bake with it *)
-let baking_minimal_timestamp state =
+let rec baking_minimal_timestamp ~count state
+    (block_stream : proposal Lwt_stream.t) =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
@@ -494,9 +496,9 @@ let baking_minimal_timestamp state =
       current_mempool
       (List.map (fun (_, x, _, _) -> x) signed_attestations)
   in
-  let dal_attestation_level = Int32.succ latest_proposal.block.shell.level in
+  let next_level = Int32.succ latest_proposal.block.shell.level in
   let* own_dal_attestations =
-    Baking_actions.get_dal_attestations state ~level:dal_attestation_level
+    Baking_actions.get_dal_attestations state ~level:next_level
   in
   let* signed_dal_attestations =
     Baking_actions.sign_dal_attestations state own_dal_attestations
@@ -519,19 +521,60 @@ let baking_minimal_timestamp state =
   let state_recorder ~new_state =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  let* _ =
+  let* new_state =
     Baking_actions.perform_action
       ~state_recorder
       state
       (Inject_block {block_to_bake; updated_state = state})
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
-  return_unit
+  if count <= 1 then return_unit
+  else
+    let*! () =
+      Lwt_stream.junk_while_s
+        (fun proposal ->
+          Lwt.return
+            Compare.Int32.(
+              proposal.Baking_state.block.shell.level <> next_level))
+        block_stream
+    in
+    let*! next_level_proposal =
+      let*! r = Lwt_stream.get block_stream in
+      match r with
+      | None -> cctxt#error "Stream unexpectedly ended"
+      | Some b -> Lwt.return b
+    in
+    let*! new_state, action =
+      State_transitions.step new_state (New_head_proposal next_level_proposal)
+    in
+    let* new_state =
+      match action with
+      | Update_to_level update ->
+          let* new_state, _preattest_action =
+            Baking_actions.update_to_level new_state update
+          in
+          return
+            {
+              new_state with
+              round_state =
+                {
+                  Baking_state.current_round = Round.zero;
+                  current_phase = Idle;
+                  delayed_prequorum = None;
+                };
+            }
+      | _ ->
+          (* Algorithmically, this will always be an update_to_level
+             action. *)
+          assert false
+    in
+    baking_minimal_timestamp ~count:(pred count) new_state block_stream
 
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force_apply ?force
     ?(minimal_timestamp = false) ?extra_operations
-    ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint delegates =
+    ?(monitor_node_mempool = true) ?context_path ?dal_node_endpoint ?(count = 1)
+    delegates =
   let open Lwt_result_syntax in
   let config =
     Baking_configuration.make
@@ -564,5 +607,6 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
           cctxt
           state.global_state.operation_worker)
   in
-  if not minimal_timestamp then bake_using_automaton config state block_stream
-  else baking_minimal_timestamp state
+  if not minimal_timestamp then
+    bake_using_automaton ~count config state block_stream
+  else baking_minimal_timestamp ~count state block_stream

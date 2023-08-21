@@ -39,6 +39,8 @@ val bake :
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:Uri.t ->
+  (* Number of baked blocks. Defaults to 1. *)
+  ?count:int ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
