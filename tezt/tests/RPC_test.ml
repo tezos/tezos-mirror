@@ -674,30 +674,35 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_current_level ()
   in
-  let* _ =
-    RPC.Client.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_helper_endorsing_rights ()
-  in
-  let* _ =
-    RPC.Client.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_helper_endorsing_rights
-         ~delegate:Constant.bootstrap4.public_key_hash
-         ()
-  in
   let* () =
-    if Protocol.(number protocol > number Nairobi) then
+    if Protocol.(number protocol <= number Oxford) then
       let* _ =
         RPC.Client.call ?endpoint ~hooks client
-        @@ RPC.get_chain_block_helper_attestation_rights ()
+        @@ RPC.get_chain_block_helper_endorsing_rights ()
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
+           This RPC helper should be removed once Oxford will be frozen. *)
       in
       let* _ =
         RPC.Client.call ?endpoint ~hooks client
-        @@ RPC.get_chain_block_helper_attestation_rights
+        @@ RPC.get_chain_block_helper_endorsing_rights
              ~delegate:Constant.bootstrap4.public_key_hash
              ()
       in
       unit
     else unit
+  in
+  let* () =
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_helper_attestation_rights ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_helper_attestation_rights
+           ~delegate:Constant.bootstrap4.public_key_hash
+           ()
+    in
+    unit
   in
   let* _ =
     RPC.Client.call ?endpoint ~hooks client
