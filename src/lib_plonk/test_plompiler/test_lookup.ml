@@ -28,6 +28,44 @@ open Plonk_test
 module CS = Plonk.Circuit
 open Helpers
 
+module Bytes_lookup : functor (L : LIB) -> sig
+  open L
+
+  type bl = bool list
+
+  val bor : bl repr -> bl repr -> bl repr t
+
+  val xor : bl repr -> bl repr -> bl repr t
+
+  val band : bl repr -> bl repr -> bl repr t
+
+  val not : bl repr -> bl repr t
+end =
+functor
+  (L : LIB)
+  ->
+  struct
+    open L
+
+    type bl = bool list
+
+    let bor a b =
+      let* l = map2M Bool.Internal.bor_lookup (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let xor a b =
+      let* l = map2M Bool.Internal.xor_lookup (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let band a b =
+      let* l = map2M Bool.Internal.band_lookup (of_list a) (of_list b) in
+      ret @@ to_list l
+
+    let not b =
+      let* l = mapM Bool.Internal.bnot_lookup (of_list b) in
+      ret @@ to_list l
+  end
+
 module Bool : Test =
 functor
   (L : LIB)
@@ -41,6 +79,8 @@ functor
     module Limbs4 = Limbs (struct
       let nb_bits = 4
     end)
+
+    module Bytes_lookup = Bytes_lookup (L)
 
     let test_bor x y z () =
       (* A dummy input with the value of zero needs to be added if the number of
@@ -63,15 +103,11 @@ functor
             test_bor (bool true) (bool true) (bool true);
           ]
 
-    let bor_lookup a b =
-      let* l = map2M Bool.Internal.bor_lookup (of_list a) (of_list b) in
-      ret @@ to_list l
-
     let test_bor_bytes a b z () =
       let* a = input ~kind:`Public a in
       let* b = input b in
       let* z = input z in
-      let* z' = bor_lookup a b in
+      let* z' = Bytes_lookup.bor a b in
       assert_equal z z'
 
     let tests_bor_bytes =
@@ -105,14 +141,14 @@ functor
       let* a = input ~kind:`Public a in
       let* b = input b in
       let* z = input z in
-      let* z' = Bytes.Internal.xor_lookup a b in
+      let* z' = Bytes_lookup.xor a b in
       assert_equal z z'
 
     let test_xor_bytes4 a b z () =
       let* a = input ~kind:`Public a in
       let* b = input b in
       let* z = input z in
-      let* z' = Limbs4.xor_lookup a b in
+      let* z' = Limbs4.xor a b in
       assert_equal z z'
 
     let bytes_of_hex = Plompiler.Utils.bytes_of_hex
@@ -157,13 +193,13 @@ functor
     let test_bnot_bytes b z () =
       let* b = input ~kind:`Public b in
       let* z = input z in
-      let* z' = Bytes.Internal.not_lookup b in
+      let* z' = Bytes_lookup.not b in
       assert_equal z z'
 
     let test_bnot_bytes4 b z () =
       let* b = input ~kind:`Public b in
       let* z = input z in
-      let* z' = Limbs4.bnot_lookup b in
+      let* z' = Limbs4.not b in
       assert_equal z z'
 
     let tests_bnot_bytes str input_bytes f =
@@ -183,7 +219,7 @@ functor
     let test_rotate_right4 l i z () =
       let* l = input ~kind:`Public l in
       let* z = input z in
-      let* o = Limbs4.rotate_right_lookup l i in
+      let* o = Limbs4.rotate_right l i in
       assert_equal o z
 
     let tests_rotate_right =
@@ -231,8 +267,8 @@ functor
       let* z = input z in
       (* We use this conversion to make sure that
          we do not have unused inputs *)
-      let* l = Limbs4.of_bytes l in
-      let* o = Limbs4.shift_right_lookup l i in
+      let* l = Limbs4.of_bool_list l in
+      let* o = Limbs4.shift_right l i in
       assert_equal o z
 
     let tests_shift_right =

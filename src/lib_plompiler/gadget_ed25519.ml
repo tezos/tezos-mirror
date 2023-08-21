@@ -209,7 +209,7 @@ module Ed25519 = struct
       val signature_encoding : (P.signature, signature, pk * bool list) encoding
     end
 
-    val verify : Bytes.bl repr -> pk repr -> signature -> bool repr t
+    val verify : Bytes.tl repr -> pk repr -> signature -> bool repr t
   end =
   functor
     (L : LIB)

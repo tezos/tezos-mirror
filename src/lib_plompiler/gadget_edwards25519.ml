@@ -95,7 +95,7 @@ module type AFFINE = functor (L : LIB) -> sig
 
   (** [to_compressed_bytes p] returns the compressed representation of a point
       [p = (x, y)] in little-endian bytes [pow2 255 * (x % 2) + y] *)
-  val to_compressed_bytes : point repr -> Bytes.bl repr t
+  val to_compressed_bytes : point repr -> Bytes.tl repr t
 end
 
 module MakeEdwards25519 : AFFINE =
@@ -169,7 +169,7 @@ functor
     let get_y_coordinate p = of_pair p |> snd
 
     (* nat_to_bytes_le 32 (pow2 255 * (x % 2) + y) *)
-    let to_compressed_bytes p : Bytes.bl repr t =
+    let to_compressed_bytes p =
       let px = get_x_coordinate p in
       let py = get_y_coordinate p in
       (* px_bytes and py_bytes are in little-endian *)
