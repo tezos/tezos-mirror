@@ -5584,6 +5584,16 @@ let hash = Protocol.hash
     let name_underscore = Name.name_underscore name in
     let number = Name.number name in
     let path = Name.base_path name in
+    (* Container of the registered sublibraries of [octez-protocol-libs] *)
+    let registered_octez_protocol_libs : Sub_lib.container =
+      Sub_lib.make_container ()
+    in
+    let _octez_protocol_lib : Sub_lib.maker =
+      Sub_lib.sub_lib
+        ~package_synopsis:(sf "Octez protocol %s libraries" name_dash)
+        ~container:registered_octez_protocol_libs
+        ~package:(sf "octez-protocol-%s-libs" name_dash)
+    in
     let active =
       match status with
       | Frozen | Overridden | Not_mainnet -> false
