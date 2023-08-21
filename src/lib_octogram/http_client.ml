@@ -48,14 +48,14 @@ let local_path_from_agent_uri ?(keep_name = false) ?(exec = true) client =
           let promise, u = Lwt.task () in
           client.pending_download <-
             SMap.add handler promise client.pending_download ;
-          Lwt.async (fun () ->
-              let* path = Helpers.download endpoint handler in
-              let* () =
-                if exec then
-                  let* () = Lwt_unix.chmod path 0o777 in
-                  unit
-                else unit
-              in
-              Lwt.wakeup u path ;
-              unit) ;
+          Background.register
+            (let* path = Helpers.download endpoint handler in
+             let* () =
+               if exec then
+                 let* () = Lwt_unix.chmod path 0o777 in
+                 unit
+               else unit
+             in
+             Lwt.wakeup u path ;
+             unit) ;
           promise)

@@ -313,13 +313,13 @@ let run ?on_terminate ?event_level ?event_sections_levels agent =
 
   (match agent.persistent_state.octogram_binary with
   | Push _ | Pull _ ->
-      Lwt.async @@ fun () ->
-      let* () = wait_for_ready agent in
-      Helpers.exec
-        ~can_fail:true
-        ~runner:agent.persistent_state.runner
-        "rm"
-        [agent.path]
+      Background.register
+      @@ let* () = wait_for_ready agent in
+         Helpers.exec
+           ~can_fail:true
+           ~runner:agent.persistent_state.runner
+           "rm"
+           [agent.path]
   | _ -> ()) ;
 
   run
