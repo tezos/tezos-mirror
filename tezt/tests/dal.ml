@@ -34,6 +34,10 @@ let hooks = Tezos_regression.hooks
 
 module Cryptobox = Rollup.Dal.Cryptobox
 
+let next_level node =
+  let* current_level = Node.get_level node in
+  return (current_level + 1)
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -380,7 +384,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       ~msg:(rex "Data-availability layer will be enabled in a future proposal")
       process
   in
-  let level = Node.get_level node + 1 in
+  let* level = next_level node in
   let* (`OpHash oph1) =
     Operation.Consensus.(
       inject
@@ -777,7 +781,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
        [h4] becomes applied;
      - No slot is confirmed as no slot header is published.
   *)
-  let now = Node.get_level node in
+  let* now = Node.get_level node in
   let* (`OpHash h1) = attest ~level:1 in
   let outdated = [h1] in
   let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
@@ -821,7 +825,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated; branch_delayed}
   in
   let* () = Client.bake_for_and_wait client in
-  let now = Node.get_level node in
+  let* now = Node.get_level node in
   let* attestation_ops =
     let level = now + lag in
     let* hashes = dal_attestations ~force:true ~nb_slots ~level [10] client in
@@ -868,7 +872,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
     return new_account
   in
   let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
-  let level = Node.get_level node + 1 in
+  let* level = next_level node in
   let* (`OpHash _oph) =
     (* The attestation from the new account should fail as
        the new account is not an attester and cannot be on the DAL committee. *)
@@ -1027,7 +1031,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
   let check_published_level_headers = check_published_level_headers dal_node in
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let pub_level = level + 1 in
   let publish ?fee source ~index content =
     let* commitment =
@@ -1874,7 +1878,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let* _commitment, _proof = store_slot slot1_content in
   let* _commitment, _proof = store_slot slot3_content in
   Log.info "Publish slots 1 and 2 (inject and bake two blocks)." ;
-  let level = Node.get_level node + 1 in
+  let* level = next_level node in
   let publish source ~index message =
     let* _op_hash =
       publish_dummy_slot ~source ~index ~message cryptobox client
@@ -2012,7 +2016,7 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
   (* Test goal: the published slot at levels in [first_level, intermediary_level - 1]
      should be attested, the one at levels in at levels in [intermediary_level,
      max_level - 1] should not be attested. *)
-  let first_level = Node.get_level node + 1 in
+  let* first_level = next_level node in
   let intermediary_level =
     (* We want at least two levels for which the published slot is attested. *)
     first_level + 2
@@ -2047,7 +2051,7 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
     (* (D) We tried to stop the baker as soon as it reaches
        [intermediary_level + attestation_lag], but it may have baked a few
        blocks more *)
-    let node_level = Node.get_level node in
+    let* node_level = Node.get_level node in
     let first_not_attested_published_level =
       node_level + 1 - parameters.attestation_lag
     in
@@ -2127,7 +2131,7 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
      [intermediary_level + 1, last_checked_level] should not be attested. *)
   let attested_levels = 2 in
   let unattested_levels = 2 in
-  let first_level = Node.get_level node + 1 in
+  let* first_level = next_level node in
   let intermediary_level = first_level + attested_levels - 1 in
   let last_checked_level = intermediary_level + unattested_levels - 1 in
   let last_level = last_checked_level + lag + 1 in
@@ -2378,7 +2382,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     ?(extra_node_operators = []) protocol parameters dal_node sc_rollup_node
     sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
   let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let current_level = Node.get_level l1_node in
+  let* current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
@@ -2423,7 +2427,8 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   (* To be sure that we just moved to [start_dal_slots_level], we wait and extra
      level. *)
   let* start_dal_slots_level =
-    Node.wait_for_level l1_node (1 + Node.get_level l1_node)
+    let* next_level = next_level l1_node in
+    Node.wait_for_level l1_node next_level
   in
   let end_dal_slots_level = start_dal_slots_level + number_of_dal_slots - 1 in
 
@@ -2457,7 +2462,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     "[e2e.sum_and_store] send an inbox messsage to the PVM to sum the received \
      payloads, and store the result in a 'value' variable@." ;
   let* () =
-    let level = Node.get_level l1_node in
+    let* level = Node.get_level l1_node in
     (* We send instructions "+...+ value" to the PVM of [number_of_dal_slots -
        1] additions, so that it sums the received slots' contents and store the
        result in a variable called "value". *)
@@ -3057,7 +3062,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
      We also prepare a waiter event for:
      - the shards that will be received by dal_node2 on its topics;
      - the messages (shards) that will be notified to dal_node2 on its topic. *)
-  let publish_level = Node.get_level node + 1 in
+  let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
   let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
 
@@ -3256,7 +3261,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       slot_content
   in
 
-  let publish_level = Node.get_level node + 1 in
+  let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
   let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
 

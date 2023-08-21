@@ -187,9 +187,9 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   Log.info
     "Bake to 'rolling_available' = %d and terminate node0"
     rolling_available ;
-  let level = Node.get_level node0 in
+  let* level = Node.get_level node0 in
   let synchronize head_node nodes =
-    let level = Node.get_level head_node in
+    let* level = Node.get_level head_node in
     Log.info
       "Synchronize node(s) %s with %s"
       (String.concat "," (List.map (fun node -> Node.name node) nodes))
@@ -202,7 +202,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   in
   let* () =
     repeat (rolling_available - level + 1) @@ fun () ->
-    let level_before = Node.get_level node0 in
+    let* level_before = Node.get_level node0 in
     let* () = Client.propose_for ~key:[baker.alias] client0 in
     let* () =
       Client.preattest_for
@@ -222,7 +222,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
     Log.debug "Manually baked to level %d" level_after ;
     unit
   in
-  let level = Node.get_level node0 in
+  let* level = Node.get_level node0 in
   Check.(
     (level = rolling_available + 1)
       int

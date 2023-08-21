@@ -78,7 +78,7 @@ let rec wait_for_balance client pkh target_balance =
   let node = get_node client in
   (* Could be racy but in practice should be ok, at worst we
      should wait one more block or do a useless check. *)
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* _ = Node.wait_for_level node (level + 1) in
   let* balance = Client.get_balance_for ~account:pkh client in
   if balance < target_balance then (
@@ -119,7 +119,7 @@ let reveal_accounts client accounts =
       unrevealed
   in
   if List.length unrevealed > 0 then (
-    let level = Node.get_level node in
+    let* level = Node.get_level node in
     Log.info
       "Waiting for a level (namely %d) to be \"sure\" the operations are \
        included..."

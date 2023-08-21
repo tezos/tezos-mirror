@@ -179,7 +179,7 @@ let scenario network =
      in [keys] for every level from current level to [first_level + num_levels -
      1]. *)
   let rec publish_slot key_index =
-    let current_level = Node.get_level node in
+    let* current_level = Node.get_level node in
     if current_level >= first_level + num_levels then return ()
     else
       let slot =
@@ -338,7 +338,7 @@ let scenario network =
     return (num_published, num_attested)
   in
 
-  let last_level = Node.get_level node in
+  let* last_level = Node.get_level node in
   let expected_min_level = first_level + num_levels + lag in
   Check.(
     (last_level >= expected_min_level)

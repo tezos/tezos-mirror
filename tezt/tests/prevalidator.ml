@@ -2004,7 +2004,7 @@ module Revamped = struct
     let* () = Client.Admin.connect_address ~peer:node2 client1 in
     let* () = Client.Admin.connect_address ~peer:node3 client1 in
     let* () = Client.Admin.connect_address ~peer:node3 client2 in
-    let lvl1 = Node.get_level node1 in
+    let* lvl1 = Node.get_level node1 in
     let* (_ : int) = Node.wait_for_level node2 lvl1
     and* (_ : int) = Node.wait_for_level node3 lvl1 in
     log_step

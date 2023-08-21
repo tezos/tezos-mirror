@@ -118,10 +118,8 @@ let check_storage_size sc_rollup_client ~address size =
     the [node]'s next level. *)
 let next_evm_level ~sc_rollup_node ~node ~client =
   let* () = Client.bake_for_and_wait client in
-  Sc_rollup_node.wait_for_level
-    ~timeout:30.
-    sc_rollup_node
-    (Node.get_level node)
+  let* level = Node.get_level node in
+  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
 
 (** [wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]
@@ -363,12 +361,8 @@ let setup_evm_kernel ?config ?kernel_installee
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   (* EVM Kernel installation level. *)
   let* () = Client.bake_for_and_wait client in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:30.
-      sc_rollup_node
-      (Node.get_level node)
-  in
+  let* level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   return
@@ -497,7 +491,7 @@ let test_originate_evm_kernel =
   (* First run of the installed EVM kernel, it will initialize the directory
      "eth_accounts". *)
   let* () = Client.bake_for_and_wait client in
-  let first_evm_run_level = Node.get_level node in
+  let* first_evm_run_level = Node.get_level node in
   let* level =
     Sc_rollup_node.wait_for_level
       ~timeout:30.

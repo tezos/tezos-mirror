@@ -53,7 +53,7 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let level = Node.get_level node0 in
+  let* level = Node.get_level node0 in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in

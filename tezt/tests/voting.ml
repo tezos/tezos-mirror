@@ -768,7 +768,10 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       let* () = Client.Admin.connect_address ~peer:node2 client in
       Log.info
         "Node 2 initialized and connected to node1, waiting for it to sync..." ;
-      let* level = Node.wait_for_level node2 (Node.get_level node) in
+      let* level =
+        let* node_level = Node.get_level node in
+        Node.wait_for_level node2 node_level
+      in
       Log.info "Both nodes are at level %d." level ;
       let all_checks =
         let* () = check_event_fetching_protocol
@@ -958,10 +961,11 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
 
     let action =
       let* r = action in
+      let* current_level = Node.get_level node in
       Log.info
         "Action `%s` executed before or at level %d (limit %d, %s)"
         action_description
-        (Node.get_level node)
+        current_level
         limit_level
         limit_description ;
       return r
@@ -994,7 +998,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
      block in which it is included. Returns the level of that block.
   *)
   let submit_and_wait_for_proposal ?(level_out = 5) node client proto_hash =
-    let start_level = Node.get_level node in
+    let* start_level = Node.get_level node in
 
     (* We have to perform the submissions sufficiently early in the
        proposal period:

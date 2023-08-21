@@ -116,7 +116,7 @@ let test_injection_and_activation () : unit =
       client1
   in
 
-  let activation_block_level = Node.get_level node1 in
+  let* activation_block_level = Node.get_level node1 in
   Log.info
     "Wait for activation block propagation at level %d"
     activation_block_level ;

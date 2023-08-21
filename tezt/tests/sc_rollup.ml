@@ -242,6 +242,10 @@ let wait_for_computed_dissection sc_node =
   let opponent = JSON.(json |-> "opponent" |> as_string) in
   Some (opponent, json)
 
+let wait_for_current_level node ?timeout sc_rollup_node =
+  let* current_level = Node.get_level node in
+  Sc_rollup_node.wait_for_level ?timeout sc_rollup_node current_level
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -327,7 +331,7 @@ let test_l1_migration_scenario ?parameters_ty ?(src = Constant.bootstrap1.alias)
   in
   let* sc_rollup = originate_sc_rollup ?parameters_ty ~kind ~src tezos_client in
   let* prior_res = scenario_prior tezos_client ~sc_rollup in
-  let current_level = Node.get_level tezos_node in
+  let* current_level = Node.get_level tezos_node in
   let migration_level = current_level + 1 in
   let* () = Node.terminate tezos_node in
   let patch_config =
@@ -422,7 +426,8 @@ let test_l2_migration_scenario ?parameters_ty ?(mode = Sc_rollup_node.Operator)
       tezos_node
       tezos_client
   in
-  let migration_level = Node.get_level tezos_node + 1 in
+  let* current_level = Node.get_level tezos_node in
+  let migration_level = current_level + 1 in
   let patch_config =
     Node.Config_file.set_sandbox_network_with_user_activated_upgrades
       [(migration_level, migrate_to)]
@@ -673,7 +678,7 @@ let test_rollup_get_genesis_info ~kind =
     }
     ~kind
   @@ fun _protocol sc_rollup tezos_node tezos_client ->
-  let origination_level = Node.get_level tezos_node in
+  let* origination_level = Node.get_level tezos_node in
   (* Bake 10 blocks to be sure that the origination_level of rollup is different
      from the level of the head node. *)
   let* () = repeat 10 (fun () -> Client.bake_for_and_wait tezos_client) in
@@ -979,13 +984,11 @@ let sc_rollup_node_stops_scenario sc_rollup_node _rollup_client sc_rollup _node
 let sc_rollup_node_disconnects_scenario sc_rollup_node _rollup_client sc_rollup
     node client =
   let num_messages = 2 in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   Log.info "we are at level %d" level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* () = send_messages num_messages client in
-  let* level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (Node.get_level node)
-  in
+  let* level = wait_for_current_level node sc_rollup_node in
   let* () = Lwt_unix.sleep 1. in
   Log.info "Terminating Tezos node" ;
   let* () = Node.terminate node in
@@ -1145,12 +1148,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
     Sc_rollup_client.get_batcher_msg sc_rollup_client msg1_hash
   in
   check_batcher_message_status status_msg1 "included" ;
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
-  in
+  let* _ = wait_for_current_level node ~timeout:3. sc_rollup_node in
   Log.info "Sending multiple messages to the batcher" ;
   let msg2 =
     (* "012456789 012456789 012456789 ..." *)
@@ -1211,9 +1209,9 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
+  let* current_level = Node.get_level node in
   let levels =
-    levels_to_commitment + init_level - Node.get_level node
-    + block_finality_time
+    levels_to_commitment + init_level - current_level + block_finality_time
   in
   Log.info "Baking %d blocks for commitment of first message" levels ;
   let* _ =
@@ -1502,7 +1500,7 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
   in
   let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
       tezos_client () =
-    let migration_level = Node.get_level tezos_node in
+    let* migration_level = Node.get_level tezos_node in
     let* () = send_messages (commitment_period + 3) tezos_client in
     let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
     let*! _l2_block =
@@ -1555,7 +1553,7 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
   in
   let scenario_after ~sc_rollup ~rollup_node ~rollup_client tezos_node
       tezos_client () =
-    let migration_level = Node.get_level tezos_node in
+    let* migration_level = Node.get_level tezos_node in
     let* () = send_messages 1 tezos_client in
     Log.info "Restarting rollup node after migration." ;
     let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
@@ -1773,7 +1771,7 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
     get_sc_rollup_commitment_period_in_blocks client
   in
   let* () = send_messages levels_to_commitment client in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level in
   Log.info "Starting other rollup node." ;
   let purposes = ["operating"; "cementing"; "batching"] in
@@ -1799,7 +1797,7 @@ let mode_publish mode publishes protocol sc_rollup_node sc_rollup_client
   let* _level = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Other rollup node synchronized." ;
   let* () = send_messages levels_to_commitment client in
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
@@ -2343,10 +2341,8 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   in
   let* () = bake_levels levels_to_cementation client in
   let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
+    let* current_level = Node.get_level node in
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node current_level
   in
 
   (* Withdraw stake before cementing should fail *)
@@ -2364,10 +2360,8 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
     cement_commitment protocol client ~sc_rollup ~hash:cemented_commitment_hash
   in
   let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node
-      (Node.get_level node)
+    let* current_level = Node.get_level node in
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node current_level
   in
 
   (* Withdraw stake after cementing should succeed *)
@@ -2392,12 +2386,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   let sc_rollup_client' = Sc_rollup_client.create ~protocol sc_rollup_node' in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
 
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node'
-      (Node.get_level node)
-  in
+  let* _ = wait_for_current_level node ~timeout:3. sc_rollup_node' in
   (* Check that no commitment was published. *)
   let*! rollup_node2_last_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client'
@@ -2428,12 +2417,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
      able to publish a commitment (bake one extra to see commitment in block). *)
   let* () = bake_levels (commitment_period + 1) client' in
   let commitment_inbox_level = commitment_inbox_level + commitment_period in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node'
-      (Node.get_level node)
-  in
+  let* _ = wait_for_current_level node ~timeout:3. sc_rollup_node' in
   let* rollup_node2_last_published_commitment =
     get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client'
   in
@@ -2604,18 +2588,10 @@ let _test_reinject_failed_commitment ~protocol:_ ~kind =
     unit
   in
   let* () = bake_levels (commitment_period + block_finality_time + 2) client in
-  let* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node1
-      (Node.get_level node)
-  and* _ =
-    Sc_rollup_node.wait_for_level
-      ~timeout:3.
-      sc_rollup_node2
-      (Node.get_level node)
-  in
-  Log.info "Rollup nodes both at %d." (Node.get_level node) ;
+  let* _ = wait_for_current_level node ~timeout:3. sc_rollup_node1
+  and* _ = wait_for_current_level node ~timeout:3. sc_rollup_node2 in
+  let* current_level = Node.get_level node in
+  Log.info "Rollup nodes both at %d." current_level ;
   (* NOTE: if the gas consumed by publishing commitments is fixed, remove the
      following check. One of the commitments is supposed to be included as
      failed in a block because when two identical commitments are in the same
@@ -2771,12 +2747,7 @@ let test_reveals_fails_on_wrong_hash =
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* () = send_text_messages client [hash.message] in
   let should_not_sync =
-    let* _level =
-      Sc_rollup_node.wait_for_level
-        ~timeout:10.
-        sc_rollup_node
-        (Node.get_level node)
-    in
+    let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
     Test.fail "The rollup node processed the incorrect reveal without failing"
   in
   Lwt.choose [error_promise; should_not_sync]
@@ -2813,12 +2784,7 @@ let test_reveals_fails_on_unknown_hash =
   (* Then, we finally send the message with the unknown hash. *)
   let* () = send_text_messages client ["hash:" ^ unknown_hash] in
   let should_not_sync =
-    let* _level =
-      Sc_rollup_node.wait_for_level
-        ~timeout:10.
-        sc_rollup_node
-        (Node.get_level node)
-    in
+    let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
     Test.fail "The rollup node processed the unknown reveal without failing"
   in
   Lwt.choose [error_promise; should_not_sync]
@@ -2849,12 +2815,7 @@ let test_reveals_4k =
   in
   let* () = send_text_messages client [hash.message] in
   let sync =
-    let* _level =
-      Sc_rollup_node.wait_for_level
-        ~timeout:10.
-        sc_rollup_node
-        (Node.get_level node)
-    in
+    let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
     unit
   in
   Lwt.choose [sync; failure]
@@ -2886,12 +2847,7 @@ let test_reveals_above_4k =
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* () = send_text_messages client [hash.message] in
   let should_not_sync =
-    let* _level =
-      Sc_rollup_node.wait_for_level
-        ~timeout:10.
-        sc_rollup_node
-        (Node.get_level node)
-    in
+    let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
     Test.fail "The rollup node processed the incorrect reveal without failing"
   in
   Lwt.choose [error_promise; should_not_sync]
@@ -3225,7 +3181,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
         let* () =
           Sc_rollup_node.wait_for sc_rollup_node event @@ fun _json -> Some ()
         in
-        let current_level = Node.get_level node in
+        let* current_level = Node.get_level node in
         let* _ =
           Sc_rollup_node.wait_for_level
             ~timeout:3.0
@@ -3598,12 +3554,13 @@ let bake_operation_via_rpc ~__LOC__ client op =
 let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
   let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
   (* This is the starting level on top of wich we'll construct the tree. *)
-  let starting_level = Node.get_level node in
+  let* starting_level = Node.get_level node in
   let mk_commit ~src ~ticks ~depth ~pred =
     (* Compute the inbox level for which we'd like to commit *)
     let inbox_level = starting_level + (commitment_period_in_blocks * depth) in
     (* d is the delta between the target inbox level and the current level *)
-    let d = inbox_level - Node.get_level node + 1 in
+    let* current_level = Node.get_level node in
+    let d = inbox_level - current_level + 1 in
     (* Bake sufficiently many blocks to be able to commit for the desired inbox
        level. We may actually bake no blocks if d <= 0 *)
     let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -3661,7 +3618,7 @@ let test_forking_scenario ~kind ~variant scenario =
   (* Building a forking commitments tree. *)
   let operator1 = Constant.bootstrap1 in
   let operator2 = Constant.bootstrap2 in
-  let level0 = Node.get_level tezos_node in
+  let* level0 = Node.get_level tezos_node in
   let* commits =
     mk_forking_commitments
       tezos_node
@@ -3670,7 +3627,7 @@ let test_forking_scenario ~kind ~variant scenario =
       ~operator1:operator1.public_key_hash
       ~operator2:operator2.public_key_hash
   in
-  let level1 = Node.get_level tezos_node in
+  let* level1 = Node.get_level tezos_node in
   scenario
     tezos_client
     tezos_node
@@ -3961,20 +3918,10 @@ let test_late_rollup_node =
   in
   Log.info "Start rollup node from scratch with same operator" ;
   let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:2.
-      sc_rollup_node2
-      (Node.get_level node)
-  in
+  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
   Log.info "Other rollup node synchronized." ;
   let* () = Client.bake_for_and_wait client in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:2.
-      sc_rollup_node2
-      (Node.get_level node)
-  in
+  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
   Log.info "Other rollup node progresses." ;
   unit
 
@@ -4012,20 +3959,10 @@ let test_late_rollup_node_2 =
   Log.info
     "Starting alternative rollup node from scratch with a different operator." ;
   let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:2.
-      sc_rollup_node2
-      (Node.get_level node)
-  in
+  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
   Log.info "Alternative rollup node is synchronized." ;
   let* () = Client.bake_for_and_wait client in
-  let* _level =
-    Sc_rollup_node.wait_for_level
-      ~timeout:2.
-      sc_rollup_node2
-      (Node.get_level node)
-  in
+  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
   Log.info "Both rollup nodes are progressing and are synchronized." ;
   let* () = Sc_rollup_node.terminate sc_rollup_node2 in
   Log.info "Alternative rollup node terminated." ;
@@ -4102,10 +4039,11 @@ let test_refutation_reward_and_punishment ~kind =
   let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
 
   (* Compute the inbox level for which we'd like to commit *)
-  let starting_level = Node.get_level node in
+  let* starting_level = Node.get_level node in
   let inbox_level = starting_level + commitment_period_in_blocks in
   (* d is the delta between the target inbox level and the current level *)
-  let d = inbox_level - Node.get_level node + 1 in
+  let* current_level = Node.get_level node in
+  let d = inbox_level - current_level + 1 in
   (* Bake sufficiently many blocks to be able to commit for the desired inbox
      level. We may actually bake no blocks if d <= 0 *)
   let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
@@ -4604,7 +4542,7 @@ let test_rpcs ~kind
   Check.((List.length hashes = n * batch_size) int)
     ~error_msg:"Injected %L messages but should have injected %R" ;
   (* Head block hash endpoint test *)
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node level in
   let* l1_block_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   let*! l2_block_hash =
@@ -5724,7 +5662,7 @@ let test_rollup_whitelist_update ~kind =
       client
       [payload_index0; payload_index1]
   in
-  let outbox_level = Node.get_level node in
+  let* outbox_level = Node.get_level node in
   let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
   let* () =
     repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
@@ -5845,7 +5783,7 @@ let test_rollup_whitelist_outdated_update ~kind =
   in
   (* Execute whitelist update with outdated message index. *)
   let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
-  let outbox_level = Node.get_level node in
+  let* outbox_level = Node.get_level node in
   let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
   let* () =
     repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
@@ -5888,7 +5826,7 @@ let test_rollup_whitelist_outdated_update ~kind =
 
   (* Execute whitelist update with outdated outbox level. *)
   let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
-  let outbox_level = Node.get_level node in
+  let* outbox_level = Node.get_level node in
   let* () = send_text_messages ~hooks ~format:`Hex client [payload; payload2] in
   let blocks_to_wait = 3 + (2 * commitment_period) + challenge_window in
   let* () =

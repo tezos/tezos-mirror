@@ -79,7 +79,8 @@ let setup_evm_infra ~mode ~operator ?runner ?preexisting_rollup
   let* () = Sc_rollup_node.wait_for_ready rollup_node in
   Log.info "Smart rollup node started." ;
   (* EVM Kernel installation level. *)
-  let* _ = Sc_rollup_node.wait_for_level rollup_node (Node.get_level node) in
+  let* current_level = Node.get_level node in
+  let* _ = Sc_rollup_node.wait_for_level rollup_node current_level in
   let* evm_proxy_server = Evm_proxy_server.init ?runner rollup_node in
   Log.info
     "Proxy server API is available at %s."

@@ -279,7 +279,7 @@ let test_export_import_snapshots =
      after activating the protocol, i.e 3*8 = 24 blocks. *)
   let blocks_to_bake = (preserved_cycles + 1) * blocks_per_cycle in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let archive_level = Node.get_level archive_node in
+  let* archive_level = Node.get_level archive_node in
   let* () = sync_all_nodes cluster archive_level in
   (* Terminate all nodes to save resources. Note: we may consider
      that exporting a snapshot from a node that is running is an
@@ -339,9 +339,9 @@ let test_drag_after_rolling_import =
      anymore (depending on the max_op_ttl)*) ;
   let blocks_to_bake = (1 * blocks_per_cycle) + max_op_ttl in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
-  let archive_level = Node.get_level archive_node in
+  let* archive_level = Node.get_level archive_node in
   let* () = sync_all_nodes [archive_node; rolling_node] archive_level in
-  let export_level = Node.get_level archive_node in
+  let* export_level = Node.get_level archive_node in
   let snapshot_dir = Temp.dir "snapshots_exports" in
   let history_mode = Node.Rolling_history in
   Log.info "Exporting snapshot at level %d" export_level ;
@@ -392,7 +392,7 @@ let test_drag_after_rolling_import =
   in
   let* () = bake_blocks archive_node client ~blocks_to_bake in
   let* () = Client.Admin.connect_address ~peer:fresh_node client in
-  let expected_head = Node.get_level archive_node in
+  let* expected_head = Node.get_level archive_node in
   let* (_ : int) = Node.wait_for_level fresh_node expected_head in
   let expected_checkpoint, expected_savepoint, expected_caboose =
     match history_mode with

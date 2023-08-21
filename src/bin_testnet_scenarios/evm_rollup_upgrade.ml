@@ -82,7 +82,10 @@ let send_external_message_and_wait ~client ~node ~sender ~hex_msg =
       ~msg:("hex:[ \"" ^ hex_msg ^ "\" ]")
       client
   in
-  let* _ = Node.wait_for_level node (Node.get_level node + 2) in
+  let* _ =
+    let* current_level = Node.get_level node in
+    Node.wait_for_level node (current_level + 2)
+  in
   unit
 
 let strip_0x s =
@@ -182,7 +185,10 @@ let upgrade_kernel ~testnet () =
       client
   in
   (* Wait for the kernel to initialize. *)
-  let* _ = Node.wait_for_level node (Node.get_level node + 2) in
+  let* _ =
+    let* current_level = Node.get_level node in
+    Node.wait_for_level node (current_level + 2)
+  in
   let new_kernel =
     project_root // upgrade_config.kernel_dir
     // (upgrade_config.new_kernel ^ ".wasm")

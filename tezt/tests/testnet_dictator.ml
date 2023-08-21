@@ -32,7 +32,7 @@
 *)
 
 let bake node client =
-  let level = Node.get_level node in
+  let* level = Node.get_level node in
   let* () =
     Client.bake_for
       ~keys:
