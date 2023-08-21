@@ -1682,6 +1682,40 @@ let test_preinitialized_evm_kernel =
       (sf "Expected to read %%L as dictator key, but found %%R instead") ;
   unit
 
+let deposit ~amount_cmutez ~fa12 ~bridge ~admin ~receiver ~sc_rollup_node ~node
+    client =
+  (* Gives enough allowance to the bridge. *)
+  let* () =
+    Client.from_fa1_2_contract_approve
+      ~burn_cap:Tez.one
+      ~contract:fa12
+      ~as_:admin
+      ~amount:amount_cmutez
+      ~from:bridge
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  (* Deposit tokens to the EVM rollup. *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
+      ~amount:Tez.zero
+      ~giver:admin
+      ~receiver:bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  unit
+
+let check_balance ~receiver ~endpoint expected_balance =
+  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
+  Check.((balance = Wei.of_eth_int expected_balance) Wei.typ)
+    ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
+  unit
+
 let test_deposit_fa12 =
   Protocol.register_test
     ~__FILE__
@@ -1723,39 +1757,22 @@ let test_deposit_fa12 =
          "The bridge does not target the expected EVM rollup, found %%R \
           expected %%L") ;
 
-  (* Gives enough allowance to the bridge. *)
   let amount_cmutez = 100_000_000 in
   let amount_ctez = 100 in
-  let* () =
-    Client.from_fa1_2_contract_approve
-      ~burn_cap:Tez.one
-      ~contract:fa12
-      ~as_:admin.public_key_hash
-      ~amount:amount_cmutez
-      ~from:bridge
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  (* Deposit tokens to the EVM rollup. *)
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+
   let* () =
-    Client.transfer
-      ~entrypoint:"deposit"
-      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
-      ~amount:Tez.zero
-      ~giver:admin.public_key_hash
-      ~receiver:bridge
-      ~burn_cap:Tez.one
+    deposit
+      ~amount_cmutez
+      ~fa12
+      ~bridge
+      ~admin:admin.public_key_hash
+      ~receiver
+      ~sc_rollup_node
+      ~node
       client
   in
-  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
-
-  (* Check the balance in the EVM rollup. *)
-  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
-  Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
-    ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
-  unit
+  check_balance ~receiver ~endpoint amount_ctez
 
 let get_kernel_boot_wasm ~sc_rollup_client =
   let*! kernel_boot_opt =
