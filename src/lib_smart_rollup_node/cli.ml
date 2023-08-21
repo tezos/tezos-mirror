@@ -320,6 +320,21 @@ let injection_ttl_arg =
          if p < 1 then Stdlib.failwith "injection-ttl should be > 1" ;
          p)
 
+let index_buffer_size_arg =
+  Tezos_clic.arg
+    ~long:"index-buffer-size"
+    ~placeholder:"<nb_entries>"
+    ~doc:
+      "The maximum cache size in memory before it is flushed to disk, used for \
+       indexes of the store."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
+         match int_of_string_opt p with
+         | Some i when i > 0 -> Lwt_result.return i
+         | None | Some _ ->
+             cctxt#error
+               "Expected a valid positive integer, provided %s instead"
+               p))
+
 let log_kernel_debug_arg : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"log-kernel-debug"
