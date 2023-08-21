@@ -41,7 +41,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args12
+    (args13
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -53,6 +53,7 @@ let config_init_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
+       index_buffer_size_arg
        log_kernel_debug_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
@@ -70,6 +71,7 @@ let config_init_command =
            injector_retention_period,
            injector_attempts,
            injection_ttl,
+           index_buffer_size,
            log_kernel_debug )
          mode
          sc_rollup_address
@@ -89,6 +91,7 @@ let config_init_command =
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators
+          ~index_buffer_size
           ~log_kernel_debug
           ~dac_observer_endpoint:None
           ~dac_timeout:None
@@ -109,7 +112,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args14
+    (args15
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -122,6 +125,7 @@ let legacy_run_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
+       index_buffer_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg)
     (prefixes ["run"] @@ stop)
@@ -137,6 +141,7 @@ let legacy_run_command =
            injector_retention_period,
            injector_attempts,
            injection_ttl,
+           index_buffer_size,
            log_kernel_debug,
            log_kernel_debug_file )
          cctxt ->
@@ -155,6 +160,7 @@ let legacy_run_command =
           ~mode
           ~sc_rollup_address
           ~sc_rollup_node_operators:[]
+          ~index_buffer_size
           ~log_kernel_debug
           ~dac_observer_endpoint:None
           ~dac_timeout:None
@@ -162,6 +168,7 @@ let legacy_run_command =
       in
       Daemon.run
         ~data_dir
+        ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration
         (new Protocol_client_context.wrap_full cctxt))
@@ -175,7 +182,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args12
+    (args13
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -186,6 +193,7 @@ let run_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
+       index_buffer_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg)
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
@@ -202,6 +210,7 @@ let run_command =
            injector_retention_period,
            injector_attempts,
            injection_ttl,
+           index_buffer_size,
            log_kernel_debug,
            log_kernel_debug_file )
          mode
@@ -223,6 +232,7 @@ let run_command =
           ~mode:(Some mode)
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators
+          ~index_buffer_size
           ~log_kernel_debug
           ~dac_observer_endpoint:None
           ~dac_timeout:None
@@ -230,6 +240,7 @@ let run_command =
       in
       Daemon.run
         ~data_dir
+        ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration
         (new Protocol_client_context.wrap_full cctxt))
