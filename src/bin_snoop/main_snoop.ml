@@ -643,7 +643,7 @@ let get_defined_cost_function_list save_to =
   let+ costs_file =
     if Sys.file_exists costs_file then Some costs_file else None
   in
-  let () = Format.eprintf "Detected %s\n" costs_file in
+  let () = Format.eprintf "Detected %s@." costs_file in
   let res = Codegen.Parser.get_cost_functions costs_file in
   match res with Ok cost_fun_list -> cost_fun_list | Error err -> raise err
 
@@ -703,12 +703,24 @@ let generate_code codegen_options generated_code =
     match fun_list with
     | None -> codes
     | Some fun_list ->
-        List.filter
-          (fun code ->
-            match Codegen.get_name_of_code code with
-            | None -> true
-            | Some name -> not @@ List.mem ~equal:String.equal name fun_list)
-          codes
+        let codes, filtered =
+          List.partition_map
+            (fun code ->
+              match Codegen.get_name_of_code code with
+              | None -> Left code
+              | Some name ->
+                  if List.mem ~equal:String.equal name fun_list then Right name
+                  else Left code)
+            codes
+        in
+        let () =
+          let open Format in
+          eprintf
+            "@[<v2>Skipped functions to be output:@;%a@]@."
+            (pp_print_list pp_print_string)
+            filtered
+        in
+        codes
   in
   String.Map.iter
     (fun k v ->
