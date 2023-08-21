@@ -71,3 +71,6 @@ val typ : t Check.typ
 
 (** Convert {!t} to U256 little endian bytes. *)
 val to_le_bytes : t -> Bytes.t
+
+(** Truncate the Wei (10^18) to Mutez (10^9). *)
+val truncate_to_mutez : t -> int
