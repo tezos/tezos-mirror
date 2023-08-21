@@ -41,13 +41,6 @@ const MAXIMUM_TRANSACTION_DEPTH: usize = 1024_usize;
 /// Be it contract -call, -create or simple transfer, the handler will update the world
 /// state in durable storage _and_ produce a summary of the outcome that will be needed
 /// for creating a transaction receipt.
-///
-/// A failed transaction will not refund gas. SputnikVM even treats some kinds of failure,
-/// eg, logging during static call, as out-of-gas.
-///
-/// A _reverted_ transaction will refund gas, as execution continues as normal. It will
-/// rollback transaction effect in the reverted sub-transaction, and it _can_ return data
-/// (like as if it the call ended with a RETURN opcode).
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecutionOutcome {
     /// How much gas was used for processing an entire transaction.
@@ -189,6 +182,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or(0_u64)
     }
 
+    /// Get the amount of gas still available for the current transaction.
+    fn gas_remaining(&self) -> u64 {
+        self.transaction_data
+            .last()
+            .map(|layer| layer.gasometer.as_ref().map(|g| g.gas()).unwrap_or(0_u64))
+            .unwrap_or(0_u64)
+    }
+
     /// Record the cost of a static-cost opcode
     fn record_cost(&mut self, cost: u64) -> Result<(), ExitError> {
         let Some(layer) = self.transaction_data.last_mut() else {
@@ -217,6 +218,27 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .as_mut()
             .map(|gasometer| gasometer.record_dynamic_cost(cost, memory_cost))
             .unwrap_or(Ok(()))
+    }
+
+    /// Record the refund of a contract call. This differs from a storage
+    /// operation refund in that the refunded gas can be used again by the
+    /// same transaction. Function name reflects the SputnikVM name used to
+    /// implement this functionality.
+    fn record_stipend(&mut self, stipend: u64) -> Result<(), EthereumError> {
+        let Some(layer) = self.transaction_data.last_mut() else {
+            return Err(EthereumError::InconsistentTransactionStack(self.transaction_data.len(), false, false))
+        };
+
+        layer
+            .gasometer
+            .as_mut()
+            .map(|gasometer| gasometer.record_stipend(stipend))
+            .unwrap_or(Ok(()))
+            .map_err(|_| {
+                EthereumError::InconsistentState(Cow::from(
+                    "Recording a stipend returned an error",
+                ))
+            })
     }
 
     /// Returns true if there is a static transaction in progress, otherwise
@@ -1031,6 +1053,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             current_depth
         );
 
+        let gas_remaining = self.gas_remaining();
+
         self.evm_account_storage
             .commit_transaction(self.host)
             .map_err(EthereumError::from)?;
@@ -1056,6 +1080,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     .deleted_contracts
                     .append(&mut committed_data.deleted_contracts);
 
+                self.record_stipend(gas_remaining)?;
+
                 Ok(())
             } else {
                 Err(EthereumError::InconsistentState(Cow::from(
@@ -1070,7 +1096,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Rollback an intermediate transaction
-    fn rollback_inter_transaction(&mut self) -> Result<(), EthereumError> {
+    fn rollback_inter_transaction(
+        &mut self,
+        refund_gas: bool,
+    ) -> Result<(), EthereumError> {
         let current_depth = self.evm_account_storage.stack_depth();
 
         if current_depth < 2 {
@@ -1087,7 +1116,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             current_depth
         );
 
-        let _ = self.transaction_data.pop();
+        if refund_gas {
+            let gas_remaining = self.gas_remaining();
+            let _ = self.transaction_data.pop();
+            self.record_stipend(gas_remaining)?;
+        } else {
+            let _ = self.transaction_data.pop();
+        }
 
         self.evm_account_storage
             .rollback_transaction(self.host)
@@ -1117,7 +1152,19 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
                 return Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![]));
             }
-        } else if let Err(err) = self.rollback_inter_transaction() {
+        } else if let Ok((ExitReason::Revert(_), _, _)) = execution_result {
+            debug_msg!(self.host, "Intermediate transaction reverted");
+
+            if let Err(err) = self.rollback_inter_transaction(true) {
+                debug_msg!(
+                    self.host,
+                    "Rolling back reverted transaction caused an error: {:?}",
+                    err
+                );
+
+                return Capture::Exit((ethereum_error_to_exit_reason(err), None, vec![]));
+            }
+        } else if let Err(err) = self.rollback_inter_transaction(false) {
             debug_msg!(
                 self.host,
                 "Intermediate transaction ended in error: {:?}",
@@ -1192,9 +1239,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn gas_left(&self) -> U256 {
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/5321
-        // Use the gasometer to find amount of gas left for current execution
-        U256::zero() // STUB
+        self.gas_remaining().into()
     }
 
     fn gas_price(&self) -> U256 {

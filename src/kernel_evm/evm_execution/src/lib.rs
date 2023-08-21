@@ -1423,7 +1423,7 @@ mod test {
         };
 
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 87048,
+            gas_used: 22348,
             is_success: true,
             new_address: None,
             logs: vec![log_record1, log_record2],
@@ -1522,7 +1522,7 @@ mod test {
         };
 
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 87048,
+            gas_used: 21911,
             is_success: true,
             new_address: None,
             logs: vec![log_record1],
@@ -1610,7 +1610,7 @@ mod test {
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 86656,
+            gas_used: 51124,
             is_success: true,
             new_address: None,
             logs: vec![],
