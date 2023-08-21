@@ -47,7 +47,7 @@ locals {
   ]
 
   # image
-  source_image         = "custom-cos-1690809563"
+  source_image         = "custom-cos-1691418108"
   source_image_family  = "custom-cos" # Build by Packer
   source_image_project = var.project_id
 
