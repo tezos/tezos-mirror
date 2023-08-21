@@ -10,6 +10,8 @@
   Availability Layer (DAL).
 - Add a new case `WhitelistUpdate(OutboxMessageWhitelistUpdate)` to the
   `OutboxMessage<Expr: Michelson>` encoding, behind the `proto-alpha` feature flag.
+- The implementation of `write_debug` in the `MockHost` no longer prefixes the debug message
+  with `DEBUG:` and do not print a newline by default.
 
 ### Installer client/kernel
 
