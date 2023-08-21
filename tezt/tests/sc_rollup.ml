@@ -2228,6 +2228,113 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
     (Option.map commitment_info_commitment published_commitment, "published") ;
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
+(* This test simulate a reorganisation where a block is reproposed, and ensures
+   that the correct commitment is published. *)
+let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
+    node1 client1 =
+  let* genesis_info =
+    RPC.Client.call ~hooks client1
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_period_in_blocks client1
+  in
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node2, client2 = Client.init_with_node ~nodes_args `Client () in
+  let* () = Client.Admin.trust_address client1 ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node ~event_level:`Debug sc_rollup []
+  in
+  (* We bake `sc_rollup_commitment_period_in_blocks - 1` levels, which
+     should cause both nodes to observe level
+     `sc_rollup_commitment_period_in_blocks + init_level - 1 . *)
+  let* () = bake_levels (levels_to_commitment - 1) client1 in
+  let* _ = Node.wait_for_level node2 (init_level + levels_to_commitment - 1) in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:3. sc_rollup_node in
+  Log.info "Nodes are synchronized." ;
+  Log.info "Forking." ;
+  let* identity2 = Node.wait_for_identity node2 in
+  let* () = Client.Admin.kick_peer client1 ~peer:identity2 in
+  let* () = send_text_messages client1 ["message1"]
+  and* () = send_text_messages client2 ["message2"] in
+  let* header1 = RPC.Client.call client1 @@ RPC.get_chain_block_header ()
+  and* header2 = RPC.Client.call client2 @@ RPC.get_chain_block_header () in
+  let level1 = JSON.(header1 |-> "level" |> as_int) in
+  let level2 = JSON.(header2 |-> "level" |> as_int) in
+  let hash1 = JSON.(header1 |-> "hash" |> as_string) in
+  let hash2 = JSON.(header2 |-> "hash" |> as_string) in
+  Check.((level1 = level2) int)
+    ~error_msg:"Heads levels should be identical but %L <> %R" ;
+  Check.((JSON.encode header1 <> JSON.encode header2) string)
+    ~error_msg:"Heads should be distinct: %L and %R" ;
+  Log.info "Nodes are following distinct branches." ;
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  let check_sc_head hash =
+    let*! sc_head =
+      Sc_rollup_client.rpc_get
+        ~hooks
+        sc_rollup_client
+        ["global"; "block"; "head"; "hash"]
+    in
+    let sc_head = JSON.as_string sc_head in
+    Check.((sc_head = hash) string)
+      ~error_msg:"Head of rollup node %L should be one of node %R" ;
+    unit
+  in
+  let* () = check_sc_head hash1 in
+  let*! state_hash1 =
+    Sc_rollup_client.state_hash sc_rollup_client ~block:hash1
+  in
+  Log.info "Changing L1 node for rollup node (1st reorg)" ;
+  let* () =
+    Sc_rollup_node.change_node_and_restart
+      ~event_level:`Debug
+      sc_rollup_node
+      sc_rollup
+      node2
+  in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  let* () = check_sc_head hash2 in
+  let*! state_hash2 =
+    Sc_rollup_client.state_hash sc_rollup_client ~block:hash2
+  in
+  Log.info
+    "Changing L1 node for rollup node (2nd reorg), back to first node to \
+     simulate reproposal of round 0" ;
+  let* () =
+    Sc_rollup_node.change_node_and_restart
+      ~event_level:`Debug
+      sc_rollup_node
+      sc_rollup
+      node1
+  in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  let* () = check_sc_head hash1 in
+  Check.((state_hash1 <> state_hash2) string)
+    ~error_msg:"States should be distinct" ;
+  let state_hash_to_commit = state_hash1 in
+  (* exactly one level left to finalize the commitment in the node. *)
+  let* () = bake_levels (block_finality_time + 2) client1 in
+  let* commitment =
+    RPC.Client.call client1
+    @@ RPC
+       .get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
+         ~sc_rollup
+         Constant.bootstrap1.public_key_hash
+  in
+  let commitment_state_hash =
+    JSON.(commitment |-> "compressed_state" |> as_string)
+  in
+  Check.((commitment_state_hash = state_hash_to_commit) string)
+    ~error_msg:"Safety error: committed state %L instead of state %R" ;
+  unit
+
 type balances = {liquid : int; frozen : int}
 
 let contract_balances ~pkh client =
@@ -6180,6 +6287,13 @@ let register ~kind ~protocols =
   test_commitment_scenario
     ~variant:"handles_chain_reorgs_missing_blocks"
     (commitments_reorgs ~kind ~switch_l1_node:true)
+    protocols
+    ~kind ;
+  test_commitment_scenario
+    ~commitment_period:3
+    ~variant:"correct_commitment_in_reproposal_reorg"
+    ~extra_tags:["reproposal"]
+    commitments_reproposal
     protocols
     ~kind ;
   test_commitment_scenario
