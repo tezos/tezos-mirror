@@ -204,7 +204,7 @@ let test_equivalence =
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
   let tz_log = [("proxy_rpc", "debug"); ("proxy_getter", "debug")] in
-  check_equivalence ~tz_log alt_mode clients
+  check_equivalence ~protocol ~tz_log alt_mode clients
 
 let test_wrong_data_dir =
   Protocol.register_test
@@ -286,22 +286,21 @@ let test_multi_protocols =
                     protocol test, expected %%L instead of %%R"
                    __LOC__))
         in
-        let* () =
-          if Protocol.(number proto > number Nairobi) then (
-            let* proto_attestation_rights =
-              RPC.Client.call client
-              @@ RPC.get_chain_block_helper_attestation_rights ?block ()
-            in
-            check proto_attestation_rights ;
-            unit)
-          else unit
-        in
-        let* proto_endorsing_rights =
+        let* proto_attestation_rights =
           RPC.Client.call client
-          @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
+          @@ RPC.get_chain_block_helper_attestation_rights ?block ()
         in
-        check proto_endorsing_rights ;
-        unit
+        check proto_attestation_rights ;
+        if Protocol.(number proto <= number Oxford) then (
+          let* proto_endorsing_rights =
+            RPC.Client.call client
+            @@ RPC.get_chain_block_helper_endorsing_rights ?block ()
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6227
+               This RPC helper should be removed once Oxford will be frozen. *)
+          in
+          check proto_endorsing_rights ;
+          unit)
+        else unit
       in
       (* Ensure the proxy serves a query to a block in [to_protocol] *)
       let* () =
