@@ -107,6 +107,7 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  index_buffer_size : int option;
   log_kernel_debug : bool;
 }
 
@@ -212,6 +213,15 @@ val check_mode : t -> t tzresult
     for a game state it already played before. *)
 val refutation_player_buffer_levels : int
 
+(** The `default_index_buffer_size` defines the maximum amount of memory 
+   reserved for caching index entries before they are written to disk. 
+   Essentially, this cache aids the efficiency of the index. 
+   The total cache capacity is determined by `index_buffer_size * entry`, 
+   with each `entry` occupying approximately 56 bytes.
+   An `entry` represents a single log record which can encompass various 
+   details such as a timestamp, message content, severity level, etc. *)
+val default_index_buffer_size : int
+
 (** [save ~force ~data_dir configuration] writes the [configuration] file in
     [data_dir]. If [force] is [true], existing configurations are
     overwritten. *)
@@ -240,6 +250,7 @@ module Cli : sig
       [< `Default of Signature.public_key_hash
       | `Purpose of purpose * Signature.public_key_hash ]
       trace ->
+    index_buffer_size:int option ->
     log_kernel_debug:bool ->
     t tzresult
 
@@ -263,6 +274,7 @@ module Cli : sig
       [< `Default of Signature.public_key_hash
       | `Purpose of purpose * Signature.public_key_hash ]
       list ->
+    index_buffer_size:int option ->
     log_kernel_debug:bool ->
     t tzresult Lwt.t
 end

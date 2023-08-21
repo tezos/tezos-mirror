@@ -138,6 +138,7 @@ val get_fee_parameter :
 val init :
   #Client_context.full ->
   data_dir:string ->
+  index_buffer_size:int ->
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->
   Layer1.t ->

@@ -31,12 +31,13 @@ let messages_store_location ~storage_dir =
   let open Filename.Infix in
   storage_dir // "messages"
 
-let version_of_unversioned_store ~storage_dir =
+let version_of_unversioned_store ~storage_dir ~index_buffer_size =
   let open Lwt_syntax in
   let path = messages_store_location ~storage_dir in
-  let* messages_store_v0 = Store_v0.Messages.load ~path ~cache_size:1 Read_only
+  let* messages_store_v0 =
+    Store_v0.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
   and* messages_store_v1 =
-    Store_v1.Messages.load ~path ~cache_size:1 Read_only
+    Store_v1.Messages.load ~path ~cache_size:1 Read_only ~index_buffer_size
   in
   let cleanup () =
     let open Lwt_syntax in
@@ -65,13 +66,13 @@ let version_of_unversioned_store ~storage_dir =
   in
   Lwt.finalize guess_version cleanup
 
-let version_of_store ~storage_dir =
+let version_of_store ~storage_dir ~index_buffer_size =
   let open Lwt_result_syntax in
   let* version = Store_version.read_version_file ~dir:storage_dir in
   match version with
   | Some v -> return_some (v, Version_known)
   | None ->
-      let+ v = version_of_unversioned_store ~storage_dir in
+      let+ v = version_of_unversioned_store ~storage_dir ~index_buffer_size in
       Option.map (fun v -> (v, Unintialized_version)) v
 
 module type MIGRATION_ACTIONS = sig
@@ -91,7 +92,8 @@ module type MIGRATION_ACTIONS = sig
 end
 
 module type S = sig
-  val migrate : storage_dir:string -> unit tzresult Lwt.t
+  val migrate :
+    storage_dir:string -> index_buffer_size:int -> unit tzresult Lwt.t
 end
 
 let migrations = Stdlib.Hashtbl.create 7
@@ -111,11 +113,16 @@ module Make
          Store_version.pp
          S_dest.version
 
-  let migrate ~storage_dir =
+  let migrate ~storage_dir ~index_buffer_size =
     let open Lwt_result_syntax in
     let* source_store =
-      S_from.load Read_only ~l2_blocks_cache_size:1 storage_dir
+      S_from.load
+        Read_only
+        ~l2_blocks_cache_size:1
+        storage_dir
+        ~index_buffer_size
     in
+
     let tmp_dir = tmp_dir ~storage_dir in
     let*! tmp_dir_exists = Lwt_utils_unix.dir_exists tmp_dir in
     let*? () =
@@ -131,7 +138,9 @@ module Make
       else Ok ()
     in
     let*! () = Lwt_utils_unix.create_dir tmp_dir in
-    let* dest_store = S_dest.load Read_write ~l2_blocks_cache_size:1 tmp_dir in
+    let* dest_store =
+      S_dest.load Read_write ~l2_blocks_cache_size:1 tmp_dir ~index_buffer_size
+    in
     let cleanup () =
       let open Lwt_syntax in
       let* (_ : unit tzresult) = S_from.close source_store
@@ -182,9 +191,9 @@ let migration_path ~from ~dest =
   in
   path [] from dest
 
-let maybe_run_migration ~storage_dir =
+let maybe_run_migration ~storage_dir ~index_buffer_size =
   let open Lwt_result_syntax in
-  let* current_version = version_of_store ~storage_dir in
+  let* current_version = version_of_store ~storage_dir ~index_buffer_size in
   let last_version = Store.version in
   match (current_version, last_version) with
   | None, _ ->
@@ -219,7 +228,7 @@ let maybe_run_migration ~storage_dir =
                   vx
                   Store_version.pp
                   vy ;
-                migrate ~storage_dir)
+                migrate ~storage_dir ~index_buffer_size)
               migrations
           in
           Format.printf "Store migration completed@.")
