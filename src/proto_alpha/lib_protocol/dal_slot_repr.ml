@@ -114,7 +114,7 @@ module Header = struct
     Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
 
   let verify_commitment cryptobox commitment proof =
-    ok (Dal.verify_commitment cryptobox commitment proof)
+    Ok (Dal.verify_commitment cryptobox commitment proof)
 end
 
 module Slot_index = Dal_slot_index_repr
@@ -399,9 +399,13 @@ module History = struct
       List.fold_left_e add_confirmed_slot_header (t, cache) slot_headers
 
     let add_confirmed_slot_headers_no_cache =
+      let open Result_syntax in
       let no_cache = History_cache.empty ~capacity:0L in
       fun t slots ->
-        List.fold_left_e add_confirmed_slot_header (t, no_cache) slots >|? fst
+        let+ cell, (_ : History_cache.t) =
+          List.fold_left_e add_confirmed_slot_header (t, no_cache) slots
+        in
+        cell
 
     (* Dal proofs section *)
 
@@ -583,9 +587,10 @@ module History = struct
         (fun () -> Dal_invalid_proof_serialization)
 
     let serialize_proof proof =
+      let open Result_syntax in
       match Data_encoding.Binary.to_bytes_opt proof_repr_encoding proof with
-      | None -> error Dal_invalid_proof_serialization
-      | Some serialized_proof -> ok serialized_proof
+      | None -> tzfail Dal_invalid_proof_serialization
+      | Some serialized_proof -> return serialized_proof
 
     type error += Dal_invalid_proof_deserialization
 
@@ -600,9 +605,10 @@ module History = struct
         (fun () -> Dal_invalid_proof_deserialization)
 
     let deserialize_proof proof =
+      let open Result_syntax in
       match Data_encoding.Binary.of_bytes_opt proof_repr_encoding proof with
-      | None -> error Dal_invalid_proof_deserialization
-      | Some deserialized_proof -> ok deserialized_proof
+      | None -> tzfail Dal_invalid_proof_deserialization
+      | Some deserialized_proof -> return deserialized_proof
 
     let pp_inclusion_proof = Format.pp_print_list pp_history
 
@@ -696,7 +702,7 @@ module History = struct
         Format.kasprintf proof_error "%s (page id=%a)." what Page.pp pid
       in
       match Dal.verify_page dal commitment ~page_index data proof with
-      | Ok true -> return ()
+      | Ok true -> return_unit
       | Ok false ->
           fail_with_error_msg
             "Wrong page content for the given page index and slot commitment"
