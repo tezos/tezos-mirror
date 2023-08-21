@@ -1754,10 +1754,7 @@ let test_deposit_fa12 =
   (* Check the balance in the EVM rollup. *)
   let* balance = Eth_cli.balance ~account:receiver ~endpoint in
   Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
-    ~error_msg:
-      (sf
-         "Expected balance of %s should be %%R, but got %%L"
-         Eth_account.bootstrap_accounts.(0).address) ;
+    ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
   unit
 
 let get_kernel_boot_wasm ~sc_rollup_client =
