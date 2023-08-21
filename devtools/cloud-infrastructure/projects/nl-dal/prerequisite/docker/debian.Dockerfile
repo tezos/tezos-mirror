@@ -4,6 +4,8 @@ FROM $SOURCE_IMAGE:latest
 # python3 is not strictly needed but could be used to run an html server for example
 # netbase is needed to handle transport services
 RUN apt update && apt install netbase libgmp-dev curl libev-dev libhidapi-dev python3 openssh-server -y
+# To create and make the /usr/bin/python binary points to /usr/bin/python3 binary
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 # This directory is necessary for running sshd
 RUN mkdir -p /run/sshd
 # A server ssh also requires a key. We generate one for all the main schemes
