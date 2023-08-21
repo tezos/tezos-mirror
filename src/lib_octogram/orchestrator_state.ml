@@ -76,10 +76,10 @@ let with_prometheus ~default state k =
 let record_metrics_source state (agent_name : Agent_name.t) node_name address
     port =
   with_prometheus ~default:() state @@ fun prometheus ->
-  Lwt.async @@ fun () ->
-  Remote_prometheus.record_metrics_source
-    prometheus
-    {
-      job_name = sf "%s://%s" (agent_name :> string) node_name;
-      target = sf "%s:%d" address port;
-    }
+  Background.register
+  @@ Remote_prometheus.record_metrics_source
+       prometheus
+       {
+         job_name = sf "%s://%s" (agent_name :> string) node_name;
+         target = sf "%s:%d" address port;
+       }

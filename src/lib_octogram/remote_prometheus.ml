@@ -130,10 +130,10 @@ let run ?event_level ?event_sections_levels agent =
       agent.path
   in
 
-  ( Lwt.async @@ fun () ->
-    let* () = wait_for_ready agent in
-    Log.debug "Agent is ready, removing the binary" ;
-    Helpers.exec ~runner:agent.persistent_state.runner "rm" [agent.path] ) ;
+  (Background.register
+  @@ let* () = wait_for_ready agent in
+     Log.debug "Agent is ready, removing the binary" ;
+     Helpers.exec ~runner:agent.persistent_state.runner "rm" [agent.path]) ;
 
   run
     ~runner:agent.persistent_state.runner
