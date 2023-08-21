@@ -3,7 +3,8 @@
 
 (library
  (name tezos_smart_rollup_016_PtMumbai)
- (public_name tezos-smart-rollup-016-PtMumbai)
+ (public_name
+  octez-protocol-016-PtMumbai-libs.tezos-smart-rollup-016-PtMumbai)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

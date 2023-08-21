@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
   octez-shell-libs.tezos-client-commands
-  tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
   octez-smart-rollup-node-lib
   octez_smart_rollup_node_Proxford)
  (link_flags

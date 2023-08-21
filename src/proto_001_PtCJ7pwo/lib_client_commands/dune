@@ -3,7 +3,8 @@
 
 (library
  (name tezos_client_001_PtCJ7pwo_commands)
- (public_name tezos-client-001-PtCJ7pwo.commands)
+ (public_name
+  octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo.commands)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -12,7 +13,7 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-001-PtCJ7pwo
+  octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
@@ -30,7 +31,8 @@
 
 (library
  (name tezos_client_001_PtCJ7pwo_commands_registration)
- (public_name tezos-client-001-PtCJ7pwo.commands-registration)
+ (public_name
+  octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo.commands-registration)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -38,9 +40,9 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-001-PtCJ7pwo
+  octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo
   octez-shell-libs.tezos-client-commands
-  tezos-client-001-PtCJ7pwo.commands
+  octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

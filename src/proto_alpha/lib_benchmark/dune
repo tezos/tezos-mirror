@@ -16,7 +16,7 @@
   octez-libs.tezos-crypto
   tezos-protocol-alpha.parameters
   hashcons
-  tezos-alpha-test-helpers
+  octez-protocol-alpha-libs.tezos-alpha-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags

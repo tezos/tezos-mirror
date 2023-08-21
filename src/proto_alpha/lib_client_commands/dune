@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_alpha_commands)
- (public_name tezos-client-alpha.commands)
+ (public_name octez-protocol-alpha-libs.tezos-client-alpha.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -17,11 +17,11 @@
   octez-shell-libs.tezos-mockup-registration
   octez-shell-libs.tezos-mockup-commands
   octez-shell-libs.tezos-client-base
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
   octez-shell-libs.tezos-client-base-unix
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -40,7 +40,8 @@
 
 (library
  (name tezos_client_alpha_commands_registration)
- (public_name tezos-client-alpha.commands-registration)
+ (public_name
+  octez-protocol-alpha-libs.tezos-client-alpha.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -50,12 +51,12 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-shell-libs.tezos-client-commands
-  tezos-client-alpha.commands
-  tezos-client-alpha.sapling
+  octez-protocol-alpha-libs.tezos-client-alpha.commands
+  octez-protocol-alpha-libs.tezos-client-alpha.sapling
   octez-libs.tezos-rpc
-  tezos-protocol-plugin-alpha)
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

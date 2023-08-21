@@ -9,10 +9,10 @@
   octez-alcotezt
   octez-libs.tezos-base
   tezos-protocol-alpha
-  tezos-client-alpha
-  tezos-alpha-test-helpers
+  octez-protocol-alpha-libs.tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-alpha-test-helpers
   octez-libs.tezos-base-test-helpers
-  tezos-protocol-plugin-alpha)
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

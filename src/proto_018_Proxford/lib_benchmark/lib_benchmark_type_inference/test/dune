@@ -9,7 +9,7 @@
   tezos-benchmark-type-inference-018-Proxford
   tezos-protocol-018-Proxford
   octez-libs.tezos-error-monad
-  tezos-client-018-Proxford)
+  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

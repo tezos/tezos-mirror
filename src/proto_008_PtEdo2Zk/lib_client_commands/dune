@@ -3,7 +3,8 @@
 
 (library
  (name tezos_client_008_PtEdo2Zk_commands)
- (public_name tezos-client-008-PtEdo2Zk.commands)
+ (public_name
+  octez-protocol-008-PtEdo2Zk-libs.tezos-client-008-PtEdo2Zk.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -13,10 +14,10 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-008-PtEdo2Zk
+  octez-protocol-008-PtEdo2Zk-libs.tezos-client-008-PtEdo2Zk
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
-  tezos-protocol-plugin-008-PtEdo2Zk)
+  octez-protocol-008-PtEdo2Zk-libs.tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -33,7 +34,8 @@
 
 (library
  (name tezos_client_008_PtEdo2Zk_commands_registration)
- (public_name tezos-client-008-PtEdo2Zk.commands-registration)
+ (public_name
+  octez-protocol-008-PtEdo2Zk-libs.tezos-client-008-PtEdo2Zk.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -42,11 +44,11 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-008-PtEdo2Zk
+  octez-protocol-008-PtEdo2Zk-libs.tezos-client-008-PtEdo2Zk
   octez-shell-libs.tezos-client-commands
-  tezos-client-008-PtEdo2Zk.commands
+  octez-protocol-008-PtEdo2Zk-libs.tezos-client-008-PtEdo2Zk.commands
   octez-libs.tezos-rpc
-  tezos-protocol-plugin-008-PtEdo2Zk)
+  octez-protocol-008-PtEdo2Zk-libs.tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

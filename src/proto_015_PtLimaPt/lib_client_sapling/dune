@@ -3,7 +3,8 @@
 
 (library
  (name tezos_client_sapling_015_PtLimaPt)
- (public_name tezos-client-015-PtLimaPt.sapling)
+ (public_name
+  octez-protocol-015-PtLimaPt-libs.tezos-client-015-PtLimaPt.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -12,10 +13,10 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-signer-backends
-  tezos-client-015-PtLimaPt
-  tezos-client-015-PtLimaPt.commands
+  octez-protocol-015-PtLimaPt-libs.tezos-client-015-PtLimaPt
+  octez-protocol-015-PtLimaPt-libs.tezos-client-015-PtLimaPt.commands
   tezos-protocol-015-PtLimaPt
-  tezos-protocol-plugin-015-PtLimaPt)
+  octez-protocol-015-PtLimaPt-libs.tezos-protocol-plugin-015-PtLimaPt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

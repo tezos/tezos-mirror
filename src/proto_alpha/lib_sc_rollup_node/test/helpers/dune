@@ -9,12 +9,12 @@
   octez-libs.tezos-base
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-libs.tezos-test-helpers
   qcheck-alcotest
   qcheck-core
   logs.lwt
-  tezos-smart-rollup-layer2-alpha
+  octez-protocol-alpha-libs.tezos-smart-rollup-layer2-alpha
   octez_smart_rollup_node_alpha
   octez-alcotezt)
  (flags

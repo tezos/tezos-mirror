@@ -3,7 +3,7 @@
 
 (library
  (name tezos_dac_017_PtNairob)
- (public_name tezos-dac-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.tezos-dac-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -11,7 +11,7 @@
   octez-libs.tezos-stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
   tezos-embedded-protocol-017-PtNairob
   tezos-protocol-017-PtNairob)
  (inline_tests (flags -verbose) (modes native))

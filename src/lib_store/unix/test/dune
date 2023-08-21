@@ -21,7 +21,7 @@
   tezos-embedded-protocol-genesis
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha.parameters
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
   octez-alcotezt
   octez-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))

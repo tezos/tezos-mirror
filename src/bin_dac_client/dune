@@ -17,11 +17,11 @@
   octez-libs.tezos-stdlib
   tezos-dac-lib
   tezos-dac-client-lib
-  tezos-dac-017-PtNairob
-  tezos-dac-018-Proxford
-  (select void_for_linking-tezos-dac-alpha from
-   (tezos-dac-alpha -> void_for_linking-tezos-dac-alpha.empty)
-   (-> void_for_linking-tezos-dac-alpha.empty)))
+  octez-protocol-017-PtNairob-libs.tezos-dac-017-PtNairob
+  octez-protocol-018-Proxford-libs.tezos-dac-018-Proxford
+  (select void_for_linking-octez-protocol-alpha-libs-tezos-dac-alpha from
+   (octez-protocol-alpha-libs.tezos-dac-alpha -> void_for_linking-octez-protocol-alpha-libs-tezos-dac-alpha.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-tezos-dac-alpha.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -37,4 +37,7 @@
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib))
 
-(rule (action (progn (write-file void_for_linking-tezos-dac-alpha.empty ""))))
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-dac-alpha.empty ""))))

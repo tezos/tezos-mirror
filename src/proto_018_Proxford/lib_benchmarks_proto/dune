@@ -19,10 +19,10 @@
   octez-libs.tezos-crypto
   octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline
-  tezos-018-Proxford-test-helpers
+  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers
   octez-libs.tezos-sapling
-  tezos-client-018-Proxford
-  tezos-protocol-plugin-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

@@ -3,7 +3,8 @@
 
 (library
  (name tezos_client_003_PsddFKi3_commands)
- (public_name tezos-client-003-PsddFKi3.commands)
+ (public_name
+  octez-protocol-003-PsddFKi3-libs.tezos-client-003-PsddFKi3.commands)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -12,7 +13,7 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-003-PsddFKi3
+  octez-protocol-003-PsddFKi3-libs.tezos-client-003-PsddFKi3
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
@@ -30,7 +31,8 @@
 
 (library
  (name tezos_client_003_PsddFKi3_commands_registration)
- (public_name tezos-client-003-PsddFKi3.commands-registration)
+ (public_name
+  octez-protocol-003-PsddFKi3-libs.tezos-client-003-PsddFKi3.commands-registration)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -38,9 +40,9 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-003-PsddFKi3
+  octez-protocol-003-PsddFKi3-libs.tezos-client-003-PsddFKi3
   octez-shell-libs.tezos-client-commands
-  tezos-client-003-PsddFKi3.commands
+  octez-protocol-003-PsddFKi3-libs.tezos-client-003-PsddFKi3.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

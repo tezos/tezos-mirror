@@ -10,10 +10,10 @@
   octez-alcotezt
   octez-libs.tezos-base
   tezos-protocol-018-Proxford
-  tezos-018-Proxford-test-helpers
+  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers
   octez-libs.tezos-base-test-helpers
   tezos-protocol-018-Proxford.parameters
-  tezos-protocol-plugin-018-Proxford)
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

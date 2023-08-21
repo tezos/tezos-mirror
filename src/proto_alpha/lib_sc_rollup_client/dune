@@ -11,10 +11,10 @@
   octez-shell-libs.tezos-client-commands
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-l2-libs.octez-smart-rollup
-  tezos-smart-rollup-alpha
-  tezos-smart-rollup-layer2-alpha)
+  octez-protocol-alpha-libs.tezos-smart-rollup-alpha
+  octez-protocol-alpha-libs.tezos-smart-rollup-layer2-alpha)
  (flags
   (:standard)
   -open Tezos_base

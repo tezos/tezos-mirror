@@ -9,14 +9,14 @@
   octez-alcotezt
   octez-libs.tezos-base
   tezos-protocol-alpha
-  tezos-alpha-test-helpers
+  octez-protocol-alpha-libs.tezos-alpha-test-helpers
   octez-libs.tezos-base-test-helpers
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   tezos-benchmark
   octez-libs.tezos-micheline
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
   tezos-protocol-alpha.parameters)
  (library_flags (:standard -linkall))
  (flags

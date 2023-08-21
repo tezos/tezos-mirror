@@ -3,7 +3,7 @@
 
 (library
  (name tezos_dac_018_Proxford)
- (public_name tezos-dac-018-Proxford)
+ (public_name octez-protocol-018-Proxford-libs.tezos-dac-018-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -11,7 +11,7 @@
   octez-libs.tezos-stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
   tezos-embedded-protocol-018-Proxford
   tezos-protocol-018-Proxford)
  (inline_tests (flags -verbose) (modes native))

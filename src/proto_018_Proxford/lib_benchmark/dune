@@ -16,7 +16,7 @@
   octez-libs.tezos-crypto
   tezos-protocol-018-Proxford.parameters
   hashcons
-  tezos-018-Proxford-test-helpers
+  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags

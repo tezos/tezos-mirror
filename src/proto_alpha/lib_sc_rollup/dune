@@ -3,7 +3,7 @@
 
 (library
  (name tezos_smart_rollup_alpha)
- (public_name tezos-smart-rollup-alpha)
+ (public_name octez-protocol-alpha-libs.tezos-smart-rollup-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

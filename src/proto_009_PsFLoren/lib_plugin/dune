@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_plugin_009_PsFLoren)
- (public_name tezos-protocol-plugin-009-PsFLoren)
+ (public_name
+  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-009-PsFLoren)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -17,12 +18,13 @@
 
 (library
  (name tezos_protocol_plugin_009_PsFLoren_registerer)
- (public_name tezos-protocol-plugin-009-PsFLoren-registerer)
+ (public_name
+  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-009-PsFLoren-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-embedded-protocol-009-PsFLoren
-  tezos-protocol-plugin-009-PsFLoren
+  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-009-PsFLoren
   octez-shell-libs.tezos-validation)
  (flags
   (:standard)
