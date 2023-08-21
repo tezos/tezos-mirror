@@ -16,6 +16,7 @@ depends: [
   "octez-smart-rollup-node-alpha"
   "octez-smart-rollup-node-lib"
   "octez-smart-rollup"
+  "tezos-client-base"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

@@ -29,7 +29,6 @@
    Component:    Smart Optimistic Rollups: Sequencer
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_sequencer.ml
 *)
-
 open Sc_rollup_helpers
 open Tezos_protocol_alpha.Protocol
 
@@ -55,39 +54,59 @@ let next_rollup_level {node; client; sc_sequencer_node; _} =
 let setup_sequencer_kernel
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(sequencer_key = Constant.bootstrap1.public_key_hash) protocol =
-  let* node, client = setup_l1 protocol in
+  (* Prepare sequencer kernel & originate it *)
+  let data_dir = Temp.dir "sequencer-kernel-data-dir" in
+  let* boot_sector =
+    prepare_installer_kernel
+      ~base_installee:"./"
+      ~config:
+        [
+          Installer_kernel_config.Set
+            {
+              value =
+                (* encodings of State::Sequenced(edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav) *)
+                "00004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
+              to_ = "/__sequencer/state";
+            };
+        ]
+      ~preimages_dir:(Filename.concat data_dir "wasm_2_0_0")
+      "sequenced_kernel"
+  in
+  let boot_sector_file = Filename.temp_file "boot-sector" ".hex" in
+  let () = write_file boot_sector_file ~contents:boot_sector in
+  let* parameters_ty =
+    let client = Client.create_with_mode Client.Mockup in
+    Client.convert_data_to_json ~data:"unit" client
+  in
+  let sc_rollup_address = "sr1ExAn7W4MzgEoAWqhHwWivGCt3W8r1qH7g" in
+  let bootstrap_tx_kernel : Protocol.bootstrap_smart_rollup =
+    {
+      address = sc_rollup_address;
+      pvm_kind = "wasm_2_0_0";
+      boot_sector;
+      parameters_ty;
+    }
+  in
+
+  (* Run Tezos node & Sequencer node*)
+  let* node, client =
+    setup_l1 ~bootstrap_smart_rollups:[bootstrap_tx_kernel] protocol
+  in
   let sc_sequencer_node =
     Sc_rollup_node.create
       Custom
       node
       ~path:"./octez-smart-rollup-sequencer-node"
+      ~data_dir
       ~base_dir:(Client.base_dir client)
       ~default_operator:sequencer_key
   in
-  (* Prepare sequencer kernel & originate it *)
-  let* boot_sector =
-    prepare_installer_kernel
-      ~base_installee:"./"
-      ~preimages_dir:
-        (Filename.concat
-           (Sc_rollup_node.data_dir sc_sequencer_node)
-           "wasm_2_0_0")
-      "sequenced_kernel"
-  in
-  let* sc_rollup_address =
-    originate_sc_rollup
-      ~kind:pvm_kind
-      ~boot_sector
-      ~parameters_ty:"unit"
-      ~src:originator_key
-      client
-  in
-  (* Start a sequencer node *)
+  let* () = Client.bake_for_and_wait client in
   let* () =
     Sc_rollup_node.run_sequencer
       sc_sequencer_node
       sc_rollup_address
-      ["--log-kernel-debug"]
+      ["--log-kernel-debug"; "--boot-sector-file"; boot_sector_file]
   in
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_sequencer_node in
   return
@@ -123,8 +142,7 @@ let send_message ~src client raw_msg =
 let wait_for_sequence_debug_message sc_node =
   Sc_rollup_node.wait_for sc_node "kernel_debug.v0" @@ fun json ->
   let message = JSON.as_string json in
-  if String.starts_with ~prefix:"Received a sequence message" message then
-    Some message
+  if String.starts_with ~prefix:"Received Sequence {" message then Some message
   else None
 
 let test_delayed_inbox_consumed =
@@ -201,24 +219,14 @@ let test_delayed_inbox_consumed =
   let expected_sequences =
     List.map (fun (delayed_inbox_prefix, delayed_inbox_suffix) ->
         Format.sprintf
-          "Received a sequence message UnverifiedSigned { body: Framed { \
-           destination: SmartRollupAddress { hash: SmartRollupHash(\"%s\") }, \
-           payload: Sequence(Sequence { nonce: 0, delayed_messages_prefix: %d, \
-           delayed_messages_suffix: %d, messages: [] }) }, signature: \
-           Signature(\"edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q\") \
-           }"
-          (Sc_rollup_repr.Address.to_b58check sc_rollup_address)
+          "Received Sequence { nonce: 0, delayed_messages_prefix: %d, \
+           delayed_messages_suffix: %d, messages: [] } targeting our rollup"
           delayed_inbox_prefix
           delayed_inbox_suffix)
     @@ [(4, 1); (7, 1)]
   in
-  Check.(
-    ( = )
-      expected_sequences
-      (List.rev !collected_sequences)
-      ~__LOC__
-      (list string)
-      ~error_msg:"Unexpected debug messages emitted") ;
+  Check.((expected_sequences = List.rev !collected_sequences) (list string))
+    ~error_msg:"Unexpected debug messages emitted:, should be %L, but got %R" ;
   Lwt.return_unit
 
 let register ~protocols = test_delayed_inbox_consumed protocols

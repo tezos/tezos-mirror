@@ -45,7 +45,8 @@ module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
 type state = {
   node_ctxt : Node_context.ro;
-  signer : Signature.public_key_hash;
+  (* This one is V0 because sequencer kernel doesn't support BLS signatures yet *)
+  signer : Signature.V0.public_key_hash * Client_keys.sk_uri;
   messages : Message_queue.t;
   batched : Batched_messages.t;
   mutable simulation_ctxt : Simulation.t option;
@@ -56,7 +57,9 @@ let inject_sequence state (sequencer_message, l2_messages) =
   let open Lwt_result_syntax in
   let operation = L1_operation.Add_messages {messages = [sequencer_message]} in
   let+ l1_hash =
-    Injector.add_pending_operation ~source:state.signer operation
+    Injector.add_pending_operation
+      ~source:(Signature.Of_V0.public_key_hash @@ fst state.signer)
+      operation
   in
   List.iter
     (fun msg ->
@@ -125,16 +128,15 @@ let get_batch_sequences state head =
     (* That might happen only for the genesis + 1 block level *)
     return ([], 0)
   else
-    return
-      ( [
-          ( Kernel_message.encode_sequence_message
-              state.node_ctxt.rollup_address
-              ~prefix:(Int32.of_int (delayed_inbox_size - 1))
-              ~suffix:1l
-              l2_messages_serialized,
-            l2_messages );
-        ],
-        delayed_inbox_size )
+    let* signed_sequence =
+      Kernel_message.encode_and_sign_sequence
+        (state.node_ctxt.cctxt, snd state.signer)
+        state.node_ctxt.rollup_address
+        ~prefix:(Int32.of_int (delayed_inbox_size - 1))
+        ~suffix:1l
+        l2_messages_serialized
+    in
+    return ([(signed_sequence, l2_messages)], delayed_inbox_size)
 
 let produce_batch_sequences state head =
   let open Lwt_result_syntax in
@@ -225,10 +227,14 @@ let on_new_head state head =
   return_unit
 
 let init_batcher_state node_ctxt ~signer =
-  Lwt.return
+  let open Lwt_result_syntax in
+  let* _alias, _pk, sk =
+    Client_keys.V0.get_key node_ctxt.Node_context.cctxt signer
+  in
+  return
     {
       node_ctxt;
-      signer;
+      signer = (signer, sk);
       messages = Message_queue.create 100_000 (* ~ 400MB *);
       batched = Batched_messages.create 100_000 (* ~ 400MB *);
       simulation_ctxt = None;
@@ -278,7 +284,20 @@ module Handlers = struct
 
   let on_launch _w () Types.{node_ctxt; signer} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state node_ctxt ~signer in
+    let to_v0_exn pkh =
+      match
+        Signature.V0.Public_key_hash.of_bytes
+        @@ Signature.Public_key_hash.to_bytes pkh
+      with
+      | Error e ->
+          failwith
+            "Couldn't convert an operator key to V0 key: %a"
+            Error_monad.pp_print_trace
+            e
+      | Ok x -> return x
+    in
+    let* signer = to_v0_exn signer in
+    let* state = init_batcher_state node_ctxt ~signer in
     return state
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :

@@ -61,8 +61,6 @@ pub fn read_input<Host: Runtime>(
                     Err(_) => {}
                     Ok((_, message)) => match message {
                         KernelMessage::Sequencer(sequencer_msg) => {
-                            debug_msg!(host, "Received a sequence message {:?}", &sequencer_msg);
-
                             let Ok(payload) = extract_payload(
                                 sequencer_msg,
                                 &raw_rollup_address,
@@ -71,7 +69,7 @@ pub fn read_input<Host: Runtime>(
 
                             match payload {
                                 SequencerMsg::Sequence(sequence) => {
-                                    handle_sequence_message(sequence)
+                                    handle_sequence_message(host, sequence)
                                 }
                                 SequencerMsg::SetSequencer(set_sequencer) => {
                                     handle_set_sequencer_message(set_sequencer)
@@ -131,8 +129,9 @@ fn extract_payload(
 }
 
 /// Handle Sequence message
-fn handle_sequence_message(_sequence: Sequence) {
+fn handle_sequence_message<H: Runtime>(host: &H, sequence: Sequence) {
     // process the sequence
+    debug_msg!(host, "Received {:?} targeting our rollup", sequence);
 }
 
 fn handle_set_sequencer_message(_set_sequencer: SetSequencer) {
@@ -153,7 +152,7 @@ fn handle_message<H: Runtime>(
     if filter_behavior.predicate(user_message.as_ref(), rollup_address) {
         debug_msg!(
             host,
-            "Received user message {:?} targeting our rollup, hence, will be added to the delayed inbox",
+            "Received a user message {:?} targeting our rollup, hence, will be added to the delayed inbox",
             user_message
         );
 
