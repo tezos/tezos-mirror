@@ -17,7 +17,7 @@ depends: [
   "tezos-embedded-protocol-genesis" {with-test}
   "tezos-embedded-protocol-alpha" {with-test}
   "tezos-protocol-alpha" {with-test}
-  "tezos-protocol-plugin-alpha" {with-test}
+  "octez-protocol-alpha-libs" {with-test}
   "octez-alcotezt" {with-test}
 ]
 build: [

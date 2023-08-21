@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
-  tezos-alpha-test-helpers)
+  octez-protocol-alpha-libs.tezos-alpha-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -54,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-plugin-alpha-tests)
+ (package octez-protocol-alpha-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

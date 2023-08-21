@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
   tezos-protocol-018-Proxford
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
@@ -46,7 +46,7 @@
 
 (rule
  (alias runtest)
- (package tezos-client-018-Proxford)
+ (package octez-protocol-018-Proxford-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

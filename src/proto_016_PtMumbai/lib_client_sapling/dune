@@ -3,7 +3,8 @@
 
 (library
  (name tezos_client_sapling_016_PtMumbai)
- (public_name tezos-client-016-PtMumbai.sapling)
+ (public_name
+  octez-protocol-016-PtMumbai-libs.tezos-client-016-PtMumbai.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -12,10 +13,10 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-signer-backends
-  tezos-client-016-PtMumbai
-  tezos-client-016-PtMumbai.commands
+  octez-protocol-016-PtMumbai-libs.tezos-client-016-PtMumbai
+  octez-protocol-016-PtMumbai-libs.tezos-client-016-PtMumbai.commands
   tezos-protocol-016-PtMumbai
-  tezos-protocol-plugin-016-PtMumbai)
+  octez-protocol-016-PtMumbai-libs.tezos-protocol-plugin-016-PtMumbai)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

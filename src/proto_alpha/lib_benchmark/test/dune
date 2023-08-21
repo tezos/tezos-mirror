@@ -15,7 +15,7 @@
   tezos-benchmark
   tezos-benchmark-type-inference-alpha
   tezos-benchmark-alpha
-  tezos-alpha-test-helpers
+  octez-protocol-alpha-libs.tezos-alpha-test-helpers
   octez-libs.tezos-error-monad
   prbnmcn-stats)
  (link_flags

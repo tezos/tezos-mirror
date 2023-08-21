@@ -16,9 +16,7 @@ depends: [
   "tezos-benchmark-alpha"
   "tezos-benchmark-type-inference-alpha"
   "octez-shell-libs"
-  "tezos-alpha-test-helpers"
-  "tezos-client-alpha"
-  "tezos-protocol-plugin-alpha"
+  "octez-protocol-alpha-libs"
   "octez-proto-libs"
 ]
 build: [

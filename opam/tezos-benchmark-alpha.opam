@@ -16,7 +16,7 @@ depends: [
   "tezos-benchmark-type-inference-alpha"
   "tezos-protocol-alpha"
   "hashcons"
-  "tezos-alpha-test-helpers"
+  "octez-protocol-alpha-libs"
   "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [

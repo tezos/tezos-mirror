@@ -12,9 +12,8 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-protocol-017-PtNairob"
-  "tezos-client-017-PtNairob"
+  "octez-protocol-017-PtNairob-libs"
   "octez-shell-libs"
-  "tezos-baking-017-PtNairob-commands"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

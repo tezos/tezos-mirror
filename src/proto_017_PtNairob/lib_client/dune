@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_017_PtNairob)
- (public_name tezos-client-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,10 +15,10 @@
   octez-shell-libs.tezos-mockup-registration
   octez-shell-libs.tezos-proxy
   octez-shell-libs.tezos-signer-backends
-  tezos-protocol-plugin-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin-017-PtNairob
   tezos-protocol-017-PtNairob.parameters
   octez-libs.tezos-rpc
-  tezos-smart-rollup-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-smart-rollup-017-PtNairob
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

@@ -14,7 +14,7 @@ depends: [
   "tezos-micheline-rewriting"
   "tezos-protocol-017-PtNairob"
   "hashcons"
-  "tezos-client-017-PtNairob" {with-test}
+  "octez-protocol-017-PtNairob-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

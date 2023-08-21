@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "yaml" { >= "3.1.0" }
-  "tezos-client-alpha"
+  "octez-protocol-alpha-libs"
   "octez-l2-libs"
   "tezos-version"
 ]

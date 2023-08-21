@@ -3,12 +3,12 @@
 
 (library
  (name tezos_layer2_utils_alpha)
- (public_name tezos-layer2-utils-alpha)
+ (public_name octez-protocol-alpha-libs.tezos-layer2-utils-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-protocol-alpha
-  tezos-client-alpha)
+  octez-protocol-alpha-libs.tezos-client-alpha)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_baking_alpha)
- (public_name tezos-baking-alpha)
+ (public_name octez-protocol-alpha-libs.tezos-baking-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -11,11 +11,11 @@
   tezos-version.value
   tezos-protocol-alpha
   tezos-protocol-alpha.lifted
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-stdlib
   octez-libs.tezos-stdlib-unix
@@ -52,7 +52,7 @@
 
 (library
  (name tezos_baking_alpha_commands)
- (public_name tezos-baking-alpha-commands)
+ (public_name octez-protocol-alpha-libs.tezos-baking-alpha-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -62,9 +62,9 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-shell-libs.tezos-client-commands
-  tezos-baking-alpha
+  octez-protocol-alpha-libs.tezos-baking-alpha
   octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))
@@ -84,7 +84,8 @@
 
 (library
  (name tezos_baking_alpha_commands_registration)
- (public_name tezos-baking-alpha-commands.registration)
+ (public_name
+  octez-protocol-alpha-libs.tezos-baking-alpha-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -92,10 +93,10 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client-alpha
   octez-shell-libs.tezos-client-commands
-  tezos-baking-alpha
-  tezos-baking-alpha-commands
+  octez-protocol-alpha-libs.tezos-baking-alpha
+  octez-protocol-alpha-libs.tezos-baking-alpha-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

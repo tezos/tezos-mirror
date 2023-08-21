@@ -13,10 +13,8 @@ depends: [
   "octez-libs"
   "tezos-protocol-alpha"
   "octez-shell-libs"
-  "tezos-client-alpha"
+  "octez-protocol-alpha-libs"
   "octez-l2-libs"
-  "tezos-smart-rollup-alpha"
-  "tezos-smart-rollup-layer2-alpha"
   "tezos-version"
 ]
 build: [
