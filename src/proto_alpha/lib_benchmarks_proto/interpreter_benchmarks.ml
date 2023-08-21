@@ -1595,7 +1595,14 @@ module Registration_section = struct
         ~intercept_stack:(Script_set.empty int, ((), eos))
         ~stack_type:(set int @$ unit @$ bot)
         ~kinstr:set_iter_code
-        ()
+        () ;
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_ISet_iter
+        ~stack_type:(set int @$ unit @$ bot)
+        ~kinstr:set_iter_code
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_ISet_iter)
 
     let () =
       simple_time_alloc_benchmark_with_stack_sampler
@@ -1725,7 +1732,14 @@ module Registration_section = struct
            (map, ((), eos)))
         ~stack_type:(map int unit @$ unit @$ bot)
         ~kinstr:(map_map_code ())
-        ()
+        () ;
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_IMap_map
+        ~stack_type:(map int unit @$ unit @$ bot)
+        ~kinstr:(map_map_code ())
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_IMap_map)
 
     let kmap_iter_code =
       IMap_iter (dummy_loc, Some (cpair int unit), IDrop (dummy_loc, halt), halt)
@@ -1744,7 +1758,14 @@ module Registration_section = struct
            (map, ((), eos)))
         ~stack_type:(map int unit @$ unit @$ bot)
         ~kinstr:kmap_iter_code
-        ()
+        () ;
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_IMap_iter
+        ~stack_type:(map int unit @$ unit @$ bot)
+        ~kinstr:kmap_iter_code
+        () ;
+      register_time_alloc_codegen_model (Instr_name N_IMap_iter)
 
     let () =
       (*
@@ -2745,7 +2766,7 @@ module Registration_section = struct
         in
         LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
       in
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IApply
         ~stack_type:(unit @$ lambda (cpair unit unit) unit @$ bot)
         ~kinstr:(IApply (dummy_loc, unit, halt))
@@ -3284,16 +3305,14 @@ module Registration_section = struct
         | Error _ -> assert false
         | Ok sz -> sz
       in
-      let info, name =
-        info_and_name
-          ~benchmark_type:Time
-          ~intercept:is_empty
-          ("ISapling_verify_update_" ^ Type_transaction.suffix)
-      in
-      let module B : Benchmark.S = struct
-        let name = name
-
-        let info = info
+      let module B (BenchmarkType : sig
+        val value : benchmark_type
+      end) : Benchmark.S = struct
+        let info, name =
+          info_and_name
+            ~benchmark_type:BenchmarkType.value
+            ~intercept:is_empty
+            ("ISapling_verify_update_" ^ Type_transaction.suffix)
 
         let module_filename = __FILE__
 
@@ -3304,7 +3323,7 @@ module Registration_section = struct
 
         let models =
           Interpreter_model.make_model
-            Time
+            BenchmarkType.value
             (Instr_name Interpreter_workload.N_ISapling_verify_update)
 
         let stack_type =
@@ -3408,13 +3427,22 @@ module Registration_section = struct
                       }
                   in
                   benchmark_from_kinstr_and_stack
-                    Time
+                    BenchmarkType.value
                     ctxt
                     step_constants
                     stack_instr)
                 transitions
       end in
-      Registration_helpers.register (module B)
+      Registration_helpers.register
+        (module B (struct
+          let value = Time
+        end)) ;
+      Registration_helpers.register
+        (module B (struct
+          let value = Alloc
+        end)) ;
+      register_time_alloc_codegen_model
+        (Instr_name Interpreter_workload.N_ISapling_verify_update)
   end
 
   module Sapling_empty = struct
@@ -3631,34 +3659,39 @@ module Registration_section = struct
         ()
 
     let () =
-      benchmark
-        ~name:Interpreter_workload.N_ISplit_ticket
-        ~kinstr_and_stack_sampler:(fun config rng_state ->
-          let _, (module Samplers) =
-            make_default_samplers config.Default_config.sampler
-          in
-          fun () ->
-            let x_amount =
-              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
-            in
-            let y_amount =
-              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
-            in
-            let amount = Script_int.add_n x_amount y_amount in
-            let amount =
-              (* this is safe because x_amount > 0 and y_amount > 0 *)
-              WithExceptions.Option.get ~loc:__LOC__
-              @@ Ticket_amount.of_n amount
-            in
-            let ticket = Samplers.Random_value.value (ticket unit) rng_state in
-            let ticket = {ticket with amount} in
-            Ex_stack_and_kinstr
-              {
-                stack = (ticket, ((x_amount, y_amount), eos));
-                stack_type;
-                kinstr = split_ticket_instr;
-              })
-        ()
+      time_and_alloc (fun benchmark_type ->
+          benchmark
+            ~benchmark_type
+            ~name:Interpreter_workload.N_ISplit_ticket
+            ~kinstr_and_stack_sampler:(fun config rng_state ->
+              let _, (module Samplers) =
+                make_default_samplers config.Default_config.sampler
+              in
+              fun () ->
+                let x_amount =
+                  Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+                in
+                let y_amount =
+                  Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+                in
+                let amount = Script_int.add_n x_amount y_amount in
+                let amount =
+                  (* this is safe because x_amount > 0 and y_amount > 0 *)
+                  WithExceptions.Option.get ~loc:__LOC__
+                  @@ Ticket_amount.of_n amount
+                in
+                let ticket =
+                  Samplers.Random_value.value (ticket unit) rng_state
+                in
+                let ticket = {ticket with amount} in
+                Ex_stack_and_kinstr
+                  {
+                    stack = (ticket, ((x_amount, y_amount), eos));
+                    stack_type;
+                    kinstr = split_ticket_instr;
+                  })
+            ()) ;
+      register_time_alloc_codegen_model (Instr_name N_ISplit_ticket)
 
     let join_tickets_instr = IJoin_tickets (dummy_loc, string, halt)
 
@@ -3696,31 +3729,34 @@ module Registration_section = struct
         ()
 
     let () =
-      benchmark
-        ~name:Interpreter_workload.N_IJoin_tickets
-        ~kinstr_and_stack_sampler:(fun config rng_state ->
-          let _, (module Samplers) =
-            make_default_samplers config.Default_config.sampler
-          in
-          fun () ->
-            let ticket =
-              Samplers.Random_value.value (ticket string) rng_state
-            in
-            let alt_amount =
-              let amount = Samplers.Random_value.value nat rng_state in
-              let open Ticket_amount in
-              match of_n amount with
-              | Some amount -> add amount one
-              | None -> one
-            in
-            let ticket' = {ticket with amount = alt_amount} in
-            Ex_stack_and_kinstr
-              {
-                stack = ((ticket, ticket'), eos);
-                stack_type;
-                kinstr = join_tickets_instr;
-              })
-        ()
+      time_and_alloc (fun benchmark_type ->
+          benchmark
+            ~benchmark_type
+            ~name:Interpreter_workload.N_IJoin_tickets
+            ~kinstr_and_stack_sampler:(fun config rng_state ->
+              let _, (module Samplers) =
+                make_default_samplers config.Default_config.sampler
+              in
+              fun () ->
+                let ticket =
+                  Samplers.Random_value.value (ticket string) rng_state
+                in
+                let alt_amount =
+                  let amount = Samplers.Random_value.value nat rng_state in
+                  let open Ticket_amount in
+                  match of_n amount with
+                  | Some amount -> add amount one
+                  | None -> one
+                in
+                let ticket' = {ticket with amount = alt_amount} in
+                Ex_stack_and_kinstr
+                  {
+                    stack = ((ticket, ticket'), eos);
+                    stack_type;
+                    kinstr = join_tickets_instr;
+                  })
+            ()) ;
+      register_time_alloc_codegen_model (Instr_name N_IJoin_tickets)
   end
 
   module Timelock = struct
@@ -3755,7 +3791,9 @@ module Registration_section = struct
         ()
 
     let () =
+      time_and_alloc @@ fun benchmark_type ->
       benchmark_with_stack_sampler
+        ~benchmark_type
         ~name
         ~kinstr
         ~stack_type
@@ -3778,6 +3816,8 @@ module Registration_section = struct
           in
           resulting_stack chest chest_key time)
         ()
+
+    let () = register_time_alloc_codegen_model (Instr_name name)
   end
 
   module Continuations = struct
