@@ -418,13 +418,9 @@ end
 type 'uri activate_protocol = {
   endpoint : 'uri;
   path_client : 'uri;
-  protocol : string;
+  protocol : Protocol.t;
   parameter_file : 'uri;
 }
-
-let protocol_of_string = function
-  | "alpha" -> Protocol.Alpha
-  | protocol -> Test.fail "Unrecognized protocol name: %s" protocol
 
 type (_, _) Remote_procedure.t +=
   | Active_protocol : 'uri activate_protocol -> (unit, 'uri) Remote_procedure.t
@@ -458,7 +454,7 @@ module Activate_protocol = struct
       (obj4
          (req "endpoint" uri_encoding)
          (req "path_client" uri_encoding)
-         (req "protocol" string)
+         (req "protocol" Protocol.encoding)
          (req "parameter_file" uri_encoding))
 
   let r_encoding = Data_encoding.empty
@@ -501,7 +497,6 @@ module Activate_protocol = struct
     let endpoint = octez_endpoint state endpoint in
     let client = Client.create ~path:path_client ~endpoint () in
     Account.write Constant.all_secret_keys ~base_dir:(Client.base_dir client) ;
-    let protocol = protocol_of_string protocol in
     (* The protocol is activated few seconds in the past. *)
     let timestamp = Tezos_base.Time.System.Span.of_seconds_exn 5. in
     Client.activate_protocol
