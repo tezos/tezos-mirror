@@ -288,10 +288,6 @@ let resto_directory =
 
 let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "1.0.0")
 
-let rlp = external_lib "rlp" V.(at_least "0.1")
-
-let rope = external_lib "rope" V.(at_least "0.6.2")
-
 let aches = external_lib ~js_compatible:true "aches" V.(at_least "1.0.0")
 
 let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
@@ -7866,8 +7862,23 @@ let evm_proxy_lib =
         octez_rpc_http_client_unix;
         octez_version_value;
         lwt_exit;
-        rlp;
-        rope;
+      ]
+
+let _octez_evm_proxy_tests =
+  tezt
+    ["test_rlp"]
+    ~path:"src/bin_evm_proxy/test"
+    ~opam:"octez-evm-proxy-tests"
+    ~synopsis:"Tests for the EVM Proxy"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
+        evm_proxy_lib;
       ]
 
 let octez_scoru_sequencer =

@@ -10,9 +10,7 @@
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-client-unix
   tezos-version.value
-  lwt-exit
-  rlp
-  rope)
+  lwt-exit)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

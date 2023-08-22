@@ -25,23 +25,21 @@
 
 open Ethereum_types
 
-(** [rope_of_hex_string s] transforms a hex string [s] into a byte string
-    represented by a [Rope.t]  *)
-let rope_of_hex_string s =
-  `Hex s |> Hex.to_bytes_exn |> Bytes.to_string |> Rope.of_string
+(** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
+let hex_string_to_bytes s = `Hex s |> Hex.to_bytes_exn
 
 (** Encoding used to forward the call to the kernel, to be used in simulation
      mode only. *)
 let rlp_encode call =
   let of_opt of_val = function
-    | None -> Rlp.RlpData Rope.empty
+    | None -> Rlp.Value Bytes.empty
     | Some v -> of_val v
   in
-  let of_addr (Address s) = Rlp.RlpData (rope_of_hex_string s) in
-  let of_qty (Qty z) = Rlp.RlpData (Rope.of_string @@ Z.to_bits z) in
-  let of_hash (Hash h) = Rlp.RlpData (rope_of_hex_string h) in
+  let of_addr (Address s) = Rlp.Value (hex_string_to_bytes s) in
+  let of_qty (Qty z) = Rlp.Value (Z.to_bits z |> Bytes.of_string) in
+  let of_hash (Hash h) = Rlp.Value (hex_string_to_bytes h) in
   let rlp_form =
-    Rlp.RlpList
+    Rlp.List
       [
         of_opt of_addr call.from;
         of_opt of_addr call.to_;
@@ -52,7 +50,7 @@ let rlp_encode call =
       ]
   in
   (* we aim to use [String.chunk_bytes] *)
-  Rlp.encode rlp_form |> Rope.to_string |> Bytes.of_string
+  Rlp.encode rlp_form
 
 type simulation_message =
   | Start
