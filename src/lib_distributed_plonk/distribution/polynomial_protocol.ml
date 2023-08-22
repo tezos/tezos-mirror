@@ -39,8 +39,8 @@ module type S = sig
     n:int ->
     alpha:Scalar.t ->
     nb_of_t_chunks:int ->
-    Evaluations.t Plonk.SMap.t ->
-    Evaluations.polynomial Plonk.SMap.t
+    Evaluations.t Kzg.SMap.t ->
+    Evaluations.polynomial Kzg.SMap.t
 end
 
 module type Super = sig
@@ -56,8 +56,8 @@ module type Super = sig
     n:int ->
     alpha:Scalar.t ->
     nb_of_t_chunks:int ->
-    Evaluations.t Plonk.SMap.t ->
-    Evaluations.polynomial Plonk.SMap.t
+    Evaluations.t Kzg.SMap.t ->
+    Evaluations.polynomial Kzg.SMap.t
 end
 
 module Make (PC : Polynomial_commitment.PC_for_distribution_sig) :

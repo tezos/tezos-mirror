@@ -25,6 +25,7 @@
 
 open Kzg.Bls
 open Kzg.Utils
+module SMap = Kzg.SMap
 
 (* Implements a batched version of the KZG10 scheme, described in Section 3 of
    the PlonK paper: https://eprint.iacr.org/2019/953.pdf *)

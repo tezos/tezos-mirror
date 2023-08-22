@@ -38,4 +38,4 @@ let verify pp inputs proof =
   let inputs = List.map (fun (k, v) -> (k, (v, []))) inputs in
   Result.value ~default:false
   @@ Tezos_lwt_result_stdlib.Lwtreslib.Bare.Result.catch (fun () ->
-         verify pp ~inputs:(Plonk.SMap.of_list inputs) proof)
+         verify pp ~inputs:(Kzg.SMap.of_list inputs) proof)

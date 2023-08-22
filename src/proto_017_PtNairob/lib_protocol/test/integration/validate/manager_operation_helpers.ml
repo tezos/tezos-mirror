@@ -358,7 +358,7 @@ let originate_zk_rollup block rollup_account =
       rollup_contract
       ~public_parameters
       ~circuits_info:
-        (Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq ZKOperator.circuits)
+        (Zk_rollup.Account.SMap.of_seq @@ Kzg.SMap.to_seq ZKOperator.circuits)
       ~init_state:ZKOperator.init_state
       ~nb_ops:1
   in
@@ -956,7 +956,7 @@ let mk_zk_rollup_origination (oinfos : operation_req) (infos : infos) =
       (contract_of (get_source infos))
       ~public_parameters
       ~circuits_info:
-        (Zk_rollup.Account.SMap.of_seq @@ Plonk.SMap.to_seq ZKOperator.circuits)
+        (Zk_rollup.Account.SMap.of_seq @@ Kzg.SMap.to_seq ZKOperator.circuits)
       ~init_state:ZKOperator.init_state
       ~nb_ops:1
   in

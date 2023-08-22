@@ -1,5 +1,6 @@
 open Kzg.Bls
 open Identities
+module SMap = Kzg.SMap
 
 module type S = sig
   module Commitment :

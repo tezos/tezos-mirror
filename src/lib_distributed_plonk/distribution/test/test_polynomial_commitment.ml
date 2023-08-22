@@ -29,7 +29,7 @@ open Kzg.Utils
 module External
     (PC : Distribution.Polynomial_commitment.PC_for_distribution_sig) =
 struct
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
 
   let generate_random_poly degree =
     Poly.of_coefficients (List.init degree (fun i -> (Scalar.random (), i)))

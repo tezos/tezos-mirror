@@ -25,7 +25,7 @@
 
 open Kzg.Bls
 open Kzg.Utils
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 (** Extension of the PC signature with additional types and functions used
     in by Distributed_prover  *)

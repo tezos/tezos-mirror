@@ -101,7 +101,7 @@ module Circuit_Builder = struct
     in
     (* FIXME Multicircuit with Meta-PlonK doesn’t work *)
     (* let circuit_map =
-         Plonk.SMap.(union_disjoint circuit_map (update_keys (fun i -> i ^ "2") circuit_map))
+         Kzg.SMap.(union_disjoint circuit_map (update_keys (fun i -> i ^ "2") circuit_map))
        in *)
     (circuit_map, witness)
 
@@ -145,7 +145,7 @@ module Helpers (DP : DP_for_tests) = struct
     output_bytes oc b ;
     close_out oc ;
     let inputs =
-      Plonk.SMap.map
+      Kzg.SMap.map
         (List.map (fun witness -> MP.{witness; input_commitments = []}))
         x_map
     in

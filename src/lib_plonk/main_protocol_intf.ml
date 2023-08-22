@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Kzg.Bls
+module SMap = Kzg.SMap
 
 module type S = sig
   (** Raised by the prover when the provided inputs are not a satisfying

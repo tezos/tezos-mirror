@@ -30,7 +30,7 @@
    a PlonK proof that the checks pass correctly. *)
 
 open Kzg.Bls
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module Make_impl
     (Main_KZG : Plonk.Main_protocol.S

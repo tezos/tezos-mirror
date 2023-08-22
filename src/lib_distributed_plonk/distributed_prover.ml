@@ -27,7 +27,7 @@ open Kzg.Bls
 open Kzg.Utils
 open Identities
 open Communication
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module MP : Plonk.Main_protocol.S

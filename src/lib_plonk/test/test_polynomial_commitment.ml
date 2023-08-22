@@ -39,7 +39,7 @@ module Internal = struct
 end
 
 module External (PC : Plonk.Polynomial_commitment.S) = struct
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
 
   let generate_random_poly degree =
     Poly.of_coefficients (List.init degree (fun i -> (Scalar.random (), i)))

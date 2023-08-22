@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 open Plompiler.Csir
 
 let gates_equal = SMap.equal (Array.for_all2 Scalar.equal)

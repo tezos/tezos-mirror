@@ -25,7 +25,7 @@
 
 open Kzg.Bls
 open Kzg.Utils
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module PP : Polynomial_protocol.S

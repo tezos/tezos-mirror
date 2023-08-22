@@ -24,7 +24,7 @@
 (*****************************************************************************)
 open Kzg.Bls
 open Plonk.Identities
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 let powers = Kzg.Utils.Fr_generation.powers
 

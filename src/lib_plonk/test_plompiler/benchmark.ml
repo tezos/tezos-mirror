@@ -607,8 +607,8 @@ let benchmark () =
   let circuit =
     Time.time "PlonK convertion" @@ fun () -> Plonk.Circuit.to_plonk cs
   in
-  let circuit_map = Plonk.SMap.singleton "" (circuit, nb_proofs) in
-  let inputs = Plonk.SMap.singleton "" witness_list in
+  let circuit_map = Kzg.SMap.singleton "" (circuit, nb_proofs) in
+  let inputs = Kzg.SMap.singleton "" witness_list in
   let pp_prv, pp_vrf =
     Time.time "Setup" @@ fun () ->
     Main.setup ~zero_knowledge:false circuit_map ~srs:Helpers.srs

@@ -48,12 +48,12 @@ let wires () =
   List.init nb_wires (fun i ->
       ( "w" ^ string_of_int i,
         Array.init wire_size (fun j -> (List.nth table i).(indexes.(j))) ))
-  |> Plonk.SMap.of_list
+  |> Kzg.SMap.of_list
 
 let f_map = List.init nb_proofs (fun _ -> wires ())
 
 let f_map_not_in_table =
-  Plonk.SMap.map
+  Kzg.SMap.map
     (fun _ -> Array.init wire_size (fun _ -> Scalar.random ()))
     (List.hd f_map)
   :: List.tl f_map
@@ -84,7 +84,7 @@ let test_wrong_proof () =
     let cm_f, _ =
       PC.Commitment.commit
         Cq.(prv.pc)
-        (Plonk.SMap.map
+        (Kzg.SMap.map
            (fun f ->
              Kzg.Bls.(
                Evaluations.(

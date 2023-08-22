@@ -38,7 +38,7 @@ module type S = sig
 
   (* All message payloads need to have an index, so that
      they can be sorted back by the master. *)
-  type ctw_payload = {index : int; content : MP.worker_inputs Plonk.SMap.t}
+  type ctw_payload = {index : int; content : MP.worker_inputs Kzg.SMap.t}
 
   type ctpap_payload = {index : int; content : MP.PP.transcript}
 

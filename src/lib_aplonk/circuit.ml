@@ -25,7 +25,7 @@
 
 (* This files contains all tools that can be used to create the verification circuit of aPlonK. *)
 
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 open Kzg.Bls
 
 let nb_wires = Plompiler.Csir.nb_wires_arch

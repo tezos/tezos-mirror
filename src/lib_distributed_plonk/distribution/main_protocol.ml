@@ -26,7 +26,7 @@
 open Kzg.Bls
 open Kzg.Utils
 open Plonk.Identities
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 let nb_wires = Plompiler.Csir.nb_wires_arch
 

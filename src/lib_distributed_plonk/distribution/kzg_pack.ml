@@ -25,7 +25,7 @@
 
 open Kzg.Bls
 open Kzg.Utils
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type Super_PC_sig = sig
   include Polynomial_commitment.PC_for_distribution_sig

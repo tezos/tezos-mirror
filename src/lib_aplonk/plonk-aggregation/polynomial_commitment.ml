@@ -26,6 +26,7 @@
 open Plonk
 open Kzg.Bls
 open Kzg.Utils
+module SMap = Kzg.SMap
 
 module type S = sig
   include Polynomial_commitment.S

@@ -27,7 +27,7 @@ open Kzg.Bls
 open Plonk.Identities
 
 module External (PP : Plonk.Polynomial_protocol.S) = struct
-  module SMap = Plonk.SMap
+  module SMap = Kzg.SMap
 
   let pow5_mod_zh ~n p =
     let domain = Domain.build_power_of_two (Z.log2 @@ Z.of_int (8 * n)) in

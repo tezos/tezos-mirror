@@ -27,6 +27,8 @@
    the evaluations of a polynomial on a certain set and its
    degree *)
 
+module SMap = Kzg.SMap
+
 module type Evaluations_sig = sig
   include Octez_bls12_381_polynomial.Evaluations_sig
 

@@ -26,7 +26,7 @@
 open Kzg.Bls
 open Kzg.Utils
 open Plonk.Identities
-module SMap = Plonk.SMap
+module SMap = Kzg.SMap
 
 module type S = sig
   module PC : Polynomial_commitment.S

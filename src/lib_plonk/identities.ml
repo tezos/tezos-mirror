@@ -1,4 +1,5 @@
 open Kzg.Bls
+module SMap = Kzg.SMap
 
 (* Module to operate with polynomials in FFT evaluations form. *)
 module Evaluations = Evaluations_map.Make (Evals)
