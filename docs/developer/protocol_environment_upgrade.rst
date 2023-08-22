@@ -22,7 +22,7 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
    * Copy the directory ``src/lib_protocol_environment/sigs/v<N-1>`` into ``src/lib_protocol_environment/sigs/v<N>``.
 
-   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.in.ml`` into ``src/lib_protocol_environment/sigs/v<N>.in.ml`` and change any reference from `v<N-1>` to `v<N>` in the copied file.
+   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.in.ml`` into ``src/lib_protocol_environment/sigs/v<N>.in.ml`` and change any reference from ``v<N-1>`` to ``v<N>`` in the copied file.
 
 2. Make the new environment buildable by updating ``manifest/main.ml``:
 
