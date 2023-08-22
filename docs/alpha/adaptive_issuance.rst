@@ -41,15 +41,13 @@ Adaptive Issuance
 
 Adaptive Issuance is a novel mechanism regulating tez issuance in Tezos.
 
-Currently, the :doc:`Tezos economic protocol <../active/protocol>` issues new
+Before the Oxford protocol, the :doc:`Tezos economic protocol <../active/protocol>` issues new
 tez via:
 
 -  Participation rewards: incentives given to delegates for
-   `participation in
-   consensus <https://tezos.gitlab.io/active/consensus.html#rewards>`__
+   :doc:`participation in consensus <consensus>`
    and random seed generation.
--  The `Liquidity Baking (LB)
-   subsidy <https://tezos.gitlab.io/active/liquidity_baking.html>`__.
+-  The :doc:`Liquidity Baking (LB) subsidy <liquidity_baking>`.
 -  Protocol "invoices": lump sums of tez issued and allocated during
    protocol migration.
 
@@ -60,8 +58,7 @@ protocol, and in previous ones, the values for participation rewards and
 the LB subsidy, if any, are defined by the Tezos protocol using fixed
 constants.
 
-The `Oxford protocol
-proposal <https://research-development.nomadic-labs.com/oxford-announcement.html>`__
+The :doc:`Oxford protocol proposal <../protocols/018_oxford>`
 introduces Adaptive Issuance: a mechanism where the amount of
 *regularly* issued tez (participation rewards and the LB subsidy, if
 active) depends on the global **staked funds ratio** – that is, the
@@ -69,8 +66,7 @@ ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
 
-At the end of each blockchain
-`cycle <https://tezos.gitlab.io/active/glossary.html#cycle>`__, the
+At the end of each blockchain :ref:`cycle <def_cycle_alpha>`, the
 regular issuance is adjusted, to nudge the staked funds ratio towards a
 protocol-defined target (set at 50% in Oxford). Participation rewards
 and the LB subsidy are recomputed to match that budget. When the staked
@@ -238,8 +234,8 @@ per block, :math:`\IL{\isb{c}}`, is distributed amongst the different
 rewards in proportion to their weight.
 
 **Consensus rewards.** Since the adoption of Tenderbake, Tezos protocols
-have rewarded delegates `for their participation in
-consensus <https://tezos.gitlab.io/oxford/consensus.html#rewards>`__
+before Oxford have rewarded delegates :doc:`for their participation in
+consensus <consensus>`
 with the following rewards per block:
 
 -  A fixed **baking** reward, given to the delegate which produced the
@@ -253,8 +249,7 @@ with the following rewards per block:
    selected in the consensus committee for that block level, for
    attesting block proposals.
 
-We refer to `the technical
-documentation <https://tezos.gitlab.io/oxford/consensus.html>`__ for
+We refer to :doc:`the consensus page <consensus>` for
 further insight on the pre-requisites and distribution of these rewards.
 Here, we derive the new formulas which compute their values *per block*
 for a cycle :math:`\IL{c}`:
@@ -275,8 +270,7 @@ number of attested slots and subject to the existing participation
 conditions.
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
-for contributing to `random seed
-generation <https://tezos.gitlab.io/oxford/randomness_generation.html#randomness-generation>`__
+for contributing to :ref:`random seed generation <randomness_generation_alpha>`
 (that is for, revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 128 blocks. The adjusted formulas result:
 
@@ -284,9 +278,8 @@ each block, but rather every 128 blocks. The adjusted formulas result:
 
   \tip{\vdf}{c} = \tip{nr}{c} = 128 \tmult \frac{1}{\tw} \tmult \isb{c}
 
-**Liquidity baking subsidy.** The `LB
-subsidy <https://tezos.gitlab.io/oxford/liquidity_baking.html>`__ per
-block is determined by the following formula:
+**Liquidity baking subsidy.** The :doc:`LB
+subsidy <liquidity_baking>` per block is determined by the following formula:
 
 .. math::
 
@@ -298,7 +291,7 @@ other words, the budget for the LB subsidy is always allocated,
 regardless of whether it is issued or not.
 
 The Oxford protocol proposal implements a new `RPC
-endpoint <https://tezos.gitlab.io/oxford/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+endpoint <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance``, which reports the precomputed values of
 all participation rewards and the LB subsidy, for the cycle
 corresponding to the queried block level, and the next 4 cycles.
@@ -308,11 +301,10 @@ corresponding to the queried block level, and the next 4 cycles.
 New Staking mechanism
 =====================
 
-Staking is an evolution of the existing Tezos `Liquid Proof-of-Stake
-mechanism <https://tezos.gitlab.io/oxford/proof_of_stake.html>`__. It
+Staking is an evolution of the existing Tezos :doc:`Liquid Proof-of-Stake
+mechanism <proof_of_stake>`. It
 introduces a new role for network participants, called **staker**,
-complementary to the existing
-`delegate <https://tezos.gitlab.io/oxford/glossary.html#delegate>`__
+complementary to the existing :ref:`delegate <def_delegate_alpha>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
@@ -328,10 +320,8 @@ delegated funds.
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are
-subject to
-`slashing <https://tezos.gitlab.io/oxford/consensus.html#slashing>`__ if
-the delegate misbehaves by
-`double-signing <https://tezos.gitlab.io/oxford/glossary.html#Doublesigning>`__
+subject to :ref:`slashing <slashing_alpha>` if
+the delegate misbehaves by :ref:`double-signing <def_double_signing_alpha>`
 block proposals or consensus operations, and are subject to the same
 withdrawal delays – colloquially, they are "frozen".
 
@@ -367,8 +357,7 @@ with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for `implicit
-accounts <https://tezos.gitlab.io/oxford/glossary.html#implicit-account>`__.
+the same name introduced for `implicit accounts <def_implicit_account_alpha>`__.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
