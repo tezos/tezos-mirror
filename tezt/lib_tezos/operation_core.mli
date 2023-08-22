@@ -656,6 +656,13 @@ val gas_limit_exceeded : rex
 val conflict_error_with_needed_fee : rex
 
 (** Matches the message produced by
+    [Operation_conflict {new_hash; needed_fee_in_mutez = None}]
+    from [src/lib_shell_services/validation_errors].
+
+    Captures [new_hash]. *)
+val conflict_error_no_possible_fee : rex
+
+(** Matches the message produced by
     [Rejected_by_full_mempool {hash; needed_fee_in_mutez = Some fee}]
     from [src/lib_shell_services/validation_errors].
 

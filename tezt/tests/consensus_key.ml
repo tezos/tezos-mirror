@@ -364,15 +364,16 @@ let test_update_consensus_key =
   in
   Log.info
     "Check that after a drain, the mempool rejects a manager operation from \
-     the same manager..." ;
-  let* () =
-    Client.transfer
-      ~expect_failure:true
-      ~burn_cap:Tez.one
-      ~amount:(Tez.of_int 1)
-      ~giver:Constant.bootstrap4.alias
-      ~receiver:Constant.bootstrap5.alias
-      client
+     the same manager (without a recommended fee to make the injection \
+     succeed, since no possible fees would allow it)" ;
+  let* (`OpHash _) =
+    let* op =
+      Operation.Manager.mk_single_transfer
+        ~source:Constant.bootstrap4
+        ~dest:Constant.bootstrap5
+        client
+    in
+    Operation.inject ~error:Operation.conflict_error_no_possible_fee op client
   in
   Log.info "Bake and check the effects of the valid drain..." ;
   let* old_balance = Client.get_balance_for ~account:destination.alias client in
