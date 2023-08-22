@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Plonk
-open Utils
+open Kzg.Utils
 
 (* Our version of SnarkPack for PLONK *)
 
@@ -164,7 +164,7 @@ module Pack_impl = struct
   let hash ~transcript ~random ?(g1s = [[||]]) ?(g2s = [[||]]) ?(gts = [[||]])
       ?(scalars = [[||]]) () =
     let transcript =
-      let open Utils.Hash in
+      let open Hash in
       let st = init () in
       update st transcript ;
       List.iter (Array.iter (fun key -> update st (G1.to_bytes key))) g1s ;
@@ -175,7 +175,7 @@ module Pack_impl = struct
         scalars ;
       finish st
     in
-    let seed, _ = Utils.Hash.bytes_to_seed transcript in
+    let seed, _ = Hash.bytes_to_seed transcript in
     let state = Some (Random.State.make seed) in
     (random ?state (), transcript)
 

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Utils
+open Kzg.Utils
 open Identities
 open Communication
 module SMap = Plonk.SMap

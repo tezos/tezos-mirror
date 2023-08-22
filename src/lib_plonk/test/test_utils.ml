@@ -42,7 +42,7 @@ let list_tests () =
 
 module Fr_generation = struct
   module Scalar = Kzg.Bls.Scalar
-  module Fr_generation = Plonk.Utils.Fr_generation
+  module Fr_generation = Kzg.Utils.Fr_generation
   module Scalar_set = Set.Make (Scalar)
 
   let test_powers () =

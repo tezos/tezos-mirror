@@ -26,7 +26,7 @@ open Kzg.Bls
 open Plonk.Identities
 module SMap = Plonk.SMap
 
-let powers = Plonk.Utils.Fr_generation.powers
+let powers = Kzg.Utils.Fr_generation.powers
 
 open Evaluations
 

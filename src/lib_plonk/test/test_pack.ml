@@ -35,7 +35,7 @@ end
 module External = struct
   open Aggregation.Pack
   open Kzg.Bls
-  open Plonk.Utils
+  open Kzg.Utils
 
   let with_time f =
     let start_time = Sys.time () in

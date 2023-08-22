@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Plonk.Utils
+open Kzg.Utils
 
 module External
     (PC : Distribution.Polynomial_commitment.PC_for_distribution_sig) =

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Utils
+open Kzg.Utils
 
 (* Implements a batched version of the KZG10 scheme, described in Section 3 of
    the PlonK paper: https://eprint.iacr.org/2019/953.pdf *)
@@ -134,7 +134,7 @@ module Kzg_impl = struct
     [@@deriving repr]
 
     let to_bytes len srs =
-      let open Utils.Hash in
+      let open Hash in
       let st = init () in
       update st (G2.to_bytes srs.encoding_1) ;
       update st (G2.to_bytes srs.encoding_x) ;

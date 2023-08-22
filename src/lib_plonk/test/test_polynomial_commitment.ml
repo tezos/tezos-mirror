@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Plonk.Utils
+open Kzg.Utils
 
 module Internal = struct
   open Plonk.Polynomial_commitment.Kzg_impl

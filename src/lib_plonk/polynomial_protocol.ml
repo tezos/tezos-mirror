@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Utils
+open Kzg.Utils
 open Identities
 
 (** A polynomial protocol allows a prover to convince a verifier of the fact

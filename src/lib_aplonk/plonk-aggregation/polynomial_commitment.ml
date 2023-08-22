@@ -25,7 +25,7 @@
 
 open Plonk
 open Kzg.Bls
-open Utils
+open Kzg.Utils
 
 module type S = sig
   include Polynomial_commitment.S
@@ -91,7 +91,7 @@ struct
       (pp_prover, pp_verifier)
 
     let to_bytes d ({pp_pc_prover; pp_pack_prover} : prover) =
-      Utils.Hash.hash_bytes
+      Hash.hash_bytes
         [
           PC.Public_parameters.to_bytes d pp_pc_prover;
           Pack.public_parameters_to_bytes pp_pack_prover;

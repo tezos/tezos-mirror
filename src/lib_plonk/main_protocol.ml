@@ -88,7 +88,7 @@
   *)
 
 open Kzg.Bls
-open Utils
+open Kzg.Utils
 open Identities
 include Main_protocol_intf
 
@@ -170,7 +170,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
       wires_array
 
   let hash_verifier_inputs verifier_inputs =
-    let open Utils.Hash in
+    let open Hash in
     let bytes_of_com c = Plompiler.Utils.to_bytes Input_commitment.public_t c in
     let st = init () in
     SMap.iter

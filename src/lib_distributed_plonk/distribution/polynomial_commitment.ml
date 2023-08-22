@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Plonk.Utils
+open Kzg.Utils
 module SMap = Plonk.SMap
 
 (** Extension of the PC signature with additional types and functions used

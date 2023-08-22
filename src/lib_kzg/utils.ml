@@ -84,7 +84,12 @@ module Transcript = struct
     let open Hash in
     let st = init () in
     update st transcript ;
-    List.iter (fun a -> update st (Plompiler.Utils.to_bytes repr a)) list ;
+    List.iter
+      (fun a ->
+        update
+          st
+          (Bytes.unsafe_of_string @@ Repr.(unstage @@ to_bin_string repr) a))
+      list ;
     finish st
 
   let expand : 'a Repr.t -> 'a -> bytes -> bytes =
@@ -115,54 +120,23 @@ module Array = struct
         i)
 end
 
-(* This function converts answers to a list of scalars. If [nb_proofs] < [nb_max_proofs], the missing answers will be added as zero, in an order that is suitable for aPlonK’s switches *)
-let pad_answers nb_max_proofs nb_rc_wires nb_proofs
-    (answers : S.t SMap.t SMap.t list) =
-  let answers = List.map (SMap.map SMap.values) answers in
-  (* We want to work on the 'a map list because it’s the only way to find the wires in the answers without knowing if there is ultra or next wire *)
-  let answers_padded =
-    List.map_end
-      (SMap.map (fun w_list ->
-           w_list
-           @ List.init
-               ((nb_max_proofs - nb_proofs)
-               * (Plompiler.Csir.nb_wires_arch + nb_rc_wires))
-               (Fun.const S.zero)))
-      answers
-  in
-  answers_padded |> List.concat_map SMap.values |> List.flatten
-
 module Fr_generation : sig
   (* computes [| 1; x; x²; x³; ...; xᵈ⁻¹ |] *)
-  val powers : int -> Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t array
+  val powers : int -> Bls.Scalar.t -> Bls.Scalar.t array
 
   (* [batch x l] adds the elements of l scaled by ascending powers of x *)
-  val batch : Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t list -> Kzg.Bls.Scalar.t
+  val batch : Bls.Scalar.t -> Bls.Scalar.t list -> Bls.Scalar.t
 
   (* quadratic non-residues for Sid *)
-  val build_quadratic_non_residues : int -> Kzg.Bls.Scalar.t array
+  val build_quadratic_non_residues : int -> Bls.Scalar.t array
 
   (* generate several scalars based on seed transcript *)
-  val random_fr_list : Bytes.t -> int -> Kzg.Bls.Scalar.t list * Bytes.t
+  val random_fr_list : Bytes.t -> int -> Bls.Scalar.t list * Bytes.t
 
   (* generate a single scalars based on seed transcript *)
-  val random_fr : Bytes.t -> Kzg.Bls.Scalar.t * Bytes.t
-
-  (* Evaluates L1 on x, where L1 is the minimal (monic) polynomial that
-     satisfies L1(generator) = 1 and L1(generator^i) = 0
-     for all i = 2, ..., domain_size. *)
-  val evaluate_l1 :
-    domain_size:int ->
-    generator:Kzg.Bls.Scalar.t ->
-    Kzg.Bls.Scalar.t ->
-    Kzg.Bls.Scalar.t
-
-  (* Evaluates Ln_p_1 on x, where Ln_p_1 is the minimal (monic) polynomial that
-     satisfies Ln_p_1(1) = 1 and Ln_p_1(generator^i) = 0
-     for all i = 1, ..., domain_size. *)
-  val evaluate_l0 : domain_size:int -> Kzg.Bls.Scalar.t -> Kzg.Bls.Scalar.t
+  val random_fr : Bytes.t -> Bls.Scalar.t * Bytes.t
 end = struct
-  open Kzg.Bls
+  open Bls
 
   let powers d x = Array.build Scalar.one Scalar.(mul x) d
 
@@ -215,18 +189,6 @@ end = struct
   let random_fr transcript =
     let l, hashed_transcript = random_fr_list transcript 1 in
     (List.hd l, hashed_transcript)
-
-  let evaluate_l1 ~domain_size ~generator x =
-    let n = Z.of_int domain_size in
-    let l1_num = Scalar.(generator * sub (pow x n) one) in
-    let l1_den = Scalar.(of_z n * sub x generator) in
-    Scalar.div_exn l1_num l1_den
-
-  let evaluate_l0 ~domain_size x =
-    let n = Z.of_int domain_size in
-    let l0_num = Scalar.(sub (pow x n) one) in
-    let l0_den = Scalar.(of_z n * sub x one) in
-    Scalar.div_exn l0_num l0_den
 end
 
 exception SRS_too_short of string

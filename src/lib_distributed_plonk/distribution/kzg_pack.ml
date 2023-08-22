@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Kzg.Bls
-open Plonk.Utils
+open Kzg.Utils
 module SMap = Plonk.SMap
 
 module type Super_PC_sig = sig

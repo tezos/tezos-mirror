@@ -220,7 +220,7 @@ struct
             answers =
               (fun answers ->
                 let answers =
-                  Plonk.Utils.pad_answers
+                  Aggreg_circuit.pad_answers
                     pp.nb_proofs
                     pp.nb_rc_wires
                     nb_proofs

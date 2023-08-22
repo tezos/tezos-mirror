@@ -40,6 +40,7 @@
 
 open Kzg.Bls
 open Identities
+open Kzg.Utils
 
 module type Cq_sig = sig
   exception Entry_not_in_table
@@ -247,7 +248,7 @@ module Internal = struct
       try G2.(add (Srs_g2.get srs2 n) (negate one))
       with Invalid_argument _ ->
         raise
-          (Utils.SRS_too_short
+          (Kzg.Utils.SRS_too_short
              (Printf.sprintf
                 "Cq.setup_verifier : SRS_2 of size at least (%d + 1) expected \
                  (size %d received)."

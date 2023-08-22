@@ -159,12 +159,3 @@ let shuffle ?seed l =
   |> List.rev_map snd
 
 let sub l start len = List.filteri (fun i _ -> start <= i && i < start + len) l
-
-(* Applies the function [f] to the last element of the list [l] ; if [l] is empty, it returns the empty list. *)
-let map_end f l =
-  let rec aux acc = function
-    | [] -> []
-    | [x] -> rev (f x :: acc)
-    | x :: tl -> aux (x :: acc) tl
-  in
-  aux [] l
