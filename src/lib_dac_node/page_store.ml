@@ -330,34 +330,28 @@ module Remote_with_flooding :
       (struct
         type remote_context = float * Dac_node_client.cctxt list
 
-        (** TODO: https://gitlab.com/tezos/tezos/-/issues/5673
-            Optimize flooding.
-        *)
         let fetch _dac_plugin (timeout, remote_cctxts) hash =
-          let open Lwt_result_syntax in
+          let open Lwt_syntax in
           let page_hash = Dac_plugin.hash_to_raw hash in
           let fetch_page cctxt =
             Lwt_unix.with_timeout timeout (fun () ->
                 Dac_node_client.V0.get_preimage cctxt ~page_hash)
           in
-          let*! results =
-            List.filter_map_p
-              (fun committee_member_cctxt ->
-                Lwt.catch
-                  (fun () ->
-                    let*! page_data = fetch_page committee_member_cctxt in
-                    match page_data with
-                    | Ok page_data -> Lwt.return (Some page_data)
-                    | Error _ -> Lwt.return_none)
-                  (fun _ -> Lwt.return_none))
+          let requests =
+            List.map
+              (fun cctxt ->
+                let* fetch_page_result = fetch_page cctxt in
+                match fetch_page_result with
+                | Ok page -> return_ok page
+                | Error _ -> Lwt.fail_with "Could not fetch page result.")
               remote_cctxts
           in
-          match List.hd results with
-          | Some a -> return a
-          | None ->
-              tzfail
+          Lwt.catch
+            (fun () -> Lwt_utils.pick_successful requests)
+            (fun _ ->
+              Lwt_result_syntax.tzfail
                 (Cannot_fetch_remote_page_with_flooding_strategy
-                   {hash = Dac_plugin.hash_to_raw hash})
+                   {hash = page_hash}))
       end)
       (F)
 
