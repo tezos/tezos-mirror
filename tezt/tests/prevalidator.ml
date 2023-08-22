@@ -1555,13 +1555,15 @@ module Revamped = struct
     let* () = check_mempool ~validated:[oph4; oph3; oph2; oph1] client1 in
     check_mempool ~validated:[oph4; oph3; oph2; oph1] client2
 
-  let test_full_mempool =
+  let test_full_mempool_propagation =
     Protocol.register_test
       ~__FILE__
-      ~title:"test full mempool"
+      ~title:"test full mempool propagation"
       ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"]
     @@ fun protocol ->
-    Log.info "Test the bound on operation count in the mempool." ;
+    Log.info
+      "Test the bound on operation count in the mempool, the propagation of \
+       operations by a full mempool, and the reclassification on flush." ;
     (* We configure the filter with a limit of 4 operations, so that
        we can easily inject more with our 5 bootstrap accounts. *)
     let max_operations = 4 in
@@ -1820,6 +1822,123 @@ module Revamped = struct
     in
     let* () =
       check_mempool ~validated:[oph4] ~branch_delayed:[oph1; oph2; oph3] client1
+    in
+    unit
+
+  let test_full_mempool_attestation_vs_manager =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"test full mempool attestation vs manager"
+      ~tags:
+        ["mempool"; "gc"; "limit"; "bounding"; "full"; "attestation"; "manager"]
+    @@ fun protocol ->
+    Log.info
+      "Test the bound on operation count in the mempool with both manager and \
+       non-manager operations." ;
+    (* Baseline fee *)
+    let fee = 1000 in
+    log_step
+      0
+      "Initialize a node and activate the protocol. Bake an additional block \
+       to be able to inject valid attestations." ;
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
+    let* level = bake_for ~wait_for_flush:true node client in
+    let max_operations = 2 in
+    log_step
+      1
+      "Set the mempool config to at most %d operations. Inject two transfers \
+       and check that they are validated in the mempool."
+      max_operations ;
+    let* () = Mempool.Config.set_filter ~log:true ~max_operations client in
+    let* (`OpHash oph1a) =
+      Operation.Manager.inject_single_transfer
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap5
+        ~fee
+        client
+    in
+    let* (`OpHash oph1b) =
+      Operation.Manager.inject_single_transfer
+        ~source:Constant.bootstrap2
+        ~dest:Constant.bootstrap5
+        ~fee:(fee + 1)
+        client
+    in
+    let* () = check_mempool ~validated:[oph1a; oph1b] client in
+    log_step
+      2
+      "Inject an attestation and check that it has replaced the lower-fee \
+       transfer." ;
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let inject_attestation (delegate : Account.key) =
+      Operation.Consensus.inject
+        (Operation.Consensus.attestation
+           ~use_legacy_name:true
+           ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+           ~level
+           ~round:0
+           ~block_payload_hash)
+        ~signer:delegate
+        client
+    in
+    let* (`OpHash oph2) = inject_attestation Constant.bootstrap1 in
+    let* () =
+      check_mempool ~validated:[oph1b; oph2] ~branch_delayed:[oph1a] client
+    in
+    log_step
+      3
+      "Check that injecting a transfer with lower fee than the remaining \
+       transfer in the mempool fails, and the recommended fee in the error is \
+       higher than that previous transfer's by 1." ;
+    let* op3 =
+      Operation.Manager.mk_single_transfer
+        ~source:Constant.bootstrap3
+        ~dest:Constant.bootstrap5
+        ~fee:(fee / 2)
+        client
+    in
+    let* () =
+      Operation.inject_error_check_recommended_fee
+        ~loc:__LOC__
+        ~rex:Operation.rejected_by_full_mempool_with_needed_fee
+        ~expected_fee:(fee + 2)
+        op3
+        client
+    in
+    let* () =
+      check_mempool ~validated:[oph1b; oph2] ~branch_delayed:[oph1a] client
+    in
+    log_step
+      4
+      "Inject a second attestation and check that it has replaced the \
+       remaining transfer." ;
+    let* (`OpHash oph3) = inject_attestation Constant.bootstrap2 in
+    let* () =
+      check_mempool
+        ~validated:[oph2; oph3]
+        ~branch_delayed:[oph1a; oph1b]
+        client
+    in
+    log_step
+      5
+      "Check that injecting a transfer fails with no recommened fee in the \
+       error, because a manager operation can't replace a consensus one no \
+       matter the fee." ;
+    let* op5 =
+      Operation.Manager.mk_single_transfer
+        ~source:Constant.bootstrap4
+        ~dest:Constant.bootstrap5
+        ~fee
+        client
+    in
+    let* (`OpHash _) =
+      Operation.inject
+        ~error:Operation.rejected_by_full_mempool_no_possible_fee
+        op5
+        client
     in
     unit
 
@@ -4051,8 +4170,9 @@ let register ~protocols =
   Revamped.ban_operation protocols ;
   Revamped.unban_operation_and_reinject protocols ;
   Revamped.unban_all_operations protocols ;
-  Revamped.test_full_mempool protocols ;
+  Revamped.test_full_mempool_propagation protocols ;
   Revamped.test_full_mempool_and_replace_same_manager protocols ;
+  Revamped.test_full_mempool_attestation_vs_manager protocols ;
   Revamped.test_full_mempool_max_total_bytes protocols ;
   Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
