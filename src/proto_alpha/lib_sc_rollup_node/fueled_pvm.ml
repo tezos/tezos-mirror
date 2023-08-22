@@ -112,10 +112,24 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Metadata.encoding
                metadata)
-      | Request_dal_page _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3927
-             Support DAL in WASM PVM. *)
-          assert false
+      | Request_dal_page dal_page -> (
+          let*! content =
+            Dal_pages_request.page_content
+              ~dal_attestation_lag
+              node_ctxt
+              dal_page
+          in
+          match content with
+          | Error error ->
+              (* The [Error_wrapper] must be caught upstream and converted into
+                 a tzresult. *)
+              (* This happens when, for example, the kernel requests a page from a future level. *)
+              Lwt.fail (Error_wrapper error)
+          | Ok None ->
+              (* The page was not confirmed by L1.
+                 We return empty string in this case, as done in the slow executon. *)
+              Lwt.return ""
+          | Ok (Some b) -> Lwt.return (Bytes.to_string b))
     in
     let eval_tick fuel failing_ticks state =
       let max_steps = F.max_ticks fuel in
