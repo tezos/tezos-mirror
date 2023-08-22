@@ -106,7 +106,8 @@ struct
     (module Bench : Benchmark.Simple_with_num)
 
   (* Generic function to cook benchmarks for linear-time encodings *)
-  let linear_shared ?(check = fun () -> ()) ~name ?(intercept = false)
+  (* Setting [purpose] will overwrite the definition from [Info]. *)
+  let linear_shared ?(check = fun () -> ()) ?purpose ~name ?(intercept = false)
       ~generator ~make_bench () =
     let const = fv (Format.asprintf "%s_const" name) in
     let coeff = fv (Format.asprintf "%s_coeff" name) in
@@ -128,7 +129,7 @@ struct
 
       let module_filename = Info.file
 
-      let purpose = Info.purpose
+      let purpose = Option.value purpose ~default:Info.purpose
 
       let tags = ["encoding"]
 
@@ -225,14 +226,16 @@ struct
   let make_encode_variable_size :
       type a.
       ?check:(unit -> unit) ->
+      ?purpose:Tezos_benchmark.Benchmark.purpose ->
       name:string ->
       encoding:a Data_encoding.t ->
       generator:(Random.State.t -> a * Shared_linear.workload) ->
       unit ->
       (module Benchmark.Simple_with_num) =
-   fun ?check ~name ~encoding ~generator () ->
+   fun ?check ?purpose ~name ~encoding ~generator () ->
     linear_shared
       ?check
+      ?purpose
       ~name
       ~generator
       ~make_bench:(fun generator () ->
@@ -263,15 +266,17 @@ struct
   let make_decode_variable_size :
       type a.
       ?check:(unit -> unit) ->
+      ?purpose:Tezos_benchmark.Benchmark.purpose ->
       name:string ->
       encoding:a Data_encoding.t ->
       ?intercept:bool ->
       generator:(Random.State.t -> a * Shared_linear.workload) ->
       unit ->
       (module Benchmark.Simple_with_num) =
-   fun ?check ~name ~encoding ?(intercept = false) ~generator ->
+   fun ?check ?purpose ~name ~encoding ?(intercept = false) ~generator ->
     linear_shared
       ?check
+      ?purpose
       ~name
       ~intercept
       ~generator

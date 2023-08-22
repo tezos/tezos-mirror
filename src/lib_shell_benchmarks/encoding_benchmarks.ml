@@ -267,9 +267,14 @@ let () = Registration.register_simple_with_num chain_id_readable_decoding
     gas models but the inferred gas constants may be used for
     over-approximating other costs or simply as reference points. *)
 
+let purpose =
+  Tezos_benchmark.Benchmark.Other_purpose
+    "Used to over-approximate other costs or as reference point."
+
 let nat_encoding =
   make_encode_variable_size
     ~name:"ENCODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~generator:(fun rng_state ->
       let nbytes =
@@ -284,6 +289,7 @@ let () = Registration.register_simple_with_num nat_encoding
 let nat_decoding =
   make_decode_variable_size
     ~name:"DECODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~generator:(fun rng_state ->
       let nbytes =
@@ -298,6 +304,7 @@ let () = Registration.register_simple_with_num nat_decoding
 let nat_decoding_intercept =
   make_decode_variable_size
     ~name:"DECODING_NAT"
+    ~purpose
     ~encoding:Data_encoding.n
     ~intercept:true
     ~generator:(fun _ -> (Z.zero, {bytes = 0}))
@@ -308,6 +315,7 @@ let () = Registration.register_simple_with_num nat_decoding_intercept
 let int_encoding =
   make_encode_variable_size
     ~name:"ENCODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~generator:(fun rng_state ->
       let nbytes =
@@ -322,6 +330,7 @@ let () = Registration.register_simple_with_num int_encoding
 let int_decoding =
   make_decode_variable_size
     ~name:"DECODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~generator:(fun rng_state ->
       let nbytes =
@@ -336,6 +345,7 @@ let () = Registration.register_simple_with_num int_decoding
 let int_decoding_intercept =
   make_decode_variable_size
     ~name:"DECODING_INT"
+    ~purpose
     ~encoding:Data_encoding.z
     ~intercept:true
     ~generator:(fun _ -> (Z.zero, {bytes = 0}))
@@ -346,6 +356,7 @@ let () = Registration.register_simple_with_num int_decoding_intercept
 let string_encoding =
   make_encode_variable_size
     ~name:"ENCODING_STRING"
+    ~purpose
     ~encoding:Data_encoding.string
     ~generator:(fun rng_state ->
       let nbytes =
@@ -360,6 +371,7 @@ let () = Registration.register_simple_with_num string_encoding
 let string_decoding =
   make_decode_variable_size
     ~name:"DECODING_STRING"
+    ~purpose
     ~encoding:Data_encoding.string
     ~generator:(fun rng_state ->
       let nbytes =
@@ -374,6 +386,7 @@ let () = Registration.register_simple_with_num string_decoding
 let adversarial_string_list_encoding =
   make_encode_variable_size
     ~name:"ENCODING_STRING_LIST_ADVERSARIAL"
+    ~purpose
     ~encoding:Data_encoding.(list string)
     ~generator:(fun rng_state ->
       let length =
@@ -391,6 +404,7 @@ let () = Registration.register_simple_with_num adversarial_string_list_encoding
 let adversarial_string_list_decoding =
   make_decode_variable_size
     ~name:"DECODING_STRING_LIST_ADVERSARIAL"
+    ~purpose
     ~encoding:Data_encoding.(list string)
     ~generator:(fun rng_state ->
       let length =
