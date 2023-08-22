@@ -400,9 +400,17 @@ parameters:
 
 Delegates can modify these staking parameters at all times, using the
 ``set_delegate_parameters`` pseudo-operation: that is, by transferring 0
-tez to their own ``set_delegate_parameters``. The chosen values for both
+tez to their own ``set_delegate_parameters`` entry-point. The chosen values for both
 parameters need to be supplied. The new parameters are then applied 5
 cycles later.
+
+::
+
+   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth)> (Pair <edge as int value in billionth> Unit)"
+
+or more conveniently::
+
+   octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
 
 **On overstaking and overdelegation.** Note that if a delegate’s
 ``limit_of_staking_over_baking`` is exceeded (that is, the delegate is
@@ -436,10 +444,24 @@ contribute to their chosen delegate’s staking balance. Note that the
 ``stake`` pseudo-operation will fail if the sender account is not
 *delegated*.
 
+::
+
+   octez-client transfer <amount> from <staker> to <staker> --entrypoint stake
+
+or more conveniently::
+
+   octez-client stake <amount> for <staker>
+
 To *unstake* funds, a staker first submits an unstake request with the
 ``unstake`` pseudo-operation. This is implemented by transferring 0 tez
-to their ``unstake`` entrypoint, while passing the chosen amount as a
-parameter.
+to their ``unstake`` entry-point, while passing the chosen amount as a
+parameter::
+
+   octez-client transfer 0 from <staker> to <staker> --entrypoint unstake --arg <amount_in_mutez>
+
+or more conveniently::
+
+   octez-client unstake <amount_in_tez|"everything"> for <staker>
 
 The requested amount will be **unstaked** but will remain **frozen**.
 After 7 cycles, unstaked frozen tokens are no longer considered at stake
@@ -448,8 +470,15 @@ nor slashable. They are said then to be both **unstaked** and
 
 A staker can retrieve all unstaked and finalizable tokens at any time,
 making them spendable again. This is done using the ``finalize_unstake``
-entrypoint – that is, by transferring 0 tez to their
-``finalize_unstake`` entry-point.
+entrypoint -– that is, by transferring 0 tez to their
+``finalize_unstake`` entry-point::
+
+   octez-client transfer 0 from <staker> to <staker> --entrypoint finalize_unstake
+
+or more conveniently::
+
+   octez-client finalize unstake for <staker>
+
 
 .. _feature_activation_alpha:
 
