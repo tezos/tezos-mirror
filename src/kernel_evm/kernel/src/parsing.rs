@@ -268,6 +268,28 @@ impl InputResult {
         Self::Input(Input::Deposit(content))
     }
 
+    fn parse_internal<Host: Runtime>(
+        host: &mut Host,
+        message: InternalInboxMessage<RollupType>,
+        smart_rollup_address: &[u8],
+        ticketer: &Option<ContractKt1Hash>,
+    ) -> Self {
+        match message {
+            InternalInboxMessage::InfoPerLevel(info) => {
+                InputResult::Input(Input::Info(info))
+            }
+            InternalInboxMessage::Transfer(transfer) if l1_bridge.is_some() => {
+                Self::parse_deposit(
+                    host,
+                    transfer,
+                    smart_rollup_address,
+                    l1_bridge.as_ref().unwrap(),
+                )
+            }
+            _ => InputResult::Unparsable,
+        }
+    }
+
     pub fn parse<Host: Runtime>(
         host: &mut Host,
         input: Message,
@@ -285,20 +307,9 @@ impl InputResult {
                 InboxMessage::External(message) => {
                     Self::parse_external(message, &smart_rollup_address)
                 }
-                InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(info)) => {
-                    InputResult::Input(Input::Info(info))
+                InboxMessage::Internal(message) => {
+                    Self::parse_internal(host, message, &smart_rollup_address, l1_bridge)
                 }
-                InboxMessage::Internal(InternalInboxMessage::Transfer(transfer))
-                    if l1_bridge.is_some() =>
-                {
-                    Self::parse_deposit(
-                        host,
-                        transfer,
-                        &smart_rollup_address,
-                        l1_bridge.as_ref().unwrap(),
-                    )
-                }
-                InboxMessage::Internal(_) => InputResult::Unparsable,
             },
             Err(_) => InputResult::Unparsable,
         }
