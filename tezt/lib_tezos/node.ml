@@ -948,3 +948,8 @@ let get_version node =
     spawn_command node version_flag |> Process.check_and_read_stdout
   in
   return @@ String.trim output
+
+let as_foreign_rpc_endpoint (t : t) =
+  let state = t.persistent_state in
+  let scheme = if Option.is_some state.rpc_tls then "https" else "http" in
+  Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
