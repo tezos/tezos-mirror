@@ -50,7 +50,7 @@ Their OpenAPI specification can be found at:
 
 - `rpc-openapi.json (version 17.3) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
-- `rpc-openapi-rc.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi-rc.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-rc.json>`_
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
@@ -60,12 +60,12 @@ Oxford RPCs
 The OpenAPI specification for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `oxford-openapi.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
+- `oxford-openapi-rc.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
 and specific to the Oxford protocol can be found at:
 
-- `oxford-mempool-openapi.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
+- `oxford-mempool-openapi-rc.json (version 18.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
 
 Nairobi RPCs
 ------------
