@@ -56,3 +56,24 @@ This configuration consists in five sections:
   and updated at jobs completion.
 - `stages` describes the scenario to run, as a sequence of jobs consisting
   in sequences of jobs to run on certain agents.
+
+## Troubleshootings
+
+### Octogram fails to kill some processes run by remote agents
+
+Octogram does not always behave correctly in presence of errors.
+
+In particular, interrupting a scenario using `C-c` is currently broken. An
+alternative interrupt mechanism has been implemented, and can be trigged by
+hitting `C-d` during an experiment. This alternative mechanism ensures the
+agents are halted in a clean way.
+
+Additionally, SSH
+connections multiplexing and persistence have proven to mitigate some of these
+issues, while improving the performances of running large experiments.
+
+```
+  ControlPath ~/.ssh/controlmasters/%r@%h:%p
+  ControlMaster auto
+  ControlPersist 2h
+```

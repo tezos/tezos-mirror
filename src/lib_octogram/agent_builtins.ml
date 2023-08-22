@@ -56,11 +56,6 @@ let () =
   register_key (module Http_server_key) ;
   register_key (module Continue_key)
 
-let stop_http_server state =
-  match Agent_state.find_opt Http_server_k state with
-  | Some server -> Http_server.kill server
-  | None -> ()
-
 type ('a, 'uri) Remote_procedure.t += Quit : (unit, 'uri) Remote_procedure.t
 
 module Quit = struct
@@ -94,7 +89,7 @@ module Quit = struct
 
   let run state () =
     Agent_state.add Continue_k false state ;
-    stop_http_server state ;
+    let* () = Process.clean_up () in
     unit
 
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ () = ()

@@ -61,35 +61,33 @@ let run ~input ~output state =
   Log.info "Ready %s..." (Agent_state.home_dir state) ;
   let rec run () =
     try_read_line ~input state @@ fun req_str ->
-    let* _ =
-      Lwt.both
-        (if Agent_builtins.agent_should_continue state then run ()
-        else return ())
-      @@
-      match Helpers.of_json_string request_encoding req_str with
-      | {proc_id; procedure = Packed proc} ->
+    match Helpers.of_json_string request_encoding req_str with
+    | {proc_id; procedure = Packed proc} ->
+        let p =
           Log.debug ">>[%d]" proc_id ;
-          Lwt.try_bind
-            (fun () -> Remote_procedure.run state proc)
-            (fun res ->
-              Lwt_io.atomic
-                (fun output ->
-                  Lwt_io.write_line
-                    output
-                    Format.(
-                      sprintf
-                        "<<[%d]: %s"
-                        proc_id
-                        (Helpers.to_json_string
-                           (Remote_procedure.response_encoding proc)
-                           res)))
-                output)
-            (fun _ ->
-              Test.fail
-                "Something went wrong with request %d, we need to do something \
-                 about that."
-                proc_id)
-    in
-    unit
+          let* res = Remote_procedure.run state proc in
+          let* () =
+            Lwt_io.atomic
+              (fun output ->
+                Lwt_io.write_line
+                  output
+                  Format.(
+                    sprintf
+                      "<<[%d]: %s"
+                      proc_id
+                      (Helpers.to_json_string
+                         (Remote_procedure.response_encoding proc)
+                         res)))
+              output
+          in
+          unit
+        in
+        let* _ =
+          Lwt.both
+            (if Agent_builtins.agent_should_continue state then run ()
+            else unit)
+            p
+        in
+        unit
   in
   run ()

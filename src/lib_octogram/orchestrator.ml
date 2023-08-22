@@ -260,6 +260,16 @@ let terminate_prometheus ~state =
   let* _status = Remote_prometheus.wait prometheus in
   unit
 
+let rec wait_for_eof k =
+  Lwt.try_bind
+    (fun () -> Lwt_io.(read_line stdin))
+    (fun _line -> wait_for_eof k)
+    (function
+      | End_of_file -> k ()
+      | exn ->
+          Log.debug "Unexpected exception: %s" (Printexc.to_string exn) ;
+          wait_for_eof k)
+
 let run_recipe ~keep_alive (recipe : Recipe.t) =
   let* prometheus =
     match recipe.prometheus_agent with
@@ -290,10 +300,22 @@ let run_recipe ~keep_alive (recipe : Recipe.t) =
       ~state
       recipe.agents
   in
-  Log.info ~color "[orchestrator] Starting stages execution" ;
-  let* () = run_stages ~state recipe.stages in
+  let interrupted = ref false in
   let* () =
-    if keep_alive then (
+    Lwt.pick
+      [
+        (Log.info
+           ~color
+           "[orchestrator] Starting stages execution. Hit C-d to exit." ;
+         run_stages ~state recipe.stages);
+        wait_for_eof (fun () ->
+            interrupted := true ;
+            unit);
+      ]
+  in
+
+  let* () =
+    if keep_alive && not !interrupted then (
       Log.info
         ~color
         "[orchestrator] Keeping agents alive. Enter newline to exit." ;
@@ -301,6 +323,9 @@ let run_recipe ~keep_alive (recipe : Recipe.t) =
       unit)
     else unit
   in
+
+  Log.info ~color "[orchestrator] Terminating remote agents" ;
+
   let* () = terminate_agents ~state in
   let* () = terminate_prometheus ~state in
-  unit
+  if !interrupted then Test.fail "Scenario aborted" else unit
