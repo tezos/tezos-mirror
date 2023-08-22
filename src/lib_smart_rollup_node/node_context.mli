@@ -202,9 +202,12 @@ val get_full_l2_block :
     head.hash] in the store. *)
 val save_level : rw -> Layer1.head -> unit tzresult Lwt.t
 
-(** [save_l2_head t l2_block] remembers that the [l2_block.head] is
-    processed. The system should not have to come back to it. *)
-val save_l2_head : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
+(** [save_l2_block t l2_block] remembers that the [l2_block] is processed. The
+    system should not have to come back to it. *)
+val save_l2_block : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
+
+(** [set_l2_head t l2_block] sets [l2_block] as the new head of the L2 chain. *)
+val set_l2_head : rw -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
 (** [last_processed_head_opt store] returns the last processed head if it
     exists. *)
