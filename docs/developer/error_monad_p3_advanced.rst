@@ -302,8 +302,8 @@ Note that if you are calling an Lwt function, you have to use ``Lwt.catch`` or
      (function
        | exc -> Lwt_result_syntax.fail (Cannot_destruct_json_value exc))
 
-The error monad provides `several helpers functions for catching exceptions
-<https://tezos.gitlab.io/api/odoc/_html/tezos-error-monad/Tezos_error_monad/Error_monad/index.html#catching-exceptions>`__.
+The error monad provides :package-api:`several helpers functions for catching exceptions
+<octez-libs/Tezos_error_monad/Error_monad/index.html#catching-exceptions>`.
 
 ::
 

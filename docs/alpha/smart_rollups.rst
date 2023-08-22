@@ -1,7 +1,7 @@
 Smart Optimistic Rollups
 ========================
 
-A **rollup** is a processing unit that receives, retrieves, and
+A **rollup** is a processing unit that receives, retrieves and
 interprets input messages to update its local state and to produce
 output messages targetting the Tezos blockchain. In this
 documentation, we will generally refer to the rollup under
@@ -84,14 +84,14 @@ There are two channels of communication to interact with smart rollups:
    information to all the rollups.
 
 #. a **reveal data channel** allows each rollup to retrieve data
-   coming from data sources external to the Layer 1. Rollups requests
+   coming from data sources external to the Layer 1. Rollups request
    data through that channel to the runner of that rollup kernel
    (i.e. the smart rollup node).
 
 Rollups inbox
 """""""""""""
 
-The inbox is unique to all rollups and contains two kinds of messages:
+A single global inbox serves all rollups and contains two kinds of messages:
 *external* messages are pushed through a Layer 1 manager operation
 while *internal* messages are pushed by Layer 1 smart contracts or by
 the protocol itself. All messages (external and internal) pushed to
@@ -136,7 +136,7 @@ inbox.
 
 Finally, after the application of the operations of the Tezos block,
 the Layer 1 pushes one final internal message “End of
-level”. Similarly to “Start of level“, this internal messages does not
+level”. Similarly to “Start of level“, these internal messages does not
 come with any payload.
 
 .. _reveal_data_channel_smart_rollups_alpha:
@@ -185,7 +185,7 @@ implements this reactive process: it downloads the Tezos block and
 interprets it according to the semantics of the PVM. This
 interpretation can require updating a state, downloading data from
 other sources, or performing some cryptographic verifications. The
-state of the rollup contains an **outbox**, that is a sequence of
+state of the rollup contains an **outbox**, which is a sequence of
 latent calls to Layer 1 contracts.
 
 The behavior of the rollup node is deterministic and fully specified
@@ -483,7 +483,7 @@ The log should show that the rollup node follows the Layer 1 chain and
 processes the inbox of each level.
 
 
-Notice that distinct Layer 1 adresses could be used for the Layer 1
+Notice that distinct Layer 1 addresses could be used for the Layer 1
 operations issued by the rollup node simply by editing the
 configuration file to set different addresses for ``publish``,
 ``add_messages``, ``cement``, and ``refute``.
@@ -606,7 +606,7 @@ representation of the message payload, one can do:
      from "${OPERATOR_ADDR}"
 
 to inject such an external message.
-So let us focus now on producing a viable contents for ``${EMESSAGE}``.
+So let us focus now on producing a viable content for ``${EMESSAGE}``.
 
 The kernel used previously in our running example is a simple "echo"
 kernel that copies its input as a new message to its outbox.
@@ -703,7 +703,7 @@ Sending an internal inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A smart contract can push an internal message in the rollup inbox
-using the Michelson ``TRANSFER_TOKENS`` instruction targetting a
+using the Michelson ``TRANSFER_TOKENS`` instruction targeting a
 specific rollup address. The parameter of this transfer must be a
 value of the Michelson type declared at the origination of this
 rollup.
@@ -799,7 +799,7 @@ The available options are:
      - `When to use Cranelift <https://github.com/wasmerio/wasmer/tree/master/lib/compiler-cranelift#when-to-use-cranelift>`_
 
 Note that while the rollup node is generally capable of using Wasmer's
-LLVM-based compiler, Octez does not current ship with it.
+LLVM-based compiler, Octez does not currently ship with it.
 
 When the environment variable is undefined, Cranelift is used by default.
 
@@ -907,7 +907,7 @@ The smart rollup carries two states:
    contracts in the Layer 1, and a durable storage which is akin to a
    file system.
 
-The durable storage is a persistent tree, whose contents is addressed
+The durable storage is a persistent tree, whose contents are addressed
 by path-like keys. A path in the storage may contain: a value (also
 called file) consisting of a sequence of raw bytes, and/or any number
 of subtrees (also called directories), that is, the paths in the
@@ -999,7 +999,7 @@ verify the ``kernel_run`` function does not take more ticks than authorized.
 The direct consequence of this setup is that it might be necessary for
 a WASM kernel to span a long computation across several calls to
 ``kernel_run``, and therefore to serialize any data it needs in the
-durable storage to avoid loosing them.
+durable storage to avoid losing them.
 
 Finally, the kernel can verify if the previous ``kernel_run``
 invocation was trapped by verifying if some data are stored under the
@@ -1046,7 +1046,7 @@ allow it to interact with the components of persistent state:
 
 ``store_delete_value``
   Cuts the value under a given path out of the durable storage, but leaves the
-  rest of the substree untouched. Since version ``2.0.0-r1`` of the WASM PVM.
+  rest of the subtree untouched. Since version ``2.0.0-r1`` of the WASM PVM.
 
 ``store_copy``
   Copies the subtree under a given path to another key. Since the
@@ -1121,7 +1121,7 @@ programs, it is a low-level, stack-based, memory unsafe language.
 Fortunately, it was designed to be a compilation target, not a
 language in which developers would directly write their programs.
 
-Rust has several advantages that makes it a good candidate for writing
+Rust has several advantages that make it a good candidate for writing
 the kernel of a smart rollup. Not only does the Rust compiler treat
 WASM as a first class citizen when it comes to compilation targets,
 but its approach to memory safety eliminates large classes of bugs and
@@ -1626,7 +1626,7 @@ Glossary
    This ability is used during the final step of refutation games.
 
 #. **Inbox**: A sequence of messages from the Layer 1 to smart rollups.
-   The contents of the inbox is determined by the consensus of the
+   The contents of the inbox are determined by the consensus of the
    Tezos protocol.
 
 #. **Outbox**: A sequence of messages from a smart rollup to the Layer 1.

@@ -7,7 +7,7 @@ help you do that. This tool allows to benchmark any given piece of OCaml code
 and use these measures to fit cost models predictive of execution time.
 
 It is in particular used to derive the functions in the
-`Michelson gas cost API <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Michelson_v1_gas/index.html>`_,
+:package-api:`Michelson gas cost API <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Michelson_v1_gas/index.html>`,
 computing the gas costs in the Tezos protocol.
 
 .. toctree::
