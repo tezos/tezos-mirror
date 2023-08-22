@@ -251,3 +251,8 @@ let run ?(wait_ready = true) ?env node =
   let* () = run ?env node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in
   return ()
+
+let as_foreign_rpc_endpoint (t : t) =
+  let state = t.persistent_state in
+  let scheme = "http" in
+  Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}

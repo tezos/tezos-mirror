@@ -32,3 +32,6 @@ val rpc_host : t -> string
 val rpc_port : t -> int
 
 val rpc_scheme : t -> string
+
+(** Encode the given foreign endpoint as a string value. *)
+val as_string : t -> string

@@ -30,3 +30,6 @@ let rpc_host {host; _} = host
 let rpc_port {port; _} = port
 
 let rpc_scheme {scheme; _} = scheme
+
+let as_string {scheme; host; port} =
+  Printf.sprintf "%s://%s:%d" scheme host port

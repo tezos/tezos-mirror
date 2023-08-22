@@ -128,3 +128,6 @@ end
 
 (** Read the content of the node's identity file. *)
 val read_identity : t -> JSON.t
+
+(** Expose the RPC server address of this node as a foreign endpoint. *)
+val as_foreign_rpc_endpoint : t -> Foreign_endpoint.t
