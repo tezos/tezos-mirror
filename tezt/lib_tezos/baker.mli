@@ -155,6 +155,44 @@ val create :
   Client.t ->
   t
 
+(** Similar to {!create}, but nodes RPCs addresses, wallet base directory and L1
+    data directory are directly provided instead of a {!Client.t}, a {!Node.t}
+    and optionally a {!Dal_node.t}.
+
+    The [node_data_dir] parameter provides the (local) node's data directory
+    used for baking.
+
+    The [node_rpc_endpoint] parameter provides the (local) node's RPC server
+    endpoint to which the baker will connect to.
+
+    The [base_dir] parameter contains needed information about the wallets used
+    by the baker.
+
+    If [dal_node_rpc_endpoint] is specified, then it provides the DAL node RPC
+    server's endpoint that the baker queries in order to determine the
+    attestations it sends to the L1 node. A [--dal_node] argument is passed
+    to specify the DAL node's endpoint.
+ *)
+val create_from_uris :
+  protocol:Protocol.t ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?event_pipe:string ->
+  ?runner:Runner.t ->
+  ?delegates:string list ->
+  ?votefile:string ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
+  ?force_apply:bool ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Foreign_endpoint.t ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  base_dir:string ->
+  node_data_dir:string ->
+  node_rpc_endpoint:Foreign_endpoint.t ->
+  unit ->
+  t
+
 (** Initialize a baker.
 
     This creates a baker, waits for it to be ready, and then returns it.
