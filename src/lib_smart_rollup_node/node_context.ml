@@ -330,16 +330,15 @@ let level_of_hash {l1_ctxt; store; _} hash =
 let save_level {store; _} Layer1.{hash; level} =
   Store.Levels_to_hashes.add store.levels_to_hashes level hash
 
-let save_l2_head {store; _} (head : Sc_rollup_block.t) =
-  let open Lwt_result_syntax in
+let save_l2_block {store; _} (head : Sc_rollup_block.t) =
   let head_info = {head with header = (); content = ()} in
-  let* () =
-    Store.L2_blocks.append
-      store.l2_blocks
-      ~key:head.header.block_hash
-      ~header:head.header
-      ~value:head_info
-  in
+  Store.L2_blocks.append
+    store.l2_blocks
+    ~key:head.header.block_hash
+    ~header:head.header
+    ~value:head_info
+
+let set_l2_head {store; _} (head : Sc_rollup_block.t) =
   Store.L2_head.write store.l2_head head
 
 let is_processed {store; _} head = Store.L2_blocks.mem store.l2_blocks head

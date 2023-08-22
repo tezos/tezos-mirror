@@ -90,7 +90,7 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
 
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
-let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
+let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
@@ -160,10 +160,38 @@ let process_new_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       node_ctxt
       Int32.(sub head.level (of_int node_ctxt.block_finality_time))
   in
-  let* () = Node_context.save_l2_head node_ctxt l2_block in
-  return_unit
+  let* () = Node_context.save_l2_block node_ctxt l2_block in
+  return l2_block
 
-let rec process_head ({node_ctxt; _} as state) ~catching_up
+let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
+    (head : Layer1.header) =
+  let open Lwt_result_syntax in
+  if is_before_origination node_ctxt head then return `Nothing
+  else
+    let* l2_head = Node_context.find_l2_block node_ctxt head.hash in
+    match l2_head with
+    | Some l2_head ->
+        (* Already processed *)
+        return (`Already_processed l2_head)
+    | None -> (
+        (* New head *)
+        let*! () = Daemon_event.head_processing head.hash head.level in
+        let* predecessor =
+          Node_context.get_predecessor_header_opt node_ctxt head
+        in
+        match predecessor with
+        | None ->
+            (* Predecessor not available on the L1, which means the block does not
+               exist in the chain. *)
+            return `Nothing
+        | Some predecessor ->
+            let* () = update_l2_chain state ~catching_up:true predecessor in
+            let* l2_head =
+              process_unseen_head state ~catching_up ~predecessor head
+            in
+            return (`New l2_head))
+
+and update_l2_chain ({node_ctxt; _} as state) ~catching_up
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
@@ -172,19 +200,12 @@ let rec process_head ({node_ctxt; _} as state) ~catching_up
       node_ctxt
       {Layer1.hash = head.hash; level = head.level}
   in
-  let* already_processed = Node_context.is_processed node_ctxt head.hash in
-  unless (already_processed || is_before_origination node_ctxt head)
-  @@ fun () ->
-  let*! () = Daemon_event.head_processing head.hash head.level in
-  let* predecessor = Node_context.get_predecessor_header_opt node_ctxt head in
-  match predecessor with
-  | None ->
-      (* Predecessor not available on the L1, which means the block does not
-         exist in the chain. *)
-      return_unit
-  | Some predecessor ->
-      let* () = process_head state ~catching_up:true predecessor in
-      let* () = process_new_head state ~catching_up ~predecessor head in
+  let* done_ = process_l1_block state ~catching_up head in
+  match done_ with
+  | `Nothing -> return_unit
+  | `Already_processed l2_block -> Node_context.set_l2_head node_ctxt l2_block
+  | `New l2_block ->
+      let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
       Metrics.Inbox.set_process_time process_time ;
@@ -225,7 +246,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
              false
              trace ->
         (* The reorganization could not be computed entirely because of missing
-           info on the Layer 1. We fallback to a recursive process_head. *)
+           info on the Layer 1. We fallback to a recursive process_l1_block. *)
         Ok {Reorg.no_reorg with new_chain = [stripped_head]}
     | _ -> reorg
   in
@@ -251,7 +272,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
           to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
-        process_head state ~catching_up header)
+        update_l2_chain state ~catching_up header)
       new_chain_prefetching
   in
   let module Plugin = (val state.plugin) in
@@ -438,7 +459,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       | e -> error_to_degraded_mode e)
 
 module Internal_for_tests = struct
-  (** Same as {!process_head} but only builds and stores the L2 block
+  (** Same as {!update_l2_chain} but only builds and stores the L2 block
         corresponding to [messages]. It is used by the unit tests to build an L2
         chain. *)
   let process_messages (module Plugin : Protocol_plugin_sig.S)
@@ -498,7 +519,8 @@ module Internal_for_tests = struct
     let l2_block =
       Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
     in
-    let* () = Node_context.save_l2_head node_ctxt l2_block in
+    let* () = Node_context.save_l2_block node_ctxt l2_block in
+    let* () = Node_context.set_l2_head node_ctxt l2_block in
     return l2_block
 end
 
