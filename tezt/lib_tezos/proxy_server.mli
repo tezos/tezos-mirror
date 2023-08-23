@@ -43,8 +43,15 @@ type argument =
           cannot be safely used as a key in any form of cache. *)
 
 (** Get the RPC port of a proxy server. It's the port to
-    do request to. *)
+    do requests to. *)
 val rpc_port : t -> int
+
+(** Get the RPC host of a proxy server. It's the host to
+    do requests to. Its value is ["127.0.0.1"]. *)
+val rpc_host : string
+
+(** Get the RPC scheme of a proxy server. Its value is ["http"]. *)
+val rpc_scheme : string
 
 (** Get the runner associated to a proxy server.
 

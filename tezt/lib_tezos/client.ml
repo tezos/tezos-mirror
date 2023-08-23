@@ -98,7 +98,7 @@ let runner endpoint =
 
 let scheme = function
   | Node n -> Node.rpc_scheme n
-  | Proxy_server _ -> "http"
+  | Proxy_server _ -> Proxy_server.rpc_scheme
   | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
@@ -4018,3 +4018,14 @@ let get_timestamp ?endpoint ?block ?seconds client =
     |> Process.check_and_read_stdout
   in
   return (String.trim output)
+
+let as_foreign_endpoint = function
+  | Node node -> Node.as_foreign_rpc_endpoint node
+  | Foreign_endpoint fe -> fe
+  | Proxy_server ps ->
+      Foreign_endpoint.
+        {
+          scheme = Proxy_server.rpc_scheme;
+          host = Proxy_server.rpc_host;
+          port = Proxy_server.rpc_port ps;
+        }
