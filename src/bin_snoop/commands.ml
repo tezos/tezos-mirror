@@ -719,17 +719,11 @@ end
 module Codegen_inferred_cmd = struct
   include Codegen_cmd
 
-  let codegen_inferred_handler (json, exclusions, save_to) solution () =
+  let codegen_inferred_handler (json, save_to) solution () =
     let transform = Option.map load_fixed_point_parameters json in
     let codegen_options = {transform; split = false; save_to} in
-    let exclusions =
-      Option.fold
-        ~none:String.Set.empty
-        ~some:Codegen.load_exclusions
-        exclusions
-    in
     commandline_outcome_ref :=
-      Some (Codegen_inferred {solution; codegen_options; exclusions}) ;
+      Some (Codegen_inferred {solution; codegen_options}) ;
     Lwt.return_ok ()
 
   let params =
@@ -742,15 +736,7 @@ module Codegen_inferred_cmd = struct
               switch"
       @@ fixed ["for"; "inferred"; "models"])
 
-  let exclude_arg =
-    Tezos_clic.arg
-      ~doc:"A file containing the function names to exclude for the codegen"
-      ~long:"exclude-file"
-      ~placeholder:"filename"
-      (Tezos_clic.parameter (fun (_ : unit) filename -> Lwt.return_ok filename))
-
-  let options =
-    Tezos_clic.args3 Codegen_cmd.fixed_point_arg exclude_arg save_to_arg
+  let options = Tezos_clic.args2 Codegen_cmd.fixed_point_arg save_to_arg
 
   let command =
     Tezos_clic.command
@@ -810,22 +796,10 @@ module Codegen_for_solutions_cmd = struct
       ~placeholder:"FILE-NAME"
       (Tezos_clic.parameter (fun () filename -> Lwt.return_ok filename))
 
-  let exclude_arg =
-    Tezos_clic.arg
-      ~doc:"A file containing the function names to exclude for the codegen"
-      ~long:"exclude-file"
-      ~placeholder:"filename"
-      (Tezos_clic.parameter (fun (_ : unit) filename -> Lwt.return_ok filename))
-
   let options =
-    Tezos_clic.args4
-      Codegen_cmd.fixed_point_arg
-      exclude_arg
-      save_to_arg
-      split_to_dir
+    Tezos_clic.args3 Codegen_cmd.fixed_point_arg save_to_arg split_to_dir
 
-  let codegen_for_solutions_handler (json, exclusions, save_to, split_to_dir)
-      solutions () =
+  let codegen_for_solutions_handler (json, save_to, split_to_dir) solutions () =
     if Option.is_some save_to && Option.is_some split_to_dir then (
       Format.eprintf
         "Error: --save-to and --split-to are mutually exclusive params.@." ;
@@ -836,14 +810,8 @@ module Codegen_for_solutions_cmd = struct
       let option = Option.to_list save_to @ Option.to_list split_to_dir in
       let save_to = List.hd option in
       let codegen_options = {transform; save_to; split} in
-      let exclusions =
-        Option.fold
-          ~none:String.Set.empty
-          ~some:Codegen.load_exclusions
-          exclusions
-      in
       commandline_outcome_ref :=
-        Some (Codegen_for_solutions {solutions; codegen_options; exclusions}) ;
+        Some (Codegen_for_solutions {solutions; codegen_options}) ;
       Lwt.return_ok ()
 
   let params =

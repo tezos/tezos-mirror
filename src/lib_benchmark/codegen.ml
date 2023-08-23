@@ -297,17 +297,6 @@ let save_solution s fn =
   save_solution_in_binary s fn ;
   save_solution_in_json s (fn ^ ".json")
 
-let load_exclusions exclude_fn =
-  (* one model name like N_IXxx_yyy__alpha per line *)
-  let open In_channel in
-  with_open_text exclude_fn (fun ic ->
-      let rec loop acc =
-        match input_line ic with
-        | None -> acc
-        | Some l -> loop (String.Set.add l acc)
-      in
-      loop String.Set.empty)
-
 (* ------------------------------------------------------------------------- *)
 
 (* [Parsetree.structure_item] has no construction for comment *)

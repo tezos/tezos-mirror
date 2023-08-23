@@ -49,9 +49,6 @@ val save_solution : solution -> string -> unit
 
 val solution_to_csv : solution -> Csv.csv
 
-(** Load a text file of lines of function names *)
-val load_exclusions : string -> String.Set.t
-
 (** Generated code for a model *)
 type code
 
