@@ -3006,6 +3006,31 @@ let test_cement_ignore_commitment ~kind =
    -------------------------
 *)
 
+type refutation_scenario_parameters = {
+  loser_modes : string list;
+  inputs : string list list;
+  final_level : int;
+  empty_levels : int list;
+  stop_loser_at : int list;
+  reset_honest_on : (string * int * Sc_rollup_node.mode option) list;
+  bad_reveal_at : int list;
+  priority : [`Priority_honest | `Priority_loser | `No_priority];
+}
+
+let refutation_scenario_parameters ?(loser_modes = []) ~final_level
+    ?(empty_levels = []) ?(stop_loser_at = []) ?(reset_honest_on = [])
+    ?(bad_reveal_at = []) ?(priority = `No_priority) inputs =
+  {
+    loser_modes;
+    inputs;
+    final_level;
+    empty_levels;
+    stop_loser_at;
+    reset_honest_on;
+    bad_reveal_at;
+    priority;
+  }
+
 let remove_state_from_dissection dissection =
   JSON.update
     "dissection"
@@ -3033,14 +3058,16 @@ let remove_state_from_dissection dissection =
 *)
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind
-    ( loser_modes,
-      inputs,
-      final_level,
-      empty_levels,
-      stop_loser_at,
-      reset_honest_on,
-      bad_reveal_at,
-      (priority : [`Priority_honest | `Priority_loser | `No_priority]) ) =
+    {
+      loser_modes;
+      inputs;
+      final_level;
+      empty_levels;
+      stop_loser_at;
+      reset_honest_on;
+      bad_reveal_at;
+      priority;
+    } =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3336,148 +3363,174 @@ let test_refutation protocols ~kind =
              index of the failing tick during the processing of this
              message. *)
           ( "inbox_proof_at_genesis",
-            (["3 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 0 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "pvm_proof_at_genesis",
-            (["3 0 1"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 0 1"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "inbox_proof",
-            (["5 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["5 0 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "inbox_proof_with_new_content",
-            (["5 0 0"], inputs_for 30, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["5 0 0"]
+              (inputs_for 30)
+              ~final_level:80
+              ~priority:`Priority_honest );
           (* In "inbox_proof_with_new_content" we add messages after the commitment
              period so the current inbox is not equal to the inbox snapshot-ted at the
              game creation. *)
           ( "inbox_proof_one_empty_level",
-            (["6 0 0"], inputs_for 10, 80, [2], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["6 0 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~empty_levels:[2]
+              ~priority:`Priority_honest );
           ( "inbox_proof_many_empty_levels",
-            ( ["9 0 0"],
-              inputs_for 10,
-              80,
-              [2; 3; 4],
-              [],
-              [],
-              [],
-              `Priority_honest ) );
+            refutation_scenario_parameters
+              ~loser_modes:["9 0 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~empty_levels:[2; 3; 4]
+              ~priority:`Priority_honest );
           ( "pvm_proof_0",
-            (["5 2 1"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["5 2 1"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "pvm_proof_1",
-            (["7 2 0"], inputs_for 10, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 2 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "pvm_proof_2",
-            (["7 2 5"], inputs_for 7, 80, [], [], [], [], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 2 5"]
+              (inputs_for 7)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "pvm_proof_3",
-            (["9 2 5"], inputs_for 7, 80, [4; 5], [], [], [], `Priority_honest)
-          );
+            refutation_scenario_parameters
+              ~loser_modes:["9 2 5"]
+              (inputs_for 7)
+              ~final_level:80
+              ~empty_levels:[4; 5]
+              ~priority:`Priority_honest );
           ( "timeout",
-            (["5 2 1"], inputs_for 10, 80, [], [35], [], [], `Priority_honest)
-          );
+            refutation_scenario_parameters
+              ~loser_modes:["5 2 1"]
+              (inputs_for 10)
+              ~final_level:80
+              ~stop_loser_at:[35]
+              ~priority:`Priority_honest );
           ( "reset_honest_during_game",
-            ( ["5 2 1"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [("sc_rollup_node_conflict_detected.v0", 2, None)],
-              [],
-              `Priority_honest ) );
+            refutation_scenario_parameters
+              ~loser_modes:["5 2 1"]
+              (inputs_for 10)
+              ~final_level:80
+              ~reset_honest_on:
+                [("sc_rollup_node_conflict_detected.v0", 2, None)]
+              ~priority:`Priority_honest );
           ( "degraded_new",
-            ( ["7 2 5"],
-              inputs_for 7,
-              80,
-              [],
-              [],
-              [],
-              [
-                14
-                (* Commitment for inbox 7 will be made at level 12 and published
-                   at level 14 *);
-              ],
-              `Priority_honest ) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 2 5"]
+              (inputs_for 7)
+              ~final_level:80
+              ~bad_reveal_at:
+                [
+                  14
+                  (* Commitment for inbox 7 will be made at level 12 and published
+                     at level 14 *);
+                ]
+              ~priority:`Priority_honest );
           ( "degraded_ongoing",
-            (["7 2 5"], inputs_for 7, 80, [], [], [], [21], `Priority_honest) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 2 5"]
+              (inputs_for 7)
+              ~final_level:80
+              ~bad_reveal_at:[21]
+              ~priority:`Priority_honest );
           ( "parallel_games_0",
-            ( ["3 0 0"; "3 0 1"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_honest ) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 0 0"; "3 0 1"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "parallel_games_1",
-            ( ["3 0 0"; "3 0 1"; "3 0 0"],
-              inputs_for 10,
-              200,
-              [],
-              [],
-              [],
-              [],
-              `Priority_honest ) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 0 0"; "3 0 1"; "3 0 0"]
+              (inputs_for 10)
+              ~final_level:200
+              ~priority:`Priority_honest );
         ]
     | "wasm_2_0_0" ->
         [
           (* First message of an inbox (level 3) *)
           ( "inbox_proof_0",
-            (["3 0 0"], inputs_for 10, 80, [], [], [], [], `Priority_loser) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 0 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           (* Fourth message of an inbox (level 3) *)
           ( "inbox_proof_1",
-            (["3 4 0"], inputs_for 10, 80, [], [], [], [], `Priority_loser) );
+            refutation_scenario_parameters
+              ~loser_modes:["3 4 0"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           (* Echo kernel takes around 2,100 ticks to execute *)
           (* Second tick of decoding *)
           ( "pvm_proof_0",
-            ( ["5 7 11_000_000_001"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["5 7 11_000_000_001"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           ( "pvm_proof_1",
-            ( ["7 7 11_000_001_000"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 7 11_000_001_000"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           (* End of evaluation *)
           ( "pvm_proof_2",
-            ( ["7 7 22_000_002_000"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 7 22_000_002_000"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           (* During padding *)
           ( "pvm_proof_3",
-            ( ["7 7 22_010_000_000"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["7 7 22_010_000_000"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           ( "parallel_games_0",
-            ( ["4 0 0"; "5 7 11_000_000_001"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["4 0 0"; "5 7 11_000_000_001"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
           ( "parallel_games_1",
-            ( ["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"],
-              inputs_for 10,
-              80,
-              [],
-              [],
-              [],
-              [],
-              `Priority_loser ) );
+            refutation_scenario_parameters
+              ~loser_modes:["4 0 0"; "7 7 22_000_002_000"; "7 7 22_000_002_000"]
+              (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
         ]
     | _ -> assert false
   in
@@ -3501,7 +3554,11 @@ let test_accuser protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"pvm_proof_2"
-    (["7 7 22_000_002_000"], inputs_for 10, 80, [], [], [], [], `Priority_honest)
+    (refutation_scenario_parameters
+       ~loser_modes:["7 7 22_000_002_000"]
+       (inputs_for 10)
+       ~final_level:80
+       ~priority:`Priority_honest)
     protocols
 
 (** Run one of the refutation tests in bailout mode instead of using a
@@ -3513,14 +3570,13 @@ let test_bailout_refutation protocols =
     ~challenge_window:10
     ~commitment_period:10
     ~variant:"bailout_mode_defends_its_commitment"
-    ( ["5 2 1"],
-      inputs_for 10,
-      80,
-      [],
-      [],
-      [("sc_rollup_node_publish_commitment.v0", 2, Some Bailout)],
-      [],
-      `Priority_honest )
+    (refutation_scenario_parameters
+       ~loser_modes:["5 2 1"]
+       (inputs_for 10)
+       ~final_level:80
+       ~reset_honest_on:
+         [("sc_rollup_node_conflict_detected.v0", 2, Some Bailout)]
+       ~priority:`Priority_honest)
     protocols
 
 (** Helper to check that the operation whose hash is given is successfully
