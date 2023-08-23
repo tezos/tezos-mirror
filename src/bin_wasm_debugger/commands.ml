@@ -341,18 +341,32 @@ let reveal_preimage_builtin config retries hash =
     ~filename:hex
     retries
 
+let request_dal_page config retries published_level slot_index page_index =
+  let open Tezos_protocol_alpha.Protocol in
+  let filename =
+    Format.asprintf
+      "%a-%a-%a"
+      Alpha_context.Raw_level.pp
+      published_level
+      Alpha_context.Dal.Slot_index.pp
+      slot_index
+      Dal_slot_repr.Page.Index.pp
+      page_index
+  in
+  read_data
+    ~kind:"DAL page"
+    ~directory:config.Config.dal_pages_directory
+    ~filename
+    retries
+
 let reveals config request =
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
   let num_retries = 3 in
   match Wasm_2_0_0PVM.decode_reveal request with
   | Reveal_raw_data hash -> reveal_preimage_builtin config num_retries hash
   | Reveal_metadata -> Lwt.return (build_metadata config)
-  | Request_dal_page _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6165
-         Support DAL requests in the WASM debugger. *)
-      Stdlib.failwith
-        "The kernel tried to request a DAL page, but this is not yet supported \
-         by the debugger."
+  | Request_dal_page {slot_id = {published_level; index}; page_index} ->
+      request_dal_page config num_retries published_level index page_index
 
 let write_debug config =
   if config.Config.kernel_debug then
