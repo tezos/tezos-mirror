@@ -53,7 +53,7 @@ full: odoc
 	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-smart-rollup-client.html:
 	@../octez-smart-rollup-client-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-	
+
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
@@ -74,16 +74,15 @@ manuals: \
 	@../octez-smart-rollup-node man -verbosity 3 -format html | \
 		sed "s#${HOME}#\$$HOME#g" > api/octez-smart-rollup-node.html
 
-# artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
-odoc: docexes
+odoc:
 	cd $$(pwd)/.. ; dune build @doc >docs/odoc.log 2>&1; \
 	  RESULT=$$?; (grep '^Error:' docs/odoc.log || true); exit $$RESULT
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
 
-odoc-lite: docexes
+odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms \
@@ -234,5 +233,6 @@ fmt: black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
+	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/octez-*.html api/octez-*.txt nairobi/octez-*.html oxford/octez-*.html alpha/octez-*.html
