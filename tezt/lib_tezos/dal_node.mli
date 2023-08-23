@@ -44,6 +44,20 @@ val create :
   unit ->
   t
 
+val create_from_endpoint :
+  ?path:string ->
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?data_dir:string ->
+  ?event_pipe:string ->
+  ?rpc_host:string ->
+  ?rpc_port:int ->
+  ?listen_addr:string ->
+  ?metrics_addr:string ->
+  l1_node_endpoint:Client.endpoint ->
+  unit ->
+  t
+
 (** Get the name of an dal node. *)
 val name : t -> string
 

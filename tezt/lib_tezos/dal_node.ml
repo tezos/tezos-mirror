@@ -31,7 +31,7 @@ module Parameters = struct
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
     metrics_addr : string;
-    node : Node.t;
+    l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
   }
 
@@ -70,10 +70,6 @@ let rpc_endpoint dal_node =
 let listen_addr dal_node = dal_node.persistent_state.listen_addr
 
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
-
-let layer1_addr dal_node = Node.rpc_host dal_node.persistent_state.node
-
-let layer1_port dal_node = Node.rpc_port dal_node.persistent_state.node
 
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
@@ -176,8 +172,9 @@ let wait_for_ready dal_node =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
+let create_from_endpoint ?(path = Constant.dal_node) ?name ?color ?data_dir
+    ?event_pipe ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr
+    ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -208,16 +205,34 @@ let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
         listen_addr;
         metrics_addr;
         pending_ready = [];
-        node;
+        l1_node_endpoint;
       }
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
+let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?listen_addr ?metrics_addr ~node () =
+  create_from_endpoint
+    ~path
+    ?name
+    ?color
+    ?data_dir
+    ?event_pipe
+    ~rpc_host
+    ?rpc_port
+    ?listen_addr
+    ?metrics_addr
+    ~l1_node_endpoint:(Client.Node node)
+    ()
+
 let make_arguments node =
+  let l1_endpoint =
+    Client.as_foreign_endpoint node.persistent_state.l1_node_endpoint
+  in
   [
     "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    Foreign_endpoint.as_string l1_endpoint;
     "--rpc-addr";
     Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
     "--net-addr";
