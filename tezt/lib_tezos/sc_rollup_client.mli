@@ -78,10 +78,11 @@ val rpc_get :
 val rpc_post :
   ?hooks:Process.hooks -> t -> Client.path -> JSON.t -> JSON.t Runnable.process
 
-(** [rpc_get_rich client path parameters] issues a GET request for [path]
-    passing [parameters]. *)
+(** [rpc_get_rich ?hooks ?log_output client path parameters] issues a GET
+    request for [path] passing [parameters]. *)
 val rpc_get_rich :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   t ->
   Client.path ->
   (string * string) list ->
@@ -119,10 +120,12 @@ type 'output_type durable_state_operation =
   | Length : int64 option durable_state_operation
   | Subkeys : string list durable_state_operation
 
-(** [inspect_durable_state_value ?block client key] gets the corresponding durable PVM state value
-    mapped to [key] for the [block] (default ["head"]). *)
+(** [inspect_durable_state_value ?hooks ?log_output ?block client key]
+    gets the corresponding durable PVM state value mapped to [key] for
+    the [block] (default ["head"]). *)
 val inspect_durable_state_value :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   ?block:string ->
   t ->
   pvm_kind:string ->

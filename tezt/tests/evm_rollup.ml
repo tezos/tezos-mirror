@@ -1777,9 +1777,16 @@ let test_deposit_fa12 =
   check_balance ~receiver ~endpoint amount_cmutez
 
 let get_kernel_boot_wasm ~sc_rollup_client =
+  let hooks : Process_hooks.t =
+    let on_spawn _command _arguments = () in
+    let on_log _output = Regression.capture "<boot.wasm>" in
+    {on_spawn; on_log}
+  in
   let*! kernel_boot_opt =
     Sc_rollup_client.inspect_durable_state_value
       sc_rollup_client
+      ~hooks
+      ~log_output:false
       ~pvm_kind:"wasm_2_0_0"
       ~operation:Sc_rollup_client.Value
       ~key:Durable_storage_path.kernel_boot_wasm
