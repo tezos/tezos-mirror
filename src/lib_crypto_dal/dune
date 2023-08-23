@@ -10,9 +10,9 @@
   octez-libs.error-monad
   data-encoding
   octez-libs.crypto-dal.dal-config
-  octez-libs.crypto
   octez-libs.bls12-381-polynomial
-  lwt.unix)
+  lwt.unix
+  octez-libs.kzg)
  (flags
   (:standard)
   -open Tezos_stdlib

@@ -302,7 +302,7 @@ module Make_common (MP : Distribution.Main_protocol.S) = struct
     return {perm_and_plook; wires_cm; pp_proof}
 end
 
-module PC_Kzg = Distribution.Kzg.Kzg_impl
+module PC_Kzg = Distribution.Polynomial_commitment.Kzg_impl
 module PP_Kzg = Distribution.Polynomial_protocol.Make (PC_Kzg)
 module Main_Kzg = Distribution.Main_protocol.Make (PP_Kzg)
 module PC_Pack = Distribution.Kzg_pack.Kzg_pack_impl

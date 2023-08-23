@@ -26,7 +26,9 @@
 open Plonk.Bls
 open Plonk.Utils
 
-module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
+module External
+    (PC : Distribution.Polynomial_commitment.PC_for_distribution_sig) =
+struct
   module SMap = Plonk.SMap
 
   let generate_random_poly degree =
@@ -179,7 +181,7 @@ module External (PC : Distribution.Kzg.PC_for_distribution_sig) = struct
     assert (not @@ prove_and_verify_instance ~wrong_transcript:true instance)
 end
 
-module KZG_Tests = External (Distribution.Kzg.Kzg_impl)
+module KZG_Tests = External (Distribution.Polynomial_commitment.Kzg_impl)
 module KZG_Pack_Tests = External (Distribution.Kzg_pack.Kzg_pack_impl)
 
 let tests =
