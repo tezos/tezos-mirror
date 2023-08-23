@@ -98,7 +98,7 @@ let runner endpoint =
 
 let scheme = function
   | Node n -> Node.rpc_scheme n
-  | Proxy_server _ -> "http"
+  | Proxy_server _ -> Proxy_server.rpc_scheme
   | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =

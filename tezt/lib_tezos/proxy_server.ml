@@ -45,6 +45,10 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; BG.gray|]
 end
 
+let rpc_host = "127.0.0.1"
+
+let rpc_scheme = "http"
+
 open Parameters
 include Daemon.Make (Parameters)
 
@@ -78,7 +82,7 @@ let connection_arguments_and_port ?rpc_port node =
          set TEZOS_LOG to "rpc->debug", just like you would do with a node.
       *)
       "--rpc-addr";
-      "http://127.0.0.1:" ^ string_of_int rpc_port;
+      Format.sprintf "%s://%s:%d" rpc_scheme rpc_host rpc_port;
     ],
     rpc_port )
 
