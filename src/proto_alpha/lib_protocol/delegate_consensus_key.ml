@@ -112,9 +112,11 @@ let check_unused ctxt pkh =
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
   fail_when is_active Invalid_consensus_key_update_active
 
-let check_not_tz4 : Signature.Public_key.t -> unit tzresult = function
-  | Bls pk -> error (Invalid_consensus_key_update_tz4 pk)
-  | Ed25519 _ | Secp256k1 _ | P256 _ -> Ok ()
+let check_not_tz4 : Signature.Public_key.t -> unit tzresult =
+  let open Result_syntax in
+  function
+  | Bls pk -> tzfail (Invalid_consensus_key_update_tz4 pk)
+  | Ed25519 _ | Secp256k1 _ | P256 _ -> return_unit
 
 let set_unused = Storage.Consensus_keys.remove
 
@@ -181,13 +183,12 @@ let raw_active_pubkey_for_cycle ctxt delegate cycle =
 
 let active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_result_syntax in
-  let* _, consensus_pk = raw_active_pubkey_for_cycle ctxt delegate cycle in
-  return
-    {
-      consensus_pk;
-      consensus_pkh = Signature.Public_key.hash consensus_pk;
-      delegate;
-    }
+  let+ _, consensus_pk = raw_active_pubkey_for_cycle ctxt delegate cycle in
+  {
+    consensus_pk;
+    consensus_pkh = Signature.Public_key.hash consensus_pk;
+    delegate;
+  }
 
 let register_update ctxt delegate pk =
   let open Lwt_result_syntax in

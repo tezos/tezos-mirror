@@ -122,7 +122,7 @@ let compute_reward_distrib ~stake ~edge_of_baking_over_staking_billionth
      rewards. Thus we can use to_mutez_exn *)
   let to_frozen = Tez_repr.of_mutez_exn to_frozen in
   let to_spendable = Tez_repr.of_mutez_exn to_spendable in
-  ok {to_frozen; to_spendable}
+  Ok {to_frozen; to_spendable}
 
 let compute_reward_distrib ctxt delegate stake rewards =
   let open Lwt_result_syntax in
@@ -146,17 +146,17 @@ let compute_reward_distrib ctxt delegate stake rewards =
 
 let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
   let open Lwt_result_syntax in
-  let*? active_stake =
-    let open Result_syntax in
+  let* active_stake =
     match active_stake with
-    | Some active_stake -> ok active_stake
+    | Some active_stake -> return active_stake
     | None ->
-        let+ stake_distrib =
+        let*? stake_distrib =
           Raw_context.stake_distribution_for_current_cycle ctxt
         in
-        Option.value
-          (Signature.Public_key_hash.Map.find delegate stake_distrib)
-          ~default:Stake_repr.zero
+        return
+          (Option.value
+             (Signature.Public_key_hash.Map.find delegate stake_distrib)
+             ~default:Stake_repr.zero)
   in
   let* {to_frozen; to_spendable} =
     compute_reward_distrib ctxt delegate active_stake rewards

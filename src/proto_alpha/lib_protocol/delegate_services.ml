@@ -469,7 +469,9 @@ module S = struct
 end
 
 let check_delegate_registered ctxt pkh =
-  Delegate.registered ctxt pkh >>= function
+  let open Lwt_result_syntax in
+  let*! is_registered = Delegate.registered ctxt pkh in
+  match is_registered with
   | true -> return_unit
   | false -> tzfail (Not_registered pkh)
 
@@ -482,7 +484,9 @@ let register () =
         match q with
         | {active = true; inactive = false; _} ->
             List.filter_es
-              (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
+              (fun pkh ->
+                let+ deactivated = Delegate.deactivated ctxt pkh in
+                not deactivated)
               delegates
         | {active = false; inactive = true; _} ->
             List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
@@ -496,14 +500,18 @@ let register () =
       | {with_minimal_stake = true; without_minimal_stake = false; _} ->
           List.filter_es
             (fun pkh ->
-              Delegate.For_RPC.staking_balance ctxt pkh
-              >|=? fun staking_balance -> Tez.(staking_balance >= minimal_stake))
+              let+ staking_balance =
+                Delegate.For_RPC.staking_balance ctxt pkh
+              in
+              Tez.(staking_balance >= minimal_stake))
             delegates
       | {with_minimal_stake = false; without_minimal_stake = true; _} ->
           List.filter_es
             (fun pkh ->
-              Delegate.For_RPC.staking_balance ctxt pkh
-              >|=? fun staking_balance -> Tez.(staking_balance < minimal_stake))
+              let+ staking_balance =
+                Delegate.For_RPC.staking_balance ctxt pkh
+              in
+              Tez.(staking_balance < minimal_stake))
             delegates
       | {with_minimal_stake = true; without_minimal_stake = true; _}
       | {with_minimal_stake = false; without_minimal_stake = false; _} ->
@@ -537,8 +545,12 @@ let register () =
         pending_consensus_keys;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
-      trace (Balance_rpc_non_delegate pkh) (check_delegate_registered ctxt pkh)
-      >>=? fun () -> Delegate.For_RPC.full_balance ctxt pkh) ;
+      let* () =
+        trace
+          (Balance_rpc_non_delegate pkh)
+          (check_delegate_registered ctxt pkh)
+      in
+      Delegate.For_RPC.full_balance ctxt pkh) ;
   register1 ~chunked:false S.current_frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       let* deposits = Delegate.frozen_deposits ctxt pkh in
@@ -548,7 +560,7 @@ let register () =
       let* deposits = Delegate.frozen_deposits ctxt pkh in
       return deposits.initial_amount) ;
   register1 ~chunked:false S.unstaked_frozen_deposits (fun ctxt pkh () () ->
-      check_delegate_registered ctxt pkh >>=? fun () ->
+      let* () = check_delegate_registered ctxt pkh in
       let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
       let csts = (Constants.all ctxt).parametric in
       let last_unslashable_cycle =
@@ -561,7 +573,7 @@ let register () =
       let* requests =
         List.map_es
           (fun cycle ->
-            Unstaked_frozen_deposits.balance ctxt pkh cycle >>=? fun deposit ->
+            let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
             return (cycle, deposit))
           cycles
       in
@@ -580,7 +592,8 @@ let register () =
       Delegate.For_RPC.staking_balance ctxt pkh) ;
   register1 ~chunked:true S.delegated_contracts (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.delegated_contracts ctxt pkh >|= ok) ;
+      let*! contracts = Delegate.delegated_contracts ctxt pkh in
+      return contracts) ;
   register1 ~chunked:false S.delegated_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.delegated_balance ctxt pkh) ;
@@ -591,13 +604,13 @@ let register () =
       let* () = check_delegate_registered ctxt pkh in
       Delegate.last_cycle_before_deactivation ctxt pkh) ;
   register1 ~chunked:false S.current_voting_power (fun ctxt pkh () () ->
-      check_delegate_registered ctxt pkh >>=? fun () ->
+      let* () = check_delegate_registered ctxt pkh in
       Vote.get_current_voting_power_free ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_voting_power_free ctxt pkh) ;
   register1 ~chunked:false S.current_baking_power (fun ctxt pkh () () ->
-      check_delegate_registered ctxt pkh >>=? fun () ->
+      let* () = check_delegate_registered ctxt pkh in
       Stake_distribution.For_RPC.delegate_current_baking_power ctxt pkh) ;
   register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in

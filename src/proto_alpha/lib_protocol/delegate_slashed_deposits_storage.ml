@@ -26,14 +26,20 @@
 (*****************************************************************************)
 
 let already_slashed_for_double_attesting ctxt delegate (level : Level_repr.t) =
-  Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
-  >>=? function
+  let open Lwt_result_syntax in
+  let* slashed_opt =
+    Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
+  in
+  match slashed_opt with
   | None -> return_false
   | Some slashed -> return slashed.for_double_attesting
 
 let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
-  Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
-  >>=? function
+  let open Lwt_result_syntax in
+  let* slashed_opt =
+    Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
+  in
+  match slashed_opt with
   | None -> return_false
   | Some slashed -> return slashed.for_double_baking
 
