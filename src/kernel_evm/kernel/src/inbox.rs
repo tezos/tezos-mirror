@@ -4,17 +4,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::error::UpgradeProcessError::{InvalidUpgradeNonce, NoDictator};
-use crate::parsing::{
-    Input, InputResult, MAX_SIZE_PER_CHUNK, SIGNATURE_HASH_SIZE, UPGRADE_NONCE_SIZE,
-};
+use crate::error::UpgradeProcessError::InvalidUpgradeNonce;
+use crate::parsing::{Input, InputResult, MAX_SIZE_PER_CHUNK, UPGRADE_NONCE_SIZE};
 use crate::simulation;
 use crate::storage::{
-    get_and_increment_deposit_nonce, read_dictator_key, read_kernel_upgrade_nonce,
+    get_and_increment_deposit_nonce, read_kernel_upgrade_nonce,
     store_last_info_per_level_timestamp,
 };
 use crate::tick_model;
-use crate::upgrade::check_dictator_signature;
 use crate::Error;
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -158,7 +155,6 @@ impl Decodable for Transaction {
 pub struct KernelUpgrade {
     pub nonce: [u8; UPGRADE_NONCE_SIZE],
     pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
-    pub signature: [u8; SIGNATURE_HASH_SIZE],
 }
 
 #[derive(Debug, PartialEq)]
@@ -171,6 +167,7 @@ pub fn read_input<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     ticketer: &Option<ContractKt1Hash>,
+    admin: &Option<ContractKt1Hash>,
 ) -> Result<InputResult, Error> {
     let input = host.read_input()?;
 
@@ -180,6 +177,7 @@ pub fn read_input<Host: Runtime>(
             input,
             smart_rollup_address,
             ticketer,
+            admin,
         )),
         None => Ok(InputResult::NoInput),
     }
@@ -231,26 +229,14 @@ fn handle_transaction_chunk<Host: Runtime>(
 
 fn handle_kernel_upgrade<Host: Runtime>(
     host: &mut Host,
-    smart_rollup_address: [u8; 20],
     kernel_upgrade: &KernelUpgrade,
 ) -> Result<(), Error> {
-    match read_dictator_key(host) {
-        Some(dictator) => {
-            let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
-            let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
-            if incoming_nonce == current_kernel_upgrade_nonce + 1 {
-                check_dictator_signature(
-                    kernel_upgrade.signature,
-                    smart_rollup_address,
-                    kernel_upgrade.nonce,
-                    kernel_upgrade.preimage_hash,
-                    dictator,
-                )
-            } else {
-                Err(Error::UpgradeError(InvalidUpgradeNonce))
-            }
-        }
-        None => Err(Error::UpgradeError(NoDictator)),
+    let current_kernel_upgrade_nonce = read_kernel_upgrade_nonce(host)?;
+    let incoming_nonce = u16::from_le_bytes(kernel_upgrade.nonce);
+    if incoming_nonce == current_kernel_upgrade_nonce + 1 {
+        Ok(())
+    } else {
+        Err(Error::UpgradeError(InvalidUpgradeNonce))
     }
 }
 
@@ -287,13 +273,14 @@ pub fn read_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     ticketer: Option<ContractKt1Hash>,
+    admin: Option<ContractKt1Hash>,
 ) -> Result<InboxContent, Error> {
     let mut res = InboxContent {
         kernel_upgrade: None,
         transactions: vec![],
     };
     loop {
-        match read_input(host, smart_rollup_address, &ticketer)? {
+        match read_input(host, smart_rollup_address, &ticketer, &admin)? {
             InputResult::NoInput => {
                 return Ok(res);
             }
@@ -311,7 +298,7 @@ pub fn read_inbox<Host: Runtime>(
                 }
             }
             InputResult::Input(Input::Upgrade(kernel_upgrade)) => {
-                match handle_kernel_upgrade(host, smart_rollup_address, &kernel_upgrade) {
+                match handle_kernel_upgrade(host, &kernel_upgrade) {
                     Ok(()) => res.kernel_upgrade = Some(kernel_upgrade),
                     Err(e) => log!(
                         host,
@@ -345,14 +332,18 @@ pub fn read_inbox<Host: Runtime>(
 mod tests {
     use super::*;
     use crate::inbox::TransactionContent::Ethereum;
+    use crate::parsing::RollupType;
     use crate::storage::*;
-    use libsecp256k1::PublicKey;
     use tezos_crypto_rs::hash::SmartRollupHash;
     use tezos_data_encoding::types::Bytes;
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
+    use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
+    use tezos_smart_rollup_encoding::michelson::ticket::UnitTicket;
+    use tezos_smart_rollup_encoding::michelson::{MichelsonPair, MichelsonUnit};
+    use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
-    use tezos_smart_rollup_mock::MockHost;
+    use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [
         20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
@@ -398,17 +389,6 @@ mod tests {
                 buffer.extend_from_slice(&tx_hash);
                 buffer.extend_from_slice(&u16::to_le_bytes(i));
                 buffer.extend_from_slice(&data);
-            }
-            Input::Upgrade(KernelUpgrade {
-                nonce,
-                preimage_hash,
-                signature,
-            }) => {
-                // Kernel upgrade tag
-                buffer.push(3);
-                buffer.extend_from_slice(&nonce);
-                buffer.extend_from_slice(&preimage_hash);
-                buffer.extend_from_slice(&signature)
             }
             _ => (),
         };
@@ -457,7 +437,8 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -478,7 +459,8 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
@@ -491,39 +473,42 @@ mod tests {
         let mut host = MockHost::default();
         store_kernel_upgrade_nonce(&mut host, 1).unwrap();
 
-        let dictator_bytes = hex::decode(
-            "046edc43401193c9321730cdf73e454f68e8aa52e377d001499b0eaa431fa4763102e685fe33851f5f51bd31adb41582bbfb0ad85c1089c0a0b4adc049a271bc01",
-        )
-        .unwrap();
-        let dictator = PublicKey::parse_slice(&dictator_bytes, None).unwrap();
-        crate::storage::internal_for_tests::store_dictator_key(&mut host, dictator)
-            .unwrap();
-
-        let preimage_hash = hex::decode(
+        // Prepare the upgrade's payload
+        let nonce = 2u16.to_le_bytes();
+        let preimage_hash: [u8; PREIMAGE_HASH_SIZE] = hex::decode(
             "004b28109df802cb1885ab29461bc1b410057a9f3a848d122ac7a742351a3a1f4e",
         )
         .unwrap()
         .try_into()
         .unwrap();
-        let nonce = 2u16.to_le_bytes();
-        let signature = hex::decode("518510c99979b8c9854302d05167beac2a96aeded627e240f30583e1d445f4fc7ba2e83a09c377a0eb46018f3dda049f0b48bd3d10202d997e6e13f9e21d31a6").unwrap().try_into().unwrap();
 
-        let kernel_upgrade = KernelUpgrade {
+        let mut kernel_upgrade_payload = vec![];
+        kernel_upgrade_payload.extend_from_slice(&nonce);
+        kernel_upgrade_payload.extend_from_slice(&preimage_hash);
+
+        // Create a transfer from the bridge contract, that act as the
+        // dictator (or administrator).
+        let source =
+            PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap();
+        let contract =
+            Contract::from_b58check("KT1HJphVV3LUxqZnc7YSH6Zdfd3up1DjLqZv").unwrap();
+        let sender = match contract.clone() {
+            Contract::Originated(kt1) => kt1,
+            _ => panic!("The contract must be a KT1"),
+        };
+        let ticket: UnitTicket = UnitTicket::new(contract, MichelsonUnit, 1).unwrap();
+        let payload: RollupType = MichelsonPair(
+            MichelsonPair(vec![].into(), ticket),
+            MichelsonPair(0.into(), kernel_upgrade_payload.into()),
+        );
+        let transfer_metadata = TransferMetadata::new(sender.clone(), source);
+        host.add_transfer(payload, &transfer_metadata);
+
+        let inbox_content = read_inbox(&mut host, [0; 20], None, Some(sender)).unwrap();
+        let expected_upgrade = Some(KernelUpgrade {
             nonce,
             preimage_hash,
-            signature,
-        };
-        let input = Input::Upgrade(kernel_upgrade.clone());
-
-        let zero_smart_rollup_address = [0; 20];
-        host.add_external(Bytes::from(input_to_bytes(
-            zero_smart_rollup_address,
-            input,
-        )));
-
-        let inbox_content =
-            read_inbox(&mut host, zero_smart_rollup_address, None).unwrap();
-        let expected_upgrade = Some(kernel_upgrade);
+        });
         assert_eq!(inbox_content.kernel_upgrade, expected_upgrade);
     }
 
@@ -552,7 +537,8 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -592,7 +578,8 @@ mod tests {
         };
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -623,7 +610,8 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let _inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -670,7 +658,8 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         assert_eq!(
             inbox_content,
             InboxContent {
@@ -683,7 +672,8 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
@@ -735,7 +725,8 @@ fc7040a71d71d3cb74bd05ead7046b10668ad255da60391c017eea31555f156").unwrap()).unwr
 
         host.add_external(framed);
 
-        let inbox_content = read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None).unwrap();
+        let inbox_content =
+            read_inbox(&mut host, SMART_ROLLUP_ADDRESS, None, None).unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash: ZERO_TX_HASH,
             content: Ethereum(tx),
