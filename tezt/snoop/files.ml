@@ -160,16 +160,15 @@ let unlink_if_present file =
       | _ -> Test.fail "%s is not a regular file" file)
 
 let rec cleanup dir =
-  let root = working_dir // dir in
-  match classify_dirname root with
-  | Does_not_exist -> create_dir root
+  match classify_dirname dir with
+  | Does_not_exist -> create_dir dir
   | Exists_and_is_not_a_dir ->
-      unlink_if_present root ;
+      unlink_if_present dir ;
       cleanup dir
   | Exists ->
       let _ =
-        Sys.readdir root
-        |> Array.iter (fun x -> Sys.remove (Filename.concat root x))
+        Sys.readdir dir
+        |> Array.iter (fun x -> Sys.remove (Filename.concat dir x))
       in
-      Sys.rmdir root ;
+      Sys.rmdir dir ;
       cleanup dir
