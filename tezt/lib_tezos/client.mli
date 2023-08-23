@@ -2871,3 +2871,7 @@ val get_timestamp :
 (** Same as [get_timestamp], but do not wait for the process to exit. *)
 val spawn_get_timestamp :
   ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> Process.t
+
+(** Return the information stored in the given endpoint as a foreign
+    endpoint. *)
+val as_foreign_endpoint : endpoint -> Foreign_endpoint.t
