@@ -198,6 +198,18 @@ let get_head db_pool =
     (fun head_level ->
       reply_public_json Data_encoding.(obj1 (opt "level" int32)) head_level)
 
+let get_cycle db_pool id =
+  let query =
+    Caqti_request.Infix.(Caqti_type.(int32 ->? int32))
+      "SELECT level FROM cycles WHERE id = ?"
+  in
+  with_caqti_error
+    (Caqti_lwt.Pool.use
+       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query id)
+       db_pool)
+    (fun cycle_level ->
+      reply_public_json Data_encoding.(obj1 (opt "level" int32)) cycle_level)
+
 (** Fetch allowed users' logins from db. *)
 let get_users db_pool =
   let query =
@@ -726,6 +738,11 @@ let routes :
     ( Re.str "/head.json",
       fun _g ~admins:_ ~users:_ db_pool _header _meth _body -> get_head db_pool
     );
+    ( Re.seq [Re.str "/cycles/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
+      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
+        get_only_endpoint meth (fun () ->
+            let id = Int32.of_string (Re.Group.get g 1) in
+            get_cycle db_pool id) );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
