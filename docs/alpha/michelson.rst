@@ -908,13 +908,14 @@ Removed instructions and types
 contract used these on Mainnet before they got deprecated, they have been
 removed. The Michelson type-checker will reject any contract using them.
 
--  ``CREATE_CONTRACT { storage 'g ; parameter 'p ; code ... }``:
+-  ``CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }``:
    Forge a new contract from a literal.
 
 ::
 
+    Γ ⊢ CREATE_CONTRACT { parameter 'p ; storage 'g ; code ... }
     :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
-       -> operation : address : 'S
+    ⇒ operation : address : 'S
 
 See the documentation of the new ``CREATE_CONTRACT`` instruction. The
 first, third, and fourth parameters are ignored.
@@ -923,8 +924,8 @@ first, third, and fourth parameters are ignored.
 
 ::
 
-    :: key_hash : option key_hash : bool : mutez : 'S
-       ->   operation : address : 'S
+    Γ ⊢ CREATE_ACCOUNT :: key_hash : option key_hash : bool : mutez : 'S
+    ⇒ operation : address : 'S
 
 Takes as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
@@ -938,7 +939,7 @@ parameter if the sender is the contract's manager.
 
 ::
 
-    :: 'S   ->   nat : 'S
+    Γ ⊢ STEPS_TO_QUOTA :: 'S ⇒ nat : 'S
 
 :doc:`../protocols/016_mumbai` deprecated the following
 type. Because no smart contract used it on Mainnet before it got
