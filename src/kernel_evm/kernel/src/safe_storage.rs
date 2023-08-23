@@ -21,7 +21,7 @@ pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
 pub struct SafeStorage<Host>(pub Host);
 
-fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
+pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
 }
 

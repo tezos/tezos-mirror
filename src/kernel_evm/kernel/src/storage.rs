@@ -28,7 +28,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 0;
+pub const STORAGE_VERSION: u64 = 1;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const SMART_ROLLUP_ADDRESS: RefPath =
@@ -767,7 +767,12 @@ pub fn read_storage_version<Host: Runtime>(host: &mut Host) -> Result<u64, Error
                 bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
             Ok(u64::from_le_bytes(slice_of_bytes))
         }
-        Err(e) => Err(e.into()),
+        Err(RuntimeError::PathNotFound) => {
+            // Storage version prior to 1 did not write the version in the
+            // storage, so we can assume a 0 here.
+            Ok(0u64)
+        }
+        Err(err) => Err(err.into()),
     }
 }
 
