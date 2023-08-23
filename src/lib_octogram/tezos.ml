@@ -113,6 +113,22 @@ end
 
 let () = Agent_state.register_key (module Dac_node_key)
 
+type _ key += Dal_node_k : string -> Dal_node.t key
+
+module Dal_node_key = struct
+  type t = string
+
+  type r = Dal_node.t
+
+  let proj : type a. a key -> (t * (a, r) eq) option = function
+    | Dal_node_k name -> Some (name, Eq)
+    | _ -> None
+
+  let compare = String.compare
+end
+
+let () = Agent_state.register_key (module Dal_node_key)
+
 let octez_endpoint state endpoint =
   match endpoint with
   | Uri.Owned {name = node} ->
@@ -2127,6 +2143,270 @@ module Generate_keys = struct
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()
 end
 
+type start_dal_node_r = {
+  name : string;
+  rpc_port : int;
+  metrics_port : int;
+  net_port : int;
+}
+
+let resolve_dal_rpc_global_uri ~self ~resolver =
+  Uri.agent_uri_of_global_uri ~self ~services:(resolver Dal_node Rpc)
+
+type dal_attestor_profile = Tezos_crypto.Signature.Public_key_hash.t
+
+type dal_producer_profile = int
+
+let dal_foreign_endpoint state endpoint =
+  match endpoint with
+  | Uri.Owned {name = node} ->
+      Dal_node.as_foreign_rpc_endpoint
+        (Agent_state.find (Dal_node_k node) state)
+  | Remote {endpoint} -> parse_endpoint endpoint
+
+type 'uri start_dal_node = {
+  name : string option;
+  path_node : 'uri;
+  rpc_port : string option;
+  metrics_port : string option;
+  net_port : string option;
+  l1_node_uri : 'uri;
+  peers : 'uri list;
+  bootstrap_profile : bool;
+  attestor_profiles : dal_attestor_profile list;
+  producer_profiles : dal_producer_profile list;
+}
+
+type (_, _) Remote_procedure.t +=
+  | Start_octez_dal_node :
+      'uri start_dal_node
+      -> (start_dal_node_r, 'uri) Remote_procedure.t
+
+module Start_octez_dal_node = struct
+  let name = "tezos.start_dal_node"
+
+  type 'uri t = 'uri start_dal_node
+
+  type r = start_dal_node_r
+
+  let of_remote_procedure :
+      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+    | Start_octez_dal_node args -> Some args
+    | _ -> None
+
+  let to_remote_procedure args = Start_octez_dal_node args
+
+  let unify : type a. (a, 'uri) Remote_procedure.t -> (a, r) Remote_procedure.eq
+      = function
+    | Start_octez_dal_node _ -> Eq
+    | _ -> Neq
+
+  let encoding uri_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             name;
+             path_node;
+             rpc_port;
+             metrics_port;
+             net_port;
+             l1_node_uri;
+             peers;
+             bootstrap_profile;
+             attestor_profiles;
+             producer_profiles;
+           } ->
+        ( name,
+          path_node,
+          rpc_port,
+          metrics_port,
+          net_port,
+          l1_node_uri,
+          peers,
+          bootstrap_profile,
+          attestor_profiles,
+          producer_profiles ))
+      (fun ( name,
+             path_node,
+             rpc_port,
+             metrics_port,
+             net_port,
+             l1_node_uri,
+             peers,
+             bootstrap_profile,
+             attestor_profiles,
+             producer_profiles ) ->
+        {
+          name;
+          path_node;
+          rpc_port;
+          metrics_port;
+          net_port;
+          l1_node_uri;
+          peers;
+          bootstrap_profile;
+          attestor_profiles;
+          producer_profiles;
+        })
+      (obj10
+         (opt "name" string)
+         (req "path_node" uri_encoding)
+         (opt "rpc_port" string)
+         (opt "metrics_port" string)
+         (opt "net_port" string)
+         (req "l1_node_uri" uri_encoding)
+         (dft "peers" (list uri_encoding) [])
+         (dft "bootstrap_profile" bool false)
+         (dft
+            "attestor_profiles"
+            (list Tezos_crypto.Signature.Public_key_hash.encoding)
+            [])
+         (dft "producer_profiles" (list uint16) []))
+
+  let r_encoding =
+    Data_encoding.(
+      conv
+        (fun ({name; rpc_port; metrics_port; net_port} : start_dal_node_r) ->
+          (name, rpc_port, metrics_port, net_port))
+        (fun (name, rpc_port, metrics_port, net_port) ->
+          {name; rpc_port; metrics_port; net_port})
+        (obj4
+           (req "name" string)
+           (req "rpc_port" int31)
+           (req "metrics_port" int31)
+           (req "net_port" int31)))
+
+  let tvalue_of_r ({name; rpc_port; metrics_port; net_port} : r) =
+    Tobj
+      [
+        ("name", Tstr name);
+        ("rpc_port", Tint rpc_port);
+        ("metrics_port", Tint metrics_port);
+        ("net_port", Tint net_port);
+      ]
+
+  let expand ~self ~run
+      {
+        name;
+        path_node;
+        rpc_port;
+        metrics_port;
+        net_port;
+        l1_node_uri;
+        peers;
+        bootstrap_profile;
+        attestor_profiles;
+        producer_profiles;
+      } =
+    let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
+    {
+      name = Option.map run name;
+      path_node = uri_run path_node;
+      rpc_port = Option.map run rpc_port;
+      metrics_port = Option.map run metrics_port;
+      net_port = Option.map run net_port;
+      l1_node_uri = uri_run l1_node_uri;
+      peers = List.map uri_run peers;
+      bootstrap_profile;
+      attestor_profiles;
+      producer_profiles;
+    }
+
+  let resolve ~self resolver
+      {
+        name;
+        path_node;
+        rpc_port;
+        metrics_port;
+        net_port;
+        l1_node_uri;
+        peers;
+        bootstrap_profile;
+        attestor_profiles;
+        producer_profiles;
+      } =
+    {
+      name;
+      path_node = Remote_procedure.file_agent_uri ~self ~resolver path_node;
+      rpc_port;
+      metrics_port;
+      net_port;
+      l1_node_uri = resolve_octez_rpc_global_uri ~self ~resolver l1_node_uri;
+      peers = List.map (resolve_dal_rpc_global_uri ~self ~resolver) peers;
+      bootstrap_profile;
+      attestor_profiles;
+      producer_profiles;
+    }
+
+  let run state
+      {
+        name;
+        path_node;
+        rpc_port;
+        metrics_port;
+        net_port;
+        l1_node_uri;
+        peers;
+        bootstrap_profile;
+        attestor_profiles;
+        producer_profiles;
+      } =
+    let* path =
+      Http_client.local_path_from_agent_uri
+        (Agent_state.http_client state)
+        path_node
+    in
+    let get_port_or_fresh = function
+      | Some port -> int_of_string port
+      | None -> Port.fresh ()
+    in
+    let mk_addr port = Format.sprintf "0.0.0.0:%d" port in
+    let peers =
+      List.map
+        (fun peer ->
+          dal_foreign_endpoint state peer |> Foreign_endpoint.as_string)
+        peers
+    in
+    let attestor_profiles =
+      List.map
+        Tezos_crypto.Signature.Public_key_hash.to_b58check
+        attestor_profiles
+    in
+    let rpc_port = get_port_or_fresh rpc_port in
+    let metrics_port = get_port_or_fresh metrics_port in
+    let net_port = get_port_or_fresh net_port in
+    let dal_node =
+      Dal_node.create_from_endpoint
+        ~path
+        ?name
+        ~rpc_port
+        ~listen_addr:(mk_addr net_port)
+        ~metrics_addr:(mk_addr metrics_port)
+        ~l1_node_endpoint:(octez_endpoint state l1_node_uri)
+        ()
+    in
+    let* () =
+      Dal_node.init_config
+        ~expected_pow:0.
+        ~peers
+        ~attestor_profiles
+        ~producer_profiles
+        ~bootstrap_profile
+        dal_node
+    in
+    (* Start the DAL node and wait until it's ready. *)
+    let* () = Dal_node.run dal_node in
+    Agent_state.add (Dal_node_k (Dal_node.name dal_node)) dal_node state ;
+    return {name = Dal_node.name dal_node; rpc_port; metrics_port; net_port}
+
+  let on_completion ~on_new_service ~on_new_metrics_source (res : r) =
+    let open Services_cache in
+    on_new_service res.name Dal_node Rpc res.rpc_port ;
+    on_new_service res.name Dal_node Metrics res.metrics_port ;
+    on_new_service res.name Dal_node P2p res.net_port ;
+    on_new_metrics_source res.name Dal_node res.metrics_port
+end
+
 type 'uri start_octez_baker = {
   name : string option;
       (** A name for this agent. It will be generated if no name is given. *)
@@ -2273,4 +2553,5 @@ let register_procedures () =
   Remote_procedure.register (module Smart_rollups_add_messages) ;
   Remote_procedure.register (module Start_dac_node) ;
   Remote_procedure.register (module Dac_post_file) ;
+  Remote_procedure.register (module Start_octez_dal_node) ;
   Remote_procedure.register (module Start_octez_baker)
