@@ -14,7 +14,7 @@ depends: [
   "octez-libs"
   "tezt" { >= "3.1.1" }
   "tezos-scoru-wasm-helpers"
-  "lwt" { >= "5.6.0" }
+  "lwt" { >= "5.7.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

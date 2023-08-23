@@ -14,7 +14,7 @@ depends: [
   "octez-libs" {with-test}
   "qcheck-core" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "lwt" { with-test & >= "5.6.0" }
+  "lwt" { with-test & >= "5.7.0" }
   "octez-alcotezt" {with-test}
 ]
 build: [

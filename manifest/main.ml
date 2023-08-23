@@ -190,7 +190,7 @@ let logs_fmt = external_sublib logs "logs.fmt"
 
 let logs_lwt = external_sublib logs "logs.lwt"
 
-let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.6.0")
+let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.7.0")
 
 let lwt_canceler =
   external_lib
