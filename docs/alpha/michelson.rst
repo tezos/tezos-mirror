@@ -963,10 +963,10 @@ A detailed description of the following instructions can be found in the `intera
 Macros
 ------
 
-In addition to the instructions listed in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__, several extensions have been added
-to the language's concrete syntax. If you are interacting with the node
-via RPC, bypassing the client, which expands away these macros, you will
-need to desugar them yourself.
+In addition to the instructions listed in the `interactive Michelson reference manual <https://tezos.gitlab.io/michelson-reference/>`__,
+several extensions have been added to the language's concrete syntax. If you are
+interacting with the node via RPC, bypassing the client, which expands away
+these macros, you will need to desugar them yourself.
 
 These macros are designed to be unambiguous and reversible, meaning that
 errors are reported in terms of desugared syntax. Below you'll see
