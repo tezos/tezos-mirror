@@ -56,22 +56,29 @@ end = struct
       ?(get_delegate_and_slot =
         fun _predpred _pred _curr -> return (None, None))
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
-    Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
-    bake genesis >>=? fun b1 ->
-    Op.attestation b1 >>=? fun attestation ->
-    bake b1 ~operations:[attestation] >>=? fun b2 ->
+    let open Lwt_result_syntax in
+    let* genesis, _contracts = Context.init_n ~consensus_threshold:1 5 () in
+    let* b1 = bake genesis in
+    let* attestation = Op.attestation b1 in
+    let* b2 = bake b1 ~operations:[attestation] in
     let attested_block = preattested_block genesis b1 b2 in
-    get_delegate_and_slot genesis b1 b2 >>=? fun (delegate, slot) ->
-    Op.preattestation ?delegate ?slot ~round:preattestation_round attested_block
-    >>=? fun p ->
+    let* delegate, slot = get_delegate_and_slot genesis b1 b2 in
+    let* p =
+      Op.preattestation
+        ?delegate
+        ?slot
+        ~round:preattestation_round
+        attested_block
+    in
     let operations = attestation :: (mk_ops @@ p) in
-    bake
-      ~payload_round
-      ~locked_round
-      ~policy:(By_round block_round)
-      ~operations
-      b1
-    >>= fun res ->
+    let*! res =
+      bake
+        ~payload_round
+        ~locked_round
+        ~policy:(By_round block_round)
+        ~operations
+        b1
+    in
     match (res, post_process) with
     | Ok ok, Ok success_fun -> success_fun ok
     | Error _, Error error -> Assert.proto_error ~loc res error
@@ -152,10 +159,12 @@ end = struct
 
   (** OK: explicit the correct attester and preattesting slot in the test *)
   let preattestation_in_block_with_good_slot () =
+    let open Lwt_result_syntax in
     aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_attesters (B curr) >>=? function
+        let* validators = Context.get_attesters (B curr) in
+        match validators with
         | {V.delegate; slots = s :: _; _} :: _ -> return (Some delegate, Some s)
         | _ -> assert false
         (* there is at least one attester with a slot *))
@@ -164,10 +173,12 @@ end = struct
 
   (** KO: the used slot for injecting the attestation is not the canonical one *)
   let preattestation_in_block_with_wrong_slot () =
+    let open Lwt_result_syntax in
     aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_attesters (B curr) >>=? function
+        let* validators = Context.get_attesters (B curr) in
+        match validators with
         | {V.delegate; V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
             return (Some delegate, Some non_canonical_slot)
         | _ -> assert false
@@ -185,10 +196,12 @@ end = struct
 
   (** KO: the delegate tries to injects with a canonical slot of another delegate *)
   let preattestation_in_block_with_wrong_signature () =
+    let open Lwt_result_syntax in
     aux_simple_preattestation_inclusion
       ~get_delegate_and_slot:(fun _predpred _pred curr ->
         let module V = Plugin.RPC.Validators in
-        Context.get_attesters (B curr) >>=? function
+        let* validators = Context.get_attesters (B curr) in
+        match validators with
         | {V.delegate; _} :: {V.slots = s :: _; _} :: _ ->
             (* the canonical slot s is not owned by the delegate "delegate" !*)
             return (Some delegate, Some s)
