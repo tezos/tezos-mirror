@@ -453,24 +453,17 @@ let get_codegen_destinations
 
 let codegen_models models sol transform ~exclusions =
   let generate_with_exclusions model_name info =
-    let benchmark_destinations = get_codegen_destinations info in
-    if
-      String.Set.mem (Namespace.to_string model_name) exclusions
-      || List.is_empty benchmark_destinations
-    then []
+    if String.Set.mem (Namespace.to_string model_name) exclusions then None
     else
-      let code = codegen info.model sol transform model_name in
-      List.map (fun destination -> (destination, code)) benchmark_destinations
+      let benchmark_destinations = get_codegen_destinations info in
+      if List.is_empty benchmark_destinations then None
+      else
+        let code = codegen info.model sol transform model_name in
+        Some (benchmark_destinations, code)
   in
-  if String.Set.is_empty exclusions then
-    List.map
-      (fun (model_name, info) ->
-        ("auto_build", codegen info.Registration.model sol transform model_name))
-      models
-  else
-    List.concat_map
-      (fun (model_name, info) -> generate_with_exclusions model_name info)
-      models
+  List.filter_map
+    (fun (model_name, info) -> generate_with_exclusions model_name info)
+    models
 
 let%expect_test "basic_printing" =
   let open Codegen in

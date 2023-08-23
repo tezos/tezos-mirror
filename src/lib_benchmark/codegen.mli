@@ -67,7 +67,7 @@ val codegen_models :
   solution ->
   Costlang.transform ->
   exclusions:String.Set.t ->
-  (string * code) list
+  (string list * code) list
 
 (** Make a comment *)
 val comment : string list -> code

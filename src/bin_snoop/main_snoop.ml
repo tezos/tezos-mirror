@@ -634,10 +634,16 @@ let generate_code_for_models sol models codegen_options =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
   let transform = code_transform codegen_options in
-  let exclusions =
-    if codegen_options.split then get_exclusions () else String.Set.empty
-  in
-  Codegen.codegen_models models sol transform ~exclusions
+  if codegen_options.split then
+    let exclusions = get_exclusions () in
+    let generated = Codegen.codegen_models models sol transform ~exclusions in
+    List.concat_map
+      (fun (dest_list, code) -> List.map (fun d -> (d, code)) dest_list)
+      generated
+  else
+    let exclusions = String.Set.empty in
+    let generated = Codegen.codegen_models models sol transform ~exclusions in
+    List.map (fun (_, code) -> ("auto_build", code)) generated
 
 (* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
 let convert_costs_file_name path =
