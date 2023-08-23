@@ -13,12 +13,11 @@ open S.Syntax
 (* fun size -> 4095. * size *)
 let cost_expand_constant_branch size =
   let size = S.safe_int size in
-  let v0 = size in
-  v0 * S.safe_int 4096
+  size * S.safe_int 4096
 
 (* model global_constants_storage/expand_no_constant_branch *)
 (* fun size -> 100. + (4.639474 * (size * (log2 (1 + size)))) *)
 let cost_expand_no_constant_branch size =
   let size = S.safe_int size in
-  let v0 = size * log2 (S.safe_int 1 + size) in
-  S.safe_int 100 + ((v0 lsr 2) + ((v0 lsr 1) + (v0 * S.safe_int 4)))
+  let w3 = log2 (size + S.safe_int 1) * size in
+  (w3 * S.safe_int 4) + (w3 lsr 1) + (w3 lsr 2) + S.safe_int 100

@@ -13,8 +13,7 @@ open S.Syntax
 (* fun size -> 0. + (80. * size) *)
 let cost_COLLECT_TICKETS_STEP size =
   let size = S.safe_int size in
-  let v0 = size in
-  v0 * S.safe_int 80
+  size * S.safe_int 80
 
 (* model tickets/COMPARE_CONTRACT *)
 (* 10. *)
@@ -26,6 +25,4 @@ let cost_COMPARE_TICKET_HASH = S.safe_int 10
 
 (* model tickets/TYPE_HAS_TICKETS *)
 (* fun size -> 10. + (6. * size) *)
-let cost_TYPE_HAS_TICKETS size =
-  let v0 = size in
-  S.safe_int 10 + (v0 * S.safe_int 6)
+let cost_TYPE_HAS_TICKETS size = (size * S.safe_int 6) + S.safe_int 10

@@ -11,12 +11,10 @@ open S.Syntax
 
 (* model skip_list/hash_cell *)
 (* fun size -> 250. + (57. * size) *)
-let cost_hash_cell size =
-  let v0 = size in
-  S.safe_int 250 + (v0 * S.safe_int 57)
+let cost_hash_cell size = (size * S.safe_int 57) + S.safe_int 250
 
 (* model skip_list/next *)
 (* fun size -> 19.2125537461 * (log2 (1 + size)) *)
 let cost_next size =
-  let v0 = log2 (S.safe_int 1 + size) in
-  (v0 lsr 1) + (v0 * S.safe_int 19)
+  let w1 = log2 (size + S.safe_int 1) in
+  (w1 * S.safe_int 19) + (w1 lsr 1)

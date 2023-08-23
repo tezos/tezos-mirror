@@ -144,7 +144,7 @@ module type S = sig
 
   val let_ : name:string -> 'a repr -> ('a repr -> 'b repr) -> 'b repr
 
-  val if_ : bool repr -> 'a repr -> 'a repr -> 'a repr
+  val if_ : bool repr -> size repr -> size repr -> size repr
 end
 
 (* ------------------------------------------------------------------------- *)
@@ -663,7 +663,7 @@ struct
 
   let let_ ~name:_ bound body subst = body bound subst
 
-  let if_ (cond : bool repr) (ift : 'a repr) (iff : 'a repr) : 'a repr =
+  let if_ (cond : bool repr) (ift : size repr) (iff : size repr) : size repr =
    fun subst ->
     let (Bool b) = cond subst in
     if b then ift subst else iff subst

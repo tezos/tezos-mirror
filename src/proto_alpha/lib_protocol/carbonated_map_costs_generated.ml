@@ -17,11 +17,8 @@ let cost_compare_int = S.safe_int 5
 (* fun size -> (50. + ((log2 size) * 2.18333333333)) + ((log2 size) * 2.) *)
 let cost_find size =
   let size = S.safe_int size in
-  let v0 = log2 size in
-  let v1 = log2 size in
-  S.safe_int 50
-  + ((v0 lsr 4) + ((v0 lsr 3) + (v0 * S.safe_int 2)))
-  + (v1 * S.safe_int 2)
+  let w1 = log2 size in
+  (w1 * S.safe_int 4) + (w1 lsr 3) + (w1 lsr 4) + S.safe_int 50
 
 (* model carbonated_map/find_intercept *)
 (* 50. *)
@@ -31,5 +28,4 @@ let cost_find_intercept = S.safe_int 50
 (* fun size -> 50. + (24. * size) *)
 let cost_fold size =
   let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 50 + (v0 * S.safe_int 24)
+  (size * S.safe_int 24) + S.safe_int 50

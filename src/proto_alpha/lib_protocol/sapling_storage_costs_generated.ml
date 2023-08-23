@@ -14,6 +14,4 @@ open S.Syntax
 let cost_SAPLING_APPLY_DIFF size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
-  let v1 = size1 in
-  let v0 = size2 in
-  S.safe_int 1300000 + (v1 * S.safe_int 5120) + (v0 * S.safe_int 55296)
+  (size1 * S.safe_int 5120) + (size2 * S.safe_int 55296) + S.safe_int 1300000
