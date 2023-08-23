@@ -307,6 +307,9 @@ Smart Rollup node
 - **Breaking change** RPC ``/global/helpers/proof/outbox`` is moved to
   ``/global/block/head/helpers/proof/outbox``. (MR :gl:`!9233`)
 
+- Fixed an issue with level association which could allow the rollup node
+  to publish invalid commitments. (MR :gl:`!9652`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
