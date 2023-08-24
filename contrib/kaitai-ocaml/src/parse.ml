@@ -56,12 +56,7 @@ let keys m f =
       match k with `Scalar {value; _} -> f value v | _ -> raise Error)
     m.m_members
 
-let parse ?file s =
-  let yaml =
-    match Yaml.yaml_of_string s with
-    | Ok x -> x
-    | Error (`Msg msg) -> failwith msg
-  in
+let parse ?file ?(path = []) s =
   let rec classSpec yaml =
     let m = mapping yaml in
     let meta =
@@ -174,10 +169,7 @@ let parse ?file s =
     ClassSpec.
       {
         fileName = file;
-        path =
-          (match file with
-          | None -> []
-          | Some file -> String.split_on_char '/' file);
+        path;
         meta;
         doc;
         toStringExpr = None;
@@ -205,4 +197,9 @@ let parse ?file s =
         EnumValueSpec.{name = id; doc}
     | _ -> raise Error
   and expression _ = Ast.Str "TODO" in
+  let yaml =
+    match Yaml.yaml_of_string s with
+    | Ok x -> x
+    | Error (`Msg msg) -> failwith msg
+  in
   classSpec yaml

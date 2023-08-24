@@ -63,7 +63,7 @@ module Ast = struct
     | BinOp of {left : t; op : operator; right : t}
     | UnaryOp of {op : unaryop; operand : t}
     | IfExp of {condition : t; ifTrue : t; ifFalse : t}
-    | Dict of {keys : t list; values : t list}
+    (* | Dict of {keys : t list; values : t list} *)
     (* Represents `X < Y`, `X > Y` and so on. *)
     | Compare of {left : t; ops : cmpop; right : t}
     | Call of {func : t; args : t list}
@@ -108,6 +108,7 @@ module Endianness = struct
 end
 
 module DataType = struct
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala *)
   type data_type =
     | NumericType
     | BooleanType
@@ -120,7 +121,7 @@ module DataType = struct
 
   and int_type =
     | CalcIntType
-    | Int1TYpe of {signed : bool}
+    | Int1Type of {signed : bool}
     | IntMultiType of {
         signed : bool;
         width : int_width;
