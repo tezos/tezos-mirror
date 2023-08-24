@@ -1,52 +1,19 @@
-Coding guidelines
-=================
+===================================
+Documentation and coding guidelines
+===================================
 
-This document provides guidelines that should be observed by all the contributors to the Octez codebase. It first presents documentation guidelines, and then rules more specific to coding (e.g., logging levels, code formatting, naming conventions, etc.).
+This document provides guidelines that should be observed by all the contributors to the Octez codebase. It first presents documentation guidelines, and then rules specific to coding (e.g., logging levels, code formatting, naming conventions, etc.).
 
-License
--------
+Documentation guidelines
+========================
 
-The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
-
-.. code-block:: ocaml
-
-    (*****************************************************************************)
-    (*                                                                           *)
-    (* SPDX-License-Identifier: MIT                                              *)
-    (* Copyright (c) [year(s)] [Holder <email>]                                  *)
-    (*                                                                           *)
-    (*****************************************************************************)
-
-The following, full-text equivalent, template is also valid (but deprecated):
-
-.. literalinclude:: LICENSE.ml
-   :language: ocaml
-
-
-Note that:
-
-- The holder, on the copyright line, is the name of the company which hires the employee or the sub-contractor.
-- For sub-contractors, check your specific contract terms. They sometimes allow to include, as an additional copyright holder, the name of a particular developer, but consider that this may end up with bloated license headers.
-- When adding a significant new contribution to a file (i.e. more like whole new features, rather than simple fixes), check whether there already is a copyright for your copyright holder (see above).
-
-  + If there is one, mentioning any year, it is not required to add the current year (but this is allowed). In no case should you *replace* the existing year with the current one.
-  + If there is no line for your copyright holder, you should add one, with the current year.
-
-- Old source files may contain on the first line ``Open Source License`` instead of ``MIT License``. When touching such a file, please replace the former with the latter, correct form.
-
-For example, for a source file with multiple contributors spanning several years, the copyright lines may look as follows:
-
-.. code-block:: ocaml
-
-  (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-  (* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
-  (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-
+Documentation guidelines are first presented in relation to the granularity of the documented piece of code, ranging from individual code elements or blocks of code up to whole files and libraries.
+In a second part, some :ref:`general rules concerning documentation <general_doc_rules>` are presented, that may apply to different granularities.
 
 .. _in_code_comments:
 
-Comments in the code
---------------------
+Comments within the code
+------------------------
 
 The OCaml code should include comments facilitating the comprehension and the maintenance. In particular, the main syntactic constructs in the code should be commented as follows.
 
@@ -97,6 +64,35 @@ The reference to an issue may be one of:
 - a URL such as ``https://gitlab.com/tezos/tezos/-/issues/1377``
 - a GitLab notation such as ``#123`` (implicitly under ``tezos/tezos``), ``michelson-reference#123`` (implicitly under ``tezos/michelson-reference``),
   or ``oxheadalpha/merbocop#123`` (fully qualified).
+
+License
+-------
+
+The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
+
+.. code-block:: ocaml
+
+    (*****************************************************************************)
+    (*                                                                           *)
+    (* SPDX-License-Identifier: MIT                                              *)
+    (* Copyright (c) [year(s)] [Holder <email>]                                  *)
+    (*                                                                           *)
+    (*****************************************************************************)
+
+The following, full-text equivalent, template is also valid (but deprecated):
+
+.. literalinclude:: LICENSE.ml
+   :language: ocaml
+
+
+Note that:
+
+- The holder, on the copyright line, is the name of the company which hires the employee or the sub-contractor.
+- For sub-contractors, check your specific contract terms. They sometimes allow to include, as an additional copyright holder, the name of a particular developer, but consider that this may end up with bloated license headers.
+- When adding a significant new contribution to a file (i.e. more like whole new features, rather than simple fixes), check whether there already is a copyright for your copyright holder (see above).
+
+  + If there is one, mentioning any year, it is not required to add the current year (but this is allowed). In no case should you *replace* the existing year with the current one.
+  + If there is no line for your copyright holder, you should add one, with the current year.
 
 Documenting interfaces and implementations
 ------------------------------------------
@@ -240,6 +236,9 @@ HTML comments (which are visible to the document maintainers but invisible to
 end-users), so that any maintainer can check how well the README instantiates
 the template, and address any gap if needed.
 
+
+Coding guidelines
+=================
 
 
 Logging Levels
