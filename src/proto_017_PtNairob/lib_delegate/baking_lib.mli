@@ -68,3 +68,14 @@ val propose :
   ?context_path:string ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
+
+(** [repropose] tries to bake a new block proposal on the same level
+    as the current head. If provided, the proposal will use the
+    [force_round] argument as its reproposal round, otherwise the
+    current tenderbake round will be used. *)
+val repropose :
+  Protocol_client_context.full ->
+  ?force:bool ->
+  ?force_round:Round.t ->
+  Baking_state.consensus_key list ->
+  unit tzresult Lwt.t
