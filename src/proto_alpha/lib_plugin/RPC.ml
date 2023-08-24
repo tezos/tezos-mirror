@@ -39,7 +39,7 @@ let version_of_string = function
   | "1" -> Ok Version_1
   | _ -> Error "Cannot parse version (supported versions \"0\" and \"1\")"
 
-let default_operations_version = Version_0
+let default_operations_version = Version_1
 
 let version_arg =
   let open RPC_arg in
