@@ -182,6 +182,18 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       ~placeholder:"preimage-dir"
       dir_parameter
 
+  let dal_pages_directory_arg =
+    let open Tezos_clic in
+    arg
+      ~doc:
+        (Format.sprintf
+           "Directory where the DAL pages can be read. If not specified, it \
+            defaults to `%s`."
+           Config.default_dal_pages_directory)
+      ~long:"dal-pages-dir"
+      ~placeholder:"dal-pages-dir"
+      dir_parameter
+
   let version_parameter =
     Tezos_clic.parameter (fun _ v ->
         let open Tezos_scoru_wasm.Wasm_pvm_state in
@@ -212,11 +224,12 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
 
   let global_options =
     Tezos_clic.(
-      args6
+      args7
         wasm_arg
         input_arg
         rollup_arg
         preimage_directory_arg
+        dal_pages_directory_arg
         version_arg
         no_kernel_debug_flag)
 
@@ -226,6 +239,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
              inputs,
              rollup_arg,
              preimage_directory,
+             dal_pages_directory,
              version,
              no_kernel_debug_flag ),
            _ ) =
@@ -241,6 +255,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       Config.config
         ?destination:rollup_arg
         ?preimage_directory
+        ?dal_pages_directory
         ~kernel_debug:(not no_kernel_debug_flag)
         ()
     in
