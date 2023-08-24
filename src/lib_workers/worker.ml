@@ -332,10 +332,7 @@ struct
         | Lwt_dropbox.Closed ->
             Lwt.return_error (Closed (extract_status_errors w))
         | exn ->
-            (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
-               We don't want to catch any other exception but we cannot use an
-               incomplete pattern like we would in a [try]-[with] construct so
-               we must explicitly match and re-raise [exn]. *)
+            (* [Lwt_dropbox.put] can only raise [Closed] which is caught above. *)
             Lwt.return_error (Any exn))
 
   module type BOX = sig

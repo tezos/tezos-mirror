@@ -91,13 +91,7 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     let open Lwt_result_syntax in
     let rec loop tree inboxes level =
       let*! () = Lwt_io.printf "> " in
-      let* input =
-        Lwt.catch
-          (fun () ->
-            let*! i = Lwt_io.read_line Lwt_io.stdin in
-            return_some i)
-          (fun _ -> return_none)
-      in
+      let*! input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match input with
       | Some command ->
           let* tree, inboxes, level =
