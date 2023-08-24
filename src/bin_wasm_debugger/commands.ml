@@ -284,11 +284,16 @@ let build_metadata config =
     }
     |> Data_encoding.Binary.to_string_exn encoding)
 
-let reveal_preimage_manually retries hash =
+let read_data_from_file path =
+  let ch = open_in path in
+  let s = really_input_string ch (in_channel_length ch) in
+  close_in ch ;
+  s
+
+let read_data_from_stdin retries =
   let open Lwt_syntax in
-  let* () = Lwt_io.printf "Preimage for hash %s not found.\n%!" hash in
-  let rec input_preimage retries : string Lwt.t =
-    if retries <= 0 then Stdlib.failwith "Too much retry, aborting"
+  let rec input_data retries : string Lwt.t =
+    if retries <= 0 then Stdlib.failwith "Too many tries, aborting."
     else
       let* () = Lwt_io.printf "> " in
       let* input =
@@ -299,31 +304,48 @@ let reveal_preimage_manually retries hash =
           (fun _ -> return_none)
       in
       match Option.bind input (fun bytes -> Hex.to_string (`Hex bytes)) with
-      | Some preimage -> Lwt.return preimage
+      | Some data -> Lwt.return data
       | None ->
           let* () =
             Lwt_io.printf
-              "Error: the preimage is not a valid hexadecimal value.\n%!"
+              "Error: the data is not a valid hexadecimal value.\n%!"
           in
-          input_preimage (pred retries)
+          input_data (pred retries)
   in
-  input_preimage retries
+  input_data retries
+
+let read_data ~kind ~directory ~filename retries =
+  Lwt.catch
+    (fun () ->
+      let path = Filename.concat directory filename in
+      let s = read_data_from_file path in
+      Lwt.return s)
+    (fun _ ->
+      let open Lwt_syntax in
+      let* () =
+        Lwt_io.printf
+          "%s %s not found in %s, or there was a reading error. Please provide \
+           it manually.\n\
+           %!"
+          kind
+          filename
+          directory
+      in
+      read_data_from_stdin retries)
 
 let reveal_preimage_builtin config retries hash =
   let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
-  Lwt.catch
-    (fun () ->
-      let path = Filename.concat config.Config.preimage_directory hex in
-      let ch = open_in path in
-      let s = really_input_string ch (in_channel_length ch) in
-      close_in ch ;
-      Lwt.return s)
-    (fun _ -> reveal_preimage_manually retries hex)
+  read_data
+    ~kind:"Preimage"
+    ~directory:config.Config.preimage_directory
+    ~filename:hex
+    retries
 
 let reveals config request =
   let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
+  let num_retries = 3 in
   match Wasm_2_0_0PVM.decode_reveal request with
-  | Reveal_raw_data hash -> reveal_preimage_builtin config 3 hash
+  | Reveal_raw_data hash -> reveal_preimage_builtin config num_retries hash
   | Reveal_metadata -> Lwt.return (build_metadata config)
   | Request_dal_page _ ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6165
