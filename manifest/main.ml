@@ -8007,6 +8007,9 @@ let octez_scoru_wasm_regressions =
 let kaitai =
   private_lib ~opam:"" "kaitai" ~path:"contrib/kaitai-ocaml/src" ~deps:[yaml]
 
+(* We use a private-lib with inline-tests in order to run the tests normally,
+   but without placing all the code for the tests within the main kaitai
+   library. *)
 let _kaitai_test =
   private_lib
     ~opam:""
