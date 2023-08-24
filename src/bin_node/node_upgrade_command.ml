@@ -111,6 +111,7 @@ module Term = struct
           | Ok v -> Lwt.return (Ok v)
           | errs -> Lwt.return errs)
     in
+    Lwt.Exception_filter.(set handle_all_except_runtime) ;
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
     | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
