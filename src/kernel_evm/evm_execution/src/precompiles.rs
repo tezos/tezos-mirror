@@ -25,7 +25,6 @@ use sha2::{Digest, Sha256};
 pub type PrecompileFn<Host> = fn(
     _: &mut EvmHandler<Host>,
     _: &[u8],
-    _: Option<u64>,
     _: &Context,
     _: bool,
 ) -> Result<PrecompileOutput, PrecompileFailure>;
@@ -44,7 +43,6 @@ pub trait PrecompileSet<Host: Runtime> {
         handler: &mut EvmHandler<Host>,
         address: H160,
         input: &[u8],
-        gas_limit: Option<u64>,
         context: &Context,
         is_static: bool,
     ) -> Option<Result<PrecompileOutput, PrecompileFailure>>;
@@ -62,16 +60,14 @@ impl<Host: Runtime> PrecompileSet<Host> for PrecompileBTreeMap<Host> {
         handler: &mut EvmHandler<Host>,
         address: H160,
         input: &[u8],
-        gas_limit: Option<u64>,
         context: &Context,
         is_static: bool,
     ) -> Option<Result<PrecompileOutput, PrecompileFailure>>
     where
         Host: Runtime,
     {
-        self.get(&address).map(|precompile| {
-            (*precompile)(handler, input, gas_limit, context, is_static)
-        })
+        self.get(&address)
+            .map(|precompile| (*precompile)(handler, input, context, is_static))
     }
 
     /// Check if the given address is a precompile. Should only be called to
@@ -86,7 +82,6 @@ impl<Host: Runtime> PrecompileSet<Host> for PrecompileBTreeMap<Host> {
 fn identity_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _gas_limit: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
@@ -104,7 +99,6 @@ fn identity_precompile<Host: Runtime>(
 fn sha256_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _gas_limit: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
@@ -129,7 +123,6 @@ fn sha256_precompile<Host: Runtime>(
 fn ripemd160_precompile<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
-    _gas_limit: Option<u64>,
     _context: &Context,
     _is_static: bool,
 ) -> Result<PrecompileOutput, PrecompileFailure> {
@@ -190,7 +183,6 @@ mod tests {
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let precompiles = precompile_set::<MockHost>();
         let config = Config::london();
-        let gas_limit = 1000_u64;
 
         let mut handler = EvmHandler::new(
             &mut mock_runtime,
@@ -199,7 +191,6 @@ mod tests {
             &block,
             &config,
             &precompiles,
-            gas_limit,
         );
         let context = Context {
             address,
@@ -207,10 +198,9 @@ mod tests {
             apparent_value: U256::zero(),
         };
 
-        let gas_limit = Some(1_000_000_000);
         let is_static = true;
 
-        precompiles.execute(&mut handler, address, input, gas_limit, &context, is_static)
+        precompiles.execute(&mut handler, address, input, &context, is_static)
     }
 
     #[test]
