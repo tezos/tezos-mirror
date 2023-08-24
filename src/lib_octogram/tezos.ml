@@ -338,7 +338,7 @@ module Start_octez_node = struct
              of the Octez node to 0 (`--expected-pow 0`). The default value
              used in network like mainnet, Mondaynet etc. is 26 (see
              `lib_node_config/config_file.ml`). *)
-          Expected_pow 26;
+          Expected_pow 0;
           Synchronisation_threshold sync_threshold;
           Network network;
           Metrics_addr (sf "0.0.0.0:%d" metrics_port);
