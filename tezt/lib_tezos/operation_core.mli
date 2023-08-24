@@ -290,6 +290,21 @@ module Consensus : sig
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** Retrieves the attestation slots at [level] by calling the [GET
+      /chains/<chain>/blocks/<block>/helpers/validators] RPC. *)
+  val get_slots : level:int -> Client.t -> JSON.t Lwt.t
+
+  (** Returns the first slot of the provided delegate in the
+      [slots_json] that describes all attestation rights at some
+      level.
+
+      Causes the test to fail if the delegate is not found. *)
+  val first_slot : slots_json:JSON.t -> Account.key -> int
+
+  (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
+      extracts the head block's payload hash from the result. *)
+  val get_block_payload_hash : Client.t -> string Lwt.t
 end
 
 module Anonymous : sig
@@ -570,6 +585,41 @@ module Manager : sig
       Tenderbake.
   *)
   val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
+
+  (** A wrapper for {!val-operation} on a list consisting in a single
+      {!val-transfer}. See both functions for details and default
+      values of arguments. *)
+  val mk_single_transfer :
+    ?source:Account.key ->
+    ?counter:int ->
+    ?fee:int ->
+    ?gas_limit:int ->
+    ?storage_limit:int ->
+    ?dest:Account.key ->
+    ?amount:int ->
+    ?branch:string ->
+    ?signer:Account.key ->
+    Client.t ->
+    operation Lwt.t
+
+  (** A wrapper for {!inject}ing a batch consisting in a single
+      transfer. See {!transfer}, {!make_batch}, and {!inject} for the
+      descriptions and default values of the arguments. *)
+  val inject_single_transfer :
+    ?source:Account.key ->
+    ?counter:int ->
+    ?fee:int ->
+    ?gas_limit:int ->
+    ?storage_limit:int ->
+    ?dest:Account.key ->
+    ?amount:int ->
+    ?request:[< `Arrived | `Flush | `Inject | `Notify > `Inject] ->
+    ?force:bool ->
+    ?branch:string ->
+    ?signer:Account.key ->
+    ?error:rex ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
 end
 
 (** Regular expressions for specific error messages.
@@ -596,3 +646,11 @@ val conflict_error_with_needed_fee : rex
 
     Captures [hash] and [fee]. *)
 val rejected_by_full_mempool_with_needed_fee : rex
+
+(** Calls {!inject_and_capture2_stderr} and checks that the second
+    captured group is [expected_fee].
+
+    Intended to be used with {!conflict_error_with_needed_fee} or
+    {!rejected_by_full_mempool_with_needed_fee} as [rex]. *)
+val inject_error_check_recommended_fee :
+  loc:string -> rex:rex -> expected_fee:int -> t -> Client.t -> unit Lwt.t
