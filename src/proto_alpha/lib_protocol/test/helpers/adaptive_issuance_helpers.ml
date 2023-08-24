@@ -318,10 +318,13 @@ let apply_finalize bbd =
 let total_balance_of_breakdown
     {liquid; bonds; staked; unstaked_frozen; unstaked_finalizable; _} ~pool_tez
     ~pool_pseudo =
+  let open Lwt_result_syntax in
   let staked_tez = tez_of_staked staked ~pool_tez ~pool_pseudo in
   Tez.(
-    liquid + bonds >>=? ( + ) staked_tez >>=? ( + ) unstaked_frozen
-    >>=? ( + ) unstaked_finalizable)
+    let* t1 = liquid + bonds in
+    let* t2 = staked_tez + t1 in
+    let* t3 = unstaked_frozen + t2 in
+    unstaked_finalizable + t3)
 
 let get_balance_breakdown ctxt contract =
   let open Lwt_result_syntax in
