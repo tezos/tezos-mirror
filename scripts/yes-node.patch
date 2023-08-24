@@ -1,20 +1,20 @@
 diff --git a/src/lib_crypto/signature_v0.ml b/src/lib_crypto/signature_v0.ml
-index 1827f52ef6..338c9a4dca 100644
+index 1827f52ef6..9f286777b7 100644
 --- a/src/lib_crypto/signature_v0.ml
 +++ b/src/lib_crypto/signature_v0.ml
 @@ -637,7 +637,7 @@ let pp_watermark ppf =
          "Custom: 0x%s"
          (try String.sub hexed 0 10 ^ "..." with Invalid_argument _ -> hexed)
- 
+
 -let sign ?watermark secret_key message =
 +let _sign ?watermark secret_key message =
    let watermark = Option.map bytes_of_watermark watermark in
    match secret_key with
    | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -667,6 +667,81 @@ let check ?watermark public_key signature message =
+@@ -667,6 +667,67 @@ let check ?watermark public_key signature message =
        P256.check ?watermark pk signature message
    | _ -> false
- 
+
 +let fake_sign pk_bytes msg =
 +  let msg = Blake2B.to_bytes @@ Blake2B.hash_bytes [msg] in
 +  let half = size / 2 in
@@ -76,13 +76,29 @@ index 1827f52ef6..338c9a4dca 100644
 +  let algo = algo_of_pk pk in
 +  check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg
 +
-+let fake_check ?watermark pk signature msg =
+ (* The following cache is a hack to work around a quadratic algorithm
+    in Tezos Mainnet protocols up to Edo. *)
+
+@@ -691,7 +752,7 @@ module Endorsement_cache =
+
+ let endorsement_cache = Endorsement_cache.create 300
+
+-let check ?watermark public_key signature message =
++let _check ?watermark public_key signature message =
+   match watermark with
+   | Some (Endorsement _) -> (
+       (* signature check cache only applies to endorsements *)
+@@ -709,15 +770,37 @@ let check ?watermark public_key signature message =
+           res)
+   | _ -> check ?watermark public_key signature message
+
++let fake_check ?watermark:_ pk _signature msg =
 +  (* computing the fake signature do hash the message,
 +     this operation is linear in the size of the message *)
 +  let _ = check_harcoded_signature pk in
 +  (* checking a valid, harcoded signature, to do at least once the crypto maths *)
-+  if equal signature (fake_sign_from_pk pk msg) then true
-+  else check ?watermark pk signature msg
++  ignore (fake_sign_from_pk pk msg) ;
++  true
 +
 +let sign ?watermark:_ sk msg =
 +  let pk_bytes = Data_encoding.Binary.to_bytes_exn Secret_key.encoding sk in
@@ -90,17 +106,14 @@ index 1827f52ef6..338c9a4dca 100644
 +
 +let check = fake_check
 +
- (* The following cache is a hack to work around a quadratic algorithm
-    in Tezos Mainnet protocols up to Edo. *)
- 
-@@ -713,11 +788,19 @@ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
- 
+ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
+
  let concat msg signature = Bytes.cat msg (to_bytes signature)
- 
+
 -type algo = Ed25519 | Secp256k1 | P256
 -
  let algos = [Ed25519; Secp256k1; P256]
- 
+
 -let generate_key ?(algo = Ed25519) ?seed () =
 +let fake_generate_key (pkh, pk, _) =
 +  let sk_of_pk (pk : public_key) : secret_key =
@@ -119,7 +132,7 @@ index 1827f52ef6..338c9a4dca 100644
 @@ -731,6 +814,12 @@ let generate_key ?(algo = Ed25519) ?seed () =
        let pkh, pk, sk = P256.generate_key ?seed () in
        (Public_key_hash.P256 pkh, Public_key.P256 pk, Secret_key.P256 sk)
- 
+
 +let generate_key ?(algo = Ed25519) ?seed () =
 +  (* We keep the original keys generation to stay as close as possible of the
 +     initial performences. *)
@@ -130,22 +143,22 @@ index 1827f52ef6..338c9a4dca 100644
    match sk with
    | Secret_key.Ed25519 sk -> Ed25519.deterministic_nonce sk msg
 diff --git a/src/lib_crypto/signature_v1.ml b/src/lib_crypto/signature_v1.ml
-index 6f17d6c602..710c4c686a 100644
+index 6f17d6c602..e1d89bf25d 100644
 --- a/src/lib_crypto/signature_v1.ml
 +++ b/src/lib_crypto/signature_v1.ml
 @@ -780,7 +780,7 @@ let pp_watermark ppf =
          "Custom: 0x%s"
          (try String.sub hexed 0 10 ^ "..." with Invalid_argument _ -> hexed)
- 
+
 -let sign ?watermark secret_key message =
 +let _sign ?watermark secret_key message =
    let watermark = Option.map bytes_of_watermark watermark in
    match secret_key with
    | Secret_key.Ed25519 sk -> of_ed25519 (Ed25519.sign ?watermark sk message)
-@@ -817,6 +817,84 @@ let check ?watermark public_key signature message =
+@@ -817,6 +817,70 @@ let check ?watermark public_key signature message =
        Bls.check ?watermark pk signature message
    | _ -> false
- 
+
 +let fake_sign pk_bytes msg =
 +  let size = Ed25519.size in
 +  let msg = Blake2B.to_bytes @@ Blake2B.hash_bytes [msg] in
@@ -210,13 +223,29 @@ index 6f17d6c602..710c4c686a 100644
 +  let algo = algo_of_pk pk in
 +  check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg
 +
-+let fake_check ?watermark pk signature msg =
+ (* The following cache is a hack to work around a quadratic algorithm
+    in Tezos Mainnet protocols up to Edo. *)
+
+@@ -841,7 +905,7 @@ module Endorsement_cache =
+
+ let endorsement_cache = Endorsement_cache.create 300
+
+-let check ?watermark public_key signature message =
++let _check ?watermark public_key signature message =
+   match watermark with
+   | Some (Endorsement _) -> (
+       (* signature check cache only applies to endorsements *)
+@@ -859,15 +923,37 @@ let check ?watermark public_key signature message =
+           res)
+   | _ -> check ?watermark public_key signature message
+
++let fake_check ?watermark:_ pk _signature msg =
 +  (* computing the fake signature do hash the message,
 +     this operation is linear in the size of the message *)
 +  let _ = check_harcoded_signature pk in
 +  (* checking a valid, harcoded signature, to do at least once the crypto maths *)
-+  if equal signature (fake_sign_from_pk pk msg) then true
-+  else check ?watermark pk signature msg
++  ignore (fake_sign_from_pk pk msg) ;
++  true
 +
 +let sign ?watermark:_ sk msg =
 +  let pk_bytes = Data_encoding.Binary.to_bytes_exn Secret_key.encoding sk in
@@ -224,17 +253,14 @@ index 6f17d6c602..710c4c686a 100644
 +
 +let check = fake_check
 +
- (* The following cache is a hack to work around a quadratic algorithm
-    in Tezos Mainnet protocols up to Edo. *)
- 
-@@ -863,11 +941,19 @@ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
- 
+ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
+
  let concat msg signature = Bytes.cat msg (to_bytes signature)
- 
+
 -type algo = Ed25519 | Secp256k1 | P256 | Bls
 -
  let algos = [Ed25519; Secp256k1; P256; Bls]
- 
+
 -let generate_key ?(algo = Ed25519) ?seed () =
 +let fake_generate_key (pkh, pk, _) =
 +  let sk_of_pk (pk : public_key) : secret_key =
@@ -253,7 +279,7 @@ index 6f17d6c602..710c4c686a 100644
 @@ -884,6 +970,12 @@ let generate_key ?(algo = Ed25519) ?seed () =
        let pkh, pk, sk = Bls.generate_key ?seed () in
        (Public_key_hash.Bls pkh, Public_key.Bls pk, Secret_key.Bls sk)
- 
+
 +let generate_key ?(algo = Ed25519) ?seed () =
 +  (* We keep the original keys generation to stay as close as possible of the
 +     initial performences. *)
