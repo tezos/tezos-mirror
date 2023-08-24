@@ -119,7 +119,7 @@ let test_self_clean _ _ =
       (fun () ->
         let* _ = IntESHashtbl.find_or_make t 6 (fun () -> Lwt.fail Not_found) in
         Assert.fail_msg "Not_found exception should propagate")
-      (function Not_found -> Lwt.return_unit | exn -> Lwt.fail exn)
+      (function Not_found -> Lwt.return_unit | exn -> Lwt.reraise exn)
   in
   let l = IntESHashtbl.length t in
   if not (l = 3) then

@@ -1640,7 +1640,7 @@ let test_too_many_proposals_in_one_operation () =
         "Encoding of proposals operation with too many proposals should fail")
     (function
       | Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 (* Bake blocks with various valid Proposals operations, and observe
    that their effects are correctly applied. *)

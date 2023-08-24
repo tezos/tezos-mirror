@@ -782,7 +782,7 @@ let definition mode x_opt def =
     (function
       | Parse.Syntax _ ->
           quoted_module_with_var_opt x_opt "<invalid module>" |> Lwt.return
-      | e -> Lwt.fail e)
+      | e -> Lwt.reraise e)
 
 let access x_opt n = String.concat " " [var_opt x_opt; name n]
 

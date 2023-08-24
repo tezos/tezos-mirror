@@ -26,7 +26,7 @@ let lookup (im : import) : Instance.extern Lwt.t =
           Unknown.error
             im.at
             ("unknown import \"" ^ module_name ^ "\".\"" ^ item_name ^ "\"")
-      | exn -> raise exn)
+      | exn -> Lwt.reraise exn)
 
 let link m =
   let open Lwt.Syntax in

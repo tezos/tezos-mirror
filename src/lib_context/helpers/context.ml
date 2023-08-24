@@ -234,7 +234,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
                 hash
             in
             raise (Context_dangling_hash str)
-        | exn -> raise exn)
+        | exn -> Lwt.reraise exn)
 
   let add_tree tree key value =
     Lwt.catch
@@ -250,7 +250,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
                 hash
             in
             raise (Context_dangling_hash str)
-        | exn -> raise exn)
+        | exn -> Lwt.reraise exn)
 end
 
 module Proof_encoding = Tezos_context_merkle_proof_encoding

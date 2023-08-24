@@ -216,7 +216,7 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
             (function
               (* the connection was already closed *)
               | Unix.Unix_error (EBADF, _, _) -> return_unit
-              | err -> Lwt.fail err)
+              | err -> Lwt.reraise err)
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in

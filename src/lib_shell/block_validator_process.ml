@@ -721,7 +721,7 @@ module External_validator_process = struct
           | Unix.Unix_error (EACCES, _, _) ->
               (* We ignore failing on EACCES as no file was created *)
               Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     let process_fd_cleaner =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -1036,7 +1036,7 @@ module External_validator_process = struct
                      killed afterward. No need to propagate the error. *)
                   let* () = Events.(emit cannot_close ()) in
                   Lwt.return_unit
-              | e -> Lwt.fail e)
+              | e -> Lwt.reraise e)
         in
         let* () =
           Lwt.catch
@@ -1053,7 +1053,7 @@ module External_validator_process = struct
                       Lwt.return_unit))
             (function
               | Lwt_unix.Timeout -> Events.(emit unresponsive_validator) ()
-              | err -> Lwt.fail err)
+              | err -> Lwt.reraise err)
         in
         let* () = Error_monad.cancel_with_exceptions canceler in
         Lwt.return_unit

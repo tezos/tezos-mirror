@@ -116,7 +116,7 @@ let assert_exception exected_ex run =
     (fun caught_exn ->
       match caught_exn with
       | e when e = exected_ex -> Lwt.return_unit
-      | x -> raise x)
+      | x -> Lwt.reraise x)
 
 (* Actual tests *)
 let test_several_operations () =

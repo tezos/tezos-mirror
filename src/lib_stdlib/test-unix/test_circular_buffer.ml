@@ -289,7 +289,8 @@ module Fail_Test = struct
             circular_buffer
         in
         assert false)
-      (function Invalid_argument _ -> Lwt.return_unit | exn -> raise exn)
+      (function
+        | Invalid_argument _ -> Lwt.return_unit | exn -> Lwt.reraise exn)
 
   (** Fail read too long.  *)
   let read_invalid ~max_buffer_len ~max_data_size ~actual_data_size =

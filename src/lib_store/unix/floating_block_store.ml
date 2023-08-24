@@ -651,7 +651,7 @@ let fix_integrity chain_dir kind =
                             append_block fresh_floating_store preds block
                         | None -> Lwt.fail Exit)
                       inconsistent_floating_store)
-                  (function Exit -> return_unit | exn -> Lwt.fail exn)
+                  (function Exit -> return_unit | exn -> Lwt.reraise exn)
               in
               let*! () =
                 swap ~src:fresh_floating_store ~dst:inconsistent_floating_store

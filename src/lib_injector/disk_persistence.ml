@@ -246,7 +246,7 @@ module Make_table (H : H) = struct
           (fun () ->
             let+ f = Lwt_unix.readdir d in
             Some f)
-          (function End_of_file -> return_none | e -> raise e)
+          (function End_of_file -> return_none | e -> Lwt.reraise e)
       in
       match filename with
       | None -> return_unit
@@ -351,7 +351,7 @@ struct
           (fun () ->
             let+ f = Lwt_unix.readdir d in
             Some f)
-          (function End_of_file -> return_none | e -> raise e)
+          (function End_of_file -> return_none | e -> Lwt.reraise e)
       in
       match filename with
       | None -> return acc
