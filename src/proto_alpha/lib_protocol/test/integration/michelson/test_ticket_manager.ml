@@ -71,7 +71,7 @@ let tokens_of_value ~include_lazy ctxt ty x =
   let* bm, ctxt =
     Ticket_token_map.of_list
       ctxt
-      ~merge_overlap:(fun ctxt v1 v2 -> ok (Z.add v1 v2, ctxt))
+      ~merge_overlap:(fun ctxt v1 v2 -> Ok (Z.add v1 v2, ctxt))
       tas
   in
   Lwt.return @@ Ticket_token_map.to_list ctxt bm
@@ -136,10 +136,10 @@ let transaction block ~sender ~recipient ~amount ~parameters =
 
 let all_contracts current_block =
   let open Lwt_result_wrap_syntax in
-  let* ctxt =
-    Incremental.begin_construction current_block >|=? Incremental.alpha_ctxt
-  in
-  Lwt.map Result.ok @@ Contract.list ctxt
+  let* result = Incremental.begin_construction current_block in
+  let ctxt = Incremental.alpha_ctxt result in
+  let*! cs = Contract.list ctxt in
+  return cs
 
 (* Fetch all added contracts between [before] and [after]. *)
 let new_contracts ~before ~after =
@@ -245,7 +245,7 @@ let validate_ticket_balances block =
     print_endline @@ show_balance_table kvs_balance
   in
   match equal_key_balances kvs_balance kvs_storage with
-  | Ok true -> return ()
+  | Ok true -> return_unit
   | Ok false ->
       print_both () ;
       failwith "Storage and balance don't match"
@@ -723,7 +723,7 @@ let test_create_contract_and_send_tickets () =
   let* (_b : Block.t) =
     test b @@ TM.send_lazy ~index:1 ~recipient:ticket_receiver_green_2
   in
-  return ()
+  return_unit
 
 (** Tets add and remove tickets from lazy storage. *)
 let test_add_remove_from_lazy_storage () =
@@ -744,7 +744,7 @@ let test_add_remove_from_lazy_storage () =
   let* (_b : Block.t) =
     tm b @@ TM.add_lazy ~index:1 ~content:"Red" ~amount:10
   in
-  return ()
+  return_unit
 
 (** Test send to self and replace big-map. *)
 let test_send_self_replace_big_map () =
@@ -758,7 +758,7 @@ let test_send_self_replace_big_map () =
   let* b = tm b @@ TM.send_self_replace_big_map in
   let* b = tm b @@ TM.send_self_replace_big_map in
   let* (_b : Block.t) = tm b @@ TM.send_self_replace_big_map in
-  return ()
+  return_unit
 
 (** Test add to and remove from strict storage. *)
 let test_add_remove_strict () =
@@ -775,7 +775,7 @@ let test_add_remove_strict () =
   (* Remove strict tickets *)
   let* b = tm b @@ TM.remove_strict in
   let* (_b : Block.t) = tm b @@ TM.add_strict ~content:"Red" ~amount:1 in
-  return ()
+  return_unit
 
 (** Test mixed operations. *)
 let test_mixed_operations () =
@@ -792,7 +792,7 @@ let test_mixed_operations () =
   (* Remove strict and lazy *)
   let* b = tm b @@ TM.remove_strict in
   let* (_b : Block.t) = tm b @@ TM.remove_all_lazy in
-  return ()
+  return_unit
 
 let tests =
   [
