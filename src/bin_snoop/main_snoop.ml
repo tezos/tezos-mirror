@@ -619,31 +619,20 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
-let get_exclusions () =
-  Registration.all_models ()
-  |> List.filter_map (fun (name, info) ->
-         let is_excluded =
-           List.is_empty @@ Codegen.get_codegen_destinations info
-         in
-         if is_excluded then Some (Namespace.to_string name) else None)
-  |> String.Set.of_list
-
 let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
   let transform = code_transform codegen_options in
+  let generated =
+    Codegen.codegen_models models sol transform ~exclusions:String.Set.empty
+  in
   if codegen_options.split then
-    let exclusions = get_exclusions () in
-    let generated = Codegen.codegen_models models sol transform ~exclusions in
     List.concat_map
       (fun (dest_list, code) -> List.map (fun d -> (d, code)) dest_list)
       generated
-  else
-    let exclusions = String.Set.empty in
-    let generated = Codegen.codegen_models models sol transform ~exclusions in
-    List.map (fun (_, code) -> ("auto_build", code)) generated
+  else List.map (fun (_, code) -> ("auto_build", code)) generated
 
 (* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
 let convert_costs_file_name path =

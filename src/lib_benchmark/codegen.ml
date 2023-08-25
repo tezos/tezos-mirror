@@ -456,10 +456,8 @@ let codegen_models models sol transform ~exclusions =
     if String.Set.mem (Namespace.to_string model_name) exclusions then None
     else
       let benchmark_destinations = get_codegen_destinations info in
-      if List.is_empty benchmark_destinations then None
-      else
-        let code = codegen info.model sol transform model_name in
-        Some (benchmark_destinations, code)
+      let code = codegen info.model sol transform model_name in
+      Some (benchmark_destinations, code)
   in
   List.filter_map
     (fun (model_name, info) -> generate_with_exclusions model_name info)
