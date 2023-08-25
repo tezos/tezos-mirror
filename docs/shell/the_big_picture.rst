@@ -261,7 +261,7 @@ compatible, and library vs command-line interface.
     :package:`tezos-protocol-alpha`, are abstracted over this object
     type. That way, it is possible to use the same code for different
     platforms or toolkits.
-  - :package:`tezos-client-alpha` provides some functions to perform
+  - :package-api:`tezos-client-alpha <octez-protocol-alpha-libs/Tezos_client_alpha/index.html>` provides some functions to perform
     the operations of protocol Alpha using the wallet and signers from
     the client context.
   - :package:`tezos-client-genesis` contains the basic activator
