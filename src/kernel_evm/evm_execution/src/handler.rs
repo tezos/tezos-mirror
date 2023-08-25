@@ -234,6 +234,22 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         self.record_cost(self.config.gas_transaction_call)
     }
 
+    /// Add withdrawals to the current transaction layer
+    fn add_withdrawals(
+        &mut self,
+        withdrawals: &mut Vec<Withdrawal>,
+    ) -> Result<(), EthereumError> {
+        match self.transaction_data.last_mut() {
+            Some(layer) => {
+                layer.withdrawals.try_reserve_exact(withdrawals.len())?;
+                layer.withdrawals.append(withdrawals);
+
+                Ok(())
+            }
+            None => Err(EthereumError::InconsistentTransactionStack(0, false, false)),
+        }
+    }
+
     /// Execute a SputnikVM runtime with this handler
     fn execute(
         &mut self,
@@ -445,7 +461,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         // TODO: touch address - mark as hot for gas calculation
         // issue: https://gitlab.com/tezos/tezos/-/issues/4866
 
-        if let Some(transfer) = transfer {
+        if let Some(ref transfer) = transfer {
             match self.execute_transfer(
                 transaction_context.context.caller,
                 address,
@@ -476,14 +492,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             &input,
             &transaction_context.context,
             self.is_static(),
+            transfer,
         ) {
             match precompile_result {
-                Ok(precompile_output) => Ok((
-                    ExitReason::Succeed(precompile_output.exit_status),
-                    None,
-                    precompile_output.output,
-                )),
-                Err(e) => Err(EthereumError::PrecompileFailed(e)),
+                Ok(mut outcome) => {
+                    self.add_withdrawals(&mut outcome.withdrawals)?;
+
+                    Ok((outcome.exit_status, None, outcome.output))
+                }
+                Err(err) => Err(err),
             }
         } else if !self.deleted(address) {
             let code = self.code(address);

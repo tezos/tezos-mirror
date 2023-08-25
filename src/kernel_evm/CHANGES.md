@@ -43,6 +43,7 @@
 - Slightly refactor the tick model and reboot scheduling. (!10040)
 - Add a reboot scheduling for the migration phase. (!10064)
 - Add withdrawals to the transaction stack in the EVM handler. (!9905)
+- Make it possible for any precompiled contract to generate withdrawals. (!9910)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
