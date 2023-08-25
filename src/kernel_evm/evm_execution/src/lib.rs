@@ -162,6 +162,11 @@ where
 
         handler.increment_nonce(caller)?;
 
+        if result.is_success {
+            let unused_gas = gas_limit.map(|gl| gl - result.gas_used);
+            handler.repay_gas(caller, unused_gas)?;
+        }
+
         Ok(Some(result))
     } else {
         // caller was unable to pay for the gas limit
@@ -1624,9 +1629,13 @@ mod test {
                 .unwrap(),
             None
         );
+
+        let funds_total =
+            1_000_000 + all_the_gas - expected_result.unwrap().unwrap().gas_used;
+
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
-            1_000_000.into()
+            funds_total.into()
         );
     }
 
