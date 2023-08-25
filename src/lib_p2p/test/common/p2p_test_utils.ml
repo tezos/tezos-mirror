@@ -213,6 +213,52 @@ let run_nodes ~addr ?port client server =
   let*! _ = Lwt_utils_unix.safe_close main_socket in
   return_unit
 
+(* for fd tests *)
+let run_nodes_fd ~addr ?port client server =
+  let open Lwt_result_syntax in
+  let p =
+    match port with
+    | None ->
+        glob_port := None ;
+        None
+    | Some p ->
+        glob_port := Some (p + 1) ;
+        Some p
+  in
+  let* main_socket, p = listen ?port:p addr in
+  let* server_node =
+    Process.detach ~prefix:"server: " (fun channel ->
+        Lwt.finalize
+          (fun () ->
+            let* () = server channel main_socket in
+            return_unit)
+          (fun () ->
+            let*! r = Lwt_utils_unix.safe_close main_socket in
+            match r with
+            | Error trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+                Lwt.return_unit
+            | Ok () -> Lwt.return_unit))
+  in
+  let* client_node =
+    Process.detach ~prefix:"client: " (fun channel ->
+        let*! () =
+          let*! r = Lwt_utils_unix.safe_close main_socket in
+          match r with
+          | Error trace ->
+              Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
+              Lwt.return_unit
+          | Ok () -> Lwt.return_unit
+        in
+        let* () = client channel addr p in
+        return_unit)
+  in
+  let nodes = [server_node; client_node] in
+  Lwt.ignore_result (sync_nodes nodes) ;
+  let* () = Process.wait_all nodes in
+  let*! _ = Lwt_utils_unix.safe_close main_socket in
+  return_unit
+
 let raw_accept sched main_socket =
   let open Lwt_syntax in
   let* r = P2p_fd.accept main_socket in

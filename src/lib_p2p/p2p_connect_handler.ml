@@ -60,9 +60,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
       (** [P2p_point_state.Info.trusted] *)
   fd_connect :
-    P2p_fd.t ->
-    Unix.sockaddr ->
-    (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
+    P2p_fd.t -> Unix.sockaddr -> (unit, P2p_fd.connect_error) result Lwt.t;
       (** [P2p_fd.connect] *)
   socket_authenticate :
     canceler:Lwt_canceler.t ->
@@ -590,10 +588,8 @@ let accept t fd point =
     (* silently ignore banned points *)
     || P2p_pool.Points.banned t.pool point
   then
-    Error_monad.dont_wait
+    Lwt.dont_wait
       (fun () -> P2p_fd.close fd)
-      (fun (`Unexpected_error ex) ->
-        Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
   else
@@ -667,14 +663,7 @@ let connect ?trusted ?expected_peer_id ?timeout t point =
                   ~timestamp
                   t.config.reconnection_config
                   point_info ;
-                let*! close_res = P2p_fd.close fd in
-                let*! () =
-                  match close_res with
-                  | Ok () -> Lwt.return_unit
-                  | Error (`Unexpected_error ex) ->
-                      Events.(emit connect_close_error)
-                        (point, lazy (Printexc.to_string ex))
-                in
+                let*! () = P2p_fd.close fd in
                 match err with
                 | `Unexpected_error ex ->
                     let*! () =
@@ -718,9 +707,7 @@ module Internal_for_tests = struct
     point_state_info_trusted :
       ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
     fd_connect :
-      P2p_fd.t ->
-      Unix.sockaddr ->
-      (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
+      P2p_fd.t -> Unix.sockaddr -> (unit, P2p_fd.connect_error) result Lwt.t;
     socket_authenticate :
       canceler:Lwt_canceler.t ->
       proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->

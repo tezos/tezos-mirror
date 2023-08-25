@@ -371,8 +371,12 @@ module ReadIO = struct
         | Error
             ( `Connection_lost _ | `Connection_closed_by_peer
             | `Connection_locally_closed ) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+               Losing some information here... *)
             tzfail P2p_errors.Connection_closed
-        | Error (`Unexpected_error_when_closing _ | `Unexpected_error _) ->
+        | Error (`Unexpected_error _) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+               Losing some information here... *)
             tzfail P2p_errors.Connection_error)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t
@@ -423,10 +427,15 @@ module WriteIO = struct
     | Ok () -> return_unit
     | Error
         ( `Connection_closed_by_peer | `Connection_lost _
-        | `Connection_locally_closed | `Unexpected_error_when_closing _
+        | `Connection_locally_closed
         | `Unexpected_error Lwt.Canceled ) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+           Losing some information here... *)
         tzfail P2p_errors.Connection_closed
-    | Error (`Unexpected_error ex) -> fail_with_exn ex
+    | Error (`Unexpected_error ex) ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5632
+           Losing some information here... *)
+        fail_with_exn ex
 
   (* [close] does nothing, it will still be possible to push values to
      the network. *)
@@ -545,11 +554,8 @@ let write_size bytes =
    - closing underlying socket (p2p_fd) *)
 let register st fd =
   if st.closed then (
-    Error_monad.dont_wait
+    Lwt.dont_wait
       (fun () -> P2p_fd.close fd)
-      (function
-        | `Unexpected_error ex ->
-            Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     raise Closed)
@@ -583,22 +589,12 @@ let register st fd =
         id
     in
     Lwt_canceler.on_cancel canceler (fun () ->
-        let open Lwt_syntax in
         P2p_fd.Table.remove st.connected fd ;
         Moving_average.destroy st.ma_state read_conn.counter ;
         Moving_average.destroy st.ma_state write_conn.counter ;
         Lwt_pipe.Maybe_bounded.close write_queue ;
         Lwt_pipe.Maybe_bounded.close read_queue ;
-        let* r = P2p_fd.close fd in
-        let* () =
-          match r with
-          | Ok () -> Lwt.return_unit
-          | Error (`Unexpected_error ex) ->
-              (* Do not prevent the closing if an exception is raised *)
-              let* () = Events.(emit close_error) (id, error_of_exn ex) in
-              Lwt.return_unit
-        in
-        return_unit) ;
+        P2p_fd.close fd) ;
     let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
     let conn =
       {
