@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "yaml" { >= "3.1.0" }
+  "ppx_expect"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

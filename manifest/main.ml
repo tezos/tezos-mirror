@@ -7998,7 +7998,6 @@ let octez_scoru_wasm_regressions =
 
 let kaitai =
   public_lib
-    ~opam:"kaitai"
     "kaitai"
     ~path:"contrib/kaitai-ocaml/src"
     ~deps:[yaml]
@@ -8009,16 +8008,15 @@ let kaitai =
    library. *)
 let _kaitai_test =
   private_lib
-    ~opam:""
     "kaitai_test"
+    ~opam:"kaitai"
     ~path:"contrib/kaitai-ocaml/test"
     ~inline_tests:ppx_expect
     ~deps:[kaitai]
 
 let kaitai_of_data_encoding =
-  private_lib
-    "kaitai_of_data_encoding"
-    ~opam:"kaitai-of-data-encoding"
+  public_lib
+    "kaitai-of-data-encoding"
     ~path:"contrib/lib_kaitai_of_data_encoding"
     ~synopsis:"Kaitai spec generator for data-encoding library"
     ~deps:[yaml; data_encoding; kaitai]
@@ -8027,9 +8025,8 @@ let kaitai_of_data_encoding =
 let _kaitai_of_data_encoding_test =
   private_lib
     "kaitai_of_data_encoding_test"
-    ~opam:""
+    ~opam:"kaitai-of-data-encoding"
     ~path:"contrib/lib_kaitai_of_data_encoding/test"
-    ~synopsis:"Tests for kaitai_of_data_encoding library"
     ~deps:[yaml; data_encoding; kaitai; kaitai_of_data_encoding]
     ~bisect_ppx:No
     ~inline_tests:ppx_expect

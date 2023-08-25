@@ -3,6 +3,7 @@
 
 (library
  (name kaitai_test)
+ (package kaitai)
  (instrumentation (backend bisect_ppx))
  (libraries
   kaitai)

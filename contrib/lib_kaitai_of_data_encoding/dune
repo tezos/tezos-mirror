@@ -3,7 +3,7 @@
 
 (library
  (name kaitai_of_data_encoding)
- (package kaitai-of-data-encoding)
+ (public_name kaitai-of-data-encoding)
  (libraries
   yaml
   data-encoding
