@@ -709,7 +709,7 @@ let activate_protocol_and_wait ?endpoint ?protocol ?protocol_hash ?fitness ?key
         | Some n -> n
         | None -> Test.fail "No node found for activate_protocol_and_wait")
   in
-  let level_before = Node.get_level node in
+  let level_before = Node.get_last_seen_level node in
   let* () =
     activate_protocol
       ?endpoint
@@ -787,7 +787,7 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
         | Some n -> n
         | None -> Test.fail "No node found for bake_for_and_wait")
   in
-  let level_before = Node.get_level node in
+  let level_before = Node.get_last_seen_level node in
   let* () =
     bake_for
       ?endpoint

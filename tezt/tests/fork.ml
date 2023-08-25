@@ -99,7 +99,8 @@ let test_fork =
   (* Bake two blocks at round 0 so that the fitness is maximal. *)
   Log.info "Bake a branch with a high fitness on node 1" ;
   let level = 1 in
-  Check.(level = Node.get_level node1)
+  let* current_level = Node.get_level node1 in
+  Check.(level = current_level)
     Check.int
     ~__LOC__
     ~error_msg:"Level is expected to be %L but is %R" ;

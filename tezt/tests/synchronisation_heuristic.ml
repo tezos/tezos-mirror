@@ -350,7 +350,7 @@ let test_threshold_two =
      and hence bootstrapped.
   *)
   let* () =
-    let level = Node.get_level node in
+    let* level = Node.get_level node in
     Lwt_list.iter_p
       (fun n ->
         let* (_ : int) = Node.wait_for_level n (level + 1) in
@@ -390,7 +390,8 @@ let test_threshold_stuck =
   let* baker = Baker.init ~protocol node client in
 
   Log.info "Bake a few blocks and kill baker" ;
-  let* (level : int) = Node.wait_for_level node (Node.get_level node + 3) in
+  let* current_level = Node.get_level node in
+  let* (level : int) = Node.wait_for_level node (current_level + 3) in
   let* () = Baker.terminate baker in
 
   Log.info "Add two additional peers" ;
@@ -483,7 +484,8 @@ let test_threshold_split_view =
   in
 
   Log.info "Delay for a few blocks" ;
-  let* (_ : int) = Node.wait_for_level node (3 + Node.get_level node) in
+  let* current_level = Node.get_level node in
+  let* (_ : int) = Node.wait_for_level node (3 + current_level) in
 
   Log.info "Check that additional peers are bootstrapped and synced" ;
   let* () = check_sync_state client Synced in

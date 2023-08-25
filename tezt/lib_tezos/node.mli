@@ -457,16 +457,29 @@ val wait_for_ready : t -> unit Lwt.t
     already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
-(** Get the current known level of a node.
+(** Get the current known level of the node.
 
     Returns [0] if the node is not running or if no [head_increment] or
     [branch_switch] event was received yet. This makes this function equivalent
     to [wait_for_level node 0] except that it does not actually wait for the
     level to be known.
 
-    Note that, as the node's status is updated only on head
-    increments, this value is wrong just after a snapshot import. *)
-val get_level : t -> int
+    Note that, as the node's status is updated only on head increments, this
+    value is wrong for instance right after a node restart or snapshot
+    import. Therefore it is recommended to use the function {!get_level}
+    instead, which does not have this problem. A use case for this function is
+    to check for a level increase, when the exact level does not matter, and
+    {!get_level}'s promise may not resolve. *)
+val get_last_seen_level : t -> int
+
+(** Return a promise that is fulfilled as soon as the node is running and its
+    level is known, which is then the value of the promise.
+
+    If the node is not running or if no [head_increment] or [branch_switch]
+    event was received yet, then wait until one of these events occur. It is
+    equivalent to [wait_for_level node 0], and thus avoids the pitfalls of
+    getting a misleading 0 value. *)
+val get_level : t -> int Lwt.t
 
 (** Wait for the node to read its identity.
 

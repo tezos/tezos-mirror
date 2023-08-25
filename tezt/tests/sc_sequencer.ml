@@ -46,10 +46,8 @@ type full_sequencer_setup = {
 
 let next_rollup_level {node; client; sc_sequencer_node; _} =
   let* () = Client.bake_for_and_wait client in
-  Sc_rollup_node.wait_for_level
-    ~timeout:30.
-    sc_sequencer_node
-    (Node.get_level node)
+  let* current_level = Node.get_level node in
+  Sc_rollup_node.wait_for_level ~timeout:30. sc_sequencer_node current_level
 
 let setup_sequencer_kernel
     ?(originator_key = Constant.bootstrap1.public_key_hash)

@@ -56,7 +56,7 @@ module Helpers = struct
     unit
 
   let bake_and_wait_block node client =
-    let level = Node.get_level node in
+    let* level = Node.get_level node in
     let* () =
       Client.bake_for ~context_path:(Node.data_dir node // "context") client
     in

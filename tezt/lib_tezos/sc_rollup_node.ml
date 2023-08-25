@@ -286,7 +286,7 @@ let wait_for_level ?timeout sc_node level =
 let unsafe_wait_sync ?path_client ?timeout sc_node =
   let* node_level =
     match sc_node.persistent_state.endpoint with
-    | Node node -> return (Node.get_level node)
+    | Node node -> Node.get_level node
     | endpoint ->
         let* level =
           RPC.Client.call (Client.create ?path:path_client ~endpoint ())

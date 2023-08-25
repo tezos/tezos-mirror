@@ -625,10 +625,12 @@ let wait_for_level node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
-let get_level node =
+let get_last_seen_level node =
   match node.status with
   | Running {session_state = {level = Known level; _}; _} -> level
   | Not_running | Running _ -> 0
+
+let get_level node = wait_for_level node 0
 
 let wait_for_identity node =
   match node.status with

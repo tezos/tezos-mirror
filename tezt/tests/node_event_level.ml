@@ -169,7 +169,7 @@ let test_debug_level_misc =
   let endpoint_1 = Client.(Node node_1) in
   let* client_1 = Client.init ~endpoint:endpoint_1 () in
   let* () = Client.activate_protocol_and_wait ~protocol client_1 in
-  let level = Node.get_level node_1 in
+  let* level = Node.get_level node_1 in
   Log.info "Node at level %d" level ;
   Log.info "Step 2: Inject a transfer operation, test RPCs." ;
   let* () =
