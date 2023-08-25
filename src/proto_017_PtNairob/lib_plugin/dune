@@ -18,6 +18,8 @@
   -open Tezos_smart_rollup_017_PtNairob)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-017-PtNairob-libs))
+
 (library
  (name tezos_protocol_plugin_017_PtNairob_registerer)
  (public_name

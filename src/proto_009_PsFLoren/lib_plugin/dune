@@ -16,6 +16,8 @@
   -open Tezos_protocol_009_PsFLoren)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-009-PsFLoren-libs))
+
 (library
  (name tezos_protocol_plugin_009_PsFLoren_registerer)
  (public_name

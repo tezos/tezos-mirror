@@ -17,6 +17,8 @@
   -open Tezos_smart_rollup_alpha)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-alpha-libs))
+
 (library
  (name tezos_protocol_plugin_alpha_registerer)
  (public_name

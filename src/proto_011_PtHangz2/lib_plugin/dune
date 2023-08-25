@@ -16,6 +16,8 @@
   -open Tezos_protocol_011_PtHangz2)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-011-PtHangz2-libs))
+
 (library
  (name tezos_protocol_plugin_011_PtHangz2_registerer)
  (public_name

@@ -18,6 +18,8 @@
   -open Tezos_smart_rollup_018_Proxford)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-018-Proxford-libs))
+
 (library
  (name tezos_protocol_plugin_018_Proxford_registerer)
  (public_name

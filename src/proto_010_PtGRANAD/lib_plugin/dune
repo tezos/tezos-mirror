@@ -16,6 +16,8 @@
   -open Tezos_protocol_010_PtGRANAD)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-010-PtGRANAD-libs))
+
 (library
  (name tezos_protocol_plugin_010_PtGRANAD_registerer)
  (public_name

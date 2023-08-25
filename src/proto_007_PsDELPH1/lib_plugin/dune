@@ -15,6 +15,8 @@
   -open Tezos_protocol_007_PsDELPH1)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-007-PsDELPH1-libs))
+
 (library
  (name tezos_protocol_plugin_007_PsDELPH1_registerer)
  (public_name
