@@ -6,7 +6,7 @@
        bash
          %{dep:rejections.sh}
          %{bin:octez-protocol-compiler}
-         %{lib:tezos-protocol-demo-noops:raw/TEZOS_PROTOCOL}
+         %{lib:tezos-protocol-demo-noops.protocol:raw/TEZOS_PROTOCOL}
        )))
 
 (rule

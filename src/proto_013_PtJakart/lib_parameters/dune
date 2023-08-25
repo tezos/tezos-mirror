@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-proto-libs.tezos-protocol-environment
-  tezos-protocol-013-PtJakart)
+  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -21,7 +21,7 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-013-PtJakart.parameters
-  tezos-protocol-013-PtJakart)
+  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)

@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_001_PtCJ7pwo)
- (public_name tezos-protocol-001-PtCJ7pwo.environment)
+ (public_name
+  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_001_PtCJ7pwo)
- (public_name tezos-protocol-001-PtCJ7pwo.raw)
+ (public_name tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-001-PtCJ7pwo.environment)
+  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -103,12 +104,12 @@
 
 (library
  (name tezos_protocol_001_PtCJ7pwo)
- (public_name tezos-protocol-001-PtCJ7pwo)
+ (public_name tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-001-PtCJ7pwo.raw)
+  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -118,7 +119,7 @@
 (install
  (package tezos-protocol-001-PtCJ7pwo)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -214,12 +215,12 @@
 
 (library
  (name tezos_protocol_001_PtCJ7pwo_lifted)
- (public_name tezos-protocol-001-PtCJ7pwo.lifted)
+ (public_name tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-001-PtCJ7pwo)
+  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -324,10 +325,11 @@
 
 (library
  (name tezos_embedded_protocol_001_PtCJ7pwo)
- (public_name tezos-embedded-protocol-001-PtCJ7pwo)
+ (public_name
+  tezos-protocol-001-PtCJ7pwo.tezos-embedded-protocol-001-PtCJ7pwo)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-001-PtCJ7pwo
+  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

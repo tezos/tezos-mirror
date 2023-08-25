@@ -12,7 +12,7 @@
   tezos-micheline-rewriting
   tezos-benchmark
   tezos-benchmark-type-inference-017-PtNairob
-  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
   octez-libs.tezos-crypto
   tezos-protocol-017-PtNairob.parameters
   hashcons

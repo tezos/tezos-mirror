@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_014_PtKathma)
- (public_name tezos-protocol-014-PtKathma.environment)
+ (public_name
+  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_014_PtKathma)
- (public_name tezos-protocol-014-PtKathma.raw)
+ (public_name tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-014-PtKathma.environment)
+  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -238,12 +239,12 @@
 
 (library
  (name tezos_protocol_014_PtKathma)
- (public_name tezos-protocol-014-PtKathma)
+ (public_name tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-014-PtKathma.raw)
+  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -252,7 +253,7 @@
 (install
  (package tezos-protocol-014-PtKathma)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -481,12 +482,12 @@
 
 (library
  (name tezos_protocol_014_PtKathma_lifted)
- (public_name tezos-protocol-014-PtKathma.lifted)
+ (public_name tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-014-PtKathma)
+  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma)
  (flags
   (:standard)
   -nopervasives
@@ -727,10 +728,11 @@
 
 (library
  (name tezos_embedded_protocol_014_PtKathma)
- (public_name tezos-embedded-protocol-014-PtKathma)
+ (public_name
+  tezos-protocol-014-PtKathma.tezos-embedded-protocol-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

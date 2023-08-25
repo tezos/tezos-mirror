@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_017_PtNairob)
- (public_name tezos-protocol-017-PtNairob.environment)
+ (public_name
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_017_PtNairob)
- (public_name tezos-protocol-017-PtNairob.raw)
+ (public_name tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-017-PtNairob.environment)
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -281,12 +282,12 @@
 
 (library
  (name tezos_protocol_017_PtNairob)
- (public_name tezos-protocol-017-PtNairob)
+ (public_name tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-017-PtNairob.raw)
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -295,7 +296,7 @@
 (install
  (package tezos-protocol-017-PtNairob)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -570,12 +571,12 @@
 
 (library
  (name tezos_protocol_017_PtNairob_lifted)
- (public_name tezos-protocol-017-PtNairob.lifted)
+ (public_name tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-017-PtNairob)
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob)
  (flags
   (:standard)
   -nopervasives
@@ -862,10 +863,11 @@
 
 (library
  (name tezos_embedded_protocol_017_PtNairob)
- (public_name tezos-embedded-protocol-017-PtNairob)
+ (public_name
+  tezos-protocol-017-PtNairob.tezos-embedded-protocol-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

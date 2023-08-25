@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   octez-protocol-alpha-libs.tezos-client
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.tezos-test-helpers
   octez-protocol-alpha-libs.tezos-test-helpers

@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_000_Ps9mPmXa)
- (public_name tezos-protocol-000-Ps9mPmXa.environment)
+ (public_name
+  tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_000_Ps9mPmXa)
- (public_name tezos-protocol-000-Ps9mPmXa.raw)
+ (public_name tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-000-Ps9mPmXa.environment)
+  tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -36,12 +37,12 @@
 
 (library
  (name tezos_protocol_000_Ps9mPmXa)
- (public_name tezos-protocol-000-Ps9mPmXa)
+ (public_name tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-000-Ps9mPmXa.raw)
+  tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -51,7 +52,7 @@
 (install
  (package tezos-protocol-000-Ps9mPmXa)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -81,12 +82,12 @@
 
 (library
  (name tezos_protocol_000_Ps9mPmXa_lifted)
- (public_name tezos-protocol-000-Ps9mPmXa.lifted)
+ (public_name tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-000-Ps9mPmXa)
+  tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -126,10 +127,11 @@
 
 (library
  (name tezos_embedded_protocol_000_Ps9mPmXa)
- (public_name tezos-embedded-protocol-000-Ps9mPmXa)
+ (public_name
+  tezos-protocol-000-Ps9mPmXa.tezos-embedded-protocol-000-Ps9mPmXa)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-000-Ps9mPmXa
+  tezos-protocol-000-Ps9mPmXa.tezos-protocol-000-Ps9mPmXa
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

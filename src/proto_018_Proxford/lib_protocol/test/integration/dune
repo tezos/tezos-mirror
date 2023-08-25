@@ -11,7 +11,7 @@
   octez-alcotezt
   octez-libs.tezos-base
   octez-protocol-018-Proxford-libs.tezos-client
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
   octez-protocol-018-Proxford-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers)

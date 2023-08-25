@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -45,7 +45,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services

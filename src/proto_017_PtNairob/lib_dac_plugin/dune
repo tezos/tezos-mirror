@@ -12,8 +12,8 @@
   tezos-dac-lib
   tezos-dac-client-lib
   octez-protocol-017-PtNairob-libs.tezos-client
-  tezos-embedded-protocol-017-PtNairob
-  tezos-protocol-017-PtNairob)
+  tezos-protocol-017-PtNairob.tezos-embedded-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

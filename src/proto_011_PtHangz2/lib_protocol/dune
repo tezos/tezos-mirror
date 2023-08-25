@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_011_PtHangz2)
- (public_name tezos-protocol-011-PtHangz2.environment)
+ (public_name
+  tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_011_PtHangz2)
- (public_name tezos-protocol-011-PtHangz2.raw)
+ (public_name tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-011-PtHangz2.environment)
+  tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -133,12 +134,12 @@
 
 (library
  (name tezos_protocol_011_PtHangz2)
- (public_name tezos-protocol-011-PtHangz2)
+ (public_name tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-011-PtHangz2.raw)
+  tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2.raw)
  (flags
   (:standard)
   -w -51
@@ -148,7 +149,7 @@
 (install
  (package tezos-protocol-011-PtHangz2)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -269,12 +270,12 @@
 
 (library
  (name tezos_protocol_011_PtHangz2_lifted)
- (public_name tezos-protocol-011-PtHangz2.lifted)
+ (public_name tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-011-PtHangz2)
+  tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2)
  (flags
   (:standard)
   -w -51
@@ -409,10 +410,11 @@
 
 (library
  (name tezos_embedded_protocol_011_PtHangz2)
- (public_name tezos-embedded-protocol-011-PtHangz2)
+ (public_name
+  tezos-protocol-011-PtHangz2.tezos-embedded-protocol-011-PtHangz2)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-011-PtHangz2
+  tezos-protocol-011-PtHangz2.tezos-protocol-011-PtHangz2
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

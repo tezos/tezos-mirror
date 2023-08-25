@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-signer-backends
   octez-protocol-012-Psithaca-libs.tezos-client
   octez-protocol-012-Psithaca-libs.tezos-client.commands
-  tezos-protocol-012-Psithaca)
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

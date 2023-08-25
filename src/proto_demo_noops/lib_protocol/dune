@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_demo_noops)
- (public_name tezos-protocol-demo-noops.environment)
+ (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_demo_noops)
- (public_name tezos-protocol-demo-noops.raw)
+ (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-noops.environment)
+  tezos-protocol-demo-noops.tezos-protocol-demo-noops.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -35,12 +35,12 @@
 
 (library
  (name tezos_protocol_demo_noops)
- (public_name tezos-protocol-demo-noops)
+ (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-noops.raw)
+  tezos-protocol-demo-noops.tezos-protocol-demo-noops.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -49,7 +49,7 @@
 (install
  (package tezos-protocol-demo-noops)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -72,12 +72,12 @@
 
 (library
  (name tezos_protocol_demo_noops_lifted)
- (public_name tezos-protocol-demo-noops.lifted)
+ (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-noops)
+  tezos-protocol-demo-noops.tezos-protocol-demo-noops)
  (flags
   (:standard)
   -nopervasives
@@ -113,10 +113,10 @@
 
 (library
  (name tezos_embedded_protocol_demo_noops)
- (public_name tezos-embedded-protocol-demo-noops)
+ (public_name tezos-protocol-demo-noops.tezos-embedded-protocol-demo-noops)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-noops
+  tezos-protocol-demo-noops.tezos-protocol-demo-noops
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

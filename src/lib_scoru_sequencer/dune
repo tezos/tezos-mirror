@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-protocol-alpha-libs.tezos-smart-rollup-layer2
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez_smart_rollup_node_alpha
   octez-libs.tezos-workers
   octez-smart-rollup-node-lib
