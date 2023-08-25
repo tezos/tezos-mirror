@@ -84,6 +84,7 @@ stages:
           - octez-node
           - octez-client
           - octez-baker-alpha
+          - octez-dal-node
 
       - name: Start octez-node
         tezos.start_node:
@@ -124,3 +125,21 @@ stages:
            - bootstrap3
            - bootstrap4
            - bootstrap5
+
+      - name: Start octez-dal-node
+        tezos.start_dal_node:
+          path_node: self://./octez-dal-node
+          rpc_port: '30011'
+          metrics_port: '30012'
+          net_port: '30013'
+          l1_node_uri: self://node
+          bootstrap_profile: false
+          attestor_profiles:
+           - tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE
+           - tz1gBnaS1n7LKqpaRnyBX5MSmamadXXfzNpt
+           - tz1YtB3Hn6oghVk96vkpZt6PHrfbyRY1ciL3
+          producer_profiles:
+           - 1
+           - 3
+           - 55
+           - 94
