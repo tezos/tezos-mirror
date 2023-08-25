@@ -103,6 +103,12 @@ val base_dir : t -> string
     always created. *)
 val additional_bootstraps : t -> Account.key list
 
+(** Call [Daemon.Make.wait_for] on a [Node] or [Proxy_server] endpoint.
+
+    Fail if the endpoint is a [Foreign_endpoint]. *)
+val endpoint_wait_for :
+  ?where:string -> endpoint -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** Create a client.
 
     The standard output and standard error output of the node will

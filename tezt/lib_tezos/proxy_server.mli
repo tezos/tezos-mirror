@@ -92,3 +92,6 @@ type event = {name : string; value : JSON.t; timestamp : float}
     You can have multiple [on_event] handlers, although
     the order in which they trigger is unspecified. *)
 val on_event : t -> (event -> unit) -> unit
+
+(** See [Daemon.Make.wait_for]. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
