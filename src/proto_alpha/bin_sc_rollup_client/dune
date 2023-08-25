@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez_smart_rollup_client_alpha
   tezos-version.value)
  (link_flags

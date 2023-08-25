@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_demo_counter)
- (public_name tezos-protocol-demo-counter.environment)
+ (public_name
+  tezos-protocol-demo-counter.tezos-protocol-demo-counter.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_demo_counter)
- (public_name tezos-protocol-demo-counter.raw)
+ (public_name tezos-protocol-demo-counter.tezos-protocol-demo-counter.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-counter.environment)
+  tezos-protocol-demo-counter.tezos-protocol-demo-counter.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -44,12 +45,12 @@
 
 (library
  (name tezos_protocol_demo_counter)
- (public_name tezos-protocol-demo-counter)
+ (public_name tezos-protocol-demo-counter.tezos-protocol-demo-counter)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-counter.raw)
+  tezos-protocol-demo-counter.tezos-protocol-demo-counter.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -58,7 +59,7 @@
 (install
  (package tezos-protocol-demo-counter)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -91,12 +92,12 @@
 
 (library
  (name tezos_protocol_demo_counter_lifted)
- (public_name tezos-protocol-demo-counter.lifted)
+ (public_name tezos-protocol-demo-counter.tezos-protocol-demo-counter.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-counter)
+  tezos-protocol-demo-counter.tezos-protocol-demo-counter)
  (flags
   (:standard)
   -nopervasives
@@ -141,10 +142,11 @@
 
 (library
  (name tezos_embedded_protocol_demo_counter)
- (public_name tezos-embedded-protocol-demo-counter)
+ (public_name
+  tezos-protocol-demo-counter.tezos-embedded-protocol-demo-counter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-counter
+  tezos-protocol-demo-counter.tezos-protocol-demo-counter
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

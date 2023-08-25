@@ -19,7 +19,7 @@
   octez-libs.tezos-requester
   octez-shell-libs.tezos-shell
   octez-shell-libs.tezos-shell-services
-  tezos-embedded-protocol-demo-noops
+  tezos-protocol-demo-noops.tezos-embedded-protocol-demo-noops
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-validation
   octez-libs.tezos-event-logging-test-helpers

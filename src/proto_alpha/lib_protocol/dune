@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_alpha)
- (public_name tezos-protocol-alpha.environment)
+ (public_name tezos-protocol-alpha.tezos-protocol-alpha.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_alpha)
- (public_name tezos-protocol-alpha.raw)
+ (public_name tezos-protocol-alpha.tezos-protocol-alpha.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-alpha.environment)
+  tezos-protocol-alpha.tezos-protocol-alpha.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -282,12 +282,12 @@
 
 (library
  (name tezos_protocol_alpha)
- (public_name tezos-protocol-alpha)
+ (public_name tezos-protocol-alpha.tezos-protocol-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-alpha.raw)
+  tezos-protocol-alpha.tezos-protocol-alpha.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -296,7 +296,7 @@
 (install
  (package tezos-protocol-alpha)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -571,12 +571,12 @@
 
 (library
  (name tezos_protocol_alpha_lifted)
- (public_name tezos-protocol-alpha.lifted)
+ (public_name tezos-protocol-alpha.tezos-protocol-alpha.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.tezos-protocol-alpha)
  (flags
   (:standard)
   -nopervasives
@@ -863,10 +863,10 @@
 
 (library
  (name tezos_embedded_protocol_alpha)
- (public_name tezos-embedded-protocol-alpha)
+ (public_name tezos-protocol-alpha.tezos-embedded-protocol-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

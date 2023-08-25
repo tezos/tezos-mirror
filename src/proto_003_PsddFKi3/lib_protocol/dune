@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_003_PsddFKi3)
- (public_name tezos-protocol-003-PsddFKi3.environment)
+ (public_name
+  tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_003_PsddFKi3)
- (public_name tezos-protocol-003-PsddFKi3.raw)
+ (public_name tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-003-PsddFKi3.environment)
+  tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -104,12 +105,12 @@
 
 (library
  (name tezos_protocol_003_PsddFKi3)
- (public_name tezos-protocol-003-PsddFKi3)
+ (public_name tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-003-PsddFKi3.raw)
+  tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -119,7 +120,7 @@
 (install
  (package tezos-protocol-003-PsddFKi3)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -216,12 +217,12 @@
 
 (library
  (name tezos_protocol_003_PsddFKi3_lifted)
- (public_name tezos-protocol-003-PsddFKi3.lifted)
+ (public_name tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-003-PsddFKi3)
+  tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -327,10 +328,11 @@
 
 (library
  (name tezos_embedded_protocol_003_PsddFKi3)
- (public_name tezos-embedded-protocol-003-PsddFKi3)
+ (public_name
+  tezos-protocol-003-PsddFKi3.tezos-embedded-protocol-003-PsddFKi3)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-003-PsddFKi3
+  tezos-protocol-003-PsddFKi3.tezos-protocol-003-PsddFKi3
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

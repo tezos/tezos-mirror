@@ -12,9 +12,9 @@
   tezos-dal-node-lib
   octez-protocol-017-PtNairob-libs.tezos-client
   octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
-  tezos-embedded-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.tezos-embedded-protocol-017-PtNairob
   octez-protocol-017-PtNairob-libs.tezos-layer2-utils
-  tezos-protocol-017-PtNairob)
+  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-protocol-011-PtHangz2"
-  "tezos-embedded-protocol-011-PtHangz2"
   "octez-shell-libs"
   "ppx_expect"
   "uri" { >= "3.1.0" }

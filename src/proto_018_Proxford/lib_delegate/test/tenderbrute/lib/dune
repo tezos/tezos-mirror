@@ -8,7 +8,7 @@
   data-encoding
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
   octez-shell-libs.tezos-client-base
   octez-protocol-018-Proxford-libs.tezos-client)
  (flags

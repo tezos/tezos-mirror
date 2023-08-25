@@ -10,8 +10,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-009-PsFLoren
-  tezos-protocol-009-PsFLoren.lifted
+  tezos-protocol-009-PsFLoren.tezos-protocol-009-PsFLoren
+  tezos-protocol-009-PsFLoren.tezos-protocol-009-PsFLoren.lifted
   octez-shell-libs.tezos-signer-backends
   octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin
   octez-libs.tezos-rpc

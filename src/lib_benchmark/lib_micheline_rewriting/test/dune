@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez-libs.tezos-error-monad
   octez-protocol-alpha-libs.tezos-client)
  (library_flags (:standard -linkall))

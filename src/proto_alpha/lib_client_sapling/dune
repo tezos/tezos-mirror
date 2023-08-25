@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-signer-backends
   octez-protocol-alpha-libs.tezos-client
   octez-protocol-alpha-libs.tezos-client.commands
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez-protocol-alpha-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags

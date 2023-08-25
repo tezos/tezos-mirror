@@ -15,7 +15,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   tezos_scoru_wasm_regressions
   tezt_self_tests_tezt_lib
   src_proto_alpha_lib_sc_rollup_node_test_tezt_lib

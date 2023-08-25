@@ -6,7 +6,7 @@
  (public_name octez-protocol-alpha-libs.tezos-bakings.mockup-simulator)
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-alpha
+  tezos-protocol-alpha.tezos-protocol-alpha
   octez-protocol-alpha-libs.tezos-client
   octez-shell-libs.tezos-client-commands
   octez-protocol-alpha-libs.tezos-baking

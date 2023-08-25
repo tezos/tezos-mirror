@@ -12,7 +12,6 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-protocol-007-PsDELPH1"
-  "tezos-embedded-protocol-007-PsDELPH1"
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
   "octez-proto-libs"

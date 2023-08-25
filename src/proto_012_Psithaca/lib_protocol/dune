@@ -3,7 +3,8 @@
 
 (library
  (name tezos_protocol_environment_012_Psithaca)
- (public_name tezos-protocol-012-Psithaca.environment)
+ (public_name
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +20,10 @@
 
 (library
  (name tezos_raw_protocol_012_Psithaca)
- (public_name tezos-protocol-012-Psithaca.raw)
+ (public_name tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-012-Psithaca.environment)
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -150,12 +151,12 @@
 
 (library
  (name tezos_protocol_012_Psithaca)
- (public_name tezos-protocol-012-Psithaca)
+ (public_name tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-012-Psithaca.raw)
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca.raw)
  (flags
   (:standard)
   -w -51
@@ -165,7 +166,7 @@
 (install
  (package tezos-protocol-012-Psithaca)
  (section lib)
- (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
+ (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
 (rule
  (targets protocol.ml)
@@ -303,12 +304,12 @@
 
 (library
  (name tezos_protocol_012_Psithaca_lifted)
- (public_name tezos-protocol-012-Psithaca.lifted)
+ (public_name tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-012-Psithaca)
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca)
  (flags
   (:standard)
   -w -51
@@ -460,10 +461,11 @@
 
 (library
  (name tezos_embedded_protocol_012_Psithaca)
- (public_name tezos-embedded-protocol-012-Psithaca)
+ (public_name
+  tezos-protocol-012-Psithaca.tezos-embedded-protocol-012-Psithaca)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-012-Psithaca
+  tezos-protocol-012-Psithaca.tezos-protocol-012-Psithaca
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
