@@ -811,6 +811,21 @@ compositions.
 
 Check the :package-api:`online documentation <octez-libs/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`.
 
+Naming
+------
+
+Good names help maintainters quickly understanding the code by concisely suggesting what a variable represents or what a function computes.
+
+This implies that good names precisely evoke the denoted value(s), without being longer than necessary:
+
+* *precision*: avoid using too generic names such as "buffer", "counter", or "result"; give instead some hint about what is stored, counted, or computed.
+* *consciseness*: as you cannot put everything into a name, select the most important notion(s), and avoid redundant words (using or not abbreviations is up to you; it's just about avoiding names longer than necessary).
+  For instance, suffixing the name with its type such as "..._list" is not needed since the IDE can tell its type; just using plural is usually enough.
+  On the contrary, it is useful to add details to the type, such as "..._dir" or "..._title" for a value of type string.
+
+Beyond choosing good individual names, it is also important to ensure *consistency* of naming.
+For example, if within a same module, "operation" is used sometimes for Michelson operations and other times for arithmetic operations, this introduces some ambiguity, that can be solved by refining the naming scheme.
+
 Other coding conventions
 ------------------------
 
