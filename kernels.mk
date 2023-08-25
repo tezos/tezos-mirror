@@ -3,20 +3,23 @@ SDK_DIR=src/kernel_sdk
 EVM_DIR=src/kernel_evm
 DEMO_DIR=src/kernel_tx_demo
 SEQUENCER_DIR=src/kernel_sequencer
-EVM_KERNEL_PREIMAGES = _evm_installer_preimages
+EVM_KERNEL_PREIMAGES=_evm_installer_preimages
+EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
 
 .PHONY: all
 all: build-dev-deps check test build
-
 
 .PHONY: kernel_sdk
 kernel_sdk:
 	@make -C src/kernel_sdk build
 	@cp src/kernel_sdk/target/$(NATIVE_TARGET)/release/smart-rollup-installer .
 
-evm_kernel.wasm::
+evm_kernel_unstripped.wasm::
 	@make -C src/kernel_evm build
 	@cp src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm $@
+
+evm_kernel.wasm:: evm_kernel_unstripped.wasm
+	@cp evm_kernel_unstripped.wasm $@
 	@wasm-strip $@
 
 evm_installer.wasm:: kernel_sdk evm_kernel.wasm
@@ -26,6 +29,16 @@ endif
 	@./smart-rollup-installer get-reveal-installer \
 	--upgrade-to evm_kernel.wasm \
 	--preimages-dir ${EVM_KERNEL_PREIMAGES} \
+	--output $@ \
+	${CONFIG}
+
+evm_unstripped_installer.wasm:: kernel_sdk evm_kernel_unstripped.wasm
+ifdef EVM_CONFIG
+	$(eval CONFIG := --setup-file ${EVM_CONFIG})
+endif
+	@./smart-rollup-installer get-reveal-installer \
+	--upgrade-to evm_kernel_unstripped.wasm \
+	--preimages-dir ${EVM_UNSTRIPPED_KERNEL_PREIMAGES} \
 	--output $@ \
 	${CONFIG}
 
