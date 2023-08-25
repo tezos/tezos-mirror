@@ -1923,7 +1923,136 @@ module Dac_post_file = struct
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ _res = ()
 end
 
+type 'uri kind =
+  | Default (* Generate default Tezt bootstrap keys (from 0 to 5). *)
+  | Fresh of {
+      count : int; (* Generate [n] fresh keys *)
+      path_client : 'uri; (* Path to octez-client binary. *)
+      alias_prefix : string; (* A prefix for generated keys aliases. *)
+    }
+
+type 'uri generate_keys = {
+  base_dir : 'uri; (* The directory where the generated keys will be stored. *)
+  kind : 'uri kind; (* Kind of wallets to generate. *)
+}
+
+type generate_keys_r = unit
+
+type (_, _) Remote_procedure.t +=
+  | Generate_keys :
+      'uri generate_keys
+      -> (generate_keys_r, 'uri) Remote_procedure.t
+
+module Generate_keys = struct
+  let name = "tezos.generate_keys"
+
+  type 'uri t = 'uri generate_keys
+
+  type r = generate_keys_r
+
+  let of_remote_procedure :
+      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+    | Generate_keys args -> Some args
+    | _ -> None
+
+  let to_remote_procedure args = Generate_keys args
+
+  let unify : type a. (a, 'uri) Remote_procedure.t -> (a, r) Remote_procedure.eq
+      = function
+    | Generate_keys _ -> Eq
+    | _ -> Neq
+
+  let kind_encoding uri_encoding =
+    let c = Helpers.make_mk_case () in
+    Data_encoding.(
+      union
+        [
+          c.mk_case
+            "default"
+            (obj1 (req "default" unit))
+            (function Default -> Some () | _ -> None)
+            (fun () -> Default);
+          c.mk_case
+            "fresh"
+            (obj1
+               (req
+                  "fresh"
+                  (obj3
+                     (req "count" uint16)
+                     (req "path_client" uri_encoding)
+                     (dft "alias_prefix" string "boot"))))
+            (function
+              | Fresh {count; path_client; alias_prefix} ->
+                  Some (count, path_client, alias_prefix)
+              | _ -> None)
+            (fun (count, path_client, alias_prefix) ->
+              Fresh {count; path_client; alias_prefix});
+        ])
+
+  let encoding uri_encoding =
+    let open Data_encoding in
+    conv
+      (fun {base_dir; kind} -> (base_dir, kind))
+      (fun (base_dir, kind) -> {base_dir; kind})
+      (obj2
+         (req "base_dir" uri_encoding)
+         (dft "kind" (kind_encoding uri_encoding) Default))
+
+  let r_encoding = Data_encoding.null
+
+  let tvalue_of_r (() : r) = Tnull
+
+  let expand ~self ~run {base_dir; kind} =
+    let kind =
+      match kind with
+      | Default -> Default
+      | Fresh {count; path_client; alias_prefix} ->
+          Fresh
+            {
+              count;
+              path_client =
+                Remote_procedure.global_uri_of_string ~self ~run path_client;
+              alias_prefix = run alias_prefix;
+            }
+    in
+    {base_dir = Remote_procedure.global_uri_of_string ~self ~run base_dir; kind}
+
+  let resolve ~self resolver {base_dir; kind} =
+    let kind =
+      match kind with
+      | Default -> Default
+      | Fresh {count; path_client; alias_prefix} ->
+          Fresh
+            {
+              count;
+              path_client =
+                Remote_procedure.file_agent_uri ~self ~resolver path_client;
+              alias_prefix;
+            }
+    in
+    {base_dir = Remote_procedure.file_agent_uri ~self ~resolver base_dir; kind}
+
+  let run state {base_dir; kind} =
+    let client = Agent_state.http_client state in
+    let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
+    let* () = Lwt_unix.mkdir base_dir 0x755 in
+    match kind with
+    | Default ->
+        Account.write Constant.all_secret_keys ~base_dir ;
+        unit
+    | Fresh {count; path_client; alias_prefix} ->
+        let* path = Http_client.local_path_from_agent_uri client path_client in
+        let* _accounts =
+          Client.create ~path ~base_dir ()
+          |> Client.stresstest_gen_keys ~alias_prefix count
+        in
+        unit
+
+  let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()
+end
+
 let register_procedures () =
+  Remote_procedure.register (module Generate_keys) ;
   Remote_procedure.register (module Start_octez_node) ;
   Remote_procedure.register (module Activate_protocol) ;
   Remote_procedure.register (module Wait_for_bootstrapped) ;
