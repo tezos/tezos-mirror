@@ -18,7 +18,7 @@ const external = require("../lib/external")
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
-const CHUNKER = external.bin("_build/default/src/bin_evm_proxy/chunker/octez_evm_chunker.exe")
+const CHUNKER = external.bin("`./octez-evm-proxy-server")
 
 const print_full = function (rawTx) {
 
@@ -78,7 +78,7 @@ const print_list = function (src) {
 }
 
 const chunk_data = function (src) {
-    run_chunker_command = `${CHUNKER} "${src}"`
+    run_chunker_command = `${CHUNKER} chunk data "${src}"`
     chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
     return chunked_message.split("\n").slice(1, -1);
 }

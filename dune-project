@@ -19,7 +19,6 @@
 (package (name octez-dal-node))
 (package (name octez-distributed-internal))
 (package (name octez-distributed-lwt-internal))
-(package (name octez-evm-chunker)(allow_empty))
 (package (name octez-evm-proxy))
 (package (name octez-evm-proxy-lib)(allow_empty))
 (package (name octez-evm-proxy-tests)(allow_empty))

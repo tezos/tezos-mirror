@@ -232,6 +232,34 @@ let rollup_node_endpoint_param =
        will communicate with, or [mockup] if you want to use mock values."
     Params.rollup_node_endpoint
 
+let rollup_address_arg =
+  let open Lwt_result_syntax in
+  let open Tezos_clic in
+  parameter (fun _ hash ->
+      let hash_opt =
+        Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt hash
+      in
+      match hash_opt with
+      | Some hash -> return hash
+      | None ->
+          failwith
+            "Parameter '%s' is an invalid smart rollup address encoded in a \
+             base58 string."
+            hash)
+  |> default_arg
+       ~long:"rollup-address"
+       ~doc:
+         "The smart rollup address in Base58 encoding used to produce the \
+          chunked messages"
+       ~default:Tezos_crypto.Hashed.Smart_rollup_address.(to_b58check zero)
+       ~placeholder:"sr1..."
+
+let data_parameter =
+  Tezos_clic.param
+    ~name:"data"
+    ~desc:"Data to prepare and chunk with the EVM rollup format"
+    Params.string
+
 let main_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -263,8 +291,33 @@ let main_command =
       let* () = wait in
       return_unit)
 
+let chunker_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      "Chunk hexadecimal data according to the message representation of the \
+       EVM rollup"
+    (args1 rollup_address_arg)
+    (prefixes ["chunk"; "data"] @@ data_parameter @@ stop)
+    (fun rollup_address data () ->
+      let print_chunks smart_rollup_address s =
+        let*? _, messages =
+          Next_rollup_node.make_encoded_messages
+            ~smart_rollup_address
+            (Hash (Ethereum_types.strip_0x s))
+        in
+        Format.printf "Chunked transactions :\n%!" ;
+        List.iter (Format.printf "%s\n%!") messages ;
+        return_unit
+      in
+      let rollup_address =
+        Tezos_crypto.Hashed.Smart_rollup_address.to_string rollup_address
+      in
+      print_chunks rollup_address data)
+
 (* List of program commands *)
-let commands = [main_command]
+let commands = [main_command; chunker_command]
 
 let global_options = Tezos_clic.no_options
 

@@ -506,8 +506,6 @@ opam:octez-distributed-lwt-internal:
   variables:
     package: octez-distributed-lwt-internal
 
-# Ignoring unreleased package octez-evm-chunker.
-
 # Ignoring unreleased package octez-evm-proxy.
 
 # Ignoring unreleased package octez-evm-proxy-lib.
