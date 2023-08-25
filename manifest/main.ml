@@ -3949,6 +3949,9 @@ let octez_benchmark =
         opam_only "hashcons" V.True;
       ]
     ~inline_tests:ppx_expect
+      (* We disable tests for this package as they require Python, which is not
+           installed in the image of the opam jobs. *)
+    ~opam_with_test:Never
 
 let octez_benchmark_examples =
   public_lib
