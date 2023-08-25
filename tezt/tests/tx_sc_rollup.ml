@@ -326,28 +326,20 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   return (client, sc_rollup_node, sc_rollup_address, [])
 
 let setup_bootstrap ~commitment_period ~challenge_window protocol =
-  let bootstrap1_key = Constant.bootstrap1.alias in
-  let data_dir = Temp.dir "tx-kernel-data-dir" in
-  let* boot_sector =
-    prepare_installer_kernel
-      ~preimages_dir:(Filename.concat data_dir "wasm_2_0_0")
-      "tx-kernel"
-  in
-  let boot_sector_file = Filename.temp_file "boot-sector" ".hex" in
-  let () = write_file boot_sector_file ~contents:boot_sector in
   let sc_rollup_address = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57" in
-  let* parameters_ty =
-    let client = Client.create_with_mode Client.Mockup in
-    Client.convert_data_to_json ~data:"pair string (ticket string)" client
+  let* {
+         bootstrap_smart_rollup = bootstrap_tx_kernel;
+         smart_rollup_node_data_dir;
+         smart_rollup_node_extra_args;
+       } =
+    setup_bootstrap_smart_rollup
+      ~name:"tx-kernel"
+      ~address:sc_rollup_address
+      ~parameters_ty:"pair string (ticket string)"
+      ~installee:"tx-kernel"
+      ()
   in
-  let bootstrap_tx_kernel : Protocol.bootstrap_smart_rollup =
-    {
-      address = sc_rollup_address;
-      pvm_kind = "wasm_2_0_0";
-      boot_sector;
-      parameters_ty;
-    }
-  in
+  let bootstrap1_key = Constant.bootstrap1.alias in
   let* node, client =
     setup_l1
       ~bootstrap_smart_rollups:[bootstrap_tx_kernel]
@@ -359,16 +351,13 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
     Sc_rollup_node.create
       Operator
       node
-      ~data_dir
+      ~data_dir:smart_rollup_node_data_dir
       ~base_dir:(Client.base_dir client)
       ~default_operator:bootstrap1_key
   in
   let* () = Client.bake_for_and_wait client in
   return
-    ( client,
-      sc_rollup_node,
-      sc_rollup_address,
-      ["--boot-sector-file"; boot_sector_file] )
+    (client, sc_rollup_node, sc_rollup_address, smart_rollup_node_extra_args)
 
 let tx_kernel_e2e setup protocol =
   let commitment_period = 10 and challenge_window = 10 in

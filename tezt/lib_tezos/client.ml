@@ -1427,7 +1427,7 @@ let convert_script ~script ~src_format ~dst_format ?typecheck client =
 let convert_data ~data ~src_format ~dst_format ?typecheck client =
   convert ~kind:Data ~input:data ~src_format ~dst_format ?typecheck client
 
-let convert_michelson_to_json ~kind ?endpoint ~input client =
+let convert_michelson_to_json ~kind ?endpoint ~input ?typecheck client =
   let* client_output =
     convert
       ?endpoint
@@ -1435,6 +1435,7 @@ let convert_michelson_to_json ~kind ?endpoint ~input client =
       ~input
       ~src_format:`Michelson
       ~dst_format:`Json
+      ?typecheck
       client
   in
   Lwt.return (Ezjsonm.from_string client_output)
@@ -1442,8 +1443,8 @@ let convert_michelson_to_json ~kind ?endpoint ~input client =
 let convert_script_to_json ?endpoint ~script client =
   convert_michelson_to_json ~kind:Script ?endpoint ~input:script client
 
-let convert_data_to_json ?endpoint ~data client =
-  convert_michelson_to_json ~kind:Data ?endpoint ~input:data client
+let convert_data_to_json ?endpoint ~data ?typecheck client =
+  convert_michelson_to_json ~kind:Data ?endpoint ~input:data ?typecheck client
 
 let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
     ?gas_limit ?dry_run ?force ~alias ~amount ~src ~prg client =
