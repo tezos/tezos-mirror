@@ -89,7 +89,7 @@ module Types = struct
        directly these messages, this is done through callbacks. *)
     synchronisation_state : Synchronisation_heuristic.Bootstrapping.t;
     valid_block_input : Store.Block.t Lwt_watcher.input;
-    new_head_input : Store.Block.t Lwt_watcher.input;
+    new_head_input : (Block_hash.t * Block_header.t) Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     prevalidator : Prevalidator.t option ref;
     active_peers : (Peer_validator.t, Empty.t) P2p_peer.Error_table.t;
@@ -525,7 +525,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         may_switch_test_chain w active_chains spawn_child block
       else Lwt.return_unit
     in
-    Lwt_watcher.notify nv.new_head_input block ;
+    Lwt_watcher.notify nv.new_head_input (Store.Block.hash block, block_header) ;
     let is_head_increment =
       Block_hash.equal head_hash block_header.shell.predecessor
     in
