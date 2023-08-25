@@ -6,6 +6,7 @@
         "@warren-bank/ethereumjs-tx-sign": "2.0.0",
         "bn.js": "^5.2.1",
         "ethereumjs-wallet": "^1.0.2",
+        "ethers": "^6.7.1",
         "keccak": "^3.0.3",
         "rlp": "^2.2.7",
         "solc": "^0.8.21"

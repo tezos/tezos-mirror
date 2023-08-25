@@ -18,9 +18,8 @@ let contract = compile_contract_file(contracts_directory, 'loop.sol')[0];
 let create_data = contract.bytecode;
 
 // create call data with different values
-let call_data_prefix = "0x0b7d796e00000000000000000000000000000000"
 let call_data = function (n) {
-    return call_data_prefix + utils.encode_number(n)
+    return contract.interface.encodeFunctionData("loop", [n]);
 }
 
 let txs = [];

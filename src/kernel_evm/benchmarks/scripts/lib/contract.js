@@ -10,6 +10,7 @@ const keccak = require("keccak");
 const solc = require("solc");
 const fs = require("fs");
 const path = require("path");
+const ethers = require("ethers");
 const { clean_input } = require('./signature');
 
 // nonce must be a number !
@@ -50,7 +51,7 @@ const compile_contract_file = function (directory, contract_file) {
     for (var contractName in output.contracts['contract.sol']) {
         let contract = output.contracts['contract.sol'][contractName];
         let infos = { bytecode : "0x" + contract.evm.bytecode.object,
-                      abi : contract.abi };
+                      interface : new ethers.Interface(contract.abi) };
         contracts.push(infos);
     }
 
