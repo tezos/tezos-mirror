@@ -40,6 +40,7 @@ type current_protocol = {
 }
 
 type 'a t = {
+  config : Configuration.t;
   cctxt : Client_context.full;
   dal_cctxt : Dal_node_client.cctxt option;
   dac_client : Dac_observer_client.t option;
@@ -210,6 +211,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   in
   return
     {
+      config = configuration;
       cctxt = (cctxt :> Client_context.full);
       dal_cctxt;
       dac_client;
@@ -969,9 +971,39 @@ module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
       kind =
     let open Lwt_result_syntax in
+    let rollup_address = Address.zero in
+    let operators = Configuration.Operator_purpose_map.empty in
+    let loser_mode = Loser_mode.no_failures in
+    let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let index_buffer_size = Configuration.default_index_buffer_size in
     let irmin_cache_size = Configuration.default_irmin_cache_size in
+    let config =
+      Configuration.
+        {
+          sc_rollup_address = rollup_address;
+          boot_sector_file = None;
+          sc_rollup_node_operators = operators;
+          rpc_addr = Configuration.default_rpc_addr;
+          rpc_port = Configuration.default_rpc_port;
+          metrics_addr = None;
+          reconnection_delay = 5.;
+          fee_parameters = Configuration.default_fee_parameters;
+          mode = Observer;
+          loser_mode;
+          dal_node_endpoint = None;
+          dac_observer_endpoint = None;
+          dac_timeout = None;
+          batcher = Configuration.default_batcher;
+          injector = Configuration.default_injector;
+          l1_blocks_cache_size;
+          l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
+          prefetch_blocks = None;
+          log_kernel_debug = false;
+        }
+    in
     let* lockfile = lock ~data_dir in
     let* store =
       Store.load
@@ -1004,15 +1036,16 @@ module Internal_for_tests = struct
     in
     return
       {
+        config;
         cctxt = (cctxt :> Client_context.full);
         dal_cctxt = None;
         dac_client = None;
         data_dir;
         l1_ctxt;
-        rollup_address = Address.zero;
+        rollup_address;
         boot_sector_file = None;
         mode = Observer;
-        operators = Configuration.Operator_purpose_map.empty;
+        operators;
         genesis_info;
         lcc;
         lpc;
@@ -1021,7 +1054,7 @@ module Internal_for_tests = struct
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;
         current_protocol;
-        loser_mode = Loser_mode.no_failures;
+        loser_mode;
         lockfile;
         store;
         context;

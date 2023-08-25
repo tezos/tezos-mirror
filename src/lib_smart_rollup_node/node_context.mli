@@ -45,7 +45,10 @@ type current_protocol = {
       (** Protocol constants retrieved from the Tezos node. *)
 }
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6316
+   Refactor this type with more structure and less redundancy. *)
 type 'a t = {
+  config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
