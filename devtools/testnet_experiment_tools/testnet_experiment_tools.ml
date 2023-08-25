@@ -85,6 +85,9 @@ let generate_baker_accounts n client =
 (* These tests can be run locally to generate the data needed to run a
    stresstest. *)
 module Local = struct
+  let format_baker_accounts () =
+    Format_baker_accounts.format_baker_accounts gen_keys_dir
+
   let generate_baker_accounts n () =
     let client_dir = gen_keys_dir in
     let* () =
@@ -122,6 +125,11 @@ let () =
     ~title:"Generate baker accounts"
     ~tags:["generate_baker_accounts"]
     (Local.generate_baker_accounts number_of_bakers) ;
+  register
+    ~__FILE__
+    ~title:"Format baker accounts"
+    ~tags:["format_baker_accounts"]
+    Local.format_baker_accounts ;
   register
     ~__FILE__
     ~title:"Generate Network Configuration"

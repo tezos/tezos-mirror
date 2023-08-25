@@ -22,4 +22,4 @@
   -open Tezos_client_base_unix
   -open Tezos_stdlib_unix
   -open Tezos_protocol_alpha)
- (modules testnet_experiment_tools))
+ (modules testnet_experiment_tools format_baker_accounts))
