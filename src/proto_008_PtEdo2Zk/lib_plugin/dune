@@ -16,6 +16,8 @@
   -open Tezos_protocol_008_PtEdo2Zk)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-008-PtEdo2Zk-libs))
+
 (library
  (name tezos_protocol_plugin_008_PtEdo2Zk_registerer)
  (public_name

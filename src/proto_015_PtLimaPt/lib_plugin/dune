@@ -16,6 +16,8 @@
   -open Tezos_protocol_015_PtLimaPt)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-015-PtLimaPt-libs))
+
 (library
  (name tezos_protocol_plugin_015_PtLimaPt_registerer)
  (public_name

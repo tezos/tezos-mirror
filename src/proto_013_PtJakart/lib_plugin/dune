@@ -16,6 +16,8 @@
   -open Tezos_protocol_013_PtJakart)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-013-PtJakart-libs))
+
 (library
  (name tezos_protocol_plugin_013_PtJakart_registerer)
  (public_name

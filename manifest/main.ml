@@ -5702,6 +5702,8 @@ let hash = Protocol.hash
         (sf "tezos-protocol-plugin-%s" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Protocol plugin"
+        ~documentation:
+          [Dune.[S "package"; S (sf "octez-protocol-%s-libs" name_dash)]]
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -6686,6 +6688,24 @@ let hash = Protocol.hash
           ~main
           ~name
           ()
+    in
+    (* Generate documentation index for [octez-protocol-%s-libs] *)
+    let () =
+      write (path // "lib_plugin/index.mld") @@ fun fmt ->
+      let header =
+        sf
+          "{0 Octez-protocol-%s-libs: octez protocol %s libraries}\n\n\
+           This is a package containing some libraries related to the Tezos %s \
+           protocol.\n\n\
+           It contains the following libraries:\n\n"
+          name_dash
+          name_dash
+          name_dash
+      in
+      Sub_lib.pp_documentation_of_container
+        ~header
+        fmt
+        registered_octez_protocol_libs
     in
     register
     @@ make

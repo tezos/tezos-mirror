@@ -16,6 +16,8 @@
   -open Tezos_protocol_012_Psithaca)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-012-Psithaca-libs))
+
 (library
  (name tezos_protocol_plugin_012_Psithaca_registerer)
  (public_name

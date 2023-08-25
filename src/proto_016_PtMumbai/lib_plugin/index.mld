@@ -1,0 +1,13 @@
+{0 Octez-protocol-016-PtMumbai-libs: octez protocol 016-PtMumbai libraries}
+
+This is a package containing some libraries by the Tezos 016-PtMumbai protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_client_016_PtMumbai}Tezos_client_016_PtMumbai}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_sapling_016_PtMumbai}Tezos_client_sapling_016_PtMumbai}
+- {{!module-Tezos_layer2_utils_016_PtMumbai}Tezos_layer2_utils_016_PtMumbai}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_016_PtMumbai}Tezos_protocol_plugin_016_PtMumbai}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_016_PtMumbai_registerer}Tezos_protocol_plugin_016_PtMumbai_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_016_PtMumbai}Tezos_smart_rollup_016_PtMumbai}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_016_PtMumbai}Tezos_smart_rollup_layer2_016_PtMumbai}: Protocol specific library for `tezos-smart-rollup`

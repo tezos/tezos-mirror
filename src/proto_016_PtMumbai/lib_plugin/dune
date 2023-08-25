@@ -18,6 +18,8 @@
   -open Tezos_smart_rollup_016_PtMumbai)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-016-PtMumbai-libs))
+
 (library
  (name tezos_protocol_plugin_016_PtMumbai_registerer)
  (public_name
