@@ -7,6 +7,9 @@
 
 const rlp = require("rlp");
 const keccak = require("keccak");
+const solc = require("solc");
+const fs = require("fs");
+const path = require("path");
 const { clean_input } = require('./signature');
 
 // nonce must be a number !
@@ -19,4 +22,39 @@ const legacy_contract_address = function (player_address, nonce) {
     return contract_address_long.substring(24);
 }
 
-module.exports = { legacy_contract_address }
+const contracts_directory = path.resolve(__dirname, '..', 'benchmarks', 'contracts');
+
+const compile_contract_file = function (directory, contract_file) {
+    let contract_path = path.resolve(directory, contract_file);
+    let contract_content = fs.readFileSync(contract_path, "UTF-8");
+
+    let input = {
+        language: 'Solidity',
+        sources: {
+            'contract.sol': {
+                content: contract_content
+            }
+        },
+        settings: {
+            evmVersion: 'london',
+            outputSelection: {
+                '*': {
+                    '*': ['*']
+                }
+            }
+        }
+    };
+
+    let output = JSON.parse(solc.compile(JSON.stringify(input)));
+    var contracts = [];
+    for (var contractName in output.contracts['contract.sol']) {
+        let contract = output.contracts['contract.sol'][contractName];
+        let infos = { bytecode : "0x" + contract.evm.bytecode.object,
+                      abi : contract.abi };
+        contracts.push(infos);
+    }
+
+    return contracts;
+}
+
+module.exports = { legacy_contract_address, contracts_directory, compile_contract_file }
