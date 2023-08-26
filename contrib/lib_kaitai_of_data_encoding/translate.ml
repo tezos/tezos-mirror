@@ -108,6 +108,8 @@ let rec from_data_encoding :
   | Int64 -> class_spec_of_ground Ground.Attr.s8
   | Int31 -> class_spec_of_ground Ground.Attr.int31
   | Float -> class_spec_of_ground Ground.Attr.f8
+  | Bytes (_kind_length, _) -> class_spec_of_ground Ground.Attr.bytes
+  | String (_kind_length, _) -> class_spec_of_ground Ground.Attr.string
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
@@ -122,4 +124,7 @@ let rec from_data_encoding :
       in
       {(default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
+  | Describe {encoding; _} -> from_data_encoding ~encoding_name encoding
+  | Dynamic_size {kind = _; encoding} ->
+      from_data_encoding ~encoding_name encoding
   | _ -> failwith "Not implemented"

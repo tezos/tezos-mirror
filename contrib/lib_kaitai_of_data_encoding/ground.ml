@@ -115,6 +115,23 @@ module Attr = struct
                   })));
     }
 
+  let bytes_limit_type_attr_spec ~id =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          BytesType
+            (BytesLimitType
+               {
+                 size = Name "size";
+                 terminator = None;
+                 include_ = false;
+                 padRight = None;
+                 process = None;
+               }));
+    }
+
   let u1 = int1_type_attr_spec ~signed:false
 
   let s1 = int1_type_attr_spec ~signed:true
@@ -134,4 +151,17 @@ module Attr = struct
     int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
 
   let f8 = float_multi_type_attr_spec ~id:"float"
+
+  let bytes =
+    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
+              We fix size header to [`Uint30] for now. This corresponds to
+              size header of ground bytes encoding. Later on we want to add
+              support for [`Uint16], [`Uint8] and [`N]. *)
+    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
+
+  let string =
+    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
+              Same as with [Bytes] above, i.e. we need to add support for [`Uint16],
+              [`Uint8] and [`N] size header as well. *)
+    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
 end

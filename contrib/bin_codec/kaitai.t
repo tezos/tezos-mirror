@@ -75,4 +75,24 @@ ground.float test
   seq:
   - id: float
     type: f8
+ground.bytes test
+  $ ./codec.exe dump kaitai for ground.bytes
+  meta:
+    id: ground__bytes
+    endian: be
+  seq:
+  - id: size
+    type: u4
+  - id: fixed size (uint30) bytes
+    size: size
 
+ground.string test
+  $ ./codec.exe dump kaitai for ground.string
+  meta:
+    id: ground__string
+    endian: be
+  seq:
+  - id: size
+    type: u4
+  - id: fixed size (uint30) bytes
+    size: size

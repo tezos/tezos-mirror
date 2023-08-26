@@ -87,6 +87,8 @@ module Ast = struct
     | List of t list
 
   type expr = t
+
+  let to_string = function Name name -> name | _ -> failwith "not implemented"
 end
 
 type processExpr =
@@ -201,6 +203,7 @@ module DataType = struct
               |> Option.value ~default:"")
         | _ -> failwith "not supported")
     | NumericType (Float_type (FloatMultiType {width = _; endian = _})) -> "f8"
+    | BytesType (BytesLimitType _) -> "fixed size (uint30) bytes"
     | _ -> failwith "not supported"
 end
 

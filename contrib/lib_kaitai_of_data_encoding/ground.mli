@@ -74,4 +74,10 @@ module Attr : sig
 
   (** [f8] returns [AttrSpec.t] definition of 64-bit float. *)
   val f8 : AttrSpec.t
+
+  (** [bytes] returns [AttrSpec.t] definition of [Data_encoding.bytes]. *)
+  val bytes : AttrSpec.t
+
+  (** [string] returns [AttrSpec.t] definition of [Data_encoding.string]. *)
+  val string : AttrSpec.t
 end
