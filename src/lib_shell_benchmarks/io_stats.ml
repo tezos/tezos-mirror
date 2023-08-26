@@ -90,7 +90,7 @@ let load_tree context key =
   Context.fold
     context
     key
-    ~order:`Sorted
+    ~order:`Undefined
     ~init:Io_helpers.Key_map.empty
     ~f:(fun path t tree ->
       let+ o = Context.Tree.to_value t in
