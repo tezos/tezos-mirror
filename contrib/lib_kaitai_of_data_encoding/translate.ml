@@ -37,7 +37,7 @@ let default_meta_spec ~encoding_name =
       path = [];
       isOpaque = false;
       id = Some encoding_name;
-      endian = None;
+      endian = Some `BE;
       bitEndian = None;
       encoding = None;
       forceDebug = false;
@@ -101,6 +101,13 @@ let rec from_data_encoding :
   match encoding with
   | Bool -> class_spec_of_ground ~enums:[Ground.Enum.bool] Ground.Attr.bool
   | Uint8 -> class_spec_of_ground Ground.Attr.u1
+  | Int8 -> class_spec_of_ground Ground.Attr.s1
+  | Uint16 -> class_spec_of_ground Ground.Attr.u2
+  | Int16 -> class_spec_of_ground Ground.Attr.s2
+  | Int32 -> class_spec_of_ground Ground.Attr.s4
+  | Int64 -> class_spec_of_ground Ground.Attr.s8
+  | Int31 -> class_spec_of_ground Ground.Attr.int31
+  | Float -> class_spec_of_ground Ground.Attr.f8
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e

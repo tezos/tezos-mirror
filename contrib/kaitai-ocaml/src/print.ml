@@ -53,7 +53,12 @@ let mapping l =
 let ( @? ) x xs = match x with None -> xs | Some x -> x :: xs
 
 let metaSpec (t : MetaSpec.t) =
-  mapping @@ Option.map (fun id -> ("id", scalar id)) t.id @? []
+  mapping
+  @@ Option.map (fun id -> ("id", scalar id)) t.id
+  @? Option.map
+       (fun endian -> ("endian", scalar (Endianness.to_string endian)))
+       t.endian
+  @? []
 
 let classSpec _ = mapping [("test", scalar "test")]
 

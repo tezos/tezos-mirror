@@ -105,6 +105,11 @@ module Endianness = struct
   type cases = (Ast.expr * fixed_endian) list
 
   type t = [fixed_endian | `Calc of Ast.expr * cases | `Inherited]
+
+  let to_string = function
+    | `BE -> "be"
+    | `LE -> "le"
+    | `Calc _ | `Inherited -> failwith "not supported"
 end
 
 module DataType = struct
@@ -180,9 +185,22 @@ module DataType = struct
 
   type t = data_type
 
+  let width_to_int = function W1 -> 1 | W2 -> 2 | W4 -> 4 | W8 -> 8
+
   let to_string = function
-    | NumericType (Int_type (Int1Type {signed})) ->
-        if signed then "s1" else "u1"
+    | NumericType (Int_type int_type) -> (
+        match int_type with
+        | Int1Type {signed} -> if signed then "s1" else "u1"
+        | IntMultiType {signed; width; endian} ->
+            Printf.sprintf
+              "%s%d%s"
+              (if signed then "s" else "u")
+              (width_to_int width)
+              (endian
+              |> Option.map Endianness.to_string
+              |> Option.value ~default:"")
+        | _ -> failwith "not supported")
+    | NumericType (Float_type (FloatMultiType {width = _; endian = _})) -> "f8"
     | _ -> failwith "not supported"
 end
 

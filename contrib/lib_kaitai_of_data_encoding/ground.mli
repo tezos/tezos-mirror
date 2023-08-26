@@ -52,4 +52,26 @@ module Attr : sig
 
   (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
   val u1 : AttrSpec.t
+
+  (** [s1] returns [AttrSpec.t] definition of 8-bit signed integer. *)
+  val s1 : AttrSpec.t
+
+  (** [u2] returns [AttrSpec.t] definition of 16-bit unsigned integer. *)
+  val u2 : AttrSpec.t
+
+  (** [s2] returns [AttrSpec.t] definition of 16-bit signed integer. *)
+  val s2 : AttrSpec.t
+
+  (** [s4] returns [AttrSpec.t] definition of 32-bit signed integer. *)
+  val s4 : AttrSpec.t
+
+  (** [s8] returns [AttrSpec.t] definition of 64-bit signed integer. *)
+  val s8 : AttrSpec.t
+
+  (** [int31] returns [AttrSpec.t] definition of 31-bit signed integer.
+      For more about this type see [Data_encoding.int31]. *)
+  val int31 : AttrSpec.t
+
+  (** [f8] returns [AttrSpec.t] definition of 64-bit float. *)
+  val f8 : AttrSpec.t
 end

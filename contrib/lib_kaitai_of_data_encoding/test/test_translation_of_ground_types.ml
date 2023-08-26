@@ -38,9 +38,129 @@ let%expect_test "test uint8 translation" =
     {|
     meta:
       id: ground_uint8
+      endian: be
     seq:
     - id: uint8
       type: u1
+  |}]
+
+let%expect_test "test int8 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_int8"
+      Data_encoding.int8
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_int8
+      endian: be
+    seq:
+    - id: int8
+      type: s1
+  |}]
+
+let%expect_test "test uint16 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_uint16"
+      Data_encoding.uint16
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_uint16
+      endian: be
+    seq:
+    - id: uint16
+      type: u2
+  |}]
+
+let%expect_test "test int16 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_int16"
+      Data_encoding.int16
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_int16
+      endian: be
+    seq:
+    - id: int16
+      type: s2
+  |}]
+
+let%expect_test "test int32 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_int32"
+      Data_encoding.int32
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_int32
+      endian: be
+    seq:
+    - id: int32
+      type: s4
+  |}]
+
+let%expect_test "test int64 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_int64"
+      Data_encoding.int64
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_int64
+      endian: be
+    seq:
+    - id: int64
+      type: s8
+  |}]
+
+let%expect_test "test int31 translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_int31"
+      Data_encoding.int31
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_int31
+      endian: be
+    seq:
+    - id: int31
+      type: s4
+  |}]
+
+let%expect_test "test float translation" =
+  let s =
+    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_float"
+      Data_encoding.float
+  in
+  print_endline (Kaitai_ast.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_float
+      endian: be
+    seq:
+    - id: float
+      type: f8
   |}]
 
 let%expect_test "test bool translation" =
@@ -54,6 +174,7 @@ let%expect_test "test bool translation" =
     {|
     meta:
       id: ground_bool
+      endian: be
     enums:
       bool:
         0: false

@@ -83,11 +83,55 @@ module Attr = struct
       enum = Some (fst Enum.bool);
     }
 
-  let u1 =
-    AttrSpec.
-      {
-        default_attr_spec with
-        id = "uint8";
-        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-      }
+  let int1_type_attr_spec ~signed =
+    {
+      default_attr_spec with
+      id = (if signed then "int8" else "uint8");
+      dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
+    }
+
+  let int_multi_type_atrr_spec ~id ~signed width =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          NumericType (Int_type (IntMultiType {signed; width; endian = None})));
+    }
+
+  let float_multi_type_attr_spec ~id =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          NumericType
+            (Float_type
+               (FloatMultiType
+                  {
+                    (* Data-encoding supports only 64-bit floats. *)
+                    width = DataType.W8;
+                    endian = None;
+                  })));
+    }
+
+  let u1 = int1_type_attr_spec ~signed:false
+
+  let s1 = int1_type_attr_spec ~signed:true
+
+  let u2 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
+
+  let s2 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
+
+  let s4 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
+
+  let s8 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
+
+  let int31 =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
+             There should be a validation that [Int31] is in the appropriate
+             range. *)
+    int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
+
+  let f8 = float_multi_type_attr_spec ~id:"float"
 end
