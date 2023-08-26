@@ -187,6 +187,14 @@ let dal_cryptobox_parameters_encoding =
        (req "slot_size" string)
        (req "redundancy_factor" string))
 
+let map_dal_cryptobox_parameters f p =
+  {
+    slot_size = f p.slot_size;
+    page_size = f p.page_size;
+    redundancy_factor = f p.redundancy_factor;
+    number_of_shards = f p.number_of_shards;
+  }
+
 type 'uri start_octez_node = {
   name : string option;
   path_node : 'uri;
@@ -332,15 +340,7 @@ module Start_octez_node = struct
     let network = run network in
     let peers = List.map run peers in
     let dal_cryptobox_parameters =
-      Option.map
-        (fun p ->
-          {
-            slot_size = run p.slot_size;
-            page_size = run p.page_size;
-            redundancy_factor = run p.redundancy_factor;
-            number_of_shards = run p.number_of_shards;
-          })
-        dal_cryptobox_parameters
+      Option.map (map_dal_cryptobox_parameters run) dal_cryptobox_parameters
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6205
        Allow to use templates to define [sync_threshold] *)
@@ -513,6 +513,153 @@ module Start_octez_node = struct
     on_new_service res.name Octez_node Metrics res.metrics_port ;
     on_new_service res.name Octez_node P2p res.net_port ;
     on_new_metrics_source res.name Octez_node res.metrics_port
+end
+
+type dal_parameters = {
+  feature_enable : string;
+  cryptobox : dal_cryptobox_parameters;
+  attestation_lag : string;
+  attestation_threshold : string;
+  number_of_slots : string;
+  blocks_per_epoch : string;
+}
+
+(* This encoding should be compatible with the protocol parameters. *)
+let dal_parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           feature_enable;
+           cryptobox;
+           attestation_lag;
+           attestation_threshold;
+           number_of_slots;
+           blocks_per_epoch;
+         } ->
+      ( cryptobox,
+        ( attestation_lag,
+          attestation_threshold,
+          number_of_slots,
+          blocks_per_epoch,
+          feature_enable ) ))
+    (fun ( cryptobox,
+           ( attestation_lag,
+             attestation_threshold,
+             number_of_slots,
+             blocks_per_epoch,
+             feature_enable ) ) ->
+      {
+        feature_enable;
+        cryptobox;
+        attestation_lag;
+        attestation_threshold;
+        number_of_slots;
+        blocks_per_epoch;
+      })
+    (merge_objs
+       dal_cryptobox_parameters_encoding
+       (obj5
+          (req "attestation_lag" string)
+          (req "attestation_threshold" string)
+          (req "number_of_slots" string)
+          (req "blocks_per_epoch" string)
+          (req "feature_enable" string)))
+
+type 'uri generate_protocol_parameters_file = {
+  basefile : 'uri;
+  dal : dal_parameters;
+}
+
+type (_, _) Remote_procedure.t +=
+  | Generate_protocol_parameters_file :
+      'uri generate_protocol_parameters_file
+      -> (string, 'uri) Remote_procedure.t
+
+module Generate_protocol_parameters_file = struct
+  let name = "tezos.generate_protocol_parameters_file"
+
+  type 'uri t = 'uri generate_protocol_parameters_file
+
+  type r = string
+
+  let of_remote_procedure :
+      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+    | Generate_protocol_parameters_file args -> Some args
+    | _ -> None
+
+  let to_remote_procedure args = Generate_protocol_parameters_file args
+
+  let unify : type a. (a, 'uri) Remote_procedure.t -> (a, r) Remote_procedure.eq
+      = function
+    | Generate_protocol_parameters_file _ -> Eq
+    | _ -> Neq
+
+  let encoding uri_encoding =
+    let open Data_encoding in
+    conv
+      (fun {basefile; dal} -> (basefile, dal))
+      (fun (basefile, dal) -> {basefile; dal})
+      (obj2 (req "basefile" uri_encoding) (req "dal" dal_parameters_encoding))
+
+  let r_encoding =
+    let open Data_encoding in
+    obj1 (req "filename" string)
+
+  let tvalue_of_r filename = Tstr filename
+
+  let expand ~self ~run base =
+    let basefile =
+      Remote_procedure.global_uri_of_string ~self ~run base.basefile
+    in
+    let dal =
+      {
+        feature_enable = run base.dal.feature_enable;
+        cryptobox = map_dal_cryptobox_parameters run base.dal.cryptobox;
+        attestation_lag = run base.dal.attestation_lag;
+        attestation_threshold = run base.dal.attestation_threshold;
+        number_of_slots = run base.dal.number_of_slots;
+        blocks_per_epoch = run base.dal.blocks_per_epoch;
+      }
+    in
+    {basefile; dal}
+
+  let resolve ~self resolver base =
+    let basefile =
+      Remote_procedure.file_agent_uri ~self ~resolver base.basefile
+    in
+    {base with basefile}
+
+  let run state {basefile; dal} =
+    let* basefile =
+      Http_client.local_path_from_agent_uri
+        (Agent_state.http_client state)
+        basefile
+    in
+    let dal_overrides : string list * JSON.u =
+      let value =
+        let aux_json =
+          Data_encoding.Json.construct dal_parameters_encoding dal
+          |> JSON.annotate ~origin:"yml params"
+        in
+        JSON.filter_map_object aux_json (fun key v ->
+            (* Read value as a string, then parse to replace string values by
+               integer/boolean values. *)
+            v |> JSON.as_string |> JSON.parse ~origin:key |> Option.some)
+        |> JSON.unannotate
+      in
+      let key = ["dal_parametric"] in
+      let path = key in
+      (path, value)
+    in
+    let overrides = ([dal_overrides] :> Protocol.parameter_overrides) in
+    let* params_file =
+      Protocol.write_parameter_file ~base:(Either.Left basefile) overrides
+    in
+    let agent_dir = Agent_state.home_dir state in
+    let* () = Helpers.exec "mv" [params_file; agent_dir] in
+    Lwt.return (Filename.concat agent_dir "parameters.json")
+
+  let on_completion ~on_new_service:_ ~on_new_metrics_source:_ _ = ()
 end
 
 type 'uri activate_protocol = {
@@ -2613,6 +2760,7 @@ end
 let register_procedures () =
   Remote_procedure.register (module Generate_keys) ;
   Remote_procedure.register (module Start_octez_node) ;
+  Remote_procedure.register (module Generate_protocol_parameters_file) ;
   Remote_procedure.register (module Activate_protocol) ;
   Remote_procedure.register (module Wait_for_bootstrapped) ;
   Remote_procedure.register (module Originate_smart_rollup) ;
