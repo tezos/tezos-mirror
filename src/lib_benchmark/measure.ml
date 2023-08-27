@@ -372,6 +372,15 @@ module Time = struct
     dt
     [@@inline always]
 
+  let measure_lwt f =
+    let open Lwt.Syntax in
+    let bef = get_time_ns () in
+    let+ res = f () in
+    let aft = get_time_ns () in
+    let dt = Int64.(to_float (sub aft bef)) in
+    (dt, res)
+    [@@inline always]
+
   let measure_and_return f =
     let bef = get_time_ns () in
     let x = f () in
