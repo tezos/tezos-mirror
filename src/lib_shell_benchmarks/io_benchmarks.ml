@@ -328,7 +328,7 @@ module Context_size_dependent_read_bench = struct
     in
     Generator.With_context {workload; closure; with_context}
 
-  let group = Benchmark.Group "io_read"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
@@ -361,7 +361,7 @@ module Context_size_dependent_write_bench = struct
   let write_storage context key bytes =
     Lwt_main.run (Tezos_protocol_environment.Context.add context key bytes)
 
-  let group = Benchmark.Group "io_write"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
@@ -626,7 +626,7 @@ module Irmin_pack_read_bench = struct
             (depth, (storage_bytes, ())))
       (read_model ~name:"irmin")
 
-  let group = Benchmark.Group "io_read"
+  let group = Benchmark.Group "io"
 
   let workload_encoding =
     let open Data_encoding in
@@ -804,7 +804,7 @@ module Irmin_pack_write_bench = struct
             (keys_written, (storage_bytes, ())))
       (write_model ~name:"irmin")
 
-  let group = Benchmark.Group "io_write"
+  let group = Benchmark.Group "io"
 
   let write_storage context key bytes =
     Lwt_main.run (Context.add context key bytes)
@@ -946,7 +946,7 @@ module Read_random_key_bench = struct
         in
         Sparse_vec.String.of_list keys
 
-  let group = Benchmark.Group "io_read"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
@@ -1097,7 +1097,7 @@ module Write_random_keys_bench = struct
         in
         Sparse_vec.String.of_list keys
 
-  let group = Benchmark.Group "io_write"
+  let group = Benchmark.Group "io"
 
   let model =
     Model.make
