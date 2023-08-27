@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -92,9 +93,7 @@ let with_context ~base_dir ~context_hash f =
     let* () = Tezos_context.Context.close index in
     Lwt.return res)
 
-let prepare_base_dir base_dir =
-  Unix.unlink base_dir ;
-  Unix.mkdir base_dir 0o700
+let prepare_base_dir base_dir = Unix.unlink base_dir
 
 (* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
