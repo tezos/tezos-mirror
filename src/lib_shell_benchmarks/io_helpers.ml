@@ -300,3 +300,13 @@ let rec copy_rec source dest =
         source ;
       set_infos dest infos
   | _ -> prerr_endline ("Can't cope with special file " ^ source)
+
+let split_absolute_path s =
+  (* Must start with / *)
+  if s = "" || s.[0] <> '/' then None
+  else
+    let ss = String.split_no_empty '/' s in
+    (* Must not contain ., .. *)
+    if List.exists (function "." | ".." -> true | _ -> false) ss then
+      None
+    else Some ss
