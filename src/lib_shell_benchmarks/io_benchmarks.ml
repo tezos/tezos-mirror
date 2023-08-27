@@ -1193,9 +1193,11 @@ module Write_random_keys_bench = struct
       Io_helpers.with_context ~base_dir ~context_hash (fun context ->
           Io_stats.load_tree context
           @@ Option.value_f ~default:(fun () ->
-              Stdlib.failwith
-                (Format.asprintf "%a: invalid config subdirectory"
-                   Namespace.pp name))
+                 Stdlib.failwith
+                   (Format.asprintf
+                      "%a: invalid config subdirectory"
+                      Namespace.pp
+                      name))
           @@ Io_helpers.split_absolute_path config.subdirectory)
     in
     let keys = List.of_seq @@ Io_helpers.Key_map.to_seq tree in

@@ -108,3 +108,9 @@ val copy_rec : string -> string -> unit
    It returns [None] for illigal paths such as ["a/b/c"], ["/a/../b"] and ["/a/b/."].
 *)
 val split_absolute_path : string -> string list option
+
+(** [load_head_block data_dir] takes the path of the Tezos node data directory
+    (typically [$HOME/.tezos-node]) and returns the information of the current head.
+*)
+val load_head_block :
+  string -> (int32 * Block_hash.t * Context_hash.t) tzresult Lwt.t

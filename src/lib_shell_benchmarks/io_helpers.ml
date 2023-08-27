@@ -300,6 +300,38 @@ let split_absolute_path s =
   else
     let ss = String.split_no_empty '/' s in
     (* Must not contain ., .. *)
-    if List.exists (function "." | ".." -> true | _ -> false) ss then
-      None
+    if List.exists (function "." | ".." -> true | _ -> false) ss then None
     else Some ss
+
+let load_head_block data_dir =
+  let chain_id = "NetXdQprcVkpa" in
+  let genesis =
+    let config =
+      let fn_config =
+        Printf.sprintf "%s/store/chain_%s/config.json" data_dir chain_id
+      in
+      let config =
+        Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file fn_config
+      in
+      match Data_encoding.Json.from_string config with
+      | Error s -> Stdlib.failwith s
+      | Ok config ->
+          Data_encoding.Json.destruct
+            Tezos_store_shared.Store_types.chain_config_encoding
+            config
+    in
+    config.genesis
+  in
+  let open Lwt_result_syntax in
+  let open Tezos_store.Store in
+  let* store =
+    init
+      ~store_dir:(Filename.concat data_dir "store")
+      ~context_dir:(Filename.concat data_dir "context")
+      ~allow_testchains:false
+      genesis
+  in
+  let chain_store = main_chain_store store in
+  let*! head = Chain.current_head chain_store in
+  let*! () = close_store store in
+  return (Block.level head, Block.hash head, Block.context_hash head)
