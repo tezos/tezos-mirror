@@ -45,6 +45,8 @@ type 'workload benchmark =
       measure : unit -> float;
     }
       -> 'workload benchmark
+      (** Calculated provides its own [measure] function, unlike the other
+      benchmarks where [Measure] module times their closures *)
   | Plain : {
       workload : 'workload;
       closure : unit -> unit;
