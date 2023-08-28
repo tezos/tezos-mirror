@@ -374,7 +374,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args11
+      (args12
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -383,6 +383,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_switch
          operations_arg
          context_path_arg
+         adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
          endpoint_arg
          block_count_arg)
@@ -395,6 +396,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force,
              extra_operations,
              context_path,
+             adaptive_issuance_vote,
              do_not_monitor_node_mempool,
              dal_node_endpoint,
              block_count )
@@ -414,6 +416,14 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?context_path
           ?dal_node_endpoint
           ~count:block_count
+          ?votes:
+            (Option.map
+               (fun adaptive_issuance_vote ->
+                 {
+                   Baking_configuration.default_votes_config with
+                   adaptive_issuance_vote;
+                 })
+               adaptive_issuance_vote)
           delegates);
     command
       ~group
