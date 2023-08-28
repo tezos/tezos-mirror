@@ -42,6 +42,8 @@ open Error_monad
 open Store_sigs
 open Indexed_store
 
+let default_index_buffer_size = 10_000
+
 (** Signature for type equipped with a generator and a pretty printing
     function. *)
 module type GENERATABLE = sig
@@ -455,7 +457,7 @@ module Indexable_for_test = struct
 
   type t = rw S.t
 
-  let load = S.load Read_write
+  let load = S.load ~index_buffer_size:default_index_buffer_size Read_write
 
   let read s k = S.find s k
 
@@ -500,7 +502,7 @@ module Indexable_removable_for_test = struct
 
   type t = rw S.t
 
-  let load = S.load Read_write
+  let load = S.load ~index_buffer_size:default_index_buffer_size Read_write
 
   let read s k = S.find s k
 
@@ -565,7 +567,12 @@ module Indexed_file_for_test = struct
 
   type t = rw S.t
 
-  let load ~path = S.load ~path ~cache_size:10 Read_write
+  let load ~path =
+    S.load
+      ~index_buffer_size:default_index_buffer_size
+      ~path
+      ~cache_size:10
+      Read_write
 
   open Lwt_result_syntax
 
@@ -611,9 +618,21 @@ let test_load () =
       (Format.sprintf "tezos-layer2-indexed-store-test-load-%d-%d" pid !uid)
   in
   let open Lwt_result_syntax in
-  let* store = Indexed_file_for_test.S.load ~path ~cache_size:1 Read_only in
+  let* store =
+    Indexed_file_for_test.S.load
+      ~index_buffer_size:default_index_buffer_size
+      ~path
+      ~cache_size:1
+      Read_only
+  in
   let* () = Indexed_file_for_test.S.close store in
-  let* store = Indexed_file_for_test.S.load ~path ~cache_size:1 Read_write in
+  let* store =
+    Indexed_file_for_test.S.load
+      ~index_buffer_size:default_index_buffer_size
+      ~path
+      ~cache_size:1
+      Read_write
+  in
   Indexed_file_for_test.S.close store
 
 let unit_tests =
