@@ -351,10 +351,20 @@ let make_driver ~file_format =
           Some (apply_lod profiler_state.max_lod report)
       | _ -> None
 
+    let writer_of file_format formatter report time =
+      match file_format with
+      | Plain_text ->
+          Format.fprintf formatter "%a%!" (pp_report ~t0:time) report
+      | Json ->
+          let encoded_report =
+            Data_encoding.Json.construct Profiler.report_encoding report
+          in
+          Data_encoding.Json.pp formatter encoded_report
+
     let may_write ({time = t0; output; _} as state) =
       match report state with
       | None -> ()
-      | Some report -> (
+      | Some report ->
           let ppf =
             match output with
             | Open (_, _, ppf) -> ppf
@@ -364,13 +374,7 @@ let make_driver ~file_format =
                 state.output <- Open (fn, fp, ppf) ;
                 ppf
           in
-          match file_format with
-          | Plain_text -> Format.fprintf ppf "%a%!" (pp_report ~t0) report
-          | Json ->
-              let encoded_report =
-                Data_encoding.Json.construct Profiler.report_encoding report
-              in
-              Data_encoding.Json.pp ppf encoded_report)
+          writer_of file_format ppf report t0
 
     let inc state report =
       state.profiler_state <- inc state.profiler_state report ;
@@ -401,6 +405,6 @@ let make_driver ~file_format =
   end : DRIVER
     with type config = string * lod)
 
-let auto_write_to_file = make_driver ~file_format:Plain_text
+let auto_write_to_txt_file = make_driver ~file_format:Plain_text
 
 let auto_write_to_json_file = make_driver ~file_format:Json
