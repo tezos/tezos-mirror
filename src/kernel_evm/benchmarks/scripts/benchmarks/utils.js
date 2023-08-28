@@ -18,7 +18,7 @@ const external = require("../lib/external")
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
-const CHUNKER = external.bin("`./octez-evm-proxy-server")
+const CHUNKER = external.bin("./octez-evm-proxy-server")
 
 const print_full = function (rawTx) {
 
