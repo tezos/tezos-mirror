@@ -135,22 +135,45 @@ module Config : sig
 
   (** Call the RPC [GET /chains/main/mempool/filter] with query
       parameter [include_default]. *)
-  val call_get_filter : ?include_default:bool -> Client.t -> JSON.t Lwt.t
+  val call_get_filter :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?include_default:bool ->
+    Client.t ->
+    JSON.t Lwt.t
 
   (** Check that the RPC [GET /chains/main/mempool/filter] returns the json
       corresponding to the provided {!t}, testing all possibilities for
       the optional argument [include_default] (omitted/[true]/[false]). *)
-  val check_get_filter_all_variations : ?log:bool -> t -> Client.t -> unit Lwt.t
+  val check_get_filter_all_variations :
+    ?log:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    t ->
+    Client.t ->
+    unit Lwt.t
 
   (** Call the RPC [POST /chains/main/mempool/filter] with data set to
       the json representation of the given config {!t}.
 
       @param log When true, log the input config at the info
       level. Defaults to false. *)
-  val post_filter : ?log:bool -> t -> Client.t -> JSON.t Lwt.t
+  val post_filter :
+    ?log:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    t ->
+    Client.t ->
+    JSON.t Lwt.t
 
   (** Same as {!post_filter} but takes the data config as a string. *)
-  val post_filter_str : ?log:bool -> string -> Client.t -> JSON.t Lwt.t
+  val post_filter_str :
+    ?log:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    string ->
+    Client.t ->
+    JSON.t Lwt.t
 
   (** Set the mempool filter config to the provided parameters. Note
       that every omitted parameter will be set back to its default
@@ -164,6 +187,8 @@ module Config : sig
       @param log is passed on to {!post_filter}. *)
   val set_filter :
     ?log:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
     ?minimal_fees:int ->
     ?minimal_nanotez_per_gas_unit:int * int ->
     ?minimal_nanotez_per_byte:int * int ->
