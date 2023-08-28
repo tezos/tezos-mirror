@@ -2093,6 +2093,35 @@ let test_kernel_upgrade_failing_migration =
     ~endpoint
     ~expected_block_level:2
 
+let test_check_kernel_upgrade_nonce =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "upgrade"; "nonce"]
+    ~title:"Ensures EVM kernel's upgrade nonce is bumped"
+  @@ fun protocol ->
+  let base_installee = "./" in
+  let installee = "evm_kernel" in
+  let dictator = Eth_account.bootstrap_accounts.(0) in
+  let* _, _, _, _, evm_proxy_server, _ =
+    gen_test_kernel_upgrade
+      ~base_installee
+      ~installee
+      ~dictator:dictator.public_key
+      ~private_key:dictator.private_key
+      protocol
+  in
+  let* upgrade_nonce_result =
+    Evm_proxy_server.call_evm_rpc
+      evm_proxy_server
+      Evm_proxy_server.{method_ = "tez_upgradeNonce"; parameters = `Null}
+  in
+  let upgrade_nonce =
+    upgrade_nonce_result |> Evm_proxy_server.extract_result |> JSON.as_int32
+  in
+  Check.((upgrade_nonce = Int32.of_int 2) int32)
+    ~error_msg:(sf "Expected upgrade nonce should be %%R, but got %%L") ;
+  unit
+
 let send_raw_transaction_request raw_tx =
   Evm_proxy_server.
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
@@ -2448,6 +2477,7 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_wrong_rollup_address protocols ;
   test_kernel_upgrade_no_dictator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
+  test_check_kernel_upgrade_nonce protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols
 
