@@ -6,11 +6,19 @@
 
 const path = require('node:path');
 
+/**
+ * Is the script execution in production (as indicated by $NODE_ENV)
+ * @returns boolean
+ */
 const in_prod = function () {
     return process.env.NODE_ENV == "production"
 }
 
-// When in production, binaries are searched in the $PATH
+/**
+ * When in production, binaries are searched in the $PATH
+ * @param filepath
+ * @returns
+ */
 const bin = function (filepath) {
     if (in_prod()) {
         return path.basename(filepath)
@@ -19,8 +27,12 @@ const bin = function (filepath) {
     }
 }
 
-// When in production, the ressources are searched for in directory
-// configurable using the env variable $EXTERNAL_RESSOURCES
+/**
+ * When in production, the ressources are searched for in directory
+ * configurable using the env variable $EXTERNAL_RESSOURCES
+ * @param filepath
+ * @returns
+ */
 const resource = function (filepath) {
     if (in_prod() && process.env.EXTERNAL_RESSOURCES) {
         return path.format({
@@ -32,7 +44,26 @@ const resource = function (filepath) {
     }
 }
 
-// Returns an output directory configurable using env variable $OUTPUT
+/**
+ * returns a directory name depending on execution environnement.
+ * In production: returns the environnement variable $EXTERNAL_RESSOURCES,
+ * else: returns filepath.
+ * @param filepath
+ * @returns
+ */
+const ressource_dir = function (filepath) {
+    if (in_prod() && process.env.EXTERNAL_RESSOURCES) {
+        return process.env.EXTERNAL_RESSOURCES
+    } else {
+        return filepath
+    }
+
+}
+
+/**
+ * Returns an output directory configurable using env variable $OUTPUT
+ * @returns
+ */
 const output = function () {
     if (process.env.OUTPUT) {
         return process.env.OUTPUT
@@ -42,4 +73,4 @@ const output = function () {
 
 }
 
-module.exports = { bin, resource, output }
+module.exports = { bin, resource, ressource_dir, output }
