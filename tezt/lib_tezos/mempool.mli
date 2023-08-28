@@ -133,6 +133,10 @@ module Config : sig
       (i.e. containing [None]) have been set to their default value. *)
   val fill_with_default : t -> t
 
+  (** Call the RPC [GET /chains/main/mempool/filter] with query
+      parameter [include_default]. *)
+  val call_get_filter : ?include_default:bool -> Client.t -> JSON.t Lwt.t
+
   (** Check that the RPC [GET /chains/main/mempool/filter] returns the json
       corresponding to the provided {!t}, testing all possibilities for
       the optional argument [include_default] (omitted/[true]/[false]). *)

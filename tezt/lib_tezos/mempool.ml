@@ -297,20 +297,17 @@ module Config = struct
       max_total_bytes = aux_int default_max_total_bytes config.max_total_bytes;
     }
 
+  let call_get_filter ?include_default client =
+    RPC.Client.call client (RPC.get_chain_mempool_filter ?include_default ())
+
   let check_get_filter_all_variations ?(log = false) expected_config client =
     let expected_full = fill_with_default expected_config in
-    let* json = RPC.Client.call client @@ RPC.get_chain_mempool_filter () in
+    let* json = call_get_filter client in
     check_equal expected_full (of_json json) ;
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:true ()
-    in
+    let* json = call_get_filter ~include_default:true client in
     check_equal expected_full (of_json json) ;
     let expected_partial = clear_default expected_config in
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_mempool_filter ~include_default:false ()
-    in
+    let* json = call_get_filter ~include_default:false client in
     check_equal expected_partial (of_json json) ;
     if log then
       Log.info
