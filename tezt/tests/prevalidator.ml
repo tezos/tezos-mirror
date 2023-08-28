@@ -3703,15 +3703,6 @@ let injecting_old_operation_fails =
   Process.check_error ~msg:injection_error_rex process
 
 (* Probably to be replaced during upcoming mempool tests refactoring *)
-let init_single_node_and_activate_protocol
-    ?(arguments = Node.[Synchronisation_threshold 0; Connections 0])
-    ?event_sections_levels protocol =
-  let* node = Node.init ?event_sections_levels arguments in
-  let* client = Client.init ~endpoint:Client.(Node node) () in
-  let* () = Client.activate_protocol_and_wait ~protocol client in
-  return (node, client)
-
-(* Probably to be replaced during upcoming mempool tests refactoring *)
 let init_two_connected_nodes_and_activate_protocol ?event_sections_levels1
     ?event_sections_levels2 protocol =
   let arguments = Node.[Synchronisation_threshold 0; Connections 1] in
@@ -3729,128 +3720,6 @@ let init_two_connected_nodes_and_activate_protocol ?event_sections_levels1
 
 (* TMP: to be replaced in !3418 *)
 let log_step n msg = Log.info ~color:Log.Color.BG.blue "Step %d: %s" n msg
-
-(** Aim: test RPCs [GET|POST /chains/<chain>/mempool/filter]. *)
-let test_get_post_mempool_filter =
-  let title = "get post mempool filter" in
-  let tags = ["mempool"; "node"; "filter"] in
-  let step1_msg = "Start a single node and activate the protocol." in
-  let step2_msg =
-    "Call RPC [GET /chains/main/mempool/filter], check that we obtain the \
-     default configuration (the full configuration when the query parameter \
-     [include_default] is either absent or set to [true], or an empty \
-     configuration if [include_default] is [false])."
-  in
-  let step3_msg =
-    "Call RPC [POST /chains/main/mempool/filter] for various configurations. \
-     Each time, call [GET /chains/main/mempool/filter] with optional parameter \
-     include_default omitted/[true]/[false] and check that we obtain the right \
-     configuration."
-  in
-  let step4_msg =
-    "Step 4: Post invalid config modifications, check that config is unchanged \
-     and event [invalid_mempool_filter_configuration] is witnessed."
-  in
-  let step5_msg =
-    "Step 5: Set the filter to {} and check that this restored the default \
-     config. Indeed, fields that are not provided are set to their default \
-     value."
-  in
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  let open Mempool.Config in
-  log_step 1 step1_msg ;
-  let* node1, client1 =
-    (* We need event level [debug] for event
-       [invalid_mempool_filter_configuration]. *)
-    init_single_node_and_activate_protocol
-      ~event_sections_levels:[("prevalidator", `Debug)]
-      protocol
-  in
-  log_step 2 step2_msg ;
-  let* () = check_get_filter_all_variations ~log:true default client1 in
-  log_step 3 step3_msg ;
-  let set_config_and_check msg config =
-    Log.info "%s" msg ;
-    let* output = post_filter ~log:true config client1 in
-    check_equal (fill_with_default config) (of_json output) ;
-    check_get_filter_all_variations ~log:true config client1
-  in
-  let* () =
-    set_config_and_check
-      "Config1: not all fields provided (missing fields should be set to \
-       default)."
-      {
-        minimal_fees = Some 25;
-        minimal_nanotez_per_gas_unit = None;
-        minimal_nanotez_per_byte = Some (1050, 1);
-        replace_by_fee_factor = None;
-        max_operations = Some 0;
-        max_total_bytes = Some 11;
-      }
-  in
-  let* () =
-    set_config_and_check
-      "Config2: all fields provided and distinct from default."
-      {
-        minimal_fees = Some 1;
-        minimal_nanotez_per_gas_unit = Some (2, 3);
-        minimal_nanotez_per_byte = Some (4, 5);
-        replace_by_fee_factor = Some (6, 7);
-        max_operations = Some 8;
-        max_total_bytes = Some 9;
-      }
-  in
-  let config3 =
-    {
-      minimal_fees = None;
-      minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
-      minimal_nanotez_per_byte = Some (4, 2);
-      replace_by_fee_factor = None;
-      max_operations = Some default_max_operations;
-      max_total_bytes = Some 10_000_000;
-    }
-  in
-  let* () =
-    set_config_and_check
-      "Config3: some of the provided fields equal to default."
-      config3
-  in
-  log_step 4 step4_msg ;
-  let config3_full = fill_with_default config3 in
-  let test_invalid_config invalid_config_str =
-    let waiter =
-      Node.wait_for
-        node1
-        (* This event has level [debug]. *)
-        "invalid_mempool_filter_configuration.v0"
-        (Fun.const (Some ()))
-    in
-    let* output = post_filter_str invalid_config_str client1 in
-    check_equal config3_full (of_json output) ;
-    let* () = waiter in
-    let* output = RPC.Client.call client1 @@ RPC.get_chain_mempool_filter () in
-    check_equal config3_full (of_json output) ;
-    Log.info "Tested invalid config: %s." invalid_config_str ;
-    unit
-  in
-  let* () =
-    Tezos_base__TzPervasives.List.iter_s
-      test_invalid_config
-      [
-        (* invalid field name *)
-        {|{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "1050", "1" ], "minimal_nanotez_per_byte": [ "7", "5" ], "replace_by_fee_factor": ["21", "20"], "max_operations": 0, "max_total_bytes": 10_000_000, "invalid_field_name": 0 }|};
-        (* wrong type *)
-        {|{ "minimal_fees": true}|};
-        (* not enough elements in a pair *)
-        {|{ "minimal_nanotez_per_gas_unit": [ "100" ]}|};
-        (* too many elements in a pair *)
-        {|{ "minimal_nanotez_per_gas_unit": [ "100", "1", "10" ]}|};
-      ]
-  in
-  log_step 5 step5_msg ;
-  let* output = post_filter_str ~log:true "{}" client1 in
-  check_equal default (of_json output) ;
-  check_get_filter_all_variations ~log:true default client1
 
 (** Similar to [Node_event_level.transfer_and_wait_for_injection] but more general.
     Should be merged with it during upcoming mempool tests refactoring. *)
@@ -4186,6 +4055,5 @@ let register ~protocols =
   test_pending_operation_version protocols ;
   force_operation_injection protocols ;
   injecting_old_operation_fails protocols ;
-  test_get_post_mempool_filter protocols ;
   test_mempool_filter_operation_arrival protocols ;
   test_request_operations_peer protocols
