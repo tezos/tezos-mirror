@@ -998,7 +998,7 @@ let parse_view_output_ty ctxt ~stack_depth ~legacy node =
     ~ret:Don't_parse_entrypoints
     node
 
-let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
+let parse_storage_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
     ctxt
     ~stack_depth
@@ -1009,15 +1009,6 @@ let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     node
-
-let parse_storage_ty :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy node ->
-  (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 (* check_packable: determine if a `ty` is packable into Michelson *)
 let check_packable ~allow_contract loc root =
