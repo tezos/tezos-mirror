@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Kaitai.Types
+open Kaitai_ast.Types
 
 (* We need to access the definition of data-encoding's [descr] type. For this
    reason we open the private/internal module [Data_encoding__Encoding] (rather

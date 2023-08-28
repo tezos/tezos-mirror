@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "yaml" { >= "3.1.0" }
   "ppx_expect"
+  "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
