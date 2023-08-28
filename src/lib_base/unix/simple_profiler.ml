@@ -319,6 +319,8 @@ type auto_writer_state = {
 type (_, _) Profiler.kind +=
   | Auto_write_to_file : (string * lod, auto_writer_state) Profiler.kind
 
+type file_format = Plain_text | Json
+
 let make_driver ~file_format =
   (module struct
     type nonrec state = auto_writer_state
@@ -399,6 +401,6 @@ let make_driver ~file_format =
   end : DRIVER
     with type config = string * lod)
 
-let auto_write_to_file = make_driver ~file_format:Profiler.Plain_text
+let auto_write_to_file = make_driver ~file_format:Plain_text
 
-let auto_write_to_json_file = make_driver ~file_format:Profiler.Json
+let auto_write_to_json_file = make_driver ~file_format:Json
