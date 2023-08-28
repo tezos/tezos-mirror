@@ -119,7 +119,7 @@ val print_view_result :
   unit tzresult Lwt.t
 
 val print_run_result :
-  #Protocol_client_context.full ->
+  Protocol_client_context.full ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr

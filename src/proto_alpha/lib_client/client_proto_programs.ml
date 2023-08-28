@@ -82,10 +82,16 @@ let print_view_result (cctxt : #Protocol_client_context.full) =
       return_unit
   | Error errs -> print_errors cctxt ~show_source:false errs
 
-let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
+let print_run_result (cctxt : Protocol_client_context.full) ~show_source ~parsed
+    =
   let open Lwt_result_syntax in
   function
   | Ok (storage, operations, maybe_lazy_storage_diff) ->
+      let* operations =
+        List.map_es
+          (Operation_result.normalize_internal_operation cctxt Readable)
+          operations
+      in
       let*! () =
         cctxt#message
           "@[<v 0>@[<v 2>storage@,\
