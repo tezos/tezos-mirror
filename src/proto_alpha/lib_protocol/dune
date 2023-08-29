@@ -189,7 +189,6 @@
   Liquidity_baking_migration
   Sc_rollup_errors
   Sc_rollup_inbox_storage
-  Remove_zero_amount_ticket_migration_for_o
   Legacy_script_patches
   Sapling_validator
   Global_constants_storage
@@ -467,7 +466,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli
@@ -746,7 +744,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli
@@ -1009,7 +1006,6 @@
   liquidity_baking_migration.ml liquidity_baking_migration.mli
   sc_rollup_errors.ml
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
-  remove_zero_amount_ticket_migration_for_o.ml
   legacy_script_patches.ml
   sapling_validator.ml
   global_constants_storage.ml global_constants_storage.mli
