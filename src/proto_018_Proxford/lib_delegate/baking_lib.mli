@@ -41,6 +41,7 @@ val bake :
   ?dal_node_endpoint:Uri.t ->
   (* Number of baked blocks. Defaults to 1. *)
   ?count:int ->
+  ?votes:Baking_configuration.per_block_votes_config ->
   Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
