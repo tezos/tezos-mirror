@@ -119,6 +119,15 @@ val non_negative_param :
   ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
   (int -> 'a, 'b) Tezos_clic.params
 
+val positive_int_parameter :
+  unit -> (int, #Client_context.io) Tezos_clic.parameter
+
+val positive_int_param :
+  name:string ->
+  desc:string ->
+  ('a, (#Client_context.io as 'b)) Tezos_clic.params ->
+  (int -> 'a, 'b) Tezos_clic.params
+
 val global_constant_param :
   name:string ->
   desc:string ->

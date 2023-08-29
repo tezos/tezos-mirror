@@ -221,6 +221,15 @@ let endpoint_arg =
     ~doc:"endpoint of the DAL node, e.g. 'http://localhost:8933'"
     (Tezos_clic.parameter (fun _ s -> return @@ Uri.of_string s))
 
+let block_count_arg =
+  Tezos_clic.default_arg
+    ~long:"count"
+    ~short:'n'
+    ~placeholder:"block count"
+    ~doc:"number of blocks to bake"
+    ~default:"1"
+  @@ Client_proto_args.positive_int_parameter ()
+
 let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     =
   let open Tezos_clic in
@@ -231,7 +240,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args10
+      (args11
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -241,7 +250,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          operations_arg
          context_path_arg
          do_not_monitor_node_mempool_arg
-         endpoint_arg)
+         endpoint_arg
+         block_count_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
@@ -252,7 +262,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              extra_operations,
              context_path,
              do_not_monitor_node_mempool,
-             dal_node_endpoint )
+             dal_node_endpoint,
+             block_count )
            pkhs
            cctxt ->
         get_delegates cctxt pkhs >>=? fun delegates ->
@@ -268,6 +279,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?extra_operations
           ?context_path
           ?dal_node_endpoint
+          ~count:block_count
           delegates);
     command
       ~group
