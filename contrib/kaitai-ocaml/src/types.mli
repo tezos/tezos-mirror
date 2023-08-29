@@ -6,11 +6,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6251
+         Add/improve existing docstring. *)
+
 module Identifier : sig
+  (** [t] is a string identifier. *)
   type t = string
 end
 
-(** https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/exprlang/Ast.scala *)
+(** [Ast] module defines Kaitai Struct expression language.
+   
+    - For more about it see {{:https://doc.kaitai.io/user_guide.html#_expression_language} the Kaitai Struct User Guide}.
+    - For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/exprlang/Ast.scala} see}.*)
 module Ast : sig
   type boolop = Or | And
 
@@ -29,44 +36,53 @@ module Ast : sig
     | BitAnd
 
   type unaryop =
-    (* Bitwise negation operator. Applicable only to `IntNum`s *)
-    | Invert
-    (* Boolean negation operator. Applicable only to `Boolean`s *)
-    | Not
-    (* Arithmetic negation operator. Applicable only to `IntNum`s / `FloatNum`s *)
+    | Invert  (** Bitwise negation operator. Applicable only to [IntNum]s. *)
+    | Not  (** Boolean negation operator. Applicable only to [Boolean]s. *)
     | Minus
+        (** Arithmetic negation operator. Applicable only to [IntNum]s or [FloatNum]s. *)
 
   type cmpop = Eq | NotEq | Lt | LtE | Gt | GtE
 
   type t =
     | Raw of string
-      (* Temporary: [Raw] So that we don't need to deal with parsing/printing of Ast.expr *)
+        (** Temporary: [Raw] So that we don't need to deal with parsing/printing of [Ast.expr]. *)
     | BoolOp of {op : boolop; values : t list}
+        (** [BoolOp] represent a boolean operation. *)
     | BinOp of {left : t; op : operator; right : t}
+        (** [BinOp] represents a binary operation. *)
     | UnaryOp of {op : unaryop; operand : t}
+        (** [UnaryOp] represents an unary operation. *)
     | IfExp of {condition : t; ifTrue : t; ifFalse : t}
-    (* | Dict of {keys : t list; values : t list} *)
-    (* Represents `X < Y`, `X > Y` and so on. *)
+        (** | Dict of {keys : t list; values : t list} *)
     | Compare of {left : t; ops : cmpop; right : t}
+        (** Represents [X < Y], [X > Y] and so on. *)
     | Call of {func : t; args : t list}
-    | IntNum of int (* BigInt *)
-    | FloatNum of float (* BigDecimal *)
-    | Str of string
-    | Bool of bool
+        (** [Call] represents a function call. *)
+    | IntNum of int
+        (** [IntNum] is originally represented by {@scala[scala.math.BigInt]}. *)
+    | FloatNum of float
+        (** [FloatNum] is originally represented by  {@scala[scala.math.BigDecimal]}. *)
+    | Str of string  (** [Str] is a string expression. *)
+    | Bool of bool  (** [Bool] is a bool expression. *)
     | EnumByLabel of {
         enumName : Identifier.t;
         label : Identifier.t;
         inType : typeId;
-      }
+      }  (** [EnumByLabel] represents an enum istance. *)
     | EnumById of {enumName : Identifier.t; id : t; inType : typeId}
+        (** [EnumById] represents an enum istance. *)
     | Attribute of {value : t; attr : Identifier.t}
+        (** [Attribute] represents a [x.y] where [y] is [attr]. *)
     | CastToType of {value : t; typeName : typeId}
+        (** [CastToType] is used for casting types. *)
     | ByteSizeOfType of {typeName : typeId}
+        (** [BytesSizeOfType] expression for specifying type size in bytes.   *)
     | BitSizeOfType of {typeName : typeId}
-    (* Represents `X[Y]`. *)
-    | Subscript of {value : t; idx : t}
+        (** [BitSizeOfType] expression for specifying type size in bits.   *)
+    | Subscript of {value : t; idx : t}  (** Represents [[X[Y]]]. *)
     | Name of Identifier.t
-    | List of t list
+        (** [Name] is used for defining variable, e.g. [x]. *)
+    | List of t list  (** [List] represents a list. *)
 
   type expr = t
 
@@ -93,8 +109,12 @@ module Endianness : sig
   val to_string : t -> string
 end
 
+(** [DocSpec] module defines primitives for attaching documentation to kaitai
+    specification files. 
+   
+    See the {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/DocSpec.scala}
+    reference implementation}.*)
 module DocSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/DocSpec.scala *)
   type refspec = TextRef of string | UrlRef of {url : string; text : string}
 
   type t = {summary : string option; refs : refspec list}
@@ -104,8 +124,11 @@ module InstanceIdentifier : sig
   type t = string
 end
 
+(** [RepeatSpec] defines possible repetitions of Kaitai primitives. 
+
+    See the {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/RepeatSpec.scala}
+    reference implementation}.*)
 module RepeatSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/RepeatSpec.scala *)
   type t =
     | RepeatExpr of Ast.expr
     | RepeatUntil of Ast.expr
@@ -113,8 +136,11 @@ module RepeatSpec : sig
     | NoRepeat
 end
 
+(** [ValidationSpec] defines validation logic for Kaitai primitives.
+
+    See the {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ValidationSpec.scala}
+    reference implementation}.*)
 module ValidationSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ValidationSpec.scala *)
   type t =
     | ValidationEq of Ast.expr
     | ValidationMin of Ast.expr
@@ -124,18 +150,20 @@ module ValidationSpec : sig
     | ValidationExpr of Ast.expr
 end
 
+(** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumValueSpec.scala} see}. *)
 module EnumValueSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumValueSpec.scala *)
   type t = {name : string; doc : DocSpec.t}
 end
 
+(** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumSpec.scala} see}.*)
 module EnumSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumSpec.scala *)
   type t = {path : string list; map : (int * EnumValueSpec.t) list}
 end
 
 module MetaSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/MetaSpec.scala *)
+  (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/MetaSpec.scala} see}.*)
+
+  (** [t] defines the meta section of Kaitai specification file. *)
   type t = {
     path : string list;
     isOpaque : bool;
@@ -150,8 +178,10 @@ module MetaSpec : sig
   }
 end
 
+(** [DataType] module defines AST for describing underlying data types.
+
+    For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala} see. *)
 module rec DataType : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala *)
   type data_type =
     | NumericType of numeric_type
     | BooleanType
@@ -215,7 +245,7 @@ module rec DataType : sig
   and complex_data_type =
     | StructType
     | UserType of ClassSpec.t
-    | Array_Type of array_type
+    | ArrayType of array_type
 
   and switch_type = {
     on : Ast.expr;
@@ -229,12 +259,13 @@ module rec DataType : sig
   val to_string : t -> string
 end
 
+(** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/AttrSpec.scala} see}.*)
 and AttrSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/AttrSpec.scala *)
   module ConditionalSpec : sig
     type t = {ifExpr : Ast.expr option; repeat : RepeatSpec.t}
   end
 
+  (** [t] is a single element inside [ClassSpec.t.seq]. *)
   type t = {
     path : string list;
     id : Identifier.t;
@@ -247,7 +278,11 @@ and AttrSpec : sig
 end
 
 and InstanceSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/InstanceSpec.scala *)
+  (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/InstanceSpec.scala} see}. *)
+
+  (** [t] defines a Kaitai instance.
+  
+      For more about it {{:https://doc.kaitai.io/user_guide.html#_instances_data_beyond_the_sequence} see}. *)
   type t = {doc : DocSpec.t; descr : descr}
 
   and descr =
@@ -261,8 +296,8 @@ and InstanceSpec : sig
     | ParseInstanceSpec (* TODO *)
 end
 
+(** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ParamDefSpec.scala} see}. *)
 and ParamDefSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ParamDefSpec.scala *)
   type t = {
     path : string list;
     id : Identifier.t;
@@ -272,7 +307,9 @@ and ParamDefSpec : sig
 end
 
 and ClassSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ClassSpec.scala *)
+  (** For a reference implementation {{:https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ClassSpec.scala} see}. *)
+
+  (** [t] is an outermost type that describes Kaitai Struct specification files. *)
   type t = {
     fileName : string option;
     path : string list;

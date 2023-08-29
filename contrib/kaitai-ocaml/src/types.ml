@@ -218,7 +218,7 @@ module rec DataType : sig
   and complex_data_type =
     | StructType
     | UserType of ClassSpec.t
-    | Array_Type of array_type
+    | ArrayType of array_type
 
   and switch_type = {
     on : Ast.expr;
@@ -294,7 +294,7 @@ end = struct
   and complex_data_type =
     | StructType
     | UserType of ClassSpec.t
-    | Array_Type of array_type
+    | ArrayType of array_type
 
   and switch_type = {
     on : Ast.expr;
