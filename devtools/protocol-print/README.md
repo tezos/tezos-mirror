@@ -48,7 +48,7 @@ You can use
 ```
 devtool/patchs/apply_env_patch.sh devtools/protocol-print/add-hack-module.patch 3 10 11
 ```
-to port this patch to different environments (here 10 and 11).
+to port this patch to different protocol environment versions (here 10 and 11).
 
 Please recall that the Hack module, as it is defined here, is useless in recent
 environments as explained in the first section of this README.
