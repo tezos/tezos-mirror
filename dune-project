@@ -4,6 +4,8 @@
 (using ctypes 0.1)
 (package (name bls12-381))
 (package (name internal-devtools))
+(package (name kaitai))
+(package (name kaitai-of-data-encoding))
 (package (name octez-accuser-Proxford))
 (package (name octez-accuser-PtNairob))
 (package (name octez-accuser-alpha))

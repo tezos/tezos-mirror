@@ -2,10 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name kaitai_test)
- (package kaitai)
- (instrumentation (backend bisect_ppx))
+ (name kaitai_of_data_encoding_test)
+ (package kaitai-of-data-encoding)
  (libraries
-  kaitai)
+  yaml
+  data-encoding
+  kaitai
+  kaitai-of-data-encoding)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect)))

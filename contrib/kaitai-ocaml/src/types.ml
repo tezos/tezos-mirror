@@ -110,7 +110,7 @@ end
 module DataType = struct
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala *)
   type data_type =
-    | NumericType
+    | NumericType of numeric_type
     | BooleanType
     | BytesType of bytes_type
     | StrType of str_type
@@ -118,6 +118,8 @@ module DataType = struct
     | AnyType
 
   and int_width = W1 | W2 | W4 | W8
+
+  and numeric_type = Int_type of int_type | Float_type of float_type
 
   and int_type =
     | CalcIntType
@@ -177,6 +179,11 @@ module DataType = struct
   }
 
   type t = data_type
+
+  let to_string = function
+    | NumericType (Int_type (Int1Type {signed})) ->
+        if signed then "s1" else "u1"
+    | _ -> failwith "not supported"
 end
 
 module DocSpec = struct

@@ -2,8 +2,9 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name kaitai)
- (public_name kaitai)
- (instrumentation (backend bisect_ppx))
+ (name kaitai_of_data_encoding)
+ (public_name kaitai-of-data-encoding)
  (libraries
-  yaml))
+  yaml
+  data-encoding
+  kaitai))
