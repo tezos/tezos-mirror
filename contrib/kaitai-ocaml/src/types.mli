@@ -93,7 +93,64 @@ module Endianness : sig
   val to_string : t -> string
 end
 
-module DataType : sig
+module DocSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/DocSpec.scala *)
+  type refspec = TextRef of string | UrlRef of {url : string; text : string}
+
+  type t = {summary : string option; refs : refspec list}
+end
+
+module InstanceIdentifier : sig
+  type t = string
+end
+
+module RepeatSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/RepeatSpec.scala *)
+  type t =
+    | RepeatExpr of Ast.expr
+    | RepeatUntil of Ast.expr
+    | RepeatEos
+    | NoRepeat
+end
+
+module ValidationSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ValidationSpec.scala *)
+  type t =
+    | ValidationEq of Ast.expr
+    | ValidationMin of Ast.expr
+    | ValidationMax of Ast.expr
+    | ValidationRange of {min : Ast.expr; max : Ast.expr}
+    | ValidationAnyOf of Ast.expr list
+    | ValidationExpr of Ast.expr
+end
+
+module EnumValueSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumValueSpec.scala *)
+  type t = {name : string; doc : DocSpec.t}
+end
+
+module EnumSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumSpec.scala *)
+  type t = {path : string list; map : (int * EnumValueSpec.t) list}
+end
+
+module MetaSpec : sig
+  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/MetaSpec.scala *)
+  type t = {
+    path : string list;
+    isOpaque : bool;
+    id : string option;
+    endian : Endianness.t option;
+    bitEndian : BitEndianness.t option;
+    mutable encoding : string option;
+    forceDebug : bool;
+    opaqueTypes : bool option;
+    zeroCopySubstream : bool option;
+    imports : string list;
+  }
+end
+
+module rec DataType : sig
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/datatype/DataType.scala *)
   type data_type =
     | NumericType of numeric_type
@@ -155,7 +212,10 @@ module DataType : sig
 
   and array_type = ArrayTypeInStream | CalcArrayType
 
-  and complex_data_type = StructType | UserType | Array_Type of array_type
+  and complex_data_type =
+    | StructType
+    | UserType of ClassSpec.t
+    | Array_Type of array_type
 
   and switch_type = {
     on : Ast.expr;
@@ -169,38 +229,7 @@ module DataType : sig
   val to_string : t -> string
 end
 
-module DocSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/DocSpec.scala *)
-  type refspec = TextRef of string | UrlRef of {url : string; text : string}
-
-  type t = {summary : string option; refs : refspec list}
-end
-
-module InstanceIdentifier : sig
-  type t = string
-end
-
-module RepeatSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/RepeatSpec.scala *)
-  type t =
-    | RepeatExpr of Ast.expr
-    | RepeatUntil of Ast.expr
-    | RepeatEos
-    | NoRepeat
-end
-
-module ValidationSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ValidationSpec.scala *)
-  type t =
-    | ValidationEq of Ast.expr
-    | ValidationMin of Ast.expr
-    | ValidationMax of Ast.expr
-    | ValidationRange of {min : Ast.expr; max : Ast.expr}
-    | ValidationAnyOf of Ast.expr list
-    | ValidationExpr of Ast.expr
-end
-
-module AttrSpec : sig
+and AttrSpec : sig
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/AttrSpec.scala *)
   module ConditionalSpec : sig
     type t = {ifExpr : Ast.expr option; repeat : RepeatSpec.t}
@@ -212,21 +241,12 @@ module AttrSpec : sig
     dataType : DataType.t;
     cond : ConditionalSpec.t;
     valid : ValidationSpec.t option;
+    enum : string option;
     doc : DocSpec.t;
   }
 end
 
-module EnumValueSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumValueSpec.scala *)
-  type t = {name : string; doc : DocSpec.t}
-end
-
-module EnumSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/EnumSpec.scala *)
-  type t = {path : string list; map : (int * EnumValueSpec.t) list}
-end
-
-module InstanceSpec : sig
+and InstanceSpec : sig
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/InstanceSpec.scala *)
   type t = {doc : DocSpec.t; descr : descr}
 
@@ -241,7 +261,7 @@ module InstanceSpec : sig
     | ParseInstanceSpec (* TODO *)
 end
 
-module ParamDefSpec : sig
+and ParamDefSpec : sig
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ParamDefSpec.scala *)
   type t = {
     path : string list;
@@ -251,23 +271,7 @@ module ParamDefSpec : sig
   }
 end
 
-module MetaSpec : sig
-  (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/MetaSpec.scala *)
-  type t = {
-    path : string list;
-    isOpaque : bool;
-    id : string option;
-    endian : Endianness.t option;
-    bitEndian : BitEndianness.t option;
-    mutable encoding : string option;
-    forceDebug : bool;
-    opaqueTypes : bool option;
-    zeroCopySubstream : bool option;
-    imports : string list;
-  }
-end
-
-module ClassSpec : sig
+and ClassSpec : sig
   (* https://github.com/kaitai-io/kaitai_struct_compiler/blob/master/shared/src/main/scala/io/kaitai/struct/format/ClassSpec.scala *)
   type t = {
     fileName : string option;

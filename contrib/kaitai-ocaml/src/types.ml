@@ -103,7 +103,58 @@ module Endianness = struct
     | `Calc _ | `Inherited -> failwith "not supported"
 end
 
-module DataType = struct
+module DocSpec = struct
+  type refspec = TextRef of string | UrlRef of {url : string; text : string}
+
+  type t = {summary : string option; refs : refspec list}
+end
+
+module InstanceIdentifier = struct
+  type t = string
+end
+
+module RepeatSpec = struct
+  type t =
+    | RepeatExpr of Ast.expr
+    | RepeatUntil of Ast.expr
+    | RepeatEos
+    | NoRepeat
+end
+
+module ValidationSpec = struct
+  type t =
+    | ValidationEq of Ast.expr
+    | ValidationMin of Ast.expr
+    | ValidationMax of Ast.expr
+    | ValidationRange of {min : Ast.expr; max : Ast.expr}
+    | ValidationAnyOf of Ast.expr list
+    | ValidationExpr of Ast.expr
+end
+
+module EnumValueSpec = struct
+  type t = {name : string; doc : DocSpec.t}
+end
+
+module EnumSpec = struct
+  type t = {path : string list; map : (int * EnumValueSpec.t) list}
+end
+
+module MetaSpec = struct
+  type t = {
+    path : string list;
+    isOpaque : bool;
+    id : string option;
+    endian : Endianness.t option;
+    bitEndian : BitEndianness.t option;
+    mutable encoding : string option;
+    forceDebug : bool;
+    opaqueTypes : bool option;
+    zeroCopySubstream : bool option;
+    imports : string list;
+  }
+end
+
+module rec DataType : sig
   type data_type =
     | NumericType of numeric_type
     | BooleanType
@@ -164,7 +215,86 @@ module DataType = struct
 
   and array_type = ArrayTypeInStream | CalcArrayType
 
-  and complex_data_type = StructType | UserType | Array_Type of array_type
+  and complex_data_type =
+    | StructType
+    | UserType of ClassSpec.t
+    | Array_Type of array_type
+
+  and switch_type = {
+    on : Ast.expr;
+    cases : (Ast.expr * data_type) list;
+    isOwning : bool;
+    mutable isOwningInExpr : bool;
+  }
+
+  type t = data_type
+
+  val to_string : t -> string
+end = struct
+  type data_type =
+    | NumericType of numeric_type
+    | BooleanType
+    | BytesType of bytes_type
+    | StrType of str_type
+    | ComplexDataType of complex_data_type
+    | AnyType
+
+  and int_width = W1 | W2 | W4 | W8
+
+  and numeric_type = Int_type of int_type | Float_type of float_type
+
+  and int_type =
+    | CalcIntType
+    | Int1Type of {signed : bool}
+    | IntMultiType of {
+        signed : bool;
+        width : int_width;
+        endian : Endianness.fixed_endian option;
+      }
+    | BitsType of {width : int; bit_endian : BitEndianness.t}
+
+  and float_type =
+    | CalcFloatType
+    | FloatMultiType of {
+        width : int_width;
+        endian : Endianness.fixed_endian option;
+      }
+
+  and boolean_type = BitsType1 of BitEndianness.t | CalcBooleanType
+
+  and bytes_type =
+    | CalcBytesType
+    | BytesEosType of {
+        terminator : int option;
+        include_ : bool;
+        padRight : int option;
+        mutable process : processExpr option;
+      }
+    | BytesLimitType of {
+        size : Ast.expr;
+        terminator : int option;
+        include_ : bool;
+        padRight : int option;
+        mutable process : processExpr option;
+      }
+    | BytesTerminatedType of {
+        terminator : int;
+        include_ : bool;
+        consume : bool;
+        eosError : bool;
+        mutable process : processExpr option;
+      }
+
+  and str_type =
+    | CalcStrType
+    | StrFromBytesType of {bytes : bytes_type; encoding : string}
+
+  and array_type = ArrayTypeInStream | CalcArrayType
+
+  and complex_data_type =
+    | StructType
+    | UserType of ClassSpec.t
+    | Array_Type of array_type
 
   and switch_type = {
     on : Ast.expr;
@@ -195,35 +325,21 @@ module DataType = struct
     | _ -> failwith "not supported"
 end
 
-module DocSpec = struct
-  type refspec = TextRef of string | UrlRef of {url : string; text : string}
+and AttrSpec : sig
+  module ConditionalSpec : sig
+    type t = {ifExpr : Ast.expr option; repeat : RepeatSpec.t}
+  end
 
-  type t = {summary : string option; refs : refspec list}
-end
-
-module InstanceIdentifier = struct
-  type t = string
-end
-
-module RepeatSpec = struct
-  type t =
-    | RepeatExpr of Ast.expr
-    | RepeatUntil of Ast.expr
-    | RepeatEos
-    | NoRepeat
-end
-
-module ValidationSpec = struct
-  type t =
-    | ValidationEq of Ast.expr
-    | ValidationMin of Ast.expr
-    | ValidationMax of Ast.expr
-    | ValidationRange of {min : Ast.expr; max : Ast.expr}
-    | ValidationAnyOf of Ast.expr list
-    | ValidationExpr of Ast.expr
-end
-
-module AttrSpec = struct
+  type t = {
+    path : string list;
+    id : Identifier.t;
+    dataType : DataType.t;
+    cond : ConditionalSpec.t;
+    valid : ValidationSpec.t option;
+    enum : string option;
+    doc : DocSpec.t;
+  }
+end = struct
   module ConditionalSpec = struct
     type t = {ifExpr : Ast.expr option; repeat : RepeatSpec.t}
   end
@@ -239,15 +355,19 @@ module AttrSpec = struct
   }
 end
 
-module EnumValueSpec = struct
-  type t = {name : string; doc : DocSpec.t}
-end
+and InstanceSpec : sig
+  type t = {doc : DocSpec.t; descr : descr}
 
-module EnumSpec = struct
-  type t = {path : string list; map : (int * EnumValueSpec.t) list}
-end
-
-module InstanceSpec = struct
+  and descr =
+    | ValueInstanceSpec of {
+        id : InstanceIdentifier.t;
+        path : string list;
+        value : Ast.expr;
+        ifExpr : Ast.expr option;
+        dataTypeOpt : DataType.t option;
+      }
+    | ParseInstanceSpec
+end = struct
   type t = {doc : DocSpec.t; descr : descr}
 
   and descr =
@@ -261,7 +381,14 @@ module InstanceSpec = struct
     | ParseInstanceSpec (* TODO *)
 end
 
-module ParamDefSpec = struct
+and ParamDefSpec : sig
+  type t = {
+    path : string list;
+    id : Identifier.t;
+    dataType : DataType.t;
+    doc : DocSpec.t;
+  }
+end = struct
   type t = {
     path : string list;
     id : Identifier.t;
@@ -270,22 +397,20 @@ module ParamDefSpec = struct
   }
 end
 
-module MetaSpec = struct
+and ClassSpec : sig
   type t = {
+    fileName : string option;
     path : string list;
-    isOpaque : bool;
-    id : string option;
-    endian : Endianness.t option;
-    bitEndian : BitEndianness.t option;
-    mutable encoding : string option;
-    forceDebug : bool;
-    opaqueTypes : bool option;
-    zeroCopySubstream : bool option;
-    imports : string list;
+    meta : MetaSpec.t;
+    doc : DocSpec.t;
+    toStringExpr : Ast.expr option;
+    params : ParamDefSpec.t list;
+    seq : AttrSpec.t list;
+    types : (string * t) list;
+    instances : (InstanceIdentifier.t * InstanceSpec.t) list;
+    enums : (string * EnumSpec.t) list;
   }
-end
-
-module ClassSpec = struct
+end = struct
   type t = {
     fileName : string option;
     path : string list;
