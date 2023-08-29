@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -104,8 +105,8 @@ let hash_to_istore_hash h =
 let istore_hash_to_hash h =
   IStore.Hash.to_raw_string h |> Smart_rollup_context_hash.of_string_exn
 
-let load : type a. a mode -> string -> a raw_index Lwt.t =
- fun mode path ->
+let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
+ fun ~cache_size mode path ->
   let open Lwt_syntax in
   let readonly = match mode with Read_only -> true | Read_write -> false in
   let+ repo =
@@ -113,6 +114,7 @@ let load : type a. a mode -> string -> a raw_index Lwt.t =
       (Irmin_pack.config
          ~readonly
          ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+         ~lru_size:cache_size
          path)
   in
   {path; repo}
@@ -322,10 +324,11 @@ module Version = struct
     match context_version with None -> set index | Some V0 -> return_unit
 end
 
-let load : type a. a mode -> string -> a raw_index tzresult Lwt.t =
- fun mode path ->
+let load :
+    type a. cache_size:int -> a mode -> string -> a raw_index tzresult Lwt.t =
+ fun ~cache_size mode path ->
   let open Lwt_result_syntax in
-  let*! index = load mode path in
+  let*! index = load ~cache_size mode path in
   let+ () =
     match mode with
     | Read_only -> Version.check index

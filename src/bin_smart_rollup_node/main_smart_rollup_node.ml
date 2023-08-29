@@ -181,6 +181,7 @@ let legacy_run_command =
       in
       Rollup_node_daemon.run
         ~data_dir
+        ~irmin_cache_size:Configuration.default_irmin_cache_size
         ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration
@@ -259,6 +260,7 @@ let run_command =
       in
       Rollup_node_daemon.run
         ~data_dir
+        ~irmin_cache_size:Configuration.default_irmin_cache_size
         ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration

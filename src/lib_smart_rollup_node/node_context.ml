@@ -132,9 +132,9 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
   in
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
 
-let init (cctxt : #Client_context.full) ~data_dir ~index_buffer_size
-    ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc ~lpc kind
-    current_protocol
+let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
+    ~index_buffer_size ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc
+    ~lpc kind current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -165,7 +165,10 @@ let init (cctxt : #Client_context.full) ~data_dir ~index_buffer_size
       Configuration.(default_storage_dir data_dir)
   in
   let* context =
-    Context.load mode (Configuration.default_context_dir data_dir)
+    Context.load
+      ~cache_size:irmin_cache_size
+      mode
+      (Configuration.default_context_dir data_dir)
   in
   let* () = Context.Rollup.check_or_set_address mode context rollup_address in
   let*! () = Event.rollup_exists ~addr:rollup_address ~kind in
@@ -944,6 +947,7 @@ module Internal_for_tests = struct
     let open Lwt_result_syntax in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let index_buffer_size = Configuration.default_index_buffer_size in
+    let irmin_cache_size = Configuration.default_irmin_cache_size in
     let* lockfile = lock ~data_dir in
     let* store =
       Store.load
@@ -953,7 +957,10 @@ module Internal_for_tests = struct
         Configuration.(default_storage_dir data_dir)
     in
     let* context =
-      Context.load Read_write (Configuration.default_context_dir data_dir)
+      Context.load
+        Read_write
+        (Configuration.default_context_dir data_dir)
+        ~cache_size:irmin_cache_size
     in
     let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
     let l1_ctxt = Layer1.Internal_for_tests.dummy cctxt in

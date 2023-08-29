@@ -94,6 +94,7 @@ type t = {
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
   index_buffer_size : int option;
+  irmin_cache_size : int option;
   log_kernel_debug : bool;
 }
 
@@ -629,6 +630,7 @@ let encoding : t Data_encoding.t =
            l2_blocks_cache_size;
            prefetch_blocks;
            index_buffer_size;
+           irmin_cache_size;
            log_kernel_debug;
          } ->
       ( ( sc_rollup_address,
@@ -641,16 +643,15 @@ let encoding : t Data_encoding.t =
           fee_parameters,
           mode,
           loser_mode ),
-        ( dal_node_endpoint,
-          dac_observer_endpoint,
-          dac_timeout,
-          batcher,
-          injector,
-          l1_blocks_cache_size,
-          l2_blocks_cache_size,
-          prefetch_blocks,
-          index_buffer_size,
-          log_kernel_debug ) ))
+        ( ( dal_node_endpoint,
+            dac_observer_endpoint,
+            dac_timeout,
+            batcher,
+            injector,
+            l1_blocks_cache_size,
+            l2_blocks_cache_size,
+            prefetch_blocks ),
+          (index_buffer_size, irmin_cache_size, log_kernel_debug) ) ))
     (fun ( ( sc_rollup_address,
              boot_sector_file,
              sc_rollup_node_operators,
@@ -661,16 +662,15 @@ let encoding : t Data_encoding.t =
              fee_parameters,
              mode,
              loser_mode ),
-           ( dal_node_endpoint,
-             dac_observer_endpoint,
-             dac_timeout,
-             batcher,
-             injector,
-             l1_blocks_cache_size,
-             l2_blocks_cache_size,
-             prefetch_blocks,
-             index_buffer_size,
-             log_kernel_debug ) ) ->
+           ( ( dal_node_endpoint,
+               dac_observer_endpoint,
+               dac_timeout,
+               batcher,
+               injector,
+               l1_blocks_cache_size,
+               l2_blocks_cache_size,
+               prefetch_blocks ),
+             (index_buffer_size, irmin_cache_size, log_kernel_debug) ) ) ->
       {
         sc_rollup_address;
         boot_sector_file;
@@ -691,6 +691,7 @@ let encoding : t Data_encoding.t =
         l2_blocks_cache_size;
         prefetch_blocks;
         index_buffer_size;
+        irmin_cache_size;
         log_kernel_debug;
       })
     (merge_objs
@@ -732,17 +733,20 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj10
-          (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
-          (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
-          (opt "dac-timeout" Data_encoding.z)
-          (dft "batcher" batcher_encoding default_batcher)
-          (dft "injector" injector_encoding default_injector)
-          (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
-          (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
-          (opt "prefetch_blocks" int31)
-          (opt "index_buffer_size" int31)
-          (dft "log-kernel-debug" Data_encoding.bool false)))
+       (merge_objs
+          (obj8
+             (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
+             (opt "dac-observer-client" Tezos_rpc.Encoding.uri_encoding)
+             (opt "dac-timeout" Data_encoding.z)
+             (dft "batcher" batcher_encoding default_batcher)
+             (dft "injector" injector_encoding default_injector)
+             (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
+             (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
+             (opt "prefetch_blocks" int31))
+          (obj3
+             (opt "index_buffer_size" int31)
+             (opt "irmin_cache_size" int31)
+             (dft "log-kernel-debug" Data_encoding.bool false))))
 
 let check_mode config =
   let open Result_syntax in
@@ -780,6 +784,8 @@ let check_mode config =
 let refutation_player_buffer_levels = 5
 
 let default_index_buffer_size = 10_000
+
+let default_irmin_cache_size = 100_000
 
 let loser_warning_message config =
   if config.loser_mode <> Loser_mode.no_failures then
@@ -833,7 +839,7 @@ module Cli = struct
       ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~log_kernel_debug =
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug =
     let sc_rollup_node_operators = make_operators sc_rollup_node_operators in
     let config =
       {
@@ -867,6 +873,7 @@ module Cli = struct
         l2_blocks_cache_size = default_l2_blocks_cache_size;
         prefetch_blocks = None;
         index_buffer_size;
+        irmin_cache_size;
         log_kernel_debug;
       }
     in
@@ -877,7 +884,7 @@ module Cli = struct
       ~dac_observer_endpoint ~dac_timeout ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~sc_rollup_node_operators ~index_buffer_size
-      ~log_kernel_debug =
+      ~irmin_cache_size ~log_kernel_debug =
     let new_sc_rollup_node_operators =
       make_operators sc_rollup_node_operators
     in
@@ -928,6 +935,8 @@ module Cli = struct
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
+        irmin_cache_size =
+          Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
       }
     in
@@ -937,7 +946,7 @@ module Cli = struct
       ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
       ~dac_timeout ~injector_retention_period ~injector_attempts ~injection_ttl
       ~mode ~sc_rollup_address ~boot_sector_file ~sc_rollup_node_operators
-      ~index_buffer_size ~log_kernel_debug =
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -976,6 +985,7 @@ module Cli = struct
           ~boot_sector_file
           ~sc_rollup_node_operators
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
       in
       return configuration
@@ -1017,6 +1027,7 @@ module Cli = struct
           ~boot_sector_file
           ~sc_rollup_node_operators
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
       in
       return config

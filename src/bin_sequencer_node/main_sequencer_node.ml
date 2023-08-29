@@ -205,6 +205,7 @@ let run_command =
       in
       Sc_rollup_node.Daemon.run
         ~data_dir
+        ~irmin_cache_size:Configuration.default_irmin_cache_size
         ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration

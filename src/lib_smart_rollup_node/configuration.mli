@@ -114,6 +114,7 @@ type t = {
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
   index_buffer_size : int option;
+  irmin_cache_size : int option;
   log_kernel_debug : bool;
 }
 
@@ -219,6 +220,11 @@ val check_mode : t -> t tzresult
     for a game state it already played before. *)
 val refutation_player_buffer_levels : int
 
+(* To limit the number of entries stored in the Irmin's LRU cache, it can adjust
+   the `lru_size` configuration. By default, it's set to 10_000 entries. Increasing
+   this value will consume more memory. Copy from irmin-pack/config.ml *)
+val default_irmin_cache_size : int
+
 (** The `default_index_buffer_size` defines the maximum amount of memory 
    reserved for caching index entries before they are written to disk. 
    Essentially, this cache aids the efficiency of the index. 
@@ -257,6 +263,7 @@ module Cli : sig
       | `Purpose of purpose * Signature.public_key_hash ]
       trace ->
     index_buffer_size:int option ->
+    irmin_cache_size:int option ->
     log_kernel_debug:bool ->
     t tzresult
 
@@ -281,6 +288,7 @@ module Cli : sig
       | `Purpose of purpose * Signature.public_key_hash ]
       list ->
     index_buffer_size:int option ->
+    irmin_cache_size:int option ->
     log_kernel_debug:bool ->
     t tzresult Lwt.t
 end
