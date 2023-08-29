@@ -56,6 +56,9 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Arithmetic errors on Michelson ``mutez`` type have been exported so
+  they can now be caught outside of the protocol. (MR :gl:`!9934`)
+
 Internal
 --------
 

@@ -38,7 +38,12 @@ type repr
     parameters of [Script_typed_ir.ty]. *)
 type t = Tez_tag of repr [@@ocaml.unboxed]
 
-type error += Subtraction_underflow of t * t (* `Temporary *)
+type error +=
+  | Addition_overflow of t * t (* `Temporary *)
+  | Subtraction_underflow of t * t (* `Temporary *)
+  | Multiplication_overflow of t * int64 (* `Temporary *)
+  | Negative_multiplicator of t * int64 (* `Temporary *)
+  | Invalid_divisor of t * int64 (* `Temporary *)
 
 type tez = t
 
