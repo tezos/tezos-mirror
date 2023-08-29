@@ -23,7 +23,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 10 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.653)
     [ (Pair (Left (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 1 257)) ]
@@ -59,7 +59,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 10 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.653)
     [ (Pair (Left (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Left (Pair 123 257)) ]
@@ -95,7 +95,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 13 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.653)
     [ (Pair (Right (Pair 1 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 1 257)) ]
@@ -131,7 +131,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 13 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (just consumed gas: 8.811)
+  - location: 14 (just consumed gas: 8.653)
     [ (Pair (Right (Pair 123 257)) None) ]
   - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 123 257)) ]
@@ -167,7 +167,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 8 characters 11 to 14,
 unexpected arithmetic overflow
 trace
-  - location: 9 (just consumed gas: 11.246)
+  - location: 9 (just consumed gas: 11.126)
     [ (Pair (Left Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Left Unit) ]
@@ -207,7 +207,7 @@ Runtime error in contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi:
 At line 14 characters 11 to 14,
 unexpected arithmetic overflow
 trace
-  - location: 9 (just consumed gas: 11.246)
+  - location: 9 (just consumed gas: 11.126)
     [ (Pair (Right Unit) Unit) ]
   - location: 9 (just consumed gas: 0.010)
     [ (Right Unit) ]

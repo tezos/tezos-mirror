@@ -7,11 +7,11 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (just consumed gas: 11.930)
+  - location: 7 (just consumed gas: 11.813)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" Unit) ]
   - location: 7 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 8 (just consumed gas: 0.310)
+  - location: 8 (just consumed gas: 0.307)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
   - location: 11 (just consumed gas: 0)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]

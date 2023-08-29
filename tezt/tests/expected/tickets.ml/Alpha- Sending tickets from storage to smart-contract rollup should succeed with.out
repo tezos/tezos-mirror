@@ -1,7 +1,7 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint mint
 Node is bootstrapped.
-Estimated gas: 2222.514 units (will add 100 for safety)
+Estimated gas: 2221.964 units (will add 100 for safety)
 Estimated storage: 221 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000494
     Expected counter: 3
-    Gas limit: 2323
+    Gas limit: 2322
     Storage limit: 241 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000494
@@ -26,11 +26,11 @@ This sequence of operations was run:
       Entrypoint: mint
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
-          Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
+        { Pair 0x018ea5a80e42cfd6d14f9ec47a37412ebdf140b4d200 (Pair "Ticket2" 1) ;
+          Pair 0x018ea5a80e42cfd6d14f9ec47a37412ebdf140b4d200 (Pair "Ticket" 1) }
       Storage size: 309 bytes
       Paid storage size diff: 221 bytes
-      Consumed gas: 2222.481
+      Consumed gas: 2221.931
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.05525
         storage fees ........................... +ꜩ0.05525
@@ -49,7 +49,7 @@ This sequence of operations was run:
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[SMART_ROLLUP_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3142.041 units (will add 100 for safety)
+Estimated gas: 3141.962 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -62,7 +62,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000624
     Expected counter: 4
-    Gas limit: 3243
+    Gas limit: 3242
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000624
@@ -76,7 +76,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 220 bytes
-      Consumed gas: 3032.033
+      Consumed gas: 3031.954
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -93,8 +93,8 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [SMART_ROLLUP_HASH]
-          Parameter: { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
-                       Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
+          Parameter: { Pair 0x018ea5a80e42cfd6d14f9ec47a37412ebdf140b4d200 (Pair "Ticket2" 1) ;
+                       Pair 0x018ea5a80e42cfd6d14f9ec47a37412ebdf140b4d200 (Pair "Ticket" 1) }
           This transaction was successfully applied
           Consumed gas: 109.941
           Ticket updates:
