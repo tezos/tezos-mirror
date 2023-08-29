@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-base-test-helpers
-  octez-libs.tezos-test-helpers
-  octez-libs.tezos-rpc
+  octez-libs.base
+  octez-libs.base-test-helpers
+  octez-libs.test-helpers
+  octez-libs.rpc
   octez-shell-libs.mockup
   octez-shell-libs.mockup-registration
   octez-shell-libs.client-base

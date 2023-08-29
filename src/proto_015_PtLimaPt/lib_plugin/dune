@@ -6,7 +6,7 @@
  (public_name octez-protocol-015-PtLimaPt-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-015-PtLimaPt.protocol)
  (flags
   (:standard)
@@ -22,7 +22,7 @@
  (public_name octez-protocol-015-PtLimaPt-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-015-PtLimaPt.embedded-protocol
   octez-protocol-015-PtLimaPt-libs.plugin
   octez-shell-libs.validation)

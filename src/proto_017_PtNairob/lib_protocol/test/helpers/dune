@@ -7,18 +7,18 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
-  octez-libs.tezos-test-helpers
-  octez-libs.tezos-base
-  octez-libs.tezos-micheline
-  octez-libs.tezos-stdlib-unix
+  octez-libs.test-helpers
+  octez-libs.base
+  octez-libs.micheline
+  octez-libs.stdlib-unix
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.client
   tezos-protocol-017-PtNairob.parameters
   octez-proto-libs.protocol-environment
   octez-protocol-017-PtNairob-libs.plugin
   octez-shell-libs.shell-services
-  octez-libs.octez-plompiler
-  octez-libs.tezos-crypto-dal)
+  octez-libs.plompiler
+  octez-libs.crypto-dal)
  (flags
   (:standard)
   -open Tezos_test_helpers

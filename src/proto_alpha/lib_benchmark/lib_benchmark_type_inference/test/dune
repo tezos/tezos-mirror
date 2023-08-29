@@ -4,11 +4,11 @@
 (executables
  (names test_uf test_inference)
  (libraries
-  octez-libs.tezos-micheline
+  octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha.protocol
-  octez-libs.tezos-error-monad
+  octez-libs.error-monad
   octez-protocol-alpha-libs.client)
  (link_flags
   (:standard)

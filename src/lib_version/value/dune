@@ -8,9 +8,9 @@
  (public_name tezos-version.value)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-version
-  octez-libs.tezos-version.parser)
+  octez-libs.base
+  octez-libs.version
+  octez-libs.version.parser)
  (js_of_ocaml)
  (flags
   (:standard)

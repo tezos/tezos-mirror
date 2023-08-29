@@ -6,7 +6,7 @@
  (package octez-smart-rollup-sequencer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-protocol-alpha-libs.smart-rollup-layer2
   tezos-protocol-alpha.protocol
   octez_smart_rollup_node_alpha
@@ -14,9 +14,9 @@
   octez-smart-rollup-node-lib
   octez-l2-libs.smart-rollup
   octez-shell-libs.client-base
-  octez-libs.tezos-rpc
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-server)
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server)
  (flags
   (:standard)
   -open Tezos_base

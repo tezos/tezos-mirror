@@ -8,9 +8,9 @@
   tezt.core
   octez-alcotezt
   qcheck-alcotest
-  octez-libs.octez-polynomial
+  octez-libs.polynomial
   bls12-381
-  octez-libs.octez-bls12-381-polynomial)
+  octez-libs.bls12-381-polynomial)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -6,7 +6,7 @@
  (public_name octez-protocol-017-PtNairob-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.client)
  (inline_tests (flags -verbose) (modes native))

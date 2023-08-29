@@ -9,12 +9,12 @@
   tezt
   octez-libs.tezos-context
   octez-alcotezt
-  octez-libs.tezos-base
+  octez-libs.base
   octez-protocol-018-Proxford-libs.client
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
   octez-protocol-018-Proxford-libs.test-helpers
-  octez-libs.tezos-base-test-helpers)
+  octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

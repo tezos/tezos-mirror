@@ -4,15 +4,15 @@
 (executable
  (name afl)
  (libraries
-  octez-libs.octez-plompiler
-  octez-libs.octez-plonk
+  octez-libs.plompiler
+  octez-libs.plonk
   bls12-381)
  (modules afl))
 
 (executable
  (name main)
  (libraries
-  octez-libs.octez-plonk.plonk-test)
+  octez-libs.plonk.plonk-test)
  (modules
   bench_poseidon
   benchmark

@@ -3,15 +3,15 @@
 
 (library
  (name tezos_crypto_dal)
- (public_name octez-libs.tezos-crypto-dal)
+ (public_name octez-libs.crypto-dal)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-error-monad
+  octez-libs.stdlib
+  octez-libs.error-monad
   data-encoding
-  octez-libs.tezos-crypto-dal.octez-dal-config
-  octez-libs.tezos-crypto
-  octez-libs.octez-bls12-381-polynomial
+  octez-libs.crypto-dal.dal-config
+  octez-libs.crypto
+  octez-libs.bls12-381-polynomial
   lwt.unix)
  (flags
   (:standard)

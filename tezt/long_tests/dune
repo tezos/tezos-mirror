@@ -7,16 +7,16 @@
   tezt
   tezt-tezos
   tezt-tezos.tezt-performance-regression
-  octez-libs.tezos-lwt-result-stdlib
+  octez-libs.lwt-result-stdlib
   octez-protocol-alpha-libs.test-helpers
-  octez-libs.tezos-micheline
+  octez-libs.micheline
   tezos-openapi
   tezos-protocol-alpha.protocol
   qcheck-core
   tezos-time-measurement
   data-encoding
-  octez-libs.tezos-event-logging
-  octez-libs.tezos-test-helpers)
+  octez-libs.event-logging
+  octez-libs.test-helpers)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

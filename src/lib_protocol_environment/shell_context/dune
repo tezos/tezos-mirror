@@ -6,7 +6,7 @@
  (public_name octez-shell-libs.shell-context)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context)
  (flags

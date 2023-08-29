@@ -6,7 +6,7 @@
  (public_name octez-protocol-alpha-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.smart-rollup)
  (flags
@@ -24,7 +24,7 @@
  (public_name octez-protocol-alpha-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.embedded-protocol
   octez-protocol-alpha-libs.plugin
   octez-shell-libs.validation)

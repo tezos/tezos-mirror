@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   bls12-381
-  octez-libs.octez-bls12-381-signature
+  octez-libs.bls12-381-signature
   octez-alcotezt
   integers_stubs_js)
  (library_flags (:standard -linkall))

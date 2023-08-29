@@ -8,9 +8,9 @@
  (public_name octez-libs.tezos-context.merkle_proof_encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-context.sigs)
+  octez-libs.base
+  octez-libs.stdlib
+  octez-libs.context.sigs)
  (js_of_ocaml)
  (flags
   (:standard)

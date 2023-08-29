@@ -6,10 +6,10 @@
  (public_name octez-protocol-012-Psithaca-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-012-Psithaca.protocol
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.mockup
@@ -18,7 +18,7 @@
   octez-shell-libs.client-base
   octez-protocol-012-Psithaca-libs.client
   octez-shell-libs.client-commands
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-shell-libs.client-base-unix
   octez-protocol-012-Psithaca-libs.plugin
   uri)
@@ -42,8 +42,8 @@
  (public_name octez-protocol-012-Psithaca-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-012-Psithaca.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
@@ -52,7 +52,7 @@
   octez-shell-libs.client-commands
   octez-protocol-012-Psithaca-libs.client.commands
   octez-protocol-012-Psithaca-libs.client.sapling
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-protocol-012-Psithaca-libs.plugin)
  (library_flags (:standard -linkall))
  (flags

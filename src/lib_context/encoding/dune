@@ -6,8 +6,8 @@
  (public_name octez-libs.tezos-context.encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib
+  octez-libs.base
+  octez-libs.stdlib
   irmin
   irmin-pack)
  (flags

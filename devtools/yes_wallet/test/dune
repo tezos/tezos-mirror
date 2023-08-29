@@ -4,8 +4,8 @@
 (executable
  (name bench_signature_perf)
  (libraries
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-crypto
+  octez-libs.error-monad
+  octez-libs.crypto
   zarith
   zarith_stubs_js
   data-encoding

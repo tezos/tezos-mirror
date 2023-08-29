@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base.unix
   octez-proto-libs.protocol-environment
   octez-alcotezt
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
   lwt.unix)
  (library_flags (:standard -linkall))

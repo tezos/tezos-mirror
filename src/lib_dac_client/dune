@@ -6,11 +6,11 @@
  (public_name tezos-dac-client-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base.unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   tezos-dac-lib)
  (flags
   (:standard)

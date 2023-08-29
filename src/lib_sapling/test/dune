@@ -9,14 +9,14 @@
  (libraries
   tezt.core
   octez-libs.tezos-sapling
-  octez-libs.tezos-crypto
+  octez-libs.crypto
   str
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
   data-encoding
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -42,7 +42,7 @@
  (modes js)
  (libraries
   octez-libs.tezos-sapling
-  octez-libs.tezos-hacl)
+  octez-libs.hacl)
  (js_of_ocaml)
  (link_flags
   (:standard)

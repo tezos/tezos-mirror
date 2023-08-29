@@ -7,8 +7,8 @@
  (implements octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.crypto
   octez-shell-libs.shell-services
   octez-libs.tezos-context.memory
   octez-shell-libs.context-ops

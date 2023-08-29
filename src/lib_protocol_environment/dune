@@ -9,19 +9,19 @@
   zarith
   zarith_stubs_js
   bls12-381
-  octez-libs.octez-plonk
-  octez-libs.tezos-crypto-dal
+  octez-libs.plonk
+  octez-libs.crypto-dal
   class_group_vdf
   aches
   aches-lwt
-  octez-libs.tezos-base
+  octez-libs.base
   octez-libs.tezos-sapling
   octez-proto-libs.protocol-environment.sigs
   octez-proto-libs.protocol-environment.structs
-  octez-libs.tezos-micheline
+  octez-libs.micheline
   octez-libs.tezos-context.memory
   octez-l2-libs.scoru-wasm
-  octez-libs.tezos-event-logging)
+  octez-libs.event-logging)
  (flags
   (:standard)
   -open Plonk

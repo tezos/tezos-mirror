@@ -500,7 +500,7 @@ let octez_l2_lib : Sub_lib.maker =
 
 let octez_test_helpers =
   octez_lib
-    "tezos-test-helpers"
+    "test-helpers"
     ~path:"src/lib_test"
     ~internal_name:"tezos_test_helpers"
     ~deps:[uri; fmt; qcheck_alcotest; lwt; pure_splitmix; data_encoding]
@@ -516,7 +516,10 @@ let octez_test_helpers =
         ]
 
 let octez_expect_helper =
-  octez_lib "tezos-expect-helper" ~path:"src/lib_expect_helper"
+  octez_lib
+    "expect-helper"
+    ~internal_name:"tezos_expect_helper"
+    ~path:"src/lib_expect_helper"
 
 let _octez_expect_helper_test =
   private_lib
@@ -528,7 +531,8 @@ let _octez_expect_helper_test =
 
 let octez_stdlib =
   octez_lib
-    "tezos-stdlib"
+    "stdlib"
+    ~internal_name:"tezos_stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
@@ -588,7 +592,7 @@ let _octez_stdlib_test_unix =
 
 let octez_lwt_result_stdlib_bare_functor_outputs =
   octez_lib
-    "tezos-lwt-result-stdlib.bare.functor-outputs"
+    "lwt-result-stdlib.bare.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/bare/functor_outputs"
     ~internal_name:"bare_functor_outputs"
     ~js_compatible:true
@@ -596,7 +600,7 @@ let octez_lwt_result_stdlib_bare_functor_outputs =
 
 let octez_lwt_result_stdlib_bare_sigs =
   octez_lib
-    "tezos-lwt-result-stdlib.bare.sigs"
+    "lwt-result-stdlib.bare.sigs"
     ~path:"src/lib_lwt_result_stdlib/bare/sigs"
     ~internal_name:"bare_sigs"
     ~js_compatible:true
@@ -604,7 +608,7 @@ let octez_lwt_result_stdlib_bare_sigs =
 
 let octez_lwt_result_stdlib_bare_structs =
   octez_lib
-    "tezos-lwt-result-stdlib.bare.structs"
+    "lwt-result-stdlib.bare.structs"
     ~path:"src/lib_lwt_result_stdlib/bare/structs"
     ~internal_name:"bare_structs"
     ~js_compatible:true
@@ -612,7 +616,7 @@ let octez_lwt_result_stdlib_bare_structs =
 
 let octez_lwt_result_stdlib_traced_functor_outputs =
   octez_lib
-    "tezos-lwt-result-stdlib.traced.functor-outputs"
+    "lwt-result-stdlib.traced.functor-outputs"
     ~path:"src/lib_lwt_result_stdlib/traced/functor_outputs"
     ~internal_name:"traced_functor_outputs"
     ~js_compatible:true
@@ -620,7 +624,7 @@ let octez_lwt_result_stdlib_traced_functor_outputs =
 
 let octez_lwt_result_stdlib_traced_sigs =
   octez_lib
-    "tezos-lwt-result-stdlib.traced.sigs"
+    "lwt-result-stdlib.traced.sigs"
     ~path:"src/lib_lwt_result_stdlib/traced/sigs"
     ~internal_name:"traced_sigs"
     ~js_compatible:true
@@ -634,7 +638,7 @@ let octez_lwt_result_stdlib_traced_sigs =
 
 let octez_lwt_result_stdlib_traced_structs =
   octez_lib
-    "tezos-lwt-result-stdlib.traced.structs"
+    "lwt-result-stdlib.traced.structs"
     ~path:"src/lib_lwt_result_stdlib/traced/structs"
     ~internal_name:"traced_structs"
     ~js_compatible:true
@@ -647,8 +651,9 @@ let octez_lwt_result_stdlib_traced_structs =
 
 let octez_lwt_result_stdlib =
   octez_lib
-    "tezos-lwt-result-stdlib"
+    "lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
+    ~internal_name:"tezos_lwt_result_stdlib"
     ~synopsis:"error-aware stdlib replacement"
     ~js_compatible:true
     ~documentation:
@@ -668,7 +673,7 @@ let octez_lwt_result_stdlib =
 
 let octez_lwt_result_stdlib_examples_traces =
   octez_lib
-    "tezos-lwt-result-stdlib.examples.traces"
+    "lwt-result-stdlib.examples.traces"
     ~path:"src/lib_lwt_result_stdlib/examples/traces"
     ~internal_name:"traces"
     ~deps:
@@ -708,7 +713,8 @@ let _octez_lwt_result_stdlib_tests =
 
 let octez_error_monad =
   octez_lib
-    "tezos-error-monad"
+    "error-monad"
+    ~internal_name:"tezos_error_monad"
     ~path:"src/lib_error_monad"
     ~synopsis:"Error monad"
     ~deps:
@@ -727,7 +733,8 @@ let octez_hacl =
   let js_generated = "runtime-generated.js" in
   let js_helper = "helper.js" in
   octez_lib
-    "tezos-hacl"
+    "hacl"
+    ~internal_name:"tezos_hacl"
     ~path:"src/lib_hacl"
     ~synopsis:"Thin layer around hacl-star"
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
@@ -863,7 +870,8 @@ let _octez_error_monad_tests =
 
 let octez_rpc =
   octez_lib
-    "tezos-rpc"
+    "rpc"
+    ~internal_name:"tezos_rpc"
     ~path:"src/lib_rpc"
     ~synopsis:
       "Library of auto-documented RPCs (service and hierarchy descriptions)"
@@ -1100,7 +1108,7 @@ let _octez_bls12_381_utils =
 
 let octez_bls12_381_signature =
   octez_lib
-    "octez-bls12-381-signature"
+    "bls12-381-signature"
     ~path:"src/lib_bls12_381_signature"
     ~internal_name:"bls12_381_signature"
     ~deps:[bls12_381]
@@ -1155,7 +1163,8 @@ let _octez_bls12_381_signature_gen_wasm_needed_names =
 
 let octez_crypto =
   octez_lib
-    "tezos-crypto"
+    "crypto"
+    ~internal_name:"tezos_crypto"
     ~path:"src/lib_crypto"
     ~synopsis:"Library with all the cryptographic primitives used by Tezos"
     ~deps:
@@ -1235,7 +1244,7 @@ let _octez_crypto_tests_unix =
 
 let octez_bls12_381_hash =
   octez_lib
-    "octez-bls12-381-hash"
+    "bls12-381-hash"
     ~path:"src/lib_bls12_381_hash"
     ~internal_name:"bls12_381_hash"
     ~c_library_flags:["-Wall"; "-Wextra"; ":standard"; "-lpthread"]
@@ -1269,7 +1278,7 @@ let _octez_bls12_381_hash_tests =
 
 let octez_mec =
   octez_lib
-    "octez-mec"
+    "mec"
     ~path:"src/lib_mec"
     ~internal_name:"mec"
     ~deps:[alcotest; bls12_381; bigarray_compat; eqaf]
@@ -1341,7 +1350,7 @@ let _octez_mec_tests =
 
 let octez_polynomial =
   octez_lib
-    "octez-polynomial"
+    "polynomial"
     ~path:"src/lib_polynomial"
     ~internal_name:"polynomial"
     ~synopsis:"Polynomials over finite fields"
@@ -1356,7 +1365,8 @@ let _octez_polynomial_tests =
 
 let octez_bls12_381_polynomial =
   octez_lib
-    "octez-bls12-381-polynomial"
+    "bls12-381-polynomial"
+    ~internal_name:"octez_bls12_381_polynomial"
     ~path:"src/lib_bls12_381_polynomial"
     ~synopsis:
       "Polynomials over BLS12-381 finite field - Temporary vendored version of \
@@ -1406,7 +1416,8 @@ let _octez_bls12_381_polynomial_tests =
 
 let octez_srs_extraction =
   octez_lib
-    "octez-srs-extraction"
+    "srs-extraction"
+    ~internal_name:"octez_srs_extraction"
     ~path:"src/lib_srs_extraction"
     ~modules:["libsrs"]
     ~bisect_ppx:No
@@ -1486,7 +1497,7 @@ let _octez_srs_extraction_tests =
 
 let octez_plompiler =
   octez_lib
-    "octez-plompiler"
+    "plompiler"
     ~internal_name:"plompiler"
     ~path:"src/lib_plompiler"
     ~deps:
@@ -1549,7 +1560,7 @@ let make_plonk_runtest_invocation ~package =
 
 let octez_plonk =
   octez_lib
-    "octez-plonk"
+    "plonk"
     ~internal_name:"plonk"
     ~path:"src/lib_plonk"
     ~deps:
@@ -1565,7 +1576,7 @@ let octez_plonk =
 
 let octez_plonk_aggregation =
   octez_lib
-    "octez-plonk.aggregation"
+    "plonk.aggregation"
     ~path:"src/lib_aplonk/plonk-aggregation"
     ~internal_name:"aggregation"
     ~preprocess:[pps ppx_repr]
@@ -1573,7 +1584,7 @@ let octez_plonk_aggregation =
 
 let octez_aplonk =
   octez_lib
-    "octez-aplonk"
+    "aplonk"
     ~internal_name:"aplonk"
     ~path:"src/lib_aplonk"
     ~preprocess:[pps ppx_repr]
@@ -1581,7 +1592,7 @@ let octez_aplonk =
 
 let octez_plonk_distribution =
   octez_lib
-    "octez-plonk.distribution"
+    "plonk.distribution"
     ~internal_name:"distribution"
     ~path:"src/lib_distributed_plonk/distribution"
     ~deps:[octez_plonk; octez_plonk_aggregation]
@@ -1589,7 +1600,7 @@ let octez_plonk_distribution =
 
 let octez_plonk_communication =
   octez_lib
-    "octez-plonk.communication"
+    "plonk.communication"
     ~internal_name:"communication"
     ~path:"src/lib_distributed_plonk/communication"
     ~deps:[logs; distributed_internal_lwt; octez_plonk_distribution |> open_]
@@ -1597,7 +1608,7 @@ let octez_plonk_communication =
 
 let octez_plonk_test_helpers =
   octez_lib
-    "octez-plonk.plonk-test"
+    "plonk.plonk-test"
     ~path:"src/lib_plonk/test"
     ~internal_name:"plonk_test"
     ~deps:[octez_plonk; octez_plonk_aggregation; octez_plonk_distribution]
@@ -1699,7 +1710,7 @@ let _octez_plonk_test_plompiler_main =
 
 let octez_distributed_plonk =
   octez_lib
-    "octez-distributed-plonk"
+    "distributed-plonk"
     ~internal_name:"distributed_plonk"
     ~path:"src/lib_distributed_plonk"
     ~deps:
@@ -1784,7 +1795,7 @@ let _octez_aplonk_test_helpers_bench =
 
 let octez_epoxy_tx =
   octez_lib
-    "octez-epoxy-tx"
+    "epoxy-tx"
     ~path:"src/lib_epoxy_tx"
     ~internal_name:"epoxy_tx"
     ~deps:[octez_plompiler; hex; stdint; octez_plonk; octez_mec]
@@ -1799,14 +1810,16 @@ let _octez_epoxy_tx_tests =
 
 let octez_dal_config =
   octez_lib
-    "tezos-crypto-dal.octez-dal-config"
+    "crypto-dal.dal-config"
+    ~internal_name:"tezos_crypto_dal_octez_dal_config"
     ~path:"src/lib_crypto_dal/dal_config"
     ~deps:[data_encoding |> open_]
     ~js_compatible:true
 
 let octez_crypto_dal =
   octez_lib
-    "tezos-crypto-dal"
+    "crypto-dal"
+    ~internal_name:"tezos_crypto_dal"
     ~path:"src/lib_crypto_dal"
     ~synopsis:"DAL cryptographic primitives"
     ~deps:
@@ -1841,7 +1854,8 @@ let _octez_crypto_dal_tests =
 
 let octez_event_logging =
   octez_lib
-    "tezos-event-logging"
+    "event-logging"
+    ~internal_name:"tezos_event_logging"
     ~path:"src/lib_event_logging"
     ~synopsis:"Octez event logging library"
     ~deps:
@@ -1856,7 +1870,8 @@ let octez_event_logging =
 
 let octez_event_logging_test_helpers =
   octez_lib
-    "tezos-event-logging-test-helpers"
+    "event-logging-test-helpers"
+    ~internal_name:"tezos_event_logging_test_helpers"
     ~path:"src/lib_event_logging/test_helpers"
     ~synopsis:"Test helpers for the event logging library"
     ~deps:
@@ -1875,7 +1890,8 @@ let octez_event_logging_test_helpers =
 
 let octez_stdlib_unix =
   octez_lib
-    "tezos-stdlib-unix"
+    "stdlib-unix"
+    ~internal_name:"tezos_stdlib_unix"
     ~path:"src/lib_stdlib_unix"
     ~synopsis:
       "Yet-another local-extension of the OCaml standard library \
@@ -1918,7 +1934,8 @@ let _octez_stdlib_unix_test =
 
 let octez_clic =
   octez_lib
-    "tezos-clic"
+    "clic"
+    ~internal_name:"tezos_clic"
     ~path:"src/lib_clic"
     ~deps:
       [
@@ -1932,7 +1949,8 @@ let octez_clic =
 
 let octez_clic_unix =
   octez_lib
-    "tezos-clic.unix"
+    "clic.unix"
+    ~internal_name:"tezos_clic_unix"
     ~path:"src/lib_clic/unix"
     ~deps:
       [
@@ -1961,7 +1979,8 @@ let _octez_clic_example =
 
 let octez_micheline =
   octez_lib
-    "tezos-micheline"
+    "micheline"
+    ~internal_name:"tezos_micheline"
     ~path:"src/lib_micheline"
     ~synopsis:"Internal AST and parser for the Michelson language"
     ~deps:
@@ -1998,7 +2017,8 @@ let _octez_micheline_tests =
 
 let octez_base =
   octez_lib
-    "tezos-base"
+    "base"
+    ~internal_name:"tezos_base"
     ~path:"src/lib_base"
     ~synopsis:"Meta-package and pervasive type definitions for Tezos"
     ~deps:
@@ -2029,7 +2049,8 @@ let octez_base =
 
 let octez_base_unix =
   octez_lib
-    "tezos-base.unix"
+    "base.unix"
+    ~internal_name:"tezos_base_unix"
     ~path:"src/lib_base/unix"
     ~deps:
       [
@@ -2047,7 +2068,8 @@ let octez_base_unix =
 
 let octez_base_p2p_identity_file =
   octez_lib
-    "tezos-base.p2p-identity-file"
+    "base.p2p-identity-file"
+    ~internal_name:"tezos_base_p2p_identity_file"
     ~path:"src/lib_base/p2p_identity_file"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_]
 
@@ -2103,7 +2125,8 @@ let _octez_base_unix_tests =
 
 let octez_base_test_helpers =
   octez_lib
-    "tezos-base-test-helpers"
+    "base-test-helpers"
+    ~internal_name:"tezos_base_test_helpers"
     ~path:"src/lib_base/test_helpers"
     ~synopsis:"Octez base test helpers"
     ~deps:
@@ -2122,14 +2145,16 @@ let octez_base_test_helpers =
 
 let octez_context_sigs =
   octez_lib
-    "tezos-context.sigs"
+    "context.sigs"
+    ~internal_name:"tezos_context_sigs"
     ~path:"src/lib_context/sigs"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
     ~js_compatible:true
 
 let tree_encoding =
   octez_lib
-    "tezos-tree-encoding"
+    "tree-encoding"
+    ~internal_name:"tezos_tree_encoding"
     ~path:"src/lib_tree_encoding"
     ~synopsis:
       "A general-purpose library to encode arbitrary data in Merkle trees"
@@ -2143,7 +2168,8 @@ let tree_encoding =
 
 let lazy_containers =
   octez_lib
-    "tezos-lazy-containers"
+    "lazy-containers"
+    ~internal_name:"tezos_lazy_containers"
     ~path:"src/lib_lazy_containers"
     ~synopsis:
       "A collection of lazy containers whose contents is fetched from \
@@ -2223,7 +2249,8 @@ let _octez_webassembly_test =
 
 let octez_version_parser =
   octez_lib
-    "tezos-version.parser"
+    "version.parser"
+    ~internal_name:"tezos_version_parser"
     ~path:"src/lib_version/parser"
     ~dune:Dune.[ocamllex "tezos_version_parser"]
     ~js_compatible:true
@@ -2231,7 +2258,8 @@ let octez_version_parser =
 
 let octez_version =
   octez_lib
-    "tezos-version"
+    "version"
+    ~internal_name:"tezos_version"
     ~path:"src/lib_version"
     ~synopsis:"Version information generated from Git"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_version_parser]
@@ -3382,7 +3410,8 @@ let _octez_store_mocked =
 
 let octez_requester =
   octez_lib
-    "tezos-requester"
+    "requester"
+    ~internal_name:"tezos_requester"
     ~path:"src/lib_requester"
     ~deps:
       [
@@ -3449,7 +3478,8 @@ let octez_shell =
 
 let octez_rpc_http =
   octez_lib
-    "tezos-rpc-http"
+    "rpc-http"
+    ~internal_name:"tezos-rpc-http"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Library of auto-documented RPCs (http server and client)"
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_rpc; resto_cohttp; uri]
@@ -3457,7 +3487,8 @@ let octez_rpc_http =
 
 let octez_rpc_http_client =
   octez_lib
-    "tezos-rpc-http-client"
+    "rpc-http-client"
+    ~internal_name:"tezos-rpc-http-client"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Library of auto-documented RPCs (http client)"
     ~deps:
@@ -3471,7 +3502,8 @@ let octez_rpc_http_client =
 
 let octez_rpc_http_client_unix =
   octez_lib
-    "tezos-rpc-http-client-unix"
+    "rpc-http-client-unix"
+    ~internal_name:"tezos_rpc_http_client_unix"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Unix implementation of the RPC client"
     ~deps:
@@ -3487,7 +3519,8 @@ let octez_rpc_http_client_unix =
 
 let octez_rpc_http_server =
   octez_lib
-    "tezos-rpc-http-server"
+    "rpc-http-server"
+    ~internal_name:"tezos_rpc_http_server"
     ~path:"src/lib_rpc_http"
     ~synopsis:"Library of auto-documented RPCs (http server)"
     ~deps:

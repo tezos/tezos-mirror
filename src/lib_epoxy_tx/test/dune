@@ -5,9 +5,9 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.octez-epoxy-tx
-  octez-libs.octez-plonk.plonk-test
-  octez-libs.octez-aplonk))
+  octez-libs.epoxy-tx
+  octez-libs.plonk.plonk-test
+  octez-libs.aplonk))
 
 (rule
  (alias runtest)

@@ -6,9 +6,9 @@
  (public_name octez-l2-libs.scoru-wasm-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-tree-encoding
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-libs.base.unix
   octez-libs.tezos-context.disk
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast

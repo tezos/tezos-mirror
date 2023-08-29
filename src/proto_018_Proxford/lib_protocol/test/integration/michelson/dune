@@ -8,13 +8,13 @@
  (libraries
   tezt.core
   octez-alcotezt
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.test-helpers
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   octez-protocol-018-Proxford-libs.client
   tezos-benchmark
-  octez-libs.tezos-micheline
+  octez-libs.micheline
   tezos-benchmark-018-Proxford
   tezos-benchmark-type-inference-018-Proxford
   octez-protocol-018-Proxford-libs.plugin

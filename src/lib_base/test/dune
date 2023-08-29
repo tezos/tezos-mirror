@@ -8,10 +8,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-error-monad
+  octez-libs.base
+  octez-libs.error-monad
   data-encoding
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (js_of_ocaml)

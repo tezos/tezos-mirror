@@ -6,7 +6,7 @@
  (package octez-libs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-micheline)
+  octez-libs.micheline)
  (inline_tests (flags -verbose) (modes native js))
  (preprocess (pps ppx_expect))
  (js_of_ocaml)
@@ -20,7 +20,7 @@
  (package octez-libs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-micheline)
+  octez-libs.micheline)
  (inline_tests (flags -verbose) (modes native js))
  (preprocess (pps ppx_expect))
  (js_of_ocaml)

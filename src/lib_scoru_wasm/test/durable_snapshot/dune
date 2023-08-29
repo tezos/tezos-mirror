@@ -6,8 +6,8 @@
  (public_name octez-l2-libs.scoru_wasm_durable_snapshot)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-tree-encoding
+  octez-libs.base
+  octez-libs.tree-encoding
   octez-l2-libs.webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags

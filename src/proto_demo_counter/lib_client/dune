@@ -6,7 +6,7 @@
  (public_name tezos-client-demo-counter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   octez-shell-libs.client-commands

@@ -6,7 +6,7 @@
  (package tezos-injector-018-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   octez-injector
   octez-protocol-018-Proxford-libs.client

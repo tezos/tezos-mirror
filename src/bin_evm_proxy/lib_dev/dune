@@ -6,9 +6,9 @@
  (package octez-evm-proxy-lib-dev)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.base
+  octez-libs.rpc-http
+  octez-libs.rpc-http-client-unix
   tezos-version.value
   lwt-exit)
  (flags

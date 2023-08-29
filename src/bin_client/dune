@@ -7,11 +7,11 @@
  (package octez-client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-clic
-  octez-libs.tezos-rpc-http-client
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc-http-client
+  octez-libs.stdlib-unix
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   octez-shell-libs.client-commands

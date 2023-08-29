@@ -6,8 +6,8 @@
  (public_name octez-protocol-012-Psithaca-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   tezos-protocol-012-Psithaca.protocol
@@ -17,7 +17,7 @@
   octez-shell-libs.signer-backends
   octez-protocol-012-Psithaca-libs.plugin
   tezos-protocol-012-Psithaca.parameters
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

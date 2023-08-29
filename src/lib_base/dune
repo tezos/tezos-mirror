@@ -5,16 +5,16 @@
 
 (library
  (name tezos_base)
- (public_name octez-libs.tezos-base)
+ (public_name octez-libs.base)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-crypto
+  octez-libs.stdlib
+  octez-libs.crypto
   data-encoding
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-rpc
-  octez-libs.tezos-micheline
-  octez-libs.tezos-event-logging
+  octez-libs.error-monad
+  octez-libs.rpc
+  octez-libs.micheline
+  octez-libs.event-logging
   ptime
   ptime.clock.os
   ezjsonm

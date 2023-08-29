@@ -6,11 +6,11 @@
  (public_name octez-protocol-018-Proxford-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.mockup
@@ -19,7 +19,7 @@
   octez-shell-libs.client-base
   octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-shell-libs.client-base-unix
   octez-protocol-018-Proxford-libs.plugin
   uri)
@@ -43,8 +43,8 @@
  (public_name octez-protocol-018-Proxford-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
   octez-proto-libs.protocol-environment
@@ -54,7 +54,7 @@
   octez-shell-libs.client-commands
   octez-protocol-018-Proxford-libs.client.commands
   octez-protocol-018-Proxford-libs.client.sapling
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
