@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -309,76 +310,101 @@ type output =
   | Closed of string
   | Open of string * out_channel * Format.formatter
 
+type auto_writer_state = {
+  mutable profiler_state : state;
+  mutable output : output;
+  time : time;
+}
+
 type (_, _) Profiler.kind +=
-  | Auto_write_to_file :
-      (string * lod, state ref * time * output ref) Profiler.kind
+  | Auto_write_to_file : (string * lod, auto_writer_state) Profiler.kind
 
-module Auto_write_to_file = struct
-  type nonrec state = state ref * time * output ref
+type file_format = Plain_text | Json
 
-  type config = string * lod
+let make_driver ~file_format =
+  (module struct
+    type nonrec state = auto_writer_state
 
-  let kind = Auto_write_to_file
+    type config = string * lod
 
-  let create (fn, lod) = (ref (empty lod), time (), ref (Closed fn))
+    let file_format = file_format
 
-  let time _ = time ()
+    let kind = Auto_write_to_file
 
-  let record (state, _, _) lod id = state := record !state lod id
+    let create (fn, lod) =
+      {profiler_state = empty lod; time = time (); output = Closed fn}
 
-  let aggregate (state, _, _) lod id = state := aggregate !state lod id
+    let time _ = time ()
 
-  let report (state, _, _) =
-    match !state.stack with
-    | Toplevel {aggregated; recorded}
-      when StringMap.cardinal aggregated > 0 || recorded <> [] ->
-        state := empty !state.max_lod ;
-        let report = {aggregated; recorded = List.rev recorded} in
-        Some (apply_lod !state.max_lod report)
-    | _ -> None
+    let record state lod id =
+      state.profiler_state <- record state.profiler_state lod id
 
-  let may_write ((_, t0, output) as state) =
-    match report state with
-    | None -> ()
-    | Some report ->
-        let ppf =
-          match !output with
-          | Open (_, _, ppf) -> ppf
-          | Closed fn ->
-              let fp = open_out fn in
-              let ppf = Format.formatter_of_out_channel fp in
-              output := Open (fn, fp, ppf) ;
-              ppf
-        in
-        Format.fprintf ppf "%a%!" (pp_report ~t0) report
+    let aggregate state lod id =
+      state.profiler_state <- aggregate state.profiler_state lod id
 
-  let inc ((s, _, _) as state) report =
-    s := inc !s report ;
-    may_write state
+    let report ({profiler_state; _} as state) =
+      match profiler_state.stack with
+      | Toplevel {aggregated; recorded}
+        when StringMap.cardinal aggregated > 0 || recorded <> [] ->
+          state.profiler_state <- empty profiler_state.max_lod ;
+          let report = {aggregated; recorded = List.rev recorded} in
+          Some (apply_lod profiler_state.max_lod report)
+      | _ -> None
 
-  let mark ((s, _, _) as state) lod id =
-    s := mark !s lod id ;
-    may_write state
+    let writer_of file_format formatter report time =
+      match file_format with
+      | Plain_text ->
+          Format.fprintf formatter "%a%!" (pp_report ~t0:time) report
+      | Json ->
+          let encoded_report =
+            Data_encoding.Json.construct Profiler.report_encoding report
+          in
+          Data_encoding.Json.pp formatter encoded_report
 
-  let stamp ((s, _, _) as state) lod id =
-    s := stamp !s lod id ;
-    may_write state
+    let may_write ({time = t0; output; _} as state) =
+      match report state with
+      | None -> ()
+      | Some report ->
+          let ppf =
+            match output with
+            | Open (_, _, ppf) -> ppf
+            | Closed fn ->
+                let fp = open_out fn in
+                let ppf = Format.formatter_of_out_channel fp in
+                state.output <- Open (fn, fp, ppf) ;
+                ppf
+          in
+          writer_of file_format ppf report t0
 
-  let span ((s, _, _) as state) lod d id =
-    s := span !s lod d id ;
-    may_write state
+    let inc state report =
+      state.profiler_state <- inc state.profiler_state report ;
+      may_write state
 
-  let stop ((s, _, _) as state) =
-    s := stop !s ;
-    may_write state
+    let mark state lod id =
+      state.profiler_state <- mark state.profiler_state lod id ;
+      may_write state
 
-  let close (_, _, output) =
-    match !output with
-    | Open (fn, fp, _) ->
-        close_out fp ;
-        output := Closed fn
-    | Closed _ -> ()
-end
+    let stamp state lod id =
+      state.profiler_state <- stamp state.profiler_state lod id ;
+      may_write state
 
-let auto_write_to_file =
-  (module Auto_write_to_file : DRIVER with type config = string * lod)
+    let span state lod d id =
+      state.profiler_state <- span state.profiler_state lod d id ;
+      may_write state
+
+    let stop ({profiler_state; _} as state) =
+      state.profiler_state <- stop profiler_state ;
+      may_write state
+
+    let close ({output; _} as state) =
+      match output with
+      | Open (fn, fp, _) ->
+          close_out fp ;
+          state.output <- Closed fn
+      | Closed _ -> ()
+  end : DRIVER
+    with type config = string * lod)
+
+let auto_write_to_txt_file = make_driver ~file_format:Plain_text
+
+let auto_write_to_json_file = make_driver ~file_format:Json

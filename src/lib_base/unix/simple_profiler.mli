@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,4 +30,6 @@ val headless : Profiler.lod Profiler.driver
 
 (** Driver printing its report to a file whenever a toplevel section
     ends. *)
-val auto_write_to_file : (string * Profiler.lod) Profiler.driver
+val auto_write_to_txt_file : (string * Profiler.lod) Profiler.driver
+
+val auto_write_to_json_file : (string * Profiler.lod) Profiler.driver
