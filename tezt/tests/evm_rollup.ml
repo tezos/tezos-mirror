@@ -1682,6 +1682,41 @@ let test_preinitialized_evm_kernel =
       (sf "Expected to read %%L as dictator key, but found %%R instead") ;
   unit
 
+let deposit ~amount_cmutez ~fa12 ~bridge ~admin ~receiver ~sc_rollup_node ~node
+    client =
+  (* Gives enough allowance to the bridge. *)
+  let* () =
+    Client.from_fa1_2_contract_approve
+      ~burn_cap:Tez.one
+      ~contract:fa12
+      ~as_:admin
+      ~amount:amount_cmutez
+      ~from:bridge
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  (* Deposit tokens to the EVM rollup. *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
+      ~amount:Tez.zero
+      ~giver:admin
+      ~receiver:bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  unit
+
+let check_balance ~receiver ~endpoint expected_balance =
+  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
+  let balance = Wei.truncate_to_mutez balance in
+  Check.((balance = expected_balance) int)
+    ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
+  unit
+
 let test_deposit_fa12 =
   Protocol.register_test
     ~__FILE__
@@ -1723,42 +1758,21 @@ let test_deposit_fa12 =
          "The bridge does not target the expected EVM rollup, found %%R \
           expected %%L") ;
 
-  (* Gives enough allowance to the bridge. *)
   let amount_cmutez = 100_000_000 in
-  let amount_ctez = 100 in
-  let* () =
-    Client.from_fa1_2_contract_approve
-      ~burn_cap:Tez.one
-      ~contract:fa12
-      ~as_:admin.public_key_hash
-      ~amount:amount_cmutez
-      ~from:bridge
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  (* Deposit tokens to the EVM rollup. *)
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+
   let* () =
-    Client.transfer
-      ~entrypoint:"deposit"
-      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
-      ~amount:Tez.zero
-      ~giver:admin.public_key_hash
-      ~receiver:bridge
-      ~burn_cap:Tez.one
+    deposit
+      ~amount_cmutez
+      ~fa12
+      ~bridge
+      ~admin:admin.public_key_hash
+      ~receiver
+      ~sc_rollup_node
+      ~node
       client
   in
-  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
-
-  (* Check the balance in the EVM rollup. *)
-  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
-  Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
-    ~error_msg:
-      (sf
-         "Expected balance of %s should be %%R, but got %%L"
-         Eth_account.bootstrap_accounts.(0).address) ;
-  unit
+  check_balance ~receiver ~endpoint amount_cmutez
 
 let get_kernel_boot_wasm ~sc_rollup_client =
   let*! kernel_boot_opt =
@@ -2124,8 +2138,8 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ~dictator ~scenario_prior ~scenario_after
-    ~protocol =
+let gen_kernel_migration_test ~deposit_admin ~dictator ~scenario_prior
+    ~scenario_after ~protocol =
   let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
   let current_kernel_installee = "ghostnet_evm_kernel" in
   let* evm_setup =
@@ -2136,7 +2150,7 @@ let gen_kernel_migration_test ~dictator ~scenario_prior ~scenario_after
           base_installee = current_kernel_base_installee;
           installee = current_kernel_installee;
         }
-      ~deposit_admin:None
+      ~deposit_admin
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
@@ -2193,6 +2207,7 @@ let test_kernel_migration =
       evm_setup
   in
   gen_kernel_migration_test
+    ~deposit_admin:None
     ~dictator:sender
     ~scenario_prior
     ~scenario_after
@@ -2322,6 +2337,66 @@ let test_deposit_dailynet =
 
   unit
 
+let test_deposit_before_and_after_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "deposit"]
+    ~title:"Deposit before and after migration"
+  @@ fun protocol ->
+  let dictator = Eth_account.bootstrap_accounts.(0) in
+  let admin = Constant.bootstrap5 in
+  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+  let amount_cmutez = 50_000_000 in
+
+  let scenario_prior
+      ~evm_setup:{deposit_addresses; sc_rollup_node; node; client; endpoint; _}
+      =
+    let {fa12; bridge} =
+      match deposit_addresses with Some x -> x | None -> assert false
+    in
+    let* () =
+      deposit
+        ~amount_cmutez
+        ~fa12
+        ~bridge
+        ~admin:admin.public_key_hash
+        ~receiver
+        ~sc_rollup_node
+        ~node
+        client
+    in
+    check_balance ~receiver ~endpoint amount_cmutez
+  in
+  let scenario_after
+      ~evm_setup:{deposit_addresses; sc_rollup_node; node; client; endpoint; _}
+      ~sanity_check:_ =
+    let {fa12; bridge} =
+      match deposit_addresses with Some x -> x | None -> assert false
+    in
+    let* () =
+      deposit
+        ~amount_cmutez
+        ~fa12
+        ~bridge
+        ~admin:admin.public_key_hash
+        ~receiver
+        ~sc_rollup_node
+        ~node
+        client
+    in
+    check_balance ~receiver ~endpoint (amount_cmutez * 2)
+  in
+  gen_kernel_migration_test
+    ~deposit_admin:(Some admin)
+    ~dictator
+    ~scenario_prior
+    ~scenario_after
+    ~protocol
+
+let register_evm_migration ~protocols =
+  test_kernel_migration protocols ;
+  test_deposit_before_and_after_migration protocols
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2359,7 +2434,8 @@ let register_evm_proxy_server ~protocols =
   test_kernel_upgrade_no_dictator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_kernel_migration protocols ;
   test_deposit_dailynet protocols
 
-let register ~protocols = register_evm_proxy_server ~protocols
+let register ~protocols =
+  register_evm_proxy_server ~protocols ;
+  register_evm_migration ~protocols

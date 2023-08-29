@@ -61,3 +61,7 @@ let to_le_bytes z =
   let bits = Z.to_bits z |> Bytes.of_string in
   Bytes.blit bits 0 buffer 0 (Bytes.length bits) ;
   buffer
+
+let truncate_to_mutez z =
+  let open Z in
+  div z (pow (of_int 10) 12) |> to_int
