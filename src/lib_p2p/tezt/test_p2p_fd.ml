@@ -53,7 +53,18 @@ let test_connect () =
         Lwt.return_error (TzTrace.make (error_of_exn ex))
   in
 
-  Test.register ~__FILE__ ~title:"p2p fd connect" ~tags:["p2p"; "fd"]
+  Test.register
+    ~__FILE__
+    ~title:"p2p fd connect"
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -113,7 +124,17 @@ let test_read_write () =
   Test.register
     ~__FILE__
     ~title:"p2p fd read write"
-    ~tags:["p2p"; "fd"; "read"; "write"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "read";
+        "write";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let data = Bytes.of_string "test" in
   let*! r =
@@ -162,7 +183,17 @@ let test_closed_by_peer_read_outgoing () =
   Test.register
     ~__FILE__
     ~title:"p2p fd closed by peer read outgoing"
-    ~tags:["p2p"; "fd"; "closed_by_peer"; "read"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "closed_by_peer";
+        "read";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -208,7 +239,17 @@ let test_closed_by_peer_read_incoming () =
   Test.register
     ~__FILE__
     ~title:"p2p fd closed by peer read incoming"
-    ~tags:["p2p"; "fd"; "closed_by_peer"; "read"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "closed_by_peer";
+        "read";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -251,7 +292,17 @@ let test_locally_closed_read_outgoing () =
   Test.register
     ~__FILE__
     ~title:"p2p fd locally closed read outgoing"
-    ~tags:["p2p"; "fd"; "locally_closed"; "read"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "locally_closed";
+        "read";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -294,7 +345,17 @@ let test_locally_closed_read_incoming () =
   Test.register
     ~__FILE__
     ~title:"p2p fd locally closed read incoming"
-    ~tags:["p2p"; "fd"; "locally_closed"; "read"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "locally_closed";
+        "read";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -336,7 +397,17 @@ let test_locally_closed_write_outgoing () =
   Test.register
     ~__FILE__
     ~title:"p2p fd locally closed write outgoing"
-    ~tags:["p2p"; "fd"; "locally_closed"; "write"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "locally_closed";
+        "write";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
@@ -378,7 +449,17 @@ let test_locally_closed_write_incoming () =
   Test.register
     ~__FILE__
     ~title:"p2p fd locally closed write incoming"
-    ~tags:["p2p"; "fd"; "locally_closed"; "write"]
+    ~tags:
+      [
+        "p2p";
+        "fd";
+        "locally_closed";
+        "write";
+        (* FIXME: https://gitlab.com/nomadic-labs/tezt/-/issues/13
+           Fatal error: exception Bad file descriptor` errors
+        *)
+        Tag.flaky;
+      ]
   @@ fun () ->
   let*! r = run_nodes_fd ~addr:Node.default_ipv6_addr client server in
   match r with
