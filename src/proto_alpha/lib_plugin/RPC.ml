@@ -377,7 +377,7 @@ module Scripts = struct
 
     let run_code =
       RPC_service.post_service
-        ~description:"Run a piece of code in the current context"
+        ~description:"Run a Michelson script in the current context"
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:run_code_output_encoding
@@ -386,7 +386,7 @@ module Scripts = struct
     let trace_code =
       RPC_service.post_service
         ~description:
-          "Run a piece of code in the current context, keeping a trace"
+          "Run a Michelson script in the current context, keeping a trace"
         ~query:RPC_query.empty
         ~input:trace_code_input_encoding
         ~output:trace_code_output_encoding
