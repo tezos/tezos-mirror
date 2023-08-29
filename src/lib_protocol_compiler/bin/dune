@@ -16,7 +16,7 @@
  (modes native)
  (libraries
   octez-protocol-compiler.native
-  tezos-version.value)
+  octez-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

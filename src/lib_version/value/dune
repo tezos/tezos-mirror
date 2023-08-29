@@ -5,7 +5,7 @@
 
 (library
  (name tezos_version_value)
- (public_name tezos-version.value)
+ (public_name octez-version.value)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base

@@ -8,7 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-version.value
+  octez-version.value
   tezos-protocol-alpha.protocol
   tezos-protocol-alpha.protocol.lifted
   octez-protocol-alpha-libs.plugin

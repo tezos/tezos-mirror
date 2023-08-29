@@ -15,7 +15,7 @@ depends: [
   "octez-shell-libs" {with-test}
   "tezos-protocol-demo-noops" {with-test}
   "octez-alcotezt" {with-test}
-  "tezos-version" {with-test}
+  "octez-version" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

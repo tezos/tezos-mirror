@@ -8,7 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-version.value
+  octez-version.value
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.plugin
   octez-proto-libs.protocol-environment

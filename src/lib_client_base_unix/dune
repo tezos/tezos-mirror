@@ -22,7 +22,7 @@
   octez-shell-libs.proxy
   octez-shell-libs.proxy.rpc
   octez-shell-libs.signer-backends.unix
-  tezos-version.value
+  octez-version.value
   lwt-exit
   uri)
  (library_flags (:standard -linkall))

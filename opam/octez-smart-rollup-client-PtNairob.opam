@@ -15,7 +15,7 @@ depends: [
   "octez-shell-libs"
   "octez-protocol-017-PtNairob-libs"
   "octez-l2-libs"
-  "tezos-version"
+  "octez-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

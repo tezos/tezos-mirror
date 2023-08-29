@@ -13,7 +13,7 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "octez-libs"
   "octez-shell-libs"
-  "tezos-version"
+  "octez-version"
 ]
 depopts: [
   "octez-protocol-005-PsBabyM1-libs"

@@ -784,6 +784,13 @@ opam:octez-smart-rollup-wasm-debugger:
 
 # Ignoring unreleased package octez-testnet-scenarios.
 
+opam:octez-version:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_exec_opam_batch_6
+  variables:
+    package: octez-version
+
 # Ignoring unreleased package scoru-sequencer-test.
 
 opam:tezos-benchmark:
@@ -1058,7 +1065,7 @@ opam:tezos-protocol-genesis:
 opam:tezos-proxy-server-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-proxy-server-config
 
@@ -1071,13 +1078,6 @@ opam:tezos-proxy-server-config:
 # Ignoring unreleased package tezos-tps-evaluation.
 
 # Ignoring unreleased package tezos-tree-encoding-test.
-
-opam:tezos-version:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_7
-  variables:
-    package: tezos-version
 
 # Ignoring unreleased package tezt-ethereum.
 

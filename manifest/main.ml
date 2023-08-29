@@ -2267,7 +2267,8 @@ let octez_version =
 
 let octez_version_value =
   public_lib
-    "tezos-version.value"
+    "octez-version.value"
+    ~internal_name:"tezos_version_value"
     ~path:"src/lib_version/value/"
     ~synopsis:"Tezos: version value generated from Git"
     ~deps:
@@ -2295,17 +2296,17 @@ let _octez_version_get_git_info =
   private_exe
     "get_git_info"
     ~path:"src/lib_version/exe"
-    ~opam:"tezos-version"
+    ~opam:"octez-version"
     ~deps:[dune_configurator; octez_version_parser]
     ~modules:["get_git_info"]
     ~bisect_ppx:No
 
 let _octez_print_version_exe =
   public_exe
-    "tezos-version"
+    "octez-version"
     ~internal_name:"tezos_print_version"
     ~path:"src/lib_version/exe"
-    ~opam:"tezos-version"
+    ~opam:"octez-version"
     ~deps:
       [octez_version_value |> open_; octez_version |> open_; octez_base_unix]
     ~modules:["tezos_print_version"]

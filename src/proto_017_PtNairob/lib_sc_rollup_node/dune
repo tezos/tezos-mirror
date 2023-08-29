@@ -42,7 +42,7 @@
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
   octez-libs.crypto-dal
-  tezos-version.value)
+  octez-version.value)
  (flags
   (:standard)
   -open Tezos_base

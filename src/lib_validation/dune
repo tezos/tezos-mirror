@@ -16,7 +16,7 @@
   octez-shell-libs.shell-services
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix
-  tezos-version.value)
+  octez-version.value)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
