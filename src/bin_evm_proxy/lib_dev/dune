@@ -9,7 +9,7 @@
   octez-libs.base
   octez-libs.rpc-http
   octez-libs.rpc-http-client-unix
-  tezos-version.value
+  octez-version.value
   lwt-exit)
  (flags
   (:standard)

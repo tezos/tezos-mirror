@@ -17,7 +17,7 @@ depends: [
   "uri" { >= "3.1.0" }
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs"
-  "tezos-version"
+  "octez-version"
   "tezos-dal-node-services"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"

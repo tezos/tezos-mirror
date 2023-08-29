@@ -15,7 +15,7 @@ depends: [
   "kaitai"
   "octez-libs"
   "octez-shell-libs"
-  "tezos-version"
+  "octez-version"
 ]
 depopts: [
   "octez-protocol-005-PsBabyM1-libs"

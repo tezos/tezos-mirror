@@ -25,7 +25,7 @@
   octez-libs.event-logging-test-helpers
   octez-libs.test-helpers
   octez-alcotezt
-  tezos-version.value)
+  octez-version.value)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

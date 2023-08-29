@@ -19,7 +19,7 @@
   tezos-dac-lib
   tezos-dac-client-lib
   octez-injector
-  tezos-version.value
+  octez-version.value
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tezos-workers

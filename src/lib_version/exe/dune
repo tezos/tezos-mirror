@@ -10,10 +10,10 @@
 
 (executable
  (name tezos_print_version)
- (public_name tezos-version)
- (package tezos-version)
+ (public_name octez-version)
+ (package octez-version)
  (libraries
-  tezos-version.value
+  octez-version.value
   octez-libs.version
   octez-libs.base.unix)
  (link_flags

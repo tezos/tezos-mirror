@@ -18,7 +18,7 @@
   octez-libs.stdlib-unix
   octez-libs.event-logging
   octez-shell-libs.signer-services
-  tezos-version.value
+  octez-version.value
   (select void_for_linking-octez-protocol-005-PsBabyM1-libs-client from
    (octez-protocol-005-PsBabyM1-libs.client -> void_for_linking-octez-protocol-005-PsBabyM1-libs-client.empty)
    (-> void_for_linking-octez-protocol-005-PsBabyM1-libs-client.empty))

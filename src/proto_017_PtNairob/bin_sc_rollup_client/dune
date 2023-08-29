@@ -11,7 +11,7 @@
   octez-libs.clic
   tezos-protocol-017-PtNairob.protocol
   octez_smart_rollup_client_PtNairob
-  tezos-version.value)
+  octez-version.value)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

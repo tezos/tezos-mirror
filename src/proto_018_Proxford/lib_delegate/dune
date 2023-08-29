@@ -8,7 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-version.value
+  octez-version.value
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.protocol.lifted
   octez-protocol-018-Proxford-libs.plugin

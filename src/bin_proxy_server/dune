@@ -20,7 +20,7 @@
   octez-libs.rpc-http-server
   octez-shell-libs.shell-services
   octez-shell-libs.shell-context
-  tezos-version.value
+  octez-version.value
   uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)

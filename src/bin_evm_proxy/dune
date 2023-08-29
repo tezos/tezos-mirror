@@ -12,7 +12,7 @@
   octez-libs.clic
   octez-libs.rpc-http
   octez-libs.rpc-http-server
-  tezos-version.value
+  octez-version.value
   evm_proxy_lib_prod
   evm_proxy_lib_dev)
  (link_flags
