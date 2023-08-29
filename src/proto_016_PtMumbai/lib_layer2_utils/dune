@@ -6,7 +6,7 @@
  (public_name octez-protocol-016-PtMumbai-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-016-PtMumbai.protocol
   octez-protocol-016-PtMumbai-libs.client)
  (inline_tests (flags -verbose) (modes native))

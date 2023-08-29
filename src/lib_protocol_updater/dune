@@ -6,9 +6,9 @@
  (public_name octez-shell-libs.protocol-updater)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-micheline
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-libs.micheline
   octez-shell-libs.shell-services
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-context

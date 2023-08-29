@@ -8,7 +8,7 @@
  (libraries
   octez-l2-libs.webassembly-interpreter
   lwt.unix
-  octez-libs.tezos-lazy-containers)
+  octez-libs.lazy-containers)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter

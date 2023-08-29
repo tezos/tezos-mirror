@@ -5,16 +5,16 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   tezt
   str
   bls12-381
   tezt-tezos
   tezt_ethereum
   data-encoding
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
   tezos_scoru_wasm_regressions
   tezt_self_tests_tezt_lib

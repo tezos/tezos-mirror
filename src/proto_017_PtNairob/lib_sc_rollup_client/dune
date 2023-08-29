@@ -6,7 +6,7 @@
  (package octez-smart-rollup-client-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
   octez-shell-libs.client-commands
   octez-shell-libs.client-base

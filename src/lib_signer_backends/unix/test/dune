@@ -6,9 +6,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-crypto
+  octez-libs.error-monad
+  octez-libs.stdlib
+  octez-libs.crypto
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends.unix
   octez-alcotezt)

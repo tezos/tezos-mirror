@@ -8,7 +8,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
+  octez-libs.base
   octez-shell-libs.shell-services
   octez-alcotezt)
  (js_of_ocaml)

@@ -7,9 +7,9 @@
  (libraries
   tezt.core
   bls12-381
-  octez-libs.octez-mec
+  octez-libs.mec
   octez-alcotezt
-  octez-libs.octez-polynomial)
+  octez-libs.polynomial)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

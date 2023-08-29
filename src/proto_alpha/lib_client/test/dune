@@ -6,12 +6,12 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-micheline
+  octez-libs.base
+  octez-libs.micheline
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol
-  octez-libs.tezos-base-test-helpers
-  octez-libs.tezos-test-helpers
+  octez-libs.base-test-helpers
+  octez-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))

@@ -6,15 +6,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.crypto
   octez-shell-libs.context-ops
   octez-shell-libs.store.shared
   octez-shell-libs.store.unix
   octez-shell-libs.store.unix-reconstruction
   octez-shell-libs.store.unix-snapshots
   octez-shell-libs.shell-services
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.validation
   octez-shell-libs.protocol-updater
   tezos-protocol-demo-noops.embedded-protocol
@@ -23,7 +23,7 @@
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.plugin
   octez-alcotezt
-  octez-libs.tezos-test-helpers)
+  octez-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

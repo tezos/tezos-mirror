@@ -6,7 +6,7 @@
  (public_name octez-protocol-alpha-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (inline_tests (flags -verbose) (modes native))

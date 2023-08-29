@@ -5,22 +5,22 @@
 
 (library
  (name tezos_crypto)
- (public_name octez-libs.tezos-crypto)
+ (public_name octez-libs.crypto)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-stdlib
+  octez-libs.stdlib
   data-encoding
-  octez-libs.tezos-lwt-result-stdlib
+  octez-libs.lwt-result-stdlib
   lwt
-  octez-libs.tezos-hacl
+  octez-libs.hacl
   secp256k1-internal
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-rpc
+  octez-libs.error-monad
+  octez-libs.rpc
   aches
   zarith
   zarith_stubs_js
   bls12-381
-  octez-libs.octez-bls12-381-signature)
+  octez-libs.bls12-381-signature)
  (js_of_ocaml)
  (flags
   (:standard)

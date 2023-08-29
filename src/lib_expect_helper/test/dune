@@ -6,6 +6,6 @@
  (package octez-libs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-expect-helper)
+  octez-libs.expect-helper)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect)))

@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-stdlib
+  octez-libs.stdlib
   octez-alcotezt
   bigstring
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

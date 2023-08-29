@@ -7,10 +7,10 @@
  (package octez-smart-rollup-wasm-debugger)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
-  octez-libs.tezos-tree-encoding
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.tree-encoding
+  octez-libs.base.unix
   yaml
   octez-protocol-alpha-libs.client
   octez-l2-libs.scoru-wasm

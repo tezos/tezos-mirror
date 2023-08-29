@@ -5,14 +5,14 @@
  (name tezos_client_006_PsCARTHA)
  (public_name octez-protocol-006-PsCARTHA-libs.client)
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   tezos-protocol-006-PsCARTHA.protocol
   tezos-protocol-006-PsCARTHA.protocol.lifted
   octez-shell-libs.signer-backends
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags

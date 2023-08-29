@@ -6,14 +6,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-base-test-helpers
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base-test-helpers
+  octez-libs.base.unix
   octez-alcotezt
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-micheline
+  octez-libs.stdlib-unix
+  octez-libs.micheline
   octez-protocol-017-PtNairob-libs.plugin
   tezos-protocol-017-PtNairob.protocol
   tezos-protocol-017-PtNairob.parameters

@@ -3,11 +3,11 @@
 
 (library
  (name tezos_rpc)
- (public_name octez-libs.tezos-rpc)
+ (public_name octez-libs.rpc)
  (instrumentation (backend bisect_ppx))
  (libraries
   data-encoding
-  octez-libs.tezos-error-monad
+  octez-libs.error-monad
   resto
   resto-directory
   uri)

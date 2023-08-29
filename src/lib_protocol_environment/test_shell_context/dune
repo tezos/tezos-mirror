@@ -8,8 +8,8 @@
   tezt.core
   octez-shell-libs.shell-context
   octez-alcotezt
-  octez-libs.tezos-test-helpers
-  octez-libs.tezos-base
+  octez-libs.test-helpers
+  octez-libs.base
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags

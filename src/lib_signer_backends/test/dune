@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib
+  octez-libs.error-monad
+  octez-libs.crypto
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends
   octez-alcotezt

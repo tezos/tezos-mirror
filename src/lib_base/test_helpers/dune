@@ -3,13 +3,13 @@
 
 (library
  (name tezos_base_test_helpers)
- (public_name octez-libs.tezos-base-test-helpers)
+ (public_name octez-libs.base-test-helpers)
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-event-logging-test-helpers
-  octez-libs.tezos-test-helpers
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.event-logging-test-helpers
+  octez-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest)
  (library_flags (:standard -linkall))

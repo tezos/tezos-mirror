@@ -3,8 +3,8 @@
 
 (library
  (name tezos_lazy_containers)
- (public_name octez-libs.tezos-lazy-containers)
+ (public_name octez-libs.lazy-containers)
  (instrumentation (backend bisect_ppx))
  (libraries
   zarith
-  octez-libs.tezos-tree-encoding))
+  octez-libs.tree-encoding))

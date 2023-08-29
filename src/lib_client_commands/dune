@@ -6,15 +6,15 @@
  (public_name octez-shell-libs.client-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-rpc
-  octez-libs.tezos-clic
-  octez-libs.tezos-clic.unix
+  octez-libs.base
+  octez-libs.rpc
+  octez-libs.clic
+  octez-libs.clic.unix
   octez-shell-libs.client-base
   octez-shell-libs.shell-services
   octez-libs.tezos-p2p-services
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-base.unix
+  octez-libs.stdlib-unix
+  octez-libs.base.unix
   octez-shell-libs.signer-backends
   data-encoding
   uri)

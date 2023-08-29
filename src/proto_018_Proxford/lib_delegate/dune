@@ -6,8 +6,8 @@
  (public_name octez-protocol-018-Proxford-libs.baking)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-version.value
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.protocol.lifted
@@ -17,15 +17,15 @@
   octez-shell-libs.client-base
   octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
   octez-shell-libs.shell-context
   octez-libs.tezos-context
   octez-libs.tezos-context.memory
-  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.rpc-http-client-unix
   octez-shell-libs.context-ops
-  octez-libs.tezos-rpc
-  octez-libs.tezos-rpc-http
+  octez-libs.rpc
+  octez-libs.rpc-http
   tezos-dal-node-services
   lwt-canceler
   lwt-exit
@@ -55,17 +55,17 @@
  (public_name octez-protocol-018-Proxford-libs.baking-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
   octez-protocol-018-Proxford-libs.baking
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -87,7 +87,7 @@
  (public_name octez-protocol-018-Proxford-libs.baking-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
@@ -96,7 +96,7 @@
   octez-shell-libs.client-commands
   octez-protocol-018-Proxford-libs.baking
   octez-protocol-018-Proxford-libs.baking-commands
-  octez-libs.tezos-rpc)
+  octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

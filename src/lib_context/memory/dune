@@ -6,11 +6,11 @@
  (public_name octez-libs.tezos-context.memory)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib
+  octez-libs.base
+  octez-libs.stdlib
   irmin-pack
   irmin-pack.mem
-  octez-libs.tezos-context.sigs
+  octez-libs.context.sigs
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers)
  (flags

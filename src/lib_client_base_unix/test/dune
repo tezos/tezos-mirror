@@ -6,10 +6,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
+  octez-libs.base
   octez-shell-libs.mockup-commands
   octez-shell-libs.client-base-unix
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

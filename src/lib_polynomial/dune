@@ -3,7 +3,7 @@
 
 (library
  (name polynomial)
- (public_name octez-libs.octez-polynomial)
+ (public_name octez-libs.polynomial)
  (instrumentation (backend bisect_ppx))
  (libraries
   bls12-381

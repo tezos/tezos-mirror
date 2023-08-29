@@ -3,11 +3,11 @@
 
 (library
  (name traced_sigs)
- (public_name octez-libs.tezos-lwt-result-stdlib.traced.sigs)
+ (public_name octez-libs.lwt-result-stdlib.traced.sigs)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt
-  octez-libs.tezos-lwt-result-stdlib.bare.sigs
-  octez-libs.tezos-lwt-result-stdlib.bare.structs
-  octez-libs.tezos-lwt-result-stdlib.traced.functor-outputs)
+  octez-libs.lwt-result-stdlib.bare.sigs
+  octez-libs.lwt-result-stdlib.bare.structs
+  octez-libs.lwt-result-stdlib.traced.functor-outputs)
  (js_of_ocaml))

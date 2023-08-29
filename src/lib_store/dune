@@ -6,9 +6,9 @@
  (public_name octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-crypto
-  octez-libs.tezos-rpc
+  octez-libs.base
+  octez-libs.crypto
+  octez-libs.rpc
   lwt-watcher
   octez-shell-libs.shell-services
   octez-shell-libs.validation

@@ -8,8 +8,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-version
-  octez-libs.tezos-version.parser
+  octez-libs.version
+  octez-libs.version.parser
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

@@ -6,12 +6,12 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-micheline
+  octez-libs.base
+  octez-libs.micheline
   octez-protocol-017-PtNairob-libs.client
   tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-context.merkle_proof_encoding
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   octez-protocol-017-PtNairob-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
@@ -19,8 +19,8 @@
   tezos-benchmark-017-PtNairob
   tezos-benchmark-type-inference-017-PtNairob
   octez-protocol-017-PtNairob-libs.smart-rollup
-  octez-libs.tezos-crypto-dal
-  octez-libs.tezos-base-test-helpers
+  octez-libs.crypto-dal
+  octez-libs.base-test-helpers
   tezos-protocol-017-PtNairob.parameters)
  (library_flags (:standard -linkall))
  (flags

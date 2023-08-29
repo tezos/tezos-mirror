@@ -6,7 +6,7 @@
  (public_name octez-protocol-012-Psithaca-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-012-Psithaca.protocol)
  (flags
   (:standard)
@@ -22,7 +22,7 @@
  (public_name octez-protocol-012-Psithaca-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-012-Psithaca.embedded-protocol
   octez-protocol-012-Psithaca-libs.plugin
   octez-shell-libs.validation)

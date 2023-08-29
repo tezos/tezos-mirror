@@ -6,16 +6,16 @@
  (public_name octez-protocol-008-PtEdo2Zk-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-008-PtEdo2Zk.protocol
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   octez-protocol-008-PtEdo2Zk-libs.client
   octez-shell-libs.client-commands
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-protocol-008-PtEdo2Zk-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
@@ -36,8 +36,8 @@
  (public_name octez-protocol-008-PtEdo2Zk-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-008-PtEdo2Zk.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
@@ -45,7 +45,7 @@
   octez-protocol-008-PtEdo2Zk-libs.client
   octez-shell-libs.client-commands
   octez-protocol-008-PtEdo2Zk-libs.client.commands
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-protocol-008-PtEdo2Zk-libs.plugin)
  (library_flags (:standard -linkall))
  (flags

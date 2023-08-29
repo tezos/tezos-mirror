@@ -3,12 +3,12 @@
 
 (library
  (name plonk_test)
- (public_name octez-libs.octez-plonk.plonk-test)
+ (public_name octez-libs.plonk.plonk-test)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.octez-plonk
-  octez-libs.octez-plonk.aggregation
-  octez-libs.octez-plonk.distribution)
+  octez-libs.plonk
+  octez-libs.plonk.aggregation
+  octez-libs.plonk.distribution)
  (preprocess (pps ppx_repr))
  (modules helpers cases))
 
@@ -34,9 +34,9 @@
 (executable
  (name main)
  (libraries
-  octez-libs.octez-plonk.plonk-test
+  octez-libs.plonk.plonk-test
   qcheck-alcotest
-  octez-libs.octez-bls12-381-polynomial)
+  octez-libs.bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_bls12_381_polynomial)
@@ -57,5 +57,5 @@
 (executable
  (name bench)
  (libraries
-  octez-libs.octez-plonk.plonk-test)
+  octez-libs.plonk.plonk-test)
  (modules bench))

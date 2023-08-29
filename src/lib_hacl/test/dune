@@ -8,16 +8,16 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-lwt-result-stdlib
+  octez-libs.stdlib
+  octez-libs.error-monad
+  octez-libs.lwt-result-stdlib
   zarith
   zarith_stubs_js
   data-encoding
-  octez-libs.tezos-hacl
+  octez-libs.hacl
   qcheck-alcotest
   octez-alcotezt
-  octez-libs.tezos-test-helpers)
+  octez-libs.test-helpers)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

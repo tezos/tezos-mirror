@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-error-monad
+  octez-libs.error-monad
   data-encoding
   octez-alcotezt)
  (js_of_ocaml)
