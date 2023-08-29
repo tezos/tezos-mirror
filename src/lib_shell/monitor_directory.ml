@@ -54,7 +54,8 @@ let build_rpc_directory ~(commit_info : Node_version.commit_info) validator
             [
               (let+ o = Lwt_stream.get block_stream in
                Option.map
-                 (fun b -> (Store.Block.hash b, Store.Block.timestamp b))
+                 (fun (hash, header) ->
+                   (hash, header.Block_header.shell.timestamp))
                  o);
               (let+ () = Chain_validator.bootstrapped mainchain_validator in
                None);
@@ -293,11 +294,9 @@ let build_rpc_directory ~(commit_info : Node_version.commit_info) validator
           in
           let stream =
             Lwt_stream.filter_map_s
-              (fun block ->
-                let header = Store.Block.header block in
+              (fun (hash, header) ->
                 let* within_protocols = within_protocols header in
-                if within_protocols then
-                  Lwt.return_some (Store.Block.hash block, header)
+                if within_protocols then Lwt.return_some (hash, header)
                 else Lwt.return_none)
               block_stream
           in
