@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Evm_proxy_lib
+open Evm_proxy_lib_prod
 
 let from_hex s =
   let open Lwt_result_syntax in

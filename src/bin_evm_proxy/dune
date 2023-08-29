@@ -13,7 +13,8 @@
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
   tezos-version.value
-  evm_proxy_lib)
+  evm_proxy_lib_prod
+  evm_proxy_lib_dev)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))

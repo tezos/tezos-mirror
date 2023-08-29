@@ -7847,14 +7847,31 @@ let _octez_scoru_wasm_debugger =
         octez_version_value;
       ]
 
-let evm_proxy_lib =
+let evm_proxy_lib_prod =
   private_lib
-    "evm_proxy_lib"
-    ~path:"src/bin_evm_proxy/lib"
-    ~opam:"octez-evm-proxy-lib"
+    "evm_proxy_lib_prod"
+    ~path:"src/bin_evm_proxy/lib_prod"
+    ~opam:"octez-evm-proxy-lib-prod"
     ~synopsis:
       "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
-       rollup"
+       rollup [prod version]"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_version_value;
+        lwt_exit;
+      ]
+
+let evm_proxy_lib_dev =
+  private_lib
+    "evm_proxy_lib_dev"
+    ~path:"src/bin_evm_proxy/lib_dev"
+    ~opam:"octez-evm-proxy-lib-dev"
+    ~synopsis:
+      "An implementation of a subset of Ethereum JSON-RPC API for the EVM \
+       rollup [dev version]"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -7878,7 +7895,8 @@ let _octez_evm_proxy_tests =
         octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
-        evm_proxy_lib;
+        evm_proxy_lib_prod;
+        evm_proxy_lib_dev;
       ]
 
 let octez_scoru_sequencer =
@@ -7959,7 +7977,8 @@ let _evm_proxy =
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         octez_version_value;
-        evm_proxy_lib;
+        evm_proxy_lib_prod;
+        evm_proxy_lib_dev;
       ]
     ~bisect_ppx:Yes
 
@@ -7974,7 +7993,8 @@ let _octez_evm_signer_exe =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_clic;
-        evm_proxy_lib;
+        evm_proxy_lib_prod;
+        evm_proxy_lib_dev;
       ]
 
 let octez_scoru_wasm_regressions =

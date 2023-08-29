@@ -11,7 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "octez-evm-proxy-lib"
+  "octez-evm-proxy-lib-prod"
+  "octez-evm-proxy-lib-dev"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

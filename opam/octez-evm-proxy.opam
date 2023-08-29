@@ -12,7 +12,8 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-version"
-  "octez-evm-proxy-lib"
+  "octez-evm-proxy-lib-prod"
+  "octez-evm-proxy-lib-dev"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
