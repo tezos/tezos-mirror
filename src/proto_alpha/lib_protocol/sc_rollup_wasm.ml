@@ -431,10 +431,19 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
           set s
-      | PS.Reveal (PS.Dal_page _content_opt) ->
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3927.
-             Handle DAL pages in wasm PVM. *)
-          assert false
+      | PS.Reveal (PS.Dal_page content_bytes) ->
+          let content_bytes =
+            Option.value ~default:Bytes.empty content_bytes
+            (* [content_opt] is [None] when the slot was not confirmed in the L1.
+               In this case, we return empty bytes.
+
+               Note that the kernel can identify this unconfirmed slot scenario because
+               all confirmed pages have a size of 4KiB. Thus, a page can only be considered
+               empty (0KiB) if it is unconfirmed. *)
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step content_bytes s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 
