@@ -170,11 +170,16 @@ rollup.
 Origination
 ^^^^^^^^^^^
 
-A smart rollup is characterized by the kind of Proof-generating
-Virtual Machine (PVM), the kernel written in a language that the PVM
-can interpret, and by the Michelson type of the entrypoint used by
-Layer 1 smart contracts to send internal messages to it. All these
-characteristics are provided when originating a new smart rollup.
+A smart rollup is characterized by:
+- the kind of Proof-generating Virtual Machine (PVM),
+- the kernel written in a language that the PVM can interpret,
+- the Michelson type of the entrypoint used by Layer 1 smart contracts
+to send internal messages to it, and
+- an optional list of addresses used as a white-list of allowed
+stakers (see :ref:`private_rollup_alpha`).
+
+All these characteristics are provided when originating a new smart
+rollup.
 
 Processing
 ^^^^^^^^^^
@@ -245,14 +250,18 @@ outbox messages can be executed by the Layer 1 by an explicit Layer 1
 operation (see :ref:`triggering_execution_outbox_message_alpha`), typically
 to transfer assets from the rollup to the Layer 1.
 
-The outbox messages can follow two different formats. Firstly, the Layer 1
-operations contained in the outbox messages can be left untyped, meaning only
-the Micheline expression is provided by the kernel. Before executing the
-transaction, the Layer 1 typechecks said expression against the expected type
-of the targeted entrypoint. Since Nairobi, it is also possible for the kernel
-to provide its expected type of the targeted entrypoint. This additional safety
-mechanism is to avoid type confusion: namely, a kernel transferring a tuple
-that the Layer 1 interprets as a ticket.
+The outbox messages can follow three different formats. Firstly, the
+Layer 1 operations contained in the outbox messages can be left
+untyped, meaning only the Micheline expression is provided by the
+kernel. Before executing the transaction, the Layer 1 typechecks said
+expression against the expected type of the targeted entrypoint. Since
+Nairobi, it is also possible for the kernel to provide its expected
+type of the targeted entrypoint. This additional safety mechanism is
+to avoid type confusion: namely, a kernel transferring a tuple that
+the Layer 1 interprets as a ticket. Lastly, the outbox message can
+contain a white-list update. This message can only be executed for a
+rollup that is private since its origination (see
+:ref:`private_rollup_alpha`).
 
 Refutation
 ^^^^^^^^^^
@@ -301,6 +310,37 @@ There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent stakers to avoid the rollup getting stuck.
+
+.. _private_rollup_alpha:
+
+Private rollup
+^^^^^^^^^^^^^^
+
+A **private** smart rollup guarantees that private data can't be
+leaked by any means, whereas in a public rollup, one can force a
+rollup to leak part of the data by starting a refutation game. This is
+achieved by restricting the set of allowed stakers with a
+white-list. With that restriction only addresses on the white-list can
+publish commitments and therefore participate in a refutation game.
+
+The white-list is optionally defined at origination. The rollup is
+considered public if no white-list is defined, private otherwise. The
+white-list can be updated with a specific outbox message. This message
+contains an optional list, the new list completely replaces the stored
+white-list in layer 1. If the message contains no list, then the
+rollup becomes public. In turn, it is forbidden to make a public
+rollup private by sending an outbox message with a non-empty
+white-list.
+
+It is the responsibility of the kernel to maintain the white-list by
+submitting outbox messages. Kernels must therefore implement their
+own access control list logic to add and remove addresses.
+
+Also, it is important to remember that because of the refutation
+logic, an outbox message can only be executed when the associated
+commitment has been cemented (see
+:ref:`triggering_execution_outbox_message_alpha`).
+
 
 Workflows
 ---------
