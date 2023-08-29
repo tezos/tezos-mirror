@@ -59,7 +59,7 @@ let assert_no_balance ctxt key =
   let*@ balance, _ = Ticket_balance.get_balance ctxt key in
   match balance with
   | Some b -> failwith "Expected empty (none) balance but got %d" (Z.to_int b)
-  | None -> return ()
+  | None -> return_unit
 
 let adjust_balance ctxt key delta =
   Ticket_balance.adjust_balance ctxt key ~delta:(Z.of_int delta)
@@ -163,7 +163,7 @@ let test_ticket_balance_different_owners () =
   let*@ _, ctxt = adjust_balance ctxt alice_blue 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_red 1 in
   let* () = assert_balance ctxt ~loc:__LOC__ alice_blue 1 in
-  return ()
+  return_unit
 
 (** Test updating the same entry with multiple updates yields
     the net result of all balance updates *)

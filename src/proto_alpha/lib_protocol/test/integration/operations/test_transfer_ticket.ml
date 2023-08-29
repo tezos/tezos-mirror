@@ -80,33 +80,38 @@ let test_mint_deposit_withdraw_implicit_transfer () =
   in
   let contents = 42 in
   let* block =
-    Op.transaction
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~parameters:
-        (Expr_common.(
-           pair_n [int (Z.of_int contents); int (Z.of_int 1); address account])
-        |> Micheline.strip_locations |> Script.lazy_expr)
-      ~fee:Tez.one
-      account
-      ticketer
-      (Tez.of_mutez_exn 0L)
-    >>=? fun operation -> Block.bake ~operation block
+    let* operation =
+      Op.transaction
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~parameters:
+          (Expr_common.(
+             pair_n [int (Z.of_int contents); int (Z.of_int 1); address account])
+          |> Micheline.strip_locations |> Script.lazy_expr)
+        ~fee:Tez.one
+        account
+        ticketer
+        (Tez.of_mutez_exn 0L)
+    in
+    Block.bake ~operation block
   in
   let ty = Expr.from_string "nat" in
   let* block =
-    Op.transfer_ticket
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~source:account
-      ~ty:(Script.lazy_expr ty)
-      ~contents:(Script.lazy_expr @@ Expr.from_string @@ string_of_int contents)
-      ~amount:
-        (WithExceptions.Option.get ~loc:__LOC__
-        @@ Ticket_amount.of_zint @@ Z.of_int 1)
-      ~destination:another_account
-      ~ticketer
-    >>=? fun operation -> Block.bake ~operation block
+    let* operation =
+      Op.transfer_ticket
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~source:account
+        ~ty:(Script.lazy_expr ty)
+        ~contents:
+          (Script.lazy_expr @@ Expr.from_string @@ string_of_int contents)
+        ~amount:
+          (WithExceptions.Option.get ~loc:__LOC__
+          @@ Ticket_amount.of_zint @@ Z.of_int 1)
+        ~destination:another_account
+        ~ticketer
+    in
+    Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
     let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
@@ -120,7 +125,8 @@ let test_mint_deposit_withdraw_implicit_transfer () =
       (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
   in
   let* ctxt =
-    Incremental.begin_construction block >|=? Incremental.alpha_ctxt
+    let+ result = Incremental.begin_construction block in
+    Incremental.alpha_ctxt result
   in
   let* token, ctxt =
     make_ex_token
@@ -209,40 +215,45 @@ let test_contract_as_ticket_transfer_destination () =
   in
   let contents = 42 in
   let* block =
-    Op.transaction
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~parameters:
-        (Expr_common.(
-           pair_n
-             [
-               string
-                 (Destination.(to_b58check (Contract account))
-                 ^ Entrypoint.(to_address_suffix default));
-               int (Z.of_int contents);
-               int (Z.of_int 1);
-             ])
-        |> Micheline.strip_locations |> Script.lazy_expr)
-      ~fee:Tez.one
-      account
-      ticketer
-      (Tez.of_mutez_exn 0L)
-    >>=? fun operation -> Block.bake ~operation block
+    let* operation =
+      Op.transaction
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~parameters:
+          (Expr_common.(
+             pair_n
+               [
+                 string
+                   (Destination.(to_b58check (Contract account))
+                   ^ Entrypoint.(to_address_suffix default));
+                 int (Z.of_int contents);
+                 int (Z.of_int 1);
+               ])
+          |> Micheline.strip_locations |> Script.lazy_expr)
+        ~fee:Tez.one
+        account
+        ticketer
+        (Tez.of_mutez_exn 0L)
+    in
+    Block.bake ~operation block
   in
   let ty = Expr.from_string "nat" in
   let* block =
-    Op.transfer_ticket
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~source:account
-      ~ty:(Script.lazy_expr ty)
-      ~contents:(Script.lazy_expr @@ Expr.from_string @@ string_of_int contents)
-      ~amount:
-        (WithExceptions.Option.get ~loc:__LOC__
-        @@ Ticket_amount.of_zint @@ Z.of_int 1)
-      ~destination:another_account
-      ~ticketer
-    >>=? fun operation -> Block.bake ~operation block
+    let* operation =
+      Op.transfer_ticket
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~source:account
+        ~ty:(Script.lazy_expr ty)
+        ~contents:
+          (Script.lazy_expr @@ Expr.from_string @@ string_of_int contents)
+        ~amount:
+          (WithExceptions.Option.get ~loc:__LOC__
+          @@ Ticket_amount.of_zint @@ Z.of_int 1)
+        ~destination:another_account
+        ~ticketer
+    in
+    Block.bake ~operation block
   in
   let make_ex_token ctxt ~ticketer ~ty ~content =
     let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
@@ -256,7 +267,8 @@ let test_contract_as_ticket_transfer_destination () =
       (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
   in
   let* ctxt =
-    Incremental.begin_construction block >|=? Incremental.alpha_ctxt
+    let+ result = Incremental.begin_construction block in
+    Incremental.alpha_ctxt result
   in
   let* token, ctxt =
     make_ex_token
@@ -275,29 +287,32 @@ let test_contract_as_ticket_transfer_destination () =
     | _ -> return_unit
   in
   let* block =
-    Op.transaction
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~parameters:
-        (Expr_common.(
-           pair_n
-             [
-               string
-                 (Destination.(to_b58check (Contract bag))
-                 ^ Entrypoint.(to_address_suffix @@ of_string_strict_exn "save")
-                 );
-               int (Z.of_int contents);
-               int (Z.of_int 1);
-             ])
-        |> Micheline.strip_locations |> Script.lazy_expr)
-      ~fee:Tez.one
-      account
-      ticketer
-      (Tez.of_mutez_exn 0L)
-    >>=? fun operation -> Block.bake ~operation block
+    let* operation =
+      Op.transaction
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~parameters:
+          (Expr_common.(
+             pair_n
+               [
+                 string
+                   (Destination.(to_b58check (Contract bag))
+                   ^ Entrypoint.(
+                       to_address_suffix @@ of_string_strict_exn "save"));
+                 int (Z.of_int contents);
+                 int (Z.of_int 1);
+               ])
+          |> Micheline.strip_locations |> Script.lazy_expr)
+        ~fee:Tez.one
+        account
+        ticketer
+        (Tez.of_mutez_exn 0L)
+    in
+    Block.bake ~operation block
   in
   let* ctxt =
-    Incremental.begin_construction block >|=? Incremental.alpha_ctxt
+    let+ result = Incremental.begin_construction block in
+    Incremental.alpha_ctxt result
   in
   let* token, ctxt =
     make_ex_token
