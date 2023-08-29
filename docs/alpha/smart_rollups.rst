@@ -715,8 +715,7 @@ proof is retrieved as follows:
 .. code:: sh
 
    PROOF=$(octez-smart-rollup-client-alpha get proof for message 0 \
-     of outbox at level "${L}" \
-     transferring "${MESSAGE}")
+     of outbox at level "${L}")
 
 Finally, the execution of the outbox message is done as follows:
 
