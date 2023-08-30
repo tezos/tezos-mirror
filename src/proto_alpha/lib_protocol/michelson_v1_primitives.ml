@@ -407,180 +407,188 @@ let string_of_prim = function
   | T_chest -> "chest"
   | H_constant -> "constant"
 
-let prim_of_string = function
-  | "parameter" -> ok K_parameter
-  | "storage" -> ok K_storage
-  | "code" -> ok K_code
-  | "view" -> ok K_view
-  | "False" -> ok D_False
-  | "Elt" -> ok D_Elt
-  | "Left" -> ok D_Left
-  | "None" -> ok D_None
-  | "Pair" -> ok D_Pair
-  | "Right" -> ok D_Right
-  | "Some" -> ok D_Some
-  | "True" -> ok D_True
-  | "Unit" -> ok D_Unit
-  | "Lambda_rec" -> ok D_Lambda_rec
-  | "PACK" -> ok I_PACK
-  | "UNPACK" -> ok I_UNPACK
-  | "BLAKE2B" -> ok I_BLAKE2B
-  | "SHA256" -> ok I_SHA256
-  | "SHA512" -> ok I_SHA512
-  | "ABS" -> ok I_ABS
-  | "ADD" -> ok I_ADD
-  | "AMOUNT" -> ok I_AMOUNT
-  | "AND" -> ok I_AND
-  | "BALANCE" -> ok I_BALANCE
-  | "CAR" -> ok I_CAR
-  | "CDR" -> ok I_CDR
-  | "CHAIN_ID" -> ok I_CHAIN_ID
-  | "CHECK_SIGNATURE" -> ok I_CHECK_SIGNATURE
-  | "COMPARE" -> ok I_COMPARE
-  | "CONCAT" -> ok I_CONCAT
-  | "CONS" -> ok I_CONS
-  | "CREATE_ACCOUNT" -> ok I_CREATE_ACCOUNT
-  | "CREATE_CONTRACT" -> ok I_CREATE_CONTRACT
-  | "IMPLICIT_ACCOUNT" -> ok I_IMPLICIT_ACCOUNT
-  | "DIP" -> ok I_DIP
-  | "DROP" -> ok I_DROP
-  | "DUP" -> ok I_DUP
-  | "VIEW" -> ok I_VIEW
-  | "EDIV" -> ok I_EDIV
-  | "EMPTY_BIG_MAP" -> ok I_EMPTY_BIG_MAP
-  | "EMPTY_MAP" -> ok I_EMPTY_MAP
-  | "EMPTY_SET" -> ok I_EMPTY_SET
-  | "EQ" -> ok I_EQ
-  | "EXEC" -> ok I_EXEC
-  | "APPLY" -> ok I_APPLY
-  | "FAILWITH" -> ok I_FAILWITH
-  | "GE" -> ok I_GE
-  | "GET" -> ok I_GET
-  | "GET_AND_UPDATE" -> ok I_GET_AND_UPDATE
-  | "GT" -> ok I_GT
-  | "HASH_KEY" -> ok I_HASH_KEY
-  | "IF" -> ok I_IF
-  | "IF_CONS" -> ok I_IF_CONS
-  | "IF_LEFT" -> ok I_IF_LEFT
-  | "IF_NONE" -> ok I_IF_NONE
-  | "INT" -> ok I_INT
-  | "KECCAK" -> ok I_KECCAK
-  | "LAMBDA" -> ok I_LAMBDA
-  | "LAMBDA_REC" -> ok I_LAMBDA_REC
-  | "LE" -> ok I_LE
-  | "LEFT" -> ok I_LEFT
-  | "LEVEL" -> ok I_LEVEL
-  | "LOOP" -> ok I_LOOP
-  | "LSL" -> ok I_LSL
-  | "LSR" -> ok I_LSR
-  | "LT" -> ok I_LT
-  | "MAP" -> ok I_MAP
-  | "MEM" -> ok I_MEM
-  | "MUL" -> ok I_MUL
-  | "NEG" -> ok I_NEG
-  | "NEQ" -> ok I_NEQ
-  | "NIL" -> ok I_NIL
-  | "NONE" -> ok I_NONE
-  | "NOT" -> ok I_NOT
-  | "NOW" -> ok I_NOW
-  | "MIN_BLOCK_TIME" -> ok I_MIN_BLOCK_TIME
-  | "OR" -> ok I_OR
-  | "PAIR" -> ok I_PAIR
-  | "UNPAIR" -> ok I_UNPAIR
-  | "PAIRING_CHECK" -> ok I_PAIRING_CHECK
-  | "PUSH" -> ok I_PUSH
-  | "RIGHT" -> ok I_RIGHT
-  | "SHA3" -> ok I_SHA3
-  | "SIZE" -> ok I_SIZE
-  | "SOME" -> ok I_SOME
-  | "SOURCE" -> ok I_SOURCE
-  | "SENDER" -> ok I_SENDER
-  | "SELF" -> ok I_SELF
-  | "SELF_ADDRESS" -> ok I_SELF_ADDRESS
-  | "SLICE" -> ok I_SLICE
-  | "STEPS_TO_QUOTA" -> ok I_STEPS_TO_QUOTA
-  | "SUB" -> ok I_SUB
-  | "SUB_MUTEZ" -> ok I_SUB_MUTEZ
-  | "SWAP" -> ok I_SWAP
-  | "TRANSFER_TOKENS" -> ok I_TRANSFER_TOKENS
-  | "SET_DELEGATE" -> ok I_SET_DELEGATE
-  | "UNIT" -> ok I_UNIT
-  | "UPDATE" -> ok I_UPDATE
-  | "XOR" -> ok I_XOR
-  | "ITER" -> ok I_ITER
-  | "LOOP_LEFT" -> ok I_LOOP_LEFT
-  | "ADDRESS" -> ok I_ADDRESS
-  | "CONTRACT" -> ok I_CONTRACT
-  | "ISNAT" -> ok I_ISNAT
-  | "CAST" -> ok I_CAST
-  | "RENAME" -> ok I_RENAME
-  | "SAPLING_EMPTY_STATE" -> ok I_SAPLING_EMPTY_STATE
-  | "SAPLING_VERIFY_UPDATE" -> ok I_SAPLING_VERIFY_UPDATE
-  | "DIG" -> ok I_DIG
-  | "DUG" -> ok I_DUG
-  | "NEVER" -> ok I_NEVER
-  | "VOTING_POWER" -> ok I_VOTING_POWER
-  | "TOTAL_VOTING_POWER" -> ok I_TOTAL_VOTING_POWER
-  | "TICKET" -> ok I_TICKET
-  | "TICKET_DEPRECATED" -> ok I_TICKET_DEPRECATED
-  | "READ_TICKET" -> ok I_READ_TICKET
-  | "SPLIT_TICKET" -> ok I_SPLIT_TICKET
-  | "JOIN_TICKETS" -> ok I_JOIN_TICKETS
-  | "OPEN_CHEST" -> ok I_OPEN_CHEST
-  | "EMIT" -> ok I_EMIT
-  | "BYTES" -> ok I_BYTES
-  | "NAT" -> ok I_NAT
-  | "bool" -> ok T_bool
-  | "contract" -> ok T_contract
-  | "int" -> ok T_int
-  | "key" -> ok T_key
-  | "key_hash" -> ok T_key_hash
-  | "lambda" -> ok T_lambda
-  | "list" -> ok T_list
-  | "map" -> ok T_map
-  | "big_map" -> ok T_big_map
-  | "nat" -> ok T_nat
-  | "option" -> ok T_option
-  | "or" -> ok T_or
-  | "pair" -> ok T_pair
-  | "set" -> ok T_set
-  | "signature" -> ok T_signature
-  | "string" -> ok T_string
-  | "bytes" -> ok T_bytes
-  | "mutez" -> ok T_mutez
-  | "timestamp" -> ok T_timestamp
-  | "unit" -> ok T_unit
-  | "operation" -> ok T_operation
-  | "address" -> ok T_address
-  | "tx_rollup_l2_address" -> ok T_tx_rollup_l2_address
-  | "sapling_state" -> ok T_sapling_state
-  | "sapling_transaction" -> ok T_sapling_transaction
-  | "sapling_transaction_deprecated" -> ok T_sapling_transaction_deprecated
-  | "chain_id" -> ok T_chain_id
-  | "never" -> ok T_never
-  | "bls12_381_g1" -> ok T_bls12_381_g1
-  | "bls12_381_g2" -> ok T_bls12_381_g2
-  | "bls12_381_fr" -> ok T_bls12_381_fr
-  | "ticket" -> ok T_ticket
-  | "chest_key" -> ok T_chest_key
-  | "chest" -> ok T_chest
-  | "constant" -> ok H_constant
+let prim_of_string =
+  let open Result_syntax in
+  function
+  | "parameter" -> return K_parameter
+  | "storage" -> return K_storage
+  | "code" -> return K_code
+  | "view" -> return K_view
+  | "False" -> return D_False
+  | "Elt" -> return D_Elt
+  | "Left" -> return D_Left
+  | "None" -> return D_None
+  | "Pair" -> return D_Pair
+  | "Right" -> return D_Right
+  | "Some" -> return D_Some
+  | "True" -> return D_True
+  | "Unit" -> return D_Unit
+  | "Lambda_rec" -> return D_Lambda_rec
+  | "PACK" -> return I_PACK
+  | "UNPACK" -> return I_UNPACK
+  | "BLAKE2B" -> return I_BLAKE2B
+  | "SHA256" -> return I_SHA256
+  | "SHA512" -> return I_SHA512
+  | "ABS" -> return I_ABS
+  | "ADD" -> return I_ADD
+  | "AMOUNT" -> return I_AMOUNT
+  | "AND" -> return I_AND
+  | "BALANCE" -> return I_BALANCE
+  | "CAR" -> return I_CAR
+  | "CDR" -> return I_CDR
+  | "CHAIN_ID" -> return I_CHAIN_ID
+  | "CHECK_SIGNATURE" -> return I_CHECK_SIGNATURE
+  | "COMPARE" -> return I_COMPARE
+  | "CONCAT" -> return I_CONCAT
+  | "CONS" -> return I_CONS
+  | "CREATE_ACCOUNT" -> return I_CREATE_ACCOUNT
+  | "CREATE_CONTRACT" -> return I_CREATE_CONTRACT
+  | "IMPLICIT_ACCOUNT" -> return I_IMPLICIT_ACCOUNT
+  | "DIP" -> return I_DIP
+  | "DROP" -> return I_DROP
+  | "DUP" -> return I_DUP
+  | "VIEW" -> return I_VIEW
+  | "EDIV" -> return I_EDIV
+  | "EMPTY_BIG_MAP" -> return I_EMPTY_BIG_MAP
+  | "EMPTY_MAP" -> return I_EMPTY_MAP
+  | "EMPTY_SET" -> return I_EMPTY_SET
+  | "EQ" -> return I_EQ
+  | "EXEC" -> return I_EXEC
+  | "APPLY" -> return I_APPLY
+  | "FAILWITH" -> return I_FAILWITH
+  | "GE" -> return I_GE
+  | "GET" -> return I_GET
+  | "GET_AND_UPDATE" -> return I_GET_AND_UPDATE
+  | "GT" -> return I_GT
+  | "HASH_KEY" -> return I_HASH_KEY
+  | "IF" -> return I_IF
+  | "IF_CONS" -> return I_IF_CONS
+  | "IF_LEFT" -> return I_IF_LEFT
+  | "IF_NONE" -> return I_IF_NONE
+  | "INT" -> return I_INT
+  | "KECCAK" -> return I_KECCAK
+  | "LAMBDA" -> return I_LAMBDA
+  | "LAMBDA_REC" -> return I_LAMBDA_REC
+  | "LE" -> return I_LE
+  | "LEFT" -> return I_LEFT
+  | "LEVEL" -> return I_LEVEL
+  | "LOOP" -> return I_LOOP
+  | "LSL" -> return I_LSL
+  | "LSR" -> return I_LSR
+  | "LT" -> return I_LT
+  | "MAP" -> return I_MAP
+  | "MEM" -> return I_MEM
+  | "MUL" -> return I_MUL
+  | "NEG" -> return I_NEG
+  | "NEQ" -> return I_NEQ
+  | "NIL" -> return I_NIL
+  | "NONE" -> return I_NONE
+  | "NOT" -> return I_NOT
+  | "NOW" -> return I_NOW
+  | "MIN_BLOCK_TIME" -> return I_MIN_BLOCK_TIME
+  | "OR" -> return I_OR
+  | "PAIR" -> return I_PAIR
+  | "UNPAIR" -> return I_UNPAIR
+  | "PAIRING_CHECK" -> return I_PAIRING_CHECK
+  | "PUSH" -> return I_PUSH
+  | "RIGHT" -> return I_RIGHT
+  | "SHA3" -> return I_SHA3
+  | "SIZE" -> return I_SIZE
+  | "SOME" -> return I_SOME
+  | "SOURCE" -> return I_SOURCE
+  | "SENDER" -> return I_SENDER
+  | "SELF" -> return I_SELF
+  | "SELF_ADDRESS" -> return I_SELF_ADDRESS
+  | "SLICE" -> return I_SLICE
+  | "STEPS_TO_QUOTA" -> return I_STEPS_TO_QUOTA
+  | "SUB" -> return I_SUB
+  | "SUB_MUTEZ" -> return I_SUB_MUTEZ
+  | "SWAP" -> return I_SWAP
+  | "TRANSFER_TOKENS" -> return I_TRANSFER_TOKENS
+  | "SET_DELEGATE" -> return I_SET_DELEGATE
+  | "UNIT" -> return I_UNIT
+  | "UPDATE" -> return I_UPDATE
+  | "XOR" -> return I_XOR
+  | "ITER" -> return I_ITER
+  | "LOOP_LEFT" -> return I_LOOP_LEFT
+  | "ADDRESS" -> return I_ADDRESS
+  | "CONTRACT" -> return I_CONTRACT
+  | "ISNAT" -> return I_ISNAT
+  | "CAST" -> return I_CAST
+  | "RENAME" -> return I_RENAME
+  | "SAPLING_EMPTY_STATE" -> return I_SAPLING_EMPTY_STATE
+  | "SAPLING_VERIFY_UPDATE" -> return I_SAPLING_VERIFY_UPDATE
+  | "DIG" -> return I_DIG
+  | "DUG" -> return I_DUG
+  | "NEVER" -> return I_NEVER
+  | "VOTING_POWER" -> return I_VOTING_POWER
+  | "TOTAL_VOTING_POWER" -> return I_TOTAL_VOTING_POWER
+  | "TICKET" -> return I_TICKET
+  | "TICKET_DEPRECATED" -> return I_TICKET_DEPRECATED
+  | "READ_TICKET" -> return I_READ_TICKET
+  | "SPLIT_TICKET" -> return I_SPLIT_TICKET
+  | "JOIN_TICKETS" -> return I_JOIN_TICKETS
+  | "OPEN_CHEST" -> return I_OPEN_CHEST
+  | "EMIT" -> return I_EMIT
+  | "BYTES" -> return I_BYTES
+  | "NAT" -> return I_NAT
+  | "bool" -> return T_bool
+  | "contract" -> return T_contract
+  | "int" -> return T_int
+  | "key" -> return T_key
+  | "key_hash" -> return T_key_hash
+  | "lambda" -> return T_lambda
+  | "list" -> return T_list
+  | "map" -> return T_map
+  | "big_map" -> return T_big_map
+  | "nat" -> return T_nat
+  | "option" -> return T_option
+  | "or" -> return T_or
+  | "pair" -> return T_pair
+  | "set" -> return T_set
+  | "signature" -> return T_signature
+  | "string" -> return T_string
+  | "bytes" -> return T_bytes
+  | "mutez" -> return T_mutez
+  | "timestamp" -> return T_timestamp
+  | "unit" -> return T_unit
+  | "operation" -> return T_operation
+  | "address" -> return T_address
+  | "tx_rollup_l2_address" -> return T_tx_rollup_l2_address
+  | "sapling_state" -> return T_sapling_state
+  | "sapling_transaction" -> return T_sapling_transaction
+  | "sapling_transaction_deprecated" -> return T_sapling_transaction_deprecated
+  | "chain_id" -> return T_chain_id
+  | "never" -> return T_never
+  | "bls12_381_g1" -> return T_bls12_381_g1
+  | "bls12_381_g2" -> return T_bls12_381_g2
+  | "bls12_381_fr" -> return T_bls12_381_fr
+  | "ticket" -> return T_ticket
+  | "chest_key" -> return T_chest_key
+  | "chest" -> return T_chest
+  | "constant" -> return H_constant
   | n ->
-      if valid_case n then error (Unknown_primitive_name n)
-      else error (Invalid_case n)
+      if valid_case n then tzfail (Unknown_primitive_name n)
+      else tzfail (Invalid_case n)
 
 let prims_of_strings expr =
+  let open Result_syntax in
   let rec convert = function
-    | (Int _ | String _ | Bytes _) as expr -> ok expr
+    | (Int _ | String _ | Bytes _) as expr -> return expr
     | Prim (loc, prim, args, annot) ->
-        Error_monad.record_trace
-          (Invalid_primitive_name (expr, loc))
-          (prim_of_string prim)
-        >>? fun prim ->
-        List.map_e convert args >|? fun args -> Prim (loc, prim, args, annot)
-    | Seq (loc, args) -> List.map_e convert args >|? fun args -> Seq (loc, args)
+        let* prim =
+          Error_monad.record_trace
+            (Invalid_primitive_name (expr, loc))
+            (prim_of_string prim)
+        in
+        let+ args = List.map_e convert args in
+        Prim (loc, prim, args, annot)
+    | Seq (loc, args) ->
+        let+ args = List.map_e convert args in
+        Seq (loc, args)
   in
-  convert (root expr) >|? fun expr -> strip_locations expr
+  let+ expr = convert (root expr) in
+  strip_locations expr
 
 let strings_of_prims expr =
   let rec convert = function
