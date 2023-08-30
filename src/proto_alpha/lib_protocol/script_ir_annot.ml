@@ -157,12 +157,6 @@ let check_type_annot loc annot =
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc types >|? fun (_a : type_annot option) -> ()
 
-let check_composed_type_annot loc annot =
-  parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
-  error_unexpected_annot loc vars >>? fun () ->
-  get_one_annot loc types >>? fun (_t : type_annot option) ->
-  get_two_annot loc fields >|? fun (_f1, _f2) -> ()
-
 let parse_field_annot :
     Script.location -> string -> Non_empty_string.t option tzresult =
  fun loc annot ->
