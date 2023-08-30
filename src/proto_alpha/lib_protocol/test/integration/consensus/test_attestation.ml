@@ -170,7 +170,7 @@ let test_negative_slot () =
       in
       failwith "negative slot should not be accepted by the binary format")
     (function
-      | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
+      | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.reraise e)
 
 (** Attestation with a non-normalized slot (that is, a slot that
     belongs to the delegate but is not the delegate's smallest slot).

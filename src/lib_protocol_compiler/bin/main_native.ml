@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let () = Lwt.Exception_filter.(set handle_all_except_runtime)
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
    Remove backwards compatible Tezos symlinks. *)
 let () =

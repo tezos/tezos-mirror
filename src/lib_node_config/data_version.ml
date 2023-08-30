@@ -426,7 +426,7 @@ let ensure_data_dir ~mode data_dir =
         write_version ())
     (function
       | Unix.Unix_error _ -> tzfail (Invalid_data_dir {data_dir; msg = None})
-      | exc -> raise exc)
+      | exc -> Lwt.reraise exc)
 
 let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
   let open Lwt_result_syntax in

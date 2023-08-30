@@ -638,7 +638,7 @@ let rec of_definition def =
         (fun () -> of_definition (Parse.string_to_module s))
         (function
           | Parse.Syntax _ -> of_bytes "<malformed quote>" |> Lwt.return
-          | e -> Lwt.fail e)
+          | e -> Lwt.reraise e)
 
 let of_wrapper mods x_opt name wrap_action wrap_assertion at =
   let open Lwt.Syntax in

@@ -199,7 +199,7 @@ let generate_with_animation ppf target =
           let+ id = P2p_identity.generate_with_bound ~max:count target in
           Ok id)
         (function
-          | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
+          | Not_found -> Lwt.return @@ Error count | exc -> Lwt.reraise exc))
     ~on_retry:(fun time count ->
       let ms = int_of_float (Mtime.Span.to_ms time) in
       let count =

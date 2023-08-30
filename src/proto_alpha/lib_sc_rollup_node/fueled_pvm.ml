@@ -146,7 +146,8 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             in
             return (state, executed_ticks, failing_ticks))
           (function
-            | Error_wrapper error -> Lwt.return (Error error) | exn -> raise exn)
+            | Error_wrapper error -> Lwt.return (Error error)
+            | exn -> Lwt.reraise exn)
       in
       let failure_insertion_eval state tick failing_ticks' =
         let*! () =

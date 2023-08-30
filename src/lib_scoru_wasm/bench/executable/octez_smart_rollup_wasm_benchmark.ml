@@ -106,6 +106,7 @@ let filename () =
     t.tm_min
 
 let () =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt_main.run
   @@ Scenario.run_scenarios
        ~verbose:true

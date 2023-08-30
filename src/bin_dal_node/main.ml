@@ -87,9 +87,11 @@ let run subcommand cli_options =
           ~default:Configuration_file.default.data_dir
           cli_options.Cli.data_dir
       in
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Daemon.run ~data_dir (merge cli_options)
   | Config_init ->
+      Lwt.Exception_filter.(set handle_all_except_runtime) ;
       Lwt_main.run @@ wrap_with_error
       @@ Configuration_file.save (merge cli_options Configuration_file.default)
 

@@ -667,6 +667,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           config)
       (function exn -> fail_with_exn exn)
   in
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Lwt_main.run
     (let*! r = Lwt_exit.wrap_and_exit main_promise in
      match r with

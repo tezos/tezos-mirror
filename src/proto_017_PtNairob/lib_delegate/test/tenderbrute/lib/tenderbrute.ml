@@ -109,7 +109,7 @@ let check ctxt ~selection =
         selection
         ctxt
       >>=? fun _ctxt -> return_true)
-    (function Exit -> return_false | e -> raise e)
+    (function Exit -> return_false | e -> Lwt.reraise e)
 
 (* Create random 32 bytes *)
 let rnd_bytes32 () =

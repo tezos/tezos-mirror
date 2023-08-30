@@ -169,7 +169,7 @@ val error_with_exn : exn -> 'a tzresult
       (fun () -> parse_input s)
       (function
          | Lex_error | Parse_error as exc -> fail_with_exn exc
-         | exn -> raise exn (* re-raise by default *))
+         | exn -> Lwt.reraise exn (* re-raise by default *))
 ]}
 
     Whilst it is useful in specific places, it is generally better to use a

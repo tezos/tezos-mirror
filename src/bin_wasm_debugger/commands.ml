@@ -296,13 +296,7 @@ let read_data_from_stdin retries =
     if retries <= 0 then Stdlib.failwith "Too many tries, aborting."
     else
       let* () = Lwt_io.printf "> " in
-      let* input =
-        Lwt.catch
-          (fun () ->
-            let* i = Lwt_io.read_line Lwt_io.stdin in
-            return_some i)
-          (fun _ -> return_none)
-      in
+      let* input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match Option.bind input (fun bytes -> Hex.to_string (`Hex bytes)) with
       | Some data -> Lwt.return data
       | None ->

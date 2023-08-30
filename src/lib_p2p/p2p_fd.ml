@@ -162,7 +162,7 @@ let create_listening_socket ?(reuse_port = false) ~backlog
           tzfail
             (Failed_to_open_listening_socket
                {reason = err; address = addr; port})
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 let close t =
   let open Lwt_syntax in

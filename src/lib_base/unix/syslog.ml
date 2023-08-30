@@ -185,7 +185,7 @@ let open_fd path =
                         "can not connect to \"%s\": %s"
                         path
                         (Unix.error_message error)))
-            | exn -> raise exn)
+            | exn -> Lwt.reraise exn)
       in
       Lwt.return fd
   | Unix.S_FIFO -> Lwt_unix.openfile path [Unix.O_WRONLY; O_CLOEXEC] 0o666
@@ -272,6 +272,6 @@ let syslog ?max_buflen ?timestamp logger level str =
           let* fd = open_fd logger.path in
           logger.fd <- fd ;
           write_string logger.fd msg
-      | exn -> raise exn)
+      | exn -> Lwt.reraise exn)
 
 let close logger = shutdown logger.fd

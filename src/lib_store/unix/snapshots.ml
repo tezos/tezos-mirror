@@ -1684,7 +1684,7 @@ module Raw_exporter : EXPORTER = struct
                       (cemented_blocks_dir t.snapshot_tmp_dir)))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     Lwt.catch
       (fun () ->
@@ -1696,7 +1696,7 @@ module Raw_exporter : EXPORTER = struct
                     (cemented_blocks_dir t.snapshot_tmp_dir)))))
       (function
         | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-        | exn -> Lwt.fail exn)
+        | exn -> Lwt.reraise exn)
 
   let filter_cemented_block_indexes t ~limit =
     let open Cemented_block_store in
@@ -1936,7 +1936,7 @@ module Tar_exporter : EXPORTER = struct
                    (cemented_blocks_hash_index_dir t.snapshot_tmp_cemented_dir))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     let* () =
       Lwt.catch
@@ -1948,7 +1948,7 @@ module Tar_exporter : EXPORTER = struct
                    (cemented_blocks_level_index_dir t.snapshot_tmp_cemented_dir))))
         (function
           | Unix.Unix_error (ENOENT, _, _) -> Lwt.return_unit
-          | exn -> Lwt.fail exn)
+          | exn -> Lwt.reraise exn)
     in
     let* () =
       Onthefly.add_directory_and_finalize

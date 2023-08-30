@@ -213,7 +213,7 @@ let check_overflow () =
       (fun () ->
         let+ () = f () in
         failwith "This test should have overflown, but didn't.")
-      (function SizeOverflow -> Lwt.return_unit | exn -> raise exn)
+      (function SizeOverflow -> Lwt.return_unit | exn -> Lwt.reraise exn)
   in
   (* Creates a vector of the maximum size possible (2^63) *)
   let v = IntVector.create (-1) in

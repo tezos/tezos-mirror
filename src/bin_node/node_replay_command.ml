@@ -550,6 +550,7 @@ let process verbosity singleprocess strict blocks data_dir config_file
       config
       blocks
   in
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
   match Lwt_main.run run with
   | Ok () -> `Ok ()
   | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)

@@ -279,5 +279,5 @@ module Make (I : Dump_interface) = struct
       (function
         | Unix.Unix_error (e, _, _) ->
             tzfail @@ System_read_error (Unix.error_message e)
-        | err -> Lwt.fail err)
+        | err -> Lwt.reraise err)
 end

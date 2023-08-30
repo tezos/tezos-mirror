@@ -36,16 +36,16 @@ let unit_es = Monad.Lwt_result_syntax.return_unit
 let catch ?(catch_only = fun _ -> true) f =
   match f () with
   | () -> ()
-  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
-  | exception e -> if catch_only e then () else raise e
+  | exception ((Stack_overflow | Out_of_memory) as e) -> Lwt.reraise e
+  | exception e -> if catch_only e then () else Lwt.reraise e
 
 let catch_f ?(catch_only = fun _ -> true) f h =
   match f () with
   | () -> ()
-  | exception ((Stack_overflow | Out_of_memory) as e) -> raise e
-  | exception e -> if catch_only e then h e else raise e
+  | exception ((Stack_overflow | Out_of_memory) as e) -> Lwt.reraise e
+  | exception e -> if catch_only e then h e else Lwt.reraise e
 
 let catch_s ?(catch_only = fun _ -> true) f =
   Lwt.catch f (function
-      | (Stack_overflow | Out_of_memory) as e -> raise e
-      | e -> if catch_only e then Lwt.return_unit else raise e)
+      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+      | e -> if catch_only e then Lwt.return_unit else Lwt.reraise e)

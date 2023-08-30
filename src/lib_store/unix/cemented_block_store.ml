@@ -152,7 +152,7 @@ let create ~log_size cemented_blocks_dir =
                 tzfail
                   (Store_errors.Failed_to_init_cemented_block_store
                      cemented_blocks_dir_path)
-            | e -> Lwt.fail e)
+            | e -> Lwt.reraise e)
       in
       let cemented_block_level_index =
         Cemented_block_level_index.v
