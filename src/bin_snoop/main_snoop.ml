@@ -625,9 +625,7 @@ let generate_code_for_models sol models codegen_options =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
   let transform = code_transform codegen_options in
-  let generated =
-    Codegen.codegen_models models sol transform ~exclusions:String.Set.empty
-  in
+  let generated = Codegen.codegen_models models sol transform in
   if codegen_options.split then
     List.filter_map
       (function Some dest, code -> Some (dest, code) | None, _ -> None)

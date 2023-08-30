@@ -447,16 +447,12 @@ let get_codegen_destination
         match B.purpose with Generate_code d -> Some d | _ -> None)
       local_models_info
 
-let codegen_models models sol transform ~exclusions =
-  let generate_with_exclusions model_name info =
-    if String.Set.mem (Namespace.to_string model_name) exclusions then None
-    else
+let codegen_models models sol transform =
+  List.map
+    (fun (model_name, info) ->
       let benchmark_destination = get_codegen_destination info in
       let code = codegen info.model sol transform model_name in
-      Some (benchmark_destination, code)
-  in
-  List.filter_map
-    (fun (model_name, info) -> generate_with_exclusions model_name info)
+      (benchmark_destination, code))
     models
 
 let%expect_test "basic_printing" =

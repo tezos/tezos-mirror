@@ -58,15 +58,13 @@ type module_
 val codegen :
   Model.packed_model -> solution -> Costlang.transform -> Namespace.t -> code
 
-(** [codegen_models models solution transform ~exclusions] generates
-    the cost function codes of multiple [models].  The functions in
-    the set [exclusions] are excluded from the generation.
+(** [codegen_models models solution transform] generates
+    the cost function codes of multiple [models].
 *)
 val codegen_models :
   (Namespace.t * Registration.model_info) list ->
   solution ->
   Costlang.transform ->
-  exclusions:String.Set.t ->
   (string option * code) list
 
 (** Make a comment *)
