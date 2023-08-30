@@ -42,3 +42,24 @@ let%expect_test "test uint8 translation" =
     - id: uint8
       type: u1
   |}]
+
+let%expect_test "test bool translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_bool"
+      Data_encoding.bool
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_bool
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: bool
+      type: u1
+      enum: bool
+  |}]

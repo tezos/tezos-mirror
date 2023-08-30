@@ -60,7 +60,11 @@ let classSpec _ = mapping [("test", scalar "test")]
 
 let instanceSpec _ = mapping [("test", scalar "test")]
 
-let enumSpec _ = mapping [("test", scalar "test")]
+let enumSpec enumspec =
+  mapping
+    (List.map
+       (fun (v, EnumValueSpec.{name; _}) -> (string_of_int v, scalar name))
+       enumspec.EnumSpec.map)
 
 let if_not_empty = function [] -> false | _ -> true
 
@@ -87,15 +91,19 @@ let to_yaml (t : ClassSpec.t) =
              |> List.map (fun v ->
                     mapping
                       (("id", scalar v.AttrSpec.id)
-                      ::
-                      (* We only add "type" to Yaml if not [AnyType].
-                         TODO: This is only correct if [AnyType] means no type? *)
-                      (if v.AttrSpec.dataType = AnyType then []
-                      else
-                        [
-                          ( "type",
-                            scalar (DataType.to_string v.AttrSpec.dataType) );
-                        ])))) );
+                       ::
+                       (* We only add "type" to Yaml if not [AnyType].
+                          TODO: This is only correct if [AnyType] means no type? *)
+                       (if v.AttrSpec.dataType = AnyType then []
+                       else
+                         [
+                           ( "type",
+                             scalar (DataType.to_string v.AttrSpec.dataType) );
+                         ])
+                      @
+                      match v.AttrSpec.enum with
+                      | None -> []
+                      | Some enum -> [("enum", scalar enum)]))) );
        ])
 
 let print t =

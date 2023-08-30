@@ -229,6 +229,7 @@ module AttrSpec = struct
     dataType : DataType.t;
     cond : ConditionalSpec.t;
     valid : ValidationSpec.t option;
+    enum : string option;
     doc : DocSpec.t;
   }
 end

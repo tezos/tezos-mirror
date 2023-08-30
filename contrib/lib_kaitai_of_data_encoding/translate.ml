@@ -61,10 +61,15 @@ let default_class_spec ~encoding_name =
       enums = [];
     }
 
-
 let from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
   match encoding with
+  | Bool ->
+      {
+        (default_class_spec ~encoding_name) with
+        seq = [Ground.Attr.bool];
+        enums = [Ground.Enum.bool];
+      }
   | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
   | _ -> failwith "Not implemented"

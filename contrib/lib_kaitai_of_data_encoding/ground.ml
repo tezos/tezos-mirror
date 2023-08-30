@@ -31,7 +31,37 @@ let default_doc_spec = DocSpec.{summary = None; refs = []}
 let cond_no_cond =
   AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
+module Enum = struct
+  type map = string * Kaitai.Types.EnumSpec.t
+
+  let bool =
+    ( "bool",
+      EnumSpec.
+        {
+          path = [];
+          map =
+            [
+              (0, EnumValueSpec.{name = "false"; doc = default_doc_spec});
+              (255, EnumValueSpec.{name = "true"; doc = default_doc_spec});
+            ];
+        } )
+
+  let add enums enum = if List.memq enum enums then enums else enum :: enums
+end
+
 module Attr = struct
+  let bool =
+    AttrSpec.
+      {
+        path = [];
+        id = "bool";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
+        doc = default_doc_spec;
+        enum = Some (fst Enum.bool);
+      }
+
   let u1 =
     AttrSpec.
       {
@@ -41,6 +71,6 @@ module Attr = struct
         cond = cond_no_cond;
         valid = None;
         doc = default_doc_spec;
+        enum = None;
       }
 end
-
