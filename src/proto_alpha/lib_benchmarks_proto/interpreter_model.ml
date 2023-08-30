@@ -551,7 +551,7 @@ let ir_model instr_or_cont =
           (const1_model, const1_model) |> m2 name
       | N_IIs_nat -> (const1_model, const1_model) |> m2 name
       | N_INeg -> affine_model name |> m
-      | N_IAbs_int -> affine_model name |> m
+      | N_IAbs_int -> (affine_model, affine_model) |> m2 name
       | N_IInt_nat -> (const1_model, const1_model) |> m2 name
       | N_IAdd_int -> linear_max_model name |> m
       | N_IAdd_nat -> linear_max_model name |> m
@@ -570,7 +570,7 @@ let ir_model instr_or_cont =
       | N_ICompare -> linear_min_offset_model name ~offset:1 |> m
       | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe ->
           (const1_model, const1_model) |> m2 name
-      | N_IPack -> pack_model name |> m
+      | N_IPack -> (pack_model, pack_model) |> m2 name
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
           affine_model name |> m
       | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
@@ -580,9 +580,15 @@ let ir_model instr_or_cont =
           (const1_model, const1_model) |> m2 name
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)
-      | N_IDupN -> break_model_2_const_offset name 300 400 ~offset:1 |> m
-      | N_IDropN -> break_model_2_const name 300 400 |> m
-      | N_IDig | N_IDug | N_IDipN -> affine_model name |> m
+      | N_IDupN ->
+          ( (fun name -> break_model_2_const_offset name 300 400 ~offset:1),
+            fun name -> break_model_2_const_offset name 300 400 ~offset:1 )
+          |> m2 name
+      | N_IDropN ->
+          ( (fun name -> break_model_2_const name 300 400),
+            fun name -> break_model_2_const name 300 400 )
+          |> m2 name
+      | N_IDig | N_IDug | N_IDipN -> (affine_model, affine_model) |> m2 name
       | N_IAdd_bls12_381_g1 | N_IAdd_bls12_381_g2 | N_IAdd_bls12_381_fr
       | N_IMul_bls12_381_g1 | N_IMul_bls12_381_g2 | N_IMul_bls12_381_fr
       | N_INeg_bls12_381_g1 | N_INeg_bls12_381_g2 | N_INeg_bls12_381_fr
@@ -597,7 +603,7 @@ let ir_model instr_or_cont =
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m
       | N_ISapling_verify_update -> verify_update_model name |> m
-      | N_IList_map -> const1_model name |> m
+      | N_IList_map -> (const1_model, const1_model) |> m2 name
       | N_IList_iter | N_IIter -> (const1_model, const1_model) |> m2 name
       | N_IMap_map -> affine_model name |> m
       | N_IMap_iter -> affine_model name |> m
@@ -614,10 +620,11 @@ let ir_model instr_or_cont =
       | N_KNil | N_KCons | N_KReturn | N_KView_exit | N_KMap_head | N_KUndip
       | N_KLoop_in | N_KLoop_in_left | N_KIter_empty | N_KIter_nonempty ->
           (const1_model, const1_model) |> m2 name
-      | N_KList_enter_body -> list_enter_body_model name |> m
-      | N_KList_exit_body -> const1_model name |> m
-      | N_KMap_enter_body -> empty_branch_model name |> m
-      | N_KMap_exit_body -> nlogm_model name |> m
+      | N_KList_enter_body ->
+          (list_enter_body_model, list_enter_body_model) |> m2 name
+      | N_KList_exit_body -> (const1_model, const1_model) |> m2 name
+      | N_KMap_enter_body -> (empty_branch_model, empty_branch_model) |> m2 name
+      | N_KMap_exit_body -> (nlogm_model, nlogm_model) |> m2 name
       | N_KLog -> (const1_model, const1_model) |> m2 name)
 
 let gas_unit_per_allocation_word = 4
