@@ -137,13 +137,15 @@ module Nonce = struct
   end
 
   let register () =
+    let open Lwt_result_syntax in
     let open Services_registration in
     register1 ~chunked:false S.get (fun ctxt raw_level () () ->
         let level = Level.from_raw ctxt raw_level in
-        Nonce.get ctxt level >|= function
-        | Ok (Revealed nonce) -> ok (Revealed nonce)
-        | Ok (Unrevealed {nonce_hash; _}) -> ok (Missing nonce_hash)
-        | Error _ -> ok Forgotten)
+        let*! status = Nonce.get ctxt level in
+        match status with
+        | Ok (Revealed nonce) -> return (Revealed nonce)
+        | Ok (Unrevealed {nonce_hash; _}) -> return (Missing nonce_hash)
+        | Error _ -> return Forgotten)
 
   let get ctxt block level = RPC_context.make_call1 S.get ctxt block level () ()
 end

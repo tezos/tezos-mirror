@@ -30,7 +30,8 @@ open Alpha_context
     Returns None in case of a tie, if proposal quorum is below required
     minimum or if there are no proposals. *)
 let select_winning_proposal ctxt =
-  Vote.get_proposals ctxt >>=? fun proposals ->
+  let open Lwt_result_syntax in
+  let* proposals = Vote.get_proposals ctxt in
   let merge proposal vote winners =
     match winners with
     | None -> Some ([proposal], vote)
@@ -42,7 +43,7 @@ let select_winning_proposal ctxt =
   in
   match Protocol_hash.Map.fold merge proposals None with
   | Some ([proposal], vote) ->
-      Vote.get_total_voting_power_free ctxt >>=? fun max_vote ->
+      let* max_vote = Vote.get_total_voting_power_free ctxt in
       let min_proposal_quorum =
         Z.of_int32 (Constants.min_proposal_quorum ctxt)
       in
@@ -94,11 +95,12 @@ let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
   (approval, new_participation_ema)
 
 let get_approval_and_update_participation_ema ctxt =
-  Vote.get_ballots ctxt >>=? fun ballots ->
-  Vote.get_total_voting_power_free ctxt >>=? fun maximum_vote ->
-  Vote.get_participation_ema ctxt >>=? fun participation_ema ->
-  Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
-  Vote.clear_ballots ctxt >>= fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ballots = Vote.get_ballots ctxt in
+  let* maximum_vote = Vote.get_total_voting_power_free ctxt in
+  let* participation_ema = Vote.get_participation_ema ctxt in
+  let* expected_quorum = Vote.get_current_quorum ctxt in
+  let*! ctxt = Vote.clear_ballots ctxt in
   let approval, new_participation_ema =
     approval_and_participation_ema
       ballots
@@ -106,7 +108,7 @@ let get_approval_and_update_participation_ema ctxt =
       ~participation_ema
       ~expected_quorum
   in
-  Vote.set_participation_ema ctxt new_participation_ema >|=? fun ctxt ->
+  let+ ctxt = Vote.set_participation_ema ctxt new_participation_ema in
   (ctxt, approval)
 
 (** Implements the state machine of the amendment procedure. Note that
@@ -116,36 +118,42 @@ let get_approval_and_update_participation_ema ctxt =
 let start_new_voting_period ctxt =
   (* any change related to the storage in this function must probably
      be replicated in `record_testnet_dictator_proposals` *)
-  Voting_period.get_current_kind ctxt >>=? fun kind ->
-  (match kind with
-  | Proposal -> (
-      select_winning_proposal ctxt >>=? fun proposal ->
-      Vote.clear_proposals ctxt >>= fun ctxt ->
-      match proposal with
-      | None -> Voting_period.reset ctxt
-      | Some proposal ->
-          Vote.init_current_proposal ctxt proposal >>=? Voting_period.succ)
-  | Exploration ->
-      get_approval_and_update_participation_ema ctxt
-      >>=? fun (ctxt, approved) ->
-      if approved then Voting_period.succ ctxt
-      else
-        Vote.clear_current_proposal ctxt >>= fun ctxt ->
+  let open Lwt_result_syntax in
+  let* kind = Voting_period.get_current_kind ctxt in
+  let* ctxt =
+    match kind with
+    | Proposal -> (
+        let* proposal = select_winning_proposal ctxt in
+        let*! ctxt = Vote.clear_proposals ctxt in
+        match proposal with
+        | None -> Voting_period.reset ctxt
+        | Some proposal ->
+            let* ctxt = Vote.init_current_proposal ctxt proposal in
+            Voting_period.succ ctxt)
+    | Exploration ->
+        let* ctxt, approved = get_approval_and_update_participation_ema ctxt in
+        if approved then Voting_period.succ ctxt
+        else
+          let*! ctxt = Vote.clear_current_proposal ctxt in
+          Voting_period.reset ctxt
+    | Cooldown -> Voting_period.succ ctxt
+    | Promotion ->
+        let* ctxt, approved = get_approval_and_update_participation_ema ctxt in
+        if approved then Voting_period.succ ctxt
+        else
+          let*! ctxt = Vote.clear_current_proposal ctxt in
+          Voting_period.reset ctxt
+    | Adoption ->
+        let* proposal = Vote.get_current_proposal ctxt in
+        let*! ctxt = activate ctxt proposal in
+        let*! ctxt = Vote.clear_current_proposal ctxt in
         Voting_period.reset ctxt
-  | Cooldown -> Voting_period.succ ctxt
-  | Promotion ->
-      get_approval_and_update_participation_ema ctxt
-      >>=? fun (ctxt, approved) ->
-      if approved then Voting_period.succ ctxt
-      else Vote.clear_current_proposal ctxt >>= Voting_period.reset
-  | Adoption ->
-      Vote.get_current_proposal ctxt >>=? fun proposal ->
-      activate ctxt proposal >>= fun ctxt ->
-      Vote.clear_current_proposal ctxt >>= Voting_period.reset)
-  >>=? fun ctxt -> Vote.update_listings ctxt
+  in
+  Vote.update_listings ctxt
 
 let may_start_new_voting_period ctxt =
-  Voting_period.is_last_block ctxt >>=? fun is_last ->
+  let open Lwt_result_syntax in
+  let* is_last = Voting_period.is_last_block ctxt in
   if is_last then start_new_voting_period ctxt else return ctxt
 
 (** {2 Application of voting operations} *)

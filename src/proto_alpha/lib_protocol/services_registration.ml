@@ -32,26 +32,31 @@ type rpc_context = {
 }
 
 let rpc_init ({block_hash; block_header; context} : Updater.rpc_context) mode =
+  let open Lwt_result_syntax in
   let timestamp = block_header.timestamp in
   let level =
     match mode with
     | `Head_level -> block_header.level
     | `Successor_level -> Int32.succ block_header.level
   in
-  Alpha_context.prepare
-    ~level
-    ~predecessor_timestamp:timestamp
-    ~timestamp
-    context
-  >|=? fun (context, _, _) -> {block_hash; block_header; context}
+  let+ context, _, _ =
+    Alpha_context.prepare
+      ~level
+      ~predecessor_timestamp:timestamp
+      ~timestamp
+      context
+  in
+  {block_hash; block_header; context}
 
 let rpc_services =
   ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
 let register0_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.register ~chunked !rpc_services s (fun ctxt q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt q i)
 
 let register0 ~chunked s f =
   register0_fullctxt ~chunked s (fun {context; _} -> f context)
@@ -61,60 +66,72 @@ let register0_noctxt ~chunked s f =
     RPC_directory.register ~chunked !rpc_services s (fun _ q i -> f q i)
 
 let register1_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.register ~chunked !rpc_services s (fun (ctxt, arg) q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt arg q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt arg q i)
 
 let register1 ~chunked s f =
   register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
 let register2_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.register
       ~chunked
       !rpc_services
       s
       (fun ((ctxt, arg1), arg2) q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt arg1 arg2 q i)
 
 let register2 ~chunked s f =
   register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
       f context a1 a2 q i)
 
 let opt_register0_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.opt_register ~chunked !rpc_services s (fun ctxt q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt q i)
 
 let opt_register0 ~chunked s f =
   opt_register0_fullctxt ~chunked s (fun {context; _} -> f context)
 
 let opt_register1_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.opt_register ~chunked !rpc_services s (fun (ctxt, arg) q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt arg q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt arg q i)
 
 let opt_register1 ~chunked s f =
   opt_register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
 
 let opt_register2_fullctxt ~chunked s f =
+  let open Lwt_result_syntax in
   rpc_services :=
     RPC_directory.opt_register
       ~chunked
       !rpc_services
       s
       (fun ((ctxt, arg1), arg2) q i ->
-        rpc_init ctxt `Head_level >>=? fun ctxt -> f ctxt arg1 arg2 q i)
+        let* ctxt = rpc_init ctxt `Head_level in
+        f ctxt arg1 arg2 q i)
 
 let opt_register2 ~chunked s f =
   opt_register2_fullctxt ~chunked s (fun {context; _} a1 a2 q i ->
       f context a1 a2 q i)
 
 let get_rpc_services () =
+  let open Lwt_syntax in
   let p =
     RPC_directory.map
       (fun c ->
-        rpc_init c `Head_level >|= function
+        let+ ctxt = rpc_init c `Head_level in
+        match ctxt with
         | Error t ->
             raise (Failure (Format.asprintf "%a" Error_monad.pp_trace t))
         | Ok c -> c.context)

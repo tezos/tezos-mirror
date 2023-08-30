@@ -59,15 +59,17 @@ let () =
       Insufficient_attestation_power {attestation_power; consensus_threshold})
 
 let bonus_baking_reward ctxt ~attestation_power =
+  let open Result_syntax in
   let consensus_threshold = Constants.consensus_threshold ctxt in
   let baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
   let extra_attestation_power = attestation_power - consensus_threshold in
-  error_when
-    Compare.Int.(extra_attestation_power < 0)
-    (Insufficient_attestation_power {attestation_power; consensus_threshold})
-  >>? fun () ->
+  let* () =
+    error_when
+      Compare.Int.(extra_attestation_power < 0)
+      (Insufficient_attestation_power {attestation_power; consensus_threshold})
+  in
   Tez.(baking_reward_bonus_per_slot *? Int64.of_int extra_attestation_power)
 
 type ordered_slots = {
@@ -80,11 +82,11 @@ type ordered_slots = {
    order, hence the use of [Slot.Range.rev_fold_es]. *)
 let attesting_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
-  Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
+  let open Lwt_result_syntax in
+  let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
   Slot.Range.rev_fold_es
     (fun (ctxt, map) slot ->
-      Stake_distribution.slot_owner ctxt level slot
-      >>=? fun (ctxt, consensus_pk) ->
+      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
       let map =
         Signature.Public_key_hash.Map.update
           consensus_pk.delegate
@@ -104,35 +106,42 @@ let attesting_rights (ctxt : t) level =
     slots
 
 let attesting_rights_by_first_slot ctxt level =
-  Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
-  >>?= fun slots ->
-  Slot.Range.fold_es
-    (fun (ctxt, (delegates_map, slots_map)) slot ->
-      Stake_distribution.slot_owner ctxt level slot
-      >|=? fun (ctxt, consensus_pk) ->
-      let initial_slot, delegates_map =
-        match
-          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
-        with
-        | None ->
-            ( slot,
-              Signature.Public_key_hash.Map.add
-                consensus_pk.delegate
-                slot
-                delegates_map )
-        | Some initial_slot -> (initial_slot, delegates_map)
-      in
-      (* [slots_map]'keys are the minimal slots of delegates because
-         we fold on slots in increasing order *)
-      let slots_map =
-        Slot.Map.update
-          initial_slot
-          (function
-            | None -> Some (consensus_pk, 1)
-            | Some (consensus_pk, count) -> Some (consensus_pk, count + 1))
-          slots_map
-      in
-      (ctxt, (delegates_map, slots_map)))
-    (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
-    slots
-  >>=? fun (ctxt, (_, slots_map)) -> return (ctxt, slots_map)
+  let open Lwt_result_syntax in
+  let*? slots =
+    Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
+  in
+  let* ctxt, (_, slots_map) =
+    Slot.Range.fold_es
+      (fun (ctxt, (delegates_map, slots_map)) slot ->
+        let+ ctxt, consensus_pk =
+          Stake_distribution.slot_owner ctxt level slot
+        in
+        let initial_slot, delegates_map =
+          match
+            Signature.Public_key_hash.Map.find
+              consensus_pk.delegate
+              delegates_map
+          with
+          | None ->
+              ( slot,
+                Signature.Public_key_hash.Map.add
+                  consensus_pk.delegate
+                  slot
+                  delegates_map )
+          | Some initial_slot -> (initial_slot, delegates_map)
+        in
+        (* [slots_map]'keys are the minimal slots of delegates because
+           we fold on slots in increasing order *)
+        let slots_map =
+          Slot.Map.update
+            initial_slot
+            (function
+              | None -> Some (consensus_pk, 1)
+              | Some (consensus_pk, count) -> Some (consensus_pk, count + 1))
+            slots_map
+        in
+        (ctxt, (delegates_map, slots_map)))
+      (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
+      slots
+  in
+  return (ctxt, slots_map)
