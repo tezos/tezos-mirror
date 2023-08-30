@@ -12,12 +12,12 @@ trace
   - location: 13 (just consumed gas: 0.010)
     [ "hello"
       (Pair None {}) ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair None {}) ]
   - location: 16 (just consumed gas: 0.010)
     [ None
       {} ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ "hello"
       None
       {} ]

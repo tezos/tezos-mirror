@@ -11,9 +11,9 @@ trace
     [ (Pair (Some "hello") "?") ]
   - location: 8 (just consumed gas: 0.010)
     [ (Some "hello") ]
-  - location: 10 (just consumed gas: 0)
+  - location: 10 (just consumed gas: 0.010)
     [ "hello" ]
-  - location: 10 (just consumed gas: 0.015)
+  - location: 10 (just consumed gas: 0.025)
     [ "hello" ]
   - location: 16 (just consumed gas: 0.010)
     [ {}

@@ -18,12 +18,12 @@ trace
     [ 1
       1
       1 ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ 1
       1 ]
   - location: 16 (just consumed gas: 0.035)
     [ 2 ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ 1
       2 ]
   - location: 17 (just consumed gas: 0.010)

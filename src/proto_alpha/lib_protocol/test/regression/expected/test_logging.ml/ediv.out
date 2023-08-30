@@ -216,19 +216,6 @@ trace
       [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
   - [halt] (entry) @ location: 52
     [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
-    - control: KCons
-    - PUSH (entry) @ location: 49
-      [ (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
-      - log/PUSH (exit) @ location: 49
-        [ (Some (Pair 11 6))
-          (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
-    - PUSH (entry) @ location: 49
-      [ (Some (Pair 11 6))
-        (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
-      - log/log/log/DIP (exit) @ location: 49
-        [ (Some (Pair 11 6))
-          (Some (Pair 11 6))
-          (Pair (Some (Pair 11 6)) (Some (Pair 11 6))) ]
     - log/DIP (exit) @ location: 49
       [ (Some (Pair 11 6))
         (Some (Pair 11 6))

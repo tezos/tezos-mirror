@@ -15,11 +15,11 @@ trace
     [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ]
   - location: 11 (just consumed gas: 220.656)
     [ 4000000000000 ]
-  - location: 12 (just consumed gas: 0)
+  - location: 12 (just consumed gas: 0.010)
     [  ]
   - location: 14 (just consumed gas: 210.466)
     [ 20000000000000 ]
-  - location: 12 (just consumed gas: 0.025)
+  - location: 12 (just consumed gas: 0.035)
     [ 4000000000000
       20000000000000 ]
   - location: 15 (just consumed gas: 0.010)

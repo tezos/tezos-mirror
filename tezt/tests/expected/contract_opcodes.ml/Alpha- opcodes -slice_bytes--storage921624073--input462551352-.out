@@ -15,13 +15,13 @@ trace
   - location: 11 (just consumed gas: 0.010)
     [ None
       (Pair 0 1) ]
-  - location: 13 (just consumed gas: 0)
+  - location: 13 (just consumed gas: 0.010)
     [ (Pair 0 1) ]
   - location: 15 (just consumed gas: 0.010)
     [  ]
   - location: 16 (just consumed gas: 0.010)
     [ None ]
-  - location: 13 (just consumed gas: 0.015)
+  - location: 13 (just consumed gas: 0.025)
     [ None ]
   - location: 22 (just consumed gas: 0.010)
     [ {}

@@ -44,23 +44,6 @@ trace
   - [halt] (entry) @ location: 22
     [ {}
       {} ]
-    - control: KCons
-    - PUSH (entry) @ location: 20
-      [ {}
-        {} ]
-      - log/PUSH (exit) @ location: 20
-        [ "[PUBLIC_KEY_HASH]"
-          {}
-          {} ]
-    - PUSH (entry) @ location: 20
-      [ "[PUBLIC_KEY_HASH]"
-        {}
-        {} ]
-      - log/log/log/DIP (exit) @ location: 20
-        [ "[PUBLIC_KEY_HASH]"
-          "[PUBLIC_KEY_HASH]"
-          {}
-          {} ]
     - log/DIP (exit) @ location: 20
       [ "[PUBLIC_KEY_HASH]"
         "[PUBLIC_KEY_HASH]"

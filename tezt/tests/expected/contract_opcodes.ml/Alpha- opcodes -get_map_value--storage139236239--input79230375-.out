@@ -15,7 +15,7 @@ trace
   - location: 13 (just consumed gas: 0.010)
     [ ""
       (Pair "" None { Elt "hello" "hi" }) ]
-  - location: 14 (just consumed gas: 0)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair "" None { Elt "hello" "hi" }) ]
   - location: 17 (just consumed gas: 0.010)
     [ (Pair None { Elt "hello" "hi" }) ]
@@ -24,7 +24,7 @@ trace
   - location: 19 (just consumed gas: 0.010)
     [ { Elt "hello" "hi" }
       { Elt "hello" "hi" } ]
-  - location: 14 (just consumed gas: 0.025)
+  - location: 14 (just consumed gas: 0.035)
     [ ""
       { Elt "hello" "hi" }
       { Elt "hello" "hi" } ]

@@ -13,9 +13,9 @@ trace
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
   - location: 8 (just consumed gas: 0.307)
     [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 11 (just consumed gas: 0)
+  - location: 11 (just consumed gas: 0.010)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
-  - location: 11 (just consumed gas: 0.015)
+  - location: 11 (just consumed gas: 0.025)
     [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
   - location: 17 (just consumed gas: 0.010)
     [  ]

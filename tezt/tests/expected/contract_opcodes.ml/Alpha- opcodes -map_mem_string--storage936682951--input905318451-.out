@@ -12,14 +12,14 @@ trace
   - location: 12 (just consumed gas: 0.010)
     [ "foo"
       (Pair { Elt "foo" 0 } None) ]
-  - location: 13 (just consumed gas: 0)
+  - location: 13 (just consumed gas: 0.010)
     [ (Pair { Elt "foo" 0 } None) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "foo" 0 } ]
   - location: 16 (just consumed gas: 0.010)
     [ { Elt "foo" 0 }
       { Elt "foo" 0 } ]
-  - location: 13 (just consumed gas: 0.025)
+  - location: 13 (just consumed gas: 0.035)
     [ "foo"
       { Elt "foo" 0 }
       { Elt "foo" 0 } ]
