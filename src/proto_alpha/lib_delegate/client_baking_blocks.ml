@@ -170,15 +170,16 @@ let monitor_applied_blocks cctxt ?chains ?protocols ~next_protocols () =
 
 let monitor_heads cctxt ~next_protocols chain =
   let open Lwt_result_syntax in
-  let* block_stream, _stop =
+  let* block_stream, stop =
     Monitor_services.heads cctxt ?next_protocols chain
   in
   return
-    (Lwt_stream.map_s
-       (fun (block, ({Tezos_base.Block_header.shell; _} as header)) ->
-         let* () = Block_seen_event.(Event.emit (make block header `Heads)) in
-         raw_info cctxt ~chain block shell)
-       block_stream)
+    ( Lwt_stream.map_s
+        (fun (block, ({Tezos_base.Block_header.shell; _} as header)) ->
+          let* () = Block_seen_event.(Event.emit (make block header `Heads)) in
+          raw_info cctxt ~chain block shell)
+        block_stream,
+      stop )
 
 type error +=
   | Unexpected_empty_block_list of {

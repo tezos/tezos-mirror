@@ -226,10 +226,17 @@ let test_vdf : Protocol.t list -> unit =
    * checked using [check_n_cycles] *)
   Protocol.register_test ~__FILE__ ~title:"VDF daemon" ~tags:["vdf"]
   @@ fun protocol ->
-  let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client
-  and* vdf_baker = Vdf.init ~protocol node in
+  (* Override the `vdf_difficulty` constant in order to preserve the test *)
+  (* which checks that a computation started too late is eventually canceled. *)
+  let parameters = [(["vdf_difficulty"], `String "100000")] in
+  let* parameter_file =
+    Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
+  in
+
+  let* node, client =
+    Client.init_with_protocol ~parameter_file ~protocol `Client ()
+  in
+  let* vdf_baker = Vdf.init ~protocol node in
 
   (* Track whether a VDF revelation has been injected during the correct stage.
    * It is set to [false] at the beginning of [bake_vdf_revelation_stage] and
