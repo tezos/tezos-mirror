@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,7 @@ module Parameters = struct
   type persistent_state = {
     arguments : string list;
     mutable pending_ready : unit option Lwt.u list;
+    mode : string;
     rpc_addr : string;
     rpc_port : int;
     rollup_node : Sc_rollup_node.t option;
@@ -45,13 +47,16 @@ include Daemon.Make (Parameters)
 
 let path = "./octez-evm-proxy-server"
 
-let connection_arguments ?rpc_addr ?rpc_port () =
+let string_of_mode = function `Development -> "dev" | `Production -> "prod"
+
+let connection_arguments ?mode ?rpc_addr ?rpc_port () =
   let open Cli_arg in
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
   ( ["--rpc-port"; string_of_int rpc_port]
-    @ optional_arg "--rpc-addr" Fun.id rpc_addr,
+    @ optional_arg "rpc-addr" Fun.id rpc_addr
+    @ optional_arg "mode" string_of_mode mode,
     Option.value ~default:"127.0.0.1" rpc_addr,
     rpc_port )
 
@@ -89,23 +94,34 @@ let wait_for_ready proxy_server =
         resolver :: proxy_server.persistent_state.pending_ready ;
       check_event proxy_server event_ready_name promise
 
-let create ?runner ?rpc_addr ?rpc_port rollup_node =
+let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?rpc_addr ?rpc_port ()
+    connection_arguments ?mode ?rpc_addr ?rpc_port ()
   in
   let proxy_server =
     create
       ~path
-      {arguments; pending_ready = []; rpc_addr; rpc_port; rollup_node; runner}
+      {
+        arguments;
+        pending_ready = [];
+        mode =
+          (match mode with
+          | Some mode -> string_of_mode mode
+          | None -> string_of_mode `Production);
+        rpc_addr;
+        rpc_port;
+        rollup_node;
+        runner;
+      }
   in
   on_event proxy_server (handle_event proxy_server) ;
   proxy_server
 
-let mockup ?runner ?rpc_addr ?rpc_port () =
-  create ?runner ?rpc_addr ?rpc_port None
+let mockup ?runner ?mode ?rpc_addr ?rpc_port () =
+  create ?runner ?mode ?rpc_addr ?rpc_port None
 
-let create ?runner ?rpc_addr ?rpc_port rollup_node =
-  create ?runner ?rpc_addr ?rpc_port (Some rollup_node)
+let create ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
+  create ?runner ?mode ?rpc_addr ?rpc_port (Some rollup_node)
 
 let rollup_node_endpoint proxy_server =
   match proxy_server.persistent_state.rollup_node with
@@ -140,8 +156,8 @@ let endpoint (proxy_server : t) =
     proxy_server.persistent_state.rpc_addr
     proxy_server.persistent_state.rpc_port
 
-let init ?runner ?rpc_addr ?rpc_port rollup_node =
-  let proxy_server = create ?runner ?rpc_addr ?rpc_port rollup_node in
+let init ?runner ?mode ?rpc_addr ?rpc_port rollup_node =
+  let proxy_server = create ?runner ?mode ?rpc_addr ?rpc_port rollup_node in
   let* () = run proxy_server in
   return proxy_server
 
