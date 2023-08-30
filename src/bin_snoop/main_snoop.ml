@@ -619,6 +619,7 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
+(** It returns [(destination, code list) map] *)
 let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
@@ -627,10 +628,17 @@ let generate_code_for_models sol models codegen_options =
   let transform = code_transform codegen_options in
   let generated = Codegen.codegen_models models sol transform in
   if codegen_options.split then
-    List.filter_map
-      (function Some dest, code -> Some (dest, code) | None, _ -> None)
+    List.fold_left
+      (fun m -> function
+        | Some dest, code ->
+            String.Map.update
+              dest
+              (function None -> Some [code] | Some x -> Some (x @ [code]))
+              m
+        | None, _ -> m)
+      String.Map.empty
       generated
-  else List.map (fun (_, code) -> ("auto_build", code)) generated
+  else String.Map.singleton "auto_build" (List.map snd generated)
 
 (* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
 let convert_costs_file_name path =
@@ -656,17 +664,7 @@ let save_code_list_as_a_module save_to code_list =
   let result = Codegen.make_toplevel_module code_list in
   stdout_or_file save_to (fun ppf -> Codegen.pp_module ppf result)
 
-let generate_code codegen_options generated_code =
-  let generated =
-    List.fold_left
-      (fun acc (destination, code) ->
-        String.Map.update
-          destination
-          (function None -> Some [code] | Some x -> Some (x @ [code]))
-          acc)
-      String.Map.empty
-      generated_code
-  in
+let generate_code codegen_options generated =
   let make_destination destination_module save_to =
     let is_split = codegen_options.Cmdline.split in
     let dirname, destination =
@@ -765,8 +763,11 @@ let codegen_for_a_solution solution codegen_options =
 
 let save_codegen_for_solutions solutions codegen_options =
   let generated =
-    List.concat_map
-      (fun solution -> codegen_for_a_solution solution codegen_options)
+    List.fold_left
+      (fun m solution ->
+        let m' = codegen_for_a_solution solution codegen_options in
+        String.Map.merge (fun _dest -> Option.merge (fun a b -> a @ b)) m m')
+      String.Map.empty
       solutions
   in
   generate_code codegen_options generated
