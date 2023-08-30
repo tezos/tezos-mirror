@@ -3,49 +3,61 @@
 {}
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}'
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10)))}'
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10))); Stack_elt (pair nat nat (pair nat nat)) {2; 5; 8; 11}}'
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10); Stack_elt (pair nat nat nat nat) (Pair 2 5 8 11)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10) ;
+  Stack_elt (pair nat nat nat nat) (Pair 2 5 8 11) }
 
 ./octez-client --mode mockup normalize stack '{}' --unparsing-mode Readable
 {}
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}' --unparsing-mode Readable
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10)))}' --unparsing-mode Readable
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10))); Stack_elt (pair nat nat (pair nat nat)) {2; 5; 8; 11}}' --unparsing-mode Readable
-{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10); Stack_elt (pair nat nat nat nat) (Pair 2 5 8 11)}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 4 7 10) ;
+  Stack_elt (pair nat nat nat nat) (Pair 2 5 8 11) }
 
 ./octez-client --mode mockup normalize stack '{}' --unparsing-mode Optimized
 {}
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}' --unparsing-mode Optimized
-{Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 }}
+{ Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 } }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10)))}' --unparsing-mode Optimized
-{Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 }; Stack_elt (pair nat nat nat nat) { 1 ; 4 ; 7 ; 10 }}
+{ Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 } ;
+  Stack_elt (pair nat nat nat nat) { 1 ; 4 ; 7 ; 10 } }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10))); Stack_elt (pair nat nat (pair nat nat)) {2; 5; 8; 11}}' --unparsing-mode Optimized
-{Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 }; Stack_elt (pair nat nat nat nat) { 1 ; 4 ; 7 ; 10 }; Stack_elt (pair nat nat nat nat) { 2 ; 5 ; 8 ; 11 }}
+{ Stack_elt (pair nat nat nat nat) { 0 ; 3 ; 6 ; 9 } ;
+  Stack_elt (pair nat nat nat nat) { 1 ; 4 ; 7 ; 10 } ;
+  Stack_elt (pair nat nat nat nat) { 2 ; 5 ; 8 ; 11 } }
 
 ./octez-client --mode mockup normalize stack '{}' --unparsing-mode Optimized_legacy
 {}
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9)}' --unparsing-mode Optimized_legacy
-{Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9)))}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9))) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10)))}' --unparsing-mode Optimized_legacy
-{Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9))); Stack_elt (pair nat nat nat nat) (Pair 1 (Pair 4 (Pair 7 10)))}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9))) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 (Pair 4 (Pair 7 10))) }
 
 ./octez-client --mode mockup normalize stack '{Stack_elt (pair nat nat nat nat) (Pair 0 3 6 9); Stack_elt (pair nat (pair nat (pair nat nat))) (Pair 1 (Pair 4 (Pair 7 10))); Stack_elt (pair nat nat (pair nat nat)) {2; 5; 8; 11}}' --unparsing-mode Optimized_legacy
-{Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9))); Stack_elt (pair nat nat nat nat) (Pair 1 (Pair 4 (Pair 7 10))); Stack_elt (pair nat nat nat nat) (Pair 2 (Pair 5 (Pair 8 11)))}
+{ Stack_elt (pair nat nat nat nat) (Pair 0 (Pair 3 (Pair 6 9))) ;
+  Stack_elt (pair nat nat nat nat) (Pair 1 (Pair 4 (Pair 7 10))) ;
+  Stack_elt (pair nat nat nat nat) (Pair 2 (Pair 5 (Pair 8 11))) }
 
 ./octez-client --mode mockup normalize stack 
 Error:
