@@ -373,7 +373,7 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~legacy
             ~program
             ~storage
@@ -439,7 +439,7 @@ let commands () =
                         cctxt
                         ~chain:cctxt#chain
                         ~block:cctxt#block
-                        ~gas:original_gas
+                        ~gas:(Some original_gas)
                         ~legacy
                         ~show_types
                         program
@@ -476,7 +476,7 @@ let commands () =
             cctxt
             ~chain:cctxt#chain
             ~block:cctxt#block
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~legacy
             ~data
             ~ty
@@ -523,7 +523,7 @@ let commands () =
           Plugin.RPC.Scripts.pack_data
             cctxt
             (cctxt#chain, cctxt#block)
-            ~gas:original_gas
+            ~gas:(Some original_gas)
             ~data:data.expanded
             ~ty:typ.expanded
         in
@@ -1016,6 +1016,7 @@ let commands () =
                     ~block:cctxt#block
                     ~legacy
                     ~show_types:true
+                    ~gas:None
                     program
                 in
                 match r with
@@ -1103,6 +1104,8 @@ let commands () =
               ~block:cctxt#block
               ~data
               ~ty
+              ~gas:None
+              ~legacy:false
               ()
           in
           match r with
