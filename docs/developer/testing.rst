@@ -199,7 +199,7 @@ Typical use cases:
 
 Example tests:
  - Unit tests for :package-api:`tezos-clic <octez-libs/Tezos_clic/index.html>`. To execute them locally, run ``dune build @src/lib_clic/runtest``.
- - Unit tests for :package:`tezos-version`. To execute them locally, run ``dune build @src/lib_version/runtest``.
+ - Unit tests for :package:`octez-version`. To execute them locally, run ``dune build @src/lib_version/runtest``.
 
 See :doc:`alcotezt` for more information on how to convert tests to
 Alcotezt, and how to execute them.
