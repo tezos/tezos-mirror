@@ -33,9 +33,9 @@ type solution = {
 }
 
 (** [get_codegen_destinations model_info] will return 
-    all the generated code destinations in which given model is used 
+    the generated code destination in which given model is used
   *)
-val get_codegen_destinations : Registration.model_info -> string trace
+val get_codegen_destination : Registration.model_info -> string option
 
 val solution_encoding : solution Data_encoding.t
 
@@ -67,7 +67,7 @@ val codegen_models :
   solution ->
   Costlang.transform ->
   exclusions:String.Set.t ->
-  (string list * code) list
+  (string option * code) list
 
 (** Make a comment *)
 val comment : string list -> code

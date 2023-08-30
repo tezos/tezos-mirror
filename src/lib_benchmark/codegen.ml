@@ -434,30 +434,26 @@ let codegen (Model.Model model) (sol : solution)
       code = generate_let_binding ~takes_saturation_reprs fun_name expr;
     }
 
-let get_codegen_destinations
+let get_codegen_destination
     Registration.{model = Model.Model (module M); from = local_models_info} =
-  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then []
+  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then None
   else
-    List.filter_map
+    List.find_map
       (fun Registration.{bench_name; _} ->
         let open Option_syntax in
         let* (module B : Benchmark.S) =
           Registration.find_benchmark bench_name
         in
-        let destination =
-          match B.purpose with Generate_code d -> Some d | _ -> None
-        in
-        destination)
+        match B.purpose with Generate_code d -> Some d | _ -> None)
       local_models_info
-    |> List.sort_uniq String.compare
 
 let codegen_models models sol transform ~exclusions =
   let generate_with_exclusions model_name info =
     if String.Set.mem (Namespace.to_string model_name) exclusions then None
     else
-      let benchmark_destinations = get_codegen_destinations info in
+      let benchmark_destination = get_codegen_destination info in
       let code = codegen info.model sol transform model_name in
-      Some (benchmark_destinations, code)
+      Some (benchmark_destination, code)
   in
   List.filter_map
     (fun (model_name, info) -> generate_with_exclusions model_name info)

@@ -629,8 +629,8 @@ let generate_code_for_models sol models codegen_options =
     Codegen.codegen_models models sol transform ~exclusions:String.Set.empty
   in
   if codegen_options.split then
-    List.concat_map
-      (fun (dest_list, code) -> List.map (fun d -> (d, code)) dest_list)
+    List.filter_map
+      (function Some dest, code -> Some (dest, code) | None, _ -> None)
       generated
   else List.map (fun (_, code) -> ("auto_build", code)) generated
 
