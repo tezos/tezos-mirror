@@ -87,5 +87,9 @@ unified_coverage:
     - "unit:non-proto-x86_64"
     - "unit:proto-x86_64"
   script:
-    # On the development branches, we compute coverage
-    - ./scripts/ci/report_coverage.sh
+    # On the development branches, we compute coverage.
+    # TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+    # We propagate the exit code to temporarily allow corrupted coverage files.
+    - ./scripts/ci/report_coverage.sh || exit $?
+  allow_failure:
+    exit_codes: 64
