@@ -64,6 +64,7 @@ impl Decodable for Deposit {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransactionContent {
     Ethereum(EthereumTransactionCommon),
@@ -79,7 +80,8 @@ impl Encodable for TransactionContent {
         match &self {
             TransactionContent::Ethereum(eth) => {
                 stream.append(&ETHEREUM_TX_TAG);
-                eth.rlp_append(stream)
+                let eth_bytes = eth.to_bytes();
+                stream.append(&eth_bytes);
             }
             TransactionContent::Deposit(dep) => {
                 stream.append(&DEPOSIT_TX_TAG);
@@ -105,7 +107,8 @@ impl Decodable for TransactionContent {
                 Ok(Self::Deposit(deposit))
             }
             ETHEREUM_TX_TAG => {
-                let eth = EthereumTransactionCommon::decode(&tx)?;
+                let bytes: Vec<u8> = tx.as_val()?;
+                let eth = EthereumTransactionCommon::from_bytes(&bytes)?;
                 Ok(Self::Ethereum(eth))
             }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),

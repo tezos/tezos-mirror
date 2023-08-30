@@ -61,6 +61,14 @@ pub fn decode_option<T: Decodable>(
     }
 }
 
+pub fn decode_list<T: Decodable>(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<Vec<T>, DecoderError> {
+    let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
+    decoder.as_list().map_err(custom_err)
+}
+
 pub fn append_option<T: Encodable>(
     stream: &mut RlpStream,
     data: Option<T>,

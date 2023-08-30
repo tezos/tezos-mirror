@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+pub mod access_list;
 pub mod block;
 pub mod eth_gen;
 pub mod rlp_helpers;

@@ -6,6 +6,7 @@
 
 - Fallback mechanism if stage zero fails. (!9732)
 - Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
+- Support EIP-2930 transaction serialization format. (!9555)
 
 ### EVM Node
 
@@ -21,8 +22,8 @@
 ### Internal
 
 - The kernel reboots before reaching maximum number of ticks (!9369)
-- Refactor `TransactionCommon` and transactions' signatures modules. (!9590)
 - One gasometer per transaction-level (AKA sub-context). (!9492)
+- Refactor `EthereumTransactionCommon` and transactions' signatures modules. (!9590)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
