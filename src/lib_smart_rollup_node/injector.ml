@@ -81,6 +81,7 @@ module Parameters :
     | Timeout _ -> Timeout
     | Refute _ -> Refute
     | Recover_bond _ -> Recover
+    | Execute_outbox_message _ -> Execute_outbox_message
 
   let fee_parameter {fee_parameters; _} operation =
     let operation_kind = operation_tag operation in

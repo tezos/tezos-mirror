@@ -57,6 +57,14 @@ let injector_operation_to_manager :
   | Recover_bond {rollup; staker} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
+  | Execute_outbox_message {rollup; cemented_commitment; output_proof} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      let cemented_commitment =
+        Sc_rollup_proto_types.Commitment_hash.of_octez cemented_commitment
+      in
+      Manager
+        (Sc_rollup_execute_outbox_message
+           {rollup; cemented_commitment; output_proof})
 
 let injector_operation_of_manager :
     type kind.
@@ -83,6 +91,13 @@ let injector_operation_of_manager :
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
       Some (Timeout {rollup; stakers})
+  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
+    ->
+      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
+      let cemented_commitment =
+        Sc_rollup_proto_types.Commitment_hash.to_octez cemented_commitment
+      in
+      Some (Execute_outbox_message {rollup; cemented_commitment; output_proof})
   | _ -> None
 
 module Proto_client = struct
