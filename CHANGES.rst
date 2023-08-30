@@ -42,6 +42,9 @@ Client
   support legacy ``endorsement`` kind instead of ``attestation``. (MR
   :gl:`!9832`)
 
+- Fixed indentation of the stacks outputted by the ``normalize stack``
+  command. (MR :gl:`!9944`)
+
 Baker
 -----
 
