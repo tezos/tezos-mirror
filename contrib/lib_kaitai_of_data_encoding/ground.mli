@@ -24,47 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Kaitai.Types
+(** [default_doc_spec] is without summary and references.  *)
+val default_doc_spec : Kaitai.Types.DocSpec.t
 
-(* We need to access the definition of data-encoding's [descr] type. For this
-   reason we open the private/internal module [Data_encoding__Encoding] (rather
-   than the public module [Data_encoding.Encoding]. *)
-open Data_encoding__Encoding
+(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
+module Attr : sig
+  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
+  val u1 : Kaitai.Types.AttrSpec.t
+end
 
-let default_meta_spec ~encoding_name =
-  MetaSpec.
-    {
-      path = [];
-      isOpaque = false;
-      id = Some encoding_name;
-      endian = None;
-      bitEndian = None;
-      encoding = None;
-      forceDebug = false;
-      opaqueTypes = None;
-      zeroCopySubstream = None;
-      imports = [];
-    }
-
-let default_class_spec ~encoding_name =
-  ClassSpec.
-    {
-      fileName = None;
-      path = [];
-      meta = default_meta_spec ~encoding_name;
-      doc = Ground.default_doc_spec;
-      toStringExpr = None;
-      params = [];
-      seq = [];
-      types = [];
-      instances = [];
-      enums = [];
-    }
-
-
-let from_data_encoding :
-    type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
- fun ~encoding_name {encoding; json_encoding = _} ->
-  match encoding with
-  | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
-  | _ -> failwith "Not implemented"

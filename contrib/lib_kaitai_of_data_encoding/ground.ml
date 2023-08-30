@@ -26,45 +26,21 @@
 
 open Kaitai.Types
 
-(* We need to access the definition of data-encoding's [descr] type. For this
-   reason we open the private/internal module [Data_encoding__Encoding] (rather
-   than the public module [Data_encoding.Encoding]. *)
-open Data_encoding__Encoding
+let default_doc_spec = DocSpec.{summary = None; refs = []}
 
-let default_meta_spec ~encoding_name =
-  MetaSpec.
-    {
-      path = [];
-      isOpaque = false;
-      id = Some encoding_name;
-      endian = None;
-      bitEndian = None;
-      encoding = None;
-      forceDebug = false;
-      opaqueTypes = None;
-      zeroCopySubstream = None;
-      imports = [];
-    }
+let cond_no_cond =
+  AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
-let default_class_spec ~encoding_name =
-  ClassSpec.
-    {
-      fileName = None;
-      path = [];
-      meta = default_meta_spec ~encoding_name;
-      doc = Ground.default_doc_spec;
-      toStringExpr = None;
-      params = [];
-      seq = [];
-      types = [];
-      instances = [];
-      enums = [];
-    }
+module Attr = struct
+  let u1 =
+    AttrSpec.
+      {
+        path = [];
+        id = "uint8";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = None;
+        doc = default_doc_spec;
+      }
+end
 
-
-let from_data_encoding :
-    type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
- fun ~encoding_name {encoding; json_encoding = _} ->
-  match encoding with
-  | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
-  | _ -> failwith "Not implemented"
