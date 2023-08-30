@@ -112,6 +112,18 @@ let sign ?protocol ({kind; signer; _} as t) client =
       let bytes = Hex.to_bytes hex in
       return (Account.sign_bytes ~watermark ~signer bytes)
 
+let signed_hex ?protocol ?signature t client =
+  let* signature =
+    match signature with
+    | None -> sign t client
+    | Some signature -> return signature
+  in
+  hex ?protocol ~signature t client
+
+let byte_size ?protocol ?signature t client =
+  let* hex = signed_hex ?protocol ?signature t client in
+  return (Bytes.length (Hex.to_bytes hex))
+
 module Tezos_operation = Tezos_base.TzPervasives.Operation
 
 let hash t client : [`OpHash of string] Lwt.t =
@@ -125,12 +137,7 @@ let hash t client : [`OpHash of string] Lwt.t =
   return (`OpHash (Tezos_crypto.Hashed.Operation_hash.to_b58check hash))
 
 let spawn_inject ?(force = false) ?protocol ?signature t client =
-  let* signature =
-    match signature with
-    | None -> sign t client
-    | Some signature -> return signature
-  in
-  let* (`Hex op) = hex ?protocol ~signature t client in
+  let* (`Hex op) = signed_hex ?protocol ?signature t client in
   let inject_rpc =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
@@ -310,6 +317,32 @@ module Consensus = struct
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
     inject ?request ?force ?error op client
+
+  let get_slots ~level client =
+    RPC.Client.call client @@ RPC.get_chain_block_helper_validators ~level ()
+
+  let first_slot ~slots_json (delegate : Account.key) =
+    let open JSON in
+    match
+      List.find_opt
+        (fun slots ->
+          String.equal
+            (slots |-> "delegate" |> as_string)
+            delegate.public_key_hash)
+        (as_list slots_json)
+    with
+    | Some slots -> List.hd (slots |-> "slots" |> as_list) |> as_int
+    | None ->
+        Test.fail
+          "No slots found for %s in: %s"
+          delegate.public_key_hash
+          (JSON.encode slots_json)
+
+  let get_block_payload_hash client =
+    let* block_header =
+      RPC.Client.call client @@ RPC.get_chain_block_header ()
+    in
+    return JSON.(block_header |-> "payload_hash" |> as_string)
 end
 
 module Anonymous = struct
@@ -707,6 +740,32 @@ module Manager = struct
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in
     RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
+
+  let mk_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit ?dest
+      ?amount ?branch ?signer client =
+    let payload =
+      make
+        ?source
+        ?counter
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        (transfer ?dest ?amount ())
+    in
+    operation ?branch ?signer [payload] client
+
+  let inject_single_transfer ?source ?counter ?fee ?gas_limit ?storage_limit
+      ?dest ?amount ?request ?force ?branch ?signer ?error client =
+    let payload =
+      make
+        ?source
+        ?counter
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        (transfer ?dest ?amount ())
+    in
+    inject ?request ?force ?branch ?signer ?error [payload] client
 end
 
 let gas_limit_exceeded =
@@ -718,6 +777,22 @@ let conflict_error_with_needed_fee =
   rex
     {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. To replace the latter, this particular operation would need a total fee of at least ([\d]+) mutez\.|}
 
+let conflict_error_no_possible_fee =
+  rex
+    {|The operation ([\w\d]+) cannot be added because the mempool already contains a conflicting operation\. The pre-existing operation cannot be replaced with the new one, even if fees were increased\. Try again after the next block has been baked\.|}
+
 let rejected_by_full_mempool_with_needed_fee =
   rex
     {|Operation ([\w\d]+) has been rejected because the mempool is full\. This specific operation would need a total fee of at least ([\d]+) mutez to be considered and propagated by the mempool of this particular node right now\. Note that if the node receives operations with a better fee over gas limit ratio in the future, the operation may be rejected even with the indicated fee, or it may be successfully injected but removed at a later date\.|}
+
+let rejected_by_full_mempool_no_possible_fee =
+  rex
+    {|Operation ([\w\d]+) has been rejected because the mempool is full\. The operation cannot be accepted by this node at the moment, regardless of its fee\. Try again after the next block has been baked\.|}
+
+let inject_error_check_recommended_fee ~loc ~rex ~expected_fee op client =
+  let* _oph, needed_fee = inject_and_capture2_stderr ~rex op client in
+  Check.(
+    (int_of_string needed_fee = expected_fee)
+      int
+      ~error_msg:("The recommended fee is %L but expected %R at " ^ loc)) ;
+  unit
