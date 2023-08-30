@@ -61,7 +61,38 @@ let default_class_spec ~encoding_name =
       enums = [];
     }
 
-let from_data_encoding :
+let rec seq_field_of_data_encoding :
+    type a.
+    (string * EnumSpec.t) list ->
+    a Data_encoding.t ->
+    (string * EnumSpec.t) list * AttrSpec.t list =
+ fun enums {encoding; json_encoding = _} ->
+  match encoding with
+  | Null -> (enums, [])
+  | Empty -> (enums, [])
+  | Ignore -> (enums, [])
+  | Constant _ -> (enums, [])
+  | Bool -> (Ground.Enum.add enums Ground.Enum.bool, [Ground.Attr.bool])
+  | Uint8 -> (enums, [Ground.Attr.u1])
+  | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding
+  | Tup e ->
+      (* This case corresponds to a [tup1] combinator being called inside a
+         [tup*] combinator. It's probably never used, but it's still a valid use
+         of data-encoding. Note that we erase the information that there is an
+         extraneous [tup1] in the encoding. *)
+      seq_field_of_data_encoding enums e
+  | Tups {kind = _; left; right} ->
+      (* This case corresponds to a [tup*] combinator being called inside a
+         [tup*] combinator. It's probably never used, but it's still a valid use
+         of data-encoding. Note that we erase the information that there is an
+         extraneous [tup*] in the encoding. *)
+      let enums, left = seq_field_of_data_encoding enums left in
+      let enums, right = seq_field_of_data_encoding enums right in
+      let seq = left @ right in
+      (enums, seq)
+  | _ -> failwith "Not implemented"
+
+let rec from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
   match encoding with
@@ -72,4 +103,18 @@ let from_data_encoding :
         enums = [Ground.Enum.bool];
       }
   | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
+  | Tup e ->
+      (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
+      from_data_encoding ~encoding_name e
+  | Tups {kind = _; left; right} ->
+      let enums, left = seq_field_of_data_encoding [] left in
+      let enums, right = seq_field_of_data_encoding enums right in
+      let seq = left @ right in
+      let seq =
+        List.mapi
+          (fun i attr -> AttrSpec.{attr with id = Printf.sprintf "field_%d" i})
+          seq
+      in
+      {(default_class_spec ~encoding_name) with seq; enums}
+  | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | _ -> failwith "Not implemented"
