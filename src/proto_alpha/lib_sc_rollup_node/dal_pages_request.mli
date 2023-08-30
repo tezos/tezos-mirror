@@ -55,6 +55,7 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
 *)
 val slot_pages :
   dal_attestation_lag:int ->
+  inbox_level:int32 ->
   _ Node_context.t ->
   Dal.slot_id ->
   Dal.Page.content list option tzresult Lwt.t
@@ -62,15 +63,16 @@ val slot_pages :
 (** Retrieve the content of the page identified by the given ID from the store.
 
     The function returns [Dal_slot_not_found_in_store] if no entry is found in
-    the store for the given ID. It
-    returns [None] in case the entry is found, but the slot is not confirmed. Said
-    otherwise, some content is only returned for confirmed pages (slots) for
+    the store for the given ID. It returns [None] in case the level of the
+    requested page is out of bounds (e.g. in the future). Said otherwise,
+    some content is only returned for confirmed pages (slots) for
     which the content has already been downloaded and saved to the store.
 
     [dal_attestation_lag] is used to retrieve the correct entry in [store].
 *)
 val page_content :
   dal_attestation_lag:int ->
+  inbox_level:int32 ->
   _ Node_context.t ->
   Dal.Page.t ->
   Dal.Page.content option tzresult Lwt.t

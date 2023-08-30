@@ -115,6 +115,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Request_dal_page dal_page -> (
           let*! content =
             Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
               ~dal_attestation_lag
               node_ctxt
               dal_page
@@ -228,6 +229,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Needs_reveal (Request_dal_page page_id) -> (
           let* content_opt =
             Dal_pages_request.page_content
+              ~inbox_level:(Int32.of_int level)
               ~dal_attestation_lag
               node_ctxt
               page_id
