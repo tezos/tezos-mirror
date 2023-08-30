@@ -41,7 +41,7 @@ Adaptive Issuance
 
 Adaptive Issuance is a novel mechanism regulating tez issuance in Tezos.
 
-Before the Oxford protocol, the :doc:`Tezos economic protocol <../active/protocol>` issues new
+The :doc:`Tezos economic protocol <../active/protocol>` issues new
 tez via:
 
 -  Participation rewards: incentives given to delegates for
@@ -53,13 +53,14 @@ tez via:
 
 Participation rewards and the LB subsidy are regularly issued by the
 protocol, whereas the value and recipients of invoices are defined
-discretionarily by the developers of a protocol proposal. In the Nairobi
-protocol, and in previous ones, the values for participation rewards and
-the LB subsidy, if any, are defined by the Tezos protocol using fixed
+discretionarily by the developers of a protocol proposal.
+The values for participation rewards and
+the LB subsidy, if any, are currently defined by the Tezos protocol using fixed
 constants.
 
 The :doc:`Oxford protocol proposal <../protocols/018_oxford>`
-introduces Adaptive Issuance: a mechanism where the amount of
+introduces the possibility to activate Adaptive Issuance:
+a mechanism where the amount of
 *regularly* issued tez (participation rewards and the LB subsidy, if
 active) depends on the global **staked funds ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
@@ -197,7 +198,7 @@ rate** for cycle :math:`\IL{c+5}` is defined as:
 Adaptive rewards
 ----------------
 
-In Nairobi, and in previous Tezos protocols, participation rewards and
+Before adaptive issuance activation, participation rewards and
 the LB subsidy are fixed values defined by protocol constants. With the
 proposed mechanism, the :ref:`adaptive issuance rate <adaptive_rate_oxford>`
 provides instead a budget for the whole cycle, which gets allocated
@@ -205,7 +206,7 @@ equally to each block of the cycle and distributed between the various
 rewards, in proportion to their relative :ref:`weights <reward_weights_oxford>`.
 
 \ **ADAPTIVE ISSUANCE PER BLOCK**\     Let :math:`\supply{c}` be the
-total supply at the end of cycle :math:`\IL{c}`, the **issuance per
+total supply at the end of cycle :math:`\IL{c}`, the **maximal issuance per
 block** for cycle :math:`\IL{c+5}` is defined as:
 
 .. math::
@@ -245,9 +246,10 @@ with the following rewards per block:
    produced the block included in the chain. This bonus is given for
    including attestations, if their combined attesting power exceeds the
    minimal threshold (two thirds of total slots).
--  A *collective* **attestation** reward shared between the delegates
-   selected in the consensus committee for that block level, for
-   attesting block proposals.
+-  A *collective* **attestation** reward, for attesting block proposals,
+   distributed at the end of the cycle to the delegates selected in the
+   consensus committees for that cycle, proportionnaly to their expected
+   participation.
 
 We refer to :doc:`the consensus page <consensus>` for
 further insight on the pre-requisites and distribution of these rewards.
@@ -264,10 +266,10 @@ Note that these formulas change the value of available rewards, but not
 why and how they are awarded. Hence, :math:`\IL{\rw{bonus}{c}}` still
 denotes the maximal value for this reward: the actual reward issued
 depends on the total number of attested slots in a block. Similarly,
-:math:`\IL{\rw{attestation}{c}}` is also a maximal value per block,
-which is further shared between multiple delegates depending on the
-number of attested slots and subject to the existing participation
-conditions.
+:math:`\IL{\rw{attestation}{c}}` is also a maximal value per block used
+as the basis for computing the share of selected delegate at the end of
+the cycle, the actual allocation of the rewards
+being subject to the existing participation conditions.
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
 for contributing to :ref:`random seed generation <randomness_generation_oxford>`
