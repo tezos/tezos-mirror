@@ -106,6 +106,10 @@ let () =
   if Filename.basename Sys.argv.(0) = "octez-validator" then
     Tezos_validation.Command_line.run ()
 
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-rpc-process" then
+    exit (Cmdliner.Cmd.eval Octez_rpc_process.Main.cmd)
+
 let term =
   let open Cmdliner.Term in
   ret (const (`Help (`Pager, None)))

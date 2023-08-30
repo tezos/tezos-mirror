@@ -535,14 +535,14 @@ opam:octez-libs:
 opam:octez-node:
   extends:
     - .opam_template
-    - .rules_template__trigger_exec_opam_batch_2
+    - .rules_template__trigger_exec_opam_batch_1
   variables:
     package: octez-node
 
 opam:octez-node-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-node-config
 
@@ -559,6 +559,13 @@ opam:octez-proxy-server:
     - .rules_template__trigger_exec_opam_batch_1
   variables:
     package: octez-proxy-server
+
+opam:octez-rpc-process:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-rpc-process
 
 opam:octez-signer:
   extends:
@@ -643,7 +650,7 @@ opam:octez-smart-rollup-wasm-debugger:
 opam:tezos-017-PtNairob-test-helpers:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: tezos-017-PtNairob-test-helpers
 
@@ -1111,7 +1118,7 @@ opam:tezos-embedded-protocol-016-PtMumbai:
 opam:tezos-embedded-protocol-017-PtNairob:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-embedded-protocol-017-PtNairob
 
@@ -1296,7 +1303,7 @@ opam:tezos-protocol-009-PsFLoren:
 opam:tezos-protocol-010-PtGRANAD:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-protocol-010-PtGRANAD
 
@@ -1491,7 +1498,7 @@ opam:tezos-protocol-plugin-013-PtJakart-registerer:
 opam:tezos-protocol-plugin-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-protocol-plugin-014-PtKathma
 
@@ -1540,7 +1547,7 @@ opam:tezos-protocol-plugin-017-PtNairob:
 opam:tezos-protocol-plugin-017-PtNairob-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-protocol-plugin-017-PtNairob-registerer
 
