@@ -50,15 +50,20 @@ let mapping l =
       m_members = List.map (fun (k, v) -> (scalar k, v)) l;
     }
 
+let ( @? ) x xs = match x with None -> xs | Some x -> x :: xs
+
 let metaSpec (t : MetaSpec.t) =
-  mapping
-    (List.filter_map
-       (fun x -> x)
-       [(match t.id with None -> None | Some id -> Some ("id", scalar id))])
+  mapping @@ Option.map (fun id -> ("id", scalar id)) t.id @? []
 
 let classSpec _ = mapping [("test", scalar "test")]
 
 let instanceSpec _ = mapping [("test", scalar "test")]
+
+let types_spec types =
+  mapping (types |> List.map (fun (k, v) -> (k, classSpec v)))
+
+let instances_spec instances =
+  mapping (instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
 
 let enumSpec enumspec =
   mapping
@@ -66,45 +71,37 @@ let enumSpec enumspec =
        (fun (v, EnumValueSpec.{name; _}) -> (string_of_int v, scalar name))
        enumspec.EnumSpec.map)
 
-let if_not_empty = function [] -> false | _ -> true
+let enums_spec enums =
+  mapping (enums |> List.map (fun (k, v) -> (k, enumSpec v)))
+
+(** We only add "type" to Yaml if not [AnyType].
+    TODO: This is only correct if [AnyType] means no type? *)
+let attr_type_if_not_any attr =
+  if attr.AttrSpec.dataType = AnyType then None
+  else Some ("type", scalar (DataType.to_string attr.AttrSpec.dataType))
+
+let attr_spec attr =
+  mapping
+    (Some ("id", scalar attr.AttrSpec.id)
+    @? attr_type_if_not_any attr
+    @? Option.map (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
+    @? [])
+
+let seq_spec seq = sequence (List.map attr_spec seq)
+
+let not_empty = function [] -> false | _ -> true
+
+let spec_if_non_empty name args f =
+  if not_empty args then Some (name, f args) else None
 
 let to_yaml (t : ClassSpec.t) =
   mapping
-    (List.filter_map
-       (fun (b, n, v) -> if b then Some (n, v) else None)
-       [
-         (true, "meta", metaSpec t.meta);
-         ( if_not_empty t.types,
-           "types",
-           mapping (t.types |> List.map (fun (k, v) -> (k, classSpec v))) );
-         ( if_not_empty t.instances,
-           "instances",
-           mapping (t.instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
-         );
-         ( if_not_empty t.enums,
-           "enums",
-           mapping (t.enums |> List.map (fun (k, v) -> (k, enumSpec v))) );
-         ( if_not_empty t.seq,
-           "seq",
-           sequence
-             (t.seq
-             |> List.map (fun v ->
-                    mapping
-                      (("id", scalar v.AttrSpec.id)
-                       ::
-                       (* We only add "type" to Yaml if not [AnyType].
-                          TODO: This is only correct if [AnyType] means no type? *)
-                       (if v.AttrSpec.dataType = AnyType then []
-                       else
-                         [
-                           ( "type",
-                             scalar (DataType.to_string v.AttrSpec.dataType) );
-                         ])
-                      @
-                      match v.AttrSpec.enum with
-                      | None -> []
-                      | Some enum -> [("enum", scalar enum)]))) );
-       ])
+  @@ Some ("meta", metaSpec t.meta)
+  @? spec_if_non_empty "types" t.types types_spec
+  @? spec_if_non_empty "instances" t.instances instances_spec
+  @? spec_if_non_empty "enums" t.enums enums_spec
+  @? spec_if_non_empty "seq" t.seq seq_spec
+  @? []
 
 let print t =
   let y = to_yaml t in

@@ -31,6 +31,18 @@ let default_doc_spec = DocSpec.{summary = None; refs = []}
 let cond_no_cond =
   AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
+let default_attr_spec =
+  AttrSpec.
+    {
+      path = [];
+      id = "";
+      dataType = DataType.AnyType;
+      cond = cond_no_cond;
+      valid = None;
+      doc = default_doc_spec;
+      enum = None;
+    }
+
 module Enum = struct
   type map = (string * Kaitai.Types.EnumSpec.t) list
 
@@ -63,26 +75,19 @@ end
 
 module Attr = struct
   let bool =
-    AttrSpec.
-      {
-        path = [];
-        id = "bool";
-        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-        cond = cond_no_cond;
-        valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
-        doc = default_doc_spec;
-        enum = Some (fst Enum.bool);
-      }
+    {
+      default_attr_spec with
+      id = "bool";
+      dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+      valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
+      enum = Some (fst Enum.bool);
+    }
 
   let u1 =
     AttrSpec.
       {
-        path = [];
+        default_attr_spec with
         id = "uint8";
         dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-        cond = cond_no_cond;
-        valid = None;
-        doc = default_doc_spec;
-        enum = None;
       }
 end

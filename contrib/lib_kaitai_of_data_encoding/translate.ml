@@ -95,14 +95,12 @@ let rec seq_field_of_data_encoding :
 let rec from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
+  let class_spec_of_ground ?(enums = []) ground =
+    {(default_class_spec ~encoding_name) with seq = [ground]; enums}
+  in
   match encoding with
-  | Bool ->
-      {
-        (default_class_spec ~encoding_name) with
-        seq = [Ground.Attr.bool];
-        enums = [Ground.Enum.bool];
-      }
-  | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
+  | Bool -> class_spec_of_ground ~enums:[Ground.Enum.bool] Ground.Attr.bool
+  | Uint8 -> class_spec_of_ground Ground.Attr.u1
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
