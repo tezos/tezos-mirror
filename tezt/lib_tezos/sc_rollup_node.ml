@@ -434,3 +434,9 @@ let change_node_and_restart ?event_level sc_rollup_node rollup_address node =
   let* () = terminate sc_rollup_node in
   sc_rollup_node.persistent_state.endpoint <- Node node ;
   run ?event_level sc_rollup_node rollup_address []
+
+let change_node_mode sc_rollup_node mode =
+  {
+    sc_rollup_node with
+    persistent_state = {sc_rollup_node.persistent_state with mode};
+  }
