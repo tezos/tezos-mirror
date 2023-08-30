@@ -41,6 +41,9 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
+  other_contracts : (Script.expr * Script.expr) list option;
+  extra_big_maps :
+    (Script.expr * Script.expr * Script.expr * Script.expr) list option;
 }
 
 (* Parameters specific to simulations of TZIP4 views *)

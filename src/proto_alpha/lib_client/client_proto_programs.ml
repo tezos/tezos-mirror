@@ -148,6 +148,9 @@ type simulation_params = {
   sender : Contract.t option;
   payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
+  other_contracts : (Script.expr * Script.expr) list option;
+  extra_big_maps :
+    (Script.expr * Script.expr * Script.expr * Script.expr) list option;
 }
 
 type run_view_params = {
@@ -177,7 +180,18 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_view_params) =
   let open Lwt_result_syntax in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     contract;
     entrypoint;
   } =
@@ -197,12 +211,25 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ~unparsing_mode
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
   let open Lwt_result_syntax in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     contract;
     view;
     unlimited_gas;
@@ -224,13 +251,26 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~unparsing_mode
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let run (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   let open Lwt_result_syntax in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     program;
     amount;
     balance;
@@ -258,13 +298,26 @@ let run (cctxt : #Protocol_client_context.rpc_context)
     ~self
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let trace (cctxt : #Protocol_client_context.rpc_context)
     ~(chain : Chain_services.chain) ~block (params : run_params) =
   let open Lwt_result_syntax in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
   let {
-    shared_params = {input; unparsing_mode; now; level; sender; payer; gas};
+    shared_params =
+      {
+        input;
+        unparsing_mode;
+        now;
+        level;
+        sender;
+        payer;
+        gas;
+        other_contracts;
+        extra_big_maps;
+      };
     program;
     amount;
     balance;
@@ -292,6 +345,8 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
     ~self
     ~now
     ~level
+    ~other_contracts
+    ~extra_big_maps
 
 let typecheck_data cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
     ~(data : Michelson_v1_parser.parsed) ~(ty : Michelson_v1_parser.parsed) () =

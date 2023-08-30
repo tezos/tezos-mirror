@@ -1012,6 +1012,8 @@ let run_view_action (cctxt : #Protocol_client_context.full) ~chain ~block
     ~unparsing_mode
     ~now:None
     ~level:None
+    ~other_contracts:None
+    ~extra_big_maps:None
 
 let () =
   Data_encoding.(

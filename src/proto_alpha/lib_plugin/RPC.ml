@@ -256,11 +256,13 @@ module Scripts = struct
            (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
            (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
-        (obj4
+        (obj6
            (opt "unparsing_mode" unparsing_mode_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
            (opt "now" Script_timestamp.encoding)
-           (opt "level" Script_int.n_encoding))
+           (opt "level" Script_int.n_encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let run_code_output_encoding =
       conv
@@ -306,19 +308,23 @@ module Scripts = struct
 
     let run_tzip4_view_encoding =
       let open Data_encoding in
-      obj10
-        (req "contract" Contract.originated_encoding)
-        (req "entrypoint" Entrypoint.simple_encoding)
-        (req "input" Script.expr_encoding)
-        (req "chain_id" Chain_id.encoding)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
-           Rename the "source" field into "sender" *)
-        (opt "source" Contract.encoding)
-        (opt "payer" Contract.implicit_encoding)
-        (opt "gas" Gas.Arith.z_integral_encoding)
-        (req "unparsing_mode" unparsing_mode_encoding)
-        (opt "now" Script_timestamp.encoding)
-        (opt "level" Script_int.n_encoding)
+      merge_objs
+        (obj10
+           (req "contract" Contract.originated_encoding)
+           (req "entrypoint" Entrypoint.simple_encoding)
+           (req "input" Script.expr_encoding)
+           (req "chain_id" Chain_id.encoding)
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/710
+              Rename the "source" field into "sender" *)
+           (opt "source" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
+           (opt "gas" Gas.Arith.z_integral_encoding)
+           (req "unparsing_mode" unparsing_mode_encoding)
+           (opt "now" Script_timestamp.encoding)
+           (opt "level" Script_int.n_encoding))
+        (obj2
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let run_script_view_encoding =
       let open Data_encoding in
@@ -336,7 +342,10 @@ module Scripts = struct
            (opt "gas" Gas.Arith.z_integral_encoding)
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
-        (obj1 (opt "level" Script_int.n_encoding))
+        (obj3
+           (opt "level" Script_int.n_encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "extra_big_maps" extra_big_maps_encoding))
 
     let normalize_stack_input_encoding =
       obj5
@@ -447,11 +456,13 @@ module Scripts = struct
         ~description:
           "Normalizes some data expression using the requested unparsing mode"
         ~input:
-          (obj4
+          (obj6
              (req "data" Script.expr_encoding)
              (req "type" Script.expr_encoding)
              (req "unparsing_mode" unparsing_mode_encoding)
-             (opt "legacy" bool))
+             (opt "legacy" bool)
+             (opt "other_contracts" other_contracts_encoding)
+             (opt "extra_big_maps" extra_big_maps_encoding))
         ~output:(obj1 (req "normalized" Script.expr_encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_data")
@@ -1402,9 +1413,18 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas_opt, now_opt, level_opt) )
+          ( unparsing_mode,
+            gas_opt,
+            now_opt,
+            level_opt,
+            other_contracts,
+            extra_big_maps ) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
         let* ctxt, step_constants =
@@ -1460,9 +1480,18 @@ module Scripts = struct
             payer_opt,
             self_opt,
             entrypoint ),
-          (unparsing_mode, gas_opt, now_opt, level_opt) )
+          ( unparsing_mode,
+            gas_opt,
+            now_opt,
+            level_opt,
+            other_contracts,
+            extra_big_maps ) )
       ->
         let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let storage = Script.lazy_expr storage in
         let code = Script.lazy_expr code in
         let* ctxt, step_constants =
@@ -1511,17 +1540,22 @@ module Scripts = struct
       (fun
         ctxt
         ()
-        ( contract_hash,
-          entrypoint,
-          input,
-          chain_id,
-          sender_opt,
-          payer_opt,
-          gas,
-          unparsing_mode,
-          now_opt,
-          level_opt )
+        ( ( contract_hash,
+            entrypoint,
+            input,
+            chain_id,
+            sender_opt,
+            payer_opt,
+            gas,
+            unparsing_mode,
+            now_opt,
+            level_opt ),
+          (other_contracts, extra_big_maps) )
       ->
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
         let*? script =
           Option.fold
@@ -1607,8 +1641,12 @@ module Scripts = struct
             gas,
             unparsing_mode,
             now_opt ),
-          level_opt )
+          (level_opt, other_contracts, extra_big_maps) )
       ->
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let* ctxt, script_opt = Contract.get_script ctxt contract_hash in
         let*? script =
           Option.fold
@@ -1778,8 +1816,16 @@ module Scripts = struct
     Registration.register0
       ~chunked:true
       S.normalize_data
-      (fun ctxt () (expr, typ, unparsing_mode, legacy) ->
+      (fun
+        ctxt
+        ()
+        (expr, typ, unparsing_mode, legacy, other_contracts, extra_big_maps)
+      ->
         let open Script_ir_translator in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
         let legacy = Option.value ~default:false legacy in
         let ctxt = Gas.set_unlimited ctxt in
         let*? Ex_ty typ, ctxt =
@@ -1890,8 +1936,8 @@ module Scripts = struct
             [] ))
 
   let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ?balance
-      ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self ~now ~level
-      ctxt block =
+      ~other_contracts ~extra_big_maps ~script ~storage ~input ~amount ~chain_id
+      ~sender ~payer ~self ~now ~level ctxt block =
     RPC_context.make_call0
       S.run_code
       ctxt
@@ -1907,11 +1953,11 @@ module Scripts = struct
           payer,
           self,
           entrypoint ),
-        (unparsing_mode, gas, now, level) )
+        (unparsing_mode, gas, now, level, other_contracts, extra_big_maps) )
 
   let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-      ?balance ~script ~storage ~input ~amount ~chain_id ~sender ~payer ~self
-      ~now ~level ctxt block =
+      ?balance ~other_contracts ~extra_big_maps ~script ~storage ~input ~amount
+      ~chain_id ~sender ~payer ~self ~now ~level ctxt block =
     RPC_context.make_call0
       S.trace_code
       ctxt
@@ -1927,30 +1973,32 @@ module Scripts = struct
           payer,
           self,
           entrypoint ),
-        (unparsing_mode, gas, now, level) )
+        (unparsing_mode, gas, now, level, other_contracts, extra_big_maps) )
 
-  let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
-      ?sender ?payer ~unparsing_mode ctxt block =
+  let run_tzip4_view ?gas ~other_contracts ~extra_big_maps ~contract ~entrypoint
+      ~input ~chain_id ~now ~level ?sender ?payer ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_tzip4_view
       ctxt
       block
       ()
-      ( contract,
-        entrypoint,
-        input,
-        chain_id,
-        sender,
-        payer,
-        gas,
-        unparsing_mode,
-        now,
-        level )
+      ( ( contract,
+          entrypoint,
+          input,
+          chain_id,
+          sender,
+          payer,
+          gas,
+          unparsing_mode,
+          now,
+          level ),
+        (other_contracts, extra_big_maps) )
 
   (** [run_script_view] is an helper function to call the corresponding
         RPC. [unlimited_gas] is set to [false] by default. *)
-  let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
-      ~chain_id ~now ~level ?sender ?payer ~unparsing_mode ctxt block =
+  let run_script_view ?gas ~other_contracts ~extra_big_maps ~contract ~view
+      ~input ?(unlimited_gas = false) ~chain_id ~now ~level ?sender ?payer
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.run_script_view
       ctxt
@@ -1966,7 +2014,7 @@ module Scripts = struct
           gas,
           unparsing_mode,
           now ),
-        level )
+        (level, other_contracts, extra_big_maps) )
 
   let typecheck_code ?gas ?legacy ~script ?show_types ctxt block =
     RPC_context.make_call0
@@ -1990,13 +2038,14 @@ module Scripts = struct
   let pack_data ?gas ~data ~ty ctxt block =
     RPC_context.make_call0 S.pack_data ctxt block () (data, ty, gas)
 
-  let normalize_data ?legacy ~data ~ty ~unparsing_mode ctxt block =
+  let normalize_data ?legacy ~other_contracts ~extra_big_maps ~data ~ty
+      ~unparsing_mode ctxt block =
     RPC_context.make_call0
       S.normalize_data
       ctxt
       block
       ()
-      (data, ty, unparsing_mode, legacy)
+      (data, ty, unparsing_mode, legacy, other_contracts, extra_big_maps)
 
   let normalize_stack ?legacy ~other_contracts ~extra_big_maps ~stack
       ~unparsing_mode ctxt block =

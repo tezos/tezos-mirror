@@ -58,6 +58,8 @@ let normalize_internal_operation cctxt unparsing_mode
             ~data:payload
             ~ty
             ~unparsing_mode
+            ~other_contracts:None
+            ~extra_big_maps:None
         in
         Event {ty; tag; payload}
     | op -> return op
