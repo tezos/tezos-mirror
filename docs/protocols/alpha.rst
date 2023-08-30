@@ -53,6 +53,8 @@ Operation receipts
 Bug Fixes
 ---------
 
+- Fix reporting of gas in traced execution of Michelson scripts. (MR :gl:`!6558`)
+
 Minor Changes
 -------------
 
