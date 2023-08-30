@@ -32,6 +32,7 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+  | Execute_outbox_message
 
 type mode =
   | Observer
@@ -44,7 +45,8 @@ type mode =
 
 type purpose = Operating | Batching | Cementing | Recovering
 
-let operation_kinds = [Publish; Add_messages; Cement; Timeout; Refute; Recover]
+let operation_kinds =
+  [Publish; Add_messages; Cement; Timeout; Refute; Execute_outbox_message]
 
 let purposes = [Operating; Batching; Cementing; Recovering]
 
@@ -209,6 +211,7 @@ let default_fee = function
          refutation moves even if the proof is large. The stake is high (we can
          lose the 10k deposit or we can get the reward). *)
       tez 5
+  | Execute_outbox_message -> tez 1
 
 let default_burn = function
   | Publish ->
@@ -221,6 +224,7 @@ let default_burn = function
   | Refute ->
       (* A refutation move can store data, e.g. opening a game. *)
       tez 1
+  | Execute_outbox_message -> tez 1
 
 let default_fee_parameter ?operation_kind () =
   let fee_cap, burn_cap =
@@ -281,6 +285,7 @@ let string_of_operation_kind = function
   | Timeout -> "timeout"
   | Refute -> "refute"
   | Recover -> "recover"
+  | Execute_outbox_message -> "execute_outbox_message"
 
 let operation_kind_of_string = function
   | "publish" -> Some Publish
@@ -289,6 +294,7 @@ let operation_kind_of_string = function
   | "timeout" -> Some Timeout
   | "refute" -> Some Refute
   | "recover" -> Some Recover
+  | "execute_outbox_message" -> Some Execute_outbox_message
   | _ -> None
 
 let operation_kind_of_string_exn s =

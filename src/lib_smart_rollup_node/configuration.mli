@@ -32,6 +32,7 @@ type operation_kind =
   | Timeout
   | Refute
   | Recover
+  | Execute_outbox_message
 
 (** Mode for the rollup node *)
 type mode =
