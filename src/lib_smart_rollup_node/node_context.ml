@@ -132,8 +132,9 @@ let make_kernel_logger ?log_kernel_debug_file data_dir =
   in
   Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
 
-let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
-    l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
+let init (cctxt : #Client_context.full) ~data_dir ~index_buffer_size
+    ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc ~lpc kind
+    current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -151,6 +152,7 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
   let* () =
     Store_migration.maybe_run_migration
       ~storage_dir:(Configuration.default_storage_dir data_dir)
+      ~index_buffer_size:Configuration.default_index_buffer_size
   in
   let dal_cctxt =
     Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
@@ -158,6 +160,7 @@ let init (cctxt : #Client_context.full) ~data_dir ?log_kernel_debug_file mode
   let* store =
     Store.load
       mode
+      ~index_buffer_size
       ~l2_blocks_cache_size
       Configuration.(default_storage_dir data_dir)
   in
@@ -940,10 +943,12 @@ module Internal_for_tests = struct
   let create_node_context cctxt current_protocol ~data_dir kind =
     let open Lwt_result_syntax in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
+    let index_buffer_size = Configuration.default_index_buffer_size in
     let* lockfile = lock ~data_dir in
     let* store =
       Store.load
         Read_write
+        ~index_buffer_size
         ~l2_blocks_cache_size
         Configuration.(default_storage_dir data_dir)
     in

@@ -85,7 +85,8 @@ module type INDEXABLE_STORE = sig
 
   type value
 
-  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string -> index_buffer_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   val mem : [> `Read] t -> key -> bool tzresult Lwt.t
 
@@ -127,7 +128,12 @@ module type INDEXED_FILE = sig
     value:value ->
     unit tzresult Lwt.t
 
-  val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string ->
+    index_buffer_size:int ->
+    cache_size:int ->
+    'a mode ->
+    'a t tzresult Lwt.t
 
   val close : _ t -> unit tzresult Lwt.t
 
@@ -211,10 +217,6 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
 
   type _ t = {index : I.t; scheduler : Lwt_idle_waiter.t}
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4654
-     Make log size constant configurable. *)
-  let log_size = 10_000
-
   let mem store k =
     let open Lwt_result_syntax in
     trace (Cannot_read_from_store N.name)
@@ -242,14 +244,15 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     if flush then I.flush store.index ;
     return_unit
 
-  let load (type a) ~path (mode : a mode) : a t tzresult Lwt.t =
+  let load (type a) ~path ~index_buffer_size (mode : a mode) :
+      a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let index = I.v ~log_size ~readonly path in
+    let index = I.v ~log_size:index_buffer_size ~readonly path in
     let scheduler = Lwt_idle_waiter.create () in
     return {index; scheduler}
 
@@ -478,14 +481,6 @@ struct
     cache : (V.t * V.Header.t, tztrace) Cache.t;
   }
 
-  (* The log_size corresponds to the maximum size of the memory zone
-     allocated in memory before flushing it onto the disk. It is
-     basically a cache which is use for the index. The cache size is
-     `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4654
-     Make log size constant configurable. *)
-  let blocks_log_size = 10_000
-
   let mem store key =
     let open Lwt_result_syntax in
     trace (Cannot_read_from_store IHeader.name)
@@ -560,7 +555,8 @@ struct
     if flush then Header_index.flush store.index ;
     return_unit
 
-  let load (type a) ~path ~cache_size (mode : a mode) : a t tzresult Lwt.t =
+  let load (type a) ~path ~index_buffer_size ~cache_size (mode : a mode) :
+      a t tzresult Lwt.t =
     let open Lwt_result_syntax in
     trace (Cannot_load_store {name = N.name; path})
     @@ protect
@@ -576,7 +572,7 @@ struct
     in
     let index =
       Header_index.v
-        ~log_size:blocks_log_size
+        ~log_size:index_buffer_size
         ~readonly
         (Filename.concat path "index")
     in

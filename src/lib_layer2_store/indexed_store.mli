@@ -78,7 +78,8 @@ module type INDEXABLE_STORE = sig
 
   (** Load (or initializes) a store in the file [path]. If [readonly] is [true],
       the store will only be accessed in read only mode. *)
-  val load : path:string -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string -> index_buffer_size:int -> 'a mode -> 'a t tzresult Lwt.t
 
   (** Returns [true] if the key has a value associated in
       the store. *)
@@ -151,7 +152,12 @@ module type INDEXED_FILE = sig
     unit tzresult Lwt.t
 
   (** Loads a new or existing indexed file store in the directory [path]. *)
-  val load : path:string -> cache_size:int -> 'a mode -> 'a t tzresult Lwt.t
+  val load :
+    path:string ->
+    index_buffer_size:int ->
+    cache_size:int ->
+    'a mode ->
+    'a t tzresult Lwt.t
 
   (** Close the index and the file. One must call {!load} again to read or write
       data in the store. *)
