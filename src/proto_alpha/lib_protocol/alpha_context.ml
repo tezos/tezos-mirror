@@ -285,9 +285,10 @@ module Gas = struct
   let consume = Raw_context.consume_gas
 
   let consume_from available_gas cost =
+    let open Result_syntax in
     match raw_consume available_gas cost with
-    | Some remaining_gas -> ok remaining_gas
-    | None -> error Operation_quota_exceeded
+    | Some remaining_gas -> return remaining_gas
+    | None -> tzfail Operation_quota_exceeded
 
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 
@@ -315,18 +316,23 @@ module Script = struct
   type consume_deserialization_gas = Always | When_needed
 
   let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let open Result_syntax in
     let gas_cost =
       match consume_deserialization_gas with
       | Always -> Script_repr.stable_force_decode_cost lexpr
       | When_needed -> Script_repr.force_decode_cost lexpr
     in
-    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
-    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
+    let* ctxt = Raw_context.consume_gas ctxt gas_cost in
+    let+ v = Script_repr.force_decode lexpr in
+    (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
-    >>? fun ctxt ->
-    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+    let open Result_syntax in
+    let* ctxt =
+      Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    in
+    let+ v = Script_repr.force_bytes lexpr in
+    (v, ctxt)
 
   let consume_decoding_gas available_gas lexpr =
     let gas_cost = Script_repr.stable_force_decode_cost lexpr in
@@ -417,12 +423,14 @@ module Big_map = struct
     Storage.Big_map.Contents.list_key_values ?offset ?length (c, m)
 
   let exists c id =
-    Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) >>?= fun c ->
-    Storage.Big_map.Key_type.find c id >>=? fun kt ->
+    let open Lwt_result_syntax in
+    let*? c = Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) in
+    let* kt = Storage.Big_map.Key_type.find c id in
     match kt with
     | None -> return (c, None)
     | Some kt ->
-        Storage.Big_map.Value_type.get c id >|=? fun kv -> (c, Some (kt, kv))
+        let+ kv = Storage.Big_map.Value_type.get c id in
+        (c, Some (kt, kv))
 
   type update = Big_map.update = {
     key : Script_repr.expr;
@@ -570,7 +578,9 @@ module Consensus = struct
   include Raw_context.Consensus
 
   let load_attestation_branch ctxt =
-    Storage.Tenderbake.Attestation_branch.find ctxt >>=? function
+    let open Lwt_result_syntax in
+    let* result = Storage.Tenderbake.Attestation_branch.find ctxt in
+    match result with
     | Some attestation_branch ->
         Raw_context.Consensus.set_attestation_branch ctxt attestation_branch
         |> return
@@ -584,11 +594,13 @@ end
 let prepare_first_block = Init_storage.prepare_first_block
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
-  Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
-  >>=? fun (ctxt, balance_updates, origination_results) ->
-  Consensus.load_attestation_branch ctxt >>=? fun ctxt ->
-  Delegate.load_forbidden_delegates ctxt >>=? fun ctxt ->
-  Adaptive_issuance_storage.load_reward_coeff ctxt >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt, balance_updates, origination_results =
+    Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+  in
+  let* ctxt = Consensus.load_attestation_branch ctxt in
+  let* ctxt = Delegate.load_forbidden_delegates ctxt in
+  let* ctxt = Adaptive_issuance_storage.load_reward_coeff ctxt in
   return (ctxt, balance_updates, origination_results)
 
 let finalize ?commit_message:message c fitness =

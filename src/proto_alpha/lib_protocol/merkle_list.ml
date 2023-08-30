@@ -274,20 +274,22 @@ end)
 
   (* The order of the path is from bottom to top *)
   let compute_path {tree; depth; next_pos} pos =
+    let open Result_syntax in
     if Compare.Int.(pos < 0 || pos >= next_pos) then
-      error Merkle_list_invalid_position
+      tzfail Merkle_list_invalid_position
     else
       let key = to_bin ~pos ~depth in
       let rec aux acc tree key =
         match (tree, key) with
-        | Leaf _, [] -> ok acc
+        | Leaf _, [] -> return acc
         | Node (_, l, r), b :: key ->
             if b then aux (root l :: acc) r key else aux (root r :: acc) l key
-        | _ -> error Merkle_list_invalid_position
+        | _ -> tzfail Merkle_list_invalid_position
       in
       aux [] tree key
 
   let check_path path pos el expected_root =
+    let open Result_syntax in
     let depth = List.length path in
     if
       Compare.Int.(pos >= 0)
@@ -301,8 +303,8 @@ end)
           (hash_elt el)
           (List.combine_drop path key)
       in
-      ok (H.equal computed_root expected_root)
-    else error Merkle_list_invalid_position
+      return (H.equal computed_root expected_root)
+    else tzfail Merkle_list_invalid_position
 
   let path_depth path = List.length path
 
