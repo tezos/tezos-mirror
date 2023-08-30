@@ -738,7 +738,11 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to normalize a typed Michelson stack."
-      (args2 (unparsing_mode_arg ~default:"Readable") legacy_switch)
+      (args4
+         (unparsing_mode_arg ~default:"Readable")
+         legacy_switch
+         other_contracts_arg
+         extra_big_maps_arg)
       (prefixes ["normalize"; "stack"]
       @@ param
            ~name:"stack"
@@ -749,7 +753,9 @@ let commands () =
               of the stack is <val_1>."
            micheline_parameter
       @@ stop)
-      (fun (unparsing_mode, legacy) (stack, source) cctxt ->
+      (fun (unparsing_mode, legacy, other_contracts, extra_big_maps)
+           (stack, source)
+           cctxt ->
         let open Lwt_result_syntax in
         let*? stack = Michelson_v1_stack.parse_stack ~source stack in
         let*! r =
@@ -759,8 +765,8 @@ let commands () =
             ~legacy
             ~stack
             ~unparsing_mode
-            ~other_contracts:None
-            ~extra_big_maps:None
+            ~other_contracts
+            ~extra_big_maps
         in
         match r with
         | Ok expr ->

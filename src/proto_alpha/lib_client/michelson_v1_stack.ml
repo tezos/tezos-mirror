@@ -30,6 +30,12 @@ open Alpha_context
 type error +=
   | Wrong_stack_item of Micheline_parser.location * Micheline_printer.node
   | Wrong_stack of Micheline_parser.location * Micheline_printer.node
+  | Wrong_other_contracts_item of
+      Micheline_parser.location * Micheline_printer.node
+  | Wrong_other_contracts of Micheline_parser.location * Micheline_printer.node
+  | Wrong_extra_big_maps_item of
+      Micheline_parser.location * Micheline_printer.node
+  | Wrong_extra_big_maps of Micheline_parser.location * Micheline_printer.node
 
 let micheline_printer_location_encoding :
     Micheline_printer.location Data_encoding.encoding =
@@ -81,7 +87,80 @@ let () =
        (req "location" Micheline_parser.location_encoding)
        (req "node" micheline_printer_node_encoding))
     (function Wrong_stack (loc, node) -> Some (loc, node) | _ -> None)
-    (fun (loc, node) -> Wrong_stack (loc, node))
+    (fun (loc, node) -> Wrong_stack (loc, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"michelson.wrong_other_contracts_item"
+    ~title:"Wrong description of an other contract"
+    ~description:"Failed to parse an item in a description of other contracts."
+    ~pp:(fun ppf (_loc, node) ->
+      Format.fprintf
+        ppf
+        "Unexpected format for an item in a description of other contracts. \
+         Expected: Contract <address> <ty>; got %a."
+        Micheline_printer.print_expr_unwrapped
+        node)
+    (obj2
+       (req "location" Micheline_parser.location_encoding)
+       (req "node" micheline_printer_node_encoding))
+    (function
+      | Wrong_other_contracts_item (loc, node) -> Some (loc, node) | _ -> None)
+    (fun (loc, node) -> Wrong_other_contracts_item (loc, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"michelson.wrong_other_contracts"
+    ~title:"Wrong description of a list of other contracts"
+    ~description:"Failed to parse a description of other contracts."
+    ~pp:(fun ppf (_loc, node) ->
+      Format.fprintf
+        ppf
+        "Unexpected format for a description of other contracts. Expected a \
+         sequence of Contract <address> <ty>; got %a."
+        Micheline_printer.print_expr_unwrapped
+        node)
+    (obj2
+       (req "location" Micheline_parser.location_encoding)
+       (req "node" micheline_printer_node_encoding))
+    (function
+      | Wrong_other_contracts (loc, node) -> Some (loc, node) | _ -> None)
+    (fun (loc, node) -> Wrong_other_contracts (loc, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"michelson.wrong_extra_big_maps_item"
+    ~title:"Wrong description of an extra big map"
+    ~description:"Failed to parse an item in a description of extra big maps."
+    ~pp:(fun ppf (_loc, node) ->
+      Format.fprintf
+        ppf
+        "Unexpected format for an item in a description of extra big maps. \
+         Expected: Big_map <index> <key_type> <value_type> <content>; got %a."
+        Micheline_printer.print_expr_unwrapped
+        node)
+    (obj2
+       (req "location" Micheline_parser.location_encoding)
+       (req "node" micheline_printer_node_encoding))
+    (function
+      | Wrong_extra_big_maps_item (loc, node) -> Some (loc, node) | _ -> None)
+    (fun (loc, node) -> Wrong_extra_big_maps_item (loc, node)) ;
+  Protocol_client_context.register_error_kind
+    `Permanent
+    ~id:"michelson.wrong_extra_big_maps"
+    ~title:"Wrong description of a list of extra big maps"
+    ~description:"Failed to parse a description of extra big maps."
+    ~pp:(fun ppf (_loc, node) ->
+      Format.fprintf
+        ppf
+        "Unexpected format for a description of extra big maps. Expected a \
+         sequence of Big_map <index> <key_type> <value_type> <content>; got \
+         %a."
+        Micheline_printer.print_expr_unwrapped
+        node)
+    (obj2
+       (req "location" Micheline_parser.location_encoding)
+       (req "node" micheline_printer_node_encoding))
+    (function
+      | Wrong_extra_big_maps (loc, node) -> Some (loc, node) | _ -> None)
+    (fun (loc, node) -> Wrong_extra_big_maps (loc, node))
 
 let parse_expression ~source (node : Micheline_parser.node) :
     Script.expr tzresult =
@@ -102,8 +181,44 @@ let parse_stack_item ~source =
       return (ty, v)
   | e -> tzfail (Wrong_stack_item (Micheline.location e, printable e))
 
+let parse_other_contract_item ~source =
+  let open Result_syntax in
+  function
+  | Micheline.Prim (_loc, "Contract", [addr; ty], _annot) ->
+      let* addr = parse_expression ~source addr in
+      let* ty = parse_expression ~source ty in
+      return (addr, ty)
+  | e -> tzfail (Wrong_other_contracts_item (Micheline.location e, printable e))
+
+let parse_extra_big_map_item ~source =
+  let open Result_syntax in
+  function
+  | Micheline.Prim (_loc, "Big_map", [i; kty; vty; map], _annot) ->
+      let* i = parse_expression ~source i in
+      let* kty = parse_expression ~source kty in
+      let* vty = parse_expression ~source vty in
+      let* map = parse_expression ~source map in
+      return (i, kty, vty, map)
+  | e -> tzfail (Wrong_extra_big_maps_item (Micheline.location e, printable e))
+
 let parse_stack ~source = function
   | Micheline.Seq (loc, l) as e ->
       record_trace (Wrong_stack (loc, printable e))
       @@ List.map_e (parse_stack_item ~source) l
   | e -> Result_syntax.tzfail (Wrong_stack (Micheline.location e, printable e))
+
+let parse_other_contracts ~source = function
+  | Micheline.Seq (loc, l) as e ->
+      record_trace (Wrong_other_contracts (loc, printable e))
+      @@ List.map_e (parse_other_contract_item ~source) l
+  | e ->
+      Result_syntax.tzfail
+        (Wrong_other_contracts (Micheline.location e, printable e))
+
+let parse_extra_big_maps ~source = function
+  | Micheline.Seq (loc, l) as e ->
+      record_trace (Wrong_extra_big_maps (loc, printable e))
+      @@ List.map_e (parse_extra_big_map_item ~source) l
+  | e ->
+      Result_syntax.tzfail
+        (Wrong_extra_big_maps (Micheline.location e, printable e))
