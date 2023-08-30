@@ -177,10 +177,9 @@ module List_key_values_benchmark_boilerplate = struct
   let model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
-      ~model:
-        (Model.affine
-           ~intercept:(fv "list_key_values_intercept")
-           ~coeff:(fv "list_key_values_step"))
+      (Model.affine
+         ~intercept:(fv "list_key_values_intercept")
+         ~coeff:(fv "list_key_values_step"))
 end
 
 module List_key_values_benchmark = struct

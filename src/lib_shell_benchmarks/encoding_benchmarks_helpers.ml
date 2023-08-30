@@ -79,7 +79,7 @@ struct
     let model =
       Model.make
         ~conv:(fun () -> ())
-        ~model:(Model.unknown_const1 ~name:(ns name) ~const:free_variable)
+        (Model.unknown_const1 ~name:(ns name) ~const:free_variable)
     in
     let module Bench : Benchmark.Simple_with_num = struct
       let name = ns name
@@ -114,7 +114,7 @@ struct
     let model =
       Model.make
         ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
-        ~model:(Model.affine ~name:(ns name) ~intercept:const ~coeff)
+        (Model.affine ~name:(ns name) ~intercept:const ~coeff)
     in
     let module Bench : Benchmark.Simple_with_num = struct
       let name =
@@ -154,7 +154,7 @@ struct
     let model =
       Model.make
         ~conv:(fun {Shared_linear.bytes} -> (bytes, ()))
-        ~model:(Model.nsqrtn_const ~name:(ns name) ~intercept:const ~coeff)
+        (Model.nsqrtn_const ~name:(ns name) ~intercept:const ~coeff)
     in
     let module Bench : Benchmark.Simple = struct
       let name = ns name

@@ -107,25 +107,23 @@ module Micheline_common = struct
   let tags = [Tags.encoding]
 
   let model_size name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~conv:(fun {size = {Size.traversal; int_bytes; string_bytes}; _} ->
-           (traversal, (int_bytes, (string_bytes, ()))))
-         ~model:
-           (Model.trilinear
-              ~name:(ns name)
-              ~coeff1:(fv (Format.asprintf "%s_micheline_traversal" name))
-              ~coeff2:(fv (Format.asprintf "%s_micheline_int_bytes" name))
-              ~coeff3:(fv (Format.asprintf "%s_micheline_string_bytes" name)))
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(fun {size = {Size.traversal; int_bytes; string_bytes}; _} ->
+        (traversal, (int_bytes, (string_bytes, ()))))
+      (Model.trilinear
+         ~name:(ns name)
+         ~coeff1:(fv (Format.asprintf "%s_micheline_traversal" name))
+         ~coeff2:(fv (Format.asprintf "%s_micheline_int_bytes" name))
+         ~coeff3:(fv (Format.asprintf "%s_micheline_string_bytes" name)))
 
   let model_bytes name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~conv:(fun {bytes; _} -> (bytes, ()))
-         ~model:
-           (Model.linear
-              ~name:(ns (name ^ "_bytes"))
-              ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(fun {bytes; _} -> (bytes, ()))
+      (Model.linear
+         ~name:(ns (name ^ "_bytes"))
+         ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
 
   let models name =
     [("micheline", model_size name); ("micheline_bytes", model_bytes name)]

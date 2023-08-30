@@ -88,10 +88,7 @@ module Blake2b_bench : Benchmark.S = struct
   (* We posit that the execution time of blake2b is proportional to the
      length of the bytes. *)
   let models =
-    [
-      ( "blake2b",
-        Model.make ~conv:(fun {nbytes} -> (nbytes, ())) ~model:model_blake2b );
-    ]
+    [("blake2b", Model.make ~conv:(fun {nbytes} -> (nbytes, ())) model_blake2b)]
 
   let blake2b_benchmark rng_state config () =
     let nbytes =

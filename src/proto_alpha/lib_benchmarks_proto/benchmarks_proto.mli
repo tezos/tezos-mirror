@@ -105,9 +105,10 @@ module Model : sig
   type 'workload t = 'workload Model.t
 
   val make :
+    ?takes_saturation_reprs:bool ->
     name:Namespace.t ->
     conv:('a -> 'b) ->
-    model:(Namespace.t -> 'b model) ->
+    (Namespace.t -> 'b model) ->
     'a t
 
   val unknown_const1 : ?const:Free_variable.t -> Namespace.t -> unit model
@@ -127,6 +128,4 @@ module Model : sig
     (int * unit) model
 
   val linear : ?coeff:Free_variable.t -> Namespace.t -> (int * unit) model
-
-  val set_takes_saturation_reprs : bool -> 'a t -> 'a t
 end

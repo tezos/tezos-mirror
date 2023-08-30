@@ -162,7 +162,7 @@ module Micheline_strip_locations : Benchmark.Simple = struct
     Model.(
       make
         ~conv:(fun {nodes; bytes = _} -> (nodes, ()))
-        ~model:(linear ~name ~coeff:(fv "nodes")))
+        (linear ~name ~coeff:(fv "nodes")))
 
   let group = Benchmark.Standalone
 

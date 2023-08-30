@@ -102,10 +102,7 @@ module Model : sig
   type 'workload t = 'workload Model.t
 
   val make :
-    name:Namespace.t ->
-    conv:('a -> 'b) ->
-    model:(Namespace.t -> 'b model) ->
-    'a t
+    name:Namespace.t -> conv:('a -> 'b) -> (Namespace.t -> 'b model) -> 'a t
 
   val unknown_const1 : ?const:Free_variable.t -> Namespace.t -> unit model
 

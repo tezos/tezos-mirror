@@ -55,8 +55,7 @@ module Publish_slot_header : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:
-        (Model.unknown_const1 ~name ~const:(fv "publish_slot_header_const"))
+      (Model.unknown_const1 ~name ~const:(fv "publish_slot_header_const"))
 
   let models = [("publish_slot_header", model)]
 

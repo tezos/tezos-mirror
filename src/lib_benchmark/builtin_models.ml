@@ -36,4 +36,4 @@ let timer_variable = fv "Timer_latency"
 let timer_model =
   Model.make
     ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~name:(ns "timer_model") ~const:timer_variable)
+    (Model.unknown_const1 ~name:(ns "timer_model") ~const:timer_variable)

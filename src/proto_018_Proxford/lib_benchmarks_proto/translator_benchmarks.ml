@@ -589,7 +589,7 @@ module Ty_eq : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     Lwt_main.run
@@ -756,7 +756,7 @@ module Parse_type_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 end
 
 let () = Registration.register (module Parse_type_benchmark)
@@ -801,7 +801,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 end
 
 let () = Registration.register (module Unparse_type_benchmark)

@@ -94,7 +94,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~const:(fv "compare_ticket_hash"))
+      (Model.unknown_const1 ~const:(fv "compare_ticket_hash"))
 
   let create_benchmark ~rng_state _conf =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 1; max = 64} in
@@ -146,7 +146,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun () -> ())
-      ~model:(Model.unknown_const1 ~const:(fv "compare_contract"))
+      (Model.unknown_const1 ~const:(fv "compare_contract"))
 
   let create_benchmark ~rng_state _conf =
     let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
@@ -222,12 +222,11 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     | Error trace ->
         raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
-  let model ~name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~conv:(function {nodes} -> (nodes, ()))
-         ~model:Model.affine
-         ~name
+  let model =
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(function {nodes} -> (nodes, ()))
+      Model.affine
 end
 
 let () = Registration.register (module Has_tickets_type_benchmark)
@@ -288,8 +287,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     | Error trace ->
         raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
-  let model =
-    Model.make ~conv:(function {nodes} -> (nodes, ())) ~model:Model.affine
+  let model = Model.make ~conv:(function {nodes} -> (nodes, ())) Model.affine
 end
 
 let () = Registration.register (module Collect_tickets_benchmark)

@@ -70,7 +70,7 @@ module Next : Benchmark.S = struct
   let workload_to_vector len =
     Sparse_vec.String.of_list [("len", float_of_int @@ len)]
 
-  let model = Model.make ~conv:(fun x -> (x, ())) ~model:Model.logn
+  let model = Model.make ~conv:(fun x -> (x, ())) Model.logn
 
   let create_skip_list_of_len len =
     let rec go n cell =
@@ -146,12 +146,11 @@ module Hash_cell : Benchmark.S = struct
     Sparse_vec.String.of_list
       [("nb_backpointers", float_of_int nb_backpointers)]
 
-  let model ~name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~name
-         ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
-         ~model:Model.affine
+  let model =
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(fun {nb_backpointers} -> (nb_backpointers, ()))
+      Model.affine
 
   let create_benchmark ~rng_state conf =
     (* Since the model we want to infer is logarithmic in

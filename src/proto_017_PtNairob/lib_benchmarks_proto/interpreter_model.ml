@@ -87,7 +87,7 @@ let model_with_conv :
     if name = instr then make_args args args arity_init
     else trace_error instr name
   in
-  Model.make ~conv ~model
+  Model.make ~conv model
 
 let sf = Format.asprintf
 
@@ -516,10 +516,9 @@ let amplification_loop_iteration = fv "amplification_loop_iteration"
 let amplification_loop_model =
   Model.make
     ~conv:(fun iterations -> (iterations, ()))
-    ~model:
-      (Model.linear
-         ~name:(ns "amplification_loop_model")
-         ~coeff:amplification_loop_iteration)
+    (Model.linear
+       ~name:(ns "amplification_loop_model")
+       ~coeff:amplification_loop_iteration)
 
 (* The following model stitches together the per-instruction models and
    adds a term corresponding to the amplification (if needed). *)

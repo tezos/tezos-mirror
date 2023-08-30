@@ -608,12 +608,11 @@ module Ty_eq : Benchmark.S = struct
 
   let group = Benchmark.Group "size_translator_model"
 
-  let model ~name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~name
-         ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-         ~model:Model.affine
+  let model =
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
+      Model.affine
 
   let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     let open Lwt_result_syntax in
@@ -779,7 +778,7 @@ module Parse_type_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:Model.affine
+      Model.affine
 end
 
 let () = Registration.register (module Parse_type_benchmark)
@@ -822,12 +821,11 @@ module Unparse_type_benchmark : Benchmark.S = struct
     | Ok closure -> closure
     | Error errs -> global_error name errs
 
-  let model ~name =
-    Model.set_takes_saturation_reprs true
-    @@ Model.make
-         ~name
-         ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-         ~model:Model.affine
+  let model =
+    Model.make
+      ~takes_saturation_reprs:true
+      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
+      Model.affine
 end
 
 let () = Registration.register (module Unparse_type_benchmark)
