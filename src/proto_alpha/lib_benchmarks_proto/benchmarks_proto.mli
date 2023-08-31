@@ -95,7 +95,8 @@ module Registration : sig
   *)
   val register : Benchmark.t -> unit
 
-  val register_as_simple_with_num : Benchmark_base.t -> unit
+  val register_as_simple_with_num :
+    group:Benchmark.group -> Benchmark_base.t -> unit
 end
 
 module Model : sig

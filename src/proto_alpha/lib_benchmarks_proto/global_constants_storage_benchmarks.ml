@@ -303,7 +303,7 @@ module Set_add : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.add."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -352,7 +352,7 @@ module Set_elements : Benchmark.S = struct
     Benchmark.Other_purpose
       "Validate assumptions about functions using Set.elements."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -404,7 +404,7 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
       "Validate assumptions about functions using \
        Script_expr_hash.of_b58check_opt."
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "script_expr_hash"
 
   let tags = ["global_constants"]
 
@@ -466,7 +466,7 @@ struct
 
   let purpose = Benchmark.Generate_code "global_constants"
 
-  let group = Benchmark.Standalone
+  let group = Benchmark.Group "global_constants"
 
   let tags = ["global_constants"]
 
@@ -542,7 +542,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 
@@ -613,7 +613,7 @@ module Global_constants_storage_expand_models = struct
 
     let purpose = Benchmark.Generate_code "global_constants"
 
-    let group = Benchmark.Standalone
+    let group = Benchmark.Group "global_constants"
 
     let tags = ["global_constants"]
 

@@ -35,7 +35,7 @@ let fv s = Free_variable.of_namespace (ns s)
 
 (** Benchmarking {!Script_typed_ir_size.value_size}. *)
 
-let local_model_name = "ir_size_model"
+let local_model_name = "script_typed_ir_size"
 
 let strict = Script_ir_translator_config.make ~legacy:false ()
 

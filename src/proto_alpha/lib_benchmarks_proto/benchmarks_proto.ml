@@ -98,7 +98,7 @@ module Registration = struct
     end in
     Registration.register_simple_with_num (module B)
 
-  let register_as_simple_with_num (module B : Benchmark_base.S) =
+  let register_as_simple_with_num ~group (module B : Benchmark_base.S) =
     let modules =
       List.map
         (fun (model_name, model) : (module Benchmark_base.Simple_with_num) ->
@@ -107,7 +107,7 @@ module Registration = struct
 
             let name = Namespace.cons name model_name
 
-            let group = Benchmark_base.Group model_name
+            let group = group
 
             let model = model
           end))

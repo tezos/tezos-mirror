@@ -293,7 +293,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
 
   let purpose = Benchmark.Generate_code "sc_rollup"
 
-  let group = Benchmarks_proto.Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let tags = ["sc_rollup"]
 
@@ -507,7 +507,7 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
 
   let purpose = Benchmark.Generate_code "sc_rollup"
 
-  let group = Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let tags = ["sc_rollup"]
 
@@ -649,7 +649,7 @@ module Sc_rollup_install_boot_sector_benchmark = struct
 
   let name = ns "Sc_rollup_install_boot_sector_benchmark"
 
-  let group = Benchmarks_proto.Benchmark.Standalone
+  let group = Benchmarks_proto.Benchmark.Group "sc_rollup"
 
   let info = "Estimating the cost of installing a boot sector."
 
