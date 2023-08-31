@@ -7,6 +7,9 @@
 - Fallback mechanism if stage zero fails. (!9732)
 - Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
 - Support EIP-2930 transaction serialization format. (!9555)
+- The kernel can no longer be administrated by a L2 dictator key, instead by a
+  L1 smart contract. It will consider upgrades messages coming from a specific
+  address defined in its storage. (!9927)
 
 ### EVM Node
 
