@@ -113,7 +113,7 @@ fn store_read_empty_safe<Host: Runtime>(
     }
 }
 
-fn store_read_slice<Host: Runtime, T: Path>(
+pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &mut Host,
     path: &T,
     buffer: &mut [u8],
