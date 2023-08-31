@@ -16,6 +16,7 @@
 - Fees are now paid by the sender. (!9480)
 - Unused gas is refunded after succesful transactions. (!9915)
 - Impose a maximum gas limit per transaction based on the tick model. (!10094)
+- Transaction logs and bloom filter are returned in a transaction receipt. (!10019)
 
 ### EVM Node
 

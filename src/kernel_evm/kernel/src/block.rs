@@ -188,7 +188,6 @@ mod tests {
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
-    use crate::indexable_storage::internal_for_tests::{get_value, length};
     use crate::retrieve_chain_id;
     use crate::storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
@@ -669,11 +668,11 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let indexed_accounts = length(&host, &accounts_index).unwrap();
+        let indexed_accounts = accounts_index.length(&host).unwrap();
 
         produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
 
-        let indexed_accounts_after_produce = length(&host, &accounts_index).unwrap();
+        let indexed_accounts_after_produce = accounts_index.length(&host).unwrap();
 
         // The sender and receiver have never been indexed yet, and are indexed
         // whether the transaction succeeds or not.
@@ -704,7 +703,7 @@ mod tests {
 
         produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
 
-        let indexed_accounts = length(&host, &accounts_index).unwrap();
+        let indexed_accounts = accounts_index.length(&host).unwrap();
 
         let next_queue = Queue {
             proposals: vec![blueprint(transactions)],
@@ -714,8 +713,7 @@ mod tests {
         produce(&mut host, next_queue, DUMMY_CHAIN_ID)
             .expect("The block production failed.");
 
-        let indexed_accounts_after_second_produce =
-            length(&host, &accounts_index).unwrap();
+        let indexed_accounts_after_second_produce = accounts_index.length(&host).unwrap();
 
         // The sender and receiver have never been indexed yet
         assert_eq!(
@@ -744,9 +742,9 @@ mod tests {
             kernel_upgrade: None,
         };
 
-        let number_of_blocks_indexed = length(&host, &blocks_index).unwrap();
+        let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let number_of_transactions_indexed =
-            length(&host, &transaction_hashes_index).unwrap();
+            transaction_hashes_index.length(&host).unwrap();
 
         let sender = H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -758,9 +756,9 @@ mod tests {
         );
         produce(&mut host, queue, DUMMY_CHAIN_ID).expect("The block production failed.");
 
-        let new_number_of_blocks_indexed = length(&host, &blocks_index).unwrap();
+        let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let new_number_of_transactions_indexed =
-            length(&host, &transaction_hashes_index).unwrap();
+            transaction_hashes_index.length(&host).unwrap();
 
         let current_block_hash = storage::read_current_block(&mut host)
             .unwrap()
@@ -776,15 +774,15 @@ mod tests {
 
         assert_eq!(
             Ok(current_block_hash),
-            get_value(&host, &blocks_index, new_number_of_blocks_indexed - 1)
+            blocks_index.get_value(&host, new_number_of_blocks_indexed - 1)
         );
 
         let last_indexed_transaction =
-            length(&host, &transaction_hashes_index).unwrap() - 1;
+            transaction_hashes_index.length(&host).unwrap() - 1;
 
         assert_eq!(
             Ok(tx_hash.to_vec()),
-            get_value(&host, &transaction_hashes_index, last_indexed_transaction)
+            transaction_hashes_index.get_value(&host, last_indexed_transaction)
         );
     }
 

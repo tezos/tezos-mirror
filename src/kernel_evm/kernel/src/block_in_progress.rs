@@ -21,6 +21,7 @@ use tezos_ethereum::transaction::{
     TransactionObject, TransactionReceipt, TransactionStatus, TransactionType,
     TRANSACTION_HASH_SIZE,
 };
+use tezos_ethereum::Bloom;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -298,6 +299,8 @@ impl BlockInProgress {
                 effective_gas_price,
                 gas_used: U256::from(outcome.gas_used),
                 contract_address: outcome.new_address,
+                logs_bloom: TransactionReceipt::logs_to_bloom(&outcome.logs),
+                logs: outcome.logs,
                 type_: TransactionType::Legacy,
                 status: if outcome.is_success {
                     TransactionStatus::Success
@@ -316,6 +319,8 @@ impl BlockInProgress {
                 effective_gas_price,
                 gas_used: U256::zero(),
                 contract_address: None,
+                logs: vec![],
+                logs_bloom: Bloom::default(),
                 type_: TransactionType::Legacy,
                 status: TransactionStatus::Failure,
             },
