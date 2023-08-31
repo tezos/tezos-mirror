@@ -135,6 +135,13 @@ let octez_endpoint state endpoint =
       Client.Node (Agent_state.find (Octez_node_k node) state)
   | Remote {endpoint} -> Foreign_endpoint (parse_endpoint endpoint)
 
+let dal_foreign_endpoint state endpoint =
+  match endpoint with
+  | Uri.Owned {name = node} ->
+      Dal_node.as_foreign_rpc_endpoint
+        (Agent_state.find (Dal_node_k node) state)
+  | Remote {endpoint} -> parse_endpoint endpoint
+
 let dac_rpc_info state mode endpoint =
   match endpoint with
   | Uri.Owned {name = node} ->
@@ -153,18 +160,21 @@ let dac_endpoint state mode endpoint =
       let foreign = parse_endpoint endpoint in
       Foreign_endpoint foreign
 
+let resolve_octez_rpc_global_uri ~self ~resolver =
+  Uri.agent_uri_of_global_uri ~self ~services:(resolver Octez_node Rpc)
+
+let resolve_dac_rpc_global_uri ~self ~resolver =
+  Uri.agent_uri_of_global_uri ~self ~services:(resolver Dac_node Rpc)
+
+let resolve_dal_rpc_global_uri ~self ~resolver =
+  Uri.agent_uri_of_global_uri ~self ~services:(resolver Dal_node Rpc)
+
 type start_octez_node_r = {
   name : string;
   rpc_port : int;
   metrics_port : int;
   net_port : int;
 }
-
-let resolve_octez_rpc_global_uri ~self ~resolver =
-  Uri.agent_uri_of_global_uri ~self ~services:(resolver Octez_node Rpc)
-
-let resolve_dac_rpc_global_uri ~self ~resolver =
-  Uri.agent_uri_of_global_uri ~self ~services:(resolver Dac_node Rpc)
 
 (* We use strings instead of numbers to allow pattern substitution. *)
 type dal_cryptobox_parameters = {
@@ -2460,19 +2470,9 @@ type start_dal_node_r = {
   net_port : int;
 }
 
-let resolve_dal_rpc_global_uri ~self ~resolver =
-  Uri.agent_uri_of_global_uri ~self ~services:(resolver Dal_node Rpc)
-
 type dal_attestor_profile = Tezos_crypto.Signature.Public_key_hash.t
 
 type dal_producer_profile = int
-
-let dal_foreign_endpoint state endpoint =
-  match endpoint with
-  | Uri.Owned {name = node} ->
-      Dal_node.as_foreign_rpc_endpoint
-        (Agent_state.find (Dal_node_k node) state)
-  | Remote {endpoint} -> parse_endpoint endpoint
 
 type 'uri start_dal_node = {
   name : string option;
