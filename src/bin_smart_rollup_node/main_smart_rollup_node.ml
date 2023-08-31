@@ -42,7 +42,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart rollup node."
-    (args16
+    (args17
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -56,6 +56,7 @@ let config_init_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
+       index_buffer_size_arg
        index_buffer_size_arg
        log_kernel_debug_arg
        boot_sector_file_arg)
@@ -78,6 +79,7 @@ let config_init_command =
            injector_attempts,
            injection_ttl,
            index_buffer_size,
+           irmin_cache_size,
            log_kernel_debug,
            boot_sector_file )
          mode
@@ -102,6 +104,7 @@ let config_init_command =
           ~boot_sector_file
           ~sc_rollup_node_operators
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
       in
       let* () = Configuration.save ~force ~data_dir config in
@@ -119,7 +122,7 @@ let legacy_run_command =
   command
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
-    (args18
+    (args19
        data_dir_arg
        mode_arg
        sc_rollup_address_arg
@@ -134,6 +137,7 @@ let legacy_run_command =
        injector_retention_period_arg
        injector_attempts_arg
        injection_ttl_arg
+       index_buffer_size_arg
        index_buffer_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg
@@ -154,6 +158,7 @@ let legacy_run_command =
            injector_attempts,
            injection_ttl,
            index_buffer_size,
+           irmin_cache_size,
            log_kernel_debug,
            log_kernel_debug_file,
            boot_sector_file )
@@ -177,6 +182,7 @@ let legacy_run_command =
           ~boot_sector_file
           ~sc_rollup_node_operators:[]
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
       in
       Rollup_node_daemon.run
@@ -196,7 +202,7 @@ let run_command =
     ~desc:
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
-    (args16
+    (args17
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -210,6 +216,7 @@ let run_command =
        injector_attempts_arg
        injection_ttl_arg
        index_buffer_size_arg
+       irmin_cache_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg
        boot_sector_file_arg)
@@ -230,6 +237,7 @@ let run_command =
            injector_attempts,
            injection_ttl,
            index_buffer_size,
+           irmin_cache_size,
            log_kernel_debug,
            log_kernel_debug_file,
            boot_sector_file )
@@ -255,6 +263,7 @@ let run_command =
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
           ~boot_sector_file
       in

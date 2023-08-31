@@ -221,7 +221,7 @@ val check_mode : t -> t tzresult
 val refutation_player_buffer_levels : int
 
 (* To limit the number of entries stored in the Irmin's LRU cache, it can adjust
-   the `lru_size` configuration. By default, it's set to 10_000 entries. Increasing
+   the `lru_size` configuration. By default, it's set to 100_000 entries. Increasing
    this value will consume more memory. Copy from irmin-pack/config.ml *)
 val default_irmin_cache_size : int
 
