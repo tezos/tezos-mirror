@@ -2425,6 +2425,7 @@ type 'uri start_octez_baker = {
       (** A path to the --data-dir of the Layer 1 node. Only set if the node_uri
           is "Remote".  Otherwise, this path is already provided by the
           [node_uri]. *)
+  dal_node_uri : 'uri option;  (** An URI to a DAL node. *)
   delegates : string list;
       (** A list of delegates handled by this baker agent. The baker will handle
           all the delegates in the wallet found in [base_dir] if no
@@ -2460,16 +2461,45 @@ module Start_octez_baker = struct
   let encoding uri_encoding =
     let open Data_encoding in
     conv
-      (fun {name; protocol; base_dir; node_uri; node_data_dir; delegates} ->
-        (name, protocol, base_dir, node_uri, node_data_dir, delegates))
-      (fun (name, protocol, base_dir, node_uri, node_data_dir, delegates) ->
-        {name; protocol; base_dir; node_uri; node_data_dir; delegates})
-      (obj6
+      (fun {
+             name;
+             protocol;
+             base_dir;
+             node_uri;
+             node_data_dir;
+             dal_node_uri;
+             delegates;
+           } ->
+        ( name,
+          protocol,
+          base_dir,
+          node_uri,
+          node_data_dir,
+          dal_node_uri,
+          delegates ))
+      (fun ( name,
+             protocol,
+             base_dir,
+             node_uri,
+             node_data_dir,
+             dal_node_uri,
+             delegates ) ->
+        {
+          name;
+          protocol;
+          base_dir;
+          node_uri;
+          node_data_dir;
+          dal_node_uri;
+          delegates;
+        })
+      (obj7
          (opt "name" string)
          (dft "protocol" Protocol.encoding Protocol.Alpha)
          (req "base_dir" uri_encoding)
          (req "node_uri" uri_encoding)
          (opt "node_data_dir" uri_encoding)
+         (opt "dal_node_uri" uri_encoding)
          (dft "delegates" (list string) []))
 
   let r_encoding =
@@ -2479,7 +2509,15 @@ module Start_octez_baker = struct
   let tvalue_of_r ({name} : r) = Tobj [("name", Tstr name)]
 
   let expand ~self ~run
-      {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+      {
+        name;
+        protocol;
+        base_dir;
+        node_uri;
+        node_data_dir;
+        dal_node_uri;
+        delegates;
+      } =
     let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
     {
       name = Option.map run name;
@@ -2487,11 +2525,20 @@ module Start_octez_baker = struct
       base_dir = uri_run base_dir;
       node_uri = uri_run node_uri;
       node_data_dir = Option.map uri_run node_data_dir;
+      dal_node_uri = Option.map uri_run dal_node_uri;
       delegates = List.map run delegates;
     }
 
   let resolve ~self resolver
-      {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+      {
+        name;
+        protocol;
+        base_dir;
+        node_uri;
+        node_data_dir;
+        dal_node_uri;
+        delegates;
+      } =
     let file_agent_uri = Remote_procedure.file_agent_uri in
     {
       name;
@@ -2499,10 +2546,21 @@ module Start_octez_baker = struct
       base_dir = file_agent_uri ~self ~resolver base_dir;
       node_data_dir = Option.map (file_agent_uri ~self ~resolver) node_data_dir;
       node_uri = resolve_octez_rpc_global_uri ~self ~resolver node_uri;
+      dal_node_uri =
+        Option.map (resolve_dal_rpc_global_uri ~self ~resolver) dal_node_uri;
       delegates;
     }
 
-  let run state {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+  let run state
+      {
+        name;
+        protocol;
+        base_dir;
+        node_uri;
+        node_data_dir;
+        delegates;
+        dal_node_uri;
+      } =
     let client = Agent_state.http_client state in
     (* Get the L1 node's data-dir and RPC endpoint. *)
     let* node_data_dir, node_rpc_endpoint =
@@ -2526,6 +2584,10 @@ module Start_octez_baker = struct
     in
     (* Get the wallet's base-dir. *)
     let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
+    (* Get the DAL node's RPC endpoint. *)
+    let dal_node_rpc_endpoint =
+      Option.map (dal_foreign_endpoint state) dal_node_uri
+    in
     (* Create a baker state. *)
     let octez_baker =
       Baker.create_from_uris
@@ -2534,6 +2596,7 @@ module Start_octez_baker = struct
         ~base_dir
         ~node_data_dir
         ~node_rpc_endpoint
+        ?dal_node_rpc_endpoint
         ~delegates
         ()
     in
