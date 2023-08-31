@@ -1,6 +1,6 @@
 # Changelog
 
-## Version next
+## Version dev
 
 ### EVM Kernel
 
@@ -12,6 +12,8 @@
 
 - Switch to `ExternalMessageFrame` protocol for external messages. (!9687)
 - Add arguments to enable CORS headers. (!9753)
+- Add an optional `mode` argument to switch from the proxy on production
+  to the one on development. (!9940)
 
 ### Bug fixes
 
