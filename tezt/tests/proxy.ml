@@ -525,9 +525,8 @@ module Location = struct
           (add_rpc_path_prefix ["helpers"; "current_level"], []);
           (add_rpc_path_prefix ["helpers"; "attestation_rights"], []);
           (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
-          (* The 2 following RPCs only exist on Alpha *)
-          (* (add_rpc_path_prefix ["helpers"; "validators"], []); *)
-          (* (add_rpc_path_prefix ["helpers"; "round"], []); *)
+          (add_rpc_path_prefix ["helpers"; "validators"], []);
+          (add_rpc_path_prefix ["helpers"; "round"], []);
           (add_rpc_path_prefix ["votes"; "current_period"], []);
           (add_rpc_path_prefix ["votes"; "successor_period"], []);
           (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
