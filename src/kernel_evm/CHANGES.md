@@ -26,6 +26,7 @@
 - The kernel reboots before reaching maximum number of ticks (!9369)
 - One gasometer per transaction-level (AKA sub-context). (!9492)
 - Refactor `EthereumTransactionCommon` and transactions' signatures modules. (!9590)
+- Add data type fore representing withdrawals as they'll be produced through transactions. (!9902)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
