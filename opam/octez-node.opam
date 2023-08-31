@@ -13,7 +13,6 @@ depends: [
   "octez-libs"
   "tezos-version"
   "octez-node-config"
-  "octez-rpc-process"
   "tezos-shell"
   "tezos-store"
   "tezos-validation"
