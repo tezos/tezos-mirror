@@ -41,8 +41,8 @@ let destination = Files.(working_dir // codegen_results_dir)
 let main () =
   Log.info "Entering Perform_codegen.main" ;
   let snoop = Snoop.create () in
+  let* () = Files.cleanup destination in
   let inference_root = Files.(working_dir // inference_results_dir) in
-  let* () = Files.(cleanup codegen_results_dir) in
   let fp_json_fn = prepare_fp_json inference_root in
   let open Lwt.Syntax in
   let solution_fn = inference_root in
