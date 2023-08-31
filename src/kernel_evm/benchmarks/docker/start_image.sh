@@ -12,4 +12,5 @@ if [ "$(docker ps -a -q -f name='^evm-benchmark$' | wc -c)" -ne 0 ]; then
 fi
 
 echo "Launching new container:"
-docker run --name evm-benchmark -d --mount type=bind,src="$(pwd)/output",target=/home/tezos/output evm-benchmark
+# TODO: fix log-driver issue on benchmark server
+docker run --log-driver none --name evm-benchmark -d --mount type=bind,src="$(pwd)/output",target=/home/tezos/output evm-benchmark
