@@ -42,6 +42,7 @@ type sc_rollup_constants = {
   challenge_window_in_blocks : int;
   commitment_period_in_blocks : int;
   reveal_activation_level : reveal_activation_level option;
+  max_number_of_stored_cemented_commitments : int;
 }
 
 type protocol_constants = {
