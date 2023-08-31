@@ -131,6 +131,36 @@ let division_cost name =
   end in
   (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
+let ediv_nat_alloc name =
+  let const = fv (sf "%s_const" name) in
+  let coeff1 = fv (sf "%s_coeff1" name) in
+  let coeff2 = fv (sf "%s_coeff2" name) in
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    let name = ns name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = Model.arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        if_
+          (lt size2 size1)
+          ((free ~name:coeff1 * size1) + (free ~name:coeff2 * size2))
+          (int 0)
+        + free ~name:const
+    end
+  end in
+  (module M : Model.Model_impl with type arg_type = int * (int * unit))
+
 let addlogadd name =
   let const = fv (sf "%s_const" name) in
   let coeff = fv (sf "%s_coeff" name) in
@@ -164,6 +194,10 @@ module Models = struct
   let const1_model name =
     (* For constant-time instructions *)
     Model.unknown_const1 ~name:(ns name) ~const:(fv (sf "%s_const" name))
+
+  let const1_skip2_model name =
+    (* For constant-time instructions *)
+    Model.unknown_const1_skip2 ~name:(ns name) ~const:(fv (sf "%s_const" name))
 
   let affine_model name =
     (* For instructions with cost function
@@ -234,7 +268,14 @@ module Models = struct
       ~coeff1:(fv (sf "%s_total_bytes" name))
       ~coeff2:(fv (sf "%s_list_length" name))
 
-  let concat_pair_model name =
+  let bilinear_affine_model name =
+    Model.bilinear_affine
+      ~name:(ns name)
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff1:(fv (sf "%s_coeff1" name))
+      ~coeff2:(fv (sf "%s_coeff2" name))
+
+  let linear_sum_model name =
     Model.linear_sum
       ~name:(ns name)
       ~intercept:(fv (sf "%s_const" name))
@@ -526,11 +567,11 @@ let ir_model instr_or_cont =
       | N_IMap_get_and_update | N_IBig_map_get_and_update ->
           nlogm_model name |> m
       | N_IConcat_string -> concat_model name |> m
-      | N_IConcat_string_pair -> concat_pair_model name |> m
+      | N_IConcat_string_pair -> linear_sum_model name |> m
       | N_ISlice_string -> affine_model name |> m
       | N_IString_size -> (const1_model, const1_model) |> m2 name
       | N_IConcat_bytes -> concat_model name |> m
-      | N_IConcat_bytes_pair -> concat_pair_model name |> m
+      | N_IConcat_bytes_pair -> linear_sum_model name |> m
       | N_ISlice_bytes -> affine_model name |> m
       | N_IBytes_size -> (const1_model, const1_model) |> m2 name
       | N_IOr_bytes -> linear_max_model name |> m
@@ -545,29 +586,32 @@ let ir_model instr_or_cont =
       | N_IInt_bytes -> affine_model name |> m
       | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
       | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
-          linear_max_model name |> m
+          (linear_max_model, linear_max_model) |> m2 name
       | N_IAdd_tez | N_ISub_tez | N_ISub_tez_legacy | N_IEdiv_tez
       | N_IMul_teznat | N_IMul_nattez | N_IEdiv_teznat ->
           (const1_model, const1_model) |> m2 name
       | N_IIs_nat -> (const1_model, const1_model) |> m2 name
-      | N_INeg -> affine_model name |> m
+      | N_INeg -> (affine_model, affine_model) |> m2 name
       | N_IAbs_int -> (affine_model, affine_model) |> m2 name
       | N_IInt_nat -> (const1_model, const1_model) |> m2 name
-      | N_IAdd_int -> linear_max_model name |> m
-      | N_IAdd_nat -> linear_max_model name |> m
-      | N_ISub_int -> linear_max_model name |> m
-      | N_IMul_int -> addlogadd name |> m
-      | N_IMul_nat -> addlogadd name |> m
-      | N_IEdiv_int -> division_cost name |> m
-      | N_IEdiv_nat -> division_cost name |> m
-      | N_ILsl_nat -> affine_model name |> m
-      | N_ILsr_nat -> affine_model name |> m
-      | N_IOr_nat -> linear_max_model name |> m
-      | N_IAnd_nat -> linear_min_model name |> m
-      | N_IAnd_int_nat -> linear_min_model name |> m
-      | N_IXor_nat -> linear_max_model name |> m
-      | N_INot_int -> affine_model name |> m
-      | N_ICompare -> linear_min_offset_model name ~offset:1 |> m
+      | N_IAdd_int -> (linear_max_model, linear_max_model) |> m2 name
+      | N_IAdd_nat -> (linear_max_model, linear_max_model) |> m2 name
+      | N_ISub_int -> (linear_max_model, linear_max_model) |> m2 name
+      | N_IMul_int -> (addlogadd, linear_sum_model) |> m2 name
+      | N_IMul_nat -> (addlogadd, linear_sum_model) |> m2 name
+      | N_IEdiv_int -> (division_cost, linear_max_model) |> m2 name
+      | N_IEdiv_nat -> (division_cost, ediv_nat_alloc) |> m2 name
+      | N_ILsl_nat ->
+          (* The interpreter limits the amount of shfit to 256 *)
+          (affine_model, affine_model) |> m2 name
+      | N_ILsr_nat -> (affine_model, affine_model) |> m2 name
+      | N_IOr_nat -> (linear_max_model, linear_max_model) |> m2 name
+      | N_IAnd_nat -> (linear_min_model, linear_min_model) |> m2 name
+      | N_IAnd_int_nat -> (linear_min_model, bilinear_affine_model) |> m2 name
+      | N_IXor_nat -> (linear_max_model, linear_max_model) |> m2 name
+      | N_INot_int -> (affine_model, affine_model) |> m2 name
+      | N_ICompare ->
+          (linear_min_offset_model ~offset:1, const1_skip2_model) |> m2 name
       | N_IEq | N_INeq | N_ILt | N_IGt | N_ILe | N_IGe ->
           (const1_model, const1_model) |> m2 name
       | N_IPack -> (pack_model, pack_model) |> m2 name

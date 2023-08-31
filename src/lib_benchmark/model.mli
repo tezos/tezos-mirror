@@ -163,6 +163,12 @@ val zero : unit model
 *)
 val unknown_const1 : name:Namespace.t -> const:Free_variable.t -> unit model
 
+(** Model ignores the arguments.
+    [fun n m -> const]
+*)
+val unknown_const1_skip2 :
+  name:Namespace.t -> const:Free_variable.t -> (int * (int * unit)) model
+
 (** [fun n -> coeff × n] *)
 val linear : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
 
@@ -203,6 +209,13 @@ val logn : name:Namespace.t -> coeff:Free_variable.t -> (int * unit) model
 
 (** [fun a b -> intercept + coeff × (a+b)] *)
 val linear_sum :
+  name:Namespace.t ->
+  intercept:Free_variable.t ->
+  coeff:Free_variable.t ->
+  (int * (int * unit)) model
+
+(** [fun a b -> intercept + coeff × (a-b)] *)
+val linear_sat_sub :
   name:Namespace.t ->
   intercept:Free_variable.t ->
   coeff:Free_variable.t ->

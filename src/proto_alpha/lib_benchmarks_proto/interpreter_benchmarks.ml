@@ -2212,7 +2212,7 @@ module Registration_section = struct
     let zero_int = Script_int.zero
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAdd_seconds_to_timestamp
         ~intercept_stack:(zero_int, (zero_timestamp, eos))
         ~stack_type:(int @$ timestamp @$ bot)
@@ -2220,7 +2220,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAdd_timestamp_to_seconds
         ~intercept_stack:(zero_timestamp, (zero_int, eos))
         ~stack_type:(timestamp @$ int @$ bot)
@@ -2228,7 +2228,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ISub_timestamp_seconds
         ~intercept_stack:(zero_timestamp, (zero_int, eos))
         ~stack_type:(timestamp @$ int @$ bot)
@@ -2236,7 +2236,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IDiff_timestamps
         ~intercept_stack:(zero_timestamp, (zero_timestamp, eos))
         ~stack_type:(timestamp @$ timestamp @$ bot)
@@ -2388,7 +2388,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_INeg
         ~intercept_stack:(zero, eos)
         ~stack_type:(int @$ bot)
@@ -2417,7 +2417,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAdd_int
         ~intercept_stack:(zero, (zero, eos))
         ~stack_type:(int @$ int @$ bot)
@@ -2425,7 +2425,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAdd_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2433,7 +2433,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ISub_int
         ~intercept_stack:(zero, (zero, eos))
         ~stack_type:(int @$ int @$ bot)
@@ -2441,7 +2441,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IMul_int
         ~intercept_stack:(zero, (zero, eos))
         ~stack_type:(int @$ int @$ bot)
@@ -2449,7 +2449,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IMul_nat
         ~intercept_stack:(zero_n, (zero, eos))
         ~stack_type:(nat @$ int @$ bot)
@@ -2457,7 +2457,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IEdiv_int
         ~intercept_stack:(zero, (zero, eos))
         ~stack_type:(int @$ int @$ bot)
@@ -2465,7 +2465,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IEdiv_nat
         ~intercept_stack:(zero_n, (zero, eos))
         ~stack_type:(nat @$ int @$ bot)
@@ -2473,7 +2473,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsl_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2490,7 +2490,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsr_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2507,7 +2507,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IOr_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2515,7 +2515,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAnd_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2523,7 +2523,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAnd_int_nat
         ~intercept_stack:(zero, (zero_n, eos))
         ~stack_type:(int @$ nat @$ bot)
@@ -2531,7 +2531,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IXor_nat
         ~intercept_stack:(zero_n, (zero_n, eos))
         ~stack_type:(nat @$ nat @$ bot)
@@ -2539,7 +2539,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_INot_int
         ~intercept_stack:(zero, eos)
         ~stack_type:(int @$ bot)
@@ -2836,6 +2836,20 @@ module Registration_section = struct
                 kinstr;
               })
         ()
+
+    let () =
+      simple_benchmark
+        ~benchmark_type:Alloc
+        ~name:Interpreter_workload.N_ICompare
+        ~stack_type:(string @$ string @$ bot)
+        ~kinstr:(ICompare (dummy_loc, String_t, halt))
+        ()
+
+    let () =
+      let (Model.Model codegen_model) =
+        Interpreter_model.make_time_alloc_codegen_model (Instr_name N_ICompare)
+      in
+      register_model_for_code_generation codegen_model
   end
 
   module Comparators = struct
