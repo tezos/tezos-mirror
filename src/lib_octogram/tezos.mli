@@ -30,6 +30,13 @@ type start_octez_node_r = {
   net_port : int;
 }
 
+type dal_cryptobox_parameters = {
+  number_of_shards : string;
+  page_size : string;
+  slot_size : string;
+  redundancy_factor : string;
+}
+
 type 'uri start_octez_node = {
   name : string option;
   path_node : 'uri;
@@ -40,6 +47,7 @@ type 'uri start_octez_node = {
   net_port : string option;
   metrics_port : string option;
   rpc_port : string option;
+  dal_cryptobox_parameters : dal_cryptobox_parameters option;
 }
 
 (** This job bakes the activation block. *)
