@@ -47,6 +47,8 @@ let chain_id () = return (qty_f (Z.of_int 1337))
 
 let kernel_version () = return "MOCKUP_KERNEL_VERSION"
 
+let upgrade_nonce () = return Int.one
+
 let net_version = chain_id
 
 let block_height_counter = ref 0
