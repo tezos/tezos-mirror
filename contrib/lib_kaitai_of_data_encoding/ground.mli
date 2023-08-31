@@ -24,42 +24,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This test suite is meant to test translation of ground encodings
-   to [Kaitai.Types.ClassSpec.t] *)
+(** [default_doc_spec] is without summary and references.  *)
+val default_doc_spec : Kaitai.Types.DocSpec.t
 
-let%expect_test "test uint8 translation" =
-  let s =
-    Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_uint8"
-      Data_encoding.uint8
-  in
-  print_endline (Kaitai.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: ground_uint8
-    seq:
-    - id: uint8
-      type: u1
-  |}]
+(** [Enum] module defines enum definitions needed for describing data-encoding
+    ground types. *)
+module Enum : sig
+  (** [map] describes mapping of enum id (string) with the corresponding
+      [EnumSpec.t]. *)
+  type map = (string * Kaitai.Types.EnumSpec.t) list
 
-let%expect_test "test bool translation" =
-  let s =
-    Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_bool"
-      Data_encoding.bool
-  in
-  print_endline (Kaitai.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: ground_bool
-    enums:
-      bool:
-        0: false
-        255: true
-    seq:
-    - id: bool
-      type: u1
-      enum: bool
-  |}]
+  (** [bool] is a mapping for boolean type. *)
+  val bool : string * Kaitai.Types.EnumSpec.t
+
+  (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
+      [enum], then new list with it is returned, otherwise existing [enums] list
+      is returned. *)
+  val add : map -> string * Kaitai.Types.EnumSpec.t -> map
+end
+
+(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
+module Attr : sig
+  (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
+  val bool : Kaitai.Types.AttrSpec.t
+
+  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
+  val u1 : Kaitai.Types.AttrSpec.t
+end

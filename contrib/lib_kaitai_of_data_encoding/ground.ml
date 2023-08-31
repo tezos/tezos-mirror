@@ -24,42 +24,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This test suite is meant to test translation of ground encodings
-   to [Kaitai.Types.ClassSpec.t] *)
+open Kaitai.Types
 
-let%expect_test "test uint8 translation" =
-  let s =
-    Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_uint8"
-      Data_encoding.uint8
-  in
-  print_endline (Kaitai.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: ground_uint8
-    seq:
-    - id: uint8
-      type: u1
-  |}]
+let default_doc_spec = DocSpec.{summary = None; refs = []}
 
-let%expect_test "test bool translation" =
-  let s =
-    Kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_bool"
-      Data_encoding.bool
-  in
-  print_endline (Kaitai.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: ground_bool
-    enums:
-      bool:
-        0: false
-        255: true
-    seq:
-    - id: bool
-      type: u1
-      enum: bool
-  |}]
+let cond_no_cond =
+  AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
+
+module Enum = struct
+  type map = (string * Kaitai.Types.EnumSpec.t) list
+
+  let add enums ((k, e) as enum) =
+    let rec add = function
+      | [] -> enum :: enums
+      | ee :: _ when enum = ee ->
+          (* [enum] is already present in [enums] *)
+          enums
+      | (kk, ee) :: _ when String.equal kk k && not (ee = e) ->
+          (* [enum] key is already present in [enums], but for a different
+             [enum]. *)
+          raise (Invalid_argument "Enum.add: duplicate keys")
+      | _ :: enums -> add enums
+    in
+    add enums
+
+  let bool =
+    ( "bool",
+      EnumSpec.
+        {
+          path = [];
+          map =
+            [
+              (0, EnumValueSpec.{name = "false"; doc = default_doc_spec});
+              (255, EnumValueSpec.{name = "true"; doc = default_doc_spec});
+            ];
+        } )
+end
+
+module Attr = struct
+  let bool =
+    AttrSpec.
+      {
+        path = [];
+        id = "bool";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
+        doc = default_doc_spec;
+        enum = Some (fst Enum.bool);
+      }
+
+  let u1 =
+    AttrSpec.
+      {
+        path = [];
+        id = "uint8";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = None;
+        doc = default_doc_spec;
+        enum = None;
+      }
+end

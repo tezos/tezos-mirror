@@ -144,8 +144,13 @@ let parse ?file ?(path = []) s =
                    | Some e ->
                        Some (ValidationSpec.ValidationExpr (expression e))
                  in
+                 let enum =
+                   match find_key_opt m "enum" with
+                   | None -> None
+                   | Some e -> Some (scalar e)
+                 in
                  AttrSpec.
-                   {path = []; id; dataType; cond; valid; doc = empty_doc})
+                   {path = []; id; dataType; cond; valid; doc = empty_doc; enum})
     in
 
     let doc = empty_doc in
