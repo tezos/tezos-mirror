@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Evm_proxy_lib
+type mode = Prod | Dev
 
 type rollup_node_endpoint = Mockup | Endpoint of Uri.t
 
@@ -34,6 +34,7 @@ type config = {
   rpc_port : int;
   debug : bool;
   rollup_node_endpoint : rollup_node_endpoint;
+  mode : mode;
   cors_origins : string list;
   cors_headers : string list;
 }
@@ -44,19 +45,23 @@ let default_config =
     rpc_port = 8545;
     debug = true;
     rollup_node_endpoint = Mockup;
+    mode = Prod;
     cors_origins = [];
     cors_headers = [];
   }
 
-let make_config ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
+let make_config ?mode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
     ~rollup_node_endpoint () =
   {
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
     debug = Option.value ~default:default_config.debug debug;
     rollup_node_endpoint;
-    cors_origins = Option.value ~default:[] cors_origins;
-    cors_headers = Option.value ~default:[] cors_headers;
+    mode = Option.value ~default:default_config.mode mode;
+    cors_origins =
+      Option.value ~default:default_config.cors_origins cors_origins;
+    cors_headers =
+      Option.value ~default:default_config.cors_headers cors_headers;
   }
 
 let install_finalizer server =
@@ -99,55 +104,48 @@ module Event = struct
       ("port", Data_encoding.uint16)
 end
 
-let start
-    {
-      rpc_addr;
-      rpc_port;
-      debug;
-      rollup_node_endpoint;
-      cors_origins;
-      cors_headers;
-    } =
+let prod_directory ~rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_prod in
+  let* rollup_node_config =
+    match rollup_node_endpoint with
+    | Endpoint endpoint ->
+        let module Rollup_node_rpc = Rollup_node.Make (struct
+          let base = endpoint
+        end) in
+        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+    | Mockup ->
+        let* smart_rollup_address = Mockup.smart_rollup_address in
+        return ((module Mockup : Rollup_node.S), smart_rollup_address)
+  in
+  return @@ Services.directory rollup_node_config
+
+let dev_directory ~rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_dev in
+  let* rollup_node_config =
+    match rollup_node_endpoint with
+    | Endpoint endpoint ->
+        let module Rollup_node_rpc = Rollup_node.Make (struct
+          let base = endpoint
+        end) in
+        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+    | Mockup ->
+        let* smart_rollup_address = Mockup.smart_rollup_address in
+        return ((module Mockup : Rollup_node.S), smart_rollup_address)
+  in
+  return @@ Services.directory rollup_node_config
+
+let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
+    =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string p2p_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
-  let* rollup_node_config =
-    match rollup_node_endpoint with
-    | Endpoint endpoint ->
-        let module Current_rollup_node_rpc = Current_rollup_node.Make (struct
-          let base = endpoint
-        end) in
-        let module Next_rollup_node_rpc = Next_rollup_node.Make (struct
-          let base = endpoint
-        end) in
-        let* smart_rollup_address =
-          Current_rollup_node_rpc.smart_rollup_address
-        in
-        return
-          Services.
-            {
-              current_rpc =
-                (module Current_rollup_node_rpc : Current_rollup_node.S);
-              next_rpc = (module Next_rollup_node_rpc : Next_rollup_node.S);
-              smart_rollup_address;
-              kernel_version = None;
-            }
-    | Mockup ->
-        let* smart_rollup_address = Mockup.smart_rollup_address in
-        let* kernel_version = Mockup.kernel_version () in
-        return
-          Services.
-            {
-              current_rpc = (module Mockup : Current_rollup_node.S);
-              next_rpc = (module Mockup : Next_rollup_node.S);
-              smart_rollup_address;
-              kernel_version = Some kernel_version;
-            }
-  in
-  let directory = Services.directory rollup_node_config in
   let cors =
     Resto_cohttp.Cors.
       {allowed_headers = cors_headers; allowed_origins = cors_origins}
@@ -180,6 +178,16 @@ module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
+
+  let mode =
+    Tezos_clic.parameter (fun _ s ->
+        let mode =
+          match s with
+          | "prod" -> Prod
+          | "dev" -> Dev
+          | _ -> Stdlib.failwith "The mode must be prod or dev."
+        in
+        Lwt.return_ok mode)
 
   let rollup_node_endpoint =
     Tezos_clic.parameter (fun _ s ->
@@ -224,6 +232,13 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
+let mode_arg =
+  Tezos_clic.arg
+    ~long:"mode"
+    ~placeholder:"MODE"
+    ~doc:"The EVM proxy server mode, it's either prod or dev."
+    Params.mode
+
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
@@ -265,19 +280,21 @@ let main_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args4
+    (args5
+       mode_arg
        rpc_addr_arg
        rpc_port_arg
        cors_allowed_origins_arg
        cors_allowed_headers_arg)
     (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
-    (fun (rpc_addr, rpc_port, cors_origins, cors_headers)
+    (fun (mode, rpc_addr, rpc_port, cors_origins, cors_headers)
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let*! () = Internal_event.Simple.emit Event.event_starting () in
       let config =
         make_config
+          ?mode
           ?rpc_addr
           ?rpc_port
           ?cors_origins
@@ -285,11 +302,36 @@ let main_command =
           ~rollup_node_endpoint
           ()
       in
-      let* server = start config in
+      let* directory =
+        match config.mode with
+        | Prod -> prod_directory ~rollup_node_endpoint
+        | Dev -> dev_directory ~rollup_node_endpoint
+      in
+      let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
       return_unit)
+
+let make_prod_messages ~smart_rollup_address s =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_prod in
+  let*? _, messages =
+    Rollup_node.make_encoded_messages
+      ~smart_rollup_address
+      (Hash (Ethereum_types.strip_0x s))
+  in
+  return messages
+
+let make_dev_messages ~smart_rollup_address s =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_dev in
+  let*? _, messages =
+    Rollup_node.make_encoded_messages
+      ~smart_rollup_address
+      (Hash (Ethereum_types.strip_0x s))
+  in
+  return messages
 
 let chunker_command =
   let open Tezos_clic in
@@ -298,14 +340,14 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args1 rollup_address_arg)
+    (args2 mode_arg rollup_address_arg)
     (prefixes ["chunk"; "data"] @@ data_parameter @@ stop)
-    (fun rollup_address data () ->
+    (fun (mode, rollup_address) data () ->
       let print_chunks smart_rollup_address s =
-        let*? _, messages =
-          Next_rollup_node.make_encoded_messages
-            ~smart_rollup_address
-            (Hash (Ethereum_types.strip_0x s))
+        let* messages =
+          match Option.value ~default:Prod mode with
+          | Prod -> make_prod_messages ~smart_rollup_address s
+          | Dev -> make_dev_messages ~smart_rollup_address s
         in
         Format.printf "Chunked transactions :\n%!" ;
         List.iter (Format.printf "%s\n%!") messages ;

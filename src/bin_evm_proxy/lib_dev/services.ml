@@ -27,17 +27,6 @@
 open Tezos_rpc
 open Rpc_encodings
 
-type rollup_node_config = {
-  current_rpc : (module Current_rollup_node.S);
-  next_rpc : (module Next_rollup_node.S);
-  smart_rollup_address : string;
-  mutable kernel_version : string option;
-}
-
-(* This version is the one compatible with the latest released/deployed
-   kernel. *)
-let current_kernel_version = "4c111dcae061bea6c3616429a0ea1262ce6c174f"
-
 let version_service =
   Service.get_service
     ~description:"version"
@@ -89,7 +78,7 @@ let dispatch_service =
     Path.(root)
 
 let get_block ~full_transaction_object block_param
-    (module Rollup_node_rpc : Current_rollup_node.S) =
+    (module Rollup_node_rpc : Rollup_node.S) =
   match block_param with
   | Ethereum_types.(Hash_param (Block_height n)) ->
       Rollup_node_rpc.nth_block ~full_transaction_object n
@@ -97,33 +86,9 @@ let get_block ~full_transaction_object block_param
       Rollup_node_rpc.current_block ~full_transaction_object
 
 let dispatch_input
-    ({
-       current_rpc = (module Current_rollup_node_rpc : Current_rollup_node.S);
-       next_rpc = (module Next_rollup_node_rpc : Next_rollup_node.S);
-       smart_rollup_address;
-       kernel_version;
-     } as rollup_node_config) (input, id) =
+    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
+    =
   let open Lwt_result_syntax in
-  (* Since the proxy is stateless, for now, we have to check the kernel version
-     before executing any RPC. *)
-  let* kernel_version =
-    match kernel_version with
-    | Some kernel_version -> return kernel_version
-    | None ->
-        let* v =
-          let*! version = Current_rollup_node_rpc.kernel_version () in
-          match version with
-          | Ok v -> return v
-          | _ -> Next_rollup_node_rpc.kernel_version ()
-        in
-        rollup_node_config.kernel_version <- Some v ;
-        return v
-  in
-  let (module Rollup_node_rpc) =
-    if kernel_version = current_kernel_version then
-      (module Current_rollup_node_rpc : Current_rollup_node.S)
-    else (module Next_rollup_node_rpc : Next_rollup_node.S)
-  in
   let* output =
     match input with
     (* INTERNAL RPCs *)
@@ -207,5 +172,6 @@ let dispatch ctx dir =
           let+ outputs = List.map_es (dispatch_input ctx) inputs in
           Batch outputs)
 
-let directory (rollup_node_config : rollup_node_config) =
-  Directory.empty |> version |> dispatch rollup_node_config
+let directory ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
+  Directory.empty |> version
+  |> dispatch ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)

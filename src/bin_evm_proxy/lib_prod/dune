@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name evm_proxy_lib)
- (package octez-evm-proxy-lib)
+ (name evm_proxy_lib_prod)
+ (package octez-evm-proxy-lib-prod)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

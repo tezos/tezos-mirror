@@ -365,7 +365,9 @@ let setup_evm_kernel ?config ?kernel_installee
   let* () = Client.bake_for_and_wait client in
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
-  let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
+  let* evm_proxy_server =
+    Evm_proxy_server.init ~mode:`Development sc_rollup_node
+  in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   return
     {
@@ -2154,7 +2156,13 @@ let gen_kernel_migration_test ~deposit_admin ~dictator ~scenario_prior
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
-  let* sanity_check = scenario_prior ~evm_setup in
+  let* evm_proxy_server =
+    Evm_proxy_server.init ~mode:`Production evm_setup.sc_rollup_node
+  in
+  let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* sanity_check =
+    scenario_prior ~evm_setup:{evm_setup with evm_proxy_server; endpoint}
+  in
   (* Upgrade the kernel. *)
   let next_kernel_base_installee = "./" in
   let next_kernel_installee = "evm_kernel" in

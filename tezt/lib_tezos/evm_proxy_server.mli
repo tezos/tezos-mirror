@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,30 +27,45 @@
 (** EVM proxy server state. *)
 type t
 
-(** [create ?runner ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server.
+(** [create ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to ["127.0.0.1"] and a fresh port is
     chosen if [rpc_port] is not set.
 
+    To use the proxy on development set [mode] to [`Development]. Otherwise to
+    set it to the one on production set [mode] to [`Production].
+
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node].
 *)
 val create :
-  ?runner:Runner.t -> ?rpc_addr:string -> ?rpc_port:int -> Sc_rollup_node.t -> t
+  ?runner:Runner.t ->
+  ?mode:[< `Production | `Development] ->
+  ?rpc_addr:string ->
+  ?rpc_port:int ->
+  Sc_rollup_node.t ->
+  t
 
-(** [mockup ?runner ?rpc_addr ?rpc_port ()] is like [create] but doesn't
+(** [mockup ?runner ?mode ?rpc_addr ?rpc_port ()] is like [create] but doesn't
     communicate with a [rollup_node] and serves mockup values. *)
-val mockup : ?runner:Runner.t -> ?rpc_addr:string -> ?rpc_port:int -> unit -> t
+val mockup :
+  ?runner:Runner.t ->
+  ?mode:[< `Production | `Development] ->
+  ?rpc_addr:string ->
+  ?rpc_port:int ->
+  unit ->
+  t
 
 (** [run proxy_server] launches the EVM proxy server with the arguments
     given during {!create}. *)
 val run : t -> unit Lwt.t
 
-(** [init ?runner ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server
+(** [init ?runner ?mode ?rpc_addr ?rpc_port rollup_node] creates an EVM proxy server
     with {!create} and runs it with {!run}. *)
 val init :
   ?runner:Runner.t ->
+  ?mode:[< `Production | `Development] ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   Sc_rollup_node.t ->

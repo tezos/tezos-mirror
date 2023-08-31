@@ -12,7 +12,8 @@
   octez-libs.tezos-test-helpers
   qcheck-alcotest
   octez-alcotezt
-  evm_proxy_lib)
+  evm_proxy_lib_prod
+  evm_proxy_lib_dev)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
