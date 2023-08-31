@@ -56,6 +56,8 @@ type argument =
   | Cors_origin of string
   | Disable_mempool
   | Version
+  | RPC_additional_addr of string
+  | RPC_additional_addr_local of string
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -85,6 +87,8 @@ let make_argument = function
   | Cors_origin cors_origin -> ["--cors-origin"; cors_origin]
   | Disable_mempool -> ["--disable-mempool"]
   | Version -> ["--version"]
+  | RPC_additional_addr addr -> ["--rpc-addr"; addr]
+  | RPC_additional_addr_local addr -> ["--local-rpc-addr"; addr]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -128,6 +132,8 @@ let is_redundant = function
   | Metrics_addr _, _
   | Cors_origin _, _
   | Disable_mempool, _
+  | RPC_additional_addr _, _
+  | RPC_additional_addr_local _, _
   | Version, _ ->
       false
 
@@ -139,6 +145,7 @@ module Parameters = struct
     net_addr : string option;
     mutable net_port : int;
     advertised_net_port : int option;
+    rpc_local : bool;
     rpc_host : string;
     rpc_port : int;
     rpc_tls : tls_config option;
@@ -188,6 +195,8 @@ let advertised_net_port node = node.persistent_state.advertised_net_port
 
 let rpc_scheme node =
   match node.persistent_state.rpc_tls with Some _ -> "https" | None -> "http"
+
+let rpc_local node = node.persistent_state.rpc_local
 
 let rpc_host node = node.persistent_state.rpc_host
 
@@ -683,7 +692,7 @@ let wait_for_disconnections node disconnections =
   waiter
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_addr ?net_port ?advertised_net_port
+    ?event_pipe ?net_addr ?net_port ?advertised_net_port ?(rpc_local = false)
     ?(rpc_host = "localhost") ?rpc_port ?rpc_tls ?(allow_all_rpc = true)
     arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
@@ -713,6 +722,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         net_addr;
         net_port;
         advertised_net_port;
+        rpc_local;
         rpc_host;
         rpc_port;
         rpc_tls;
@@ -813,7 +823,8 @@ let runlike_command_arguments node command arguments =
   in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
-  :: "--rpc-addr"
+  :: (if node.persistent_state.rpc_local then "--local-rpc-addr"
+     else "--rpc-addr")
   :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
   :: command_args
 
@@ -874,7 +885,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     arguments
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?rpc_host ?rpc_port ?rpc_tls ?event_level
+    ?advertised_net_port ?rpc_local ?rpc_host ?rpc_port ?rpc_tls ?event_level
     ?event_sections_levels ?patch_config ?snapshot arguments =
   (* The single process argument does not exist in the configuration
      file of the node. It is only known as a command-line option. As a
@@ -892,6 +903,7 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?event_pipe
       ?net_port
       ?advertised_net_port
+      ?rpc_local
       ?rpc_host
       ?rpc_port
       ?rpc_tls

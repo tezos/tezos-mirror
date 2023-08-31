@@ -84,6 +84,8 @@ type argument =
   | Cors_origin of string  (** [--cors-origin] *)
   | Disable_mempool  (** [--disable-mempool] *)
   | Version  (** [--version] *)
+  | RPC_additional_addr of string  (** [--rpc-addr] *)
+  | RPC_additional_addr_local of string  (** [--local-rpc-addr] *)
 
 (** A TLS configuration for the node: paths to a [.crt] and a [.key] file.
 
@@ -112,6 +114,9 @@ type t
     provided, or a value allowing the local Tezt program to connect to it
     if it is.
 
+    Default [rpc_local] is [false]. If [rpc_local] is [true], the node will not
+    spawn a process for non-blocking RPCs.
+
     Default values for [net_port] or [rpc_port] are chosen automatically
     with values starting from 16384 (configurable with `--starting-port`).
     They are used by [config_init]
@@ -139,6 +144,7 @@ val create :
   ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?rpc_tls:tls_config ->
@@ -213,6 +219,9 @@ val advertised_net_port : t -> int option
 
     Returns [https] if node is started with [--rpc-tls], otherwise [http] *)
 val rpc_scheme : t -> string
+
+(** Returns [False] if RPCs are handled by a dedicated process. *)
+val rpc_local : t -> bool
 
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
@@ -556,6 +565,7 @@ val init :
   ?event_pipe:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
+  ?rpc_local:bool ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   ?rpc_tls:tls_config ->
