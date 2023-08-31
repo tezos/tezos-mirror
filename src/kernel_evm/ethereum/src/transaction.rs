@@ -12,7 +12,7 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 pub const TRANSACTION_HASH_SIZE: usize = 32;
 pub type TransactionHash = [u8; TRANSACTION_HASH_SIZE];
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq)]
 pub enum TransactionType {
     Legacy,
     Eip2930,

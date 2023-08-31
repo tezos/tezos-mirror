@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use hex::FromHexError;
-use libsecp256k1::{curve::Scalar, sign, Message, RecoveryId, SecretKey, Signature};
+use libsecp256k1::{
+    curve::Scalar, sign, Error, Message, RecoveryId, SecretKey, Signature,
+};
 use primitive_types::{H256, U256};
 use rlp::{DecoderError, Encodable, RlpIterator};
 use thiserror::Error;
@@ -48,6 +50,13 @@ impl From<libsecp256k1::Error> for TxSigError {
     }
 }
 
+pub fn h256_to_scalar(h: H256) -> Scalar {
+    let h1: [u8; 32] = h.into();
+    let mut h = Scalar([0; 8]);
+    let _ = h.set_b32(&h1);
+    h
+}
+
 impl TxSignature {
     pub fn v(&self) -> U256 {
         self.v
@@ -88,21 +97,13 @@ impl TxSignature {
     }
 
     /// Validate that signatures conforms EIP-2
-    /// and that is possible
-    pub fn signature(
+    /// and that is possible to restore parity from `chain_id` and `v`
+    pub fn signature_legacy(
         &self,
         chain_id: U256,
     ) -> Result<(Signature, RecoveryId), TxSigError> {
-        // copy r to Scalar
-        let r: H256 = self.r.to_owned();
-        let r1: [u8; 32] = r.into();
-        let mut r = Scalar([0; 8]);
-        let _ = r.set_b32(&r1);
-        // copy s to Scalar
-        let s: H256 = self.s.to_owned();
-        let s1: [u8; 32] = s.into();
-        let mut s = Scalar([0; 8]);
-        let _ = s.set_b32(&s1);
+        let r = h256_to_scalar(self.r.to_owned());
+        let s = h256_to_scalar(self.s.to_owned());
         if s.is_high() {
             // if s > secp256k1n / 2 the signature is invalid
             // cf EIP2 (part 2) https://eips.ethereum.org/EIPS/eip-2
@@ -114,6 +115,24 @@ impl TxSignature {
             let parity = self.legacy_compute_parity(chain_id)?;
             let ri = RecoveryId::parse(parity as u8)?;
             Ok((Signature { r, s }, ri))
+        }
+    }
+
+    /// Validate that signatures conforms EIP-2
+    pub fn signature(&self) -> Result<(Signature, RecoveryId), TxSigError> {
+        let r = h256_to_scalar(self.r.to_owned());
+        let s = h256_to_scalar(self.s.to_owned());
+        if s.is_high() {
+            // if s > secp256k1n / 2 the signature is invalid
+            // cf EIP2 (part 2) https://eips.ethereum.org/EIPS/eip-2
+            Err(TxSigError::ECDSAError(
+                libsecp256k1::Error::InvalidSignature,
+            ))
+        } else if self.v < U256::from(4) {
+            let ri = RecoveryId::parse(self.v().as_u32() as u8)?;
+            Ok((Signature { r, s }, ri))
+        } else {
+            Err(TxSigError::ECDSAError(Error::InvalidRecoveryId))
         }
     }
 
@@ -130,6 +149,15 @@ impl TxSignature {
         }
     }
 
+    pub fn sign_secp256k1(
+        msg: &Message,
+        string_sk: String,
+    ) -> Result<(Signature, RecoveryId), TxSigError> {
+        let hex: &[u8] = &hex::decode(string_sk)?;
+        let sk = SecretKey::parse_slice(hex)?;
+        Ok(sign(msg, &sk))
+    }
+
     /// This function creates a signature for a legacy tx.
     /// Legacy tx has a tricky approach for signature creation, where
     /// `v` field of a signature carry information about `chain_id`.
@@ -139,15 +167,25 @@ impl TxSignature {
         string_sk: String,
         chain_id: U256,
     ) -> Result<Self, TxSigError> {
-        let hex: &[u8] = &hex::decode(string_sk)?;
-        let sk = SecretKey::parse_slice(hex)?;
-        let (sig, recovery_id) = sign(msg, &sk);
+        let (sig, recovery_id) = Self::sign_secp256k1(msg, string_sk)?;
         let parity: u8 = recovery_id.into();
         let v = Self::compute_v(chain_id, parity)
             .ok_or(TxSigError::Parity(ParityError::ChainId(chain_id)))?;
 
         let (r, s) = (H256::from(sig.r.b32()), H256::from(sig.s.b32()));
         Ok(TxSignature { v, r, s })
+    }
+
+    pub fn sign(msg: &Message, string_sk: String) -> Result<Self, TxSigError> {
+        let (sig, recovery_id) = Self::sign_secp256k1(msg, string_sk)?;
+        let parity: u8 = recovery_id.into();
+
+        let (r, s) = (H256::from(sig.r.b32()), H256::from(sig.s.b32()));
+        Ok(TxSignature {
+            v: U256::from(parity),
+            r,
+            s,
+        })
     }
 
     #[cfg(test)]
