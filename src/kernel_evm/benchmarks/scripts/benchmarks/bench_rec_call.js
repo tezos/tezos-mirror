@@ -10,10 +10,12 @@
 
 const utils = require('./utils');
 const addr = require('../lib/address');
+const { contracts_directory, compile_contract_file } = require("../lib/contract");
 let faucet = require('./players/faucet.json');
 
-let create_data = "0x608060405234801561001057600080fd5b5060d18061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806328b5e32b14602d575b600080fd5b60336035565b005b60003090508073ffffffffffffffffffffffffffffffffffffffff166328b5e32b6040518163ffffffff1660e01b8152600401600060405180830381600087803b158015608157600080fd5b505af11580156094573d6000803e3d6000fd5b505050505056fea2646970667358221220015c6d8adac4157ee7d1d64cca81b25b08378be6b510781f321e4dea29f8892964736f6c63430008120033"
-let call_data = "0x28b5e32b"
+let contract = compile_contract_file(contracts_directory, "rec_call.sol")[0];
+let create_data = contract.bytecode;
+let call_data = contract.interface.encodeFunctionData("call", []);
 
 let player1 = require('./players/player1.json');
 
