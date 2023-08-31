@@ -32,15 +32,15 @@ val default_doc_spec : Kaitai.Types.DocSpec.t
 module Enum : sig
   (** [map] describes mapping of enum id (string) with the corresponding
       [EnumSpec.t]. *)
-  type map = string * Kaitai.Types.EnumSpec.t
+  type map = (string * Kaitai.Types.EnumSpec.t) list
 
   (** [bool] is a mapping for boolean type. *)
-  val bool : map
+  val bool : string * Kaitai.Types.EnumSpec.t
 
   (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
       [enum], then new list with it is returned, otherwise existing [enums] list
       is returned. *)
-  val add : map list -> map -> map list
+  val add : map -> string * Kaitai.Types.EnumSpec.t -> map
 end
 
 (** [Attr] is module for getting [AttrSpec.t] of ground types. *)

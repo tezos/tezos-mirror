@@ -32,7 +32,21 @@ let cond_no_cond =
   AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
 module Enum = struct
-  type map = string * Kaitai.Types.EnumSpec.t
+  type map = (string * Kaitai.Types.EnumSpec.t) list
+
+  let add enums ((k, e) as enum) =
+    let rec add = function
+      | [] -> enum :: enums
+      | ee :: _ when enum = ee ->
+          (* [enum] is already present in [enums] *)
+          enums
+      | (kk, ee) :: _ when String.equal kk k && not (ee = e) ->
+          (* [enum] key is already present in [enums], but for a different
+             [enum]. *)
+          raise (Invalid_argument "Enum.add: duplicate keys")
+      | _ :: enums -> add enums
+    in
+    add enums
 
   let bool =
     ( "bool",
@@ -45,8 +59,6 @@ module Enum = struct
               (255, EnumValueSpec.{name = "true"; doc = default_doc_spec});
             ];
         } )
-
-  let add enums enum = if List.memq enum enums then enums else enum :: enums
 end
 
 module Attr = struct
