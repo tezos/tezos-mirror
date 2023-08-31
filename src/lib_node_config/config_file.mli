@@ -75,7 +75,6 @@ and p2p = {
 
 and rpc = {
   listen_addrs : string list;
-  local_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
   tls : tls option;
@@ -117,7 +116,6 @@ val update :
   ?advertised_net_port:int ->
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
-  ?local_rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
   ?metrics_addr:string list ->
@@ -178,8 +176,6 @@ val resolve_metrics_addrs :
    [default_p2p_port]. Fails if the address could not be parsed. *)
 val resolve_bootstrap_addrs :
   string list -> (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t
-
-val rpc_encoding : rpc Data_encoding.t
 
 val encoding : t Data_encoding.t
 
