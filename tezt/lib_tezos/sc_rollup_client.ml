@@ -122,13 +122,14 @@ let base_dir_arg sc_client = ["--base-dir"; sc_client.base_dir]
 let endpoint_arg sc_client =
   ["--endpoint"; Sc_rollup_node.endpoint sc_client.sc_node]
 
-let spawn_command ?hooks sc_client command =
+let spawn_command ?hooks ?log_output sc_client command =
   let process =
     Process.spawn
       ?runner:sc_client.runner
       ~name:sc_client.name
       ~color:sc_client.color
       ?hooks
+      ?log_output
       sc_client.path
       (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
   in
@@ -267,7 +268,7 @@ let rpc_post ?hooks sc_client path data =
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
-let rpc_get_rich ?hooks sc_client path parameters =
+let rpc_get_rich ?hooks ?log_output sc_client path parameters =
   let parameters =
     if parameters = [] then ""
     else
@@ -275,7 +276,7 @@ let rpc_get_rich ?hooks sc_client path parameters =
       @@ List.map (fun (k, v) -> Format.asprintf "%s=%s" k v) parameters
   in
   let uri = Client.string_of_path path ^ parameters in
-  spawn_command ?hooks sc_client ["rpc"; "get"; uri]
+  spawn_command ?hooks ?log_output sc_client ["rpc"; "get"; uri]
   |> Runnable.map @@ fun output ->
      JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
@@ -290,17 +291,19 @@ let string_of_durable_state_operation (type a) (x : a durable_state_operation) =
 let inspect_durable_state_value :
     type a.
     ?hooks:Process.hooks ->
+    ?log_output:bool ->
     ?block:string ->
     t ->
     pvm_kind:string ->
     operation:a durable_state_operation ->
     key:string ->
     a Runnable.process =
- fun ?hooks ?(block = "head") sc_client ~pvm_kind ~operation ~key ->
+ fun ?hooks ?log_output ?(block = "head") sc_client ~pvm_kind ~operation ~key ->
   let op = string_of_durable_state_operation operation in
   let rpc_req () =
     rpc_get_rich
       ?hooks
+      ?log_output
       sc_client
       ["global"; "block"; block; "durable"; pvm_kind; op]
       [("key", key)]
