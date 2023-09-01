@@ -21,10 +21,22 @@ test-protocol-compiles:
 	cd ${CI_PROJECT_DIR} && \
 		dune build @runtest_compile_protocol
 
+# For Tezt tests, there are multiple timeouts:
+# - --global-timeout is the internal timeout of Tezt, which only works if tests
+#   are cooperative;
+# - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
+#   in case tests are not cooperative;
+# - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
+#   Tezt is still stuck;
+# - the CI timeout.
+# The use of the "timeout" command is to make sure that Tezt eventually exits,
+# because if the CI timeout is reached, there are no artefacts,
+# and thus no logs to investigate.
+# See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
 .PHONY: test-tezt
 test-tezt:
 	cd ${CI_PROJECT_DIR} && \
-		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1 && \
+		timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1 && \
 		./scripts/ci/merge_coverage.sh
 
 .PHONY: test-tezt-static-binaries
@@ -33,7 +45,7 @@ ifndef TESTS
 	$(error TESTS is undefined)
 endif
 	cd ${CI_PROJECT_DIR} && \
-		_build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1
+		timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe ${TESTS} --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --record tezt-results-${CI_NODE_INDEX}.json -j 3 --retry 1
 
 .PHONY: test-tezt-build-long
 test-tezt-build-long:
