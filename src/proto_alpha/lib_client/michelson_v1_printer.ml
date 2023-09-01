@@ -31,15 +31,21 @@ open Micheline_printer
 
 let anon = {comment = None}
 
-let print_expr ppf expr =
+let node_of_expr expr =
   expr |> Michelson_v1_primitives.strings_of_prims
   |> Micheline.inject_locations (fun _ -> anon)
-  |> print_expr ppf
 
-let print_expr_unwrapped ppf expr =
-  expr |> Michelson_v1_primitives.strings_of_prims
-  |> Micheline.inject_locations (fun _ -> anon)
-  |> print_expr_unwrapped ppf
+let node_of_stack_elt (ty, x) =
+  let ty = node_of_expr ty in
+  let x = node_of_expr x in
+  Micheline.Prim (anon, "Stack_elt", [ty; x], [])
+
+let print_typed_stack out l =
+  print_expr out (Micheline.Seq (anon, List.map node_of_stack_elt l))
+
+let print_expr ppf expr = print_expr ppf (node_of_expr expr)
+
+let print_expr_unwrapped ppf expr = print_expr_unwrapped ppf (node_of_expr expr)
 
 let print_stack ppf = function
   | [] -> Format.fprintf ppf "[]"
@@ -51,18 +57,6 @@ let print_stack ppf = function
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ : ")
            print_expr_unwrapped)
         more
-
-let print_stack_elt out (ty, x) =
-  Format.fprintf out "Stack_elt %a %a" print_expr ty print_expr x
-
-let print_typed_stack out l =
-  Format.fprintf
-    out
-    "{%a}"
-    (Format.pp_print_list
-       ~pp_sep:(fun out () -> Format.fprintf out "; ")
-       print_stack_elt)
-    l
 
 let print_execution_trace ppf (trace : Script_typed_ir.execution_trace) =
   Format.pp_print_list
