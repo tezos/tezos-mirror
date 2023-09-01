@@ -74,6 +74,16 @@ module Helpers : sig
     proof:Cryptobox.commitment_proof ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** This function builds a slot with the given content, and makes the given
+      DAL node to compute and store the corresponding commitment and shards by
+      calling relevant RPCs. It returns the commitment and its proof. *)
+  val store_slot :
+    Dal_node.t ->
+    slot_size:int ->
+    ?with_proof:bool ->
+    slot ->
+    (string * string) Lwt.t
 end
 
 module RPC_legacy : sig

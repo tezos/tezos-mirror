@@ -886,26 +886,14 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
   in
   unit
 
-(* This function builds a slot with the given content, and makes the given DAL
-   node to compute and store the corresponding commitment and shards by calling
-   relevant RPCs. It returns the commitment and its proof. *)
-let store_slot dal_node ~slot_size ?with_proof content =
-  let slot = Helpers.make_slot ~slot_size content in
-  let* commitment = RPC.call dal_node @@ Dal_common.RPC.post_commitment slot in
-  let* () =
-    RPC.call dal_node
-    @@ Dal_common.RPC.put_commitment_shards ?with_proof commitment
-  in
-  let* proof =
-    RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
-  in
-  return (commitment, proof)
-
 let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     dal_node =
-  let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let* slot_commitment, _proof = store_slot dal_node ~slot_size slot_content in
+  let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
+  let* slot_commitment, _proof =
+    Helpers.store_slot dal_node ~slot_size
+    @@ Helpers.make_slot ~slot_size slot_content
+  in
   let* received_slot =
     RPC.call dal_node (Dal_common.RPC.get_commitment_slot slot_commitment)
   in
@@ -933,7 +921,9 @@ let () =
 
 let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
     dal_node source ~index content ~slot_size =
-  let* commitment, proof = store_slot dal_node ~slot_size ?with_proof content in
+  let* commitment, proof =
+    Helpers.store_slot dal_node ~slot_size ?with_proof content
+  in
   let* _ =
     publish_slot_header
       ?counter
@@ -1020,6 +1010,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* level = Node.get_level node in
   let pub_level = level + 1 in
   let publish ?fee source ~index content =
+    let content = Helpers.make_slot ~slot_size content in
     let* commitment =
       publish_and_store_slot
         ?fee
@@ -1237,7 +1228,10 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
   let publish = publish_and_store_slot client dal_node ~slot_size in
-  let* slot_header = publish Constant.bootstrap1 ~index:0 slot_content in
+  let* slot_header =
+    publish Constant.bootstrap1 ~index:0
+    @@ Helpers.make_slot ~slot_size slot_content
+  in
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
   let number_of_shards =
@@ -1299,8 +1293,14 @@ let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
   let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
   let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let* slot_header1, _proof1 = store_slot dal_node1 ~slot_size "content1" in
-  let* slot_header2, _proof2 = store_slot dal_node2 ~slot_size "content2" in
+  let* slot_header1, _proof1 =
+    Helpers.store_slot dal_node1 ~slot_size
+    @@ Helpers.make_slot ~slot_size "content1"
+  in
+  let* slot_header2, _proof2 =
+    Helpers.store_slot dal_node2 ~slot_size
+    @@ Helpers.make_slot ~slot_size "content2"
+  in
   Check.(
     (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
   Check.(
@@ -1536,7 +1536,9 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and slot 1 has not been downloaded.
   *)
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let store_slot = store_slot dal_node ~slot_size in
+  let store_slot content =
+    Helpers.(store_slot dal_node ~slot_size @@ make_slot ~slot_size content)
+  in
 
   Log.info
     "Step 1: send three slots to DAL node and obtain corresponding headers" ;
@@ -1991,7 +1993,9 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
 let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
     client dal_node =
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let store_slot = store_slot dal_node ~slot_size in
+  let store_slot s =
+    Helpers.(store_slot dal_node ~slot_size @@ Helpers.make_slot ~slot_size s)
+  in
   let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   Log.info "Inject the shards of slots 1 and 3." ;
   let slot1_content = "slot 1" in
@@ -2102,7 +2106,11 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
       Format.asprintf "content at level %d index %d" level index
     in
     let* () = publish source ~index slot_content in
-    let* _commitment, _proof = store_slot dal_node slot_content ~slot_size in
+    let* _commitment, _proof =
+      Helpers.(
+        store_slot dal_node ~slot_size
+        @@ Helpers.make_slot ~slot_size slot_content)
+    in
     unit
   in
   let publish_and_bake ~init_level ~target_level =
@@ -2272,7 +2280,11 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
       Format.asprintf "content at level %d index %d" level index
     in
     let* () = publish source ~index slot_content in
-    let* _commitment, _proof = store_slot dal_node slot_content ~slot_size in
+    let* _commitment, _proof =
+      Helpers.(
+        store_slot dal_node ~slot_size
+        @@ Helpers.make_slot ~slot_size slot_content)
+    in
     unit
   in
   let publish_and_bake ~from_level ~to_level delegates =
@@ -2410,7 +2422,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
         dal_node
         source
         ~index:slot_index
-        (sf " %d " payload)
+      @@ Helpers.make_slot ~slot_size (sf " %d " payload)
     in
     incr counter ;
     publish_and_store_slot_promises :=
@@ -3175,7 +3187,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       ~slot_size
       Constant.bootstrap1
       ~index:slot_index
-      slot_content
+    @@ Helpers.make_slot ~slot_size slot_content
   in
 
   (* Preparing event waiters for different shards that will be published by
@@ -3329,7 +3341,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
             ~slot_size
             account
             ~index:slot_index
-            slot_content
+          @@ Helpers.make_slot ~slot_size slot_content
         in
         unit)
   in
@@ -3380,7 +3392,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       ~slot_size
       account1
       ~index:slot_index
-      slot_content
+    @@ Helpers.make_slot ~slot_size slot_content
   in
 
   let* publish_level = next_level node in

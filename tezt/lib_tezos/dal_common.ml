@@ -132,7 +132,7 @@ module RPC_legacy = struct
         JSON.(json |> as_list |> List.map encode))
 end
 
-module RPC = struct
+module Dal_RPC = struct
   include RPC_legacy
 
   type commitment = string
@@ -361,6 +361,15 @@ module Helpers = struct
           @@ dal_publish_slot_header ~index ~commitment ~proof;
         ]
         client)
+
+  let store_slot dal_node ~slot_size ?with_proof content =
+    let slot = make_slot ~slot_size content in
+    let* commitment = RPC.call dal_node @@ Dal_RPC.post_commitment slot in
+    let* () =
+      RPC.call dal_node @@ Dal_RPC.put_commitment_shards ?with_proof commitment
+    in
+    let* proof = RPC.call dal_node @@ Dal_RPC.get_commitment_proof commitment in
+    return (commitment, proof)
 end
 
 module Commitment = struct
@@ -404,7 +413,7 @@ module Commitment = struct
 end
 
 module Check = struct
-  open RPC
+  open Dal_RPC
 
   let profiles_typ : profiles Check.typ =
     let pp_operator_profile ppf = function
@@ -438,3 +447,5 @@ module Check = struct
     in
     Check.equalable pp equal
 end
+
+module RPC = Dal_RPC
