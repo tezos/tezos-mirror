@@ -71,64 +71,6 @@ module Parameters = struct
     from_protocol_parameters json |> return
 end
 
-module Helpers = struct
-  let endpoint dal_node =
-    Printf.sprintf
-      "http://%s:%d"
-      (Dal_node.rpc_host dal_node)
-      (Dal_node.rpc_port dal_node)
-
-  let pad n message =
-    let padding = String.make n '\000' in
-    message ^ padding
-
-  type slot = string
-
-  let make_slot ?(padding = true) ~slot_size slot =
-    if String.contains slot '\000' then
-      Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
-    let actual_slot_size = String.length slot in
-    if actual_slot_size < slot_size && padding then
-      pad (slot_size - actual_slot_size) slot
-    else slot
-
-  let content_of_slot slot =
-    (* We make the assumption that the content of a slot (for test
-       purpose only) does not contain two `\000` in a row. This
-       invariant is ensured by [make_slot]. *)
-    String.split_on_char '\000' slot
-    |> List.filter (fun str -> not (str = String.empty))
-    |> String.concat "\000"
-
-  let make_cryptobox
-      ?(on_error =
-        fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
-      parameters =
-    let initialisation_parameters =
-      Cryptobox.Internal_for_tests.parameters_initialisation parameters
-    in
-    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
-    match Cryptobox.make parameters with
-    | Ok cryptobox -> cryptobox
-    | Error (`Fail msg) -> on_error msg
-
-  let publish_slot_header ?counter ?force ?source ?fee ?error ~index ~commitment
-      ~proof client =
-    (* We scale the fees to match the actual gas cost of publishing a slot header.
-       Doing this here allows to keep the diff small as gas cost for
-       publishing slot header is adjusted. *)
-    let fee = Option.map (fun x -> x * 13) fee in
-    Operation.Manager.(
-      inject
-        ?error
-        ?force
-        [
-          make ?source ?fee ?counter
-          @@ dal_publish_slot_header ~index ~commitment ~proof;
-        ]
-        client)
-end
-
 module Committee = struct
   type member = {attestor : string; first_shard_index : int; power : int}
 
@@ -361,6 +303,64 @@ module RPC = struct
               let json = get "attestable_slots_set" json in
               Attestable_slots (json |> as_list |> List.map as_bool)
           | _ -> failwith "invalid case"))
+end
+
+module Helpers = struct
+  let endpoint dal_node =
+    Printf.sprintf
+      "http://%s:%d"
+      (Dal_node.rpc_host dal_node)
+      (Dal_node.rpc_port dal_node)
+
+  let pad n message =
+    let padding = String.make n '\000' in
+    message ^ padding
+
+  type slot = string
+
+  let make_slot ?(padding = true) ~slot_size slot =
+    if String.contains slot '\000' then
+      Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
+    let actual_slot_size = String.length slot in
+    if actual_slot_size < slot_size && padding then
+      pad (slot_size - actual_slot_size) slot
+    else slot
+
+  let content_of_slot slot =
+    (* We make the assumption that the content of a slot (for test
+       purpose only) does not contain two `\000` in a row. This
+       invariant is ensured by [make_slot]. *)
+    String.split_on_char '\000' slot
+    |> List.filter (fun str -> not (str = String.empty))
+    |> String.concat "\000"
+
+  let make_cryptobox
+      ?(on_error =
+        fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
+      parameters =
+    let initialisation_parameters =
+      Cryptobox.Internal_for_tests.parameters_initialisation parameters
+    in
+    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+    match Cryptobox.make parameters with
+    | Ok cryptobox -> cryptobox
+    | Error (`Fail msg) -> on_error msg
+
+  let publish_slot_header ?counter ?force ?source ?fee ?error ~index ~commitment
+      ~proof client =
+    (* We scale the fees to match the actual gas cost of publishing a slot header.
+       Doing this here allows to keep the diff small as gas cost for
+       publishing slot header is adjusted. *)
+    let fee = Option.map (fun x -> x * 13) fee in
+    Operation.Manager.(
+      inject
+        ?error
+        ?force
+        [
+          make ?source ?fee ?counter
+          @@ dal_publish_slot_header ~index ~commitment ~proof;
+        ]
+        client)
 end
 
 module Commitment = struct
