@@ -111,6 +111,22 @@ module Helpers = struct
     match Cryptobox.make parameters with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg
+
+  let publish_slot ?counter ?force ?source ?fee ?error ~index ~commitment ~proof
+      client =
+    (* We scale the fees to match the actual gas cost of publishing a slot header.
+       Doing this here allows to keep the diff small as gas cost for
+       publishing slot header is adjusted. *)
+    let fee = Option.map (fun x -> x * 13) fee in
+    Operation.Manager.(
+      inject
+        ?error
+        ?force
+        [
+          make ?source ?fee ?counter
+          @@ dal_publish_slot_header ~index ~commitment ~proof;
+        ]
+        client)
 end
 
 module Committee = struct

@@ -50,7 +50,7 @@ module Helpers : sig
      are smaller than the expected size of a slot. *)
   type slot
 
-  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
+  (** [make_slot ?paddming ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
       {!type:Cryptobox.parameters}). *)
@@ -62,6 +62,18 @@ module Helpers : sig
 
   val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
+
+  val publish_slot :
+    ?counter:int ->
+    ?force:bool ->
+    ?source:Account.key ->
+    ?fee:int ->
+    ?error:rex ->
+    index:int ->
+    commitment:Cryptobox.commitment ->
+    proof:Cryptobox.commitment_proof ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
 end
 
 module RPC_legacy : sig
