@@ -33,6 +33,7 @@
 let hooks = Tezos_regression.hooks
 
 module Cryptobox = Dal_common.Cryptobox
+module Helpers = Dal_common.Helpers
 
 let next_level node =
   let* current_level = Node.get_level node in
@@ -158,7 +159,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let cryptobox = Dal_common.Helpers.make_cryptobox dal_parameters.cryptobox in
+  let cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
@@ -368,7 +369,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
      cannot be propagated by checking their classification in the
      mempool. *)
   let* params = Dal_common.Parameters.from_client client in
-  let cryptobox = Dal_common.Helpers.make_cryptobox params.cryptobox in
+  let cryptobox = Helpers.make_cryptobox params.cryptobox in
   let commitment, proof =
     Dal_common.Commitment.dummy_commitment cryptobox "coucou"
   in
@@ -481,7 +482,7 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
       slot_size = 2 * parameters.cryptobox.slot_size;
     }
   in
-  let cryptobox' = Dal_common.Helpers.make_cryptobox cryptobox_params in
+  let cryptobox' = Helpers.make_cryptobox cryptobox_params in
   let msg = "a" in
   let commitment, _proof =
     Dal_common.(Commitment.dummy_commitment cryptobox msg)
@@ -904,7 +905,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
    node to compute and store the corresponding commitment and shards by calling
    relevant RPCs. It returns the commitment and its proof. *)
 let store_slot dal_node ~slot_size ?with_proof content =
-  let slot = Dal_common.Helpers.make_slot ~slot_size content in
+  let slot = Helpers.make_slot ~slot_size content in
   let* commitment = RPC.call dal_node @@ Dal_common.RPC.post_commitment slot in
   let* () =
     RPC.call dal_node
@@ -923,9 +924,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
   let* received_slot =
     RPC.call dal_node (Dal_common.RPC.get_commitment_slot slot_commitment)
   in
-  let received_slot_content =
-    Dal_common.Helpers.content_of_slot received_slot
-  in
+  let received_slot_content = Helpers.content_of_slot received_slot in
   Check.(
     (slot_content = received_slot_content)
       string
@@ -1066,9 +1065,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot2_b = publish Constant.bootstrap4 ~index:4 ~fee:1_350 "test4_b" in
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
-    let slot =
-      Dal_common.Helpers.make_slot ~slot_size "never associated to a slot_id"
-    in
+    let slot = Helpers.make_slot ~slot_size "never associated to a slot_id" in
     let* commit = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
     return (6, commit)
   in
@@ -1278,7 +1275,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
   let shards = shards |> List.to_seq |> Seq.map shard_of_json in
-  let cryptobox = Dal_common.Helpers.make_cryptobox parameters.cryptobox in
+  let cryptobox = Helpers.make_cryptobox parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
@@ -1329,7 +1326,7 @@ let commitment_of_slot cryptobox slot =
   let polynomial =
     Cryptobox.polynomial_from_slot
       cryptobox
-      (Dal_common.Helpers.content_of_slot slot |> Bytes.of_string)
+      (Helpers.content_of_slot slot |> Bytes.of_string)
     |> Result.get_ok
   in
   match Cryptobox.commit cryptobox polynomial with
@@ -1341,10 +1338,7 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let mk_slot size =
-    Dal_common.Helpers.make_slot
-      ~padding:false
-      ~slot_size
-      (generate_dummy_slot size)
+    Helpers.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
   in
   let failing_post_slot_rpc slot =
     let* response =
@@ -1397,9 +1391,7 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
     return @@ RPC.check_string_response ~code:404 response
   in
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let slot =
-    Dal_common.Helpers.make_slot ~slot_size (generate_dummy_slot slot_size)
-  in
+  let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
   let commitment =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
@@ -1423,9 +1415,7 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
 let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let slot =
-    Dal_common.Helpers.make_slot ~slot_size (generate_dummy_slot slot_size)
-  in
+  let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
   let commitment =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
@@ -1440,9 +1430,7 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
   let* got_slot =
     RPC.call dal_node (Dal_common.RPC.get_commitment_slot commitment)
   in
-  Check.(
-    Dal_common.Helpers.content_of_slot slot
-    = Dal_common.Helpers.content_of_slot got_slot)
+  Check.(Helpers.content_of_slot slot = Helpers.content_of_slot got_slot)
     Check.string
     ~error_msg:
       "The slot content retrieved from the node is not as expected (expected = \
@@ -1452,9 +1440,7 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
 let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
-  let slot =
-    Dal_common.Helpers.make_slot ~slot_size (generate_dummy_slot slot_size)
-  in
+  let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
   let* commitment = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   let* proof =
     RPC.call dal_node (Dal_common.RPC.get_commitment_proof commitment)
@@ -2109,7 +2095,7 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
     =
   Check.((parameters.Dal_common.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Dal_common.Helpers.endpoint dal_node in
+  let dal_node_endpoint = Helpers.endpoint dal_node in
   let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let slot_idx level = level mod number_of_slots in
@@ -2265,7 +2251,7 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
     dal_node =
   Check.((parameters.Dal_common.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Dal_common.Helpers.endpoint dal_node in
+  let dal_node_endpoint = Helpers.endpoint dal_node in
   let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let lag = parameters.attestation_lag in
