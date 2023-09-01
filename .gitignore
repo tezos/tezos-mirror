@@ -58,6 +58,7 @@ __pycache__
 /octez-dac-*
 /octez-binaries
 /octogram
+/simulation-scenario
 
 /src/proto_*/parameters/*-parameters.json
 
