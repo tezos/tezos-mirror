@@ -131,6 +131,19 @@ $(ALL_EXECUTABLES):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
+.PHONY: kaitai-struct-files
+kaitai-struct-files:
+	@dune build contrib/bin_codec_kaitai/codec.exe
+	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/
+
+.PHONY: check-kaitai-struct-files
+check-kaitai-struct-files:
+	@dune build contrib/bin_codec_kaitai/codec.exe
+	@git diff --exit-code contrib/kaitai-struct-files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
+	@rm contrib/kaitai-struct-files/*.ksy
+	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/ 2>/dev/null
+	@git diff --exit-code contrib/kaitai-struct-files || (echo "Kaitai struct files mismatch. Update the files."; exit 1)
+
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
 # the exact list can vary. We just remove all of them.
