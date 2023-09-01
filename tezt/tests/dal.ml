@@ -381,7 +381,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
         client)
   in
   let* (`OpHash oph2) =
-    Helpers.publish_slot ~force:true ~index:0 ~commitment ~proof client
+    Helpers.publish_slot_header ~force:true ~index:0 ~commitment ~proof client
   in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
@@ -441,7 +441,7 @@ let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof =
     Dal_common.(Commitment.dummy_commitment cryptobox message)
   in
-  Helpers.publish_slot ~source ?fee ?error ~index ~commitment ~proof
+  Helpers.publish_slot_header ~source ?fee ?error ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for a different
    slot leads to a proof-checking error. *)
@@ -453,7 +453,7 @@ let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
   let _commitment, proof =
     Dal_common.(Commitment.dummy_commitment cryptobox "b")
   in
-  Helpers.publish_slot ~source ?fee ~index ~commitment ~proof
+  Helpers.publish_slot_header ~source ?fee ~index ~commitment ~proof
 
 (* We check that publishing a slot header with a proof for the "same"
    slot contents but represented using a different [slot_size] leads
@@ -474,13 +474,13 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
   let _commitment, proof =
     Dal_common.(Commitment.dummy_commitment cryptobox' msg)
   in
-  Helpers.publish_slot ~source ?fee ~index ~commitment ~proof
+  Helpers.publish_slot_header ~source ?fee ~index ~commitment ~proof
 
 let publish_slot_header ?counter ?force ~source ?(fee = 1200) ~index ~commitment
     ~proof client =
   let commitment = Dal_common.Commitment.of_string commitment in
   let proof = Dal_common.Commitment.proof_of_string proof in
-  Helpers.publish_slot
+  Helpers.publish_slot_header
     ?counter
     ?force
     ~source

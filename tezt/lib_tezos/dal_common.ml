@@ -112,8 +112,8 @@ module Helpers = struct
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg
 
-  let publish_slot ?counter ?force ?source ?fee ?error ~index ~commitment ~proof
-      client =
+  let publish_slot_header ?counter ?force ?source ?fee ?error ~index ~commitment
+      ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
        Doing this here allows to keep the diff small as gas cost for
        publishing slot header is adjusted. *)
