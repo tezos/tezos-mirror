@@ -110,6 +110,7 @@ let create_cycles =
   "CREATE TABLE IF NOT EXISTS cycles(\n\
   \   id INTEGER PRIMARY KEY,\n\
   \   level INTEGER NOT NULL,\n\
+  \   size INTEGER NOT NULL,\n\
   \   UNIQUE (level))"
 
 let create_endorsing_rights_level_idx =
@@ -134,6 +135,9 @@ let create_operations_inclusion_operation_idx =
   "CREATE INDEX IF NOT EXISTS operations_inclusion_operation_idx ON \
    operations_inclusion(operation)"
 
+let create_cycles_level_idx =
+  "CREATE INDEX IF NOT EXISTS cycles_level_idx ON cycles(level)"
+
 let create_tables =
   [
     create_delegates;
@@ -151,6 +155,7 @@ let create_tables =
     create_blocks_reception_block_idx;
     create_operations_reception_operation_idx;
     create_operations_inclusion_operation_idx;
+    create_cycles_level_idx;
   ]
 
 let alter_blocks = "ALTER TABLE blocks ADD COLUMN predecessor INTEGER"
@@ -287,8 +292,9 @@ let maybe_insert_block =
      EXCLUDED.predecessor, EXCLUDED.baker) WHERE True"
 
 let maybe_insert_cycle =
-  Caqti_request.Infix.(Caqti_type.(tup2 int32 int32 ->. unit))
-    "INSERT INTO cycle (id, level) VALUES (?, ?) ON CONFLICT DO NOTHING"
+  Caqti_request.Infix.(Caqti_type.(tup3 int32 int32 int32 ->. unit))
+    "INSERT INTO cycles (id, level, size) VALUES (?, ?, ?) ON CONFLICT DO \
+     NOTHING"
 
 let insert_received_operation =
   Caqti_request.Infix.(

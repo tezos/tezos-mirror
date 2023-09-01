@@ -73,7 +73,10 @@ val maybe_insert_block :
   Caqti_request.t
 
 val maybe_insert_cycle :
-  (int32 (* id *) * int32 (* level *), unit, [`Zero]) Caqti_request.t
+  ( int32 (* id *) * int32 (* level *) * int32 (* size *),
+    unit,
+    [`Zero] )
+  Caqti_request.t
 
 val insert_received_operation :
   ( (Ptime.t
