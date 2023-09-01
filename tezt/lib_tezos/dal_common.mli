@@ -60,7 +60,7 @@ module Helpers : sig
      by removing the padding. *)
   val content_of_slot : slot -> string
 
-  val make :
+  val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 end
 

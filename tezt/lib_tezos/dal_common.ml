@@ -100,9 +100,9 @@ module Helpers = struct
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
 
-  let make
+  let make_cryptobox
       ?(on_error =
-        fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
+        fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
       parameters =
     let initialisation_parameters =
       Cryptobox.Internal_for_tests.parameters_initialisation parameters
@@ -212,7 +212,7 @@ module RPC = struct
   let post_commitment slot =
     let slot =
       JSON.parse
-        ~origin:"Rollup.RPC.post_commitments"
+        ~origin:"Dal_common.RPC.post_commitments"
         (encode_bytes_to_hex_string slot)
     in
     let data : RPC_core.data = Data (JSON.unannotate slot) in
@@ -352,7 +352,7 @@ module Commitment = struct
       ?(on_error =
         function
         | `Slot_wrong_size str ->
-            Test.fail "Rollup.Dal.dummy_commitment failed: %s" str
+            Test.fail "Dal_common.dummy_commitment failed: %s" str
         | `Invalid_degree_strictly_less_than_expected _ as commit_error ->
             Test.fail "%s" (Cryptobox.string_of_commit_error commit_error))
       cryptobox message =

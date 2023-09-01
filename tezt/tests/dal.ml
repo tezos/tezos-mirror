@@ -158,7 +158,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let cryptobox = Dal_common.Helpers.make dal_parameters.cryptobox in
+  let cryptobox = Dal_common.Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
@@ -368,7 +368,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
      cannot be propagated by checking their classification in the
      mempool. *)
   let* params = Dal_common.Parameters.from_client client in
-  let cryptobox = Dal_common.Helpers.make params.cryptobox in
+  let cryptobox = Dal_common.Helpers.make_cryptobox params.cryptobox in
   let commitment, proof =
     Dal_common.Commitment.dummy_commitment cryptobox "coucou"
   in
@@ -481,7 +481,7 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
       slot_size = 2 * parameters.cryptobox.slot_size;
     }
   in
-  let cryptobox' = Dal_common.Helpers.make cryptobox_params in
+  let cryptobox' = Dal_common.Helpers.make_cryptobox cryptobox_params in
   let msg = "a" in
   let commitment, _proof =
     Dal_common.(Commitment.dummy_commitment cryptobox msg)
@@ -1278,7 +1278,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
   let shards = shards |> List.to_seq |> Seq.map shard_of_json in
-  let cryptobox = Dal_common.Helpers.make parameters.cryptobox in
+  let cryptobox = Dal_common.Helpers.make_cryptobox parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
