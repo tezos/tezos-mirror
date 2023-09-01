@@ -2475,6 +2475,17 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.(option Sc_rollup.Whitelist.encoding)
         RPC_path.(path_sc_rollup / "whitelist")
+
+    let last_whitelist_update =
+      RPC_service.get_service
+        ~description:
+          "Last whitelist update for private smart rollups. If the output is \
+           None then the rollup is public."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            option Sc_rollup.Whitelist.last_whitelist_update_encoding)
+        RPC_path.(path_sc_rollup / "last_whitelist_update")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2489,6 +2500,20 @@ module Sc_rollup = struct
   let register_whitelist () =
     Registration.register1 ~chunked:true S.whitelist (fun ctxt address () () ->
         Sc_rollup.Whitelist.find_whitelist_uncarbonated ctxt address)
+
+  let register_last_whitelist_update () =
+    let open Lwt_result_syntax in
+    Registration.register1
+      ~chunked:true
+      S.last_whitelist_update
+      (fun ctxt address () () ->
+        let* ctxt, is_private = Sc_rollup.Whitelist.is_private ctxt address in
+        if is_private then
+          let* _ctxt, last_whitelist_update =
+            Sc_rollup.Whitelist.get_last_whitelist_update ctxt address
+          in
+          return_some last_whitelist_update
+        else return_none)
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -2686,6 +2711,7 @@ module Sc_rollup = struct
     register_kind () ;
     register_inbox () ;
     register_whitelist () ;
+    register_last_whitelist_update () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -2709,6 +2735,15 @@ module Sc_rollup = struct
 
   let whitelist ctxt block sc_rollup_address =
     RPC_context.make_call1 S.whitelist ctxt block sc_rollup_address () ()
+
+  let last_whitelist_update ctxt block sc_rollup_address =
+    RPC_context.make_call1
+      S.last_whitelist_update
+      ctxt
+      block
+      sc_rollup_address
+      ()
+      ()
 
   let genesis_info ctxt block sc_rollup_address =
     RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()
