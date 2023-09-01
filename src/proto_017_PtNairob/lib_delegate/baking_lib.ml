@@ -378,6 +378,56 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
+let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
+    delegates =
+  let open Lwt_result_syntax in
+  let cache = Baking_cache.Block_cache.create 10 in
+  let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
+  let config = Baking_configuration.make ?force () in
+  let* state = create_state cctxt ~config ~current_proposal delegates in
+  (* Make sure the operation worker is populated to avoid empty blocks
+     being proposed. *)
+  let*? event = Baking_scheduling.compute_bootstrap_event state in
+  let*! state, _action = State_transitions.step state event in
+  let latest_proposal = state.level_state.latest_proposal in
+  let open State_transitions in
+  let round =
+    match force_round with
+    | Some x -> x
+    | None -> state.round_state.current_round
+  in
+  let*! proposal_validity =
+    is_acceptable_proposal_for_current_level state latest_proposal
+  in
+  match proposal_validity with
+  | Invalid | Outdated_proposal -> (
+      let slotmap = state.level_state.delegate_slots.own_delegate_slots in
+      match State_transitions.round_proposer state slotmap round with
+      | Some (delegate, _) ->
+          let*! action =
+            State_transitions.propose_block_action
+              state
+              delegate
+              round
+              state.level_state.latest_proposal
+          in
+          let* state = do_action (state, action) in
+          let*! () =
+            cctxt#message
+              "Reproposed block at level %ld on round %a"
+              state.level_state.current_level
+              Round.pp
+              state.round_state.current_round
+          in
+          return_unit
+      | None -> cctxt#error "No slots for current round")
+  | Valid_proposal ->
+      cctxt#error
+        "Cannot propose: there's already a valid proposal for the current \
+         round %a"
+        Round.pp
+        round
+
 let bake_using_automaton ~count config state heads_stream =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in

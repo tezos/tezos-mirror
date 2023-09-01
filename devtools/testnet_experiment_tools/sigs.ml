@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,59 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+module type PROTO_TOOL = sig
+  val start_injector :
+    Client_context.full -> operations_file_path:string -> unit tzresult Lwt.t
 
-(** {1 API} *)
+  val sync_node :
+    Client_context.full ->
+    ?round_duration_target:int ->
+    unit ->
+    unit tzresult Lwt.t
+end
 
-val bake :
-  Protocol_client_context.full ->
-  ?minimal_fees:Tez.t ->
-  ?minimal_nanotez_per_gas_unit:Q.t ->
-  ?minimal_nanotez_per_byte:Q.t ->
-  ?force_apply:bool ->
-  ?force:bool ->
-  ?minimal_timestamp:bool ->
-  ?extra_operations:Baking_configuration.Operations_source.t ->
-  ?monitor_node_mempool:bool ->
-  ?context_path:string ->
-  ?dal_node_endpoint:Uri.t ->
-  (* Number of baked blocks. Defaults to 1. *)
-  ?count:int ->
-  Baking_state.consensus_key list ->
-  unit tzresult Lwt.t
+let all : (module PROTO_TOOL) Protocol_hash.Map.t ref =
+  ref Protocol_hash.Map.empty
 
-val preendorse :
-  Protocol_client_context.full ->
-  ?force:bool ->
-  Baking_state.consensus_key list ->
-  unit tzresult Lwt.t
-
-val endorse :
-  Protocol_client_context.full ->
-  ?force:bool ->
-  Baking_state.consensus_key list ->
-  unit tzresult Lwt.t
-
-val propose :
-  Protocol_client_context.full ->
-  ?minimal_fees:Tez.t ->
-  ?minimal_nanotez_per_gas_unit:Q.t ->
-  ?minimal_nanotez_per_byte:Q.t ->
-  ?force_apply:bool ->
-  ?force:bool ->
-  ?minimal_timestamp:bool ->
-  ?extra_operations:Baking_configuration.Operations_source.t ->
-  ?context_path:string ->
-  Baking_state.consensus_key list ->
-  unit tzresult Lwt.t
-
-(** [repropose] tries to bake a new block proposal on the same level
-    as the current head. If provided, the proposal will use the
-    [force_round] argument as its reproposal round, otherwise the
-    current tenderbake round will be used. *)
-val repropose :
-  Protocol_client_context.full ->
-  ?force:bool ->
-  ?force_round:Round.t ->
-  Baking_state.consensus_key list ->
-  unit tzresult Lwt.t
+let register proto t = all := Protocol_hash.Map.add proto t !all

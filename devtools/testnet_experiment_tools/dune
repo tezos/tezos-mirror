@@ -23,3 +23,65 @@
   -open Tezos_stdlib_unix
   -open Tezos_protocol_alpha)
  (modules testnet_experiment_tools format_baker_accounts))
+
+(library
+ (name simulation_scenario_lib)
+ (libraries
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-baking-017-PtNairob
+  tezos-client-017-PtNairob
+  tezos-client-017-PtNairob.commands
+  tezos-protocol-017-PtNairob
+  tezos-baking-018-Proxford
+  tezos-client-018-Proxford
+  tezos-client-018-Proxford.commands
+  tezos-protocol-018-Proxford
+  tezos-baking-alpha
+  tezos-client-alpha
+  tezos-client-alpha.commands
+  tezos-protocol-alpha)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base
+  -open Tezos_client_base_unix)
+ (modules sigs tool_017_PtNairob tool_018_Proxford tool_alpha))
+
+(executable
+ (name simulation_scenario)
+ (libraries
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  tezos-store
+  octez-libs.tezos-clic
+  tezos-store.unix-snapshots
+  tezos-store.shared
+  octez-node-config
+  tezos-client-base
+  tezos-client-base-unix
+  simulation_scenario_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Tezos_store_unix_snapshots
+  -open Tezos_store_shared
+  -open Octez_node_config
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Simulation_scenario_lib)
+ (modules simulation_scenario))

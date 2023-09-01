@@ -7245,6 +7245,95 @@ let _testnet_experiment_tools =
       ]
     ~modules:["testnet_experiment_tools"; "format_baker_accounts"]
 
+let simulation_scenario_lib =
+  let proto_deps, proto_tools =
+    let proto_tool proto = sf "tool_%s" @@ Protocol.name_underscore proto in
+    let get_tool_module proto =
+      "devtools" // "testnet_experiment_tools" // (proto_tool proto ^ ".ml")
+    in
+    let alpha_tool = get_tool_module Protocol.alpha in
+    List.filter_map
+      (fun proto ->
+        let tool_path = get_tool_module proto in
+        match (Protocol.status proto, Protocol.client proto) with
+        | Active, Some _client ->
+            (if not @@ Sys.file_exists tool_path then
+             let contents = file_content @@ alpha_tool in
+             let contents =
+               List.fold_left
+                 (fun contents (re, replace) ->
+                   Str.global_replace re replace contents)
+                 contents
+                 [
+                   ( Str.regexp_string "open Tezos_client_alpha",
+                     "open Tezos_client_" ^ Protocol.name_underscore proto );
+                   ( Str.regexp_string "open Tezos_baking_alpha",
+                     "open Tezos_baking_" ^ Protocol.name_underscore proto );
+                   ( Str.regexp_string "open Tezos_protocol_alpha",
+                     "open Tezos_protocol_" ^ Protocol.name_underscore proto );
+                 ]
+             in
+             write tool_path (fun fmt -> Format.pp_print_string fmt contents)) ;
+            let proto_deps =
+              Protocol.
+                [
+                  baking_exn proto;
+                  client_exn proto;
+                  client_commands_exn proto;
+                  main proto;
+                ]
+            in
+            Some (proto_deps, proto_tool proto)
+        | _ ->
+            remove_if_exists tool_path ;
+            None)
+      Protocol.all
+    |> List.split
+  in
+  private_lib
+    "simulation_scenario_lib"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~synopsis:"Simulation scenario lib"
+    ~opam:""
+    ~deps:
+      ([
+         octez_stdlib_unix |> open_;
+         octez_base |> open_ |> open_ ~m:"TzPervasives";
+         octez_base_unix;
+         octez_client_base |> open_;
+         octez_client_base_unix |> open_;
+       ]
+      @ List.flatten proto_deps)
+    ~modules:("sigs" :: proto_tools)
+    ~bisect_ppx:No
+    ~linkall:true
+
+let _simulation_scenario =
+  private_exe
+    "simulation_scenario"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~with_macos_security_framework:true
+    ~synopsis:
+      "A script creating a simulation scenario from a tezos node directory."
+    ~opam:""
+    ~deps:
+      [
+        octez_stdlib_unix |> open_;
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_store |> open_;
+        octez_clic;
+        octez_store_unix_snapshots |> open_;
+        octez_store_shared |> open_;
+        octez_node_config |> open_;
+        octez_client_base |> open_;
+        octez_client_base_unix |> open_;
+        simulation_scenario_lib |> open_;
+      ]
+    ~modules:["simulation_scenario"]
+    ~bisect_ppx:No
+    ~linkall:true
+
 let simdal_lib =
   private_lib
     "simdal"
