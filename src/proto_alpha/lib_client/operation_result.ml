@@ -43,6 +43,28 @@ let pp_micheline_from_lazy_expr ppf expr =
   in
   pp_micheline_expr ppf expr
 
+let normalize_internal_operation cctxt unparsing_mode
+    (Internal_operation {operation; sender; nonce}) =
+  let open Lwt_result_syntax in
+  let normalize_op (type kind) :
+      kind internal_operation_contents ->
+      kind internal_operation_contents tzresult Lwt.t = function
+    | Event {ty; tag; payload} ->
+        let+ payload =
+          Plugin.RPC.Scripts.normalize_data
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~legacy:true
+            ~data:payload
+            ~ty
+            ~unparsing_mode
+        in
+        Event {ty; tag; payload}
+    | op -> return op
+  in
+  let+ operation = normalize_op operation in
+  Internal_operation {operation; sender; nonce}
+
 let pp_internal_operation ppf (Internal_operation {operation; sender; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 2>Internal " ;
