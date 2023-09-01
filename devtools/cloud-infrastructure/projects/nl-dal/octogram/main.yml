@@ -16,7 +16,9 @@ agents:
 
 vars:
   network: sandbox
-  
+  alias_prefix: bootstrap
+  keys_base_dir: fresh_wallet
+
 stages:
   - name: Initialize protocol file
     with_agents: 'localhost'
@@ -24,8 +26,30 @@ stages:
     jobs:
       - name: Upload protocol file
         copy:
-          local_path: 'src/proto_alpha/parameters/{{ vars.network }}-parameters.json'          
+          local_path: 'src/proto_alpha/parameters/{{ vars.network }}-parameters.json'
           remote_path: '.'
+
+      - name: Upload octez-client
+        copy:
+          local_path: octez-client
+          remote_path: '.'
+
+      - name: Generate keys
+        tezos.generate_keys:
+          base_dir: 'self://{{ vars.keys_base_dir }}'
+          kind:
+             default: # We currently re-use default Tezt keys
+             # for when we want fresh keys
+             # fresh:
+             #   count: 10
+             #   path_client: 'self://./octez-client'
+             #   alias_prefix: '{{ vars.alias_prefix }}'
+
+      - name: Compress generated keys
+        builtins.tar:
+          contents: '{{ vars.keys_base_dir }}'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: create
 
       - name: Start HTTP server
         builtins.start_http_server:
