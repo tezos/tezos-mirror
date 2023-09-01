@@ -45,6 +45,17 @@ type current_protocol = {
       (** Protocol constants retrieved from the Tezos node. *)
 }
 
+type last_whitelist_update = {message_index : int; outbox_level : Int32.t}
+
+type private_info = {
+  last_whitelist_update : last_whitelist_update;
+  last_outbox_level_searched : int32;
+      (** If the rollup is private then the last search outbox level
+          when looking at whitelist update to execute. This is to
+          reduce the folding call at each cementation. If the rollup
+          is public then it's None. *)
+}
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6316
    Refactor this type with more structure and less redundancy. *)
 type 'a t = {
@@ -88,6 +99,8 @@ type 'a t = {
   lpc : ('a, Commitment.t option) Reference.t;
       (** The last published commitment, i.e. commitment that the operator is
           staked on. *)
+  private_info : ('a, private_info option) Reference.t;
+      (** contains information for the rollup when it's private.*)
   kernel_debug_logger : debug_logger;
       (** Logger used for writing [kernel_debug] messages *)
   finaliser : unit -> unit Lwt.t;
@@ -159,6 +172,7 @@ val init :
   irmin_cache_size:int ->
   index_buffer_size:int ->
   ?log_kernel_debug_file:string ->
+  ?last_whitelist_update:Z.t * Int32.t ->
   'a Store_sigs.mode ->
   Layer1.t ->
   genesis_info ->

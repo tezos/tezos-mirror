@@ -75,6 +75,11 @@ val publish_commitment : Commitment.Hash.t -> int32 -> unit Lwt.t
     operation is being submitted. *)
 val recover_bond : Signature.Public_key_hash.t -> unit Lwt.t
 
+(** [publish_execute_whitelist_update hash level index] emits the
+    event that a new execute whitelist update is being published. *)
+val publish_execute_whitelist_update :
+  Commitment.Hash.t -> int32 -> int -> unit Lwt.t
+
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig
   (** [request_failed view status errors] emits the event that a worker

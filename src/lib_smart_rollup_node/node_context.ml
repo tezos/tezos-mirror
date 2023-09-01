@@ -39,6 +39,13 @@ type current_protocol = {
   constants : Rollup_constants.protocol_constants;
 }
 
+type last_whitelist_update = {message_index : int; outbox_level : Int32.t}
+
+type private_info = {
+  last_whitelist_update : last_whitelist_update;
+  last_outbox_level_searched : int32;
+}
+
 type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
@@ -61,6 +68,7 @@ type 'a t = {
   context : 'a Context.index;
   lcc : ('a, lcc) Reference.t;
   lpc : ('a, Commitment.t option) Reference.t;
+  private_info : ('a, private_info option) Reference.t;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
   mutable current_protocol : current_protocol;
@@ -159,8 +167,8 @@ let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   return (kernel_debug, fun () -> Lwt_io.close chan)
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ~index_buffer_size ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc
-    ~lpc kind current_protocol
+    ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
+    l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
     Configuration.(
       {
         sc_rollup_address = rollup_address;
@@ -221,6 +229,16 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     else return (Event.kernel_debug, fun () -> return_unit)
   in
   let global_block_watcher = Lwt_watcher.create_input () in
+  let private_info =
+    Option.map
+      (fun (message_index, outbox_level) ->
+        {
+          last_whitelist_update =
+            {outbox_level; message_index = Z.to_int message_index};
+          last_outbox_level_searched = outbox_level;
+        })
+      last_whitelist_update
+  in
   return
     {
       config = configuration;
@@ -236,6 +254,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       genesis_info;
       lcc = Reference.new_ lcc;
       lpc = Reference.new_ lpc;
+      private_info = Reference.new_ private_info;
       kind;
       injector_retention_period = 0;
       block_finality_time = 2;
@@ -296,6 +315,7 @@ let readonly (node_ctxt : _ t) =
     context = Context.readonly node_ctxt.context;
     lcc = Reference.readonly node_ctxt.lcc;
     lpc = Reference.readonly node_ctxt.lpc;
+    private_info = Reference.readonly node_ctxt.private_info;
   }
 
 type 'a delayed_write = ('a, rw) Delayed_write_monad.t
@@ -1062,6 +1082,7 @@ module Internal_for_tests = struct
         genesis_info;
         lcc;
         lpc;
+        private_info = Reference.new_ None;
         kind;
         injector_retention_period = 0;
         block_finality_time = 2;

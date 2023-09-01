@@ -235,6 +235,9 @@ let process_included_l1_operation (type kind) (node_ctxt : Node_context.rw)
         else Lwt.return_unit
       in
       let* () = maybe_recover_bond node_ctxt in
+      let* () =
+        Outbox_execution.publish_execute_whitelist_update_message node_ctxt
+      in
       return_unit
   | ( Sc_rollup_refute _,
       Sc_rollup_refute_result {game_status = Ended end_status; _} )
