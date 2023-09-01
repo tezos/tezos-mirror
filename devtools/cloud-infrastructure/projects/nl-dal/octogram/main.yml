@@ -59,10 +59,19 @@ stages:
     with_agents: 'node'
     run_agents: concurrent
     jobs:
-      - name: Push file
+      - name: Pull protocol parameters file
         builtins.prefetch: 'localhost://sandbox-parameters.json'
 
-      - name: Upload octez-node
+      - name: Pull generated keys
+        builtins.prefetch: 'localhost://{{ vars.keys_base_dir }}.tar.gz'
+
+      - name: Uncompress generated keys
+        builtins.tar:
+          contents: 'my-unique-baker'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: extract
+
+      - name: Upload octez binaries
         run_items: concurrent
         copy:
           local_path: '{{ item }}'
@@ -70,12 +79,8 @@ stages:
         with_items:
           - octez-node
           - octez-client
- 
-      - name: Upload octez-client
-        copy:
-          local_path: octez-client
-          remote_path: '.'
-        
+          - octez-baker-alpha
+
       - name: Start octez-node
         tezos.start_node:
           name: node
@@ -97,3 +102,16 @@ stages:
         tezos.wait_for_bootstrapped:
           path_client: self://./octez-client
           endpoint: self://node
+
+      - name: Start octez-baker-alpha
+        tezos.start_baker:
+          name: my-unique-baker
+          protocol: alpha
+          base_dir: 'self://my-unique-baker/{{ vars.keys_base_dir }}'
+          node_uri: self://node
+          delegates:
+           - bootstrap1
+           - bootstrap2
+           - bootstrap3
+           - bootstrap4
+           - bootstrap5

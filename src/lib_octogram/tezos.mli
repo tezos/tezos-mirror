@@ -46,7 +46,7 @@ type 'uri start_octez_node = {
 type 'uri activate_protocol = {
   endpoint : 'uri;  (** Node endpoint *)
   path_client : 'uri;  (** Where to find the client. *)
-  protocol : string;  (** Which protocol to activate *)
+  protocol : Protocol.t;  (** Which protocol to activate *)
   parameter_file : 'uri;  (** The path to the protocol file that will be used. *)
 }
 

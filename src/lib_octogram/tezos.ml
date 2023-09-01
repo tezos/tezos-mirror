@@ -53,6 +53,22 @@ end
 
 let () = Agent_state.register_key (module Octez_node_key)
 
+type _ key += Octez_baker_k : string -> Baker.t key
+
+module Octez_baker_key = struct
+  type t = string
+
+  type r = Baker.t
+
+  let proj : type a. a key -> (t * (a, r) eq) option = function
+    | Octez_baker_k name -> Some (name, Eq)
+    | _ -> None
+
+  let compare = String.compare
+end
+
+let () = Agent_state.register_key (module Octez_baker_key)
+
 type _ key += Rollup_node_k : string -> Sc_rollup_node.t key
 
 module Rollup_node_key = struct
@@ -322,7 +338,7 @@ module Start_octez_node = struct
              of the Octez node to 0 (`--expected-pow 0`). The default value
              used in network like mainnet, Mondaynet etc. is 26 (see
              `lib_node_config/config_file.ml`). *)
-          Expected_pow 26;
+          Expected_pow 0;
           Synchronisation_threshold sync_threshold;
           Network network;
           Metrics_addr (sf "0.0.0.0:%d" metrics_port);
@@ -418,13 +434,9 @@ end
 type 'uri activate_protocol = {
   endpoint : 'uri;
   path_client : 'uri;
-  protocol : string;
+  protocol : Protocol.t;
   parameter_file : 'uri;
 }
-
-let protocol_of_string = function
-  | "alpha" -> Protocol.Alpha
-  | protocol -> Test.fail "Unrecognized protocol name: %s" protocol
 
 type (_, _) Remote_procedure.t +=
   | Active_protocol : 'uri activate_protocol -> (unit, 'uri) Remote_procedure.t
@@ -458,7 +470,7 @@ module Activate_protocol = struct
       (obj4
          (req "endpoint" uri_encoding)
          (req "path_client" uri_encoding)
-         (req "protocol" string)
+         (req "protocol" Protocol.encoding)
          (req "parameter_file" uri_encoding))
 
   let r_encoding = Data_encoding.empty
@@ -501,7 +513,6 @@ module Activate_protocol = struct
     let endpoint = octez_endpoint state endpoint in
     let client = Client.create ~path:path_client ~endpoint () in
     Account.write Constant.all_secret_keys ~base_dir:(Client.base_dir client) ;
-    let protocol = protocol_of_string protocol in
     (* The protocol is activated few seconds in the past. *)
     let timestamp = Tezos_base.Time.System.Span.of_seconds_exn 5. in
     Client.activate_protocol
@@ -2051,6 +2062,140 @@ module Generate_keys = struct
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()
 end
 
+type 'uri start_octez_baker = {
+  name : string option;
+      (** A name for this agent. It will be generated if no name is given. *)
+  protocol : Protocol.t;
+      (** The baker's protocol. One of those in {!Protocol.t}. *)
+  base_dir : 'uri;  (** The --base-dir of the baker. *)
+  node_uri : 'uri;
+      (** An URI to a Layer 1 node (either "Owned/Managed" or "Remote". *)
+  node_data_dir : 'uri option;
+      (** A path to the --data-dir of the Layer 1 node. Only set if the node_uri
+          is "Remote".  Otherwise, this path is already provided by the
+          [node_uri]. *)
+  delegates : string list;
+      (** A list of delegates handled by this baker agent. The baker will handle
+          all the delegates in the wallet found in [base_dir] if no
+          delegate is given. *)
+}
+
+type start_octez_baker_r = {name : string}
+
+type (_, _) Remote_procedure.t +=
+  | Start_octez_baker :
+      'uri start_octez_baker
+      -> (start_octez_baker_r, 'uri) Remote_procedure.t
+
+module Start_octez_baker = struct
+  let name = "tezos.start_baker"
+
+  type 'uri t = 'uri start_octez_baker
+
+  type r = start_octez_baker_r
+
+  let of_remote_procedure :
+      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+    | Start_octez_baker args -> Some args
+    | _ -> None
+
+  let to_remote_procedure args = Start_octez_baker args
+
+  let unify : type a. (a, 'uri) Remote_procedure.t -> (a, r) Remote_procedure.eq
+      = function
+    | Start_octez_baker _ -> Eq
+    | _ -> Neq
+
+  let encoding uri_encoding =
+    let open Data_encoding in
+    conv
+      (fun {name; protocol; base_dir; node_uri; node_data_dir; delegates} ->
+        (name, protocol, base_dir, node_uri, node_data_dir, delegates))
+      (fun (name, protocol, base_dir, node_uri, node_data_dir, delegates) ->
+        {name; protocol; base_dir; node_uri; node_data_dir; delegates})
+      (obj6
+         (opt "name" string)
+         (dft "protocol" Protocol.encoding Protocol.Alpha)
+         (req "base_dir" uri_encoding)
+         (req "node_uri" uri_encoding)
+         (opt "node_data_dir" uri_encoding)
+         (dft "delegates" (list string) []))
+
+  let r_encoding =
+    let open Data_encoding in
+    conv (fun {name} -> name) (fun name -> {name}) (obj1 (req "name" string))
+
+  let tvalue_of_r ({name} : r) = Tobj [("name", Tstr name)]
+
+  let expand ~self ~run
+      {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+    let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
+    {
+      name = Option.map run name;
+      protocol;
+      base_dir = uri_run base_dir;
+      node_uri = uri_run node_uri;
+      node_data_dir = Option.map uri_run node_data_dir;
+      delegates = List.map run delegates;
+    }
+
+  let resolve ~self resolver
+      {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+    let file_agent_uri = Remote_procedure.file_agent_uri in
+    {
+      name;
+      protocol;
+      base_dir = file_agent_uri ~self ~resolver base_dir;
+      node_data_dir = Option.map (file_agent_uri ~self ~resolver) node_data_dir;
+      node_uri = resolve_octez_rpc_global_uri ~self ~resolver node_uri;
+      delegates;
+    }
+
+  let run state {name; protocol; base_dir; node_uri; node_data_dir; delegates} =
+    let client = Agent_state.http_client state in
+    (* Get the L1 node's data-dir and RPC endpoint. *)
+    let* node_data_dir, node_rpc_endpoint =
+      match (node_data_dir, octez_endpoint state node_uri) with
+      | Some node_data_dir, Client.Foreign_endpoint fe ->
+          let* node_data_dir =
+            Http_client.local_path_from_agent_uri client node_data_dir
+          in
+          Lwt.return (node_data_dir, fe)
+      | None, Client.Node node ->
+          Lwt.return (Node.data_dir node, Node.as_foreign_rpc_endpoint node)
+      | _, Client.Proxy_server _ ->
+          Test.fail "Proxy_server not supported as a Node endpoint for baking"
+      | Some _, Client.Node _ ->
+          Test.fail
+            "Should not provide both a node data dir and an 'owned' node"
+      | None, Client.Foreign_endpoint _ ->
+          Test.fail
+            "Should provide a node data dir for a node given as foreign \
+             endpoint"
+    in
+    (* Get the wallet's base-dir. *)
+    let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
+    (* Create a baker state. *)
+    let octez_baker =
+      Baker.create_from_uris
+        ?name
+        ~protocol
+        ~base_dir
+        ~node_data_dir
+        ~node_rpc_endpoint
+        ~delegates
+        ()
+    in
+    (* Register the baker state. *)
+    let name = Baker.name octez_baker in
+    Agent_state.add (Octez_baker_k name) octez_baker state ;
+    (* Start the baker. *)
+    let* () = Baker.run octez_baker in
+    return {name}
+
+  let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()
+end
+
 let register_procedures () =
   Remote_procedure.register (module Generate_keys) ;
   Remote_procedure.register (module Start_octez_node) ;
@@ -2062,4 +2207,5 @@ let register_procedures () =
   Remote_procedure.register (module Prepare_kernel_installer) ;
   Remote_procedure.register (module Smart_rollups_add_messages) ;
   Remote_procedure.register (module Start_dac_node) ;
-  Remote_procedure.register (module Dac_post_file)
+  Remote_procedure.register (module Dac_post_file) ;
+  Remote_procedure.register (module Start_octez_baker)

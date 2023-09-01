@@ -27,6 +27,10 @@
 (* Declaration order must respect the version order. *)
 type t = Nairobi | Oxford | Alpha
 
+let encoding =
+  Data_encoding.string_enum
+    [("nairobi", Nairobi); ("oxford", Oxford); ("alpha", Alpha)]
+
 type constants =
   | Constants_sandbox
   | Constants_mainnet
