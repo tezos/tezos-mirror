@@ -96,3 +96,5 @@
    (write-file void_for_linking-tezos-client-017-PtNairob.empty "")
    (write-file void_for_linking-tezos-client-018-Proxford.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty ""))))
+
+(cram (deps codec.exe) (package octez-codec))

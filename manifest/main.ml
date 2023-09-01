@@ -7580,6 +7580,13 @@ let _octez_codec =
              if link then Protocol.client protocol else None);
          ])
     ~linkall:true
+    ~dune:
+      Dune.
+        [
+          S "cram"
+          :: G [S "deps" :: [S "codec.exe"]]
+          :: [S "package" :: [S "octez-codec"]];
+        ]
 
 let _octez_proxy_server =
   public_exe
