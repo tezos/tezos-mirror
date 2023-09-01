@@ -589,8 +589,8 @@ let simple_benchmark_with_stack_sampler ?(benchmark_type = Time) ?amplification
     intercept_stack
 
 let simple_time_alloc_benchmark_with_stack_sampler ?amplification
-    ?intercept_stack ?salt ?more_tags ?check ~name ~stack_type ~kinstr
-    ~stack_sampler () =
+    ?intercept_stack ?(alloc_intercept = true) ?salt ?more_tags ?check ~name
+    ~stack_type ~kinstr ~stack_sampler () =
   simple_benchmark_with_stack_sampler
     ~benchmark_type:Time
     ?amplification
@@ -605,7 +605,7 @@ let simple_time_alloc_benchmark_with_stack_sampler ?amplification
     () ;
   simple_benchmark_with_stack_sampler
     ~benchmark_type:Alloc
-    ?intercept_stack
+    ?intercept_stack:(if alloc_intercept then intercept_stack else None)
     ?salt
     ?more_tags
     ?check
@@ -1598,11 +1598,12 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISet_mem
         ~stack_type:(int @$ set int @$ unit @$ bot)
         ~kinstr:(ISet_mem (dummy_loc, halt))
         ~intercept_stack:(Script_int.zero, (Script_set.empty int, ((), eos)))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 1) ;
           let n =
@@ -1625,7 +1626,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISet_update
         ~stack_type:(int @$ bool @$ set int @$ bot)
         ~kinstr:(ISet_update (dummy_loc, halt))
@@ -1751,13 +1752,14 @@ module Registration_section = struct
         (map_mem) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_mem
         ~stack_type:(int @$ map int unit @$ unit @$ bot)
         ~kinstr:(IMap_mem (dummy_loc, halt))
         ~intercept_stack:
           (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1769,13 +1771,14 @@ module Registration_section = struct
         (map_get) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_get
         ~stack_type:(int @$ map int unit @$ unit @$ bot)
         ~kinstr:(IMap_get (dummy_loc, halt))
         ~intercept_stack:
           (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1787,7 +1790,7 @@ module Registration_section = struct
         (map_update) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_update
         ~stack_type:(int @$ option unit @$ map int unit @$ bot)
         ~kinstr:(IMap_update (dummy_loc, halt))
@@ -1806,7 +1809,7 @@ module Registration_section = struct
         (map_get) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_get_and_update
         ~stack_type:(int @$ option unit @$ map int unit @$ bot)
         ~kinstr:(IMap_get_and_update (dummy_loc, halt))
@@ -1888,13 +1891,14 @@ module Registration_section = struct
         (big_map_mem) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBig_map_mem
         ~stack_type:(int @$ big_map int unit @$ unit @$ bot)
         ~kinstr:(IBig_map_mem (dummy_loc, halt))
         ~intercept_stack:
           (let map = Script_big_map.empty int unit in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1906,13 +1910,14 @@ module Registration_section = struct
         (big_map_get) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBig_map_get
         ~stack_type:(int @$ big_map int unit @$ unit @$ bot)
         ~kinstr:(IBig_map_get (dummy_loc, halt))
         ~intercept_stack:
           (let map = Script_big_map.empty int unit in
            (Script_int.zero, (map, ((), eos))))
+        ~alloc_intercept:false
         ~stack_sampler:(fun cfg rng_state () ->
           let key, map = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1924,7 +1929,7 @@ module Registration_section = struct
         (big_map_update) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBig_map_update
         ~stack_type:(int @$ option unit @$ big_map int unit @$ bot)
         ~kinstr:(IBig_map_update (dummy_loc, halt))
@@ -1943,7 +1948,7 @@ module Registration_section = struct
         (big_map_get) ->
         IHalt
        *)
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBig_map_get_and_update
         ~stack_type:(int @$ option unit @$ big_map int unit @$ bot)
         ~kinstr:(IBig_map_get_and_update (dummy_loc, halt))
@@ -1960,7 +1965,7 @@ module Registration_section = struct
     open Script_string
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IConcat_string
         ~intercept_stack:(Script_list.empty, eos)
         ~stack_type:(list string @$ bot)
@@ -1968,7 +1973,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IConcat_string_pair
         ~intercept_stack:(empty, (empty, eos))
         ~stack_type:(string @$ string @$ bot)
@@ -1976,7 +1981,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISlice_string
         ~stack_type:(nat @$ nat @$ string @$ bot)
         ~kinstr:(ISlice_string (dummy_loc, halt))
@@ -2006,7 +2011,7 @@ module Registration_section = struct
     (* Copy of [String] modulo renaming string to bytes. *)
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IConcat_bytes
         ~intercept_stack:(Script_list.empty, eos)
         ~stack_type:(list bytes @$ bot)
@@ -2014,7 +2019,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IConcat_bytes_pair
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
@@ -2022,7 +2027,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ISlice_bytes
         ~stack_type:(nat @$ nat @$ bytes @$ bot)
         ~kinstr:(ISlice_bytes (dummy_loc, halt))
@@ -2048,7 +2053,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IAnd_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
@@ -2072,7 +2077,7 @@ module Registration_section = struct
         (bytes1, (bytes2, eos))
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IOr_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
@@ -2081,7 +2086,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IXor_bytes
         ~intercept_stack:(Bytes.empty, (Bytes.empty, eos))
         ~stack_type:(bytes @$ bytes @$ bot)
@@ -2090,7 +2095,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_INot_bytes
         ~intercept_stack:(Bytes.empty, eos)
         ~stack_type:(bytes @$ bot)
@@ -2098,7 +2103,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsl_bytes
         ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
         ~stack_type:(bytes @$ nat @$ bot)
@@ -2120,7 +2125,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ILsr_bytes
         ~intercept_stack:(Bytes.empty, (Script_int.one_n, eos))
         ~stack_type:(bytes @$ nat @$ bot)
@@ -2145,7 +2150,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBytes_nat
         ~stack_type:(nat @$ bot)
         ~kinstr:(IBytes_nat (dummy_loc, halt))
@@ -2165,7 +2170,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_INat_bytes
         ~stack_type:(bytes @$ bot)
         ~kinstr:(INat_bytes (dummy_loc, halt))
@@ -2187,7 +2192,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IBytes_int
         ~stack_type:(int @$ bot)
         ~kinstr:(IBytes_int (dummy_loc, halt))
@@ -2207,7 +2212,7 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark_with_stack_sampler
+      simple_time_alloc_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IInt_bytes
         ~stack_type:(bytes @$ bot)
         ~kinstr:(IInt_bytes (dummy_loc, halt))

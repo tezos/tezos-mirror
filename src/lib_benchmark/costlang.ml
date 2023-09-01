@@ -965,12 +965,12 @@ module Fold_constants (X : S) = struct
     | Bool _ -> assert false
 
   let log2 x =
-    inj
-    @@
     match x with
-    | Int i -> X.(log2 (int i))
-    | Float f -> X.(log2 (float f))
-    | Not_const term -> X.(log2 term)
+    | Int 1 -> Int 0
+    | Int i -> inj @@ X.(log2 (int i))
+    | Float 1. -> Float 0.
+    | Float f -> inj @@ X.(log2 (float f))
+    | Not_const term -> inj @@ X.(log2 term)
     | Bool _ -> assert false
 
   let sqrt x =
