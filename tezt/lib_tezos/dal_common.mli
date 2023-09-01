@@ -43,21 +43,26 @@ module Parameters : sig
   val from_client : Client.t -> t Lwt.t
 end
 
-val endpoint : Dal_node.t -> string
+module Helpers : sig
+  val endpoint : Dal_node.t -> string
 
-(** Abstract version of a slot to deal with messages content which
+  (** Abstract version of a slot to deal with messages content which
      are smaller than the expected size of a slot. *)
-type slot
+  type slot
 
-(** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
+  (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
       {!type:Cryptobox.parameters}). *)
-val make_slot : ?padding:bool -> slot_size:int -> string -> slot
+  val make_slot : ?padding:bool -> slot_size:int -> string -> slot
 
-(** [content_of_slot slot] retrieves the original content of a slot
+  (** [content_of_slot slot] retrieves the original content of a slot
      by removing the padding. *)
-val content_of_slot : slot -> string
+  val content_of_slot : slot -> string
+
+  val make :
+    ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
+end
 
 module RPC_legacy : sig
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
@@ -106,7 +111,7 @@ module RPC : sig
 
   (** Call RPC "POST /commitments" to store a slot and retrun the commitment
         in case of success. *)
-  val post_commitment : slot -> (Dal_node.t, commitment) RPC_core.t
+  val post_commitment : Helpers.slot -> (Dal_node.t, commitment) RPC_core.t
 
   (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
         whose commitment is given. *)
@@ -118,7 +123,7 @@ module RPC : sig
 
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
-  val get_commitment_slot : commitment -> (Dal_node.t, slot) RPC_core.t
+  val get_commitment_slot : commitment -> (Dal_node.t, Helpers.slot) RPC_core.t
 
   (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
         shards of the slot whose commitment is given, using the current DAL
@@ -187,15 +192,12 @@ module RPC : sig
     (Dal_node.t, attestable_slots) RPC_core.t
 end
 
-val make :
-  ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
-
 module Commitment : sig
   val dummy_commitment :
     ?on_error:
       ([ `Invalid_degree_strictly_less_than_expected of
          (int, int) Cryptobox.error_container
-       | `Slot_wrong_size of slot ] ->
+       | `Slot_wrong_size of Helpers.slot ] ->
       Cryptobox.commitment * Cryptobox.commitment_proof) ->
     Cryptobox.t ->
     string ->

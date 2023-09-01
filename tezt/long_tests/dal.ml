@@ -116,7 +116,7 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attestor_profiles = [])
   return dal_node
 
 let store_slot_to_dal_node ~slot_size dal_node =
-  let slot = Dal_common.make_slot "someslot" ~slot_size in
+  let slot = Dal_common.Helpers.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
   let* commitment = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   (* Compute and save the shards of the slot. *)
@@ -255,7 +255,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
             "Expected validated operations in mempool to be %L, got %R.") ;
       unit
     in
-    let dal_node_endpoint = Dal_common.endpoint dal_node2 in
+    let dal_node_endpoint = Dal_common.Helpers.endpoint dal_node2 in
     Log.info "Bake two blocks to finalize the slot header." ;
     let* () =
       Base.repeat 2 (fun () ->

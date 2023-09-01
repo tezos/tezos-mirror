@@ -71,11 +71,47 @@ module Parameters = struct
     from_protocol_parameters json |> return
 end
 
-let endpoint dal_node =
-  Printf.sprintf
-    "http://%s:%d"
-    (Dal_node.rpc_host dal_node)
-    (Dal_node.rpc_port dal_node)
+module Helpers = struct
+  let endpoint dal_node =
+    Printf.sprintf
+      "http://%s:%d"
+      (Dal_node.rpc_host dal_node)
+      (Dal_node.rpc_port dal_node)
+
+  let pad n message =
+    let padding = String.make n '\000' in
+    message ^ padding
+
+  type slot = string
+
+  let make_slot ?(padding = true) ~slot_size slot =
+    if String.contains slot '\000' then
+      Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
+    let actual_slot_size = String.length slot in
+    if actual_slot_size < slot_size && padding then
+      pad (slot_size - actual_slot_size) slot
+    else slot
+
+  let content_of_slot slot =
+    (* We make the assumption that the content of a slot (for test
+       purpose only) does not contain two `\000` in a row. This
+       invariant is ensured by [make_slot]. *)
+    String.split_on_char '\000' slot
+    |> List.filter (fun str -> not (str = String.empty))
+    |> String.concat "\000"
+
+  let make
+      ?(on_error =
+        fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
+      parameters =
+    let initialisation_parameters =
+      Cryptobox.Internal_for_tests.parameters_initialisation parameters
+    in
+    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+    match Cryptobox.make parameters with
+    | Ok cryptobox -> cryptobox
+    | Error (`Fail msg) -> on_error msg
+end
 
 module Committee = struct
   type member = {attestor : string; first_shard_index : int; power : int}
@@ -103,28 +139,6 @@ module Committee = struct
            {attestor = pkh; first_shard_index; power})
          (JSON.as_list json)
 end
-
-let pad n message =
-  let padding = String.make n '\000' in
-  message ^ padding
-
-type slot = string
-
-let make_slot ?(padding = true) ~slot_size slot =
-  if String.contains slot '\000' then
-    Test.fail "make_slot: The content of a slot cannot contain `\000`" ;
-  let actual_slot_size = String.length slot in
-  if actual_slot_size < slot_size && padding then
-    pad (slot_size - actual_slot_size) slot
-  else slot
-
-let content_of_slot slot =
-  (* We make the assumption that the content of a slot (for test
-     purpose only) does not contain two `\000` in a row. This
-     invariant is ensured by [make_slot]. *)
-  String.split_on_char '\000' slot
-  |> List.filter (fun str -> not (str = String.empty))
-  |> String.concat "\000"
 
 module RPC_legacy = struct
   let make ?data ?query_string =
@@ -333,18 +347,6 @@ module RPC = struct
           | _ -> failwith "invalid case"))
 end
 
-let make
-    ?(on_error =
-      fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
-    parameters =
-  let initialisation_parameters =
-    Cryptobox.Internal_for_tests.parameters_initialisation parameters
-  in
-  Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
-  match Cryptobox.make parameters with
-  | Ok cryptobox -> cryptobox
-  | Error (`Fail msg) -> on_error msg
-
 module Commitment = struct
   let dummy_commitment
       ?(on_error =
@@ -357,7 +359,7 @@ module Commitment = struct
     let parameters = Cryptobox.Verifier.parameters cryptobox in
     let padding_length = parameters.slot_size - String.length message in
     let padded_message =
-      if padding_length > 0 then pad padding_length message else message
+      if padding_length > 0 then Helpers.pad padding_length message else message
     in
     let slot = String.to_bytes padded_message in
     let open Tezos_error_monad.Error_monad.Result_syntax in
