@@ -172,6 +172,19 @@ type transaction_log = {
   removed : bool;
 }
 
+let transaction_log_body_from_rlp = function
+  | Rlp.List [Value address; List topics; Value data] ->
+      ( decode_address address,
+        List.map
+          (function
+            | Rlp.Value bytes -> decode_hash bytes
+            | _ -> raise (Invalid_argument "Expected hash representing topic"))
+          topics,
+        decode_hash data )
+  | _ ->
+      raise
+        (Invalid_argument "Expected list of 3 elements representing log body")
+
 let transaction_log_encoding =
   let open Data_encoding in
   conv
@@ -258,6 +271,8 @@ let transaction_receipt_from_rlp bytes =
           Value effective_gas_price;
           Value gas_used;
           Value contract_address;
+          List logs;
+          Value bloom;
           Value type_;
           Value status;
         ]) ->
@@ -274,6 +289,24 @@ let transaction_receipt_from_rlp bytes =
         if contract_address = Bytes.empty then None
         else Some (decode_address contract_address)
       in
+      let logs_body = List.map transaction_log_body_from_rlp logs in
+      let logs_objects =
+        List.mapi
+          (fun i (address, topics, data) ->
+            {
+              address;
+              topics;
+              data;
+              blockHash = block_hash;
+              blockNumber = block_number;
+              transactionHash = hash;
+              transactionIndex = index;
+              logIndex = quantity_of_z (Z.of_int i);
+              removed = false;
+            })
+          logs_body
+      in
+      let bloom = decode_hex bloom in
       let type_ = decode_number type_ in
       let status = decode_number status in
       {
@@ -286,13 +319,16 @@ let transaction_receipt_from_rlp bytes =
         cumulativeGasUsed = cumulative_gas_used;
         effectiveGasPrice = effective_gas_price;
         gasUsed = gas_used;
-        logs = [];
-        logsBloom = Hex (String.make 256 'a');
+        logs = logs_objects;
+        logsBloom = bloom;
         type_;
         status;
         contractAddress = contract_address;
       }
-  | _ -> raise (Invalid_argument "Expected a List of 12 elements")
+  | _ ->
+      raise
+        (Invalid_argument
+           "Expected a RlpList of 14 elements in transaction receipt")
 
 let transaction_receipt_encoding =
   let open Data_encoding in
