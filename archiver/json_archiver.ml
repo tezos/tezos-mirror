@@ -283,6 +283,7 @@ let dump_included_in_block path block_level block_hash block_predecessor
        let out_infos =
          Data.
            {
+             cycle_info;
              blocks = infos.blocks;
              delegate_operations;
              unaccurate = infos.unaccurate;
@@ -320,14 +321,20 @@ let dump_included_in_block path block_level block_hash block_predecessor
             reception_times;
             timestamp;
             nonce = None;
-            cycle_info;
+            cycle_info = None;
           }
         :: infos.Data.blocks
       in
       write
         filename
         Data.encoding
-        Data.{blocks; delegate_operations; unaccurate = infos.unaccurate})
+        Data.
+          {
+            cycle_info;
+            blocks;
+            delegate_operations;
+            unaccurate = infos.unaccurate;
+          })
   >>= fun out ->
   let () = drop_file_mutex filename in
   match out with
@@ -454,7 +461,13 @@ let dump_received path ?unaccurate level received_ops =
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
         let out_infos =
-          Data.{blocks = infos.blocks; delegate_operations; unaccurate}
+          Data.
+            {
+              cycle_info = infos.cycle_info;
+              blocks = infos.blocks;
+              delegate_operations;
+              unaccurate;
+            }
         in
         let* () = write filename Data.encoding out_infos in
         if infos.unaccurate then return_unit
