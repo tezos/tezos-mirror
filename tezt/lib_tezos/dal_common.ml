@@ -388,6 +388,10 @@ module Commitment = struct
     | Error e -> on_error e
 
   let to_string commitment = Cryptobox.Commitment.to_b58check commitment
+
+  let of_string commitment =
+    Cryptobox.Commitment.of_b58check_opt commitment
+    |> mandatory "The b58check-encoded slot commitment is not valid"
 end
 
 module Check = struct

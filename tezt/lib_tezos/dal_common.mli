@@ -216,6 +216,8 @@ module Commitment : sig
     Cryptobox.commitment * Cryptobox.commitment_proof
 
   val to_string : Cryptobox.commitment -> string
+
+  val of_string : string -> Cryptobox.commitment
 end
 
 module Committee : sig

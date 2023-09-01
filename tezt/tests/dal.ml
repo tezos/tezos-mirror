@@ -478,10 +478,7 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
 
 let publish_slot_header ?counter ?force ~source ?(fee = 1200) ~index ~commitment
     ~proof client =
-  let commitment =
-    Cryptobox.Commitment.of_b58check_opt commitment
-    |> mandatory "The b58check-encoded slot commitment is not valid"
-  in
+  let commitment = Dal_common.Commitment.of_string commitment in
   let proof =
     Data_encoding.Json.destruct
       Cryptobox.Commitment_proof.encoding
