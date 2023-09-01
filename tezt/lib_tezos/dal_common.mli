@@ -218,6 +218,10 @@ module Commitment : sig
   val to_string : Cryptobox.commitment -> string
 
   val of_string : string -> Cryptobox.commitment
+
+  val proof_to_string : Cryptobox.commitment_proof -> string
+
+  val proof_of_string : string -> Cryptobox.commitment_proof
 end
 
 module Committee : sig

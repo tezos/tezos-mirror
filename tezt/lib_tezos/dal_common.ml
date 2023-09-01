@@ -392,6 +392,15 @@ module Commitment = struct
   let of_string commitment =
     Cryptobox.Commitment.of_b58check_opt commitment
     |> mandatory "The b58check-encoded slot commitment is not valid"
+
+  let proof_to_string proof =
+    Data_encoding.Json.construct Cryptobox.Commitment_proof.encoding proof
+    |> Data_encoding.Json.to_string
+
+  let proof_of_string proof =
+    Data_encoding.Json.destruct
+      Cryptobox.Commitment_proof.encoding
+      (`String proof)
 end
 
 module Check = struct

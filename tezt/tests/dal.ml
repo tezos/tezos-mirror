@@ -479,11 +479,7 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
 let publish_slot_header ?counter ?force ~source ?(fee = 1200) ~index ~commitment
     ~proof client =
   let commitment = Dal_common.Commitment.of_string commitment in
-  let proof =
-    Data_encoding.Json.destruct
-      Cryptobox.Commitment_proof.encoding
-      (`String proof)
-  in
+  let proof = Dal_common.Commitment.proof_of_string proof in
   Helpers.publish_slot
     ?counter
     ?force
