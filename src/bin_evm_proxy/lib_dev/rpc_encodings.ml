@@ -200,6 +200,18 @@ module Kernel_version = MethodMaker (struct
   let method_ = "tez_kernelVersion"
 end)
 
+module Upgrade_nonce = MethodMaker (struct
+  type input = unit
+
+  type output = int32
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.int32
+
+  let method_ = "tez_upgradeNonce"
+end)
+
 module Network_id = MethodMaker (struct
   type input = unit
 
@@ -448,6 +460,7 @@ end)
 let methods : (module METHOD) list =
   [
     (module Kernel_version);
+    (module Upgrade_nonce);
     (module Network_id);
     (module Chain_id);
     (module Accounts);

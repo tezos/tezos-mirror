@@ -103,6 +103,9 @@ module type S = sig
         the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t
 
+  (** [upgrade_nonce ()] returns the upgrade nonce. *)
+  val upgrade_nonce : unit -> int tzresult Lwt.t
+
   (** [simulate_call call_info] asks the rollup to simulate a call, and returns the
         result. *)
   val simulate_call : Ethereum_types.call -> Ethereum_types.hash tzresult Lwt.t
