@@ -88,6 +88,51 @@ Generate default config
             },
             "children": [
               {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
+              {
                 "namespace": "intercept",
                 "config": {
                   "sampler": {
@@ -195,6 +240,51 @@ Modify empty config
               }
             },
             "children": [
+              {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
               {
                 "namespace": "intercept",
                 "config": {
@@ -319,6 +409,51 @@ Test merge
               }
             },
             "children": [
+              {
+                "namespace": "alloc",
+                "config": {
+                  "sampler": {
+                    "int_size": {
+                      "min": 8,
+                      "max": 100000
+                    },
+                    "string_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "bytes_size": {
+                      "min": 1024,
+                      "max": 131072
+                    },
+                    "list_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "set_size": {
+                      "min": 10,
+                      "max": 1000
+                    },
+                    "map_size": {
+                      "min": 10,
+                      "max": 1000
+                    }
+                  },
+                  "sapling": {
+                    "sapling_txs_file": "/no/such/file",
+                    "seed": null
+                  },
+                  "comb": {
+                    "max_depth": 1000
+                  },
+                  "compare": {
+                    "type_size": {
+                      "min": 1,
+                      "max": 15
+                    }
+                  }
+                },
+                "children": []
+              },
               {
                 "namespace": "intercept",
                 "config": {

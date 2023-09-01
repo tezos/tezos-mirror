@@ -300,6 +300,26 @@ let unknown_const1 ~name ~const =
   end in
   (module M : Model_impl with type arg_type = unit)
 
+let unknown_const1_skip1 ~name ~const =
+  let module M = struct
+    type arg_type = int * unit
+
+    let name = name
+
+    let takes_saturation_reprs = false
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model = lam ~name:"size" @@ fun (_ : size repr) -> free ~name:const
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
 let unknown_const1_skip2 ~name ~const =
   let module M = struct
     type arg_type = int * (int * unit)

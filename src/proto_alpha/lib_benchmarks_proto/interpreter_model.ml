@@ -195,6 +195,10 @@ module Models = struct
     (* For constant-time instructions *)
     Model.unknown_const1 ~name:(ns name) ~const:(fv (sf "%s_const" name))
 
+  let const1_skip1_model name =
+    (* For constant-time instructions *)
+    Model.unknown_const1_skip1 ~name:(ns name) ~const:(fv (sf "%s_const" name))
+
   let const1_skip2_model name =
     (* For constant-time instructions *)
     Model.unknown_const1_skip2 ~name:(ns name) ~const:(fv (sf "%s_const" name))
@@ -616,10 +620,10 @@ let ir_model instr_or_cont =
           (const1_model, const1_model) |> m2 name
       | N_IPack -> (pack_model, pack_model) |> m2 name
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
-          affine_model name |> m
+          (affine_model, const1_skip1_model) |> m2 name
       | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
       | N_ICheck_signature_p256 | N_ICheck_signature_bls ->
-          affine_model name |> m
+          (affine_model, const1_skip1_model) |> m2 name
       | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
           (const1_model, const1_model) |> m2 name
       (* The following two instructions are expected to have an affine model. However,
@@ -640,9 +644,10 @@ let ir_model instr_or_cont =
           (const1_model, const1_model) |> m2 name
       | N_IMul_bls12_381_fr_z | N_IMul_bls12_381_z_fr
       | N_IPairing_check_bls12_381 ->
-          affine_model name |> m
-      | N_IComb | N_IUncomb -> affine_offset_model name ~offset:2 |> m
-      | N_IComb_get | N_IComb_set -> affine_model name |> m
+          (affine_model, const1_skip1_model) |> m2 name
+      | N_IComb | N_IUncomb ->
+          (affine_offset_model ~offset:2, affine_model) |> m2 name
+      | N_IComb_get | N_IComb_set -> (affine_model, affine_model) |> m2 name
       | N_ITicket | N_IRead_ticket -> (const1_model, const1_model) |> m2 name
       | N_ISplit_ticket -> linear_max_model name |> m
       | N_IJoin_tickets -> join_tickets_model name |> m
