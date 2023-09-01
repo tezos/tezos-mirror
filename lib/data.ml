@@ -279,15 +279,8 @@ module Block = struct
          (opt "cycle_info" cycle_info_encoding))
 end
 
-module Cycle = struct
-  type t = {cycle : int32; cycle_position : int32}
-
-  let encoding =
-    let open Data_encoding in
-    obj2 (req "cycle" int32) (req "cycle_position" int32)
-end
-
 type t = {
+  cycle_info : Block.cycle_info option;
   blocks : Block.t list;
   delegate_operations : Delegate_operations.t list;
   unaccurate : bool;
@@ -296,17 +289,19 @@ type t = {
 let encoding =
   let open Data_encoding in
   conv
-    (fun {blocks; delegate_operations; unaccurate} ->
-      (blocks, delegate_operations, unaccurate))
-    (fun (blocks, delegate_operations, unaccurate) ->
-      {blocks; delegate_operations; unaccurate})
-    (obj3
+    (fun {cycle_info; blocks; delegate_operations; unaccurate} ->
+      (cycle_info, blocks, delegate_operations, unaccurate))
+    (fun (cycle_info, blocks, delegate_operations, unaccurate) ->
+      {cycle_info; blocks; delegate_operations; unaccurate})
+    (obj4
+       (opt "cycle_info" Block.cycle_info_encoding)
        (dft "blocks" (list Block.encoding) [])
        (* TODO: change name? *)
        (dft "endorsements" (list Delegate_operations.encoding) [])
        (dft "unaccurate" bool false))
 
-let empty = {blocks = []; delegate_operations = []; unaccurate = true}
+let empty =
+  {cycle_info = None; blocks = []; delegate_operations = []; unaccurate = true}
 
 let block_data_encoding =
   let open Data_encoding in

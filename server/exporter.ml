@@ -74,6 +74,24 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
       | None -> None)
     acc
 
+let select_cycle_info db_pool level =
+  let cycle_request =
+    Caqti_request.Infix.(
+      Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
+      "SELECT id, l - MAX(level), size FROM cycles, (SELECT ? l) WHERE level \
+       <= l"
+  in
+  Caqti_lwt.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Lwt.map
+        (function
+          | Error e -> Error e
+          | Ok (Some (cycle, cycle_position, _)) ->
+              Ok (Some Teztale_lib.Data.Block.{cycle; cycle_position})
+          | Ok None -> Ok None)
+        (Db.find_opt cycle_request level))
+    db_pool
+
 let select_blocks db_pool level =
   let block_request =
     Caqti_request.Infix.(
@@ -321,6 +339,7 @@ let anomalies level ops =
     []
 
 let data_at_level db_pool level =
+  let* cycle_info = select_cycle_info db_pool level in
   let blocks_e = select_blocks db_pool level in
   let* delegate_operations = select_ops db_pool level in
   let* blocks = blocks_e in
@@ -329,7 +348,7 @@ let data_at_level db_pool level =
     Tezos_crypto.Hashed.Block_hash.Map.fold (fun _ x acc -> x :: acc) blocks []
   in
   let unaccurate = false in
-  return Teztale_lib.Data.{blocks; delegate_operations; unaccurate}
+  return Teztale_lib.Data.{cycle_info; blocks; delegate_operations; unaccurate}
 
 let anomalies_at_level db_pool level =
   let* ops = select_ops db_pool level in
