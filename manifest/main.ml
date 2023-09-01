@@ -8071,21 +8071,6 @@ let _evm_proxy =
       ]
     ~bisect_ppx:Yes
 
-let _octez_evm_signer_exe =
-  private_exe
-    "octez_evm_upgrade_signer"
-    ~path:"src/bin_evm_proxy/upgrade_signer"
-    ~synopsis:"EVM upgrade message"
-    ~opam:"octez-evm-upgrade-signer"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_clic;
-        evm_proxy_lib_prod;
-        evm_proxy_lib_dev;
-      ]
-
 let octez_scoru_wasm_regressions =
   private_lib
     "tezos_scoru_wasm_regressions"
