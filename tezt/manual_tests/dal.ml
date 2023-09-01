@@ -54,7 +54,7 @@ let dal_distribution =
         Test.fail "Specify an output file with --test-arg output-file=<file>"
     | Some output_file -> output_file
   in
-  let* parameter_file = Rollup.Dal.Parameters.parameter_file protocol in
+  let* parameter_file = Dal_common.Parameters.parameter_file protocol in
   let* node, client =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in

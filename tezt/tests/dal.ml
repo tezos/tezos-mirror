@@ -32,7 +32,7 @@
 
 let hooks = Tezos_regression.hooks
 
-module Cryptobox = Rollup.Dal.Cryptobox
+module Cryptobox = Dal_common.Cryptobox
 
 let next_level node =
   let* current_level = Node.get_level node in
@@ -84,7 +84,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   in
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
-  let* dal_parameters = Rollup.Dal.Parameters.from_client client in
+  let* dal_parameters = Dal_common.Parameters.from_client client in
   let config : Cryptobox.Config.t =
     {
       activated = true;
@@ -158,7 +158,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let cryptobox = Rollup.Dal.make dal_parameters.cryptobox in
+  let cryptobox = Dal_common.make dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
@@ -367,10 +367,10 @@ let test_feature_flag _protocol _parameters _cryptobox node client
      - 2. It checks the new operations added by the feature flag
      cannot be propagated by checking their classification in the
      mempool. *)
-  let* params = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make params.cryptobox in
+  let* params = Dal_common.Parameters.from_client client in
+  let cryptobox = Dal_common.make params.cryptobox in
   let commitment, proof =
-    Rollup.Dal.Commitment.dummy_commitment cryptobox "coucou"
+    Dal_common.Commitment.dummy_commitment cryptobox "coucou"
   in
   Check.(
     (params.feature_enabled = false)
@@ -415,7 +415,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
 
 let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
     _bootstrap_key =
-  let blocks_per_epoch = parameters.Rollup.Dal.Parameters.blocks_per_epoch in
+  let blocks_per_epoch = parameters.Dal_common.Parameters.blocks_per_epoch in
   let* current_level =
     RPC.(call node @@ get_chain_block_helper_current_level ())
   in
@@ -423,7 +423,7 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
      that is indeed the case. *)
   assert (current_level.cycle_position = 0) ;
   let* first_committee =
-    Rollup.Dal.Committee.at_level node ~level:current_level.level
+    Dal_common.Committee.at_level node ~level:current_level.level
   in
   (* We iterate through (the committees at) levels [current_level +
      offset], with [offset] from 1 to [blocks_per_epoch]. At offset 0
@@ -435,15 +435,15 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
     if offset > blocks_per_epoch then unit
     else
       let level = current_level.level + offset in
-      let* committee = Rollup.Dal.Committee.at_level node ~level in
+      let* committee = Dal_common.Committee.at_level node ~level in
       if offset < blocks_per_epoch then (
-        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+        Check.((first_committee = committee) Dal_common.Committee.typ)
           ~error_msg:
             "Unexpected different DAL committees at first level: %L, versus \
              current level: %R" ;
         unit)
       else if offset = blocks_per_epoch then (
-        Check.((first_committee = committee) Rollup.Dal.Committee.typ)
+        Check.((first_committee = committee) Dal_common.Committee.typ)
           ~error_msg:
             "Unexpected equal DAL committees at first levels in subsequent \
              epochs: %L and %R" ;
@@ -454,7 +454,7 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
 
 let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof =
-    Rollup.Dal.(Commitment.dummy_commitment cryptobox message)
+    Dal_common.(Commitment.dummy_commitment cryptobox message)
   in
   publish_slot ~source ?fee ?error ~index ~commitment ~proof
 
@@ -463,10 +463,10 @@ let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
 let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
     cryptobox =
   let commitment, _proof =
-    Rollup.Dal.(Commitment.dummy_commitment cryptobox "a")
+    Dal_common.(Commitment.dummy_commitment cryptobox "a")
   in
   let _commitment, proof =
-    Rollup.Dal.(Commitment.dummy_commitment cryptobox "b")
+    Dal_common.(Commitment.dummy_commitment cryptobox "b")
   in
   publish_slot ~source ?fee ~index ~commitment ~proof
 
@@ -477,17 +477,17 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
     ~index parameters cryptobox =
   let cryptobox_params =
     {
-      parameters.Rollup.Dal.Parameters.cryptobox with
+      parameters.Dal_common.Parameters.cryptobox with
       slot_size = 2 * parameters.cryptobox.slot_size;
     }
   in
-  let cryptobox' = Rollup.Dal.make cryptobox_params in
+  let cryptobox' = Dal_common.make cryptobox_params in
   let msg = "a" in
   let commitment, _proof =
-    Rollup.Dal.(Commitment.dummy_commitment cryptobox msg)
+    Dal_common.(Commitment.dummy_commitment cryptobox msg)
   in
   let _commitment, proof =
-    Rollup.Dal.(Commitment.dummy_commitment cryptobox' msg)
+    Dal_common.(Commitment.dummy_commitment cryptobox' msg)
   in
   publish_slot ~source ?fee ~index ~commitment ~proof
 
@@ -688,7 +688,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
   check_manager_operation_status operations_result proof_error oph6 ;
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
-  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let nb_slots = parameters.Dal_common.Parameters.number_of_slots in
   let lag = parameters.attestation_lag in
   let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
   let* _ =
@@ -732,7 +732,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
 let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     node client _bootstrap_key =
   (* Some helpers *)
-  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let nb_slots = parameters.Dal_common.Parameters.number_of_slots in
   let lag = parameters.attestation_lag in
   assert (lag > 1) ;
   let attest ~level =
@@ -871,7 +871,7 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
     let* () = Client.bake_for_and_wait client in
     return new_account
   in
-  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let nb_slots = parameters.Dal_common.Parameters.number_of_slots in
   let* level = next_level node in
   let* (`OpHash _oph) =
     (* The attestation from the new account should fail as
@@ -904,26 +904,26 @@ let test_slots_attestation_operation_dal_committee_membership_check _protocol
    node to compute and store the corresponding commitment and shards by calling
    relevant RPCs. It returns the commitment and its proof. *)
 let store_slot dal_node ~slot_size ?with_proof content =
-  let slot = Rollup.Dal.make_slot ~slot_size content in
-  let* commitment = RPC.call dal_node @@ Rollup.Dal.RPC.post_commitment slot in
+  let slot = Dal_common.make_slot ~slot_size content in
+  let* commitment = RPC.call dal_node @@ Dal_common.RPC.post_commitment slot in
   let* () =
     RPC.call dal_node
-    @@ Rollup.Dal.RPC.put_commitment_shards ?with_proof commitment
+    @@ Dal_common.RPC.put_commitment_shards ?with_proof commitment
   in
   let* proof =
-    RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof commitment
+    RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
   in
   return (commitment, proof)
 
 let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     dal_node =
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let* slot_commitment, _proof = store_slot dal_node ~slot_size slot_content in
   let* received_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot slot_commitment)
+    RPC.call dal_node (Dal_common.RPC.get_commitment_slot slot_commitment)
   in
-  let received_slot_content = Rollup.Dal.content_of_slot received_slot in
+  let received_slot_content = Dal_common.content_of_slot received_slot in
   Check.(
     (slot_content = received_slot_content)
       string
@@ -931,7 +931,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
   (* Only check that the function to retrieve pages succeeds, actual
      contents are checked in the test `rollup_node_stores_dal_slots`. *)
   let* _slots_as_pages =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_commitment)
+    RPC.call dal_node (Dal_common.RPC.slot_pages slot_commitment)
   in
   return ()
 
@@ -967,7 +967,7 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
       let* response =
         RPC.call_raw
           dal_node
-          (Rollup.Dal.RPC.get_level_index_commitment ~slot_index ~slot_level)
+          (Dal_common.RPC.get_level_index_commitment ~slot_index ~slot_level)
       in
       return @@ check_result commitment' response)
     slots_info
@@ -993,7 +993,7 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
     let* response =
       RPC.call_raw
         dal_node
-        (Rollup.Dal.RPC.get_commitment_headers ?slot_index ?slot_level commit)
+        (Dal_common.RPC.get_commitment_headers ?slot_index ?slot_level commit)
     in
     return @@ check_result response
   in
@@ -1003,7 +1003,7 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
 let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~number_of_headers =
   let* slot_headers =
-    RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers pub_level)
+    RPC.call dal_node (Dal_common.RPC.get_published_level_headers pub_level)
   in
   Check.(List.length slot_headers = number_of_headers)
     ~__LOC__
@@ -1015,11 +1015,11 @@ let get_headers_succeeds ~__LOC__ expected_status response =
   let headers =
     JSON.(
       parse ~origin:"get_headers_succeeds" response.RPC_core.body
-      |> Rollup.Dal.RPC.slot_headers_of_json)
+      |> Dal_common.RPC.slot_headers_of_json)
   in
   List.iter
     (fun header ->
-      Check.(header.Rollup.Dal.RPC.status = expected_status)
+      Check.(header.Dal_common.RPC.status = expected_status)
         ~__LOC__
         Check.string
         ~error_msg:
@@ -1030,7 +1030,7 @@ let get_headers_succeeds ~__LOC__ expected_status response =
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
   let check_published_level_headers = check_published_level_headers dal_node in
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let* level = Node.get_level node in
   let pub_level = level + 1 in
   let publish ?fee source ~index content =
@@ -1065,9 +1065,9 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot =
-      Rollup.Dal.make_slot ~slot_size "never associated to a slot_id"
+      Dal_common.make_slot ~slot_size "never associated to a slot_id"
     in
-    let* commit = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+    let* commit = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
     return (6, commit)
   in
 
@@ -1122,13 +1122,13 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot_headers =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.get_published_level_headers
+      (Dal_common.RPC.get_published_level_headers
          ~status:"waiting_attestation"
          pub_level)
   in
   let slot_headers =
     List.map
-      (fun sh -> (sh.Rollup.Dal.RPC.slot_index, sh.commitment))
+      (fun sh -> (sh.Dal_common.RPC.slot_index, sh.commitment))
       slot_headers
     |> List.fast_sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
   in
@@ -1165,7 +1165,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     "Attest slots slot0 and slot2_b, and wait for the attestations to be final" ;
   let attested = [slot0; slot2_b] in
   let unattested = [slot1] in
-  let nb_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let nb_slots = parameters.Dal_common.Parameters.number_of_slots in
   let* () = repeat (lag - 2) (fun () -> Client.bake_for_and_wait client) in
   let* _op_hash = dal_attestations ~nb_slots (List.map fst attested) client in
   let wait_block_processing3 =
@@ -1249,7 +1249,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
         from this slot (it would work with more)
      4. Ensure we can rebuild the original data using the above shards
   *)
-  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let crypto_params = parameters.Dal_common.Parameters.cryptobox in
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
   let publish = publish_and_store_slot client dal_node ~slot_size in
@@ -1264,7 +1264,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
   let* shards =
-    RPC.call dal_node (Rollup.Dal.RPC.shards ~slot_header downloaded_shard_ids)
+    RPC.call dal_node (Dal_common.RPC.shards ~slot_header downloaded_shard_ids)
   in
   let shard_of_json shard =
     let shard =
@@ -1276,7 +1276,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
   let shards = shards |> List.to_seq |> Seq.map shard_of_json in
-  let cryptobox = Rollup.Dal.make parameters.cryptobox in
+  let cryptobox = Dal_common.make parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
@@ -1303,18 +1303,18 @@ let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
   let* () = Dal_node.run dal_node3 in
   let* () = Dal_node.run dal_node4 in
   let commitment1, _proof1 =
-    Rollup.Dal.Commitment.dummy_commitment cryptobox "content1"
+    Dal_common.Commitment.dummy_commitment cryptobox "content1"
   in
-  let slot_header1_exp = Rollup.Dal.Commitment.to_string commitment1 in
+  let slot_header1_exp = Dal_common.Commitment.to_string commitment1 in
   let commitment2, _proof2 =
-    Rollup.Dal.Commitment.dummy_commitment cryptobox "content2"
+    Dal_common.Commitment.dummy_commitment cryptobox "content2"
   in
-  let slot_header2_exp = Rollup.Dal.Commitment.to_string commitment2 in
+  let slot_header2_exp = Dal_common.Commitment.to_string commitment2 in
   let p1 = wait_for_stored_slot dal_node3 slot_header1_exp in
   let p2 = wait_for_stored_slot dal_node3 slot_header2_exp in
   let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
   let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let* slot_header1, _proof1 = store_slot dal_node1 ~slot_size "content1" in
   let* slot_header2, _proof2 = store_slot dal_node2 ~slot_size "content2" in
   Check.(
@@ -1327,7 +1327,7 @@ let commitment_of_slot cryptobox slot =
   let polynomial =
     Cryptobox.polynomial_from_slot
       cryptobox
-      (Rollup.Dal.content_of_slot slot |> Bytes.of_string)
+      (Dal_common.content_of_slot slot |> Bytes.of_string)
     |> Result.get_ok
   in
   match Cryptobox.commit cryptobox polynomial with
@@ -1337,13 +1337,13 @@ let commitment_of_slot cryptobox slot =
 
 let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     _client dal_node =
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let mk_slot size =
-    Rollup.Dal.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
+    Dal_common.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
   in
   let failing_post_slot_rpc slot =
     let* response =
-      RPC.call_raw dal_node @@ Rollup.Dal.RPC.post_commitment slot
+      RPC.call_raw dal_node @@ Dal_common.RPC.post_commitment slot
     in
     return
     @@ RPC.check_string_response
@@ -1351,17 +1351,17 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
          ~code:500
          response
   in
-  let size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let slot_big = mk_slot (size + 1) in
   let slot_small = mk_slot (size - 1) in
   let slot_ok = mk_slot size in
   let* () = failing_post_slot_rpc slot_big in
   let* () = failing_post_slot_rpc slot_small in
   let* commitment1 =
-    RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot_ok)
+    RPC.call dal_node (Dal_common.RPC.post_commitment slot_ok)
   in
   let* commitment2 =
-    RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot_ok)
+    RPC.call dal_node (Dal_common.RPC.post_commitment slot_ok)
   in
   (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4250
      The second RPC call above succeeeds, but the (untested) returned HTTP status
@@ -1387,17 +1387,17 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
   let failing_patch_slot_rpc commit ~slot_level ~slot_index =
     let* response =
       RPC.call_raw dal_node
-      @@ Rollup.Dal.RPC.patch_commitment commit ~slot_level ~slot_index
+      @@ Dal_common.RPC.patch_commitment commit ~slot_level ~slot_index
     in
     return @@ RPC.check_string_response ~code:404 response
   in
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let slot = Rollup.Dal.make_slot ~slot_size (generate_dummy_slot slot_size) in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
+  let slot = Dal_common.make_slot ~slot_size (generate_dummy_slot slot_size) in
   let commitment =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
   let* () = failing_patch_slot_rpc commitment ~slot_level:0 ~slot_index:0 in
-  let* commitment' = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+  let* commitment' = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   Check.(commitment' = commitment)
     Check.string
     ~error_msg:
@@ -1406,7 +1406,7 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
   let patch_slot_rpc ~slot_level ~slot_index =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.patch_commitment commitment ~slot_level ~slot_index)
+      (Dal_common.RPC.patch_commitment commitment ~slot_level ~slot_index)
   in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
@@ -1415,23 +1415,23 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
 
 let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     _client dal_node =
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let slot = Rollup.Dal.make_slot ~slot_size (generate_dummy_slot slot_size) in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
+  let slot = Dal_common.make_slot ~slot_size (generate_dummy_slot slot_size) in
   let commitment =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
   let* () =
     let* response =
-      RPC.call_raw dal_node @@ Rollup.Dal.RPC.get_commitment_slot commitment
+      RPC.call_raw dal_node @@ Dal_common.RPC.get_commitment_slot commitment
     in
     return @@ RPC.check_string_response ~code:404 response
   in
-  let* _commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+  let* _commitment = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   (* commit = _commitment already tested in /POST test. *)
   let* got_slot =
-    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_slot commitment)
+    RPC.call dal_node (Dal_common.RPC.get_commitment_slot commitment)
   in
-  Check.(Rollup.Dal.content_of_slot slot = Rollup.Dal.content_of_slot got_slot)
+  Check.(Dal_common.content_of_slot slot = Dal_common.content_of_slot got_slot)
     Check.string
     ~error_msg:
       "The slot content retrieved from the node is not as expected (expected = \
@@ -1440,20 +1440,20 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
 
 let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     _client dal_node =
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
-  let slot = Rollup.Dal.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let* commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
+  let slot = Dal_common.make_slot ~slot_size (generate_dummy_slot slot_size) in
+  let* commitment = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   let* proof =
-    RPC.call dal_node (Rollup.Dal.RPC.get_commitment_proof commitment)
+    RPC.call dal_node (Dal_common.RPC.get_commitment_proof commitment)
   in
   let _, expected_proof =
-    Rollup.Dal.Commitment.dummy_commitment
+    Dal_common.Commitment.dummy_commitment
       cryptobox
       (generate_dummy_slot slot_size)
   in
   let (`Hex expected_proof) =
     Data_encoding.Binary.to_bytes_exn
-      Rollup.Dal.Cryptobox.Commitment_proof.encoding
+      Dal_common.Cryptobox.Commitment_proof.encoding
       expected_proof
     |> Hex.of_bytes
   in
@@ -1551,7 +1551,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      9. Verify that rollup node has downloaded slot 2. Slot 0 is unconfirmed,
      and slot 1 has not been downloaded.
   *)
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let store_slot = store_slot dal_node ~slot_size in
 
   Log.info
@@ -1727,7 +1727,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
             ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
         let slot_commitment = List.nth commitments slot_index in
         let* slot_pages =
-          RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_commitment)
+          RPC.call dal_node (Dal_common.RPC.slot_pages slot_commitment)
         in
         let relevant_page = List.nth slot_pages 0 in
         let confirmed_slot_content =
@@ -1933,17 +1933,17 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       else unit
 
 let check_profiles ~__LOC__ dal_node ~expected =
-  let* profiles = RPC.call dal_node (Rollup.Dal.RPC.get_profiles ()) in
+  let* profiles = RPC.call dal_node (Dal_common.RPC.get_profiles ()) in
   return
     Check.(
       (profiles = expected)
-        Rollup.Dal.Check.profiles_typ
+        Dal_common.Check.profiles_typ
         ~error_msg:
           (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
 
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
-  let open Rollup.Dal.RPC in
+  let open Dal_common.RPC in
   let check_bad_attestor_pkh_encoding profile =
     let* response = RPC.call_raw dal_node @@ patch_profiles [profile] in
     return @@ RPC.check_string_response ~code:400 response
@@ -1982,14 +1982,14 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
     RPC.(call node @@ get_chain_block_helper_current_level ())
     |> Lwt.map (fun level -> level.RPC.level)
   in
-  let* committee_from_l1 = Rollup.Dal.Committee.at_level node ~level in
+  let* committee_from_l1 = Dal_common.Committee.at_level node ~level in
   let* shards_from_dal =
-    RPC.call dal_node Rollup.Dal.RPC.(get_assigned_shard_indices ~level ~pkh)
+    RPC.call dal_node Dal_common.RPC.(get_assigned_shard_indices ~level ~pkh)
   in
   match
     committee_from_l1
     |> List.find_opt (fun member ->
-           String.equal member.Rollup.Dal.Committee.attestor pkh)
+           String.equal member.Dal_common.Committee.attestor pkh)
   with
   | None -> Test.fail ~__LOC__ "pkh %S not found in committee from L1." pkh
   | Some member ->
@@ -2006,9 +2006,9 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
 
 let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
     client dal_node =
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let store_slot = store_slot dal_node ~slot_size in
-  let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   Log.info "Inject the shards of slots 1 and 3." ;
   let slot1_content = "slot 1" in
   let slot2_content = "slot 2" in
@@ -2043,7 +2043,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
       let* res =
         RPC.call
           dal_node
-          (Rollup.Dal.RPC.get_attestable_slots ~attestor ~attested_level)
+          (Dal_common.RPC.get_attestable_slots ~attestor ~attested_level)
       in
       match res with
       | Not_in_committee ->
@@ -2068,7 +2068,7 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   let* res =
     RPC.call
       dal_node
-      (Rollup.Dal.RPC.get_attestable_slots
+      (Dal_common.RPC.get_attestable_slots
          ~attestor:new_account
          ~attested_level)
   in
@@ -2094,10 +2094,10 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
 *)
 let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
     =
-  Check.((parameters.Rollup.Dal.Parameters.attestation_threshold = 100) int)
+  Check.((parameters.Dal_common.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Rollup.Dal.endpoint dal_node in
-  let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let dal_node_endpoint = Dal_common.endpoint dal_node in
+  let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let slot_idx level = level mod number_of_slots in
   let num_bakers = Array.length Account.Bootstrap.keys in
@@ -2212,13 +2212,13 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
     if level >= max_level then return ()
     else
       let* slot_headers =
-        RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers level)
+        RPC.call dal_node (Dal_common.RPC.get_published_level_headers level)
       in
       Check.(
         (1 = List.length slot_headers)
           int
           ~error_msg:"Expected a single header (got %R headers)") ;
-      let Rollup.Dal.RPC.{slot_level; slot_index; status; _} =
+      let Dal_common.RPC.{slot_level; slot_index; status; _} =
         List.hd slot_headers
       in
       Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
@@ -2250,10 +2250,10 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
    baker daemon, only `bake for`. *)
 let test_attestor_with_bake_for _protocol parameters cryptobox node client
     dal_node =
-  Check.((parameters.Rollup.Dal.Parameters.attestation_threshold = 100) int)
+  Check.((parameters.Dal_common.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
-  let dal_node_endpoint = Rollup.Dal.endpoint dal_node in
-  let number_of_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let dal_node_endpoint = Dal_common.endpoint dal_node in
+  let number_of_slots = parameters.Dal_common.Parameters.number_of_slots in
   let slot_size = parameters.cryptobox.slot_size in
   let lag = parameters.attestation_lag in
   let slot_idx level = level mod number_of_slots in
@@ -2331,13 +2331,13 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
     if level > last_checked_level then return ()
     else
       let* slot_headers =
-        RPC.call dal_node (Rollup.Dal.RPC.get_published_level_headers level)
+        RPC.call dal_node (Dal_common.RPC.get_published_level_headers level)
       in
       Check.(
         (1 = List.length slot_headers)
           int
           ~error_msg:"Expected a single header (got %R headers)") ;
-      let Rollup.Dal.RPC.{slot_level; slot_index; status; _} =
+      let Dal_common.RPC.{slot_level; slot_index; status; _} =
         List.hd slot_headers
       in
       Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
@@ -2519,7 +2519,7 @@ let create_additional_nodes ~protocol ~extra_node_operators rollup_address
 let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     ?(extra_node_operators = []) protocol parameters dal_node sc_rollup_node
     sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
-  let slot_size = parameters.Rollup.Dal.Parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal_common.Parameters.cryptobox.slot_size in
   let* current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
@@ -2537,7 +2537,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   in
   Log.info
     "[e2e.configure_pvm] configure PVM with DAL parameters via inbox message@." ;
-  let Rollup.Dal.Parameters.{attestation_lag; cryptobox; _} = parameters in
+  let Dal_common.Parameters.{attestation_lag; cryptobox; _} = parameters in
   (* We ask the Arith PVM of [_sc_rollup_address] to track the slot index 5 of
      the DAL. *)
   let tracked_slot_index = 5 in
@@ -3020,7 +3020,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     from the first node, so that when it joins the topics, it also sends Graft messages
     in addition to sending Subscribe messages. *)
 let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
-  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
+  let profile1 = Dal_common.RPC.Attestor pkh1 in
   let peer_id1 =
     JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
@@ -3035,7 +3035,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
+  let* () = RPC.call dal_node1 (Dal_common.RPC.patch_profiles [profile1]) in
   let* () = event_waiter in
 
   (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
@@ -3054,7 +3054,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node2 (Rollup.Dal.RPC.patch_profiles [profile1]) in
+  let* () = RPC.call dal_node2 (Dal_common.RPC.patch_profiles [profile1]) in
   Lwt.join [event_waiter_subscribe; event_waiter_graft]
 
 (** This helper returns the list of promises that allow to wait for the
@@ -3065,7 +3065,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
 *)
 let waiters_publish_shards l1_committee dal_node commitment ~publish_level
     ~slot_index =
-  let open Rollup.Dal.Committee in
+  let open Dal_common.Committee in
   List.map
     (fun {attestor; first_shard_index; power} ->
       check_events_with_message
@@ -3087,7 +3087,7 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
     one at the attesattion level corresponding to [publish_level]. *)
 let waiter_receive_shards l1_committee dal_node commitment ~publish_level
     ~slot_index ~pkh ~from_peer =
-  let open Rollup.Dal.Committee in
+  let open Dal_common.Committee in
   match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
   | {attestor; first_shard_index; power} ->
       check_events_with_message
@@ -3110,7 +3110,7 @@ let waiter_receive_shards l1_committee dal_node commitment ~publish_level
     one at the attesattion level corresponding to [publish_level]. *)
 let waiter_successful_shards_app_notification l1_committee dal_node commitment
     ~publish_level ~slot_index ~pkh =
-  let open Rollup.Dal.Committee in
+  let open Dal_common.Committee in
   match List.find (fun {attestor; _} -> attestor = pkh) l1_committee with
   | {attestor; first_shard_index; power} ->
       check_message_notified_to_app_event
@@ -3140,12 +3140,12 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
 let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
     dal_node1 =
   let pkh1 = Constant.bootstrap1.public_key_hash in
-  let profile1 = Rollup.Dal.RPC.Attestor pkh1 in
-  let num_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let profile1 = Dal_common.RPC.Attestor pkh1 in
+  let num_slots = parameters.Dal_common.Parameters.number_of_slots in
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
   in
-  let* () = RPC.call dal_node1 (Rollup.Dal.RPC.patch_profiles [profile1]) in
+  let* () = RPC.call dal_node1 (Dal_common.RPC.patch_profiles [profile1]) in
   event_waiter
 
 (** This generic test function is used to test messages exchanges between two
@@ -3172,7 +3172,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
 
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
-  let num_slots = parameters.Rollup.Dal.Parameters.number_of_slots in
+  let num_slots = parameters.Dal_common.Parameters.number_of_slots in
   let account1 = Constant.bootstrap1 in
   let pkh1 = account1.public_key_hash in
   (* The two nodes join the same topics *)
@@ -3202,7 +3202,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
      - the messages (shards) that will be notified to dal_node2 on its topic. *)
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
-  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+  let* committee = Dal_common.Committee.at_level node ~level:attested_level in
 
   let waiter_publish_list =
     waiters_publish_shards
@@ -3248,7 +3248,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   let* res =
     RPC.call
       dal_node2
-      (Rollup.Dal.RPC.get_attestable_slots ~attestor:account1 ~attested_level)
+      (Dal_common.RPC.get_attestable_slots ~attestor:account1 ~attested_level)
   in
   match res with
   | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
@@ -3282,7 +3282,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
 let make_invalid_dal_node protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
-    let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+    let crypto_params = parameters.Dal_common.Parameters.cryptobox in
     let parameters =
       dal_enable_param (Some true)
       @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
@@ -3321,7 +3321,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       let* () = f n in
       repeat_i (n - 1) f
   in
-  let crypto_params = parameters.Rollup.Dal.Parameters.cryptobox in
+  let crypto_params = parameters.Dal_common.Parameters.cryptobox in
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
 
@@ -3332,7 +3332,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
     let num_slots =
       min
         (Array.length Account.Bootstrap.keys)
-        parameters.Rollup.Dal.Parameters.number_of_slots
+        parameters.Dal_common.Parameters.number_of_slots
     in
     repeat_i num_slots (fun i ->
         let slot_index = i - 1 in
@@ -3401,12 +3401,12 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
 
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
-  let* committee = Rollup.Dal.Committee.at_level node ~level:attested_level in
+  let* committee = Dal_common.Committee.at_level node ~level:attested_level in
 
-  let Rollup.Dal.Committee.{attestor; first_shard_index; power} =
+  let Dal_common.Committee.{attestor; first_shard_index; power} =
     match
       List.find
-        (fun Rollup.Dal.Committee.{attestor; _} -> attestor = pkh1)
+        (fun Dal_common.Committee.{attestor; _} -> attestor = pkh1)
         committee
     with
     | {attestor; first_shard_index; power} ->
@@ -3453,7 +3453,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
   in
   let profiles =
     List.map
-      (fun key -> Rollup.Dal.RPC.Attestor key.Account.public_key_hash)
+      (fun key -> Dal_common.RPC.Attestor key.Account.public_key_hash)
       delegates
   in
   let delegates = List.map (fun key -> key.Account.alias) delegates in

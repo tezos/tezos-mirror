@@ -84,8 +84,8 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
     | Some peer -> Client.Admin.connect_address ~peer client
   in
   (* Update [dal_config] in the node config. *)
-  let* dal_parameters = Rollup.Dal.Parameters.from_client client in
-  let config : Rollup.Dal.Cryptobox.Config.t =
+  let* dal_parameters = Dal_common.Parameters.from_client client in
+  let config : Dal_common.Cryptobox.Config.t =
     {
       activated = true;
       use_mock_srs_for_testing = Some dal_parameters.cryptobox;
@@ -116,27 +116,27 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attestor_profiles = [])
   return dal_node
 
 let store_slot_to_dal_node ~slot_size dal_node =
-  let slot = Rollup.Dal.make_slot "someslot" ~slot_size in
+  let slot = Dal_common.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
-  let* commitment = RPC.call dal_node (Rollup.Dal.RPC.post_commitment slot) in
+  let* commitment = RPC.call dal_node (Dal_common.RPC.post_commitment slot) in
   (* Compute and save the shards of the slot. *)
   let* () =
     RPC.call dal_node
-    @@ Rollup.Dal.RPC.put_commitment_shards ~with_proof:true commitment
+    @@ Dal_common.RPC.put_commitment_shards ~with_proof:true commitment
   in
   let commitment_hash =
-    match Rollup.Dal.Cryptobox.Commitment.of_b58check_opt commitment with
+    match Dal_common.Cryptobox.Commitment.of_b58check_opt commitment with
     | None -> Test.fail ~__LOC__ "Decoding commitment failed."
     | Some hash -> hash
   in
   (* Compute the proof for the commitment. *)
   let* proof =
     let* proof =
-      RPC.call dal_node @@ Rollup.Dal.RPC.get_commitment_proof commitment
+      RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
     in
     return
       (Data_encoding.Json.destruct
-         Rollup.Dal.Cryptobox.Commitment_proof.encoding
+         Dal_common.Cryptobox.Commitment_proof.encoding
          (`String proof))
   in
   return (commitment_hash, proof)
@@ -224,7 +224,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   let* (), time =
     measure @@ fun () ->
     Log.info "Store slot in [dal_node2]." ;
-    let* dal_parameters = Rollup.Dal.Parameters.from_client client2 in
+    let* dal_parameters = Dal_common.Parameters.from_client client2 in
     let* commitment_hash, proof =
       measure_and_add_data_point ~tag:"locally_store_slot" @@ fun () ->
       store_slot_to_dal_node
@@ -255,7 +255,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
             "Expected validated operations in mempool to be %L, got %R.") ;
       unit
     in
-    let dal_node_endpoint = Rollup.Dal.endpoint dal_node2 in
+    let dal_node_endpoint = Dal_common.endpoint dal_node2 in
     Log.info "Bake two blocks to finalize the slot header." ;
     let* () =
       Base.repeat 2 (fun () ->
