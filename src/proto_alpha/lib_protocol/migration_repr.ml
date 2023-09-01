@@ -56,11 +56,7 @@ let origination_result_list_encoding =
               paid_storage_size_diff;
             })
           (obj4
-             (dft
-                "balance_updates"
-                Receipt_repr
-                .balance_updates_encoding_with_legacy_attestation_name
-                [])
+             (dft "balance_updates" Receipt_repr.balance_updates_encoding [])
              (dft
                 "originated_contracts"
                 (list Contract_repr.originated_encoding)

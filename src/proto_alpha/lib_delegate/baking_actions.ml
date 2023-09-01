@@ -37,8 +37,7 @@ module Operations_source = struct
       }
 
   let operations_encoding =
-    Data_encoding.(
-      list (dynamic_size Operation.encoding_with_legacy_attestation_name))
+    Data_encoding.(list (dynamic_size Operation.encoding))
 
   let retrieve =
     let open Lwt_result_syntax in
@@ -476,7 +475,7 @@ let inject_preattestations state ~preattestations =
             in
             let unsigned_operation_bytes =
               Data_encoding.Binary.to_bytes_exn
-                Operation.unsigned_encoding_with_legacy_attestation_name
+                Operation.unsigned_encoding
                 unsigned_operation
             in
             Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -571,7 +570,7 @@ let sign_attestations state attestations =
           let unsigned_operation = (shell, Contents_list contents) in
           let unsigned_operation_bytes =
             Data_encoding.Binary.to_bytes_exn
-              Operation.unsigned_encoding_with_legacy_attestation_name
+              Operation.unsigned_encoding
               unsigned_operation
           in
           Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
@@ -611,7 +610,7 @@ let sign_dal_attestations state attestations =
       let unsigned_operation = (shell, Contents_list contents) in
       let unsigned_operation_bytes =
         Data_encoding.Binary.to_bytes_exn
-          Operation.unsigned_encoding_with_legacy_attestation_name
+          Operation.unsigned_encoding
           unsigned_operation
       in
       let*! signature =
@@ -666,9 +665,7 @@ let inject_dal_attestations state attestations =
   List.iter_ep
     (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
       let encoded_op =
-        Data_encoding.Binary.to_bytes_exn
-          Operation.encoding_with_legacy_attestation_name
-          signed_operation
+        Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
       in
       let* oph =
         Shell_services.Injection.operation
