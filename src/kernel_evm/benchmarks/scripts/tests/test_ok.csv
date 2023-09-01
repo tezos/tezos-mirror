@@ -1,0 +1,4 @@
+benchmark_name,gas_cost,run_transaction_ticks,signature_verification_ticks
+0,30000,1500000,23000000
+1,30000,6000000,23000000
+2,21000,600000,23000000
