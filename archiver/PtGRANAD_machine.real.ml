@@ -137,7 +137,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       ( public_key_hash_of_v0 metadata.protocol_data.baker,
         ( Tezos_raw_protocol_010_PtGRANAD.Alpha_context.Cycle.to_int32
             metadata.protocol_data.level_info.cycle,
-          metadata.protocol_data.level_info.cycle_position ) )
+          metadata.protocol_data.level_info.cycle_position,
+          0l ) )
 
   let baking_right cctxt level priority =
     let* baking_rights =

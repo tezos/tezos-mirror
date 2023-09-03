@@ -133,14 +133,14 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
-    let* delegate, (cycle, cycle_position) =
+    let* delegate, (cycle, cycle_position, cycle_size) =
       Services.baker_and_cycle cctx hash
     in
     let predecessor = Some header.Block_header.shell.Block_header.predecessor in
     block_data
       cctx
       (delegate, timestamp, round, hash, predecessor)
-      (Some {cycle; cycle_position})
+      (Some {cycle; cycle_position; cycle_size})
       reception_times
 
   let () =

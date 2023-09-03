@@ -144,7 +144,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       ( metadata.protocol_data.baker.delegate,
         ( Tezos_raw_protocol_017_PtNairob.Alpha_context.Cycle.to_int32
             metadata.protocol_data.level_info.cycle,
-          metadata.protocol_data.level_info.cycle_position ) )
+          metadata.protocol_data.level_info.cycle_position,
+          0l ) )
 
   let baking_right cctxt level round =
     let* baking_rights =
