@@ -86,8 +86,9 @@ let select_cycle_info db_pool level =
       Lwt.map
         (function
           | Error e -> Error e
-          | Ok (Some (cycle, cycle_position, _)) ->
-              Ok (Some Teztale_lib.Data.Block.{cycle; cycle_position})
+          | Ok (Some (cycle, cycle_position, cycle_size)) ->
+              Ok
+                (Some Teztale_lib.Data.Block.{cycle; cycle_position; cycle_size})
           | Ok None -> Ok None)
         (Db.find_opt cycle_request level))
     db_pool

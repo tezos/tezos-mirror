@@ -194,7 +194,7 @@ module Block = struct
     validation_time : Time.System.t option;
   }
 
-  type cycle_info = {cycle : int32; cycle_position : int32}
+  type cycle_info = {cycle : int32; cycle_position : int32; cycle_size : int32}
 
   type t = {
     hash : Block_hash.t;
@@ -222,9 +222,14 @@ module Block = struct
   let cycle_info_encoding =
     let open Data_encoding in
     conv
-      (fun {cycle; cycle_position} -> (cycle, cycle_position))
-      (fun (cycle, cycle_position) -> {cycle; cycle_position})
-      (obj2 (req "cycle" int32) (req "cycle_position" int32))
+      (fun {cycle; cycle_position; cycle_size} ->
+        (cycle, cycle_position, cycle_size))
+      (fun (cycle, cycle_position, cycle_size) ->
+        {cycle; cycle_position; cycle_size})
+      (obj3
+         (req "cycle" int32)
+         (req "cycle_position" int32)
+         (req "cycle_size" int32))
 
   let encoding =
     let open Data_encoding in

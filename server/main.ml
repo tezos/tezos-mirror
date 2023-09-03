@@ -371,8 +371,9 @@ let block_callback db_pool g source
         in
         let* () =
           match cycle_info with
-          | Some Teztale_lib.Data.Block.{cycle; cycle_position = 0l} ->
-              Db.exec Sql_requests.maybe_insert_cycle (cycle, level, 0l)
+          | Some Teztale_lib.Data.Block.{cycle; cycle_position = _; cycle_size}
+            ->
+              Db.exec Sql_requests.maybe_insert_cycle (cycle, level, cycle_size)
           | _ -> Lwt.return_ok ()
         in
         let* () =
