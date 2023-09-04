@@ -74,9 +74,9 @@ wasm-strip tx-kernel.wasm
 
 # dal_echo_kernel.wasm
 
-The `dal_echo_kernel.wasm` is a simple kernel for testing the `reveal_dal_page` functionality of the wasm rollup. At each level, it will download page 0 from slot 0 published at `current_level - attestation_lag`, then store the downloaded content to `/output` of the durable storage.
+The `dal_echo_kernel.wasm` is a simple kernel for testing the `reveal_dal_page` functionality of the wasm rollup. At each level, it will download all pages from slot 0 published at `current_level - attestation_lag`, then store the downloaded content to `/output/slot-0` of the durable storage.
 
-The code is hosted in https://gitlab.com/tezos/kernel-gallery/-/merge_requests/58/diffs
+The code is hosted in https://gitlab.com/tezos/kernel-gallery/-/merge_requests/63/diffs
 
 To build the kernel, run the following:
 
@@ -85,7 +85,7 @@ git clone git@gitlab.com:tezos/kernel-gallery.git
 
 cd kernel-gallery
 
-git checkout c8dd22d150d2b90b22e67f52dd1721c503517095
+git checkout eugenz@udpate-dal-echo-kernel
 
 cd 99_dal_echo_kernel
 
