@@ -31,36 +31,6 @@ open Kaitai.Types
    than the public module [Data_encoding.Encoding]. *)
 open Data_encoding__Encoding
 
-let default_meta_spec ~encoding_name =
-  MetaSpec.
-    {
-      path = [];
-      isOpaque = false;
-      id = Some encoding_name;
-      endian = Some `BE;
-      bitEndian = None;
-      encoding = None;
-      forceDebug = false;
-      opaqueTypes = None;
-      zeroCopySubstream = None;
-      imports = [];
-    }
-
-let default_class_spec ~encoding_name =
-  ClassSpec.
-    {
-      fileName = None;
-      path = [];
-      meta = default_meta_spec ~encoding_name;
-      doc = Ground.default_doc_spec;
-      toStringExpr = None;
-      params = [];
-      seq = [];
-      types = [];
-      instances = [];
-      enums = [];
-    }
-
 let rec seq_field_of_data_encoding :
     type a.
     (string * EnumSpec.t) list ->
@@ -96,7 +66,7 @@ let rec from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
   let class_spec_of_ground ?(enums = []) ground =
-    {(default_class_spec ~encoding_name) with seq = [ground]; enums}
+    {(Helpers.default_class_spec ~encoding_name) with seq = [ground]; enums}
   in
   match encoding with
   | Bool -> class_spec_of_ground ~enums:[Ground.Enum.bool] Ground.Attr.bool
@@ -122,7 +92,7 @@ let rec from_data_encoding :
           (fun i attr -> AttrSpec.{attr with id = Printf.sprintf "field_%d" i})
           seq
       in
-      {(default_class_spec ~encoding_name) with seq; enums}
+      {(Helpers.default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | Describe {encoding; _} ->
       (* TODO: patch the documentation to include available information *)

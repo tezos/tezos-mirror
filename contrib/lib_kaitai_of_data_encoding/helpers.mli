@@ -24,57 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This module consists of helpers for building kaitai specifications. *)
+
 open Kaitai.Types
 
-(** [Enum] module defines enum definitions needed for describing data-encoding
-    ground types. *)
-module Enum : sig
-  (** [map] describes mapping of enum id (string) with the corresponding
-      [EnumSpec.t]. *)
-  type map = (string * EnumSpec.t) list
+(** [default_doc_spec] is without summary and references.  *)
+val default_doc_spec : DocSpec.t
 
-  (** [bool] is a mapping for boolean type. *)
-  val bool : string * EnumSpec.t
+(** [cond_no_cond] is default conditional specification that has no [if]
+    expression and no repetition. *)
+val cond_no_cond : AttrSpec.ConditionalSpec.t
 
-  (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
-      [enum], then new list with it is returned, otherwise existing [enums] list
-      is returned. *)
-  val add : map -> string * EnumSpec.t -> map
-end
+(** [default_attr_spec] is initialized with default (empty) values. *)
+val default_attr_spec : AttrSpec.t
 
-(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
-module Attr : sig
-  (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
-  val bool : AttrSpec.t
+(** [default_meta_spec ~encoding_name] returns default [MetaSpec.t].
 
-  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
-  val u1 : AttrSpec.t
+    The following meta section properties are set:
+    - [endian] is set to [BE] (as per data-encoding default).
+    - [id] is set to [~encoding_name].
+    - Other fields are [[]] or [None]. *)
+val default_meta_spec : encoding_name:string -> MetaSpec.t
 
-  (** [s1] returns [AttrSpec.t] definition of 8-bit signed integer. *)
-  val s1 : AttrSpec.t
+(** [default_class_spec ~encoding_name] builds an default (empty) [ClassSpec.t].
 
-  (** [u2] returns [AttrSpec.t] definition of 16-bit unsigned integer. *)
-  val u2 : AttrSpec.t
-
-  (** [s2] returns [AttrSpec.t] definition of 16-bit signed integer. *)
-  val s2 : AttrSpec.t
-
-  (** [s4] returns [AttrSpec.t] definition of 32-bit signed integer. *)
-  val s4 : AttrSpec.t
-
-  (** [s8] returns [AttrSpec.t] definition of 64-bit signed integer. *)
-  val s8 : AttrSpec.t
-
-  (** [int31] returns [AttrSpec.t] definition of 31-bit signed integer.
-      For more about this type see [Data_encoding.int31]. *)
-  val int31 : AttrSpec.t
-
-  (** [f8] returns [AttrSpec.t] definition of 64-bit float. *)
-  val f8 : AttrSpec.t
-
-  (** [bytes] returns [AttrSpec.t] definition of [Data_encoding.bytes]. *)
-  val bytes : AttrSpec.t
-
-  (** [string] returns [AttrSpec.t] definition of [Data_encoding.string]. *)
-  val string : AttrSpec.t
-end
+    @param ~encoding_name is added to meta section as [id]. *)
+val default_class_spec : encoding_name:string -> ClassSpec.t
