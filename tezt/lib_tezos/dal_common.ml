@@ -371,11 +371,11 @@ module Helpers = struct
         client)
 
   let store_slot dal_node ?with_proof slot =
-    let* commitment = RPC.call dal_node @@ Dal_RPC.post_commitment slot in
+    let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
     let* () =
-      RPC.call dal_node @@ Dal_RPC.put_commitment_shards ?with_proof commitment
+      Dal_RPC.(call dal_node @@ put_commitment_shards ?with_proof commitment)
     in
-    let* proof = RPC.call dal_node @@ Dal_RPC.get_commitment_proof commitment in
+    let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
     return (commitment, proof)
 end
 

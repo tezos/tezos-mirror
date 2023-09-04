@@ -35,6 +35,7 @@ let hooks = Tezos_regression.hooks
 module Dal = Dal_common
 module Cryptobox = Dal.Cryptobox
 module Helpers = Dal.Helpers
+module Dal_RPC = Dal.RPC
 
 let next_level node =
   let* current_level = Node.get_level node in
@@ -883,7 +884,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
   in
   let* received_slot =
-    RPC.call dal_node (Dal.RPC.get_commitment_slot slot_commitment)
+    Dal_RPC.(call dal_node @@ get_commitment_slot slot_commitment)
   in
   let received_slot_content = Helpers.content_of_slot received_slot in
   Check.(
@@ -893,7 +894,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
   (* Only check that the function to retrieve pages succeeds, actual
      contents are checked in the test `rollup_node_stores_dal_slots`. *)
   let* _slots_as_pages =
-    RPC.call dal_node (Dal.RPC.slot_pages slot_commitment)
+    Dal_RPC.(call dal_node @@ slot_pages slot_commitment)
   in
   return ()
 
@@ -927,9 +928,9 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
     (fun (slot_index, commitment') ->
       let* response =
-        RPC.call_raw
-          dal_node
-          (Dal.RPC.get_level_index_commitment ~slot_index ~slot_level)
+        Dal_RPC.(
+          call_raw dal_node
+          @@ get_level_index_commitment ~slot_index ~slot_level)
       in
       return @@ check_result commitment' response)
     slots_info
@@ -953,9 +954,9 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
       else (Some slot_level, Some slot_index)
     in
     let* response =
-      RPC.call_raw
-        dal_node
-        (Dal.RPC.get_commitment_headers ?slot_index ?slot_level commit)
+      Dal_RPC.(
+        call_raw dal_node
+        @@ get_commitment_headers ?slot_index ?slot_level commit)
     in
     return @@ check_result response
   in
@@ -965,7 +966,7 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
 let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~number_of_headers =
   let* slot_headers =
-    RPC.call dal_node (Dal.RPC.get_published_level_headers pub_level)
+    Dal_RPC.(call dal_node @@ get_published_level_headers pub_level)
   in
   Check.(List.length slot_headers = number_of_headers)
     ~__LOC__
@@ -977,11 +978,11 @@ let get_headers_succeeds ~__LOC__ expected_status response =
   let headers =
     JSON.(
       parse ~origin:"get_headers_succeeds" response.RPC_core.body
-      |> Dal.RPC.slot_headers_of_json)
+      |> Dal_RPC.slot_headers_of_json)
   in
   List.iter
     (fun header ->
-      Check.(header.Dal.RPC.status = expected_status)
+      Check.(header.Dal_RPC.status = expected_status)
         ~__LOC__
         Check.string
         ~error_msg:
@@ -1021,7 +1022,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot = Helpers.make_slot ~slot_size "never associated to a slot_id" in
-    let* commit = RPC.call dal_node (Dal.RPC.post_commitment slot) in
+    let* commit = Dal_RPC.(call dal_node @@ post_commitment slot) in
     return (6, commit)
   in
 
@@ -1074,14 +1075,12 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
   in
   let* slot_headers =
-    RPC.call
-      dal_node
-      (Dal.RPC.get_published_level_headers
-         ~status:"waiting_attestation"
-         pub_level)
+    Dal_RPC.(
+      call dal_node
+      @@ get_published_level_headers ~status:"waiting_attestation" pub_level)
   in
   let slot_headers =
-    List.map (fun sh -> (sh.Dal.RPC.slot_index, sh.commitment)) slot_headers
+    List.map (fun sh -> (sh.Dal_RPC.slot_index, sh.commitment)) slot_headers
     |> List.fast_sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
   in
   Check.(slot_headers = ok)
@@ -1219,7 +1218,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
   let* shards =
-    RPC.call dal_node (Dal.RPC.shards ~slot_header downloaded_shard_ids)
+    Dal_RPC.(call dal_node @@ shards ~slot_header downloaded_shard_ids)
   in
   let shard_of_json shard =
     let shard =
@@ -1301,7 +1300,7 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     Helpers.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
   in
   let failing_post_slot_rpc slot =
-    let* response = RPC.call_raw dal_node @@ Dal.RPC.post_commitment slot in
+    let* response = Dal_RPC.(call_raw dal_node @@ post_commitment slot) in
     return
     @@ RPC.check_string_response
          ~body_rex:"dal.node.invalid_slot_size"
@@ -1314,8 +1313,8 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
   let slot_ok = mk_slot size in
   let* () = failing_post_slot_rpc slot_big in
   let* () = failing_post_slot_rpc slot_small in
-  let* commitment1 = RPC.call dal_node (Dal.RPC.post_commitment slot_ok) in
-  let* commitment2 = RPC.call dal_node (Dal.RPC.post_commitment slot_ok) in
+  let* commitment1 = Dal_RPC.(call dal_node @@ post_commitment slot_ok) in
+  let* commitment2 = Dal_RPC.(call dal_node @@ post_commitment slot_ok) in
   (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4250
      The second RPC call above succeeeds, but the (untested) returned HTTP status
      should likely be 200 and 201 in the first similar RPC call.
@@ -1339,8 +1338,8 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
     _client dal_node =
   let failing_patch_slot_rpc commit ~slot_level ~slot_index =
     let* response =
-      RPC.call_raw dal_node
-      @@ Dal.RPC.patch_commitment commit ~slot_level ~slot_index
+      Dal_RPC.(
+        call_raw dal_node @@ patch_commitment commit ~slot_level ~slot_index)
     in
     return @@ RPC.check_string_response ~code:404 response
   in
@@ -1350,16 +1349,15 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
   in
   let* () = failing_patch_slot_rpc commitment ~slot_level:0 ~slot_index:0 in
-  let* commitment' = RPC.call dal_node (Dal.RPC.post_commitment slot) in
+  let* commitment' = Dal_RPC.(call dal_node @@ post_commitment slot) in
   Check.(commitment' = commitment)
     Check.string
     ~error_msg:
       "The commitment of a stored commitment should match the one computed \
        locally (current = %L, expected = %R)" ;
   let patch_slot_rpc ~slot_level ~slot_index =
-    RPC.call
-      dal_node
-      (Dal.RPC.patch_commitment commitment ~slot_level ~slot_index)
+    Dal_RPC.(
+      call dal_node @@ patch_commitment commitment ~slot_level ~slot_index)
   in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
   let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
@@ -1375,13 +1373,13 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
   in
   let* () =
     let* response =
-      RPC.call_raw dal_node @@ Dal.RPC.get_commitment_slot commitment
+      Dal_RPC.(call_raw dal_node @@ get_commitment_slot commitment)
     in
     return @@ RPC.check_string_response ~code:404 response
   in
-  let* _commitment = RPC.call dal_node (Dal.RPC.post_commitment slot) in
+  let* _commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
   (* commit = _commitment already tested in /POST test. *)
-  let* got_slot = RPC.call dal_node (Dal.RPC.get_commitment_slot commitment) in
+  let* got_slot = Dal_RPC.(call dal_node @@ get_commitment_slot commitment) in
   Check.(Helpers.content_of_slot slot = Helpers.content_of_slot got_slot)
     Check.string
     ~error_msg:
@@ -1393,8 +1391,8 @@ let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let* commitment = RPC.call dal_node (Dal.RPC.post_commitment slot) in
-  let* proof = RPC.call dal_node (Dal.RPC.get_commitment_proof commitment) in
+  let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
+  let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
   let _, expected_proof =
     Dal.Commitment.dummy_commitment cryptobox (generate_dummy_slot slot_size)
   in
@@ -1676,7 +1674,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
             ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
         let slot_commitment = List.nth commitments slot_index in
         let* slot_pages =
-          RPC.call dal_node (Dal.RPC.slot_pages slot_commitment)
+          Dal_RPC.(call dal_node @@ slot_pages slot_commitment)
         in
         let relevant_page = List.nth slot_pages 0 in
         let confirmed_slot_content =
@@ -1921,7 +1919,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   unit
 
 let check_profiles ~__LOC__ dal_node ~expected =
-  let* profiles = RPC.call dal_node (Dal.RPC.get_profiles ()) in
+  let* profiles = Dal_RPC.(call dal_node @@ get_profiles ()) in
   return
     Check.(
       (profiles = expected)
@@ -1931,16 +1929,15 @@ let check_profiles ~__LOC__ dal_node ~expected =
 
 let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
-  let open Dal.RPC in
   let check_bad_attestor_pkh_encoding profile =
-    let* response = RPC.call_raw dal_node @@ patch_profiles [profile] in
+    let* response = Dal_RPC.(call_raw dal_node @@ patch_profiles [profile]) in
     return @@ RPC.check_string_response ~code:400 response
   in
   let patch_profile_rpc profile =
-    RPC.call dal_node (patch_profiles [profile])
+    Dal_RPC.(call dal_node (patch_profiles [profile]))
   in
-  let profile1 = Attestor Constant.bootstrap1.public_key_hash in
-  let profile2 = Attestor Constant.bootstrap2.public_key_hash in
+  let profile1 = Dal_RPC.Attestor Constant.bootstrap1.public_key_hash in
+  let profile2 = Dal_RPC.Attestor Constant.bootstrap2.public_key_hash in
   (* We start with empty profile list *)
   let* () = check_profiles ~__LOC__ dal_node ~expected:(Operator []) in
   (* Adding [Attestor] profile with pkh that is not encoded as
@@ -1972,7 +1969,7 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
   in
   let* committee_from_l1 = Dal.Committee.at_level node ~level in
   let* shards_from_dal =
-    RPC.call dal_node Dal.RPC.(get_assigned_shard_indices ~level ~pkh)
+    Dal_RPC.(call dal_node @@ get_assigned_shard_indices ~level ~pkh)
   in
   match
     committee_from_l1
@@ -2029,9 +2026,8 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
       let attestor = Account.Bootstrap.keys.(i) in
       (* Note: we assume that the key has at least an assigned shard index. *)
       let* res =
-        RPC.call
-          dal_node
-          (Dal.RPC.get_attestable_slots ~attestor ~attested_level)
+        Dal_RPC.(
+          call dal_node @@ get_attestable_slots ~attestor ~attested_level)
       in
       match res with
       | Not_in_committee ->
@@ -2054,9 +2050,9 @@ let test_dal_node_get_attestable_slots _protocol parameters cryptobox node
   Log.info "Check case when pkh not in the DAL committee." ;
   let* new_account = Client.gen_and_show_keys client in
   let* res =
-    RPC.call
-      dal_node
-      (Dal.RPC.get_attestable_slots ~attestor:new_account ~attested_level)
+    Dal_RPC.(
+      call dal_node
+      @@ get_attestable_slots ~attestor:new_account ~attested_level)
   in
   match res with
   | Not_in_committee -> return ()
@@ -2200,13 +2196,13 @@ let test_attestor_with_daemon protocol parameters cryptobox node client dal_node
     if level >= max_level then return ()
     else
       let* slot_headers =
-        RPC.call dal_node (Dal.RPC.get_published_level_headers level)
+        Dal_RPC.(call dal_node @@ get_published_level_headers level)
       in
       Check.(
         (1 = List.length slot_headers)
           int
           ~error_msg:"Expected a single header (got %R headers)") ;
-      let Dal.RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
+      let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
       Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
       Check.(
         (slot_idx level = slot_index)
@@ -2319,13 +2315,13 @@ let test_attestor_with_bake_for _protocol parameters cryptobox node client
     if level > last_checked_level then return ()
     else
       let* slot_headers =
-        RPC.call dal_node (Dal.RPC.get_published_level_headers level)
+        Dal_RPC.(call dal_node @@ get_published_level_headers level)
       in
       Check.(
         (1 = List.length slot_headers)
           int
           ~error_msg:"Expected a single header (got %R headers)") ;
-      let Dal.RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
+      let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
       Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
       Check.(
         (slot_idx level = slot_index)
@@ -3005,7 +3001,7 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     from the first node, so that when it joins the topics, it also sends Graft messages
     in addition to sending Subscribe messages. *)
 let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
-  let profile1 = Dal.RPC.Attestor pkh1 in
+  let profile1 = Dal_RPC.Attestor pkh1 in
   let peer_id1 =
     JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
   in
@@ -3020,7 +3016,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node1 (Dal.RPC.patch_profiles [profile1]) in
+  let* () = Dal_RPC.(call dal_node1 @@ patch_profiles [profile1]) in
   let* () = event_waiter in
 
   (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
@@ -3039,7 +3035,7 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
       ~num_slots
       pkh1
   in
-  let* () = RPC.call dal_node2 (Dal.RPC.patch_profiles [profile1]) in
+  let* () = Dal_RPC.(call dal_node2 @@ patch_profiles [profile1]) in
   Lwt.join [event_waiter_subscribe; event_waiter_graft]
 
 (** This helper returns the list of promises that allow to wait for the
@@ -3125,12 +3121,12 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
 let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
     dal_node1 =
   let pkh1 = Constant.bootstrap1.public_key_hash in
-  let profile1 = Dal.RPC.Attestor pkh1 in
+  let profile1 = Dal_RPC.Attestor pkh1 in
   let num_slots = parameters.Dal.Parameters.number_of_slots in
   let event_waiter =
     check_events_with_topic ~event_with_topic:Join dal_node1 ~num_slots pkh1
   in
-  let* () = RPC.call dal_node1 (Dal.RPC.patch_profiles [profile1]) in
+  let* () = Dal_RPC.(call dal_node1 @@ patch_profiles [profile1]) in
   event_waiter
 
 (** This generic test function is used to test messages exchanges between two
@@ -3230,9 +3226,8 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   (* Check that dal_node2 has the shards needed by attestor account1/pkh1 to
      attest the slot with index 0. *)
   let* res =
-    RPC.call
-      dal_node2
-      (Dal.RPC.get_attestable_slots ~attestor:account1 ~attested_level)
+    Dal_RPC.(
+      call dal_node2 @@ get_attestable_slots ~attestor:account1 ~attested_level)
   in
   match res with
   | Not_in_committee -> Test.fail "attestor %s not in committee" account1.alias
@@ -3432,7 +3427,7 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
     List.to_seq Constant.all_secret_keys |> Seq.take 3 |> List.of_seq
   in
   let profiles =
-    List.map (fun key -> Dal.RPC.Attestor key.Account.public_key_hash) delegates
+    List.map (fun key -> Dal_RPC.Attestor key.Account.public_key_hash) delegates
   in
   let delegates = List.map (fun key -> key.Account.alias) delegates in
 
