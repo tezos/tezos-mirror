@@ -95,3 +95,40 @@ let info_per_level_serialized ~predecessor ~predecessor_timestamp =
   let open Sc_rollup_inbox_message_repr in
   unsafe_to_string
     (info_per_level_serialized ~predecessor ~predecessor_timestamp)
+
+let find_whitelist_update_output_index node_ctxt state ~outbox_level =
+  let open Lwt_syntax in
+  let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let outbox_level = Raw_level.of_int32_exn outbox_level in
+  let* outbox = PVM.get_outbox outbox_level state in
+  let rec aux i = function
+    | [] -> None
+    | Sc_rollup.{message = Whitelist_update _; _} :: _rest -> Some i
+    | _ :: rest -> aux (i - 1) rest
+  in
+  (* looking for the last whitelist update produced by the kernel,
+     list is reverted for this reason. *)
+  aux (List.length outbox - 1) (List.rev outbox) |> return
+
+let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
+    =
+  let open Lwt_result_syntax in
+  let module PVM = (val Pvm.of_kind node_ctxt.Node_context.kind) in
+  let outbox_level = Raw_level.of_int32_exn outbox_level in
+  let*! outbox = PVM.get_outbox outbox_level state in
+  let output = List.nth outbox message_index in
+  match output with
+  | None -> invalid_arg "invalid index"
+  | Some output -> (
+      let*! proof = PVM.produce_output_proof node_ctxt.context state output in
+      match proof with
+      | Ok proof ->
+          let serialized_proof =
+            Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
+          in
+          return serialized_proof
+      | Error err ->
+          failwith
+            "Error producing outbox proof (%a)"
+            Environment.Error_monad.pp
+            err)

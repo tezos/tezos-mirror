@@ -91,6 +91,16 @@ module type S = sig
 
   val get_status : _ Node_context.t -> Context.tree -> string tzresult Lwt.t
 
+  val find_whitelist_update_output_index :
+    _ Node_context.t -> Context.tree -> outbox_level:int32 -> int option Lwt.t
+
+  val produce_serialized_output_proof :
+    Node_context.rw ->
+    Context.tree ->
+    outbox_level:int32 ->
+    message_index:int ->
+    string tzresult Lwt.t
+
   val get_current_level : Kind.t -> Context.tree -> int32 option Lwt.t
 
   val start_of_level_serialized : string
