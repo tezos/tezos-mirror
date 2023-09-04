@@ -518,8 +518,6 @@ opam:octez-distributed-lwt-internal:
 
 # Ignoring unreleased package octez-evm-proxy-tests.
 
-# Ignoring unreleased package octez-evm-upgrade-signer.
-
 opam:octez-injector:
   extends:
     - .opam_template

@@ -25,7 +25,6 @@
 (package (name octez-evm-proxy-lib-dev)(allow_empty))
 (package (name octez-evm-proxy-lib-prod)(allow_empty))
 (package (name octez-evm-proxy-tests)(allow_empty))
-(package (name octez-evm-upgrade-signer)(allow_empty))
 (package (name octez-injector))
 (package (name octez-libs))
 (package (name octez-node))

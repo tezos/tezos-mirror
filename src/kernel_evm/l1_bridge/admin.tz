@@ -1,0 +1,30 @@
+{ parameter (pair (address %evm_rollup) (bytes %payload)) ;
+  storage address ;
+  code { UNPAIR ;
+         UNPAIR ;
+         DUP 3 ;
+         SENDER ;
+         COMPARE ;
+         NEQ ;
+         IF { DROP 3 ; PUSH string "Unauthorized set entrypoint" ; FAILWITH }
+            { CONTRACT (pair (pair bytes (ticket unit)) nat bytes) ;
+              IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+              PUSH nat 1 ;
+              UNIT ;
+              TICKET ;
+              IF_NONE { PUSH string "Failed to create the ticket" ; FAILWITH } {} ;
+              DIG 3 ;
+              NIL operation ;
+              DIG 3 ;
+              PUSH mutez 0 ;
+              DIG 5 ;
+              PUSH nat 0 ;
+              PAIR ;
+              DIG 5 ;
+              PUSH bytes 0x ;
+              PAIR ;
+              PAIR ;
+              TRANSFER_TOKENS ;
+              CONS ;
+              PAIR } } }
+

@@ -57,16 +57,12 @@ const NEW_CHUNKED_TRANSACTION_TAG: u8 = 1;
 
 const TRANSACTION_CHUNK_TAG: u8 = 2;
 
-const KERNEL_UPGRADE_TAG: u8 = 3;
-
 pub const MAX_SIZE_PER_CHUNK: usize = 4095 // Max input size minus external tag
             - 1 // ExternalMessageFrame tag
             - 20 // Smart rollup address size (ExternalMessageFrame::Targetted)
             - 1  // Transaction chunk tag
             - 2  // Number of chunks (u16)
             - 32; // Transaction hash size
-
-pub const SIGNATURE_HASH_SIZE: usize = 64;
 
 pub const UPGRADE_NONCE_SIZE: usize = 2;
 
@@ -99,7 +95,7 @@ pub enum InputResult {
     Unparsable,
 }
 
-type RollupType = MichelsonPair<
+pub type RollupType = MichelsonPair<
     MichelsonPair<MichelsonBytes, UnitTicket>,
     MichelsonPair<MichelsonInt, MichelsonBytes>,
 >;
@@ -147,7 +143,16 @@ impl InputResult {
         })
     }
 
-    fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
+    fn parse_kernel_upgrade(
+        source: ContractKt1Hash,
+        admin: &Option<ContractKt1Hash>,
+        bytes: &[u8],
+    ) -> Self {
+        // Consider only upgrades from the bridge contract.
+        if admin.is_none() || &source != admin.as_ref().unwrap() {
+            return Self::Unparsable;
+        }
+
         // Next UPGRADE_NONCE_SIZE bytes is the incoming kernel upgrade nonce
         let (nonce, remaining) = parsable!(split_at(bytes, UPGRADE_NONCE_SIZE));
         let nonce: [u8; UPGRADE_NONCE_SIZE] = parsable!(nonce.try_into().ok());
@@ -156,14 +161,10 @@ impl InputResult {
             parsable!(split_at(remaining, PREIMAGE_HASH_SIZE));
         let preimage_hash: [u8; PREIMAGE_HASH_SIZE] =
             parsable!(preimage_hash.try_into().ok());
-        // Next SIGNATURE_HASH_SIZE bytes is the preimage hash
-        let (signature, remaining) = parsable!(split_at(remaining, SIGNATURE_HASH_SIZE));
-        let signature: [u8; SIGNATURE_HASH_SIZE] = parsable!(signature.try_into().ok());
         if remaining.is_empty() {
             Self::Input(Input::Upgrade(KernelUpgrade {
                 nonce,
                 preimage_hash,
-                signature,
             }))
         } else {
             Self::Unparsable
@@ -188,7 +189,6 @@ impl InputResult {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(remaining),
             NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(remaining),
             TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(remaining),
-            KERNEL_UPGRADE_TAG => Self::parse_kernel_upgrade(remaining),
             _ => InputResult::Unparsable,
         }
     }
@@ -203,23 +203,13 @@ impl InputResult {
 
     fn parse_deposit<Host: Runtime>(
         host: &mut Host,
-        transfer: Transfer<RollupType>,
-        smart_rollup_address: &[u8],
-        ticketer: &ContractKt1Hash,
+        ticket: UnitTicket,
+        receiver: MichelsonBytes,
+        gas_price: MichelsonInt,
+        ticketer: &Option<ContractKt1Hash>,
     ) -> Self {
-        if transfer.destination.hash().0 != smart_rollup_address {
-            log!(
-                host,
-                Info,
-                "Deposit ignored because of different smart rollup address"
-            );
-            return InputResult::Unparsable;
-        }
-
-        let ticket = transfer.payload.0 .1;
-
         match &ticket.creator().0 {
-            Contract::Originated(kt1) if kt1 == ticketer => (),
+            Contract::Originated(kt1) if Some(kt1) == ticketer.as_ref() => (),
             _ => {
                 log!(host, Info, "Deposit ignored because of different ticketer");
                 return InputResult::Unparsable;
@@ -236,12 +226,11 @@ impl InputResult {
         let amount: U256 = eth_from_mutez(amount);
 
         // Amount for gas
-        let gas_price: MichelsonInt = transfer.payload.1 .0;
         let (_sign, gas_price_bytes) = gas_price.0 .0.to_bytes_le();
         let gas_price: U256 = U256::from_little_endian(&gas_price_bytes);
 
         // EVM address
-        let receiver_bytes: Vec<u8> = transfer.payload.0 .0 .0;
+        let receiver_bytes = receiver.0;
         if receiver_bytes.len() != std::mem::size_of::<H160>() {
             log!(
                 host,
@@ -268,11 +257,63 @@ impl InputResult {
         Self::Input(Input::Deposit(content))
     }
 
+    fn parse_internal_transfer<Host: Runtime>(
+        host: &mut Host,
+        transfer: Transfer<RollupType>,
+        smart_rollup_address: &[u8],
+        ticketer: &Option<ContractKt1Hash>,
+        admin: &Option<ContractKt1Hash>,
+    ) -> Self {
+        if transfer.destination.hash().0 != smart_rollup_address {
+            log!(
+                host,
+                Info,
+                "Deposit ignored because of different smart rollup address"
+            );
+            return InputResult::Unparsable;
+        }
+
+        let source = transfer.sender;
+        let receiver = transfer.payload.0 .0;
+        let ticket = transfer.payload.0 .1;
+        let gas_price = transfer.payload.1 .0;
+        let extra_bytes = transfer.payload.1 .1 .0;
+
+        if extra_bytes.is_empty() {
+            Self::parse_deposit(host, ticket, receiver, gas_price, ticketer)
+        } else {
+            Self::parse_kernel_upgrade(source, admin, &extra_bytes)
+        }
+    }
+
+    fn parse_internal<Host: Runtime>(
+        host: &mut Host,
+        message: InternalInboxMessage<RollupType>,
+        smart_rollup_address: &[u8],
+        ticketer: &Option<ContractKt1Hash>,
+        admin: &Option<ContractKt1Hash>,
+    ) -> Self {
+        match message {
+            InternalInboxMessage::InfoPerLevel(info) => {
+                InputResult::Input(Input::Info(info))
+            }
+            InternalInboxMessage::Transfer(transfer) => Self::parse_internal_transfer(
+                host,
+                transfer,
+                smart_rollup_address,
+                ticketer,
+                admin,
+            ),
+            _ => InputResult::Unparsable,
+        }
+    }
+
     pub fn parse<Host: Runtime>(
         host: &mut Host,
         input: Message,
         smart_rollup_address: [u8; 20],
-        l1_bridge: &Option<ContractKt1Hash>,
+        ticketer: &Option<ContractKt1Hash>,
+        admin: &Option<ContractKt1Hash>,
     ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
@@ -285,20 +326,13 @@ impl InputResult {
                 InboxMessage::External(message) => {
                     Self::parse_external(message, &smart_rollup_address)
                 }
-                InboxMessage::Internal(InternalInboxMessage::InfoPerLevel(info)) => {
-                    InputResult::Input(Input::Info(info))
-                }
-                InboxMessage::Internal(InternalInboxMessage::Transfer(transfer))
-                    if l1_bridge.is_some() =>
-                {
-                    Self::parse_deposit(
-                        host,
-                        transfer,
-                        &smart_rollup_address,
-                        l1_bridge.as_ref().unwrap(),
-                    )
-                }
-                InboxMessage::Internal(_) => InputResult::Unparsable,
+                InboxMessage::Internal(message) => Self::parse_internal(
+                    host,
+                    message,
+                    &smart_rollup_address,
+                    ticketer,
+                    admin,
+                ),
             },
             Err(_) => InputResult::Unparsable,
         }
@@ -319,7 +353,13 @@ mod tests {
 
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
-            InputResult::parse(&mut host, message, ZERO_SMART_ROLLUP_ADDRESS, &None),
+            InputResult::parse(
+                &mut host,
+                message,
+                ZERO_SMART_ROLLUP_ADDRESS,
+                &None,
+                &None
+            ),
             InputResult::Unparsable
         )
     }

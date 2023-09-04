@@ -44,11 +44,16 @@ val code : string -> path
     can be provided to get the path of a sub-element in the storage. *)
 val storage : string -> ?key:string -> unit -> path
 
-(** [dictator] is the path to the dictator key. *)
-val dictator : path
+(** [admin] is the path to the administrator contract. *)
+val admin : path
 
 (** [ticketer] is the path to the ticketer contract. *)
 val ticketer : path
 
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
+
+module Legacy : sig
+  (** [dictator] is the path to the dictator key. *)
+  val dictator : path
+end

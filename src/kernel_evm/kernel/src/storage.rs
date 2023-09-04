@@ -7,7 +7,6 @@
 use crate::indexable_storage::IndexableStorage;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
-use libsecp256k1::PublicKey;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -37,12 +36,7 @@ const SMART_ROLLUP_ADDRESS: RefPath =
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-// Size of the ticketer contract, it is encoded in base58.
-const TICKETER_SIZE: usize = 36;
-
-const DICTATOR_KEY: RefPath = RefPath::assert_from(b"/dictator_key");
-// Size of the dictator public key in full length.
-const DICTATOR_KEY_SIZE: usize = 65;
+const ADMIN: RefPath = RefPath::assert_from(b"/admin");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
@@ -700,12 +694,23 @@ pub fn index_account(
     }
 }
 
-/// Reads the ticketer address set by the installer, if any, encoded in b58.
-pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+fn read_b58_kt1<Host: Runtime>(
+    host: &mut Host,
+    path: &OwnedPath,
+) -> Option<ContractKt1Hash> {
     let mut buffer = [0; 36];
-    store_read_slice(host, &TICKETER, &mut buffer, 36).ok()?;
+    store_read_slice(host, path, &mut buffer, 36).ok()?;
     let kt1_b58 = String::from_utf8(buffer.to_vec()).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
+}
+
+/// Reads the ticketer address set by the installer, if any, encoded in b58.
+pub fn read_ticketer<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &TICKETER.into())
+}
+
+pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &ADMIN.into())
 }
 
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(
@@ -744,12 +749,6 @@ pub fn index_transaction_hash(
     transaction_hashes_index
         .push_value(host, transaction_hash)
         .map_err(Error::from)
-}
-
-pub fn read_dictator_key<Host: Runtime>(host: &mut Host) -> Option<PublicKey> {
-    let mut buffer = [0; DICTATOR_KEY_SIZE];
-    store_read_slice(host, &DICTATOR_KEY, &mut buffer, DICTATOR_KEY_SIZE).ok()?;
-    PublicKey::parse_slice(&buffer, None).ok()
 }
 
 pub fn store_storage_version<Host: Runtime>(
@@ -840,14 +839,6 @@ pub fn was_rebooted<Host: Runtime>(host: &mut Host) -> Result<bool, Error> {
 
 pub(crate) mod internal_for_tests {
     use super::*;
-
-    pub fn store_dictator_key<Host: Runtime>(
-        host: &mut Host,
-        dictator: PublicKey,
-    ) -> Result<(), Error> {
-        host.store_write(&DICTATOR_KEY, &dictator.serialize(), 0)
-            .map_err(Error::from)
-    }
 
     /// Reads status from the receipt in storage.
     pub fn read_transaction_receipt_status<Host: Runtime>(

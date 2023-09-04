@@ -18,6 +18,10 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6282
+        // Migrate the upgrade mechanism in the storage.
+
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?
     }

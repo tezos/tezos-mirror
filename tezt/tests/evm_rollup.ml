@@ -42,7 +42,9 @@ let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 let bridge_path () =
   Base.(project_root // "src/kernel_evm/l1_bridge/evm_bridge.tz")
 
-type deposit_addresses = {fa12 : string; bridge : string}
+let admin_path () = Base.(project_root // "src/kernel_evm/l1_bridge/admin.tz")
+
+type l1_contracts = {fa12 : string; bridge : string; admin : string}
 
 type full_evm_setup = {
   node : Node.t;
@@ -54,7 +56,7 @@ type full_evm_setup = {
   rollup_operator_key : string;
   evm_proxy_server : Evm_proxy_server.t;
   endpoint : string;
-  deposit_addresses : deposit_addresses option;
+  l1_contracts : l1_contracts option;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -208,7 +210,7 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
   in
   return (requests, receipt)
 
-let setup_deposit_contracts ~admin client protocol =
+let setup_l1_contracts ~admin client protocol =
   (* Originates a FA1.2 token. *)
   let fa12_script = Fa12.fa12_reference in
   let* _fa12_alias, fa12_address =
@@ -247,11 +249,25 @@ let setup_deposit_contracts ~admin client protocol =
   in
   let* () = Client.bake_for_and_wait client in
 
-  return {fa12 = fa12_address; bridge = bridge_address}
+  (* Originates the administrator contract. *)
+  let* admin =
+    Client.originate_contract
+      ~alias:"evm-admin"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "%S" admin.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  return {fa12 = fa12_address; bridge = bridge_address; admin}
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?dictator () =
+let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
+    =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let ticketer =
     Option.fold
@@ -277,15 +293,25 @@ let make_config ?bootstrap_accounts ?ticketer ?dictator () =
       ~none:[]
       bootstrap_accounts
   in
-  let dictator =
-    Option.fold
-      ~some:(fun dictator ->
-        let to_ = Durable_storage_path.dictator in
-        [Set {value = dictator; to_}])
-      ~none:[]
-      dictator
+  let administrator =
+    (* If we use a legacy dictator, we do not set the same key. *)
+    let r =
+      match legacy_dictator with
+      | Some dictator ->
+          Some
+            ( Durable_storage_path.Legacy.dictator,
+              dictator.Eth_account.public_key )
+      | None ->
+          Option.map
+            (fun administrator ->
+              let to_ = Durable_storage_path.admin in
+              let administrator = Hex.(of_string administrator |> show) in
+              (to_, administrator))
+            administrator
+    in
+    Option.fold ~some:(fun (to_, value) -> [Set {value; to_}]) ~none:[] r
   in
-  match ticketer @ bootstrap_accounts @ dictator with
+  match ticketer @ bootstrap_accounts @ administrator with
   | [] -> None
   | res -> Some (`Config res)
 
@@ -294,13 +320,13 @@ type kernel_installee = {base_installee : string; installee : string}
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
-    ?(bootstrap_accounts = Eth_account.bootstrap_accounts) ?dictator
-    ~deposit_admin protocol =
+    ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
+    ?(with_administrator = true) ?legacy_dictator ~admin protocol =
   let* node, client = setup_l1 protocol in
-  let* deposit_addresses =
-    match deposit_admin with
+  let* l1_contracts =
+    match admin with
     | Some admin ->
-        let* res = setup_deposit_contracts ~admin client protocol in
+        let* res = setup_l1_contracts ~admin client protocol in
         return (Some res)
     | None -> return None
   in
@@ -309,10 +335,18 @@ let setup_evm_kernel ?config ?kernel_installee
     match config with
     | Some config -> Some config
     | None ->
-        let ticketer =
-          Option.map (fun {bridge; _} -> bridge) deposit_addresses
+        let ticketer = Option.map (fun {bridge; _} -> bridge) l1_contracts in
+        let administrator =
+          if with_administrator then
+            Option.map (fun {admin; _} -> admin) l1_contracts
+          else None
         in
-        make_config ~bootstrap_accounts ?ticketer ?dictator ()
+        make_config
+          ~bootstrap_accounts
+          ?ticketer
+          ?administrator
+          ?legacy_dictator
+          ()
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -345,7 +379,7 @@ let setup_evm_kernel ?config ?kernel_installee
   in
   (* Make the L1 bridge aware of the target EVM rollup. *)
   let* () =
-    match (deposit_addresses, deposit_admin) with
+    match (l1_contracts, admin) with
     | Some {bridge; _}, Some admin ->
         Client.transfer
           ~entrypoint:"set"
@@ -380,18 +414,19 @@ let setup_evm_kernel ?config ?kernel_installee
       rollup_operator_key;
       evm_proxy_server;
       endpoint;
-      deposit_addresses;
+      l1_contracts;
     }
 
-let setup_past_genesis ?dictator ?kernel_installee ?originator_key
-    ?rollup_operator_key ~deposit_admin protocol =
+let setup_past_genesis ?with_administrator ?kernel_installee ?originator_key
+    ?rollup_operator_key ~admin ?legacy_dictator protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?kernel_installee
       ?originator_key
       ?rollup_operator_key
-      ?dictator
-      ~deposit_admin
+      ?with_administrator
+      ?legacy_dictator
+      ~admin
       protocol
   in
   (* Force a level to got past the genesis block *)
@@ -490,7 +525,7 @@ let test_originate_evm_kernel =
     ~title:"Originate EVM kernel with installer"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; sc_rollup_client; _} =
-    setup_evm_kernel ~deposit_admin:None protocol
+    setup_evm_kernel ~admin:None protocol
   in
   (* First run of the installed EVM kernel, it will initialize the directory
      "eth_accounts". *)
@@ -528,9 +563,7 @@ let test_rpc_getBalance =
     ~tags:["evm"; "get_balance"]
     ~title:"RPC method eth_getBalance"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* balance =
     Eth_cli.balance
@@ -550,9 +583,7 @@ let test_rpc_getBlockByNumber =
     ~tags:["evm"; "get_block_by_number"]
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let* block =
     Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
@@ -582,9 +613,7 @@ let test_rpc_getTransactionCount =
     ~tags:["evm"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count =
     get_transaction_count
       evm_proxy_server
@@ -600,9 +629,7 @@ let test_rpc_getTransactionCountBatch =
     ~tags:["evm"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count =
     get_transaction_count
       evm_proxy_server
@@ -629,9 +656,7 @@ let test_rpc_batch =
     ~tags:["evm"; "rpc"; "batch"]
     ~title:"RPC batch requests"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let* transaction_count, chain_id =
     let transaction_count =
       transaction_count_request Eth_account.bootstrap_accounts.(0).address
@@ -666,7 +691,7 @@ let test_l2_blocks_progression =
     ~title:"Check L2 blocks progression"
   @@ fun protocol ->
   let* {node; client; sc_rollup_node; _} =
-    setup_evm_kernel ~deposit_admin:None protocol
+    setup_evm_kernel ~admin:None protocol
   in
   let* evm_proxy_server = Evm_proxy_server.init sc_rollup_node in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
@@ -714,7 +739,7 @@ let test_l2_deploy_simple_storage =
     ~title:"Check L2 contract deployment"
   @@ fun protocol ->
   let* ({sc_rollup_client; evm_proxy_server; _} as full_evm_setup) =
-    setup_past_genesis ~deposit_admin:None protocol
+    setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -790,7 +815,7 @@ let test_l2_call_simple_storage =
   @@ fun protocol ->
   (* setup *)
   let* ({evm_proxy_server; sc_rollup_client; _} as evm_setup) =
-    setup_past_genesis ~deposit_admin:None protocol
+    setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -846,7 +871,7 @@ let test_l2_deploy_erc20 =
   (* setup *)
   let* ({sc_rollup_client; evm_proxy_server; node; client; sc_rollup_node; _} as
        evm_setup) =
-    setup_past_genesis ~deposit_admin:None protocol
+    setup_past_genesis ~admin:None protocol
   in
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -1071,7 +1096,7 @@ let make_transfer ?data ~value ~sender ~receiver full_evm_setup =
     }
 
 let transfer ?data protocol =
-  let* full_evm_setup = setup_past_genesis ~deposit_admin:None protocol in
+  let* full_evm_setup = setup_past_genesis ~admin:None protocol in
   let sender, receiver =
     (Eth_account.bootstrap_accounts.(0), Eth_account.bootstrap_accounts.(1))
   in
@@ -1170,7 +1195,7 @@ let test_simulate =
     ~title:"A block can be simulated in the rollup node"
     (fun protocol ->
       let* {evm_proxy_server; sc_rollup_client; _} =
-        setup_past_genesis ~deposit_admin:None protocol
+        setup_past_genesis ~admin:None protocol
       in
       let* json =
         Evm_proxy_server.call_evm_rpc
@@ -1216,7 +1241,7 @@ let test_full_blocks =
        informations"
   @@ fun protocol ->
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~deposit_admin:None protocol
+    setup_past_genesis ~admin:None protocol
   in
   let txs =
     read_tx_from_file ()
@@ -1271,9 +1296,7 @@ let test_latest_block =
       "Check `evm_getBlockByNumber` works correctly when asking for the \
        `latest`"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   (* The first execution of the kernel actually builds two blocks: the genesis
      block and the block for the current inbox. As such, the latest block is
      always of level 1. *)
@@ -1299,9 +1322,7 @@ let test_eth_call_nullable_recipient =
     ~tags:["evm"; "eth_call"; "null"]
     ~title:"Check `eth_call.to` input can be null"
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let* call_result =
     Evm_proxy_server.(
       call_evm_rpc
@@ -1322,7 +1343,7 @@ let test_inject_100_transactions =
     ~title:"Check blocks can contain more than 64 transactions"
   @@ fun protocol ->
   let* {evm_proxy_server; sc_rollup_node; node; client; _} =
-    setup_past_genesis ~deposit_admin:None protocol
+    setup_past_genesis ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -1377,9 +1398,7 @@ let test_eth_call_large =
     ~title:"Try to call with a large amount of data"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} =
-        setup_past_genesis ~deposit_admin:None protocol
-      in
+      let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
       let sender = Eth_account.bootstrap_accounts.(0) in
 
       (* large request *)
@@ -1415,9 +1434,7 @@ let test_estimate_gas =
     ~title:"Try to estimate gas for contract creation"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} =
-        setup_past_genesis protocol ~deposit_admin:None
-      in
+      let* {evm_proxy_server; _} = setup_past_genesis protocol ~admin:None in
 
       (* large request *)
       let data = read_file simple_storage.bin in
@@ -1445,9 +1462,7 @@ let test_estimate_gas_additionnal_field =
     ~title:"eth_estimateGas allows additional fields"
     (fun protocol ->
       (* setup *)
-      let* {evm_proxy_server; _} =
-        setup_past_genesis protocol ~deposit_admin:None
-      in
+      let* {evm_proxy_server; _} = setup_past_genesis protocol ~admin:None in
 
       (* large request *)
       let data = read_file simple_storage.bin in
@@ -1486,7 +1501,7 @@ let test_eth_call_storage_contract_rollup_node =
     (fun protocol ->
       (* setup *)
       let* ({evm_proxy_server; endpoint; _} as evm_setup) =
-        setup_past_genesis ~deposit_admin:None protocol
+        setup_past_genesis ~admin:None protocol
       in
 
       let sender = Eth_account.bootstrap_accounts.(0) in
@@ -1555,7 +1570,7 @@ let test_eth_call_storage_contract_proxy =
     ~title:"Try to call a view (directly through rollup node)"
     (fun protocol ->
       let* ({sc_rollup_client; evm_proxy_server; _} as evm_setup) =
-        setup_past_genesis ~deposit_admin:None protocol
+        setup_past_genesis ~admin:None protocol
       in
 
       let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
@@ -1606,7 +1621,7 @@ let test_eth_call_storage_contract_eth_cli =
       (* setup *)
       let* ({evm_proxy_server; endpoint; sc_rollup_node; client; node; _} as
            evm_setup) =
-        setup_past_genesis ~deposit_admin:None protocol
+        setup_past_genesis ~admin:None protocol
       in
 
       (* sanity *)
@@ -1648,10 +1663,10 @@ let test_eth_call_storage_contract_eth_cli =
 let test_preinitialized_evm_kernel =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "dictator"; "config"]
-    ~title:"Creates a kernel with an initialized dictator key"
+    ~tags:["evm"; "administrator"; "config"]
+    ~title:"Creates a kernel with an initialized administrator key"
   @@ fun protocol ->
-  let dictator_key_path = Durable_storage_path.dictator in
+  let dictator_key_path = Durable_storage_path.admin in
   let dictator_key = Eth_account.bootstrap_accounts.(0).address in
   let config =
     `Config
@@ -1664,9 +1679,7 @@ let test_preinitialized_evm_kernel =
             };
         ]
   in
-  let* {sc_rollup_client; _} =
-    setup_evm_kernel ~config ~deposit_admin:None protocol
-  in
+  let* {sc_rollup_client; _} = setup_evm_kernel ~config ~admin:None protocol in
   let*! found_dictator_key_hex =
     Sc_rollup_client.inspect_durable_state_value
       sc_rollup_client
@@ -1676,12 +1689,12 @@ let test_preinitialized_evm_kernel =
   in
   let found_dictator_key =
     Option.map
-      (fun dictator -> Hex.to_string (`Hex dictator))
+      (fun administrator -> Hex.to_string (`Hex administrator))
       found_dictator_key_hex
   in
   Check.((Some dictator_key = found_dictator_key) (option string))
     ~error_msg:
-      (sf "Expected to read %%L as dictator key, but found %%R instead") ;
+      (sf "Expected to read %%L as administrator key, but found %%R instead") ;
   unit
 
 let deposit ~amount_cmutez ~fa12 ~bridge ~admin ~receiver ~sc_rollup_node ~node
@@ -1729,16 +1742,16 @@ let test_deposit_fa12 =
   let* {
          client;
          sc_rollup_address;
-         deposit_addresses;
+         l1_contracts;
          sc_rollup_node;
          node;
          endpoint;
          _;
        } =
-    setup_evm_kernel ~deposit_admin:(Some admin) protocol
+    setup_evm_kernel ~admin:(Some admin) protocol
   in
-  let {fa12; bridge} =
-    match deposit_addresses with
+  let {fa12; bridge; admin = _} =
+    match l1_contracts with
     | Some x -> x
     | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
   in
@@ -1795,40 +1808,8 @@ let get_kernel_boot_wasm ~sc_rollup_client =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
-    ?(nonce = 2) ~base_installee ~installee ?dictator ~private_key protocol =
-  let* {
-         node;
-         client;
-         sc_rollup_node;
-         sc_rollup_client;
-         sc_rollup_address;
-         evm_proxy_server;
-         _;
-       } =
-    match evm_setup with
-    | Some evm_setup -> return evm_setup
-    | None -> setup_evm_kernel ?dictator ~deposit_admin:None protocol
-  in
-  let sc_rollup_address =
-    Option.value ~default:sc_rollup_address rollup_address
-  in
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* _, preimage_root_hash_opt =
-    Sc_rollup_helpers.prepare_installer_kernel_gen
-      ~preimages_dir
-      ~base_installee
-      ~display_root_hash:true
-      installee
-  in
-  let preimage_root_hash_bytes =
-    match preimage_root_hash_opt with
-    | Some preimage_root_hash -> Hex.to_string @@ `Hex preimage_root_hash
-    | None ->
-        failwith
-          "Couldn't obtain the root hash of the preimages of the chunked \
-           kernel."
-  in
+let legacy_upgrade ~sc_rollup_node ~node ~client ~upgrade_nonce_bytes
+    ~preimage_root_hash_bytes ~sc_rollup_address ~private_key =
   let* rollup_address_bytes =
     let address_opt =
       Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt sc_rollup_address
@@ -1841,7 +1822,6 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
              address
     | None -> failwith "Unexpected smart rollup address."
   in
-  let upgrade_nonce_bytes = Helpers.u16_to_bytes nonce in
   let message_to_sign =
     rollup_address_bytes ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes
   in
@@ -1862,28 +1842,67 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
          (String.to_bytes message_to_sign)
   in
   let upgrade_tag_bytes = "\003" in
-  let* framing_protocol_target_byte =
-    let kernel_version_rpc =
-      Evm_proxy_server.{method_ = "tez_kernelVersion"; parameters = `Null}
-    in
-    let* kernel_version =
-      let* result =
-        Evm_proxy_server.call_evm_rpc evm_proxy_server kernel_version_rpc
-      in
-      return JSON.(result |-> "result" |> as_string)
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6203
-       Whenever the version is strictly superior to:
-       4c111dcae061bea6c3616429a0ea1262ce6c174f
-       alway return "\000". *)
-    if kernel_version = "4c111dcae061bea6c3616429a0ea1262ce6c174f" then
-      return ""
-    else return "\000"
-  in
   let full_external_message =
-    Hex.show @@ Hex.of_string @@ framing_protocol_target_byte
-    ^ rollup_address_bytes ^ upgrade_tag_bytes ^ upgrade_nonce_bytes
-    ^ preimage_root_hash_bytes ^ signature
+    Hex.show @@ Hex.of_string @@ rollup_address_bytes ^ upgrade_tag_bytes
+    ^ upgrade_nonce_bytes ^ preimage_root_hash_bytes ^ signature
+  in
+  send_external_message_and_wait
+    ~sc_rollup_node
+    ~node
+    ~client
+    ~sender:Constant.bootstrap1.public_key_hash
+    ~hex_msg:full_external_message
+
+let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
+    ?(nonce = 2) ~base_installee ~installee ?with_administrator
+    ?expect_l1_failure ?legacy_dictator ?(admin = Constant.bootstrap1)
+    ?(upgrador = admin) protocol =
+  let* {
+         node;
+         client;
+         sc_rollup_node;
+         sc_rollup_client;
+         sc_rollup_address;
+         evm_proxy_server;
+         l1_contracts;
+         _;
+       } =
+    match evm_setup with
+    | Some evm_setup -> return evm_setup
+    | None ->
+        setup_evm_kernel
+          ?with_administrator
+          ?legacy_dictator
+          ~admin:(Some admin)
+          protocol
+  in
+  let l1_contracts =
+    match l1_contracts with
+    | Some x -> x
+    | None -> Test.fail "The test requires the l1 contracts."
+  in
+  let sc_rollup_address =
+    Option.value ~default:sc_rollup_address rollup_address
+  in
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let* _, preimage_root_hash_opt =
+    Sc_rollup_helpers.prepare_installer_kernel_gen
+      ~preimages_dir
+      ~base_installee
+      ~display_root_hash:true
+      installee
+  in
+  let preimage_root_hash_bytes =
+    match preimage_root_hash_opt with
+    | Some preimage_root_hash -> Hex.to_string @@ `Hex preimage_root_hash
+    | None ->
+        failwith
+          "Couldn't obtain the root hash of the preimages of the chunked \
+           kernel."
+  in
+  let upgrade_nonce_bytes = Helpers.u16_to_bytes nonce in
+  let upgrade_payload =
+    upgrade_nonce_bytes ^ preimage_root_hash_bytes |> Hex.of_string |> Hex.show
   in
   let* kernel_boot_wasm_before_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
@@ -1895,12 +1914,29 @@ let gen_test_kernel_upgrade ?evm_setup ?rollup_address ?(should_fail = false)
       @@ read_file (project_root // base_installee // (installee ^ ".wasm"))
   in
   let* () =
-    send_external_message_and_wait
-      ~sc_rollup_node
-      ~node
-      ~client
-      ~sender:Constant.bootstrap1.public_key_hash
-      ~hex_msg:full_external_message
+    match legacy_dictator with
+    | Some dictator ->
+        legacy_upgrade
+          ~sc_rollup_node
+          ~node
+          ~client
+          ~upgrade_nonce_bytes
+          ~preimage_root_hash_bytes
+          ~sc_rollup_address
+          ~private_key:dictator.private_key
+    | None ->
+        let* () =
+          Client.transfer
+            ?expect_failure:expect_l1_failure
+            ~amount:Tez.zero
+            ~giver:upgrador.public_key_hash
+            ~receiver:l1_contracts.admin
+            ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address upgrade_payload)
+            ~burn_cap:Tez.one
+            client
+        in
+        let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+        unit
   in
   let* kernel_boot_wasm_after_upgrade =
     get_kernel_boot_wasm ~sc_rollup_client
@@ -1923,15 +1959,7 @@ let test_kernel_upgrade_to_debug =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
-  let* _ =
-    gen_test_kernel_upgrade
-      ~base_installee
-      ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
-      protocol
-  in
+  let* _ = gen_test_kernel_upgrade ~base_installee ~installee protocol in
   unit
 
 let test_kernel_upgrade_evm_to_evm =
@@ -1942,14 +1970,8 @@ let test_kernel_upgrade_evm_to_evm =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* sc_rollup_node, _, node, client, evm_proxy_server, _ =
-    gen_test_kernel_upgrade
-      ~base_installee
-      ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
-      protocol
+    gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
      blocks. *)
@@ -1964,19 +1986,19 @@ let test_kernel_upgrade_evm_to_evm =
 let test_kernel_upgrade_wrong_key =
   Protocol.register_test
     ~__FILE__
-    ~tags:["dictator"; "upgrade"]
-    ~title:"Ensures EVM kernel's upgrade fails with a wrong dictator key"
+    ~tags:["administrator"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails with a wrong administrator key"
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
+      ~expect_l1_failure:true
       ~should_fail:true
       ~base_installee
       ~installee
-      ~dictator:dictator.public_key
-      ~private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~admin:Constant.bootstrap1
+      ~upgrador:Constant.bootstrap2
       protocol
   in
   unit
@@ -1989,15 +2011,12 @@ let test_kernel_upgrade_wrong_nonce =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
       ~nonce:3
       ~should_fail:true
       ~base_installee
       ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
       protocol
   in
   unit
@@ -2010,15 +2029,13 @@ let test_kernel_upgrade_wrong_rollup_address =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _ =
     gen_test_kernel_upgrade
+      ~expect_l1_failure:true
       ~rollup_address:"sr1T13qeVewVm3tudQb8dwn8qRjptNo7KVkj"
       ~should_fail:true
       ~base_installee
       ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
       protocol
   in
   unit
@@ -2026,8 +2043,8 @@ let test_kernel_upgrade_wrong_rollup_address =
 let test_kernel_upgrade_no_dictator =
   Protocol.register_test
     ~__FILE__
-    ~tags:["dictator"; "upgrade"]
-    ~title:"Ensures EVM kernel's upgrade fails if there is no dictator"
+    ~tags:["administrator"; "upgrade"]
+    ~title:"Ensures EVM kernel's upgrade fails if there is no administrator"
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "debug_kernel" in
@@ -2036,7 +2053,7 @@ let test_kernel_upgrade_no_dictator =
       ~should_fail:true
       ~base_installee
       ~installee
-      ~private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~with_administrator:false
       protocol
   in
   unit
@@ -2049,19 +2066,13 @@ let test_kernel_upgrade_failing_migration =
   @@ fun protocol ->
   let base_installee = "src/kernel_evm/kernel/tests/resources" in
   let installee = "failed_migration" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* ( sc_rollup_node,
          sc_rollup_client,
          node,
          client,
          evm_proxy_server,
          original_kernel_boot_wasm ) =
-    gen_test_kernel_upgrade
-      ~base_installee
-      ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
-      protocol
+    gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   (* Fallback mechanism is triggered, no block is produced at that level. *)
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
@@ -2101,14 +2112,8 @@ let test_check_kernel_upgrade_nonce =
   @@ fun protocol ->
   let base_installee = "./" in
   let installee = "evm_kernel" in
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let* _, _, _, _, evm_proxy_server, _ =
-    gen_test_kernel_upgrade
-      ~base_installee
-      ~installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
-      protocol
+    gen_test_kernel_upgrade ~base_installee ~installee protocol
   in
   let* upgrade_nonce_result =
     Evm_proxy_server.call_evm_rpc
@@ -2144,9 +2149,7 @@ let test_rpc_sendRawTransaction =
     ~title:
       "Ensure EVM proxy returns appropriate hash for any given transactions."
   @@ fun protocol ->
-  let* {evm_proxy_server; _} =
-    setup_past_genesis ~deposit_admin:None protocol
-  in
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
   let* hashes =
     Lwt_list.map_p
@@ -2176,19 +2179,20 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ~deposit_admin ~dictator ~scenario_prior
-    ~scenario_after ~protocol =
+let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
+    ~scenario_after protocol =
   let current_kernel_base_installee = "src/kernel_evm/kernel/tests/resources" in
   let current_kernel_installee = "ghostnet_evm_kernel" in
+  let legacy_dictator = Eth_account.bootstrap_accounts.(0) in
   let* evm_setup =
     setup_past_genesis
-      ~dictator:dictator.Eth_account.public_key
       ~kernel_installee:
         {
           base_installee = current_kernel_base_installee;
           installee = current_kernel_installee;
         }
-      ~deposit_admin
+      ~admin:(Some admin)
+      ~legacy_dictator
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
@@ -2205,10 +2209,9 @@ let gen_kernel_migration_test ~deposit_admin ~dictator ~scenario_prior
   let* _ =
     gen_test_kernel_upgrade
       ~evm_setup
+      ~legacy_dictator
       ~base_installee:next_kernel_base_installee
       ~installee:next_kernel_installee
-      ~dictator:dictator.public_key
-      ~private_key:dictator.private_key
       protocol
   in
   (* Check the values after the upgrade with [sanity_check] results. *)
@@ -2250,12 +2253,7 @@ let test_kernel_migration =
       ~config_result:sanity_check.config_result
       evm_setup
   in
-  gen_kernel_migration_test
-    ~deposit_admin:None
-    ~dictator:sender
-    ~scenario_prior
-    ~scenario_after
-    ~protocol
+  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
 let test_deposit_dailynet =
   Protocol.register_test
@@ -2387,16 +2385,14 @@ let test_deposit_before_and_after_migration =
     ~tags:["evm"; "migration"; "deposit"]
     ~title:"Deposit before and after migration"
   @@ fun protocol ->
-  let dictator = Eth_account.bootstrap_accounts.(0) in
   let admin = Constant.bootstrap5 in
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
   let amount_cmutez = 50_000_000 in
 
   let scenario_prior
-      ~evm_setup:{deposit_addresses; sc_rollup_node; node; client; endpoint; _}
-      =
-    let {fa12; bridge} =
-      match deposit_addresses with Some x -> x | None -> assert false
+      ~evm_setup:{l1_contracts; sc_rollup_node; node; client; endpoint; _} =
+    let {fa12; bridge; _} =
+      match l1_contracts with Some x -> x | None -> assert false
     in
     let* () =
       deposit
@@ -2412,10 +2408,10 @@ let test_deposit_before_and_after_migration =
     check_balance ~receiver ~endpoint amount_cmutez
   in
   let scenario_after
-      ~evm_setup:{deposit_addresses; sc_rollup_node; node; client; endpoint; _}
+      ~evm_setup:{l1_contracts; sc_rollup_node; node; client; endpoint; _}
       ~sanity_check:_ =
-    let {fa12; bridge} =
-      match deposit_addresses with Some x -> x | None -> assert false
+    let {fa12; bridge; _} =
+      match l1_contracts with Some x -> x | None -> assert false
     in
     let* () =
       deposit
@@ -2430,12 +2426,7 @@ let test_deposit_before_and_after_migration =
     in
     check_balance ~receiver ~endpoint (amount_cmutez * 2)
   in
-  gen_kernel_migration_test
-    ~deposit_admin:(Some admin)
-    ~dictator
-    ~scenario_prior
-    ~scenario_after
-    ~protocol
+  gen_kernel_migration_test ~admin ~scenario_prior ~scenario_after protocol
 
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
