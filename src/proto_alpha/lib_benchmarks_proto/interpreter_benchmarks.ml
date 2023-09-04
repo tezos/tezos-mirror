@@ -787,10 +787,10 @@ let alloc_benchmark_from_continuation :
       ~error:(fun _ -> 0.0)
       ~ok:(fun (stack_top, stack, _, _) ->
         let size_after =
-          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
+          Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef, cont))
         in
         let size_before =
-          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef))
+          Obj.reachable_words (Obj.repr (bef_top, bef, bef_top, bef, cont))
         in
 
         float_of_int (size_after - size_before))
