@@ -7548,7 +7548,7 @@ let _kaitai_of_data_encoding_test =
 let _octez_codec =
   public_exe
     "octez-codec"
-    ~path:"src/bin_codec"
+    ~path:"contrib/bin_codec"
     ~internal_name:"codec"
     ~synopsis:"Tezos: `octez-codec` binary to encode and decode values"
     ~release_status:Released
