@@ -648,16 +648,14 @@ let exec_op f =  let open Lwt_result_syntax in
       return (block, state))
   --> next_block
 
+(* ======== Definition of basic actions ======== *)
 
-let run_action :
-    type input output. (input, output) action -> input -> output tzresult Lwt.t
-    =
- fun action input ->
-  let open Lwt_result_syntax in
-  match action with
-  | Do f -> f input
-  | Noop -> return input
-  | Begin_test (constants, delegates_name_list, activate_ai) ->
+(** Initialize the test, given some initial parameters *)
+let begin_test ~activate_ai
+    (constants : Protocol.Alpha_context.Constants.Parametric.t)
+    delegates_name_list : (unit, t) scenarios =
+  exec (fun () ->
+      let open Lwt_result_syntax in
       Log.info ~color:begin_end_color "-- Begin test --" ;
       let bootstrap = "__bootstrap__" in
       let delegates_name_list = bootstrap :: delegates_name_list in
@@ -676,226 +674,219 @@ let run_action :
       let* block, delegates = Context.init_with_constants_n constants n in
       let*? init_level = Context.get_level (B block) in
       let init_staked = Tez.of_mutez 200_000_000_000L in
-      let* accounts_info =
-        List.fold_left2_es
+      let*? account_map =
+        List.fold_left2
           ~when_different_lengths:[Inconsistent_number_of_bootstrap_accounts]
-          (fun accounts_info name contract ->
-            let balance =
-              {initial_bbd with liquid = Account.default_initial_balance}
-            in
-            let* balance = apply_self_stake init_staked balance in
+          (fun account_map name contract ->
+            let liquid = Tez.(Account.default_initial_balance -! init_staked) in
+            let frozen_deposits = Frozen_tez.init init_staked name in
             let pkh = Context.Contract.pkh contract in
             let account =
-              {
-                name;
-                pkh;
-                contract;
-                balance;
-                delegate = Some name;
-                parameters = default_params;
-              }
+              init_account
+                ~name
+                ~delegate:name
+                ~pkh
+                ~contract
+                ~parameters:default_params
+                ~liquid
+                ~frozen_deposits
+                ()
             in
-            let {pool_tez; pool_pseudo; staked; _} = account.balance in
-            let total_staked = tez_of_staked staked ~pool_tez ~pool_pseudo in
-            let* total_balance =
-              total_balance_of_breakdown account.balance ~pool_tez ~pool_pseudo
+            let account_map = String.Map.add name account account_map in
+            let balance, total_balance =
+              balance_and_total_balance_of_account name account_map
             in
             Log.debug "Initial balance for %s:\n%a" name balance_pp balance ;
-            Log.debug "Initial stake: %a" Tez.pp total_staked ;
             Log.debug "Initial total balance: %a" Tez.pp total_balance ;
-            return (String.Map.add name account accounts_info))
+            account_map)
           String.Map.empty
           delegates_name_list
           delegates
       in
       let baker = bootstrap in
       let* total_supply = Context.get_total_supply (B block) in
-      let info =
-        {
-          accounts = delegates_name_list;
-          accounts_info;
-          total_supply;
-          constants;
-          unstake_requests = [];
-          activate_ai;
-          staker = "";
-          baker;
-          last_level_rewards = init_level;
-          snapshot_balances = [];
-        }
+      let state =
+        State.
+          {
+            account_names = delegates_name_list;
+            account_map;
+            total_supply;
+            constants;
+            param_requests = [];
+            activate_ai;
+            baker;
+            last_level_rewards = init_level;
+            snapshot_balances = String.Map.empty;
+            pending_operations = [];
+          }
       in
-      let* () = check_all_balances (block, info) in
-      return (block, info)
-  | End_test ->
-      Log.info ~color:begin_end_color "-- End test --" ;
-      return_unit
-  | Next_block ->
-      Log.info ~color:action_color "[Next block]" ;
-      bake input
-  | Next_cycle ->
-      Log.info ~color:action_color "[Next cycle]" ;
-      let block, ({constants; activate_ai; _} as info) = input in
-      if
-        Tez.(constants.issuance_weights.base_total_issued_per_minute = zero)
-        || not activate_ai
-      then
-        (* Apply rewards in info only after the while cycle ends *)
-        let baker = find_account info.baker info in
-        let policy = Block.By_account baker.pkh in
-        let* block = Block.bake_until_cycle_end ~policy block in
-        let* info = apply_end_cycle_info info in
-        apply_rewards (block, info)
-      else
-        (* Apply rewards in info every block *)
-        bake_until_cycle_end_slow input
-  | Set_delegate_params (delegate_name, params) ->
-      let delegate_name = resolve_name delegate_name input in
+      let* () = check_all_balances block state in
+      return (block, state))
+
+(** Set delegate parameters for the given delegate *)
+let set_delegate_params delegate_name params : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      (* Simple example of action_atom definition: *)
+      let delegate = State.find_account delegate_name state in
       Log.info
         ~color:action_color
         "[Set delegate parameters for \"%s\"]"
-        delegate_name ;
-      let block, info = input in
-      let delegate = find_account delegate_name info in
+        delegate.name ;
+      (* Define the operation *)
       let* operation =
         set_delegate_parameters
           (B block)
           delegate.contract
           ~limit_of_staking_over_baking:params.limit_of_staking_over_baking
-          ~edge_of_baking_over_staking_billionth:params.baking_over_staking_edge
+          ~edge_of_baking_over_staking_billionth:
+            params.edge_of_baking_over_staking
       in
-      let* block, info = bake ~operation (block, info) in
-      let info =
-        update_account delegate_name {delegate with parameters = params} info
+      (* Update state *)
+      let cd = state.constants.preserved_cycles - 1 in
+      let state =
+        {
+          state with
+          param_requests = (delegate_name, params, cd) :: state.param_requests;
+        }
       in
-      return (block, info)
-  | Add_account name ->
-      let name = resolve_name name input in
+      (* Return both *)
+      return (state, [operation]))
+
+(** Add a new account with the given name *)
+let add_account name : (t, t) scenarios =
+  exec_state (fun (_block, state) ->
       Log.info ~color:action_color "[Add account \"%s\"]" name ;
-      let block, info = input in
       let new_account = Account.new_account () in
       let pkh = new_account.pkh in
       let contract = Protocol.Alpha_context.Contract.Implicit pkh in
-      let account_info =
-        {
-          name;
-          pkh;
-          contract;
-          delegate = None;
-          parameters = default_params;
-          balance = initial_bbd;
-        }
+      let account_state =
+        init_account ~name ~pkh ~contract ~parameters:default_params ()
       in
-      let info = update_account name account_info info in
-      let info = {info with accounts = name :: info.accounts} in
-      return (block, info)
-  | Reveal name ->
-      let name = resolve_name name input in
-      Log.info ~color:action_color "[Reveal \"%s\"]" name ;
-      let block, info = input in
-      let account = find_account name info in
+      let state = State.update_account name account_state state in
+      let state = {state with account_names = name :: state.account_names} in
+      return state)
+
+(** Reveal operation *)
+let reveal name : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let account = State.find_account name state in
+      Log.info ~color:action_color "[Reveal \"%s\"]" account.name ;
       let* acc = Account.find account.pkh in
       let* operation =
         Op.revelation ~fee:Protocol.Alpha_context.Tez.zero (B block) acc.pk
       in
-      bake ~operation (block, info)
-  | Transfer (src_name, dst_name, amount) ->
-      let src_name = resolve_name src_name input in
-      let dst_name = resolve_name dst_name input in
+      return (state, [operation]))
+
+(** Transfer from src to dst *)
+let transfer src_name dst_name amount : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let src = State.find_account src_name state in
+      let dst = State.find_account dst_name state in
+      let amount = quantity_to_tez src.liquid amount in
       Log.info
         ~color:action_color
         "[Transfer \"%s\" -> \"%s\" (%aꜩ)]"
-        src_name
-        dst_name
+        src.name
+        dst.name
         Tez.pp
         amount ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let dst = find_account dst_name info in
       let* operation =
         Op.transaction ~fee:Tez.zero (B block) src.contract dst.contract amount
       in
-      let* info = update_balance_2 ~f:(apply_transfer amount) src dst info in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
-  | Set_delegate (src_name, delegate_name) ->
-      let src_name = resolve_name src_name input in
-      Log.info
-        ~color:action_color
-        "[Set delegate \"%s\" for \"%s\"]"
-        delegate_name
-        src_name ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let delegate = find_account delegate_name info in
+      let state = State.apply_transfer amount src.name dst.name state in
+      return (state, [operation]))
+
+(** Set delegate for src. If [delegate_name_opt = None], then unset current delegate *)
+let set_delegate src_name delegate_name_opt : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let src = State.find_account src_name state in
+      let delegate_pkh_opt =
+        match delegate_name_opt with
+        | None ->
+            Log.info ~color:action_color "[Unset delegate of \"%s\"]" src.name ;
+            None
+        | Some delegate_name ->
+            let delegate = State.find_account delegate_name state in
+            Log.info
+              ~color:action_color
+              "[Set delegate \"%s\" for \"%s\"]"
+              delegate.name
+              src.name ;
+            Some delegate.pkh
+      in
+      let cycle = Block.current_cycle block in
       let* operation =
-        Op.delegation ~fee:Tez.zero (B block) src.contract (Some delegate.pkh)
+        Op.delegation ~fee:Tez.zero (B block) src.contract delegate_pkh_opt
       in
-      let* info = apply_unstake_info src Max_tez info in
-      let info =
-        update_account src_name {src with delegate = Some delegate_name} info
+      let balance = balance_of_account src_name state.account_map in
+      let state =
+        if Q.(equal balance.staked_b zero) then state
+        else
+          let state = State.apply_unstake cycle Tez.max_mutez src_name state in
+          (* Changing delegate applies finalize if unstake happened *)
+          State.apply_finalize src_name state
       in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
-  | Unset_delegate src_name ->
-      let src_name = resolve_name src_name input in
-      Log.info ~color:action_color "[Unset delegate of \"%s\"]" src_name ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let* operation =
-        Op.delegation ~fee:Tez.zero (B block) src.contract None
-      in
-      let* info = apply_unstake_info src Max_tez info in
-      let info = update_account src_name {src with delegate = None} info in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
-  | Stake (src_name, stake_value) ->
-      let src_name = resolve_name src_name input in
+      let state = State.update_delegate src_name delegate_name_opt state in
+      return (state, [operation]))
+
+(** Stake operation *)
+let stake src_name stake_value : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let src = State.find_account src_name state in
       Log.info
         ~color:action_color
         "[Stake for \"%s\" (%a)]"
-        src_name
-        stake_value_pp
+        src.name
+        tez_quantity_pp
         stake_value ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let amount =
-        match stake_value with
-        | None -> Tez.zero
-        | All -> src.balance.liquid
-        | Half -> Tez.div_exn src.balance.liquid 2
-        | Max_tez -> Tez.max_mutez
-        | Amount a -> a
-      in
+      (* Stake applies finalize *before* the stake *)
+      let state = State.apply_finalize src_name state in
+      let amount = quantity_to_tez src.liquid stake_value in
       let* operation = stake (B block) src.contract amount in
-      let* info = apply_stake_info src amount info in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
-  | Unstake (src_name, unstake_value) ->
-      let src_name = resolve_name src_name input in
+      let state = State.apply_stake amount src_name state in
+      return (state, [operation]))
 
+(** unstake operation *)
+let unstake src_name unstake_value : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let src = State.find_account src_name state in
       Log.info
         ~color:action_color
         "[Unstake for \"%s\" (%a)]"
-        src_name
-        stake_value_pp
+        src.name
+        tez_quantity_pp
         unstake_value ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let amount = unstake_value_to_tez src unstake_value info in
+      let stake_balance =
+        (balance_of_account src_name state.account_map).staked_b
+        |> Partial_tez.to_tez
+      in
+      let amount = quantity_to_tez stake_balance unstake_value in
       let* operation = unstake (B block) src.contract amount in
-      let* info = apply_unstake_info src unstake_value info in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
-  | Finalize_unstake src_name ->
-      let src_name = resolve_name src_name input in
-      Log.info ~color:action_color "[Finalize_unstake for \"%s\"]" src_name ;
-      let block, info = input in
-      let src = find_account src_name info in
-      let* operation = finalize_unstake (B block) src.contract in
-      let* info = update_balance ~f:apply_finalize src info in
-      let* block, info = bake ~operation (block, info) in
-      return (block, info)
+      let cycle = Block.current_cycle block in
+      let balance = balance_of_account src_name state.account_map in
+      let state =
+        if Q.(equal balance.staked_b zero) then state
+        else
+          let state = State.apply_unstake cycle amount src_name state in
+          State.apply_finalize src_name state
+      in
+      return (state, [operation]))
 
+(** finalize unstake operation *)
+let finalize_unstake src_name : (t, t) scenarios =
+  exec_op (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let src = State.find_account src_name state in
+      Log.info ~color:action_color "[Finalize_unstake for \"%s\"]" src.name ;
+      let* operation = finalize_unstake (B block) src.contract in
+      let state = State.apply_finalize src_name state in
+      return (state, [operation]))
 
 
 let rec wait_n_cycles n =
