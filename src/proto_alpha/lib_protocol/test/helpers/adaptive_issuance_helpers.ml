@@ -79,7 +79,7 @@ module Partial_tez = struct
     let tez, rem = to_tez_rem a in
     (* If rem = 0, we keep the (+ 0), to indicate that it's a partial tez *)
     Format.fprintf fmt "%a ( +%aµꜩ )" Tez.pp tez Q.pp_print rem
- end
+end
 
 module Cycle = Protocol.Alpha_context.Cycle
 
@@ -101,7 +101,8 @@ module Frozen_tez = struct
   let zero = {initial = Tez.zero; current = String.Map.empty}
 
   let init amount account =
-    { initial = amount;
+    {
+      initial = amount;
       current = String.Map.singleton account (Partial_tez.of_tez amount);
     }
 
@@ -111,7 +112,8 @@ module Frozen_tez = struct
     | Some p -> p
 
   let union a b =
-    { initial = Tez.(a.initial +! b.initial);
+    {
+      initial = Tez.(a.initial +! b.initial);
       current =
         String.Map.union
           (fun _ x y -> Some Partial_tez.(x + y))
@@ -159,7 +161,8 @@ module Frozen_tez = struct
 
   (* Adds frozen to account. Happens each stake in frozen deposits *)
   let add_current amount account a =
-    { a with
+    {
+      a with
       current =
         String.Map.update
           account
@@ -488,18 +491,22 @@ let update_account ~f account_name account_map =
 let add_liquid_rewards amount account_name account_map =
   let f account =
     let liquid = Tez.(account.liquid +! amount) in
-    {account with liquid}  in
+    {account with liquid}
+  in
   update_account ~f account_name account_map
 
 let add_frozen_rewards amount account_name account_map =
   let f account =
     let frozen_deposits =
-      Frozen_tez.add_tez_to_all_current amount account.frozen_deposits   in
-    {account with frozen_deposits}  in
+      Frozen_tez.add_tez_to_all_current amount account.frozen_deposits
+    in
+    {account with frozen_deposits}
+  in
   update_account ~f account_name account_map
 
 let apply_transfer amount src_name dst_name account_map =
-  if Tez.(equal amount zero) then account_map else
+  if Tez.(equal amount zero) then account_map
+  else
     match
       ( String.Map.find src_name account_map,
         String.Map.find dst_name account_map )
@@ -508,16 +515,19 @@ let apply_transfer amount src_name dst_name account_map =
         let amount = Tez.min src.liquid amount in
         let f_src src =
           let liquid = Tez.(src.liquid -! amount) in
-          {src with liquid}        in
+          {src with liquid}
+        in
         let f_dst dst =
           let liquid = Tez.(dst.liquid +! amount) in
-          {dst with liquid}        in
+          {dst with liquid}
+        in
         let account_map = update_account ~f:f_src src_name account_map in
         update_account ~f:f_dst dst_name account_map
     | _ -> raise Not_found
 
 let apply_stake amount staker_name account_map =
-  if Tez.(equal amount zero) then account_map  else
+  if Tez.(equal amount zero) then account_map
+  else
     match String.Map.find staker_name account_map with
     | None -> raise Not_found
     | Some staker -> (
@@ -544,7 +554,8 @@ let apply_stake amount staker_name account_map =
             update_account ~f:f_delegate delegate_name account_map)
 
 let apply_unstake cycle amount staker_name account_map =
-  if Tez.(equal amount zero) then account_map  else
+  if Tez.(equal amount zero) then account_map
+  else
     match String.Map.find staker_name account_map with
     | None -> raise Not_found
     | Some staker -> (
@@ -580,12 +591,15 @@ let apply_unstake cycle amount staker_name account_map =
 let apply_unslashable cycle account_map =
   let f delegate =
     let amount_unslashable, unstaked_frozen =
-      Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen    in
+      Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen
+    in
     let unstaked_finalizable =
       Unstaked_finalizable.add_from_frozen
         amount_unslashable
-        delegate.unstaked_finalizable    in
-    {delegate with unstaked_frozen; unstaked_finalizable} in
+        delegate.unstaked_finalizable
+    in
+    {delegate with unstaked_frozen; unstaked_finalizable}
+  in
   String.Map.map f account_map
 
 let apply_finalize staker_name account_map =
@@ -627,7 +641,8 @@ let apply_finalize staker_name account_map =
 let balance_and_total_balance_of_account account_name account_map =
   let ({liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
       as balance) =
-    balance_of_account account_name account_map in
+    balance_of_account account_name account_map
+  in
   ( balance,
     Tez.(
       liquid_b +! bonds_b
@@ -635,7 +650,8 @@ let balance_and_total_balance_of_account account_name account_map =
       +! Partial_tez.to_tez unstaked_frozen_b
       +! unstaked_finalizable_b) )
 
-let get_balance_from_context ctxt contract =  let open Lwt_result_syntax in
+let get_balance_from_context ctxt contract =
+  let open Lwt_result_syntax in
   let* liquid_b = Context.Contract.balance ctxt contract in
   let* bonds_b = Context.Contract.frozen_bonds ctxt contract in
   let* staked_b = Context.Contract.staked_balance ctxt contract in
