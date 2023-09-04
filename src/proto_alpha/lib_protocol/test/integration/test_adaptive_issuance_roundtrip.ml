@@ -555,9 +555,54 @@ let bake_until_cycle_end_slow : t -> t tzresult Lwt.t =
   in
   step (init_block, init_state)
 
-let check_snapshot_balances =
-  Do
-    (fun ((_, info) as input) ->
+(* ======== State updates ======== *)
+
+(** Sets the de facto baker for all future blocks *)
+let set_baker baker : (t, t) scenarios =
+  exec_state (fun (_block, state) -> return {state with State.baker})
+
+(** Creates a snapshot of the current balances for the given account names.
+    Can be used to check that balances at point A and B in the execution of a test
+    are the same (either nothing happened, or a succession of actions resulted in
+    getting the same values as before *)
+let snapshot_balances snap_name names_list : (t, t) scenarios =
+  exec_state (fun (_block, state) ->
+      Log.debug
+        ~color:low_debug_color
+        "Snapshoting balances as \"%s\""
+        snap_name ;
+      let balances =        List.map
+          (fun name -> (name, balance_of_account name state.State.account_map))
+          names_list      in      let snapshot_balances =
+        String.Map.add snap_name balances state.snapshot_balances      in
+      return {state with snapshot_balances})
+
+(** Check balances against a previously defined snapshot *)
+let check_snapshot_balances snap_name : (t, t) scenarios =  let open Lwt_result_syntax in
+  exec_state (fun (_block, state) ->
+      Log.debug
+        ~color:low_debug_color
+        "Checking equality of balances between \"%s\" and now"
+        snap_name ;      let snapshot_balances =
+        String.Map.find snap_name state.State.snapshot_balances      in
+      match snapshot_balances with
+      | None ->
+          Log.debug
+            ~color:warning_color
+            "\"%s\" snapshot not found..."
+            snap_name ;
+          return state
+      | Some snapshot_balances ->
+          let* () =
+            List.iter_es
+              (fun (name, old_balance) ->
+                let new_balance =
+                  balance_of_account name state.State.account_map
+                in
+                assert_balance_equal ~loc:__LOC__ old_balance new_balance)
+              snapshot_balances
+          in
+          return state)
       let open Lwt_result_syntax in
       let* () =
         List.iter_es
