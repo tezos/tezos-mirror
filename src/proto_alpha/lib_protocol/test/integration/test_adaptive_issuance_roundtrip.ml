@@ -36,6 +36,11 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
+let default_param_cd, default_unstake_cd =
+  let constants = Default_parameters.constants_test in
+  let pc = constants.preserved_cycles in
+  let msp = constants.max_slashing_period in
+  (pc + 1, pc + msp)
 
 (** Contains the functions and constants relative to logging.*)
 module Log_module = struct
@@ -102,6 +107,23 @@ end
 
 open Log_module
 
+(** Double attestation helpers *)
+let order_attestations ~correct_order op1 op2 =
+  let oph1 = Protocol.Alpha_context.Operation.hash op1 in
+  let oph2 = Protocol.Alpha_context.Operation.hash op2 in
+  let c = Operation_hash.compare oph1 oph2 in
+  if correct_order then if c < 0 then (op1, op2) else (op2, op1)
+  else if c < 0 then (op2, op1)
+  else (op1, op2)
+
+let double_attestation ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_attestations ~correct_order op1 op2 in
+  Op.double_attestation ctxt e1 e2
+
+let double_preattestation ctxt ?(correct_order = true) op1 op2 =
+  let e1, e2 = order_attestations ~correct_order op1 op2 in
+  Op.double_preattestation ctxt e1 e2
+
 (** Aliases for tez values *)
 type tez_quantity =
   | Half
@@ -124,6 +146,30 @@ let tez_quantity_pp fmt value =
   in
   Format.fprintf fmt "%s" s
 
+(* [all] is the amount returned when [qty = All]. If [qty = Half], returns half of that. *)
+let quantity_to_tez all qty =
+  match qty with
+  | Nothing -> Tez.zero
+  | All -> all
+  | All_but_one ->
+      if Tez.(equal all zero) then Tez.zero else Tez.(all -! one_mutez)
+  | Half -> Tez.div_exn all 2
+  | Max_tez -> Tez.max_mutez
+  | Amount a -> a
+
+let default_params =
+  let Protocol.Staking_parameters_repr.
+        {
+          limit_of_staking_over_baking_millionth;
+          edge_of_baking_over_staking_billionth;
+        } =
+    Protocol.Staking_parameters_repr.default  in
+  {
+    limit_of_staking_over_baking =
+      Int32.to_int limit_of_staking_over_baking_millionth;
+    edge_of_baking_over_staking =
+      Int32.to_int edge_of_baking_over_staking_billionth;
+  }
 
 type info = {
   accounts : string list;
