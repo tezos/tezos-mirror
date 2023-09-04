@@ -87,11 +87,12 @@ let endpoint_of_test_mode_tag node = function
    - [parameter_overrides] specifies protocol parameters to change from the default
      sandbox parameters.
    - [nodes_args] specifies additional parameters to pass to the node.
+   - [event_sections_levels] is passed to the node initialization.
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
 let check_rpc_regression ~test_mode_tag ~test_function ?supports
-    ?parameter_overrides ?nodes_args sub_group =
+    ?parameter_overrides ?nodes_args ?event_sections_levels sub_group =
   let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
@@ -108,6 +109,7 @@ let check_rpc_regression ~test_mode_tag ~test_function ?supports
     Client.init_with_protocol
       ?parameter_file
       ?nodes_args
+      ?event_sections_levels
       ~protocol
       client_mode_tag
       ()
@@ -995,49 +997,163 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
     Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
-  (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
-  let get_filter_variations () =
-    let get_filter ?include_default client =
-      RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.get_chain_mempool_filter ?include_default ()
+
+  Log.info
+    ~color:Log.Color.BG.yellow
+    "## Test RPCs [GET|POST /chains/main/mempool/filter]" ;
+  let open Mempool.Config in
+  Log.info
+    "Check that GET filter returns the default configuration (the full default \
+     configuration when the query parameter [include_default] is either absent \
+     or set to [true], or an empty configuration when [include_default] is \
+     [false])." ;
+  let* () =
+    check_get_filter_all_variations
+      ~log:true
+      ?endpoint
+      ~hooks:mempool_hooks
+      default
+      client
+  in
+  Log.info
+    "For various configurations, call POST filter then check that GET filter \
+     returns the expected result (for all variations of [include_default)." ;
+  let set_config_and_check msg config =
+    Log.info "%s" msg ;
+    let* output =
+      post_filter ~log:true ?endpoint ~hooks:mempool_hooks config client
     in
-    let* _ = get_filter client in
-    let* _ = get_filter ~include_default:true client in
-    let* _ = get_filter ~include_default:false client in
+    check_equal (fill_with_default config) (of_json output) ;
+    check_get_filter_all_variations
+      ~log:true
+      ?endpoint
+      ~hooks:mempool_hooks
+      config
+      client
+  in
+  let* () =
+    set_config_and_check
+      "Config 1: all fields provided and distinct from default."
+      {
+        minimal_fees = Some 1;
+        minimal_nanotez_per_gas_unit = Some (2, 3);
+        minimal_nanotez_per_byte = Some (4, 5);
+        replace_by_fee_factor = Some (6, 7);
+        max_operations = Some 8;
+        max_total_bytes = Some 9;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 2: omitted fields (which should be set to default)."
+      {
+        minimal_fees = Some 25;
+        minimal_nanotez_per_gas_unit = None;
+        minimal_nanotez_per_byte = Some (1050, 1);
+        replace_by_fee_factor = None;
+        max_operations = Some 2000;
+        max_total_bytes = None;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 3: {} (ie. all fields should be set to default)."
+      {
+        minimal_fees = None;
+        minimal_nanotez_per_gas_unit = None;
+        minimal_nanotez_per_byte = None;
+        replace_by_fee_factor = None;
+        max_operations = None;
+        max_total_bytes = None;
+      }
+  in
+  let* () =
+    set_config_and_check
+      "Config 4: divide by zero. (Should this config be invalid?)"
+      {
+        minimal_fees = None;
+        minimal_nanotez_per_gas_unit = Some (100, 0);
+        minimal_nanotez_per_byte = None;
+        replace_by_fee_factor = None;
+        max_operations = None;
+        max_total_bytes = None;
+      }
+  in
+  let config5 =
+    {
+      minimal_fees = None;
+      minimal_nanotez_per_gas_unit = Some default_minimal_nanotez_per_gas_unit;
+      minimal_nanotez_per_byte = Some (max_int, 1);
+      replace_by_fee_factor = None;
+      max_operations = Some default_max_operations;
+      max_total_bytes = Some 0;
+    }
+  in
+  let* () =
+    set_config_and_check
+      "Config 5: some fields omitted, some provided and equal to default, some \
+       with extreme values."
+      config5
+  in
+  Log.info
+    "Post invalid configurations; check that the config is unchanged and that \
+     event [invalid_mempool_filter_configuration] is witnessed." ;
+  let config5_full = fill_with_default config5 in
+  let endpoint =
+    match endpoint with
+    | Some endpoint -> endpoint
+    | None -> Test.fail "This test requires an actual endpoint at %s" __LOC__
+  in
+  let test_invalid_config msg config_str =
+    Log.info "%s" msg ;
+    let waiter =
+      Client.endpoint_wait_for
+        endpoint
+        "invalid_mempool_filter_configuration.v0"
+        (Fun.const (Some ()))
+    in
+    let* output_post =
+      post_filter_str ~log:true ~endpoint ~hooks:mempool_hooks config_str client
+    in
+    check_equal config5_full (of_json output_post) ;
+    let* () = waiter in
+    let* output_get = call_get_filter ~endpoint ~hooks:mempool_hooks client in
+    check_equal config5_full (of_json output_get) ;
     unit
   in
-  let post_and_get_filter config_str =
-    let* _ =
-      RPC.Client.call ?endpoint ~hooks:mempool_hooks client
-      @@ RPC.post_chain_mempool_filter
-           ~data:(Data (Ezjsonm.from_string config_str))
-           ()
-    in
-    get_filter_variations ()
-  in
-  let* () = get_filter_variations () in
   let* () =
-    (* valid configuration *)
-    post_and_get_filter
-      {|{ "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
-          "minimal_nanotez_per_byte": [ "56", "3" ],
-          "replace_by_fee_factor": ["21", "20"], "max_operations": 0,
-          "max_total_bytes": 100_000_000 }|}
+    test_invalid_config
+      "Invalid config 1: invalid field name"
+      {|{ "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "1050", "1" ], "minimal_nanotez_per_byte": [ "7", "5" ], "replace_by_fee_factor": ["21", "20"], "max_operations": 10, "max_total_bytes": 10_000_000, "invalid_field_name": 100 }|}
   in
   let* () =
-    (* valid configuration with omitted fields *)
-    post_and_get_filter
-      {|{ "minimal_fees": "200", "replace_by_fee_factor": ["1", "1"] }|}
+    test_invalid_config
+      "Invalid config 2: wrong type"
+      {|{ "minimal_fees": "true" }|}
   in
   let* () =
-    (* invalid field name *)
-    post_and_get_filter {|{ "max_operations": 100, "invalid_field_name": 100 }|}
+    test_invalid_config
+      "Invalid config 3: wrong type bis"
+      {|{ "max_operations": "1000" }|}
   in
   let* () =
-    (* ill-typed data *) post_and_get_filter {|{ "minimal_fees": "toto" }|}
+    test_invalid_config
+      "Invalid config 4: not enough elements in fraction"
+      {|{ "minimal_nanotez_per_gas_unit": [ "100" ] }|}
   in
-  let* () = (* back to default config *) post_and_get_filter "{}" in
-  unit
+  let* () =
+    test_invalid_config
+      "Invalid config 5: too many elements in fraction"
+      {|{ "minimal_nanotez_per_gas_unit": [ "100", "1", "10" ] }|}
+  in
+  let* () =
+    test_invalid_config
+      "Invalid config 6: negative"
+      {|{ "minimal_fees": "-1" }|}
+  in
+  test_invalid_config
+    "Invalid config 7: negative bis"
+    {|{ "max_operations": -1 }|}
 
 let start_with_acl address acl =
   let* node =
@@ -1495,11 +1611,12 @@ let register protocols =
     binary_regression_test ;
   let register protocols test_mode_tag =
     let check_rpc_regression ?parameter_overrides ?supports ?nodes_args
-        ~test_function sub_group =
+        ?event_sections_levels ~test_function sub_group =
       check_rpc_regression
         ~test_mode_tag
         ?parameter_overrides
         ?nodes_args
+        ?event_sections_levels
         ~test_function
         sub_group
         ?supports
@@ -1550,7 +1667,10 @@ let register protocols =
         check_rpc_regression
           "mempool"
           ~test_function:test_mempool
-          ~nodes_args:mempool_node_flags) ;
+          ~nodes_args:mempool_node_flags
+          ~event_sections_levels:[("prevalidator", `Debug)]
+        (* Level [Debug] is needed to witness prevalidator event
+           [invalid_mempool_filter_configuration]. *)) ;
     check_rpc
       "network"
       ~test_function:test_network

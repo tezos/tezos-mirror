@@ -81,6 +81,12 @@ let get_mode t = t.mode
 
 let set_mode mode t = t.mode <- mode
 
+let endpoint_wait_for ?where endpoint event filter =
+  match endpoint with
+  | Node node -> Node.wait_for ?where node event filter
+  | Proxy_server ps -> Proxy_server.wait_for ?where ps event filter
+  | Foreign_endpoint _ -> Test.fail "Cannot wait_for with a Foreign_endpoint"
+
 let next_name = ref 1
 
 let fresh_name () =
