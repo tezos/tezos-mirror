@@ -134,10 +134,7 @@ let store_slot_to_dal_node ~slot_size dal_node =
     let* proof =
       RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
     in
-    return
-      (Data_encoding.Json.destruct
-         Dal_common.Cryptobox.Commitment_proof.encoding
-         (`String proof))
+    Dal_common.Commitment.proof_of_string proof |> return
   in
   return (commitment_hash, proof)
 

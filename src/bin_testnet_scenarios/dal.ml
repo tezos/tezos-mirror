@@ -210,10 +210,7 @@ let scenario network =
         let* proof =
           RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
         in
-        return
-          (Data_encoding.Json.destruct
-             Dal_common.Cryptobox.Commitment_proof.encoding
-             (`String proof))
+        Dal_common.Commitment.proof_of_string proof |> return
       in
       let source = List.nth keys key_index in
       let* _ =
