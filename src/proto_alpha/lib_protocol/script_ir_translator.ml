@@ -998,7 +998,7 @@ let parse_view_output_ty ctxt ~stack_depth ~legacy node =
     ~ret:Don't_parse_entrypoints
     node
 
-let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
+let parse_storage_ty ctxt ~stack_depth ~legacy node =
   (parse_ty [@tailcall])
     ctxt
     ~stack_depth
@@ -1009,49 +1009,6 @@ let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
     ~allow_ticket:true
     ~ret:Don't_parse_entrypoints
     node
-
-let parse_storage_ty :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy node ->
-  match node with
-  | Prim
-      ( loc,
-        T_pair,
-        [Prim (big_map_loc, T_big_map, args, map_annot); remaining_storage],
-        storage_annot )
-    when legacy (* Legacy check introduced before Ithaca. *) -> (
-      match storage_annot with
-      | [] ->
-          (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
-      | [single]
-        when Compare.Int.(String.length single > 0)
-             && Compare.Char.(single.[0] = '%') ->
-          (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
-      | _ ->
-          (* legacy semantics of big maps used the wrong annotation parser *)
-          Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
-          parse_big_map_ty
-            ctxt
-            ~stack_depth:(stack_depth + 1)
-            ~legacy
-            big_map_loc
-            args
-            map_annot
-          >>? fun (Ex_ty big_map_ty, ctxt) ->
-          parse_normal_storage_ty
-            ctxt
-            ~stack_depth:(stack_depth + 1)
-            ~legacy
-            remaining_storage
-          >>? fun (Ex_ty remaining_storage, ctxt) ->
-          check_composed_type_annot loc storage_annot >>? fun () ->
-          pair_t loc big_map_ty remaining_storage >|? fun (Ty_ex_c ty) ->
-          (Ex_ty ty, ctxt))
-  | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 (* check_packable: determine if a `ty` is packable into Michelson *)
 let check_packable ~allow_contract loc root =
