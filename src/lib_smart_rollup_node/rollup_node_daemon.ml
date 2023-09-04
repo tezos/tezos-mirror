@@ -60,7 +60,6 @@ let previous_context (node_ctxt : _ Node_context.t)
 let start_workers (configuration : Configuration.t)
     (plugin : (module Protocol_plugin_sig.S)) (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
-  let module Plugin = (val plugin) in
   let* () = Publisher.init node_ctxt in
   let* () =
     match
