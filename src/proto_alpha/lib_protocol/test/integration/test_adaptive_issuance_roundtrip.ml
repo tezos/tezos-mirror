@@ -888,19 +888,114 @@ let finalize_unstake src_name : (t, t) scenarios =
       let state = State.apply_finalize src_name state in
       return (state, [operation]))
 
+(* ======== Misc functions ========*)
 
+let check_failure_aux : ('a -> 'b) -> 'a -> 'a tzresult Lwt.t =
+ fun f input ->
+  Log.info ~color:assert_block_color "Entering failling scenario..." ;
+  let* output = f input in
+  match output with
+  | Ok _ -> failwith "Unexpected success"
+  | Error _ ->
+      Log.info ~color:assert_block_color "Rollback" ;
+      return input
+
+let check_fail_and_rollback :
+    ('a, 'b) single_scenario -> 'a -> 'a tzresult Lwt.t =
+ fun sc input -> check_failure_aux (run_scenario sc) input
+
+(** Useful function to test expected failures: runs the given branch until it fails,
+    then rollbacks to before execution. Fails if the given branch Succeeds *)
+let assert_failure : ('a, 'b) scenarios -> ('a, 'a) scenarios = fun scenarios ->
+  match unfold_scenarios scenarios with
+  | [] -> Empty
+  | [(sc, _, _)] -> exec (check_fail_and_rollback sc)
+  | _ ->
+      exec (fun _ ->
+          failwith "Error: assert_failure used with branching scenario")
+
+(** Loop *)
+let rec loop n : ('a, 'a) scenarios -> ('a, 'a) scenarios =
+ fun scenario ->
+  (* If branching scenarios with k branches, returns a scenario with k^n branches *)
+  if n = 0 then Empty
+  else if n = 1 then scenario
+  else loop (n - 1) scenario --> scenario
+
+let rec loop_action n : ('a -> 'a tzresult Lwt.t) -> ('a, 'a) scenarios =
+ fun f ->
+  if n = 0 then Empty
+  else if n = 1 then exec f
+  else loop_action (n - 1) f --> exec f
+
+(** Check a specific balance field for a specific account is equal to a specific amount *)
+let check_balance_field src_name field amount : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  let check = Assert.equal_tez ~loc:__LOC__ amount in
+  let check' a = check (Partial_tez.to_tez a) in
+  exec_state (fun (block, state) ->
+      let src = State.find_account src_name state in
+      let src_balance, src_total =
+        balance_and_total_balance_of_account src_name state.account_map
+      in
+      let* rpc_balance, rpc_total =
+        get_balance_from_context (B block) src.contract
+      in
+      let* () =
+        match field with
+        | `Liquid ->
+            let* () = check rpc_balance.liquid_b in
+            check src_balance.liquid_b
+        | `Bonds ->
+            let* () = check rpc_balance.bonds_b in
+            check src_balance.bonds_b
+        | `Staked ->
+            let* () = check' rpc_balance.staked_b in
+            check' src_balance.staked_b
+        | `Unstaked_frozen_total ->
+            let* () = check' rpc_balance.unstaked_frozen_b in
+            check' src_balance.unstaked_frozen_b
+        | `Unstaked_finalizable ->
+            let* () = check rpc_balance.unstaked_finalizable_b in
+            check src_balance.unstaked_finalizable_b
+        | `Total ->
+            let* () = check rpc_total in
+            check src_total
+      in
+      return state)
+
+(** Waiting functions *)
 let rec wait_n_cycles n =
   if n <= 0 then noop
-  else if n = 1 then Action Next_cycle
-  else wait_n_cycles (n - 1) --> Next_cycle
+  else if n = 1 then next_cycle
+  else wait_n_cycles (n - 1) --> next_cycle
 
 let rec wait_n_blocks n =
   if n <= 0 then noop
-  else if n = 1 then Action Next_block
-  else wait_n_blocks (n - 1) --> Next_block
+  else if n = 1 then next_block
+  else wait_n_blocks (n - 1) --> next_block
 
+(** Wait until AI activates. Bakes one block if AI is already activated,
+    fails if AI is not set to be activated in the future. *)
+let wait_ai_activation =
+  exec (fun (block, state) ->
+      let open Lwt_result_syntax in
+      Log.info ~color:time_color "Fast forward to AI activation" ;
+      let* block =
+        if state.State.activate_ai then
+          let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
+          (* Bake until the activation. *)
+          Block.bake_until_cycle launch_cycle block
+        else assert false
+      in
+      let* state = apply_rewards block state in
+      Log.info ~color:event_color "AI activated" ;
+      return (block, state))
+
+(** Create an account and give an initial balance funded by [source] *)
 let add_account_with_funds name source amount =
-  noop --> Add_account name --> Transfer (source, name, amount) --> Reveal name
+  add_account name --> transfer source name amount --> reveal name
+
 
 let init_constants ?reward_per_block () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
