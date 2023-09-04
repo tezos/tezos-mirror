@@ -39,12 +39,15 @@ let pvm_kind = "wasm_2_0_0"
 
 let kernel_inputs_path = "tezt/tests/evm_kernel_inputs"
 
+let exchanger_path () =
+  Base.(project_root // "src/kernel_evm/l1_bridge/exchanger.tz")
+
 let bridge_path () =
   Base.(project_root // "src/kernel_evm/l1_bridge/evm_bridge.tz")
 
 let admin_path () = Base.(project_root // "src/kernel_evm/l1_bridge/admin.tz")
 
-type l1_contracts = {fa12 : string; bridge : string; admin : string}
+type l1_contracts = {exchanger : string; bridge : string; admin : string}
 
 type full_evm_setup = {
   node : Node.t;
@@ -210,39 +213,27 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
   in
   return (requests, receipt)
 
-let setup_l1_contracts ~admin client protocol =
-  (* Originates a FA1.2 token. *)
-  let fa12_script = Fa12.fa12_reference in
-  let* _fa12_alias, fa12_address =
-    Fa12.originate_fa12
+let setup_l1_contracts ~admin client =
+  (* Originates the exchanger. *)
+  let* exchanger =
+    Client.originate_contract
+      ~alias:"exchanger"
+      ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~admin
-      ~fa12_script
-      client
-      protocol
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  (* Mint some tokens for the admin. *)
-  let* () =
-    Fa12.mint
-      ~admin
-      ~mint:(Tez.of_int 100)
-      ~dest:admin
-      ~fa12_address
-      ~fa12_script
+      ~init:"Unit"
+      ~prg:(exchanger_path ())
+      ~burn_cap:Tez.one
       client
   in
   let* () = Client.bake_for_and_wait client in
 
   (* Originates the bridge. *)
-  let* bridge_address =
+  let* bridge =
     Client.originate_contract
       ~alias:"evm-bridge"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~init:
-        (sf {|(Pair (Pair "%s" "%s") None)|} admin.public_key_hash fa12_address)
+      ~init:(sf "Pair %S None" exchanger)
       ~prg:(bridge_path ())
       ~burn_cap:Tez.one
       client
@@ -255,14 +246,14 @@ let setup_l1_contracts ~admin client protocol =
       ~alias:"evm-admin"
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.public_key_hash
-      ~init:(sf "%S" admin.public_key_hash)
+      ~init:(sf "%S" admin.Account.public_key_hash)
       ~prg:(admin_path ())
       ~burn_cap:Tez.one
       client
   in
   let* () = Client.bake_for_and_wait client in
 
-  return {fa12 = fa12_address; bridge = bridge_address; admin}
+  return {exchanger; bridge; admin}
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
@@ -333,7 +324,7 @@ let setup_evm_kernel ?config ?kernel_installee
   let* l1_contracts =
     match admin with
     | Some admin ->
-        let* res = setup_l1_contracts ~admin client protocol in
+        let* res = setup_l1_contracts ~admin client in
         return (Some res)
     | None -> return None
   in
@@ -342,7 +333,9 @@ let setup_evm_kernel ?config ?kernel_installee
     match config with
     | Some config -> Some config
     | None ->
-        let ticketer = Option.map (fun {bridge; _} -> bridge) l1_contracts in
+        let ticketer =
+          Option.map (fun {exchanger; _} -> exchanger) l1_contracts
+        in
         let administrator =
           if with_administrator then
             Option.map (fun {admin; _} -> admin) l1_contracts
@@ -393,20 +386,6 @@ let setup_evm_kernel ?config ?kernel_installee
       ~parameters_ty:"pair (pair bytes (ticket unit)) (pair nat bytes)"
       ~src:originator_key
       client
-  in
-  (* Make the L1 bridge aware of the target EVM rollup. *)
-  let* () =
-    match (l1_contracts, admin) with
-    | Some {bridge; _}, Some admin ->
-        Client.transfer
-          ~entrypoint:"set"
-          ~arg:(sf {|"%s"|} sc_rollup_address)
-          ~amount:Tez.zero
-          ~giver:admin.public_key_hash
-          ~receiver:bridge
-          ~burn_cap:Tez.one
-          client
-    | _ -> unit
   in
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address ["--log-kernel-debug"]
@@ -1713,46 +1692,32 @@ let test_preinitialized_evm_kernel =
       (sf "Expected to read %%L as administrator key, but found %%R instead") ;
   unit
 
-let deposit ~amount_cmutez ~fa12 ~bridge ~admin ~receiver ~sc_rollup_node ~node
-    client =
-  (* Gives enough allowance to the bridge. *)
-  let* () =
-    Client.from_fa1_2_contract_approve
-      ~burn_cap:Tez.one
-      ~contract:fa12
-      ~as_:admin
-      ~amount:amount_cmutez
-      ~from:bridge
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  (* Deposit tokens to the EVM rollup. *)
+let deposit ~amount_mutez ~bridge ~depositor ~receiver ~sc_rollup_node
+    ~sc_rollup_address ~node client =
   let* () =
     Client.transfer
       ~entrypoint:"deposit"
-      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
-      ~amount:Tez.zero
-      ~giver:admin
+      ~arg:(sf "Pair %S %s" sc_rollup_address receiver)
+      ~amount:amount_mutez
+      ~giver:depositor.Account.public_key_hash
       ~receiver:bridge
       ~burn_cap:Tez.one
       client
   in
+  let* () = Client.bake_for_and_wait client in
+
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   unit
 
 let check_balance ~receiver ~endpoint expected_balance =
   let* balance = Eth_cli.balance ~account:receiver ~endpoint in
   let balance = Wei.truncate_to_mutez balance in
-  Check.((balance = expected_balance) int)
+  Check.((balance = Tez.to_mutez expected_balance) int)
     ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
   unit
 
-let test_deposit_fa12 =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "deposit"]
-    ~title:"Deposit FA1.2 token"
+let test_deposit =
+  Protocol.register_test ~__FILE__ ~tags:["evm"; "deposit"] ~title:"Deposit tez"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
   let* {
@@ -1766,44 +1731,27 @@ let test_deposit_fa12 =
        } =
     setup_evm_kernel ~admin:(Some admin) protocol
   in
-  let {fa12; bridge; admin = _} =
+  let {bridge; admin = _; exchanger = _} =
     match l1_contracts with
     | Some x -> x
     | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
   in
 
-  (* Asserts that L1 bridge targets the EVM rollup. *)
-  let* bridge_evm_storage =
-    RPC.Client.call client
-    @@ RPC.get_chain_block_context_contract_storage ~id:bridge ()
-  in
-  let bridge_evm_rollup =
-    match JSON.encode bridge_evm_storage =~* rex "\"(sr1.+)\"" with
-    | Some rollup -> rollup
-    | None ->
-        Test.fail ~__LOC__ "EVM rollup address not found in bridge contract"
-  in
-  Check.((sc_rollup_address = bridge_evm_rollup) string)
-    ~error_msg:
-      (sf
-         "The bridge does not target the expected EVM rollup, found %%R \
-          expected %%L") ;
-
-  let amount_cmutez = 100_000_000 in
+  let amount_mutez = Tez.of_mutez_int 100_000_000 in
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
 
   let* () =
     deposit
-      ~amount_cmutez
-      ~fa12
+      ~amount_mutez
+      ~sc_rollup_address
       ~bridge
-      ~admin:admin.public_key_hash
+      ~depositor:admin
       ~receiver
       ~sc_rollup_node
       ~node
       client
   in
-  check_balance ~receiver ~endpoint amount_cmutez
+  check_balance ~receiver ~endpoint amount_mutez
 
 let get_kernel_boot_wasm ~sc_rollup_client =
   let hooks : Process_hooks.t =
@@ -2286,7 +2234,7 @@ let test_deposit_dailynet =
     ~title:"deposit on dailynet"
   @@ fun protocol ->
   let bridge_address = "KT1QwBaLj5TRaGU3qkU4ZKKQ5mvNvyyzGBFv" in
-  let fa12_address = "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW" in
+  let exchanger_address = "KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW" in
   let rollup_address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf" in
 
   let mockup_client = Client.create_with_mode Mockup in
@@ -2303,34 +2251,24 @@ let test_deposit_dailynet =
         {delegate = None; amount = Tez.of_int 0; script; hash = Some address}
   in
 
-  (* Creates the FA1.2 contract with only approve and transfer that approves and
-     transfers anything. *)
-  let* fa12_contract =
+  (* Creates the exchanger contract. *)
+  let* exchanger_contract =
     make_bootstrap_contract
-      ~address:fa12_address
-      ~code:
-        {|{ parameter (or (pair %approve address nat) (pair %transfer address address nat)) ;
-  storage unit ;
-  code { CAR ; IF_LEFT { DROP } { DROP } ; UNIT ; NIL operation ; PAIR } }|}
+      ~address:exchanger_address
+      ~code:(exchanger_path ())
       ~storage:"Unit"
       ()
   in
-  (* Creates the bridge contract initialized with the FA1.2 contract and the rollup
-     address. *)
+  (* Creates the bridge contract initialized with exchanger contract. *)
   let* bridge_contract =
     make_bootstrap_contract
       ~address:bridge_address
       ~code:(bridge_path ())
-      ~storage:
-        (sf
-           {|Pair (Pair "tz1R4EjaQqeBhBP2dztahpkzHTZ61PSssqkh" "%s") (Some "%s")|}
-           fa12_address
-           rollup_address)
-      ~typecheck:"pair (pair address address) (option address)"
+      ~storage:(sf "Pair %S None" exchanger_address)
       ()
   in
 
-  (* Creates the EVM rollup that listens to the bootstrap smart contract bridge. *)
+  (* Creates the EVM rollup that listens to the bootstrap smart contract exchanger. *)
   let* {
          bootstrap_smart_rollup = evm;
          smart_rollup_node_data_dir;
@@ -2347,12 +2285,12 @@ let test_deposit_dailynet =
       ()
   in
 
-  (* Setup a chain where the EVM rollup, the FA1.2 contract and the bridge
+  (* Setup a chain where the EVM rollup, the exchanger contract and the bridge
      are all originated. *)
   let* node, client =
     setup_l1
       ~bootstrap_smart_rollups:[evm]
-      ~bootstrap_contracts:[fa12_contract; bridge_contract]
+      ~bootstrap_contracts:[exchanger_contract; bridge_contract]
       protocol
   in
 
@@ -2377,31 +2315,23 @@ let test_deposit_dailynet =
   let endpoint = Evm_proxy_server.endpoint evm_proxy_server in
 
   (* Deposit tokens to the EVM rollup. *)
-  let amount_cmutez = 100_000_000 in
-  let amount_ctez = 100 in
-
+  let amount_mutez = Tez.of_mutez_int 100_000_000 in
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+
   let* () =
-    Client.transfer
-      ~entrypoint:"deposit"
-      ~arg:(sf {|Pair (Pair %d %s) 1|} amount_cmutez receiver)
-      ~amount:Tez.zero
-      ~giver:Constant.bootstrap2.public_key_hash
-      ~receiver:bridge_address
-      ~burn_cap:Tez.one
+    deposit
+      ~amount_mutez
+      ~bridge:bridge_address
+      ~depositor:Constant.bootstrap2
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address:rollup_address
+      ~node
       client
   in
-  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
 
   (* Check the balance in the EVM rollup. *)
-  let* balance = Eth_cli.balance ~account:receiver ~endpoint in
-  Check.((balance = Wei.of_eth_int amount_ctez) Wei.typ)
-    ~error_msg:
-      (sf
-         "Expected balance of %s should be %%R, but got %%L"
-         Eth_account.bootstrap_accounts.(0).address) ;
-
-  unit
+  check_balance ~receiver ~endpoint amount_mutez
 
 let test_deposit_before_and_after_migration =
   Protocol.register_test
@@ -2411,44 +2341,61 @@ let test_deposit_before_and_after_migration =
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
   let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
-  let amount_cmutez = 50_000_000 in
+  let amount_mutez = Tez.of_mutez_int 50_000_000 in
 
   let scenario_prior
-      ~evm_setup:{l1_contracts; sc_rollup_node; node; client; endpoint; _} =
-    let {fa12; bridge; _} =
+      ~evm_setup:
+        {
+          l1_contracts;
+          sc_rollup_node;
+          sc_rollup_address;
+          node;
+          client;
+          endpoint;
+          _;
+        } =
+    let {bridge; _} =
       match l1_contracts with Some x -> x | None -> assert false
     in
     let* () =
       deposit
-        ~amount_cmutez
-        ~fa12
+        ~amount_mutez
         ~bridge
-        ~admin:admin.public_key_hash
+        ~depositor:admin
         ~receiver
         ~sc_rollup_node
+        ~sc_rollup_address
         ~node
         client
     in
-    check_balance ~receiver ~endpoint amount_cmutez
+    check_balance ~receiver ~endpoint amount_mutez
   in
   let scenario_after
-      ~evm_setup:{l1_contracts; sc_rollup_node; node; client; endpoint; _}
-      ~sanity_check:_ =
-    let {fa12; bridge; _} =
+      ~evm_setup:
+        {
+          l1_contracts;
+          sc_rollup_node;
+          sc_rollup_address;
+          node;
+          client;
+          endpoint;
+          _;
+        } ~sanity_check:_ =
+    let {bridge; _} =
       match l1_contracts with Some x -> x | None -> assert false
     in
     let* () =
       deposit
-        ~amount_cmutez
-        ~fa12
+        ~amount_mutez
         ~bridge
-        ~admin:admin.public_key_hash
+        ~depositor:admin
         ~receiver
         ~sc_rollup_node
+        ~sc_rollup_address
         ~node
         client
     in
-    check_balance ~receiver ~endpoint (amount_cmutez * 2)
+    check_balance ~receiver ~endpoint Tez.(amount_mutez + amount_mutez)
   in
   gen_kernel_migration_test ~admin ~scenario_prior ~scenario_after protocol
 
@@ -2482,7 +2429,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
   test_preinitialized_evm_kernel protocols ;
-  test_deposit_fa12 protocols ;
+  test_deposit protocols ;
   test_estimate_gas protocols ;
   test_estimate_gas_additionnal_field protocols ;
   test_kernel_upgrade_to_debug protocols ;
