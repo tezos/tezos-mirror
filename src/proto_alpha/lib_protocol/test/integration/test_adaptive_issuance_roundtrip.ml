@@ -133,7 +133,6 @@ type tez_quantity =
   | Max_tez
   | Amount of Tez.t
 
-
 let tez_quantity_pp fmt value =
   let s =
     match value with
@@ -163,7 +162,8 @@ let default_params =
           limit_of_staking_over_baking_millionth;
           edge_of_baking_over_staking_billionth;
         } =
-    Protocol.Staking_parameters_repr.default  in
+    Protocol.Staking_parameters_repr.default
+  in
   {
     limit_of_staking_over_baking =
       Int32.to_int limit_of_staking_over_baking_millionth;
@@ -315,7 +315,8 @@ module State = struct
     let state =
       match Cycle.sub new_cycle unstake_cd with
       | None -> state
-      | Some cycle -> apply_unslashable cycle state    in
+      | Some cycle -> apply_unslashable cycle state
+    in
     (* Apply parameter changes *)
     let state, param_requests =
       List.fold_left
@@ -328,7 +329,8 @@ module State = struct
             in
             (state, remaining_requests))
         (state, [])
-        state.param_requests    in
+        state.param_requests
+    in
     (* Refresh initial amount of frozen deposits at cycle end *)
     let state =
       update_map
@@ -339,7 +341,8 @@ module State = struct
                  frozen_deposits =
                    Frozen_tez.refresh_at_new_cycle x.frozen_deposits;
                }))
-        state    in
+        state
+    in
     {state with param_requests}
 
   (* end module State *)
@@ -418,7 +421,8 @@ let unfolded_to_test :
     | [n] -> n
     | title :: tags ->
         (* We chose to separate all tags with a comma, and use the head tag as a title for the test *)
-        title ^ ": " ^ String.concat ", " tags  in
+        title ^ ": " ^ String.concat ", " tags
+  in
   Tztest.tztest name speed (run_scenario s)
 
 (** Useful aliases and operators *)
@@ -467,7 +471,8 @@ let tests_of_scenarios :
 let exec f = Action f
 
 (** Execute a function that does not modify the block, only the state *)
-let exec_state f =  let open Lwt_result_syntax in
+let exec_state f =
+  let open Lwt_result_syntax in
   Action
     (fun ((block, _state) as input) ->
       let* state = f input in
@@ -490,7 +495,8 @@ let check_all_balances block state : unit tzresult Lwt.t =
   Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
 
 (** Apply rewards in state + check *)
-let apply_rewards block state : State.t tzresult Lwt.t =  let open Lwt_result_syntax in
+let apply_rewards block state : State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let* state = State.apply_rewards block state in
   let* () = check_all_balances block state in
   return state
@@ -571,20 +577,27 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
         ~color:low_debug_color
         "Snapshoting balances as \"%s\""
         snap_name ;
-      let balances =        List.map
+      let balances =
+        List.map
           (fun name -> (name, balance_of_account name state.State.account_map))
-          names_list      in      let snapshot_balances =
-        String.Map.add snap_name balances state.snapshot_balances      in
+          names_list
+      in
+      let snapshot_balances =
+        String.Map.add snap_name balances state.snapshot_balances
+      in
       return {state with snapshot_balances})
 
 (** Check balances against a previously defined snapshot *)
-let check_snapshot_balances snap_name : (t, t) scenarios =  let open Lwt_result_syntax in
+let check_snapshot_balances snap_name : (t, t) scenarios =
+  let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
         "Checking equality of balances between \"%s\" and now"
-        snap_name ;      let snapshot_balances =
-        String.Map.find snap_name state.State.snapshot_balances      in
+        snap_name ;
+      let snapshot_balances =
+        String.Map.find snap_name state.State.snapshot_balances
+      in
       match snapshot_balances with
       | None ->
           Log.debug
@@ -640,7 +653,8 @@ let next_cycle =
         bake_until_cycle_end_slow input)
 
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
-let exec_op f =  let open Lwt_result_syntax in
+let exec_op f =
+  let open Lwt_result_syntax in
   Action
     (fun ((block, _state) as input) ->
       let* state, ops = f input in
@@ -906,7 +920,8 @@ let check_fail_and_rollback :
 
 (** Useful function to test expected failures: runs the given branch until it fails,
     then rollbacks to before execution. Fails if the given branch Succeeds *)
-let assert_failure : ('a, 'b) scenarios -> ('a, 'a) scenarios = fun scenarios ->
+let assert_failure : ('a, 'b) scenarios -> ('a, 'a) scenarios =
+ fun scenarios ->
   match unfold_scenarios scenarios with
   | [] -> Empty
   | [(sc, _, _)] -> exec (check_fail_and_rollback sc)
