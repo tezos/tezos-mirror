@@ -603,16 +603,50 @@ let check_snapshot_balances snap_name : (t, t) scenarios =  let open Lwt_result_
               snapshot_balances
           in
           return state)
-      let open Lwt_result_syntax in
-      let* () =
-        List.iter_es
-          (fun (name, old_balance) ->
-            let new_balance = (find_account name info).balance in
-            assert_balance_equal ~loc:__LOC__ old_balance new_balance)
-          info.snapshot_balances
-      in
-      return input)
 
+(* ======== Operations ======== *)
+
+(** Bake a single block *)
+let next_block =
+  exec (fun input ->
+      Log.info ~color:action_color "[Next block]" ;
+      bake input)
+
+(** Bake until the end of a cycle *)
+let next_cycle =
+  exec (fun input ->
+      let open Lwt_result_syntax in
+      Log.info ~color:action_color "[Next cycle]" ;
+      let block, (State.{constants; activate_ai; _} as state) = input in
+      if
+        Tez.(constants.issuance_weights.base_total_issued_per_minute = zero)
+        || not activate_ai
+      then
+        (* Apply rewards in state only after the while cycle ends *)
+        let new_cycle = Cycle.succ (Block.current_cycle block) in
+        let baker = State.find_account state.baker state in
+        let policy = Block.By_account baker.pkh in
+        let* block, state =
+          if state.pending_operations = [] then return (block, state)
+          else bake input
+        in
+        let* block = Block.bake_until_cycle new_cycle ~policy block in
+        (* TODO: other way around ?? *)
+        let state = State.apply_end_cycle new_cycle state in
+        let* state = apply_rewards block state in
+        return (block, state)
+      else
+        (* Apply rewards in state every block *)
+        bake_until_cycle_end_slow input)
+
+(** Executes an operation: f should return a new state and a list of operations, which are then applied *)
+let exec_op f =  let open Lwt_result_syntax in
+  Action
+    (fun ((block, _state) as input) ->
+      let* state, ops = f input in
+      let state = State.add_pending_operations ops state in
+      return (block, state))
+  --> next_block
 
 
 let run_action :
