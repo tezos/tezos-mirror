@@ -80,6 +80,119 @@ module Partial_tez = struct
     (* If rem = 0, we keep the (+ 0), to indicate that it's a partial tez *)
     Format.fprintf fmt "%a ( +%aµꜩ )" Tez.pp tez Q.pp_print rem
  end
+
+module Cycle = Protocol.Alpha_context.Cycle
+
+(** [Frozen_tez] represents frozen stake and frozen unstaked funds.
+    Properties:
+    - sum of all current partial tez is an integer
+    - slashing is always a portion of initial
+    - Can only add integer amounts
+    - Can always subtract integer amount (if lower than frozen amount)
+    - If subtracting partial amount, must be the whole frozen amount (for given contract).
+      The remainder is then distributed equally amongst remaining accounts, to keep property 1.
+    - All entries of current are positive, non zero.
+*)
+module Frozen_tez = struct
+  (* The map in current maps the stakers' name with their staked value.
+     It contains only delegators of the delegate which owns the frozen tez *)
+  type t = {initial : Tez.t; current : Partial_tez.t String.Map.t}
+
+  let zero = {initial = Tez.zero; current = String.Map.empty}
+
+  let init amount account =
+    { initial = amount;
+      current = String.Map.singleton account (Partial_tez.of_tez amount);
+    }
+
+  let get account frozen_tez =
+    match String.Map.find account frozen_tez.current with
+    | None -> Partial_tez.zero
+    | Some p -> p
+
+  let union a b =
+    { initial = Tez.(a.initial +! b.initial);
+      current =
+        String.Map.union
+          (fun _ x y -> Some Partial_tez.(x + y))
+          a.current
+          b.current;
+    }
+
+  let total_current_q current =
+    String.Map.fold
+      (fun _ x acc -> Partial_tez.(x + acc))
+      current
+      Partial_tez.zero
+
+  let total_current a =
+    let r = total_current_q a.current in
+    let tez, rem = Partial_tez.to_tez_rem r in
+    assert (Q.(equal rem zero)) ;
+    tez
+
+  let add_q_to_all_current quantity current =
+    let s = total_current_q current in
+    let f p_amount =
+      let q = Q.div p_amount s in
+      Partial_tez.add p_amount (Q.mul quantity q)
+    in
+    String.Map.map f current
+
+  (* For rewards, distribute equally *)
+  let add_tez_to_all_current tez a =
+    let quantity = Partial_tez.of_tez tez in
+    let current = add_q_to_all_current quantity a.current in
+    {a with current}
+
+  (* For slashing, slash equally *)
+  let sub_tez_from_all_current tez a =
+    let s = total_current_q a.current in
+    if Partial_tez.(geq (of_tez tez) s) then {a with current = String.Map.empty}
+    else
+      let f p_amount =
+        let q = Q.div p_amount s in
+        Partial_tez.sub p_amount (Tez.mul_q tez q)
+        (* > 0 *)
+      in
+      {a with current = String.Map.map f a.current}
+
+  (* Adds frozen to account. Happens each stake in frozen deposits *)
+  let add_current amount account a =
+    { a with
+      current =
+        String.Map.update
+          account
+          (function
+            | None -> Some (Partial_tez.of_tez amount)
+            | Some q -> Some Partial_tez.(add q (of_tez amount)))
+          a.current;
+    }
+
+  (* Adds frozen to account. Happens each unstake to unstaked frozen deposits *)
+  let add_init amount account a = union a (init amount account)
+
+  (* Allows amount greater than current frozen amount.
+     Happens each unstake in frozen deposits *)
+  let sub_current amount account a =
+    match String.Map.find account a.current with
+    | None -> (a, Tez.zero)
+    | Some frozen ->
+        let amount_q = Partial_tez.of_tez amount in
+        if Q.(geq amount_q frozen) then
+          let removed, remainder = Partial_tez.to_tez_rem frozen in
+          let current = String.Map.remove account a.current in
+          let current = add_q_to_all_current remainder current in
+          ({a with current}, removed)
+        else
+          let current =
+            String.Map.add account Q.(frozen - amount_q) a.current
+          in
+          ({a with current}, amount)
+
+  (* Refresh initial amount at beginning of cycle *)
+  let refresh_at_new_cycle a = {a with initial = total_current a}
+end
 let balance_pp fmt
     {
       liquid;
