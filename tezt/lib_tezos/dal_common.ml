@@ -99,6 +99,12 @@ module Committee = struct
 end
 
 module RPC_legacy = struct
+  let call = RPC_core.call
+
+  let call_raw = RPC_core.call_raw
+
+  let call_json = RPC_core.call_json
+
   let make ?data ?query_string =
     RPC.make
       ?data
@@ -242,7 +248,9 @@ module Dal_RPC = struct
     | _ -> failwith "invalid case"
 
   let patch_profiles profiles =
-    let data = Client.Data (`A (List.map json_of_operator_profile profiles)) in
+    let data : RPC_core.data =
+      Data (`A (List.map json_of_operator_profile profiles))
+    in
     make ~data PATCH ["profiles"] as_empty_object_or_fail
 
   let get_profiles () = make GET ["profiles"] profiles_of_json
