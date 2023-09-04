@@ -46,16 +46,6 @@ module Tez = struct
     Q.(mul portion ~$$tez_z |> to_int64) |> of_mutez
 end
 
-type balance_breakdown = {
-  liquid : Tez.t;
-  bonds : Tez.t;
-  staked : Q.t;
-  unstaked_frozen : Tez.t;
-  unstaked_finalizable : Tez.t;
-  pool_tez : Tez.t;
-  pool_pseudo : Q.t;
-}
-
 let balance_pp fmt
     {
       liquid;
@@ -192,87 +182,6 @@ let assert_balance_equal ~loc
   in
   return_unit
 
-let balance_add
-    {
-      liquid = bbd1_liquid;
-      bonds = bbd1_bonds;
-      staked = bbd1_staked;
-      unstaked_frozen = bbd1_unstaked_frozen;
-      unstaked_finalizable = bbd1_unstaked_finalizable;
-      pool_tez = bbd1_pool_tez;
-      pool_pseudo = bbd1_pool_pseudo;
-    }
-    {
-      liquid = bbd2_liquid;
-      bonds = bbd2_bonds;
-      staked = bbd2_staked;
-      unstaked_frozen = bbd2_unstaked_frozen;
-      unstaked_finalizable = bbd2_unstaked_finalizable;
-      pool_tez = bbd2_pool_tez;
-      pool_pseudo = bbd2_pool_pseudo;
-    } =
-  let open Lwt_result_syntax in
-  let* liquid = Tez.(bbd1_liquid + bbd2_liquid) in
-  let* bonds = Tez.(bbd1_bonds + bbd2_bonds) in
-  let staked = Q.add bbd1_staked bbd2_staked in
-  let pool_pseudo = Q.add bbd1_pool_pseudo bbd2_pool_pseudo in
-  let* pool_tez = Tez.(bbd1_pool_tez + bbd2_pool_tez) in
-  let* unstaked_frozen = Tez.(bbd1_unstaked_frozen + bbd2_unstaked_frozen) in
-  let* unstaked_finalizable =
-    Tez.(bbd1_unstaked_finalizable + bbd2_unstaked_finalizable)
-  in
-  return
-    {
-      liquid;
-      bonds;
-      staked;
-      unstaked_frozen;
-      unstaked_finalizable;
-      pool_tez;
-      pool_pseudo;
-    }
-
-(* Will raise an error if one of the tez field in bbd1 is less than the same field in bbd2 *)
-let balance_sub
-    {
-      liquid = bbd1_liquid;
-      bonds = bbd1_bonds;
-      staked = bbd1_staked;
-      unstaked_frozen = bbd1_unstaked_frozen;
-      unstaked_finalizable = bbd1_unstaked_finalizable;
-      pool_tez = bbd1_pool_tez;
-      pool_pseudo = bbd1_pool_pseudo;
-    }
-    {
-      liquid = bbd2_liquid;
-      bonds = bbd2_bonds;
-      staked = bbd2_staked;
-      unstaked_frozen = bbd2_unstaked_frozen;
-      unstaked_finalizable = bbd2_unstaked_finalizable;
-      pool_tez = bbd2_pool_tez;
-      pool_pseudo = bbd2_pool_pseudo;
-    } =
-  let open Lwt_result_syntax in
-  let* liquid = Tez.(bbd1_liquid - bbd2_liquid) in
-  let* bonds = Tez.(bbd1_bonds - bbd2_bonds) in
-  let staked = Q.sub bbd1_staked bbd2_staked in
-  let pool_pseudo = Q.sub bbd1_pool_pseudo bbd2_pool_pseudo in
-  let* pool_tez = Tez.(bbd1_pool_tez - bbd2_pool_tez) in
-  let* unstaked_frozen = Tez.(bbd1_unstaked_frozen - bbd2_unstaked_frozen) in
-  let* unstaked_finalizable =
-    Tez.(bbd1_unstaked_finalizable - bbd2_unstaked_finalizable)
-  in
-  return
-    {
-      liquid;
-      bonds;
-      staked;
-      unstaked_frozen;
-      unstaked_finalizable;
-      pool_tez;
-      pool_pseudo;
-    }
-
 let add_liquid_rewards amount bbd =
   let open Lwt_result_syntax in
   let* liquid = Tez.(bbd.liquid + amount) in
@@ -282,25 +191,6 @@ let add_frozen_rewards amount bbd =
   let open Lwt_result_syntax in
   let* pool_tez = Tez.(bbd.pool_tez + amount) in
   return {bbd with pool_tez}
-
-let tez_of_staked ~pool_tez ~pool_pseudo staked =
-  if Q.(staked = zero) then Tez.zero
-  else if Q.(pool_pseudo = zero) then (
-    assert (Tez.(pool_tez = zero)) ;
-    Tez.zero)
-  else
-    let portion = Q.div staked pool_pseudo in
-    Tez.mul_q pool_tez portion
-
-let staked_of_tez ~pool_tez ~pool_pseudo amount =
-  if Tez.(amount = zero) then Q.zero
-  else if Tez.(pool_tez = zero) then
-    if Q.(pool_pseudo = zero) then Q.one
-    else assert false
-      (* Happens when completely slashed: stake is forbidden in this case *)
-  else
-    let portion = Tez.ratio amount pool_tez in
-    Q.mul portion pool_pseudo
 
 let apply_transfer amount (bbd_src, bbd_dst) =
   let open Lwt_result_syntax in
@@ -386,17 +276,6 @@ let apply_finalize bbd =
   let unstaked_finalizable = Tez.zero in
   let* liquid = Tez.(bbd.unstaked_finalizable + bbd.liquid) in
   return {bbd with liquid; unstaked_finalizable}
-
-let total_balance_of_breakdown
-    {liquid; bonds; staked; unstaked_frozen; unstaked_finalizable; _} ~pool_tez
-    ~pool_pseudo =
-  let open Lwt_result_syntax in
-  let staked_tez = tez_of_staked staked ~pool_tez ~pool_pseudo in
-  Tez.(
-    let* t1 = liquid + bonds in
-    let* t2 = staked_tez + t1 in
-    let* t3 = unstaked_frozen + t2 in
-    unstaked_finalizable + t3)
 
 let get_balance_breakdown ctxt contract =
   let open Lwt_result_syntax in
