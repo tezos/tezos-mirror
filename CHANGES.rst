@@ -46,6 +46,8 @@ Node
   ``2``. Version ``0`` has been removed and version ``1`` can still be used
   with ``?version=1`` argument. (MR :gl:`!9839`)
 
+- Added metrics about distributed data base messages sent, broadcasted or received
+
 Client
 ------
 
