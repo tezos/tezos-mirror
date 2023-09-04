@@ -57,9 +57,29 @@ module Tez = struct
   let mul_q tez portion =
     let tez_z = to_mutez tez |> Z.of_int64 in
     Q.(mul portion ~$$tez_z)
-
 end
 
+(** Representation of Tez with non integer values *)
+module Partial_tez = struct
+  include Q
+
+  let of_tez a = Tez.to_mutez a |> of_int64
+
+  let to_tez_rem {num; den} =
+    let tez, rem = Z.div_rem num den in
+    (Tez.of_z tez, rem /// den)
+
+  let to_tez ?(round_up = false) a =
+    let tez, rem = to_tez_rem a in
+    if round_up && Q.(gt rem zero) then Tez.(tez +! one_mutez) else tez
+
+  let get_rem a = snd (to_tez_rem a)
+
+  let pp fmt a =
+    let tez, rem = to_tez_rem a in
+    (* If rem = 0, we keep the (+ 0), to indicate that it's a partial tez *)
+    Format.fprintf fmt "%a ( +%aµꜩ )" Tez.pp tez Q.pp_print rem
+ end
 let balance_pp fmt
     {
       liquid;
