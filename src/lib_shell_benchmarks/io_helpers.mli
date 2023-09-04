@@ -35,6 +35,10 @@ val assert_ok : msg:string -> 'a tzresult -> 'a
 
 val commit : Context.t -> Context_hash.t Lwt.t
 
+val flush :
+  Tezos_protocol_environment.Context.t ->
+  Tezos_protocol_environment.Context.t Lwt.t
+
 val prepare_empty_context : string -> (Context_hash.t, tztrace) result Lwt.t
 
 val load_context_from_disk :

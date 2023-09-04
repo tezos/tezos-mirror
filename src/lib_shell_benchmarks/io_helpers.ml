@@ -61,6 +61,12 @@ let commit context =
          (Int64.of_int (int_of_float @@ Unix.gettimeofday ())))
     context
 
+let flush context =
+  let open Lwt.Syntax in
+  let context = Tezos_shell_context.Shell_context.unwrap_disk_context context in
+  let+ context = Tezos_context.Context.flush context in
+  Tezos_shell_context.Shell_context.wrap_disk_context context
+
 let prepare_empty_context base_dir =
   let open Lwt_result_syntax in
   let* index, context, _context_hash = prepare_genesis base_dir in
