@@ -24,6 +24,7 @@
 ### Breaking changes
 
 - External Messages must now be framed using `ExternalMessageFrame` (adds an additional prefix byte). (!9687)
+- The EVM rollup accepts tickets wrapping tez instead of ctez. (!9982)
 
 ### Internal
 

@@ -21,6 +21,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6282
         // Migrate the upgrade mechanism in the storage.
+        // Replace the ticketer address by the exchanger contract.
 
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?
