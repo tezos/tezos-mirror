@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Tez manipulation module *)
 module Tez = struct
   include Protocol.Alpha_context.Tez
 
@@ -36,14 +37,27 @@ module Tez = struct
     let*?@ s = a -? b in
     return s
 
+  let ( +! ) a b =
+    let a = to_mutez a in
+    let b = to_mutez b in
+    Int64.add a b |> of_mutez_exn
+
+  let ( -! ) a b =
+    let a = to_mutez a in
+    let b = to_mutez b in
+    Int64.sub a b |> of_mutez_exn
+
   let of_mutez = of_mutez_exn
+
+  let of_z a = Z.to_int64 a |> of_mutez
 
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
 
   let mul_q tez portion =
     let tez_z = to_mutez tez |> Z.of_int64 in
-    Q.(mul portion ~$$tez_z |> to_int64) |> of_mutez
+    Q.(mul portion ~$$tez_z)
+
 end
 
 let balance_pp fmt
