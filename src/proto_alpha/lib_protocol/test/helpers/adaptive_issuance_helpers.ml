@@ -378,15 +378,7 @@ let balance_of_account account_name (account_map : account_map) =
       {balance with unstaked_frozen_b; unstaked_finalizable_b}
 
 let balance_pp fmt
-    {
-      liquid;
-      bonds;
-      staked;
-      unstaked_frozen;
-      unstaked_finalizable;
-      pool_tez;
-      pool_pseudo;
-    } =
+    {liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b} =
   Format.fprintf
     fmt
     "{@;\
@@ -395,42 +387,32 @@ let balance_pp fmt
      staked : %a@;\
      unstaked_frozen : %a@;\
      unstaked_finalizable : %a@;\
-     pool_tez : %a@;\
-     pool_pseudo : %a@]@;\
      }@."
     Tez.pp
-    liquid
+    liquid_b
     Tez.pp
-    bonds
-    Q.pp_print
-    staked
+    bonds_b
+    Partial_tez.pp
+    staked_b
+    Partial_tez.pp
+    unstaked_frozen_b
     Tez.pp
-    unstaked_frozen
-    Tez.pp
-    unstaked_finalizable
-    Tez.pp
-    pool_tez
-    Q.pp_print
-    pool_pseudo
+    unstaked_finalizable_b
 
 let balance_update_pp fmt
     ( {
-        liquid = a_liquid;
-        bonds = a_bonds;
-        staked = a_staked;
-        unstaked_frozen = a_unstaked_frozen;
-        unstaked_finalizable = a_unstaked_finalizable;
-        pool_tez = a_pool_tez;
-        pool_pseudo = a_pool_pseudo;
+        liquid_b = a_liquid_b;
+        bonds_b = a_bonds_b;
+        staked_b = a_staked_b;
+        unstaked_frozen_b = a_unstaked_frozen_b;
+        unstaked_finalizable_b = a_unstaked_finalizable_b;
       },
       {
-        liquid = b_liquid;
-        bonds = b_bonds;
-        staked = b_staked;
-        unstaked_frozen = b_unstaked_frozen;
-        unstaked_finalizable = b_unstaked_finalizable;
-        pool_tez = b_pool_tez;
-        pool_pseudo = b_pool_pseudo;
+        liquid_b = b_liquid_b;
+        bonds_b = b_bonds_b;
+        staked_b = b_staked_b;
+        unstaked_frozen_b = b_unstaked_frozen_b;
+        unstaked_finalizable_b = b_unstaked_finalizable_b;
       } ) =
   Format.fprintf
     fmt
@@ -440,76 +422,60 @@ let balance_update_pp fmt
      staked : %a -> %a@;\
      unstaked_frozen : %a -> %a@;\
      unstaked_finalizable : %a -> %a@;\
-     pool_tez : %a -> %a@;\
-     pool_pseudo : %a -> %a@]@;\
      }@."
     Tez.pp
-    a_liquid
+    a_liquid_b
     Tez.pp
-    b_liquid
+    b_liquid_b
     Tez.pp
-    a_bonds
+    a_bonds_b
     Tez.pp
-    b_bonds
-    Q.pp_print
-    a_staked
-    Q.pp_print
-    b_staked
+    b_bonds_b
+    Partial_tez.pp
+    a_staked_b
+    Partial_tez.pp
+    b_staked_b
+    Partial_tez.pp
+    a_unstaked_frozen_b
+    Partial_tez.pp
+    b_unstaked_frozen_b
     Tez.pp
-    a_unstaked_frozen
+    a_unstaked_finalizable_b
     Tez.pp
-    b_unstaked_frozen
-    Tez.pp
-    a_unstaked_finalizable
-    Tez.pp
-    b_unstaked_finalizable
-    Tez.pp
-    a_pool_tez
-    Tez.pp
-    b_pool_tez
-    Q.pp_print
-    a_pool_pseudo
-    Q.pp_print
-    b_pool_pseudo
+    b_unstaked_finalizable_b
 
 let assert_balance_equal ~loc
     {
-      liquid = a_liquid;
-      bonds = a_bonds;
-      staked = a_staked;
-      unstaked_frozen = a_unstaked_frozen;
-      unstaked_finalizable = a_unstaked_finalizable;
-      pool_tez = a_pool_tez;
-      pool_pseudo = a_pool_pseudo;
+      liquid_b = a_liquid_b;
+      bonds_b = a_bonds_b;
+      staked_b = a_staked_b;
+      unstaked_frozen_b = a_unstaked_frozen_b;
+      unstaked_finalizable_b = a_unstaked_finalizable_b;
     }
     {
-      liquid = b_liquid;
-      bonds = b_bonds;
-      staked = b_staked;
-      unstaked_frozen = b_unstaked_frozen;
-      unstaked_finalizable = b_unstaked_finalizable;
-      pool_tez = b_pool_tez;
-      pool_pseudo = b_pool_pseudo;
+      liquid_b = b_liquid_b;
+      bonds_b = b_bonds_b;
+      staked_b = b_staked_b;
+      unstaked_frozen_b = b_unstaked_frozen_b;
+      unstaked_finalizable_b = b_unstaked_finalizable_b;
     } =
   let open Lwt_result_syntax in
-  let* () = Assert.equal_tez ~loc a_liquid b_liquid in
-  let* () = Assert.equal_tez ~loc a_bonds b_bonds in
+  let* () = Assert.equal_tez ~loc a_liquid_b b_liquid_b in
+  let* () = Assert.equal_tez ~loc a_bonds_b b_bonds_b in
   let* () =
-    Assert.equal ~loc Q.equal "Assert equal staked" Q.pp_print a_staked b_staked
-  in
-  let* () = Assert.equal_tez ~loc a_unstaked_frozen b_unstaked_frozen in
-  let* () =
-    Assert.equal_tez ~loc a_unstaked_finalizable b_unstaked_finalizable
-  in
-  let* () = Assert.equal_tez ~loc a_pool_tez b_pool_tez in
-  let* () =
-    Assert.equal
+    Assert.equal_tez
       ~loc
-      Q.equal
-      "Assert equal pool pseudotokens"
-      Q.pp_print
-      a_pool_pseudo
-      b_pool_pseudo
+      (Partial_tez.to_tez a_staked_b)
+      (Partial_tez.to_tez b_staked_b)
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc
+      (Partial_tez.to_tez a_unstaked_frozen_b)
+      (Partial_tez.to_tez b_unstaked_frozen_b)
+  in
+  let* () =
+    Assert.equal_tez ~loc a_unstaked_finalizable_b b_unstaked_finalizable_b
   in
   return_unit
 
