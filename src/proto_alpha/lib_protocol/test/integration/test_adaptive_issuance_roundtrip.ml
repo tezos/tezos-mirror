@@ -43,10 +43,6 @@ let action_color = Log.Color.FG.green
 
 let event_color = Log.Color.FG.blue
 
-type staking_parameters = {
-  limit_of_staking_over_baking : int;
-  baking_over_staking_edge : int;
-}
 
 let default_params =
   {
@@ -78,16 +74,6 @@ let stake_value_pp fmt value =
   in
   Format.fprintf fmt "%s" s
 
-type account_info = {
-  name : string;
-  pkh : Signature.Public_key_hash.t;
-  contract : Protocol.Alpha_context.Contract.t;
-  delegate : string option;
-  parameters : staking_parameters;
-  balance : balance_breakdown;
-}
-
-type accounts_info = account_info String.Map.t
 
 type info = {
   accounts : string list;

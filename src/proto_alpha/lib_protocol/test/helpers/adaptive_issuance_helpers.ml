@@ -270,6 +270,49 @@ module Unstaked_finalizable = struct
   let get account {map; _} =
     match String.Map.find account map with None -> Tez.zero | Some x -> x
 end
+
+(** Abstraction of the staking parameters for tests *)
+type staking_parameters = {
+  limit_of_staking_over_baking : int;
+  edge_of_baking_over_staking : int;
+}
+
+(** Abstract information of accounts *)
+type account_state = {
+  name : string;
+  pkh : Signature.Public_key_hash.t;
+  contract : Protocol.Alpha_context.Contract.t;
+  delegate : string option;
+  parameters : staking_parameters;
+  liquid : Tez.t;
+  bonds : Tez.t;
+  (* The three following fields contain maps from the account's stakers to,
+     respectively, their frozen stake, their unstaked frozen balance, and
+     their unstaked finalizable funds. Additionally, [unstaked_frozen] indexes
+     the maps with the cycle at which the unstake operation occured. *)
+  frozen_deposits : Frozen_tez.t;
+  unstaked_frozen : Unstaked_frozen.t;
+  unstaked_finalizable : Unstaked_finalizable.t;
+}
+
+let init_account ?delegate ~name ~pkh ~contract ~parameters ?(liquid = Tez.zero)
+    ?(bonds = Tez.zero) ?(frozen_deposits = Frozen_tez.zero)
+    ?(unstaked_frozen = Unstaked_frozen.zero)
+    ?(unstaked_finalizable = Unstaked_finalizable.zero) () =
+  {
+    name;
+    pkh;
+    contract;
+    delegate;
+    parameters;
+    liquid;
+    bonds;
+    frozen_deposits;
+    unstaked_frozen;
+    unstaked_finalizable;
+  }
+
+type account_map = account_state String.Map.t
 let balance_pp fmt
     {
       liquid;
