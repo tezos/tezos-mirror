@@ -36,17 +36,71 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
-let begin_end_color = Log.Color.(BG.bright_white ++ FG.black ++ bold)
 
-let time_color = Log.Color.FG.yellow
+(** Contains the functions and constants relative to logging.*)
+module Log_module = struct
+  let begin_end_color = Log.Color.(BG.bright_white ++ FG.black ++ bold)
 
-let action_color = Log.Color.FG.green
+  let time_color = Log.Color.FG.yellow
 
-let event_color = Log.Color.FG.blue
+  let action_color = Log.Color.FG.green
 
+  let event_color = Log.Color.FG.blue
 
+  let warning_color = Log.Color.FG.red
 
+  let low_debug_color = Log.Color.FG.gray
 
+  let assert_block_color = Log.Color.(BG.blue ++ FG.gray)
+
+  let tez_color = Log.Color.FG.bright_white
+
+  let log_debug_balance account_name account_map : unit =
+    let balance, total_balance =
+      balance_and_total_balance_of_account account_name account_map
+    in
+    Log.debug
+      "Model balance of %s:\n%aTotal balance: %a\n"
+      account_name
+      balance_pp
+      balance
+      Tez.pp
+      total_balance
+
+  let log_debug_rpc_balance name contract block : unit tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let* balance, total_balance = get_balance_from_context (B block) contract in
+    Log.debug
+      "RPC balance of %s:\n%aTotal balance: %a\n"
+      name
+      balance_pp
+      balance
+      Tez.pp
+      total_balance ;
+    return_unit
+
+  let log_debug_balance_update account_name old_account_map new_account_map :
+      unit =
+    let old_balance, old_total_balance =
+      balance_and_total_balance_of_account account_name old_account_map
+    in
+    let new_balance, new_total_balance =
+      balance_and_total_balance_of_account account_name new_account_map
+    in
+    Log.debug
+      "Balance update of %s:\n%aTotal balance: %a -> %a\n"
+      account_name
+      balance_update_pp
+      (old_balance, new_balance)
+      Tez.pp
+      old_total_balance
+      Tez.pp
+      new_total_balance
+
+  (* end module Log_module *)
+end
+
+open Log_module
 
 (** Aliases for tez values *)
 type tez_quantity =
@@ -112,62 +166,6 @@ let get_total_staked_and_balance account info =
   in
   return (total_staked, total_balance)
 
-let log_debug_balance account info =
-  let open Lwt_result_syntax in
-  let* total_staked, total_balance =
-    get_total_staked_and_balance account info
-  in
-  Log.debug
-    "Balance of %s:\n%aTez staked: %a\nTotal balance: %a\n"
-    account.name
-    balance_pp
-    account.balance
-    Tez.pp
-    total_staked
-    Tez.pp
-    total_balance ;
-  return_unit
-
-let log_debug_rpc_balance account block =
-  let open Lwt_result_syntax in
-  let* balance, total_staked, total_balance =
-    get_balance_breakdown (B block) account.contract
-  in
-  Log.debug
-    "RPC balance of %s:\n%aTez staked: %a\nTotal balance: %a\n"
-    account.name
-    balance_pp
-    balance
-    Tez.pp
-    total_staked
-    Tez.pp
-    total_balance ;
-  return_unit
-
-let log_debug_balance_update (account_before, info_before)
-    (account_after, info_after) =
-  let open Lwt_result_syntax in
-  let* total_staked_bef, total_balance_bef =
-    get_total_staked_and_balance account_before info_before
-  in
-
-  let* total_staked_aft, total_balance_aft =
-    get_total_staked_and_balance account_after info_after
-  in
-  Log.debug
-    "Balance update of %s:\n%aTez staked: %a -> %a\nTotal balance: %a -> %a\n"
-    account_before.name
-    balance_update_pp
-    (account_before.balance, account_after.balance)
-    Tez.pp
-    total_staked_bef
-    Tez.pp
-    total_staked_aft
-    Tez.pp
-    total_balance_bef
-    Tez.pp
-    total_balance_aft ;
-  return_unit
 
 let update_balance ~f account info =
   let open Lwt_result_syntax in
