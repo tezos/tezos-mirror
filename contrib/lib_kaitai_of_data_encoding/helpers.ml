@@ -63,5 +63,20 @@ let add_uniq_assoc mappings ((k, v) as mapping) =
       if v = vv then mappings
       else raise (Invalid_argument "Mappings.add: duplicate keys")
 
+let types_field_from_attr_seq attributes =
+  let types =
+    List.filter_map
+      (fun {AttrSpec.dataType; _} ->
+        match dataType with
+        | DataType.ComplexDataType (UserType class_spec) -> (
+            match class_spec.meta.id with
+            | Some id -> Some (id, class_spec)
+            | None -> failwith "User defined type has no name")
+        | _ -> None)
+      attributes
+  in
+  List.fold_left add_uniq_assoc [] types
+
 let class_spec_of_attr ~encoding_name ?(enums = []) attr =
-  {(default_class_spec ~encoding_name) with seq = [attr]; enums}
+  let types = types_field_from_attr_seq [attr] in
+  {(default_class_spec ~encoding_name) with seq = [attr]; enums; types}

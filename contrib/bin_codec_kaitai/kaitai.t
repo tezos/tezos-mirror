@@ -80,19 +80,28 @@ ground.bytes test
   meta:
     id: ground__bytes
     endian: be
+  types:
+    fixed_bytes:
+      seq:
+      - id: size
+        type: u4
+      - id: value
+        size: size
   seq:
-  - id: size
-    type: u4
   - id: fixed size (uint30) bytes
-    size: size
+    type: fixed_bytes
 ground.string test
   $ ./codec.exe dump kaitai for ground.string
   meta:
     id: ground__string
     endian: be
+  types:
+    fixed_bytes:
+      seq:
+      - id: size
+        type: u4
+      - id: value
+        size: size
   seq:
-  - id: size
-    type: u4
   - id: fixed size (uint30) bytes
-    size: size
-
+    type: fixed_bytes

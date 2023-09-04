@@ -63,8 +63,12 @@ val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
 (** [class_spec_of_attr ~encoding_name ?enums attr] returns a [ClassSpet.t]
     for [attr].
 
-   @param ~encoding_name is added to meta section as [id].
-   @param ?enums are added to class specification if present. *)
+    In case of [attr] being of [ComplexDataType UserType _] type, then [types]
+    section of returned [ClassSpec.t] is automatically populated with
+    an appropriate type.
+
+    @param ~encoding_name is added to meta section as [id].
+    @param ?enums is added to class specification if present. *)
 val class_spec_of_attr :
   encoding_name:string ->
   ?enums:(string * EnumSpec.t) list ->
