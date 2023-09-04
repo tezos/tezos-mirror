@@ -99,6 +99,8 @@ module Committee = struct
 end
 
 module RPC_legacy = struct
+  type uri_provider = Dal_node.t
+
   let call = RPC_core.call
 
   let call_raw = RPC_core.call_raw
