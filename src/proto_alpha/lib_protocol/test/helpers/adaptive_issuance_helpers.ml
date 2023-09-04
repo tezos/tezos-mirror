@@ -574,71 +574,63 @@ let apply_finalize bbd =
   let* liquid = Tez.(bbd.unstaked_finalizable + bbd.liquid) in
   return {bbd with liquid; unstaked_finalizable}
 
-let get_balance_breakdown ctxt contract =
-  let open Lwt_result_syntax in
-  let* liquid = Context.Contract.balance ctxt contract in
-  let* bonds = Context.Contract.frozen_bonds ctxt contract in
-  let* staked_balance = Context.Contract.staked_balance ctxt contract in
-  let staked_balance = Option.value ~default:Tez.zero staked_balance in
-  let* unstaked_frozen =
+let balance_and_total_balance_of_account account_name account_map =
+  let ({liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
+      as balance) =
+    balance_of_account account_name account_map in
+  ( balance,
+    Tez.(
+      liquid_b +! bonds_b
+      +! Partial_tez.to_tez staked_b
+      +! Partial_tez.to_tez unstaked_frozen_b
+      +! unstaked_finalizable_b) )
+
+let get_balance_from_context ctxt contract =  let open Lwt_result_syntax in
+  let* liquid_b = Context.Contract.balance ctxt contract in
+  let* bonds_b = Context.Contract.frozen_bonds ctxt contract in
+  let* staked_b = Context.Contract.staked_balance ctxt contract in
+  let staked_b =
+    Option.value ~default:Tez.zero staked_b |> Partial_tez.of_tez
+  in
+  let* unstaked_frozen_b =
     Context.Contract.unstaked_frozen_balance ctxt contract
   in
-  let unstaked_frozen = Option.value ~default:Tez.zero unstaked_frozen in
-  let* unstaked_finalizable =
+  let unstaked_frozen_b =
+    Option.value ~default:Tez.zero unstaked_frozen_b |> Partial_tez.of_tez
+  in
+  let* unstaked_finalizable_b =
     Context.Contract.unstaked_finalizable_balance ctxt contract
   in
-  let unstaked_finalizable =
-    Option.value ~default:Tez.zero unstaked_finalizable
+  let unstaked_finalizable_b =
+    Option.value ~default:Tez.zero unstaked_finalizable_b
   in
   let* total_balance = Context.Contract.full_balance ctxt contract in
   let bd =
-    {
-      liquid;
-      bonds;
-      staked = Q.zero;
-      (* unused *)
-      pool_tez = Tez.zero;
-      (* unused *)
-      pool_pseudo = Q.zero;
-      (* unused *)
-      unstaked_frozen;
-      unstaked_finalizable;
-    }
+    {liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
   in
-  return (bd, staked_balance, total_balance)
+  return (bd, total_balance)
 
-let assert_balance_breakdown ~loc ctxt contract
-    ({
-       liquid;
-       bonds;
-       staked;
-       unstaked_frozen;
-       unstaked_finalizable;
-       pool_tez = _;
-       pool_pseudo = _;
-     } as asserted_balance) ~pool_tez ~pool_pseudo =
+let assert_balance_check ~loc ctxt account_name account_map =
   let open Lwt_result_syntax in
-  let* bd, staked_balance, total_balance =
-    get_balance_breakdown ctxt contract
-  in
-  let asserted_staked_balance = tez_of_staked staked ~pool_tez ~pool_pseudo in
-  let* asserted_total_balance =
-    total_balance_of_breakdown asserted_balance ~pool_tez ~pool_pseudo
-  in
-  let* () = Assert.equal_tez ~loc bd.liquid liquid in
-  let* () = Assert.equal_tez ~loc bd.bonds bonds in
-  let* () = Assert.equal_tez ~loc staked_balance asserted_staked_balance in
-  let* () = Assert.equal_tez ~loc total_balance asserted_total_balance in
-  let* () = Assert.equal_tez ~loc bd.unstaked_frozen unstaked_frozen in
-  let* () =
-    Assert.equal_tez ~loc bd.unstaked_finalizable unstaked_finalizable
-  in
-  return_unit
+  match String.Map.find account_name account_map with
+  | None -> raise Not_found
+  | Some account ->
+      let* balance_ctxt, total_balance_ctxt =
+        get_balance_from_context ctxt account.contract
+      in
+      let balance, total_balance =
+        balance_and_total_balance_of_account account_name account_map
+      in
+      let* () = assert_balance_equal ~loc balance_ctxt balance in
+      let* () = Assert.equal_tez ~loc total_balance_ctxt total_balance in
+      return_unit
 
 let get_launch_cycle ~loc blk =
   let open Lwt_result_syntax in
   let* launch_cycle_opt = Context.get_adaptive_issuance_launch_cycle (B blk) in
   Assert.get_some ~loc launch_cycle_opt
+
+(** AI operations *)
 
 let stake ctxt contract amount =
   Op.transaction
