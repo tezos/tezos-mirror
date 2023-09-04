@@ -313,6 +313,25 @@ let init_account ?delegate ~name ~pkh ~contract ~parameters ?(liquid = Tez.zero)
   }
 
 type account_map = account_state String.Map.t
+
+(** Balance returned by RPCs. Partial tez are rounded down *)
+type balance = {
+  liquid_b : Tez.t;
+  bonds_b : Tez.t;
+  staked_b : Partial_tez.t;
+  unstaked_frozen_b : Partial_tez.t;
+  unstaked_finalizable_b : Tez.t;
+}
+
+let balance_zero =
+  {
+    liquid_b = Tez.zero;
+    bonds_b = Tez.zero;
+    staked_b = Partial_tez.zero;
+    unstaked_frozen_b = Partial_tez.zero;
+    unstaked_finalizable_b = Tez.zero;
+  }
+
 let balance_pp fmt
     {
       liquid;
