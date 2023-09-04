@@ -156,3 +156,17 @@ end
     during the exection of [f].
 *)
 val with_memory_restriction : float -> ((unit -> unit) -> 'a) -> 'a
+
+(** [fill_disk_cache ~rng ~restrict_memory context keys] loads [keys]
+    in [context] randomly, until Linux kernel's disk cache is completely
+    filled.
+
+    [restrict_memory] is the function obtained by [with_memory_restriction].
+    It is used to keep the amount of [MemAvailable] at the same level.
+*)
+val fill_disk_cache :
+  rng:Random.State.t ->
+  restrict_memory:(unit -> unit) ->
+  Tezos_protocol_environment.Context.t ->
+  (Tezos_protocol_environment.Context.key * _) array list ->
+  unit Lwt.t
