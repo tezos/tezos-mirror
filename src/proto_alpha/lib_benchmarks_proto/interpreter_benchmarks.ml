@@ -1699,6 +1699,25 @@ module Registration_section = struct
       in
       (key, map)
 
+    let generate_map_and_key_not_in_map (cfg : Default_config.config) rng_state
+        =
+      (* [adversarial_ints] could return a non-distinct list,
+         so the returned [key] may be bound in the [map] in a low probability. *)
+      let n =
+        Base_samplers.sample_in_interval rng_state ~range:cfg.sampler.set_size
+      in
+      let keys = adversarial_ints rng_state cfg n in
+      let key, keys =
+        match keys with [] -> assert false | x :: xs -> (x, xs)
+      in
+      let map =
+        List.fold_left
+          (fun map i -> Script_map.update i (Some ()) map)
+          (Script_map.empty int)
+          keys
+      in
+      (key, map)
+
     let () =
       simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_IEmpty_map
@@ -1822,7 +1841,7 @@ module Registration_section = struct
           (let map = Script_map.empty int in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
-          let key, map = generate_map_and_key_in_map cfg rng_state in
+          let key, map = generate_map_and_key_not_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
         ()
 
@@ -1841,7 +1860,7 @@ module Registration_section = struct
           (let map = Script_map.empty int in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
-          let key, map = generate_map_and_key_in_map cfg rng_state in
+          let key, map = generate_map_and_key_not_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
         ()
 
@@ -1870,16 +1889,8 @@ module Registration_section = struct
         Base_samplers.sample_in_interval rng_state ~range:cfg.sampler.set_size
       in
       let keys = adversarial_ints rng_state cfg n in
-      let map =
-        List.fold_left
-          (fun map i -> Script_map.update i (Some (Some ())) map)
-          (Script_map.empty int)
-          keys
-      in
-      let (module M) = Script_map.get_module map in
-      let key =
-        M.OPS.fold (fun k _ -> function None -> Some k | x -> x) M.boxed None
-        |> WithExceptions.Option.get ~loc:__LOC__
+      let key, keys =
+        match keys with [] -> assert false | hd :: tl -> (hd, tl)
       in
       let big_map =
         raise_if_error
@@ -1888,12 +1899,11 @@ module Registration_section = struct
               let big_map = Script_big_map.empty int unit_t in
               let* big_map, _ =
                 let*! result =
-                  Script_map.fold
-                    (fun k v acc ->
-                      let* bm, ctxt_acc = acc in
-                      Script_big_map.update ctxt_acc k v bm)
-                    map
-                    (return (big_map, ctxt))
+                  List.fold_left_es
+                    (fun (bm, ctxt_acc) k ->
+                      Script_big_map.update ctxt_acc k (Some ()) bm)
+                    (big_map, ctxt)
+                    keys
                 in
                 Lwt.return (Environment.wrap_tzresult result)
               in
@@ -4141,7 +4151,7 @@ module Registration_section = struct
           let kbody = ICdr (dummy_loc, halt) in
           fun () ->
             let ty = map int unit in
-            let key, map = Maps.generate_map_and_key_in_map cfg rng_state in
+            let key, map = Maps.generate_map_and_key_not_in_map cfg rng_state in
             let cont = KMap_exit_body (kbody, [], map, key, Some ty, KNil) in
             Ex_stack_and_cont
               {stack = ((), ((), eos)); stack_type = unit @$ unit @$ bot; cont})
