@@ -332,6 +332,51 @@ let balance_zero =
     unstaked_finalizable_b = Tez.zero;
   }
 
+let balance_of_account account_name (account_map : account_map) =
+  match String.Map.find account_name account_map with
+  | None -> raise Not_found
+  | Some account ->
+      let balance =
+        {balance_zero with liquid_b = account.liquid; bonds_b = account.bonds}
+      in
+      let balance =
+        match account.delegate with
+        | None -> balance
+        | Some d -> (
+            match String.Map.find d account_map with
+            | None -> raise Not_found
+            | Some delegate_account ->
+                {
+                  balance with
+                  staked_b =
+                    Frozen_tez.get account_name delegate_account.frozen_deposits;
+                })
+      in
+      (* Because an account can still have frozen or finalizable funds from a delegate
+         that is not its own, we iterate over all of them *)
+      let unstaked_frozen_b, unstaked_finalizable_b =
+        String.Map.fold
+          (fun _delegate_name delegate (frozen, finalzbl) ->
+            let frozen =
+              Q.(
+                frozen
+                + Unstaked_frozen.get_total
+                    account_name
+                    delegate.unstaked_frozen)
+            in
+            let finalzbl =
+              Tez.(
+                finalzbl
+                +! Unstaked_finalizable.get
+                     account_name
+                     delegate.unstaked_finalizable)
+            in
+            (frozen, finalzbl))
+          account_map
+          (Q.zero, Tez.zero)
+      in
+      {balance with unstaked_frozen_b; unstaked_finalizable_b}
+
 let balance_pp fmt
     {
       liquid;
