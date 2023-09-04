@@ -69,7 +69,3 @@ val error : tztrace -> unit Lwt.t
 (** Emit an event for when the node enters the degraded mode to only play
     refutations. *)
 val degraded_mode : unit -> unit Lwt.t
-
-(** Emit an event for when the node enters the bailout mode to only defends and 
-    cements, does not publish any new commitment. *)
-val bailout_mode : unit -> unit Lwt.t
