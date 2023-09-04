@@ -233,11 +233,11 @@ module Dal_proofs = struct
       is in the following boundaries:
       - page_published_level > origination_level: this means that the slot
         of the page was published after the rollup origination ;
-      - page_published_level + dal_attestation_lag < commit_level: this
-        means that the slot of the page has been confirmed before the
+      - page_published_level + dal_attestation_lag <= commit_level: this
+        means that the slot of the page has been confirmed before or at the
         [commit_level]. According to the definition in
         {!Sc_rollup_commitment_repr}, [commit_level] (aka inbox_level
-        in that module) is the level (excluded) up to which the PVM consumed
+        in that module) is the level (included) up to which the PVM consumed
         all messages and DAL/DAC inputs before producing the related commitment.
   *)
   let page_level_is_valid ~dal_attestation_lag ~origination_level ~commit_level
@@ -249,7 +249,7 @@ module Dal_proofs = struct
     let open Raw_level_repr in
     let not_too_old = page_published_level > origination_level in
     let not_too_recent =
-      add page_published_level dal_attestation_lag < commit_level
+      add page_published_level dal_attestation_lag <= commit_level
     in
     not_too_old && not_too_recent
 
