@@ -126,3 +126,29 @@ val purge_disk_cache : unit -> unit
 *)
 val load_head_block :
   string -> (int32 * Block_hash.t * Context_hash.t) tzresult Lwt.t
+
+(** Reading [/proc/meminfo].  Only for Linux *)
+module Meminfo : sig
+  (** all in KiB = 1024 bytes *)
+  type t = {
+    memTotal : int;
+    memFree : int;
+    memAvailable : int;
+    buffers : int;
+    cached : int;
+    swapTotal : int;
+  }
+
+  val pp : Format.formatter -> t -> unit
+
+  val get : unit -> t
+end
+
+(** [with_memory_restriction gib f] executes [f] trying to restrict
+    the [MemAvailable] of [/proc/meminfo] to [gib] GiB. It only works
+    in Linux.
+
+    Function [f] takes a function to re-restrict the [MemAvailable]
+    during the exection of [f].
+*)
+val with_memory_restriction : float -> ((unit -> unit) -> 'a) -> 'a

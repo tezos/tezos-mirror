@@ -4026,6 +4026,7 @@ let octez_shell_benchmarks =
         octez_micheline;
       ]
     ~linkall:true
+    ~foreign_stubs:{language = C; flags = []; names = ["alloc_mmap"]}
 
 let _tezt_testnet_scenarios =
   public_exe

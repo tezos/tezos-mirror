@@ -342,3 +342,119 @@ let load_head_block data_dir =
   let*! head = Chain.current_head chain_store in
   let*! () = close_store store in
   return (Block.level head, Block.hash head, Block.context_hash head)
+
+module Meminfo = struct
+  type t = {
+    memTotal : int;
+    memFree : int;
+    memAvailable : int;
+    buffers : int;
+    cached : int;
+    swapTotal : int;
+  }
+
+  let pp ppf {memTotal; memFree; memAvailable; buffers; cached; swapTotal} =
+    let open Format in
+    fprintf
+      ppf
+      "{ memTotal: %d; memFree: %d; memAvailable: %d; buffers: %d; cached: %d; \
+       swapTotal: %d }"
+      memTotal
+      memFree
+      memAvailable
+      buffers
+      cached
+      swapTotal
+
+  let get () =
+    let ic = open_in "/proc/meminfo" in
+    let rec loop acc =
+      match input_line ic with
+      | exception End_of_file ->
+          close_in ic ;
+          acc
+      | s ->
+          let acc =
+            try
+              let n = String.index s ':' in
+              let key = String.sub s 0 n in
+              let rest =
+                let rest = String.(sub s (n + 1) (length s - n - 1)) in
+                match String.remove_suffix ~suffix:" kB" rest with
+                | Some s -> s
+                | _ | (exception _) -> rest
+              in
+              let kbs = Scanf.sscanf rest " %d" Fun.id in
+              match key with
+              | "MemTotal" -> {acc with memTotal = kbs}
+              | "MemFree" -> {acc with memFree = kbs}
+              | "MemAvailable" -> {acc with memAvailable = kbs}
+              | "Buffers" -> {acc with buffers = kbs}
+              | "Cached" -> {acc with cached = kbs}
+              | "SwapTotal" -> {acc with swapTotal = kbs}
+              | _ -> acc
+            with _ -> acc
+          in
+          loop acc
+    in
+    (* We can use [option] type but no worth for it *)
+    loop
+      {
+        memTotal = -1;
+        memFree = -1;
+        memAvailable = -1;
+        buffers = -1;
+        cached = -1;
+        swapTotal = -1;
+      }
+
+  let get_available () =
+    let meminfo = get () in
+    meminfo.memAvailable
+end
+
+module Dummy_memory = struct
+  (* Dummy memory is allocated by mmap(2).
+
+     [MemAvailable] decreases immediately when a process allocates
+     a new memory block. However, it does not increase immediately
+     even when the process frees it.
+
+     [MemAvailable] is immediately updated when the memory is allocated
+     by mmap(2) then released by munmap(2).
+  *)
+
+  type t
+
+  external alloc : int -> t = "caml_alloc_by_mmap"
+
+  external free : t -> unit = "caml_free_by_mmap"
+
+  let allocate = alloc
+
+  let deallocate = free
+end
+
+let with_memory_restriction gib f =
+  let blocks = ref ([] : Dummy_memory.t list) in
+  let block_size = 1024 * 1024 * 100 (* 100MiB *) in
+  let target = int_of_float (gib *. 1024. *. 1024. *. 1024.) in
+  let restrict () =
+    let rec loop acc =
+      let available = Meminfo.get_available () * 1024 in
+      let diff = available - target in
+      if diff <= -block_size then (
+        match acc with
+        | [] -> acc
+        | block :: acc ->
+            Dummy_memory.deallocate block ;
+            loop acc)
+      else if block_size < diff then
+        loop (Dummy_memory.allocate block_size :: acc)
+      else acc
+    in
+    blocks := loop !blocks
+  in
+  let res = f restrict in
+  List.iter Dummy_memory.deallocate !blocks ;
+  res
