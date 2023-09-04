@@ -545,7 +545,7 @@ let check_manager_operation_status result expected_status oph =
 
 let check_dal_raw_context node =
   let* dal_raw_json =
-    RPC.call node @@ RPC.get_chain_block_context_raw_json ~path:["dal"] ()
+    RPC.(call node @@ get_chain_block_context_raw_json ~path:["dal"] ())
   in
   if JSON.is_null dal_raw_json then
     Test.fail "Expected the context to contain information under /dal key."
@@ -554,9 +554,9 @@ let check_dal_raw_context node =
       JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
     in
     let* confirmed_slots_opt =
-      RPC.call
-        node
-        (RPC.get_chain_block_context_dal_confirmed_slot_headers_history ())
+      RPC.(
+        call node
+        @@ get_chain_block_context_dal_confirmed_slot_headers_history ())
     in
     if JSON.is_null confirmed_slots_opt then
       Test.fail
@@ -681,7 +681,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       client
   in
   let* () = Client.bake_for_and_wait client in
-  let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
+  let* metadata = RPC.(call node @@ get_chain_block_metadata ()) in
   let attestation =
     match metadata.dal_attestation with
     | None ->
@@ -728,7 +728,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     unit
   in
   let check_slots_availability ~__LOC__ ~attested =
-    let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
+    let* metadata = RPC.(call node @@ get_chain_block_metadata ()) in
     let dal_attestation =
       (* Field is part of the encoding when the feature flag is true *)
       Option.get metadata.dal_attestation
