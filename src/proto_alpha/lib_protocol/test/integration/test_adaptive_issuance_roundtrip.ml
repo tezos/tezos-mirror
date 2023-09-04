@@ -171,102 +171,186 @@ let default_params =
       Int32.to_int edge_of_baking_over_staking_billionth;
   }
 
-type info = {
-  accounts : string list;
-  accounts_info : accounts_info;
-  total_supply : Tez.t;
-  constants : Protocol.Alpha_context.Constants.Parametric.t;
-  unstake_requests :
-    (* src, amount, cycles before final *)
-    (string * Tez.t * int) list;
-  activate_ai : bool;
-  staker : string;
-  baker : string;
-  last_level_rewards : Protocol.Alpha_context.Raw_level.t;
-  snapshot_balances : (string * balance_breakdown) list;
-}
+(** Module for the [State.t] type of asserted information about the system during a test. *)
+module State = struct
+  (** Type of the state *)
+  type t = {
+    account_names : string list;
+    account_map : account_map;
+    total_supply : Tez.t;
+    constants : Protocol.Alpha_context.Constants.Parametric.t;
+    param_requests : (string * staking_parameters * int) list;
+    activate_ai : bool;
+    baker : string;
+    last_level_rewards : Protocol.Alpha_context.Raw_level.t;
+    snapshot_balances : (string * balance) list String.Map.t;
+    pending_operations : Protocol.Alpha_context.packed_operation list;
+  }
 
-let find_account account info =
-  match String.Map.find account info.accounts_info with
-  | None -> assert false
-  | Some r -> r
+  (** Expected number of cycles before staking parameters get applied *)
+  let param_cd state = state.constants.preserved_cycles + 1
 
-let update_account account value info =
-  let accounts_info = String.Map.add account value info.accounts_info in
-  {info with accounts_info}
+  (** Expected number of cycles before staking unstaked funds get unfrozen *)
+  let unstake_cd state =
+    let pc = state.constants.preserved_cycles in
+    let msp = state.constants.max_slashing_period in
+    pc + msp
 
-let get_total_staked_and_balance account info =
-  let open Lwt_result_syntax in
-  let pool_tez, pool_pseudo =
-    match account.delegate with
-    | None -> (Tez.zero, Q.one)
-    | Some string ->
-        let {balance = delegate_balance; _} = find_account string info in
-        (delegate_balance.pool_tez, delegate_balance.pool_pseudo)
-  in
-  let total_staked =
-    tez_of_staked account.balance.staked ~pool_tez ~pool_pseudo
-  in
-  let* total_balance =
-    total_balance_of_breakdown account.balance ~pool_tez ~pool_pseudo
-  in
-  return (total_staked, total_balance)
+  (** From a name, returns the corresponding account *)
+  let find_account (account_name : string) (state : t) : account_state =
+    match String.Map.find account_name state.account_map with
+    | None -> raise Not_found
+    | Some r -> r
+
+  (** Returns true iff account is a delegate *)
+  let is_self_delegate (account_name : string) (state : t) : bool =
+    let acc = find_account account_name state in
+    match acc.delegate with
+    | None -> false
+    | Some d ->
+        let del = find_account d state in
+        String.equal del.name acc.name
+
+  let update_map ?(log_updates = []) ~(f : account_map -> account_map)
+      (state : t) : t =
+    let log_updates = List.sort_uniq String.compare log_updates in
+    let new_state = {state with account_map = f state.account_map} in
+    List.iter
+      (fun x ->
+        log_debug_balance_update x state.account_map new_state.account_map)
+      log_updates ;
+    new_state
+
+  let apply_transfer amount src_name dst_name (state : t) : t =
+    let f = apply_transfer amount src_name dst_name in
+    update_map ~log_updates:[src_name; dst_name] ~f state
+
+  let apply_stake amount staker_name (state : t) : t =
+    let f = apply_stake amount staker_name in
+    update_map ~log_updates:[staker_name] ~f state
+
+  let apply_unstake cycle amount staker_name (state : t) : t =
+    let f = apply_unstake cycle amount staker_name in
+    update_map ~log_updates:[staker_name] ~f state
+
+  let apply_finalize staker_name (state : t) : t =
+    let f = apply_finalize staker_name in
+    update_map ~log_updates:[staker_name] ~f state
+
+  let apply_unslashable cycle (state : t) : t =
+    let f = apply_unslashable cycle in
+    (* no log *)
+    update_map ~f state
+
+  let apply_rewards block (state : t) : t tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let {last_level_rewards; total_supply; constants = _; _} = state in
+    let*? current_level = Context.get_level (B block) in
+    (* We assume one block per minute *)
+    let* rewards_per_block = Context.get_issuance_per_minute (B block) in
+    if Tez.(rewards_per_block = zero) then return state
+    else
+      let delta_time =
+        Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
+        |> Int32.to_int
+      in
+      let ({parameters; _} as baker) = find_account state.baker state in
+      let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
+      if delta_time = 1 then
+        Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
+      else if delta_time > 1 then
+        Log.info
+          ~color:tez_color
+          "+%aꜩ (over %d blocks, %aꜩ per block)"
+          Tez.pp
+          delta_rewards
+          delta_time
+          Tez.pp
+          rewards_per_block
+      else assert false ;
+      let to_liquid =
+        Tez.mul_q
+          delta_rewards
+          (Q.of_ints parameters.edge_of_baking_over_staking 1_000_000_000)
+      in
+      let to_liquid = Partial_tez.to_tez ~round_up:true to_liquid in
+      let to_frozen = Tez.(delta_rewards -! to_liquid) in
+      let state =
+        update_map ~f:(add_liquid_rewards to_liquid baker.name) state
+      in
+      let state =
+        update_map ~f:(add_frozen_rewards to_frozen baker.name) state
+      in
+      let* total_supply = Tez.(total_supply + delta_rewards) in
+      return {state with last_level_rewards = current_level; total_supply}
+
+  (* TODO *)
+  let apply_slashing _pct _delegate_name (state : t) : t = state
+
+  (** Given an account name and new account state, updates [state] accordingly
+      Preferably use other specific update functions *)
+  let update_account (account_name : string) (value : account_state) (state : t)
+      : t =
+    let account_map = String.Map.add account_name value state.account_map in
+    {state with account_map}
+
+  let update_delegate account_name delegate_name_opt state : t =
+    let account = find_account account_name state in
+    update_account
+      account_name
+      {account with delegate = delegate_name_opt}
+      state
+
+  let add_pending_operations operations state =
+    {state with pending_operations = state.pending_operations @ operations}
+
+  let pop_pending_operations state =
+    ({state with pending_operations = []}, state.pending_operations)
+
+  (** When reaching a new cycle: apply unstakes and parameters changes.
+    We expect these changes after applying the last block of a cycle *)
+  let apply_end_cycle new_cycle state : t =
+    let unstake_cd = unstake_cd state in
+    (* Prepare finalizable unstakes *)
+    let state =
+      match Cycle.sub new_cycle unstake_cd with
+      | None -> state
+      | Some cycle -> apply_unslashable cycle state    in
+    (* Apply parameter changes *)
+    let state, param_requests =
+      List.fold_left
+        (fun (state, remaining_requests) (name, params, cd) ->
+          if cd > 0 then (state, (name, params, cd - 1) :: remaining_requests)
+          else
+            let src = find_account name state in
+            let state =
+              update_account name {src with parameters = params} state
+            in
+            (state, remaining_requests))
+        (state, [])
+        state.param_requests    in
+    (* Refresh initial amount of frozen deposits at cycle end *)
+    let state =
+      update_map
+        ~f:
+          (String.Map.map (fun x ->
+               {
+                 x with
+                 frozen_deposits =
+                   Frozen_tez.refresh_at_new_cycle x.frozen_deposits;
+               }))
+        state    in
+    {state with param_requests}
+
+  (* end module State *)
+end
 
 
-let update_balance ~f account info =
-  let open Lwt_result_syntax in
-  let* balance = f account.balance in
-  let new_account = {account with balance} in
-  let new_info = update_account account.name new_account info in
-  let* () = log_debug_balance_update (account, info) (new_account, new_info) in
-  return new_info
-
-let update_balance_2 ~f account1 account2 info =
-  let open Lwt_result_syntax in
-  let* balance1, balance2 = f (account1.balance, account2.balance) in
-  let new_account1 = {account1 with balance = balance1} in
-  let new_account2 = {account2 with balance = balance2} in
-  let new_info = update_account account1.name new_account1 info in
-  let new_info = update_account account2.name new_account2 new_info in
-  let* () =
-    log_debug_balance_update (account1, info) (new_account1, new_info)
-  in
-  let* () =
-    log_debug_balance_update (account2, info) (new_account2, new_info)
-  in
-  return new_info
 
 (* Threaded context for the tests. Contains the block, as well as various
    informations on the state of the current test. *)
 type t = Block.t * info
 
-(* Must be applied every block if testing when ai activated and rewards != 0 *)
-let apply_rewards_info current_level info =
-  let open Lwt_result_syntax in
-  let {last_level_rewards; total_supply; constants; _} = info in
-  (* We assume one block per minute *)
-  let rewards_per_block =
-    constants.issuance_weights.base_total_issued_per_minute
-  in
-  if Tez.(rewards_per_block = zero) then return info
-  else
-    let delta_time =
-      Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
-      |> Int32.to_int
-    in
-    let ({parameters; _} as baker) = find_account info.baker info in
-    let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
-    let to_liquid =
-      Tez.(
-        div_exn
-          (mul_exn delta_rewards parameters.baking_over_staking_edge)
-          1_000_000_000)
-    in
-    let* to_frozen = Tez.(delta_rewards - to_liquid) in
-    let* info = update_balance ~f:(add_liquid_rewards to_liquid) baker info in
-    let* info = update_balance ~f:(add_frozen_rewards to_frozen) baker info in
-    let* total_supply = Tez.(total_supply + delta_rewards) in
-    return {info with last_level_rewards = current_level; total_supply}
 
 let check_all_balances (block, info) =
   let open Lwt_result_syntax in
