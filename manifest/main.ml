@@ -5907,7 +5907,7 @@ let hash = Protocol.hash
         ~deps:
           [
             qcheck_alcotest;
-            octez_test_helpers |> open_;
+            octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_micheline |> open_;

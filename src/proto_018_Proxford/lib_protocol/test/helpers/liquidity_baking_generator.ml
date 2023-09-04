@@ -47,7 +47,7 @@ let rec shrink_list l =
 
 let gen_balances : int64 -> int -> int -> balances QCheck2.Gen.t =
  fun max_xtz max_tzbtc max_liquidity ->
-  let open Qcheck2_helpers in
+  let open Tezos_test_helpers.Qcheck2_helpers in
   let+ xtz = int64_strictly_positive_gen max_xtz
   and+ tzbtc = int_strictly_positive_gen max_tzbtc
   and+ liquidity = int_strictly_positive_gen max_liquidity in
@@ -144,7 +144,7 @@ let genopt_step_tzbtc_to_xtz :
   let*? source = genopt_account_with_tzbtc ?choice:source env state in
   let*? destination = genopt_account ?choice:destination env in
   let+ tzbtc_deposit =
-    Qcheck2_helpers.int_strictly_positive_gen
+    Tezos_test_helpers.Qcheck2_helpers.int_strictly_positive_gen
       (SymbolicMachine.get_tzbtc_balance source env state)
   in
   (* See note (2) *)
@@ -197,7 +197,8 @@ let genopt_step_add_liquidity :
   (* the source needs at least one xtz *)
   if 1L < source_xtz_pool then
     let+ candidate =
-      Qcheck2_helpers.int64_strictly_positive_gen source_xtz_pool
+      Tezos_test_helpers.Qcheck2_helpers.int64_strictly_positive_gen
+        source_xtz_pool
     in
     let xtz_deposit =
       find_xtz_deposit
