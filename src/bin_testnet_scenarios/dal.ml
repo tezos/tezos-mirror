@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Dal_helpers
+module Dal = Dal_common
 
 (* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
    or Mondaynet), and it publishes slots for a number of levels and a number of
@@ -165,7 +166,7 @@ let scenario network =
       proto_parameters |-> "minimal_block_delay" |> as_string |> int_of_string)
   in
   let dal_parameters =
-    Dal_common.Parameters.from_protocol_parameters proto_parameters
+    Dal.Parameters.from_protocol_parameters proto_parameters
   in
   let cryptobox = dal_parameters.cryptobox in
   let number_of_slots = dal_parameters.number_of_slots in
@@ -186,7 +187,7 @@ let scenario network =
         String.init 30 (fun _i ->
             let x = Random.int 26 in
             Char.code 'a' + x |> Char.chr)
-        |> Dal_common.Helpers.make_slot ~slot_size:cryptobox.slot_size
+        |> Dal.Helpers.make_slot ~slot_size:cryptobox.slot_size
       in
       let slot_index = key_index mod number_of_slots in
 
@@ -194,23 +195,21 @@ let scenario network =
         "Publishing a slot at level %d with index %d..."
         current_level
         slot_index ;
-      let* commitment =
-        RPC.call dal_node (Dal_common.RPC.post_commitment slot)
-      in
+      let* commitment = RPC.call dal_node (Dal.RPC.post_commitment slot) in
       let* () =
         RPC.call dal_node
-        @@ Dal_common.RPC.put_commitment_shards ~with_proof:true commitment
+        @@ Dal.RPC.put_commitment_shards ~with_proof:true commitment
       in
       let commitment_hash =
-        match Dal_common.Cryptobox.Commitment.of_b58check_opt commitment with
+        match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
         | None -> assert false
         | Some hash -> hash
       in
       let* proof =
         let* proof =
-          RPC.call dal_node @@ Dal_common.RPC.get_commitment_proof commitment
+          RPC.call dal_node @@ Dal.RPC.get_commitment_proof commitment
         in
-        Dal_common.Commitment.proof_of_string proof |> return
+        Dal.Commitment.proof_of_string proof |> return
       in
       let source = List.nth keys key_index in
       let* _ =
@@ -245,11 +244,11 @@ let scenario network =
   let check_attestations level =
     let module Map = Map.Make (String) in
     let* slot_headers =
-      RPC.call dal_node (Dal_common.RPC.get_published_level_headers level)
+      RPC.call dal_node (Dal.RPC.get_published_level_headers level)
     in
     let map =
       List.fold_left
-        (fun acc Dal_common.RPC.{status; slot_index; _} ->
+        (fun acc Dal.RPC.{status; slot_index; _} ->
           Map.update
             status
             (function
