@@ -996,6 +996,7 @@ let wait_ai_activation =
 let add_account_with_funds name source amount =
   add_account name --> transfer source name amount --> reveal name
 
+(* ======== Scenarios ======== *)
 
 let init_constants ?reward_per_block () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
@@ -1024,64 +1025,75 @@ let init_constants ?reward_per_block () =
     cost_per_byte;
   }
 
+(** Initialization of scenarios with 3 cases:
+     - AI activated, staker = delegate
+     - AI activated, staker != delegate
+     - AI not activated (and staker = delegate)
+    Any scenario that begins with this will be triplicated.
+ *)
 let init_scenario ?reward_per_block () =
-  let open Lwt_result_syntax in
   let constants = init_constants ?reward_per_block () in
-  (* TODO LATER:
-     if rewards != 0, info is incorrect -> reset info balances after wait *)
-  let wait_ai_activation (block, info) =
-    Log.info ~color:time_color "Fast forward to AI activation" ;
-    let* block =
-      if info.activate_ai then
-        let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
-        (* Bake until the activation. *)
-        Block.bake_until_cycle launch_cycle block
-      else assert false
-    in
-    Log.info ~color:event_color "AI activated" ;
-    return (block, info)
+  let init_params =
+    {
+      limit_of_staking_over_baking = 1_000_000;
+      edge_of_baking_over_staking = 1_000_000_000;
+    }
+  in
+  let begin_test ~activate_ai ~self_stake =
+    let name = if self_stake then "staker" else "delegate" in
+    begin_test ~activate_ai constants [name]
+    --> set_delegate_params name init_params
+    --> stake name (Amount (Tez.of_mutez 1_800_000_000_000L))
   in
   (Tag "AI activated"
-   --> Begin_test (constants, ["delegate"], true)
-   --> Set_delegate_params ("delegate", default_params)
-   --> Stake ("delegate", Amount (Tez.of_mutez 1_800_000_000_000L))
-   ---> (Tag "self stake" --> set_staker "delegate"
-        |+ Tag "external stake"
-           ---> add_account_with_funds
-                  "staker"
-                  "delegate"
-                  (Tez.of_mutez 2_000_000_000_000L)
-           --> Set_delegate ("staker", "delegate")
-           --> set_staker "staker")
-   --> Do wait_ai_activation
+   --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
+       |+ Tag "external stake"
+          --> begin_test ~activate_ai:true ~self_stake:false
+          --> add_account_with_funds
+                "staker"
+                "delegate"
+                (Amount (Tez.of_mutez 2_000_000_000_000L))
+          --> set_delegate "staker" (Some "delegate"))
+   --> wait_ai_activation
   |+ Tag "AI disactivated, self stake"
-     --> Begin_test (constants, ["delegate"], true)
-     --> Set_delegate_params ("delegate", default_params)
-     --> Stake ("delegate", Amount (Tez.of_mutez 1_800_000_000_000L))
-     --> set_staker "delegate")
-  --> Next_cycle
+     --> begin_test ~activate_ai:false ~self_stake:true)
+  --> next_block
 
-let simple_roundtrip =
-  noop
-  --> Stake (with_staker, Half)
-  ---> (Tag "no wait after stake" --> Noop
-       |+ Tag "wait after stake" ---> wait_n_cycles 2)
-  ---> (Tag "half unstake"
-        --> Unstake (with_staker, Half)
-        ---> (Tag "then half unstake" ---> wait_n_cycles 2
-              --> Unstake (with_staker, Half)
-             |+ Tag "then unstake rest" ---> wait_n_cycles 2
-                --> Unstake (with_staker, All)
-             |+ Empty)
-       |+ Tag "full unstake" --> Unstake (with_staker, All))
-  ---> wait_n_cycles 8 --> Finalize_unstake with_staker --> Next_cycle
+module Roundtrip = struct
+  let stake_init =
+    stake "staker" Half
+    --> (Tag "no wait after stake" --> Empty
+        |+ Tag "wait after stake" --> wait_n_cycles 2)
+
+  let wait_for_unfreeze_and_check cd =
+    snapshot_balances "wait snap" ["staker"]
+    --> wait_n_cycles (cd - 1)
+    (* Balance didn't change yet, but will change next cycle *)
+    --> check_snapshot_balances "wait snap"
+    --> next_cycle
+    --> assert_failure (check_snapshot_balances "wait snap")
+
+  let finalize staker =
+    assert_failure (check_balance_field staker `Unstaked_finalizable Tez.zero)
+    --> finalize_unstake staker
+    --> check_balance_field staker `Unstaked_finalizable Tez.zero
+
+  let simple_roundtrip =
+    stake_init
+    --> (Tag "full unstake" --> unstake "staker" All
+        |+ Tag "half unstake" --> unstake "staker" Half)
+    --> wait_for_unfreeze_and_check default_unstake_cd
+    --> finalize "staker" --> next_cycle
+
+  let tests =
+    tests_of_scenarios
+    @@ [
+         ("Test simple roundtrip", init_scenario () --> simple_roundtrip);
+       ]
+end
 
 let tests =
-  tests_of_scenarios
-  @@ [
-       ("Test init", init_scenario ());
-       ("Test simple roundtrip", init_scenario () ---> simple_roundtrip);
-     ]
+  (tests_of_scenarios @@ [("Test init", init_scenario ())]) @ Roundtrip.tests
 
 let () =
   Alcotest_lwt.run
