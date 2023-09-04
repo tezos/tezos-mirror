@@ -8,6 +8,17 @@ License
 
 The Octez software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
 
+.. code-block:: ocaml
+
+    (*****************************************************************************)
+    (*                                                                           *)
+    (* SPDX-License-Identifier: MIT                                              *)
+    (* Copyright (c) [year(s)] [Holder <email>]                                  *)
+    (*                                                                           *)
+    (*****************************************************************************)
+
+The following, full-text equivalent, template is also valid (but deprecated):
+
 .. literalinclude:: LICENSE.ml
    :language: ocaml
 
