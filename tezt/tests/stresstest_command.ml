@@ -49,19 +49,19 @@ let wait_for_n_injections n node =
     do not expect to terminate. *)
 let non_terminating_process (_process : Process.t) = ()
 
-(** Check that the mempool contains [n] applied operations. Also
-    return these applied operations (which will usually be transactions
+(** Check that the mempool contains [n] validated operations. Also
+    return these validated operations (which will usually be transactions
     injected by the transfer command). *)
-let check_n_applied_operations_in_mempool n client =
+let check_n_validated_operations_in_mempool n client =
   let* mempool_ops =
     Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
-  let applied_ops = JSON.(mempool_ops |-> "applied" |> as_list) in
+  let validated_ops = JSON.(mempool_ops |-> "validated" |> as_list) in
   Check.(
-    (List.length applied_ops = n)
+    (List.length validated_ops = n)
       int
-      ~error_msg:"Found %L applied operations in the mempool; expected %R.") ;
-  return applied_ops
+      ~error_msg:"Found %L validated operations in the mempool; expected %R.") ;
+  return validated_ops
 
 (** Check that the head block contains [n] manager operations. Also
     return these manager operations (which will usually be transactions
@@ -82,7 +82,7 @@ let check_n_manager_operations_in_head n client =
     More precisely, this test checks that:
 
     - After letting the [stresstest] command run for a while on a
-      given head, the mempool contains exactly one applied operation by
+      given head, the mempool contains exactly one validated operation by
       each source account provided to the command. The same goes for
       manager operations included in the next baked block. (Note that
       this is true in a minimalist context where no operation injection
@@ -211,7 +211,7 @@ let test_stresstest_sources_format =
        operations (check that they number [n_bootstraps_to_use] and the
        set of their sources is [expected_pkhs]).
      - Wait for [n_bootstraps_to_use] injections.
-     - Inspect the mempool's applied operations (check that they
+     - Inspect the mempool's validated operations (check that they
        number [n_bootstraps_to_use] and the set of their sources is
        [expected_pkhs]). *)
   let rec loop ~first_iteration ~repeat =
@@ -254,7 +254,7 @@ let test_stresstest_sources_format =
        it [repeat] times. *)
     let* () = Lwt_unix.sleep 5. in
     let* ops =
-      check_n_applied_operations_in_mempool n_bootstraps_to_use client
+      check_n_validated_operations_in_mempool n_bootstraps_to_use client
     in
     check_pkhs ops ;
     if repeat <= 1 then unit
@@ -265,7 +265,7 @@ let test_stresstest_sources_format =
 (** Run the [stresstest] command in an isolated node with an explicit
     parameter [transfers], that makes it stop after injecting this
     number of transfers. Then check that the mempool contains this many
-    applied operations, and bake a block and check that it also
+    validated operations, and bake a block and check that it also
     contains the same number of manager operations. *)
 let test_stresstest_n_transfers =
   Protocol.register_test
@@ -293,7 +293,7 @@ let test_stresstest_n_transfers =
   (* Bake some blocks to reach required level for stresstest command. *)
   let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () = Client.stresstest ~transfers:n_transfers ~source_aliases client in
-  let* _ = check_n_applied_operations_in_mempool n_transfers client in
+  let* _ = check_n_validated_operations_in_mempool n_transfers client in
   let* () = Client.bake_for_and_wait client in
   let* _ = check_n_manager_operations_in_head n_transfers client in
   unit
@@ -323,7 +323,7 @@ let wait_for_n_arrivals n node =
 
     We check that after the initial command calls and after each
     subsequent baking, the mempool of the central node eventually
-    contains [n_nodes * n_bootstraps_per_node] applied operations. We
+    contains [n_nodes * n_bootstraps_per_node] validated operations. We
     also check that the baked blocks contain the same number of manager
     operations. *)
 let test_stresstest_multiple_nodes =
@@ -439,7 +439,7 @@ let test_stresstest_multiple_nodes =
        for it [repeat] times. *)
     let* () = Lwt_unix.sleep 5. in
     let* _ =
-      check_n_applied_operations_in_mempool n_bootstraps_total central_client
+      check_n_validated_operations_in_mempool n_bootstraps_total central_client
     in
     if repeat <= 1 then unit
     else loop ~first_iteration:false ~repeat:(repeat - 1)

@@ -107,7 +107,7 @@ let monitor_operations =
       Constant.bootstrap2
       Constant.bootstrap3
   in
-  let* ophs = Node_event_level.get_applied_operation_hash_list client in
+  let* ophs = Node_event_level.get_validated_operation_hash_list client in
   (* Step 4 *)
   (* Bake a block *)
   let* () = Node_event_level.bake_wait_log node client in

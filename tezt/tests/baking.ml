@@ -659,7 +659,7 @@ let test_operation_pool_ordering
   let* mempool =
     Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
   in
-  let mgmt_ops = JSON.get "applied" mempool in
+  let mgmt_ops = JSON.get "validated" mempool in
 
   let filename = Filename.temp_file "opool_" ".json" in
   let json = JSON.as_list mgmt_ops in
