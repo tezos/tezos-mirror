@@ -473,43 +473,31 @@ let exec_state f =  let open Lwt_result_syntax in
       let* state = f input in
       return (block, state))
 
+(* ======== Baking ======== *)
 
-let check_all_balances (block, info) =
+(** After baking and applying rewards in state *)
+let check_all_balances block state : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let {accounts_info; total_supply; _} = info in
+  let State.{account_map; total_supply; _} = state in
   let* () =
     String.Map.iter_es
-      (fun _name ({balance; delegate; contract; _} as account) ->
-        let pool_tez, pool_pseudo =
-          match delegate with
-          | None -> (Tez.zero, Q.one)
-          | Some string ->
-              let {balance = delegate_balance; _} = find_account string info in
-              (delegate_balance.pool_tez, delegate_balance.pool_pseudo)
-        in
-        let* () = log_debug_rpc_balance account block in
-        assert_balance_breakdown
-          ~loc:__LOC__
-          (B block)
-          contract
-          balance
-          ~pool_tez
-          ~pool_pseudo)
-      accounts_info
+      (fun _name account ->
+        log_debug_balance account.name account_map ;
+        assert_balance_check ~loc:__LOC__ (B block) account.name account_map)
+      account_map
   in
   let* actual_total_supply = Context.get_total_supply (B block) in
   Assert.equal_tez ~loc:__LOC__ actual_total_supply total_supply
 
-let apply_rewards (block, info) =
-  let open Lwt_result_syntax in
-  let*? current_level = Context.get_level (B block) in
-  let* info = apply_rewards_info current_level info in
-  let input = (block, info) in
-  let* () = check_all_balances input in
-  return input
+(** Apply rewards in state + check *)
+let apply_rewards block state : State.t tzresult Lwt.t =  let open Lwt_result_syntax in
+  let* state = State.apply_rewards block state in
+  let* () = check_all_balances block state in
+  return state
 
-
-let bake ?operation (block, info) =
+(** Bake a block, with the given baker and the given operations. *)
+let bake ?baker : t -> t tzresult Lwt.t =
+ fun (block, state) ->
   let open Lwt_result_syntax in
   Log.info
     ~color:time_color
@@ -517,50 +505,55 @@ let bake ?operation (block, info) =
     (Int32.to_int (Int32.succ Block.(block.header.shell.level))) ;
   let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =
-    if info.activate_ai then
+    if state.activate_ai then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
   let baker =
-    try find_account info.baker info
-    with _ ->
-      Log.info "Invalid baker: %s not found. Aborting" info.baker ;
-      assert false
+    match baker with
+    | None -> (
+        try State.find_account state.baker state
+        with Not_found ->
+          Log.info
+            ~color:warning_color
+            "Invalid baker: %s not found. Aborting"
+            state.baker ;
+          assert false)
+    | Some baker -> baker
   in
   let policy = Block.By_account baker.pkh in
-  let* block = Block.bake ~policy ~adaptive_issuance_vote ?operation block in
+  let state, operations = State.pop_pending_operations state in
+  let* block = Block.bake ~policy ~adaptive_issuance_vote ~operations block in
+  (* TODO: mistake ? They apply before we reach the new cycle... *)
   let new_current_cycle = Block.current_cycle block in
-  let* input =
+  let state =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
-      return (block, info)
-    else
-      let* info = apply_end_cycle_info info in
-      return (block, info)
+      state
+    else (
+      Log.info
+        ~color:time_color
+        "Cycle %d"
+        (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
+      State.apply_end_cycle new_current_cycle state)
   in
-  apply_rewards input
+  let* state = apply_rewards block state in
+  return (block, state)
 
-let bake_until_cycle_end_slow ((init_block, _) as init_input) =
+(** Bake until the end of a cycle, using [bake] instead of [Block.bake]
+    Should be slower because checks balances at the end of every block (avoidable in some cases) *)
+let bake_until_cycle_end_slow : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
   let open Lwt_result_syntax in
   let current_cycle = Block.current_cycle init_block in
-  let rec step ((old_block, _) as old_input) =
+  let rec step (old_block, old_state) =
     let step_cycle = Block.current_cycle old_block in
     if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
-      return old_input
+      return (old_block, old_state)
     else
-      let* new_input = bake old_input in
-      step new_input
+      let* new_block, new_state = bake (old_block, old_state) in
+      step (new_block, new_state)
   in
-  step init_input
-
-let snapshot_balances names_list =
-  Do
-    (fun (block, info) ->
-      let snapshot_balances =
-        List.map
-          (fun name -> (name, (find_account name info).balance))
-          names_list
-      in
-      return (block, {info with snapshot_balances}))
+  step (init_block, init_state)
 
 let check_snapshot_balances =
   Do
