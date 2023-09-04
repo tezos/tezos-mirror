@@ -33,6 +33,7 @@
 
 open Adaptive_issuance_helpers
 
+(** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
 let begin_end_color = Log.Color.(BG.bright_white ++ FG.black ++ bold)
@@ -44,30 +45,25 @@ let action_color = Log.Color.FG.green
 let event_color = Log.Color.FG.blue
 
 
-let default_params =
-  {
-    limit_of_staking_over_baking = 1_000_000;
-    baking_over_staking_edge = 1_000_000_000;
-  }
 
-let initial_bbd =
-  {
-    liquid = Tez.zero;
-    bonds = Tez.zero;
-    staked = Q.zero;
-    unstaked_frozen = Tez.zero;
-    unstaked_finalizable = Tez.zero;
-    pool_tez = Tez.zero;
-    pool_pseudo = Q.zero;
-  }
 
-type stake_value = Half | All | None | Max_tez | Amount of Tez.t
 
-let stake_value_pp fmt value =
+(** Aliases for tez values *)
+type tez_quantity =
+  | Half
+  | All
+  | All_but_one
+  | Nothing
+  | Max_tez
+  | Amount of Tez.t
+
+
+let tez_quantity_pp fmt value =
   let s =
     match value with
-    | None -> "Zero"
+    | Nothing -> "Zero"
     | All -> "All"
+    | All_but_one -> "All but 1µꜩ"
     | Half -> "Half"
     | Max_tez -> "Maximum"
     | Amount a -> Format.asprintf "%aꜩ" Tez.pp a
