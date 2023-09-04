@@ -508,56 +508,6 @@ let apply_rewards (block, info) =
   let* () = check_all_balances input in
   return input
 
-type ('input, 'output) action =
-  | Do (* arbitrary action *) :
-      ('input -> 'output tzresult Lwt.t)
-      -> ('input, 'output) action
-  | Noop : ('input, 'input) action
-  | Set_delegate_params : (string * staking_parameters) -> (t, t) action
-  | Add_account : (* name of new account *) string -> (t, t) action
-  | Reveal : string -> (t, t) action
-  | Transfer :
-      (* src, dest, amount *) (string * string * Tez.t)
-      -> (t, t) action
-  | Set_delegate : (* src, dest *) (string * string) -> (t, t) action
-  | Unset_delegate : string -> (t, t) action
-  | Stake : (string * stake_value) -> (t, t) action
-  | Unstake : (string * stake_value) -> (t, t) action
-  | Finalize_unstake : string -> (t, t) action
-  | Next_block : (t, t) action
-  | Next_cycle : (t, t) action
-  | End_test : (t, unit) action
-  | Begin_test :
-      (* parametrs, list of names for delegates, activate_ai flag *)
-      (Protocol.Alpha_context.Constants.Parametric.t * string list * bool)
-      -> (unit, t) action
-
-let set_staker staker : (t, t) action =
-  Do (fun (block, info) -> return (block, {info with staker}))
-
-let with_staker = "#staker#" (* Special staker/unstaker value *)
-
-let resolve_name s (_, info) =
-  if String.equal s with_staker then info.staker else s
-
-let set_baker baker : (t, t) action =
-  Do (fun (block, info) -> return (block, {info with baker}))
-
-let apply_end_cycle_info info =
-  let open Lwt_result_syntax in
-  let* info, unstake_requests =
-    List.fold_left_es
-      (fun (info, remaining_requests) (name, amount, cd) ->
-        if cd > 0 then
-          return (info, (name, amount, cd - 1) :: remaining_requests)
-        else
-          let src = find_account name info in
-          let* info = update_balance ~f:(apply_unslashable amount) src info in
-          return (info, remaining_requests))
-      (info, [])
-      info.unstake_requests
-  in
-  return {info with unstake_requests}
 
 let bake ?operation (block, info) =
   let open Lwt_result_syntax in
@@ -625,61 +575,7 @@ let check_snapshot_balances =
       in
       return input)
 
-let unstake_value_to_tez src unstake_value info =
-  match src.delegate with
-  | None -> (
-      match unstake_value with
-      | Amount a -> a
-      | Max_tez -> Tez.max_mutez
-      | _ -> Tez.zero)
-  | Some delegate_name -> (
-      let delegate = find_account delegate_name info in
-      let pool_tez = delegate.balance.pool_tez in
-      let pool_pseudo = delegate.balance.pool_pseudo in
-      match unstake_value with
-      | None -> Tez.zero
-      | All -> tez_of_staked src.balance.staked ~pool_tez ~pool_pseudo
-      | Half ->
-          tez_of_staked (Q.div_2exp src.balance.staked 1) ~pool_tez ~pool_pseudo
-      | Max_tez -> Tez.max_mutez
-      | Amount a -> a)
 
-let apply_unstake_info src unstake_value info =
-  let open Lwt_result_syntax in
-  match src.delegate with
-  | None -> return info
-  | Some delegate_name ->
-      let amount = unstake_value_to_tez src unstake_value info in
-      if Tez.(amount = zero) then return info
-      else
-        let delegate = find_account delegate_name info in
-        let old_unstaked = src.balance.unstaked_frozen in
-        let* ({constants; _} as info) =
-          if String.equal src.name delegate.name then
-            update_balance ~f:(apply_self_unstake amount) src info
-          else update_balance_2 ~f:(apply_unstake amount) src delegate info
-        in
-        let new_src = find_account src.name info in
-        let cd =
-          constants.preserved_cycles + constants.max_slashing_period - 1
-        in
-        let* actual_amount =
-          Tez.(new_src.balance.unstaked_frozen - old_unstaked)
-        in
-        let unstake_requests =
-          (src.name, actual_amount, cd) :: info.unstake_requests
-        in
-        return {info with unstake_requests}
-
-let apply_stake_info src amount info =
-  let open Lwt_result_syntax in
-  match src.delegate with
-  | None -> return info
-  | Some delegate_name ->
-      let delegate = find_account delegate_name info in
-      if String.equal src.name delegate.name then
-        update_balance ~f:(apply_self_stake amount) src info
-      else update_balance_2 ~f:(apply_stake amount) src delegate info
 
 let run_action :
     type input output. (input, output) action -> input -> output tzresult Lwt.t
@@ -928,87 +824,7 @@ let run_action :
       let* block, info = bake ~operation (block, info) in
       return (block, info)
 
-type ('input, 'output) scenarios =
-  | Action : ('input, 'output) action -> ('input, 'output) scenarios
-  | Empty : ('t, 't) scenarios
-  | Concat : (('a, 'b) scenarios * ('b, 'c) scenarios) -> ('a, 'c) scenarios
-  | Branch : (('a, 'b) scenarios * ('a, 'b) scenarios) -> ('a, 'b) scenarios
-  | Tag : (* Name for test branch *) string -> ('t, 't) scenarios
-  | Slow : (* If in scenario branch, makes the test `Slow *)
-      ('t, 't) scenarios
 
-type ('input, 'output) single_scenario =
-  | End : ('t, 't) single_scenario
-  | Cons :
-      (('input, 't) action * ('t, 'output) single_scenario)
-      -> ('input, 'output) single_scenario
-
-let rec cat_ss :
-    type a b c.
-    (a, b) single_scenario -> (b, c) single_scenario -> (a, c) single_scenario =
- fun a b -> match a with End -> b | Cons (act, a') -> Cons (act, cat_ss a' b)
-
-let combine f l1 l2 =
-  List.map (fun a -> List.map (fun b -> f a b) l2) l1 |> List.flatten
-
-let rec unfold_scenarios :
-    type input output.
-    (input, output) scenarios ->
-    ((input, output) single_scenario * string list * bool) list = function
-  | Slow -> [(End, [], true)]
-  | Tag s -> [(End, [s], false)]
-  | Empty -> [(End, [], false)]
-  | Action a -> [(Cons (a, End), [], false)]
-  | Branch (left, right) -> unfold_scenarios left @ unfold_scenarios right
-  | Concat (left, right) ->
-      let l = unfold_scenarios left in
-      let r = unfold_scenarios right in
-      combine
-        (fun (sl, tl, bl) (sr, tr, br) -> (cat_ss sl sr, tl @ tr, bl || br))
-        l
-        r
-
-let rec run_scenario :
-    type input output.
-    (input, output) single_scenario -> input -> output tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  fun scenario input ->
-    match scenario with
-    | End -> return input
-    | Cons (action, next) ->
-        let* input = run_action action input in
-        run_scenario next input
-
-let unfolded_to_test :
-    (unit, unit) single_scenario * string list * bool ->
-    unit Alcotest_lwt.test_case =
- fun (s, name, b) ->
-  let speed = if b then `Slow else `Quick in
-  let name =
-    match name with
-    | [] -> ""
-    | [n] -> n
-    | title :: tags -> title ^ ": " ^ String.concat ", " tags
-  in
-  Tztest.tztest name speed (run_scenario s)
-
-let noop = Empty
-
-let ( --> ) a b = Concat (a, Action b)
-
-let ( ---> ) a b = Concat (a, b)
-
-let ( |+ ) a b = Branch (a, b)
-
-let tests_of_scenarios :
-    (string * (unit, t) scenarios) list -> unit Alcotest_lwt.test_case list =
- fun scenarios ->
-  List.map (fun (s, x) -> Tag s ---> x --> End_test) scenarios |> function
-  | [] -> []
-  | a :: t ->
-      List.fold_left ( |+ ) a t |> unfold_scenarios |> List.map unfolded_to_test
-
-(*****************************************************************************)
 
 let rec wait_n_cycles n =
   if n <= 0 then noop
