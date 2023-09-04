@@ -479,100 +479,150 @@ let assert_balance_equal ~loc
   in
   return_unit
 
-let add_liquid_rewards amount bbd =
-  let open Lwt_result_syntax in
-  let* liquid = Tez.(bbd.liquid + amount) in
-  return {bbd with liquid}
+let update_account ~f account_name account_map =
+  String.Map.update
+    account_name
+    (function None -> raise Not_found | Some x -> Some (f x))
+    account_map
 
-let add_frozen_rewards amount bbd =
-  let open Lwt_result_syntax in
-  let* pool_tez = Tez.(bbd.pool_tez + amount) in
-  return {bbd with pool_tez}
+let add_liquid_rewards amount account_name account_map =
+  let f account =
+    let liquid = Tez.(account.liquid +! amount) in
+    {account with liquid}  in
+  update_account ~f account_name account_map
 
-let apply_transfer amount (bbd_src, bbd_dst) =
-  let open Lwt_result_syntax in
-  if Tez.(amount = zero) then return (bbd_src, bbd_dst)
-  else
-    let amount = Tez.min bbd_src.liquid amount in
-    let* liquid_src = Tez.(bbd_src.liquid - amount) in
-    let* liquid_dst = Tez.(bbd_dst.liquid + amount) in
-    return
-      ({bbd_src with liquid = liquid_src}, {bbd_dst with liquid = liquid_dst})
+let add_frozen_rewards amount account_name account_map =
+  let f account =
+    let frozen_deposits =
+      Frozen_tez.add_tez_to_all_current amount account.frozen_deposits   in
+    {account with frozen_deposits}  in
+  update_account ~f account_name account_map
 
-let apply_stake amount (bbd_staker, bbd_delegate) =
-  let open Lwt_result_syntax in
-  if Tez.(amount = zero) then return (bbd_staker, bbd_delegate)
-  else
-    let amount = Tez.min bbd_staker.liquid amount in
-    let new_stake =
-      staked_of_tez
-        ~pool_tez:bbd_delegate.pool_tez
-        ~pool_pseudo:bbd_delegate.pool_pseudo
-        amount
-    in
-    let* liquid = Tez.(bbd_staker.liquid - amount) in
-    let staked = Q.(bbd_staker.staked + new_stake) in
-    let* pool_tez = Tez.(bbd_delegate.pool_tez + amount) in
-    let pool_pseudo = Q.(bbd_delegate.pool_pseudo + new_stake) in
-    return
-      ( {bbd_staker with liquid; staked},
-        {bbd_delegate with pool_tez; pool_pseudo} )
+let apply_transfer amount src_name dst_name account_map =
+  if Tez.(equal amount zero) then account_map else
+    match
+      ( String.Map.find src_name account_map,
+        String.Map.find dst_name account_map )
+    with
+    | Some src, Some _ ->
+        let amount = Tez.min src.liquid amount in
+        let f_src src =
+          let liquid = Tez.(src.liquid -! amount) in
+          {src with liquid}        in
+        let f_dst dst =
+          let liquid = Tez.(dst.liquid +! amount) in
+          {dst with liquid}        in
+        let account_map = update_account ~f:f_src src_name account_map in
+        update_account ~f:f_dst dst_name account_map
+    | _ -> raise Not_found
 
-let apply_self_stake amount bbd =
-  let open Lwt_result_syntax in
-  if Tez.(amount = zero) then return bbd
-  else
-    let* a, b = apply_stake amount (bbd, bbd) in
-    let* added = balance_add a b in
-    balance_sub added bbd
+let apply_stake amount staker_name account_map =
+  if Tez.(equal amount zero) then account_map  else
+    match String.Map.find staker_name account_map with
+    | None -> raise Not_found
+    | Some staker -> (
+        match staker.delegate with
+        | None -> account_map
+        | Some delegate_name ->
+            let amount = Tez.min staker.liquid amount in
+            let f_staker staker =
+              let liquid = Tez.(staker.liquid -! amount) in
+              {staker with liquid}
+            in
+            let f_delegate delegate =
+              let frozen_deposits =
+                Frozen_tez.add_current
+                  amount
+                  staker_name
+                  delegate.frozen_deposits
+              in
+              {delegate with frozen_deposits}
+            in
+            let account_map =
+              update_account ~f:f_staker staker_name account_map
+            in
+            update_account ~f:f_delegate delegate_name account_map)
 
-let apply_unstake amount (bbd_staker, bbd_delegate) =
-  let open Lwt_result_syntax in
-  if Tez.(amount = zero) then return (bbd_staker, bbd_delegate)
-  else
-    let amount = Tez.min bbd_delegate.pool_tez amount in
-    let to_unstake =
-      staked_of_tez
-        ~pool_tez:bbd_delegate.pool_tez
-        ~pool_pseudo:bbd_delegate.pool_pseudo
-        amount
-    in
-    let amount, to_unstake =
-      if Q.(to_unstake >= bbd_staker.staked) then
-        ( tez_of_staked
-            ~pool_tez:bbd_delegate.pool_tez
-            ~pool_pseudo:bbd_delegate.pool_pseudo
-            bbd_staker.staked,
-          bbd_staker.staked )
-      else (amount, to_unstake)
-    in
-    let staked = Q.(bbd_staker.staked - to_unstake) in
-    let* unstaked_frozen = Tez.(bbd_staker.unstaked_frozen + amount) in
-    let pool_pseudo = Q.(bbd_delegate.pool_pseudo - to_unstake) in
-    let* pool_tez = Tez.(bbd_delegate.pool_tez - amount) in
-    return
-      ( {bbd_staker with staked; unstaked_frozen},
-        {bbd_delegate with pool_pseudo; pool_tez} )
+let apply_unstake cycle amount staker_name account_map =
+  if Tez.(equal amount zero) then account_map  else
+    match String.Map.find staker_name account_map with
+    | None -> raise Not_found
+    | Some staker -> (
+        match staker.delegate with
+        | None -> account_map
+        | Some delegate_name -> (
+            match String.Map.find delegate_name account_map with
+            | None -> raise Not_found
+            | Some delegate ->
+                let frozen_deposits, amount_unstaked =
+                  Frozen_tez.sub_current
+                    amount
+                    staker_name
+                    delegate.frozen_deposits
+                in
+                let delegate = {delegate with frozen_deposits} in
+                let account_map =
+                  String.Map.add delegate_name delegate account_map
+                in
+                let f delegate =
+                  let unstaked_frozen =
+                    Unstaked_frozen.add_unstake
+                      cycle
+                      amount_unstaked
+                      staker_name
+                      delegate.unstaked_frozen
+                  in
+                  {delegate with unstaked_frozen}
+                in
+                update_account ~f delegate_name account_map))
 
-let apply_self_unstake amount bbd =
-  let open Lwt_result_syntax in
-  if Tez.(amount = zero) then return bbd
-  else
-    let* a, b = apply_unstake amount (bbd, bbd) in
-    let* added = balance_add a b in
-    balance_sub added bbd
+(* Updates unstaked unslashable values in all accounts *)
+let apply_unslashable cycle account_map =
+  let f delegate =
+    let amount_unslashable, unstaked_frozen =
+      Unstaked_frozen.pop_cycle cycle delegate.unstaked_frozen    in
+    let unstaked_finalizable =
+      Unstaked_finalizable.add_from_frozen
+        amount_unslashable
+        delegate.unstaked_finalizable    in
+    {delegate with unstaked_frozen; unstaked_finalizable} in
+  String.Map.map f account_map
 
-let apply_unslashable amount bbd =
-  let open Lwt_result_syntax in
-  let* unstaked_frozen = Tez.(bbd.unstaked_frozen - amount) in
-  let* unstaked_finalizable = Tez.(bbd.unstaked_finalizable + amount) in
-  return {bbd with unstaked_frozen; unstaked_finalizable}
-
-let apply_finalize bbd =
-  let open Lwt_result_syntax in
-  let unstaked_finalizable = Tez.zero in
-  let* liquid = Tez.(bbd.unstaked_finalizable + bbd.liquid) in
-  return {bbd with liquid; unstaked_finalizable}
+let apply_finalize staker_name account_map =
+  match String.Map.find staker_name account_map with
+  | None -> raise Not_found
+  | Some _staker ->
+      (* Because an account can still have finalizable funds from a delegate
+         that is not its own, we iterate over all of them *)
+      String.Map.fold
+        (fun delegate_name delegate account_map_acc ->
+          match
+            String.Map.find staker_name delegate.unstaked_finalizable.map
+          with
+          | None -> account_map_acc
+          | Some amount ->
+              let f_staker staker =
+                let liquid = Tez.(staker.liquid +! amount) in
+                {staker with liquid}
+              in
+              let f_delegate delegate =
+                let map =
+                  String.Map.remove
+                    staker_name
+                    delegate.unstaked_finalizable.map
+                in
+                {
+                  delegate with
+                  unstaked_finalizable =
+                    {delegate.unstaked_finalizable with map};
+                }
+              in
+              let account_map_acc =
+                update_account ~f:f_staker staker_name account_map_acc
+              in
+              update_account ~f:f_delegate delegate_name account_map_acc)
+        account_map
+        account_map
 
 let balance_and_total_balance_of_account account_name account_map =
   let ({liquid_b; bonds_b; staked_b; unstaked_frozen_b; unstaked_finalizable_b}
