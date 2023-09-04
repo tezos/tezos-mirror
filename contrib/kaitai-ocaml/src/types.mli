@@ -313,7 +313,8 @@ and ClassSpec : sig
   type t = {
     fileName : string option;
     path : string list;
-    (* isTopLevel : bool; *)
+    isTopLevel : bool;
+        (** if [isTopLevel  class_spec] is true, we have a corresponding meta section. *)
     meta : MetaSpec.t;
     doc : DocSpec.t;
     toStringExpr : Ast.expr option;

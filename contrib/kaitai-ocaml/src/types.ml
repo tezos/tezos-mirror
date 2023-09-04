@@ -401,6 +401,7 @@ and ClassSpec : sig
   type t = {
     fileName : string option;
     path : string list;
+    isTopLevel : bool;
     meta : MetaSpec.t;
     doc : DocSpec.t;
     toStringExpr : Ast.expr option;
@@ -414,6 +415,7 @@ end = struct
   type t = {
     fileName : string option;
     path : string list;
+    isTopLevel : bool;
     meta : MetaSpec.t;
     doc : DocSpec.t;
     toStringExpr : Ast.expr option;

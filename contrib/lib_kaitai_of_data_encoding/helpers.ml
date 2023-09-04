@@ -46,6 +46,7 @@ let default_class_spec ~encoding_name =
       fileName = None;
       path = [];
       meta = default_meta_spec ~encoding_name;
+      isTopLevel = true;
       doc = default_doc_spec;
       toStringExpr = None;
       params = [];

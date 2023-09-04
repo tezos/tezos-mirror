@@ -60,12 +60,7 @@ let metaSpec (t : MetaSpec.t) =
        t.endian
   @? []
 
-let classSpec _ = mapping [("test", scalar "test")]
-
 let instanceSpec _ = mapping [("test", scalar "test")]
-
-let types_spec types =
-  mapping (types |> List.map (fun (k, v) -> (k, classSpec v)))
 
 let instances_spec instances =
   mapping (instances |> List.map (fun (k, v) -> (k, instanceSpec v)))
@@ -114,14 +109,16 @@ let not_empty = function [] -> false | _ -> true
 let spec_if_non_empty name args f =
   if not_empty args then Some (name, f args) else None
 
-let to_yaml (t : ClassSpec.t) =
+let rec to_yaml (t : ClassSpec.t) =
   mapping
-  @@ Some ("meta", metaSpec t.meta)
+  @@ (if t.isTopLevel then Some ("meta", metaSpec t.meta) else None)
   @? spec_if_non_empty "types" t.types types_spec
   @? spec_if_non_empty "instances" t.instances instances_spec
   @? spec_if_non_empty "enums" t.enums enums_spec
   @? spec_if_non_empty "seq" t.seq seq_spec
   @? []
+
+and types_spec types = mapping (types |> List.map (fun (k, v) -> (k, to_yaml v)))
 
 let print t =
   let y = to_yaml t in
