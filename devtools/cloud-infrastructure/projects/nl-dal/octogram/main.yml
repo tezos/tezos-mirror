@@ -18,6 +18,10 @@ vars:
   network: sandbox
   alias_prefix: bootstrap
   keys_base_dir: fresh_wallet
+  number_of_shards: 2048
+  page_size: 4096
+  slot_size: 65536
+  redundancy_factor: 2
 
 stages:
   - name: Initialize protocol file
@@ -90,14 +94,19 @@ stages:
           rpc_port: '30001'
           metrics_port: '30002'
           net_port: '30003'
-          
+          dal_cryptobox_parameters:
+            number_of_shards: '{{ vars.number_of_shards }}'
+            page_size: '{{ vars.page_size }}'
+            slot_size: '{{ vars.slot_size }}'
+            redundancy_factor: '{{ vars.redundancy_factor }}'
+
       - name: Activate protocol
         tezos.activate_protocol:
           endpoint: self://node
           path_client: self://./octez-client
           protocol: alpha
           parameter_file: 'self://sandbox-parameters.json'
-          
+
       - name: Wait for bootstrapped node
         tezos.wait_for_bootstrapped:
           path_client: self://./octez-client

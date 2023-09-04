@@ -150,6 +150,27 @@ let resolve_octez_rpc_global_uri ~self ~resolver =
 let resolve_dac_rpc_global_uri ~self ~resolver =
   Uri.agent_uri_of_global_uri ~self ~services:(resolver Dac_node Rpc)
 
+(* We use strings instead of numbers to allow pattern substitution. *)
+type dal_cryptobox_parameters = {
+  number_of_shards : string;
+  page_size : string;
+  slot_size : string;
+  redundancy_factor : string;
+}
+
+let dal_cryptobox_parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {number_of_shards; page_size; slot_size; redundancy_factor} ->
+      (number_of_shards, page_size, slot_size, redundancy_factor))
+    (fun (number_of_shards, page_size, slot_size, redundancy_factor) ->
+      {number_of_shards; page_size; slot_size; redundancy_factor})
+    (obj4
+       (req "number_of_shards" string)
+       (req "page_size" string)
+       (req "slot_size" string)
+       (req "redundancy_factor" string))
+
 type 'uri start_octez_node = {
   name : string option;
   path_node : 'uri;
@@ -160,6 +181,7 @@ type 'uri start_octez_node = {
   net_port : string option;
   metrics_port : string option;
   rpc_port : string option;
+  dal_cryptobox_parameters : dal_cryptobox_parameters option;
 }
 
 type (_, _) Remote_procedure.t +=
@@ -199,6 +221,7 @@ module Start_octez_node = struct
                net_port;
                metrics_port;
                rpc_port;
+               dal_cryptobox_parameters;
              } ->
           ( name,
             path_node,
@@ -208,7 +231,8 @@ module Start_octez_node = struct
             peers,
             net_port,
             metrics_port,
-            rpc_port ))
+            rpc_port,
+            dal_cryptobox_parameters ))
         (fun ( name,
                path_node,
                network,
@@ -217,7 +241,8 @@ module Start_octez_node = struct
                peers,
                net_port,
                metrics_port,
-               rpc_port ) ->
+               rpc_port,
+               dal_cryptobox_parameters ) ->
           {
             name;
             path_node;
@@ -228,9 +253,10 @@ module Start_octez_node = struct
             net_port;
             metrics_port;
             rpc_port;
+            dal_cryptobox_parameters;
           })
         Data_encoding.(
-          obj9
+          obj10
             (opt "name" string)
             (req "path_node" uri_encoding)
             (dft "network" string "{{ network }}")
@@ -239,7 +265,8 @@ module Start_octez_node = struct
             (dft "peers" (list string) [])
             (opt "net_port" string)
             (opt "metrics_port" string)
-            (opt "rpc_port" string)))
+            (opt "rpc_port" string)
+            (opt "dal_cryptobox_parameters" dal_cryptobox_parameters_encoding)))
 
   let r_encoding =
     Data_encoding.(
@@ -274,6 +301,7 @@ module Start_octez_node = struct
         net_port;
         metrics_port;
         rpc_port;
+        dal_cryptobox_parameters;
       } =
     let name = Option.map run name in
     let path_node =
@@ -287,6 +315,17 @@ module Start_octez_node = struct
     let rpc_port = Option.map run rpc_port in
     let network = run network in
     let peers = List.map run peers in
+    let dal_cryptobox_parameters =
+      Option.map
+        (fun p ->
+          {
+            slot_size = run p.slot_size;
+            page_size = run p.page_size;
+            redundancy_factor = run p.redundancy_factor;
+            number_of_shards = run p.number_of_shards;
+          })
+        dal_cryptobox_parameters
+    in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6205
        Allow to use templates to define [sync_threshold] *)
     {
@@ -299,6 +338,7 @@ module Start_octez_node = struct
       net_port;
       metrics_port;
       rpc_port;
+      dal_cryptobox_parameters;
     }
 
   let resolve ~self resolver
@@ -312,6 +352,7 @@ module Start_octez_node = struct
         net_port;
         metrics_port;
         rpc_port;
+        dal_cryptobox_parameters;
       } =
     let path_node = Remote_procedure.file_agent_uri ~self ~resolver path_node in
     let snapshot =
@@ -327,10 +368,32 @@ module Start_octez_node = struct
       net_port;
       metrics_port;
       rpc_port;
+      dal_cryptobox_parameters;
     }
 
+  let config_dal_srs node dal_cryptobox_parameters =
+    let p = dal_cryptobox_parameters in
+    let dal_cryptobox : Tezos_crypto_dal.Cryptobox.parameters =
+      {
+        slot_size = int_of_string p.slot_size;
+        page_size = int_of_string p.page_size;
+        redundancy_factor = int_of_string p.redundancy_factor;
+        number_of_shards = int_of_string p.number_of_shards;
+      }
+    in
+    let config : Tezos_crypto_dal_octez_dal_config.Dal_config.t =
+      {
+        activated = true;
+        use_mock_srs_for_testing = Some dal_cryptobox;
+        bootstrap_peers = [];
+      }
+    in
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_sandbox_network_with_dal_config config)
+
   let setup_octez_node ~network ~sync_threshold ~path_node ~metrics_port
-      ~rpc_port ~net_port ~peers ?name ?snapshot () =
+      ~rpc_port ~net_port ~peers ?name ?snapshot ?dal_cryptobox_parameters () =
     let l1_node_args =
       Node.
         [
@@ -356,6 +419,7 @@ module Start_octez_node = struct
         l1_node_args
     in
     let* () = Node.config_init node [] in
+    Option.iter (config_dal_srs node) dal_cryptobox_parameters ;
     let* () =
       match snapshot with
       | Some snapshot ->
@@ -412,6 +476,7 @@ module Start_octez_node = struct
         ~metrics_port
         ~peers:args.peers
         ?snapshot
+        ?dal_cryptobox_parameters:args.dal_cryptobox_parameters
         ()
     in
     Agent_state.add (Octez_node_k (Node.name octez_node)) octez_node state ;
