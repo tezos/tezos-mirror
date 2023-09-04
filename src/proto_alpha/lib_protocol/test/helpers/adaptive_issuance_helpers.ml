@@ -238,6 +238,38 @@ module Unstaked_frozen = struct
   let refresh_at_new_cycle l =
     List.map (fun (c, t) -> (c, Frozen_tez.refresh_at_new_cycle t)) l
 end
+
+(** Representation of unstaked finalizable tez *)
+module Unstaked_finalizable = struct
+  (* Slashing might put inaccessible tez in this container: they are represented in the remainder.
+     They still count towards the total supply, but are currently owned by noone.
+     At most one mutez per unstaking account per slashed cycle *)
+  type t = {map : Tez.t String.Map.t; remainder : Tez.t}
+
+  let zero = {map = String.Map.empty; remainder = Tez.zero}
+
+  (* Called when unstaked frozen for some cycle becomes finalizable *)
+  let add_from_frozen (frozen : Frozen_tez.t) {map; remainder} =
+    let map_rounded_down =
+      String.Map.map (fun qt -> Partial_tez.to_tez qt) frozen.current
+    in
+    let map =
+      String.Map.union (fun _ a b -> Some Tez.(a +! b)) map map_rounded_down
+    in
+    let full_frozen = Frozen_tez.total_current frozen in
+    let actual_frozen =
+      String.Map.fold (fun _ x acc -> Tez.(x +! acc)) map_rounded_down Tez.zero
+    in
+    let undistributed = Tez.(full_frozen -! actual_frozen) in
+    let remainder = Tez.(remainder +! undistributed) in
+    {map; remainder}
+
+  let total {map; remainder} =
+    String.Map.fold (fun _ x acc -> Tez.(x +! acc)) map remainder
+
+  let get account {map; _} =
+    match String.Map.find account map with None -> Tez.zero | Some x -> x
+end
 let balance_pp fmt
     {
       liquid;
