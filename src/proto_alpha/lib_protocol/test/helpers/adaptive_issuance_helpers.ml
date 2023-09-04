@@ -193,6 +193,51 @@ module Frozen_tez = struct
   (* Refresh initial amount at beginning of cycle *)
   let refresh_at_new_cycle a = {a with initial = total_current a}
 end
+
+(** Representation of Unstaked frozen deposits *)
+module Unstaked_frozen = struct
+  type t = (Cycle.t * Frozen_tez.t) list
+
+  let zero = []
+
+  let fold unstaked =
+    List.fold_left
+      (fun acc (_, frozen) -> Frozen_tez.union acc frozen)
+      Frozen_tez.zero
+      unstaked
+
+  let get account unstaked =
+    List.map (fun (c, frozen) -> (c, Frozen_tez.get account frozen)) unstaked
+
+  let get_total account unstaked = Frozen_tez.get account (fold unstaked)
+
+  let sum_current l =
+    List.fold_left
+      (fun acc (_, st) -> Tez.(acc +! Frozen_tez.total_current st))
+      Tez.zero
+      l
+
+  (* Happens each unstake operation *)
+  let rec add_unstake cycle amount account = function
+    | [] -> [(cycle, Frozen_tez.init amount account)]
+    | (c, a) :: t ->
+        if Cycle.equal c cycle then
+          (c, Frozen_tez.add_init amount account a) :: t
+        else (c, a) :: add_unstake cycle amount account t
+
+  (* Makes given cycle finalizable (and unslashable) *)
+  let rec pop_cycle cycle = function
+    | [] -> (Frozen_tez.zero, [])
+    | (c, a) :: t ->
+        if Cycle.equal c cycle then (a, t)
+        else
+          let amount, rest = pop_cycle cycle t in
+          (amount, (c, a) :: rest)
+
+  (* Refresh initial amount at beginning of cycle (unused) *)
+  let refresh_at_new_cycle l =
+    List.map (fun (c, t) -> (c, Frozen_tez.refresh_at_new_cycle t)) l
+end
 let balance_pp fmt
     {
       liquid;
