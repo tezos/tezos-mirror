@@ -233,15 +233,15 @@ module Dal_proofs = struct
       is in the following boundaries:
       - page_published_level > origination_level: this means that the slot
         of the page was published after the rollup origination ;
-      - page_published_level + dal_attestation_lag < commit_level: this
-        means that the slot of the page has been confirmed before the
+      - page_published_level + dal_attestation_lag <= commit_level: this
+        means that the slot of the page has been confirmed before or at the
         [commit_level]. According to the definition in
         {!Sc_rollup_commitment_repr}, [commit_level] (aka inbox_level
-        in that module) is the level (excluded) up to which the PVM consumed
+        in that module) is the level (included) up to which the PVM consumed
         all messages and DAL/DAC inputs before producing the related commitment.
   *)
-  let page_level_is_valid ~dal_attestation_lag ~origination_level ~commit_level
-      page_id =
+  let page_level_is_valid ~dal_attestation_lag ~origination_level
+      ~commit_inbox_level page_id =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let page_published_level =
       Dal_slot_repr.(page_id.Page.slot_id.Header.published_level)
@@ -249,18 +249,18 @@ module Dal_proofs = struct
     let open Raw_level_repr in
     let not_too_old = page_published_level > origination_level in
     let not_too_recent =
-      add page_published_level dal_attestation_lag < commit_level
+      add page_published_level dal_attestation_lag <= commit_inbox_level
     in
     not_too_old && not_too_recent
 
-  let verify ~metadata ~dal_attestation_lag ~commit_level dal_parameters page_id
-      dal_snapshot proof =
+  let verify ~metadata ~dal_attestation_lag ~commit_inbox_level dal_parameters
+      page_id dal_snapshot proof =
     let open Result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
-        ~commit_level
+        ~commit_inbox_level
         page_id
     then
       let* input =
@@ -273,14 +273,14 @@ module Dal_proofs = struct
       return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
     else return_none
 
-  let produce ~metadata ~dal_attestation_lag ~commit_level dal_parameters
+  let produce ~metadata ~dal_attestation_lag ~commit_inbox_level dal_parameters
       page_id ~page_info ~get_history confirmed_slots_history =
     let open Lwt_result_syntax in
     if
       page_level_is_valid
         ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
         ~dal_attestation_lag
-        ~commit_level
+        ~commit_inbox_level
         page_id
     then
       let* proof, content_opt =
@@ -331,7 +331,7 @@ let valid (type state proof output)
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level:commit_inbox_level
+          ~commit_inbox_level
           page_id
           dal_snapshot
           proof
@@ -482,7 +482,7 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           dal_parameters
           ~dal_attestation_lag
-          ~commit_level:commit_inbox_level
+          ~commit_inbox_level
           page_id
           ~page_info
           ~get_history
