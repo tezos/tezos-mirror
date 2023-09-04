@@ -15,7 +15,7 @@ depends: [
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

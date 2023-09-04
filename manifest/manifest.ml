@@ -2901,11 +2901,24 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       |> String_set.of_list |> String_set.elements
       |> List.concat_map make_runtest
     in
-    {
-      Opam.command = [S "rm"; S "-r"; S "vendors"; S "contrib"];
-      with_test = Never;
-    }
-    :: build :: runtests
+    let rms =
+      let active_paths =
+        internals
+        |> List.map (fun x -> x.Target.path)
+        |> List.map (fun p ->
+               let slash_index = String.index p '/' in
+               String.sub p 0 slash_index)
+        |> List.sort_uniq String.compare
+      in
+      let rms =
+        List.filter
+          (fun s -> not (List.mem s active_paths))
+          List.["vendors"; "contrib"]
+        |> List.map (fun x -> Opam.S x)
+      in
+      match rms with [] -> [] | _ :: _ -> Opam.S "rm" :: Opam.S "-r" :: rms
+    in
+    {Opam.command = rms; with_test = Never} :: build :: runtests
   in
   let licenses =
     match
