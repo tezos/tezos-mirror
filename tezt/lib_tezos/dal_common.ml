@@ -362,8 +362,7 @@ module Helpers = struct
         ]
         client)
 
-  let store_slot dal_node ~slot_size ?with_proof content =
-    let slot = make_slot ~slot_size content in
+  let store_slot dal_node ?with_proof slot =
     let* commitment = RPC.call dal_node @@ Dal_RPC.post_commitment slot in
     let* () =
       RPC.call dal_node @@ Dal_RPC.put_commitment_shards ?with_proof commitment

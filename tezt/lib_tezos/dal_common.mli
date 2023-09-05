@@ -79,11 +79,7 @@ module Helpers : sig
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
   val store_slot :
-    Dal_node.t ->
-    slot_size:int ->
-    ?with_proof:bool ->
-    slot ->
-    (string * string) Lwt.t
+    Dal_node.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
 end
 
 module RPC_legacy : sig
