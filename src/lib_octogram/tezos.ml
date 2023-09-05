@@ -566,8 +566,10 @@ let dal_parameters_encoding =
           (req "feature_enable" string)))
 
 type 'uri generate_protocol_parameters_file = {
-  basefile : 'uri;
+  base_file : 'uri;
+  output_file_name : string option;
   dal : dal_parameters;
+  minimal_block_delay : string option;
 }
 
 type generate_protocol_parameters_r = {filename : string}
@@ -599,9 +601,15 @@ module Generate_protocol_parameters_file = struct
   let encoding uri_encoding =
     let open Data_encoding in
     conv
-      (fun {basefile; dal} -> (basefile, dal))
-      (fun (basefile, dal) -> {basefile; dal})
-      (obj2 (req "basefile" uri_encoding) (req "dal" dal_parameters_encoding))
+      (fun {base_file; output_file_name; dal; minimal_block_delay} ->
+        (base_file, output_file_name, dal, minimal_block_delay))
+      (fun (base_file, output_file_name, dal, minimal_block_delay) ->
+        {base_file; output_file_name; dal; minimal_block_delay})
+      (obj4
+         (req "base_file" uri_encoding)
+         (opt "output_file_name" string)
+         (req "dal" dal_parameters_encoding)
+         (opt "minimal_block_delay" string))
 
   let r_encoding =
     let open Data_encoding in
@@ -613,9 +621,10 @@ module Generate_protocol_parameters_file = struct
   let tvalue_of_r {filename} = Tobj [("filename", Tstr filename)]
 
   let expand ~self ~run base =
-    let basefile =
-      Remote_procedure.global_uri_of_string ~self ~run base.basefile
+    let base_file =
+      Remote_procedure.global_uri_of_string ~self ~run base.base_file
     in
+    let output_file_name = Option.map run base.output_file_name in
     let dal =
       {
         feature_enable = run base.dal.feature_enable;
@@ -626,19 +635,20 @@ module Generate_protocol_parameters_file = struct
         blocks_per_epoch = run base.dal.blocks_per_epoch;
       }
     in
-    {basefile; dal}
+    let minimal_block_delay = Option.map run base.minimal_block_delay in
+    {base_file; output_file_name; dal; minimal_block_delay}
 
   let resolve ~self resolver base =
-    let basefile =
-      Remote_procedure.file_agent_uri ~self ~resolver base.basefile
+    let base_file =
+      Remote_procedure.file_agent_uri ~self ~resolver base.base_file
     in
-    {base with basefile}
+    {base with base_file}
 
-  let run state {basefile; dal} =
-    let* basefile =
+  let run state {base_file; output_file_name; dal; minimal_block_delay} =
+    let* base_file =
       Http_client.local_path_from_agent_uri
         (Agent_state.http_client state)
-        basefile
+        base_file
     in
     let dal_overrides : string list * JSON.u =
       let value =
@@ -656,13 +666,26 @@ module Generate_protocol_parameters_file = struct
       let path = key in
       (path, value)
     in
-    let overrides = ([dal_overrides] :> Protocol.parameter_overrides) in
+    let minimal_block_delay_overrides =
+      Option.fold
+        ~none:[]
+        ~some:(fun v -> [(["minimal_block_delay"], `String v)])
+        minimal_block_delay
+    in
+    let overrides =
+      ([dal_overrides] @ minimal_block_delay_overrides
+        :> Protocol.parameter_overrides)
+    in
     let* params_file =
-      Protocol.write_parameter_file ~base:(Either.Left basefile) overrides
+      Protocol.write_parameter_file ~base:(Either.Left base_file) overrides
     in
     let agent_dir = Agent_state.home_dir state in
-    let* () = Helpers.exec "mv" [params_file; agent_dir] in
-    Lwt.return {filename = Filename.concat agent_dir "parameters.json"}
+    let filename =
+      match output_file_name with None -> "parameters.json" | Some str -> str
+    in
+    let path = Filename.concat agent_dir filename in
+    let* () = Helpers.exec "mv" [params_file; path] in
+    Lwt.return {filename}
 
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ _ = ()
 end
