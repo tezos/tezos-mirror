@@ -110,10 +110,12 @@ module S = struct
 end
 
 let register () =
+  let open Lwt_syntax in
   let open Services_registration in
   register0 ~chunked:false S.ballots (fun ctxt () () -> Vote.get_ballots ctxt) ;
   register0 ~chunked:true S.ballot_list (fun ctxt () () ->
-      Vote.get_ballot_list ctxt >|= ok) ;
+      let+ result = Vote.get_ballot_list ctxt in
+      Ok result) ;
   register0 ~chunked:false S.current_period (fun ctxt () () ->
       Voting_period.get_rpc_current_info ctxt) ;
   register0 ~chunked:false S.successor_period (fun ctxt () () ->
@@ -123,7 +125,8 @@ let register () =
   register0 ~chunked:true S.proposals (fun ctxt () () ->
       Vote.get_proposals ctxt) ;
   register0 ~chunked:true S.listings (fun ctxt () () ->
-      Vote.get_listings ctxt >|= ok) ;
+      let+ result = Vote.get_listings ctxt in
+      Ok result) ;
   register0 ~chunked:false S.current_proposal (fun ctxt () () ->
       Vote.find_current_proposal ctxt) ;
   register0 ~chunked:false S.total_voting_power (fun ctxt () () ->
