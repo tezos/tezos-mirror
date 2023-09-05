@@ -23,11 +23,8 @@ const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
 
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
-const RUN_INSTALLER_COMMAND = external.bin('src/kernel_sdk/target/release/smart-rollup-installer')
-const EVM_INSTALLER_KERNEL_PATH = 'evm_installer.wasm';
-const PREIMAGE_DIR = 'preimages';
-const SETUP_FILE_PATH = external.resource('src/kernel_evm/config/benchmarking.yaml')
-const EVM_KERNEL_PATH = external.resource('src/kernel_evm/target/wasm32-unknown-unknown/release/evm_kernel.wasm')
+const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_unstripped_installer.wasm');
+const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
 const OUTPUT_DIRECTORY = external.output()
 
 
@@ -147,15 +144,6 @@ async function run_benchmark(path) {
     return profiler_output_analysis_result;
 }
 
-function build_evm_installer_kernel_for_benchmark() {
-    try {
-        execSync(`${RUN_INSTALLER_COMMAND} get-reveal-installer --upgrade-to ${EVM_KERNEL_PATH} --output ${EVM_INSTALLER_KERNEL_PATH} --preimages-dir ${PREIMAGE_DIR} --setup-file ${SETUP_FILE_PATH}`);
-    } catch (error) {
-        console.log("Error building evm kernel installer");
-        console.error(error);
-    }
-}
-
 function build_benchmark_scenario(benchmark_script) {
     try {
         let bench_path = path.format({ dir: __dirname, base: benchmark_script })
@@ -227,5 +215,5 @@ benchmark_scripts = [
     "benchmarks/bench_erc20tok.js",
     "benchmarks/bench_loop.js",
 ]
-build_evm_installer_kernel_for_benchmark();
+
 run_all_benchmarks(benchmark_scripts);
