@@ -25,13 +25,14 @@
 
 type service_kind = Metrics | Rpc | Http | P2p
 
-type node_kind = Octez_node | Rollup_node | Dac_node | Http_server
+type node_kind = Octez_node | Rollup_node | Dac_node | Http_server | Dal_node
 
 let int_of_service_kind = function
   | Octez_node -> 0
   | Rollup_node -> 1
   | Dac_node -> 2
   | Http_server -> 3
+  | Dal_node -> 4
 
 module Cache = Map.Make (struct
   type t = node_kind * string
