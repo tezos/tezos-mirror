@@ -1749,35 +1749,67 @@ let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
       - Writes the downloaded slot contents to "/output" in durable storage.
    - At level N, publish a slot to the L1 and DAL.
    - Bake until [attestation_lag] blocks so the L1 attests the published slot.
-   - Confirm that the kernel downloaded the slot and wrote the content to "/output".
+   - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>".
 
    For reference, this is the kernel used in this test:
-
    ```
    use tezos_smart_rollup::{kernel_entry, prelude::*, storage::path::OwnedPath};
 
+   fn process_slot(
+       host: &mut impl Runtime,
+       published_level: i32,
+       num_pages: usize,
+       page_size: usize,
+       slot_index: u8,
+   ) {
+       let mut buffer = vec![0u8; page_size * num_pages];
+
+       for page_index in 0..num_pages {
+           let result = host.reveal_dal_page(
+               published_level,
+               slot_index,
+               page_index.try_into().unwrap(),
+               &mut buffer[page_index * page_size..(page_index + 1) * page_size],
+           );
+
+           match result {
+               Ok(_) => {}
+               Err(err) => {
+                   debug_msg!(
+                       host,
+                       "Failed to retrieve one of the pages. Slot {} not processed. Error: {}",
+                       slot_index,
+                       &err.to_string()
+                   );
+                   // Stop fetching pages on error
+                   return;
+               }
+           }
+       }
+
+       let slot_path = format!("/output/slot-{}", slot_index);
+       let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
+       host.store_write(&path, &buffer, 0)
+           .map_err(|_| "Error writing to storage".to_string())
+           .unwrap_or_default();
+   }
+
    pub fn entry(host: &mut impl Runtime) {
+       // we use the current sandbox parameters
+       let attestation_lag = 4;
+       let slot_size = 32768;
+       let page_size = 128;
+       let num_pages = slot_size / page_size;
+
        match host.read_input() {
            Ok(Some(message)) => {
                let level = message.level;
-               let attestation_lag = 4;
-               let mut buffer = [0u8; 4096];
-               let result = host.reveal_dal_page(
-                   (level - attestation_lag) as i32,
-                   0,
-                   0,
-                   buffer.as_mut_slice(),
-               );
-               match result {
-                   Ok(_) => {
-                       let path: OwnedPath = "/output".as_bytes().to_vec().try_into().unwrap();
-                       host.store_write(&path, buffer.as_slice(), 0)
-                           .map_err(|_| "Error writing to storage".to_string())
-                           .unwrap_or_default();
-                   }
-                   Err(err) => {
-                       debug_msg!(host, "err: {}", &err.to_string())
-                   }
+
+               let published_level = (level - attestation_lag) as i32;
+
+               let slot_indexes = vec![0u8];
+               for slot_index in slot_indexes {
+                   process_slot(host, published_level, num_pages, page_size, slot_index);
                }
            }
            Ok(None) => {
@@ -1802,6 +1834,15 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       int
       ~error_msg:
         "The kernel used in the test assumes attestation_lag of %R, got %L") ;
+  let slot_size = parameters.cryptobox.slot_size in
+  Check.(
+    (slot_size = 32768)
+      int
+      ~error_msg:"The kernel used in the test assumes slot_size of %R, got %L") ;
+  Check.(
+    (parameters.cryptobox.page_size = 128)
+      int
+      ~error_msg:"The kernel used in the test assumes page_size of %R, got %L") ;
   Log.info "Originate rollup." ;
   let* boot_sector =
     Sc_rollup_helpers.prepare_installer_kernel
@@ -1824,7 +1865,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let sc_rollup_client = Sc_rollup_client.create ~protocol sc_rollup_node in
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
-  let slot_content = "Hello world from the DAL page!" in
+  let slot_content = generate_dummy_slot slot_size in
   let* _commitment =
     publish_and_store_slot
       client
@@ -1853,33 +1894,31 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       client
   in
   let* () = Client.bake_for_and_wait client in
+  let* level = Node.get_level node in
   Log.info "Assert that the slot was attested." ;
   let* {dal_attestation; _} = RPC.(call node @@ get_chain_block_metadata ()) in
   Check.((Some [|true|] = dal_attestation) (option (array bool)))
     ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
+  Log.info "Wait for the rollup node to catch up to the latest level." ;
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
   Log.info "Read and assert against value written in durable storage." ;
+  let key = "/output/slot-0" in
   let*! value_written =
     Sc_rollup_client.inspect_durable_state_value
       ~hooks
       sc_rollup_client
       ~pvm_kind:pvm_name
       ~operation:Sc_rollup_client.Value
-      ~key:"/output"
+      ~key
   in
-  match value_written with
-  | None -> Test.fail ~__LOC__ "Expected value written in /output"
-  | Some value_written ->
-      let encoded_slot_content =
-        match Hex.of_string slot_content with `Hex s -> s
-      in
-      if not @@ String.starts_with ~prefix:encoded_slot_content value_written
-      then
-        Test.fail
-          ~__LOC__
-          "Expected value in /output to start with %s, got %s"
-          encoded_slot_content
-          value_written
-      else unit
+  let encoded_slot_content =
+    match Hex.of_string slot_content with `Hex s -> s
+  in
+  Check.(
+    (Some encoded_slot_content = value_written)
+      (option string)
+      ~error_msg:"Expected value written in /output/slot-0 to be %L, got %R") ;
+  unit
 
 let check_profiles ~__LOC__ dal_node ~expected =
   let* profiles = RPC.call dal_node (Dal.RPC.get_profiles ()) in
