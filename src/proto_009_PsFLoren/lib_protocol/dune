@@ -6,7 +6,7 @@
  (public_name tezos-protocol-009-PsFLoren.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_009_PsFLoren))
 
@@ -118,8 +118,8 @@
  (public_name tezos-protocol-009-PsFLoren)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-009-PsFLoren.raw)
  (flags
   (:standard)
@@ -241,8 +241,8 @@
  (public_name tezos-protocol-009-PsFLoren.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-009-PsFLoren)
  (flags
   (:standard)
@@ -261,8 +261,8 @@
 (library
  (name tezos_protocol_009_PsFLoren_functor)
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -364,8 +364,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-009-PsFLoren
-  tezos-protocol-updater
-  octez-libs.tezos-protocol-environment)
+  octez-shell-libs.tezos-protocol-updater
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

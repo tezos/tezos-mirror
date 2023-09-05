@@ -5,7 +5,7 @@
  (name tenderbrute_main)
  (libraries
   octez-libs.tezos-base
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-client-alpha
   tezos-protocol-alpha
   tezos-baking-alpha.tenderbrute)

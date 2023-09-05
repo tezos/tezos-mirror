@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  tezos-proxy
+  octez-shell-libs.tezos-proxy
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
   tezos_proxy_test_helpers_shell_services
@@ -45,7 +45,7 @@
 
 (rule
  (alias runtest)
- (package tezos-proxy)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

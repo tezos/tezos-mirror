@@ -2153,6 +2153,207 @@ let add_dep_to_profile profile = function
       in
       profile_deps := String_map.add profile (dep :: old) !profile_deps
 
+module Sub_lib = struct
+  type documentation_entrypoint = Module | Page | Sub_lib
+
+  type sub_lib = {
+    name : string;
+    synopsis : string option;
+    documentation_type : documentation_entrypoint;
+  }
+
+  type container = sub_lib list ref
+
+  let make_container () = ref []
+
+  let make_documentation ~package ~public_name ~internal_name ~name ~synopsis =
+    function
+    | Some docs when not (docs = Dune.[[S "package"; S package]]) ->
+        {name; synopsis; documentation_type = Page}
+    | _ ->
+        (* In the case that the documentation stanza is only a package declaration,
+               we don't want the page to be used *)
+        if String.contains (Option.value ~default:public_name internal_name) '.'
+        then
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Sub_lib;
+          }
+        else
+          {
+            name = String.capitalize_ascii name;
+            synopsis;
+            documentation_type = Module;
+          }
+
+  let pp_documentation pp = function
+    | {name; synopsis = None; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}@." name name
+    | {name; synopsis = Some synopsis; documentation_type = Module} ->
+        Format.fprintf pp "- {{!module-%s}%s}: %s@." name name synopsis
+    | {name; synopsis = None; documentation_type = Page} ->
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}@."
+          name
+          (String.capitalize_ascii name)
+    | {name; synopsis = Some synopsis; documentation_type = Page} ->
+        Format.fprintf
+          pp
+          "- {{!page-%s}%s}: %s@."
+          name
+          (String.capitalize_ascii name)
+          synopsis
+    | {documentation_type = Sub_lib; _} ->
+        (* In case it's a sub_lib, we don't link anything *) ()
+
+  (* Prints all the registered libs of a container package. *)
+  let pp_documentation_of_container ~header fmt registered_libs =
+    Format.fprintf
+      fmt
+      "%s%a"
+      header
+      (Format.pp_print_list ~pp_sep:(fun _ () -> ()) pp_documentation)
+    @@ List.sort
+         (fun {name = name1; _} {name = name2; _} ->
+           String.compare
+             (String.capitalize_ascii name1)
+             (String.capitalize_ascii name2))
+         !registered_libs
+
+  type maker = ?internal_name:string -> string Target.maker
+
+  let sub_lib ~package_synopsis ~container ~package : maker =
+   fun ?internal_name
+       ?all_modules_except
+       ?bisect_ppx
+       ?c_library_flags
+       ?conflicts
+       ?deps
+       ?dune
+       ?flags
+       ?foreign_archives
+       ?foreign_stubs
+       ?ctypes
+       ?implements
+       ?inline_tests
+       ?js_compatible
+       ?js_of_ocaml
+       ?documentation
+       ?linkall
+       ?modes
+       ?modules
+       ?modules_without_implementation
+       ?npm_deps
+       ?ocaml
+       ?opam
+       ?opam_bug_reports
+       ?opam_doc
+       ?opam_homepage
+       ?opam_with_test
+       ?optional
+       ?preprocess
+       ?preprocessor_deps
+       ?private_modules
+       ?profile
+       ?opam_only_deps
+       ?release_status
+       ?static
+       ?synopsis
+       ?description
+       ?time_measurement_ppx
+       ?virtual_modules
+       ?default_implementation
+       ?cram
+       ?license
+       ?extra_authors
+       ?with_macos_security_framework
+       ~path
+       public_name ->
+    if Option.is_some opam then
+      invalid_arg "sub-libraries cannot be given custom `opam` parameters." ;
+    let name =
+      let s = Option.value ~default:public_name internal_name in
+      String.map
+        (function
+          | '-' | '.' -> '_'
+          | '/' ->
+              invalid_arg ("octez library " ^ s ^ " name cannot contain \"/\"")
+          | c -> c)
+        s
+    in
+    let registered =
+      make_documentation
+        ~package
+        ~public_name
+        ~internal_name
+        ~name
+        ~synopsis
+        documentation
+    in
+    if
+      List.exists
+        (fun registered -> String.equal registered.name name)
+        !container
+    then
+      invalid_arg
+        (Format.sprintf
+           "%s already contains a library that would have the same internal \
+            name, %s, as %s"
+           package
+           (Option.value ~default:public_name internal_name)
+           name)
+    else container := registered :: !container ;
+    Target.public_lib
+      (package ^ "." ^ public_name)
+      ~path
+      ~internal_name:name
+      ~opam:package
+      ~synopsis:package_synopsis
+      ?all_modules_except
+      ?bisect_ppx
+      ?c_library_flags
+      ?conflicts
+      ?deps
+      ?dune
+      ?flags
+      ?foreign_archives
+      ?foreign_stubs
+      ?ctypes
+      ?implements
+      ?inline_tests
+      ?js_compatible
+      ?js_of_ocaml
+      ?documentation
+      ?linkall
+      ?modes
+      ?modules
+      ?modules_without_implementation
+      ?npm_deps
+      ?ocaml
+      ?opam_bug_reports
+      ?opam_doc
+      ?opam_homepage
+      ?opam_with_test
+      ?optional
+      ?preprocess
+      ?preprocessor_deps
+      ?private_modules
+      ?profile
+      ?opam_only_deps
+      ?release_status
+      ?static
+      ?description
+      ?time_measurement_ppx
+      ?virtual_modules
+      ?default_implementation
+      ?cram
+      ?license
+      ?extra_authors
+      ?with_macos_security_framework
+end
+
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)

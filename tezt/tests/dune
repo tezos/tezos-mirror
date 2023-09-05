@@ -9,7 +9,7 @@
   tezt
   str
   bls12-381
-  octez-libs.tezt-tezos
+  tezt-tezos
   tezt_ethereum
   data-encoding
   octez-libs.tezos-base

@@ -8,7 +8,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt
-  octez-libs.tezt-tezos
+  tezt-tezos
   octogram
   yaml)
  (link_flags

@@ -3,17 +3,17 @@
 
 (library
  (name tezos_proxy)
- (public_name tezos-proxy)
+ (public_name octez-shell-libs.tezos-proxy)
  (instrumentation (backend bisect_ppx))
  (libraries
   aches
   aches-lwt
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-client-base
-  octez-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-rpc
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-context.memory
   uri)
  (flags

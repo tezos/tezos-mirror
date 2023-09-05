@@ -10,13 +10,13 @@
   octez-libs.tezos-clic
   tezos-protocol-010-PtGRANAD
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-010-PtGRANAD
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
-  tezos-client-base-unix
+  octez-shell-libs.tezos-client-base-unix
   tezos-protocol-plugin-010-PtGRANAD)
  (library_flags (:standard -linkall))
  (flags
@@ -41,11 +41,11 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-010-PtGRANAD
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-010-PtGRANAD
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-client-010-PtGRANAD.commands
   octez-libs.tezos-rpc
   tezos-protocol-plugin-010-PtGRANAD)

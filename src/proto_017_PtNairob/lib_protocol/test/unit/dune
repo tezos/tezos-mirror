@@ -10,19 +10,19 @@
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-micheline
   tezos-client-017-PtNairob
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-protocol-017-PtNairob.parameters
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix
   tezos-protocol-017-PtNairob
   octez-libs.tezos-test-helpers
   tezos-017-PtNairob-test-helpers
   octez-alcotezt
-  tezos-scoru-wasm-helpers
+  octez-l2-libs.tezos-scoru-wasm-helpers
   octez-libs.tezos-stdlib
   octez-libs.tezos-crypto-dal
-  octez-libs.tezos-scoru-wasm
-  tezos-webassembly-interpreter-extra)
+  octez-l2-libs.tezos-scoru-wasm
+  octez-l2-libs.tezos-webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

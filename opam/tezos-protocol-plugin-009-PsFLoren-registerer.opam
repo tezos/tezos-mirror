@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "tezos-embedded-protocol-009-PsFLoren"
   "tezos-protocol-plugin-009-PsFLoren"
-  "tezos-validation"
+  "octez-shell-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

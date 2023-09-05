@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "tezos-benchmark"
   "tezos-benchmark-examples"
-  "tezos-shell-benchmarks"
+  "octez-shell-libs"
   "tezos-benchmarks-proto-alpha"
   "pyml"
   "prbnmcn-stats" { = "0.0.6" }

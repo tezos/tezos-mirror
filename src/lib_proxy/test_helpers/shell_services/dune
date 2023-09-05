@@ -5,7 +5,7 @@
  (name tezos_proxy_test_helpers_shell_services)
  (libraries
   octez-libs.tezos-base
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-test-helpers
   qcheck-core
   octez-libs.tezos-context.memory

@@ -21,9 +21,5 @@ depends: [
   "ocaml-migrate-parsetree"
   "hashcons"
 ]
-build: [
-  ["rm" "-r" "vendors" "contrib"]
-  ["dune" "build" "-p" name "-j" jobs]
-  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-]
+build: [["rm" "-r" "vendors" "contrib"] ["dune" "build" "-p" name "-j" jobs]]
 synopsis: "Tezos: library for writing benchmarks and performing simple parameter inference"

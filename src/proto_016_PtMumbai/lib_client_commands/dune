@@ -11,16 +11,16 @@
   tezos-protocol-016-PtMumbai
   tezos-protocol-016-PtMumbai.parameters
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-mockup
-  tezos-mockup-registration
-  tezos-mockup-commands
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-mockup
+  octez-shell-libs.tezos-mockup-registration
+  octez-shell-libs.tezos-mockup-commands
+  octez-shell-libs.tezos-client-base
   tezos-client-016-PtMumbai
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
-  tezos-client-base-unix
+  octez-shell-libs.tezos-client-base-unix
   tezos-protocol-plugin-016-PtMumbai
   uri)
  (library_flags (:standard -linkall))
@@ -47,11 +47,11 @@
   octez-libs.tezos-clic
   tezos-protocol-016-PtMumbai
   tezos-protocol-016-PtMumbai.parameters
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-016-PtMumbai
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-client-016-PtMumbai.commands
   tezos-client-016-PtMumbai.sapling
   octez-libs.tezos-rpc

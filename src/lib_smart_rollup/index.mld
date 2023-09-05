@@ -1,0 +1,17 @@
+{0 Octez-l2-libs: octez layer2 libraries}
+
+This is a package containing some libraries used by the layer 2 of Octez.
+
+It contains the following libraries:
+
+- {{!module-Octez_smart_rollup}Octez_smart_rollup}: Octez: library for Smart Rollups
+- {{!module-Octez_smart_rollup_wasm_benchmark_lib}Octez_smart_rollup_wasm_benchmark_lib}: Smart Rollup WASM benchmark library
+- {{!module-Tezos_layer2_store}Tezos_layer2_store}: Tezos: layer2 storage utils
+- {{!module-Tezos_scoru_wasm}Tezos_scoru_wasm}
+- {{!module-Tezos_scoru_wasm_durable_snapshot}Tezos_scoru_wasm_durable_snapshot}: Durable storage reference implementation
+- {{!module-Tezos_scoru_wasm_fast}Tezos_scoru_wasm_fast}: WASM functionality for SCORU Fast Execution
+- {{!module-Tezos_scoru_wasm_helpers}Tezos_scoru_wasm_helpers}: Helpers for the smart rollup wasm functionality and debugger
+- {{!module-Tezos_scoru_wasm_test_helpers}Tezos_scoru_wasm_test_helpers}: Helpers for test of the smart rollup wasm functionality
+- {{!module-Tezos_wasmer}Tezos_wasmer}: Wasmer bindings for SCORU WASM
+- {{!module-Tezos_webassembly_interpreter}Tezos_webassembly_interpreter}
+- {{!module-Tezos_webassembly_interpreter_extra}Tezos_webassembly_interpreter_extra}: Additional modules from the WebAssembly REPL used in testing

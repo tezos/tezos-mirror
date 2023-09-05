@@ -3,10 +3,10 @@
 
 (library
  (name tezt_tezos)
- (public_name octez-libs.tezt-tezos)
+ (public_name tezt-tezos)
  (libraries
   tezt
-  octez-libs.tezt-performance-regression
+  tezt-tezos.tezt-performance-regression
   uri
   hex
   octez-libs.tezos-crypto-dal
@@ -17,4 +17,4 @@
   (:standard)
   -open Tezt
   -open Tezt.Base
-  -open Tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression))

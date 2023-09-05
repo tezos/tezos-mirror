@@ -4,7 +4,7 @@
             tezos-alpha-test-helpers
             octez-libs.tezos-micheline
             tezos-protocol-alpha
-            octez-libs.tezt-tezos
+            tezt-tezos
             ptime)
  (flags (:standard
           (:include %{workspace_root}/macos-link-flags.sexp)

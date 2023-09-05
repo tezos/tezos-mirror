@@ -8,11 +8,11 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-protocol-008-PtEdo2Zk
   tezos-protocol-008-PtEdo2Zk.lifted
-  tezos-signer-backends
+  octez-shell-libs.tezos-signer-backends
   tezos-protocol-plugin-008-PtEdo2Zk
   octez-libs.tezos-rpc
   uri)

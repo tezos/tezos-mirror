@@ -3,16 +3,16 @@
 
 (library
  (name tezos_store_shared)
- (public_name tezos-store.shared)
+ (public_name octez-shell-libs.tezos-store.shared)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-base
   octez-libs.tezos-crypto
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   aches
   aches-lwt
-  tezos-validation)
+  octez-shell-libs.tezos-validation)
  (flags
   (:standard)
   -open Tezos_stdlib_unix

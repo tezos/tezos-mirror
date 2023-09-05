@@ -50,7 +50,7 @@ For example, if you are modifying the Shell using the new
 dependency, you must add an entry in the ``~deps`` list of the
 ``let octez_shell =`` entry of the :src:`manifest/main.ml` and then run
 ``make -C manifest``. You should see the changes propagated onto
-:src:`opam/tezos-shell.opam` and :src:`src/lib_shell/dune`.
+:src:`opam/octez-libs.opam` and :src:`src/lib_shell/dune`.
 
 **Add dependencies to build files:** both opam files and dune files must
 be updated.

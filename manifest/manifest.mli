@@ -1190,6 +1190,44 @@ val open_if : ?m:string -> bool -> target -> target
     actual package. *)
 val add_dep_to_profile : string -> target -> unit
 
+(** This module is used to register multiple libraries (sub-libraries)
+    for a single container package. See
+    [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
+    for the corresponding dune feature. *)
+module Sub_lib : sig
+  type documentation_entrypoint = Module | Page | Sub_lib
+
+  type sub_lib = {
+    name : string;
+    synopsis : string option;
+    documentation_type : documentation_entrypoint;
+  }
+
+  (** The type of a container for a set of sub-libraries *)
+  type container
+
+  (** Create a container *)
+  val make_container : unit -> container
+
+  (** A sub-lib [maker] is similar to a generic [maker] except that:
+
+      - Passing a value for the [opam] parameter raises [Invalid_argument],
+        as all sub-libraires are necessarily restricted to a single opam
+        package.
+
+      - The [internal_name] parameter can be given to set the internal name of the
+      library. *)
+  type nonrec maker = ?internal_name:string -> string maker
+
+  (** Define a maker for sub-libraries of a given [container]. *)
+  val sub_lib :
+    package_synopsis:string -> container:container -> package:string -> maker
+
+  (** Prints all the registered sub-libraries of a package. *)
+  val pp_documentation_of_container :
+    header:string -> Format.formatter -> container -> unit
+end
+
 (** Get a name for a given target, to display in errors.
 
     If a target has multiple names, one is chosen arbitrarily.

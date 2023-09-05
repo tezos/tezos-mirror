@@ -13,9 +13,8 @@ depends: [
   "octez-libs"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
-  "tezos-client-commands"
+  "octez-shell-libs"
   "tezos-baking-alpha-commands"
-  "tezos-client-base-unix"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

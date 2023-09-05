@@ -1,8 +1,8 @@
 (executable
  (name main)
  (libraries tezt
-            octez-libs.tezt-tezos
-            octez-libs.tezt-performance-regression
+            tezt-tezos
+            tezt-tezos.tezt-performance-regression
             octez-libs.tezos-lwt-result-stdlib
             tezos-alpha-test-helpers
             octez-libs.tezos-micheline
@@ -19,7 +19,7 @@
           -open Tezt_tezos
           -open Tezt_tezos.Runnable.Syntax
           -open Tezt.Base
-          -open Tezt_performance_regression
+          -open Tezt_tezos_tezt_performance_regression
           -open Tezos_lwt_result_stdlib
           -open Tezos_event_logging
           -open Tezos_test_helpers

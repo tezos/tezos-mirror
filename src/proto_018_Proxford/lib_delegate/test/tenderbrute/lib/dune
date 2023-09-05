@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   tezos-protocol-018-Proxford
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford)
  (flags
   (:standard)

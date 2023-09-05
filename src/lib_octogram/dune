@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt
-  octez-libs.tezt-tezos
+  tezt-tezos
   jingoo
   dmap)
  (flags

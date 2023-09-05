@@ -3,7 +3,7 @@
 
 (library
  (name tezos_shell)
- (public_name tezos-shell)
+ (public_name octez-shell-libs.tezos-shell)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt-watcher
@@ -13,19 +13,19 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-rpc
   octez-libs.tezos-context
-  tezos-store
-  tezos-store.shared
-  octez-libs.tezos-protocol-environment
-  tezos-context-ops
-  octez-libs.tezos-shell-context
-  octez-libs.tezos-p2p
+  octez-shell-libs.tezos-store
+  octez-shell-libs.tezos-store.shared
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-context-ops
+  octez-shell-libs.tezos-shell-context
+  octez-shell-libs.tezos-p2p
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-p2p-services
-  tezos-protocol-updater
+  octez-shell-libs.tezos-protocol-updater
   octez-libs.tezos-requester
   octez-libs.tezos-workers
-  tezos-validation
+  octez-shell-libs.tezos-validation
   octez-libs.tezos-version
   octez-libs.tezos-crypto-dal.octez-dal-config
   lwt-exit)
@@ -53,4 +53,4 @@
   -open Tezos_version
   -open Tezos_crypto_dal_octez_dal_config))
 
-(documentation (package tezos-shell))
+(documentation (package octez-shell-libs) (mld_files octez_shell))

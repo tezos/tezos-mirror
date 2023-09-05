@@ -8,8 +8,8 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-stdlib-unix
-  tezos-client-base
-  tezos-client-base-unix
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-client-base-unix
   tezos-client-alpha
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
@@ -25,12 +25,12 @@
   tezos-dac-alpha
   tezos-dac-lib
   tezos-dac-client-lib
-  octez-libs.tezos-shell-services
-  octez-smart-rollup
+  octez-shell-libs.tezos-shell-services
+  octez-l2-libs.octez-smart-rollup
   tezos-smart-rollup-alpha
   tezos-smart-rollup-layer2-alpha
   tezos-layer2-utils-alpha
-  tezos_layer2_store
+  octez-l2-libs.tezos_layer2_store
   octez-crawler
   octez-libs.tezos-tree-encoding
   data-encoding
@@ -41,8 +41,8 @@
   aches-lwt
   octez-injector
   octez-smart-rollup-node-lib
-  octez-libs.tezos-scoru-wasm
-  tezos-scoru-wasm-fast
+  octez-l2-libs.tezos-scoru-wasm
+  octez-l2-libs.tezos-scoru-wasm-fast
   octez-libs.tezos-crypto-dal
   tezos-version.value)
  (flags

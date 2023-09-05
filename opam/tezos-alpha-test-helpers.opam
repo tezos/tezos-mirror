@@ -14,7 +14,9 @@ depends: [
   "octez-libs"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
+  "octez-proto-libs"
   "tezos-protocol-plugin-alpha"
+  "octez-shell-libs"
   "tezos-smart-rollup-alpha"
 ]
 build: [

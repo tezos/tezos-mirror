@@ -54,7 +54,7 @@ Here is a quick description of each file in this environment, all located under
    implementations are assembled into a single implementation file ``VX.ml`` by
    a helper program located in ``s_packer/``.
 
-The API can be found in :package-api:`tezos-protocol-environment <octez-libs/Tezos_protocol_environment/index.html>`
+The API can be found in :package-api:`tezos-protocol-environment <octez-proto-libs/Tezos_protocol_environment/index.html>`
 
 
 Environment versions

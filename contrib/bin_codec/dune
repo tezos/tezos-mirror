@@ -10,12 +10,12 @@
   data-encoding
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-client-base-unix
-  tezos-client-base
+  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.tezos-client-base
   octez-libs.tezos-clic
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-event-logging
-  tezos-signer-services
+  octez-shell-libs.tezos-signer-services
   tezos-version.value
   kaitai.kaitai-of-data-encoding
   kaitai.ast

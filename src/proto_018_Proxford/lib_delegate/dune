@@ -12,18 +12,18 @@
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.lifted
   tezos-protocol-plugin-018-Proxford
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-stdlib
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-shell-context
+  octez-shell-libs.tezos-shell-context
   octez-libs.tezos-context
   octez-libs.tezos-context.memory
   octez-libs.tezos-rpc-http-client-unix
-  tezos-context-ops
+  octez-shell-libs.tezos-context-ops
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http
   tezos-dal-node-services
@@ -59,11 +59,11 @@
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-baking-018-Proxford
   octez-libs.tezos-rpc
   uri)
@@ -89,11 +89,11 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-018-Proxford
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-client-018-Proxford
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   tezos-baking-018-Proxford
   tezos-baking-018-Proxford-commands
   octez-libs.tezos-rpc)

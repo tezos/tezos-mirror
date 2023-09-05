@@ -3,7 +3,7 @@
 
 (library
  (name octez_smart_rollup)
- (public_name octez-smart-rollup)
+ (public_name octez-l2-libs.octez-smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -17,3 +17,5 @@
   -open Tezos_base
   -open Tezos_stdlib_unix
   -open Tezos_crypto))
+
+(documentation (package octez-l2-libs))

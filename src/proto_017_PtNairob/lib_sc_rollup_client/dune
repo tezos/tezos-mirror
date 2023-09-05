@@ -8,11 +8,11 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob
-  tezos-client-commands
-  tezos-client-base
-  tezos-client-base-unix
+  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-client-base-unix
   tezos-client-017-PtNairob
-  octez-smart-rollup
+  octez-l2-libs.octez-smart-rollup
   tezos-smart-rollup-017-PtNairob
   tezos-smart-rollup-layer2-017-PtNairob)
  (flags

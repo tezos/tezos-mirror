@@ -91,7 +91,7 @@ be compiled to JavaScript. External dependencies are not shown in this
 illustration.
 
 Note that many packages described below are grouped in a single one: :package:`octez-libs`.
-This includes packages as diverse as :package-api:`tezos-stdlib <octez-libs/Tezos_stdlib/index.html>`, :package-api:`tezos-base <octez-libs/Tezos_base/index.html>`, :package-api:`tezos-shell-services <octez-libs/Tezos_shell_services/index.html>`, :package-api:`tezos-context <octez-libs/Tezos_context/index.html>`, etc.)
+This includes packages as diverse as :package-api:`tezos-stdlib <octez-libs/Tezos_stdlib/index.html>`, :package-api:`tezos-base <octez-libs/Tezos_base/index.html>`, :package-api:`tezos-shell-services <octez-shell-libs/Tezos_shell_services/index.html>`, :package-api:`tezos-context <octez-libs/Tezos_context/index.html>`, etc.)
 
 Base and below
 ~~~~~~~~~~~~~~
@@ -149,7 +149,7 @@ The shell is the part of the node responsible for all communications,
 peer-to-peer and RPC, acting as a cocoon around the economic
 protocols.
 
-  - :package-api:`tezos-shell-services <octez-libs/Tezos_shell_services/index.html>` contains the definition of the
+  - :package-api:`tezos-shell-services <octez-shell-libs/Tezos_shell_services/index.html>` contains the definition of the
     node's service hierarchy, and calling functions to use in the
     client (or any third party software). As this library is linked
     into the client to call the services in a type-safe way, only the
@@ -159,16 +159,16 @@ protocols.
     use :opam:`cohttp` to implement the RPC
     over HTTP server and client, allowing to make actual use of
     services declared using :package-api:`tezos-rpc <octez-libs/Tezos_rpc/index.html>`.
-  - :package-api:`tezos-p2p <octez-libs/Tezos_p2p/index.html>` is the in-house peer-to-peer layer.
-  - :package:`tezos-store` is the chain-data store that handles
+  - :package-api:`tezos-p2p <octez-shell-libs/Tezos_p2p/index.html>` is the in-house peer-to-peer layer.
+  - :package-api:`tezos-store <octez-shell-libs/Tezos_store/index.html>` is the chain-data store that handles
     on-disk block storage, snapshots exporting/importing and chain
     reconstruction.
   - :package-api:`tezos-context <octez-libs/Tezos_context/index.html>` contains the raw versioned key-value store
     used for storing the ledger's context (one version per
     block). This is implemented using :opam:`irmin`.
-  - :package:`tezos-protocol-updater` maintains the table of available
+  - :package-api:`tezos-protocol-updater <octez-shell-libs/Tezos_protocol_updater/index.html>` maintains the table of available
     protocol versions, embedded or dynamically linked.
-  - :package:`tezos-shell` implements the scheduling of block
+  - :package-api:`tezos-shell <octez-shell-libs/Tezos_shell/index.html>` implements the scheduling of block
     validations, the mempool management, and the distributed database.
     A description is available in :doc:`this document <../shell/validation>`.
 
@@ -181,7 +181,7 @@ economic protocol, as a form of static sandboxing. It also generates a
 functorized version of the protocol, to make the execution of the
 protocol in an alternative environment possible.
 
-  - :package-api:`tezos-protocol-environment <octez-libs/Tezos_protocol_environment/index.html>` contains the protocol
+  - :package-api:`tezos-protocol-environment <octez-proto-libs/Tezos_protocol_environment/index.html>` contains the protocol
     generic environment, that is the API of the modules that are available to
     the economic protocol and the exported protocol API. A review of this
     sandbox is available :doc:`here <../shell/protocol_environment>`.
@@ -202,7 +202,7 @@ protocol in an alternative environment possible.
     standard library as a parameter. This parameter can be filled with
     any of the implementations described in the two points below.
 
-  - :package-api:`tezos-shell-context <octez-libs/Tezos_shell_context/index.html>` implements a context representation
+  - :package-api:`tezos-shell-context <octez-shell-libs/Tezos_shell_context/index.html>` implements a context representation
     that is accepted by the protocol environment. The node uses this
     instance to read and write data on disk.
 
@@ -253,11 +253,11 @@ The client is split into many packages, to enforce three separation
 lines: shell vs economic protocol, Unix dependent vs JavaScript
 compatible, and library vs command-line interface.
 
-  - :package:`tezos-client-base` defines the client context, which is
+  - :package-api:`tezos-client-base <octez-shell-libs/Tezos_client_base/index.html>` defines the client context, which is
     an object whose methods allow for: accessing a wallet of keys,
     interacting via the user, making RPC calls, and signing data using
     signer plug-ins. Most of them, including RPC calling functions from
-    :package-api:`tezos-shell-services <octez-libs/Tezos_shell_services/index.html>` and
+    :package-api:`tezos-shell-services <octez-shell-libs/Tezos_shell_services/index.html>` and
     :package:`tezos-protocol-alpha`, are abstracted over this object
     type. That way, it is possible to use the same code for different
     platforms or toolkits.
@@ -266,7 +266,7 @@ compatible, and library vs command-line interface.
     the client context.
   - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
-  - :package:`tezos-client-base-unix` implements configuration file
+  - :package-api:`tezos-client-base-unix <octez-shell-libs/Tezos_client_base_unix/index.html>` implements configuration file
     and wallet storage in Unix files, user interaction via the Unix
     console, and terminal based signer plug-ins.
 
@@ -280,14 +280,14 @@ run them.
  - :src:`tezt/`:
    end-to-end tests as Tezt tests that e.g. launch local sandboxed nodes
    and performs various tasks using the client
- - :package-api:`tezos-p2p <octez-libs/Tezos_p2p/index.html>`
+ - :package-api:`tezos-p2p <octez-shell-libs/Tezos_p2p/index.html>`
    (in directory :src:`src/lib_p2p/test/`):
    tests of the peer-to-peer layer, independently of the Tezos gossip
    protocol (establishing connections, propagating peers, etc.)
- - :package-api:`tezos-protocol-environment <octez-libs/Tezos_protocol_environment/index.html>`
+ - :package-api:`tezos-protocol-environment <octez-proto-libs/Tezos_protocol_environment/index.html>`
    (in directory :src:`src/lib_protocol_environment/test/`):
    tests for the in-memory context implementation.
- - :package:`tezos-shell`
+ - :package-api:`tezos-shell <octez-shell-libs/Tezos_shell/index.html>`
    (in directory :src:`src/lib_shell/test/`):
    tests for the chain data storage.
  - :package-api:`tezos-stdlib <octez-libs/Tezos_stdlib/index.html>`
@@ -296,7 +296,7 @@ run them.
  - :package-api:`tezos-context <octez-libs/Tezos_context/index.html>`
    (in directory :src:`src/lib_context/test/`):
    tests for the versioned key-value context.
- - :package:`tezos-store`
+ - :package-api:`tezos-store <octez-shell-libs/Tezos_store/index.html>`
    (in directory :src:`src/lib_store/unix/test/`):
    tests for the on-disk store.
  - :package:`tezos-protocol-alpha`

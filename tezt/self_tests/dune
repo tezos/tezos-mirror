@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   tezt
-  octez-libs.tezt-tezos)
+  tezt-tezos)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -28,7 +28,7 @@
 
 (rule
  (alias runtest)
- (package octez-libs)
+ (package tezt-tezos)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

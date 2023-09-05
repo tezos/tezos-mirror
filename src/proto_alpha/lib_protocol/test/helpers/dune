@@ -14,9 +14,9 @@
   tezos-protocol-alpha
   tezos-client-alpha
   tezos-protocol-alpha.parameters
-  octez-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment
   tezos-protocol-plugin-alpha
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal
   tezos-smart-rollup-alpha)
