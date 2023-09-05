@@ -20,7 +20,7 @@ Please refer to :doc:`Data Availability Committees <../shell/data_availability_c
 
 Octez version 18 improves performance, notably to the block validation process: total validation time is halved on average, resulting in a reduced block propagation time.
 
-As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See `Adaptive Issuance and Staking <https://research-development.nomadic-labs.com/adaptive-issuance.html#new-staking-mechanism>`_ for more details.
+As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_oxford>` for more details.
 
 Oxford's feature activation vote
 --------------------------------
@@ -36,7 +36,7 @@ Instead, these are guarded behind a *single* per-block vote mechanism, where bak
 Specifically, the Octez v18.0~rc1 Oxford baker executable introduces a dedicated option ``--adaptive-issuance-vote``, to allow bakers to manifest their choice.
 The use of this flag is *optional*, and defaults to **Pass** if not present.
 
-See `here <https://research-development.nomadic-labs.com/adaptive-issuance.html#feature-activation-vs-protocol-activation>`__ for further details on this additional activation vote mechanism.
+See :ref:`here <feature_activation_oxford>` for further details on this additional activation vote mechanism.
 
 
 Update Instructions
