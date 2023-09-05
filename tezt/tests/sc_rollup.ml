@@ -5895,12 +5895,12 @@ let test_rollup_whitelist_outdated_update ~kind =
     ~msg:(rex ".*Outdated whitelist update: got outbox level")
     process
 
-(** This test uses the rollup node, first it is running in an
-    Operator mode, it bakes some blocks, then terminate. Then we
-    restart the node in a Bailout mode, and make sure that there are
-    no new commitments have been published *)
+(** This test uses the rollup node, first it is running in an Operator
+    mode, it bakes some blocks, then terminate. Then we restart the
+    node in a Bailout mode, initiate the recover_bond process, and
+    make sure that no new commitments are published. *)
 let bailout_mode_not_publish ~kind =
-  let operator = Constant.bootstrap1.public_key_hash in
+  let operator = Constant.bootstrap5.public_key_hash in
   let commitment_period = 5 in
   let challenge_window = 5 in
   test_full_scenario
@@ -5955,7 +5955,6 @@ let bailout_mode_not_publish ~kind =
       []
       ~mode:Bailout
   in
-  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
   (* The challenge window is neded to compute the correct number of block before
      cementation, we also add 2 times of commitment period to make sure
      no commit are published. *)
@@ -5963,6 +5962,11 @@ let bailout_mode_not_publish ~kind =
     repeat
       ((2 * commitment_period) + challenge_window)
       (fun () -> Client.bake_for_and_wait tezos_client)
+  and* () =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "sc_rollup_node_recover_bond.v0"
+      (Fun.const (Some ()))
   in
   let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:100. in
   let* published_commitment_after =
@@ -5988,14 +5992,16 @@ let bailout_mode_not_publish ~kind =
       Check.string
       ~error_msg:"Last published commitment have been updated."
   in
-  let* () = Sc_rollup_node.terminate sc_rollup_node in
-  Log.info "Client submits the recover_bond operation." ;
-  let*! () =
-    Client.Sc_rollup.submit_recover_bond
-      ~rollup:sc_rollup
-      ~src:operator
-      ~staker:operator
-      tezos_client
+  Log.info
+    "The node has submitted the recover_bond operation, and the operator is no \
+     longer staked." ;
+  let* operator_balance = contract_balances ~pkh:operator tezos_client in
+  let () =
+    Check.(
+      (operator_balance.frozen = 0)
+        int
+        ~error_msg:
+          "The operator should not have a stake nor holds a frozen balance.")
   in
   unit
 

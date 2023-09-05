@@ -71,6 +71,10 @@ val compute_commitment : int32 -> unit Lwt.t
     being published. *)
 val publish_commitment : Commitment.Hash.t -> int32 -> unit Lwt.t
 
+(** [recover_bond staker] emits the event that a recover bond
+    operation is being submitted. *)
+val recover_bond : Signature.Public_key_hash.t -> unit Lwt.t
+
 (** Events emmitted by the Publisher worker *)
 module Publisher : sig
   (** [request_failed view status errors] emits the event that a worker

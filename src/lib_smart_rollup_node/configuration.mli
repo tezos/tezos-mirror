@@ -38,11 +38,17 @@ type mode =
           the signers *)
 
 (** The kind of operations that can be injected by the rollup node. *)
-type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
 
 (** Purposes for operators, indicating their role and thus the kinds of
     operations that they sign. *)
-type purpose = Operating | Batching | Cementing
+type purpose = Operating | Batching | Cementing | Recovering
 
 module Operation_kind_map : Map.S with type key = operation_kind
 

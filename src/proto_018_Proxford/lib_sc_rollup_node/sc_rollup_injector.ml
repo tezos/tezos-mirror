@@ -51,6 +51,9 @@ let injector_operation_to_manager :
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
       let stakers = Sc_rollup_proto_types.Game.index_of_octez stakers in
       Manager (Sc_rollup_timeout {rollup; stakers})
+  | Recover_bond {rollup; staker} ->
+      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
+      Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
 
 let injector_operation_of_manager :
     type kind.

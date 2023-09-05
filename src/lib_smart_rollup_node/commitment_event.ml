@@ -101,6 +101,14 @@ module Simple = struct
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
+  let recover_bond =
+    declare_1
+      ~section
+      ~name:"sc_rollup_node_recover_bond"
+      ~msg:"Recover bond for {staker}."
+      ~level:Notice
+      ("staker", Signature.Public_key_hash.encoding)
+
   let commitment_parent_is_not_lcc =
     declare_3
       ~section
@@ -196,6 +204,8 @@ let compute_commitment level = Simple.(emit compute_commitment level)
 
 let publish_commitment head level =
   Simple.(emit publish_commitment (head, level))
+
+let recover_bond staker = Simple.(emit recover_bond staker)
 
 let commitment_parent_is_not_lcc level predecessor_hash lcc_hash =
   Simple.(emit commitment_parent_is_not_lcc (level, predecessor_hash, lcc_hash))

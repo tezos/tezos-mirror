@@ -34,13 +34,19 @@ type mode =
   | Operator
   | Custom
 
-type operation_kind = Publish | Add_messages | Cement | Timeout | Refute
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
 
-type purpose = Operating | Batching | Cementing
+type purpose = Operating | Batching | Cementing | Recovering
 
-let operation_kinds = [Publish; Add_messages; Cement; Timeout; Refute]
+let operation_kinds = [Publish; Add_messages; Cement; Timeout; Refute; Recover]
 
-let purposes = [Operating; Batching; Cementing]
+let purposes = [Operating; Batching; Cementing; Recovering]
 
 module Operation_kind_map = Map.Make (struct
   type t = operation_kind
@@ -176,6 +182,7 @@ let default_burn_cap = mutez 0L
 *)
 let default_fee = function
   | Cement -> tez 1
+  | Recover -> tez 1
   | Publish -> tez 2
   | Add_messages ->
       (* We keep this limit even though it depends on the size of the message
@@ -195,6 +202,7 @@ let default_burn = function
       tez 1
   | Add_messages -> tez 0
   | Cement -> tez 0
+  | Recover -> tez 0
   | Timeout -> tez 0
   | Refute ->
       (* A refutation move can store data, e.g. opening a game. *)
@@ -257,6 +265,7 @@ let operation_kinds_of_purpose = function
   | Batching -> [Add_messages]
   | Cementing -> [Cement]
   | Operating -> [Publish; Refute; Timeout]
+  | Recovering -> [Recover]
 
 let string_of_operation_kind = function
   | Publish -> "publish"
@@ -264,6 +273,7 @@ let string_of_operation_kind = function
   | Cement -> "cement"
   | Timeout -> "timeout"
   | Refute -> "refute"
+  | Recover -> "recover"
 
 let operation_kind_of_string = function
   | "publish" -> Some Publish
@@ -271,6 +281,7 @@ let operation_kind_of_string = function
   | "cement" -> Some Cement
   | "timeout" -> Some Timeout
   | "refute" -> Some Refute
+  | "recover" -> Some Recover
   | _ -> None
 
 let operation_kind_of_string_exn s =
@@ -282,6 +293,7 @@ let string_of_purpose = function
   | Operating -> "operating"
   | Batching -> "batching"
   | Cementing -> "cementing"
+  | Recovering -> "recovering"
 
 let purpose_of_string = function
   (* For backward compability:
@@ -292,6 +304,7 @@ let purpose_of_string = function
   | "operating" | "publish" | "refute" | "timeout" -> Some Operating
   | "batching" | "add_messages" -> Some Batching
   | "cementing" | "cement" -> Some Cementing
+  | "recovering" -> Some Recovering
   | _ -> None
 
 let purpose_of_string_exn s =
@@ -759,7 +772,7 @@ let check_mode config =
   | Observer -> narrow_purposes []
   | Batcher -> narrow_purposes [Batching]
   | Accuser -> narrow_purposes [Operating]
-  | Bailout -> narrow_purposes [Operating; Cementing]
+  | Bailout -> narrow_purposes [Operating; Cementing; Recovering]
   | Maintenance -> narrow_purposes [Operating; Cementing]
   | Operator -> narrow_purposes [Operating; Cementing; Batching]
   | Custom -> return config
