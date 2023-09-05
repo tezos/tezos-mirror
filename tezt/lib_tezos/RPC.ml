@@ -1153,6 +1153,13 @@ let get_chain_block_context_delegate_delegated_contracts ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_delegate_stakers ?(chain = "main") ?(block = "head")
+    pkh =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "stakers"]
+    Fun.id
+
 let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
     ?(block = "head") pkh =
   make
