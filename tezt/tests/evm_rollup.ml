@@ -1594,7 +1594,7 @@ let test_eth_call_storage_contract_proxy =
             Hex.to_string @@ `Hex "ff";
             Hex.to_string
             @@ `Hex
-                 "ff01e68094d77420f73b4612a7a99dba8c2afd30a1886b03448857040000000000008080844e70b1dc";
+                 "ff0100e68094d77420f73b4612a7a99dba8c2afd30a1886b03448857040000000000008080844e70b1dc";
           ]
       in
       let expected_insights =

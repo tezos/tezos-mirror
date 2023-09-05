@@ -88,8 +88,17 @@ let new_chunked_tag = "\002"
 (** Tag signaling a simulation message containing a chunk *)
 let chunk_tag = "\003"
 
+(** Tag indicating simulation is an evaluation *)
+let evaluation_tag = "\000"
+
+(** Tag indicating simulation is a validation *)
+let validation_tag = "\001"
+
 (** [hex_str_of_binary_string s] translate a binary string into an hax string *)
 let hex_str_of_binary_string s = s |> Hex.of_string |> Hex.show
+
+(** [add_tag tag bytes] prefixes bytes by the given tag *)
+let add_tag tag bytes = tag ^ Bytes.to_string bytes |> String.to_bytes
 
 let encode_message = function
   | Start -> hex_str_of_binary_string @@ simulation_tag
@@ -103,12 +112,16 @@ let encode_message = function
 
 let encode call =
   let open Result_syntax in
-  let* messages = call |> rlp_encode |> split_in_messages in
+  let* messages =
+    call |> rlp_encode |> add_tag evaluation_tag |> split_in_messages
+  in
   return @@ List.map encode_message messages
 
 let encode_tx tx =
   let open Result_syntax in
-  let* messages = tx |> tx_rlp_encode |> split_in_messages in
+  let* messages =
+    tx |> tx_rlp_encode |> add_tag validation_tag |> split_in_messages
+  in
   return @@ List.map encode_message messages
 
 module Encodings = struct
