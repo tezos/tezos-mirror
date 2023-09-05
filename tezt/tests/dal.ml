@@ -1561,26 +1561,26 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   let* () = send_messages client messages in
 
   Log.info "Step 4: publish the slot headers for indexes 0, 1, and 2" ;
-  let* _op_hash =
-    publish_slot_header
-      ~source:Constant.bootstrap1
-      ~index:0
+  let*! () =
+    Client.publish_dal_commitment
+      ~src:Constant.bootstrap1.alias
+      ~slot_index:0
       ~commitment:commitment_0
       ~proof:proof_0
       client
   in
-  let* _op_hash =
-    publish_slot_header
-      ~source:Constant.bootstrap2
-      ~index:1
+  let*! () =
+    Client.publish_dal_commitment
+      ~src:Constant.bootstrap2.alias
+      ~slot_index:1
       ~commitment:commitment_1
       ~proof:proof_1
       client
   in
-  let* _op_hash =
-    publish_slot_header
-      ~source:Constant.bootstrap3
-      ~index:2
+  let*! () =
+    Client.publish_dal_commitment
+      ~src:Constant.bootstrap3.alias
+      ~slot_index:2
       ~commitment:commitment_2
       ~proof:proof_2
       client

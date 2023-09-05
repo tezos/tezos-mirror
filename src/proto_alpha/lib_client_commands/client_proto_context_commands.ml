@@ -3559,7 +3559,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Publish a DAL commitment on L1 for the given level and slot index"
+      ~desc:"Publish a DAL commitment on L1 for the given slot index"
       (args7
          fee_arg
          dry_run_switch
