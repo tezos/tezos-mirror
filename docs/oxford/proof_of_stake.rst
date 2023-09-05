@@ -182,6 +182,9 @@ The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
+
+The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_oxford>`.
+
 Other presentations of the Tezos' proof-of-stake mechanism can be
 found in the `Tezos Agora wiki entry
 <https://wiki.tezosagora.org/learn/baking/proofofstake>`_ and
