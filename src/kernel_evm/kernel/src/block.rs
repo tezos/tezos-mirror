@@ -925,7 +925,7 @@ mod tests {
         let mut block_in_progress =
             BlockInProgress::new(U256::from(1), U256::from(1), transactions);
         // block is almost full wrt ticks
-        block_in_progress.estimated_ticks = tick_model::MAX_TICKS - 1000;
+        block_in_progress.estimated_ticks = tick_model::constants::MAX_TICKS - 1000;
 
         // act
         compute::<MockHost>(
@@ -948,7 +948,7 @@ mod tests {
         );
         assert_eq!(
             block_in_progress.estimated_ticks,
-            tick_model::MAX_TICKS - 1000,
+            tick_model::constants::MAX_TICKS - 1000,
             "should not have consumed any tick"
         );
 
