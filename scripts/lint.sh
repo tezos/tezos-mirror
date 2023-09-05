@@ -170,13 +170,21 @@ update_gitlab_ci_yml () {
     # one being ignored. Gitlab linter doesn't warn for it
     # Job key `unified_coverage` is allowed to be duplicated because we use a conditional include
     # on files `.gitlab/ci/coverage/coverage.yml` and `.gitlab/ci/jobs/coverage_default.yml`
-    repeated=$(find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml -exec grep '^[^ #-]' \{\} \;  \
-                   | sort \
-                   | grep -v unified_coverage \
-                   | uniq --repeated)
-    if [ -n "$repeated" ]; then
-        echo ".gitlab-ci.yml contains repeated rules:"
-        echo "$repeated"
+    find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml | \
+        while read -r filename; do
+            repeated=$(grep '^[^ #-]' "$filename" \
+                           | sort \
+                           | grep -v include \
+                           | uniq --repeated)
+            if [ -n "$repeated" ]; then
+                echo "$filename contains repeated rules:"
+                echo "$repeated"
+                touch /tmp/repeated
+            fi
+        done
+
+    if [ -f /tmp/repeated ]; then
+        rm /tmp/repeated
         exit 1
     fi
 }
