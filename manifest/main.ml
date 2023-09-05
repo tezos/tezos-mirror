@@ -4048,6 +4048,8 @@ let octogram =
     ~synopsis:"An Ansible-inspired environment to run scenarios and experiments"
     ~deps:
       [
+        octez_shell_services |> open_;
+        octez_rpc_http_client_unix |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         jingoo;
