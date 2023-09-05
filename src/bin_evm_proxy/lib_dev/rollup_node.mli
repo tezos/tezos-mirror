@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -129,8 +130,10 @@ module type S = sig
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
-  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks if the nonce is correct. *)
-  val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
+  (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks if the nonce is correct
+      and returns the associated public key of transaction. *)
+  val is_tx_valid :
+    Ethereum_types.hex -> (Ethereum_types.address, string) result tzresult Lwt.t
 
   (** [storage_at address pos] returns the value at index [pos] of the
       account [address]'s storage. *)
