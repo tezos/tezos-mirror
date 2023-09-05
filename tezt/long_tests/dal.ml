@@ -35,7 +35,13 @@
    Add more fine-grained measurements (e.g. time to verify shard) *)
 
 module Dal = Dal_common
-module Dal_RPC = Dal.RPC
+
+module Dal_RPC = struct
+  include Dal.RPC
+
+  (* We override call_xx RPCs in Dal.RPC to use a DAL node in this file. *)
+  include Dal.RPC.Local
+end
 
 let measurement = "time-to-produce-and-propagate-shards"
 

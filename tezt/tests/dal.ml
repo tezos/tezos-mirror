@@ -34,8 +34,21 @@ let hooks = Tezos_regression.hooks
 
 module Dal = Dal_common
 module Cryptobox = Dal.Cryptobox
-module Helpers = Dal.Helpers
-module Dal_RPC = Dal.RPC
+
+module Helpers = struct
+  include Dal.Helpers
+
+  (* We override store slot so that it uses a DAL node in this file. *)
+  let store_slot dal_node ?with_proof slot =
+    store_slot (Either.Left dal_node) ?with_proof slot
+end
+
+module Dal_RPC = struct
+  include Dal.RPC
+
+  (* We override call_xx RPCs in Dal.RPC to use a DAL node in this file. *)
+  include Dal.RPC.Local
+end
 
 let next_level node =
   let* current_level = Node.get_level node in

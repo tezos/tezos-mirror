@@ -25,7 +25,13 @@
 
 open Dal_helpers
 module Dal = Dal_common
-module Dal_RPC = Dal.RPC
+
+module Dal_RPC = struct
+  include Dal.RPC
+
+  (* We override call_xx RPCs in Dal.RPC to use a DAL node in this file. *)
+  include Dal.RPC.Local
+end
 
 (* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
    or Mondaynet), and it publishes slots for a number of levels and a number of

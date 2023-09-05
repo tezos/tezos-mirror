@@ -99,7 +99,9 @@ module Committee = struct
 end
 
 module RPC_legacy = struct
-  type uri_provider = Dal_node.t
+  type default_uri_provider = (Dal_node.t, Foreign_endpoint.t) Either.t
+
+  type local_uri_provider = Dal_node.t
 
   let call = RPC_core.call
 
@@ -111,9 +113,15 @@ module RPC_legacy = struct
     RPC.make
       ?data
       ?query_string
-      ~get_host:Dal_node.rpc_host
-      ~get_port:Dal_node.rpc_port
-      ~get_scheme:(Fun.const "http")
+      ~get_host:(function
+        | Either.Left node -> Dal_node.rpc_host node
+        | Right fe -> Foreign_endpoint.rpc_host fe)
+      ~get_port:(function
+        | Either.Left node -> Dal_node.rpc_port node
+        | Right fe -> Foreign_endpoint.rpc_port fe)
+      ~get_scheme:(function
+        | Either.Left _node -> "http"
+        | Right fe -> Foreign_endpoint.rpc_scheme fe)
 
   (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
   let encode_bytes_to_hex_string raw =
@@ -313,6 +321,66 @@ module Dal_RPC = struct
               let json = get "attestable_slots_set" json in
               Attestable_slots (json |> as_list |> List.map as_bool)
           | _ -> failwith "invalid case"))
+
+  module type CALLERS = sig
+    type input_uri_provider
+
+    (** See {!RPC_core.call} *)
+    val call :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      'result Lwt.t
+
+    (** See {!RPC_core.call_raw} *)
+    val call_raw :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      string RPC_core.response Lwt.t
+
+    (** See {!RPC_core.call_json} *)
+    val call_json :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      JSON.t RPC_core.response Lwt.t
+  end
+
+  module Local : CALLERS with type input_uri_provider := local_uri_provider =
+  struct
+    let call ?log_request ?log_response_status ?log_response_body node rpc =
+      call
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (Either.Left node)
+        rpc
+
+    let call_raw ?(log_request = true) ?(log_response_status = true)
+        ?(log_response_body = true) node rpc =
+      call_raw
+        ~log_request
+        ~log_response_status
+        ~log_response_body
+        (Either.Left node)
+        rpc
+
+    let call_json ?log_request ?log_response_status ?(log_response_body = true)
+        node rpc =
+      call_json
+        ?log_request
+        ?log_response_status
+        ~log_response_body
+        (Either.Left node)
+        rpc
+  end
 end
 
 module Helpers = struct
@@ -372,12 +440,18 @@ module Helpers = struct
         ]
         client)
 
-  let store_slot dal_node ?with_proof slot =
-    let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
-    let* () =
-      Dal_RPC.(call dal_node @@ put_commitment_shards ?with_proof commitment)
+  let store_slot dal_node_or_endpoint ?with_proof slot =
+    let* commitment =
+      Dal_RPC.(call dal_node_or_endpoint @@ post_commitment slot)
     in
-    let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
+    let* () =
+      Dal_RPC.(
+        call dal_node_or_endpoint
+        @@ put_commitment_shards ?with_proof commitment)
+    in
+    let* proof =
+      Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
+    in
     return (commitment, proof)
 end
 
