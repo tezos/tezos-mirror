@@ -16,6 +16,7 @@ depends: [
   "tezos-client-base"
   "tezos-signer-services"
   "tezos-version"
+  "kaitai"
 ]
 depopts: [
   "tezos-client-005-PsBabyM1"
@@ -35,7 +36,7 @@ depopts: [
   "tezos-client-alpha"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
