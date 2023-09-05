@@ -961,6 +961,12 @@ module Auto_build = struct
     (* override [bench_number] and [nsamples] for intercept and TIMER_LATENCY *)
     let bench_number, nsamples =
       match Namespace.to_list bench_name with
+      | "." :: "io" :: _ ->
+          (* Currently, IO benchmarks reloads the context and purges the disk cache only
+             once for each benchmark.  [nsamples] must be 1 otherwise the second and later
+             samples are executed with the caches available.
+          *)
+          (bench_number, 1)
       | ["."; "interpreter"; "N_IOpen_chest"; "intercept"] ->
           (* Timings of [IOpen_chest] are highly affected by hidden randomness
              of [puzzle].  We need multiple [bench_number] to avoid this effect.
