@@ -216,33 +216,10 @@ let check_n_cycles n constants starting_level client node injected =
   in
   loop n starting_level
 
-(* In total, [test_vdf] bakes [2 * (n_cycles + 1)] cycles *)
-let n_cycles = 3
-
-let test_vdf : Protocol.t list -> unit =
-  (* [check_n_cycles] requires that the starting_level is the beginning of
-   * a new cycle. Since that's not the case when the VDF daemon is launched,
-   * the first cycle is checked here directly and the following cycles are
-   * checked using [check_n_cycles] *)
-  Protocol.register_test ~__FILE__ ~title:"VDF daemon" ~tags:["vdf"]
-  @@ fun protocol ->
-  (* Override the `vdf_difficulty` constant in order to preserve the test *)
-  (* which checks that a computation started too late is eventually canceled. *)
-  let parameters = [(["vdf_difficulty"], `String "100000")] in
-  let* parameter_file =
-    Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
-  in
-
+let init_test ?parameter_file protocol =
   let* node, client =
-    Client.init_with_protocol ~parameter_file ~protocol `Client ()
+    Client.init_with_protocol ?parameter_file ~protocol `Client ()
   in
-  let* vdf_baker = Vdf.init ~protocol node in
-
-  (* Track whether a VDF revelation has been injected during the correct stage.
-   * It is set to [false] at the beginning of [bake_vdf_revelation_stage] and
-   * to [true] by a listener for [vdf_revelation_injected] events. *)
-  let injected = ref false in
-  init_vdf_event_listener vdf_baker injected ;
 
   let* constants =
     RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
@@ -253,6 +230,31 @@ let test_vdf : Protocol.t list -> unit =
   let* nonce_revelation_threshold =
     return JSON.(constants |-> "nonce_revelation_threshold" |> as_int)
   in
+  return (node, client, blocks_per_cycle, nonce_revelation_threshold)
+
+(* This test runs through a number of cycles [n_cycles], checking correct
+ * injection of a VDF revelation for each one. It then runs through a cycle
+ * with no VDF daemon in order to check that RANDAO randomness is computed
+ * on chain in the absence of a VDF revelation. *)
+let vdf_cycles : Protocol.t list -> unit =
+  Protocol.register_test ~__FILE__ ~title:"VDF daemon" ~tags:["vdf"]
+  @@ fun protocol ->
+  let n_cycles = 2 in
+  let* node, client, blocks_per_cycle, nonce_revelation_threshold =
+    init_test protocol
+  in
+  let* vdf_baker = Vdf.init ~protocol node in
+
+  (* Track whether a VDF revelation has been injected during the correct stage.
+   * It is set to [false] at the beginning of [bake_vdf_revelation_stage] and
+   * to [true] by a listener for [vdf_revelation_injected] events. *)
+  let injected = ref false in
+  init_vdf_event_listener vdf_baker injected ;
+
+  (* [check_n_cycles] requires that the starting_level is the beginning of
+   * a new cycle. Since that's not the case when the VDF daemon is launched,
+   * the first cycle is checked here directly and the following cycles are
+   * checked using [check_n_cycles] *)
 
   (* Bake and check that we are in the nonce revelation stage *)
   let* () = Client.bake_for client in
@@ -300,7 +302,7 @@ let test_vdf : Protocol.t list -> unit =
   let* level = Node.wait_for_level node (blocks_per_cycle + 1) in
   let* () = assert_level client level (blocks_per_cycle + 1) in
 
-  (* Check correct behaviour for the following cycles *)
+  (* Check correct behaviour for the following [n_cycles] cycles *)
   let* level =
     check_n_cycles
       n_cycles
@@ -318,7 +320,7 @@ let test_vdf : Protocol.t list -> unit =
   let* () =
     assert_level client level ((blocks_per_cycle * (n_cycles + 1)) + 1)
   in
-  let* level =
+  let* _ =
     bake_until
       level
       ((blocks_per_cycle * (n_cycles + 2)) + 1)
@@ -327,13 +329,45 @@ let test_vdf : Protocol.t list -> unit =
       true
       nonce_revelation_threshold
   in
+  Lwt.return_unit
 
-  (* Bake through most of a new cycle and restart the VDF daemon right before
+(* This test runs through 1 cycle, launching the VDF daemons late in order
+ *  to test that the VDF computation is cancelled if not finished by the end
+ *  of the cycle *)
+let vdf_cancel : Protocol.t list -> unit =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Cancelling VDF computation"
+    ~tags:["vdf"]
+  @@ fun protocol ->
+  (* Override the `vdf_difficulty` constant in order ensure that
+   * a VDF computation started in the last block of a cycle will not be finished
+   * by the end of the cycle *)
+  let parameters = [(["vdf_difficulty"], `String "100000")] in
+  let* parameter_file =
+    Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
+  in
+  let* node, client, blocks_per_cycle, nonce_revelation_threshold =
+    init_test ~parameter_file protocol
+  in
+  let injected = ref false in
+
+  (* Bake and check that we are in the nonce revelation stage *)
+  let* () = Client.bake_for client in
+  let* level = Node.wait_for_level node 1 in
+  let* () =
+    assert_computation_status
+      nonce_revelation_threshold
+      client
+      Nonce_revelation_stage
+  in
+
+  (* Bake through most of a new cycle and start the VDF daemon right before
    * the end of the cycle so that the VDF is computed too late for injection. *)
   let* level =
     bake_until
       level
-      ((blocks_per_cycle * (n_cycles + 3)) - 1)
+      (blocks_per_cycle - 1)
       client
       node
       true
@@ -345,30 +379,21 @@ let test_vdf : Protocol.t list -> unit =
   init_vdf_event_listener vdf_baker2 injected ;
 
   (* Bake to the end of the cycle and check that the VDF was not injected. *)
-  let* level =
+  let* _ =
     bake_until
       level
-      ((blocks_per_cycle * (n_cycles + 3)) + 1)
+      (blocks_per_cycle + 1)
       client
       node
       true
       nonce_revelation_threshold
   in
-
-  (* Check correct behaviour for another [n_cycles] after the RANDAO cycle and
-   * the failed injection cycle. *)
-  let* _level =
-    check_n_cycles
-      n_cycles
-      (blocks_per_cycle, nonce_revelation_threshold)
-      level
-      client
-      node
-      injected
-  in
+  assert (not !injected) ;
 
   let* () = Vdf.terminate vdf_baker in
   let* () = Vdf.terminate vdf_baker2 in
   Lwt.return_unit
 
-let register ~protocols = test_vdf protocols
+let register ~protocols =
+  vdf_cycles protocols ;
+  vdf_cancel protocols
