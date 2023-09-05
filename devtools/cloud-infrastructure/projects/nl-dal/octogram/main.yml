@@ -26,6 +26,7 @@ vars:
   attestation_lag: 4
   attestation_threshold: 5
   blocks_per_epoch: 1
+  minimal_block_delay: 2
 
 stages:
   - name: Initialize protocol parameters file
@@ -39,8 +40,10 @@ stages:
 
       - name: Generate protocol parameters file
         tezos.generate_protocol_parameters_file:
-          # generates the file parameters.json in the root dir
-          basefile: 'self://{{ vars.network }}-parameters.json'
+          # generates the file 'parameters.json' in the agent's home dir
+          # use output_file_name: <other_file_name> to change that
+          base_file: 'self://{{ vars.network }}-parameters.json'
+          minimal_block_delay: '{{ vars.minimal_block_delay }}'
           dal:
             feature_enable: 'true'
             number_of_shards: '{{ vars.number_of_shards }}'
