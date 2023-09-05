@@ -418,6 +418,9 @@ module Start_octez_node = struct
              used in network like mainnet, Mondaynet etc. is 26 (see
              `lib_node_config/config_file.ml`). *)
           Expected_pow 0;
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
+
+             Use default PoW and add an option to override it. *)
           Synchronisation_threshold sync_threshold;
           Network network;
           Metrics_addr (sf "0.0.0.0:%d" metrics_port);
@@ -2385,6 +2388,9 @@ module Start_octez_dal_node = struct
         ~l1_node_endpoint:(octez_endpoint state l1_node_uri)
         ()
     in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
+
+       Use default PoW and add an option to override it. *)
     let* () =
       Dal_node.init_config
         ~expected_pow:0.
