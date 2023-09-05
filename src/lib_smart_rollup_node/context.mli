@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -54,8 +55,10 @@ type hash = Smart_rollup_context_hash.t
 (** The type of commits for the context. *)
 type commit
 
-(** [load path] initializes from disk a context from [path]. *)
-val load : 'a mode -> string -> 'a index tzresult Lwt.t
+(** [load cache_size path] initializes from disk a context from [path].
+    [cache_size] allows to change the LRU cache size of Irmin 
+    (100_000 by default at irmin-pack/config.ml *)
+val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index

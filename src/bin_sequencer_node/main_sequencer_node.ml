@@ -73,7 +73,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the sequencer node."
-    (args14
+    (args15
        force_switch
        data_dir_arg
        rpc_addr_arg
@@ -86,6 +86,7 @@ let config_init_command =
        injector_attempts_arg
        injection_ttl_arg
        index_buffer_size_arg
+       irmin_cache_size_arg
        log_kernel_debug_arg
        boot_sector_file_arg)
     (prefix "init"
@@ -105,6 +106,7 @@ let config_init_command =
            injector_attempts,
            injection_ttl,
            index_buffer_size,
+           irmin_cache_size,
            log_kernel_debug,
            boot_sector_file )
          sc_rollup_address
@@ -128,6 +130,7 @@ let config_init_command =
           ~boot_sector_file
           ~sc_rollup_node_operators:[sc_sequencer_operator]
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
       in
       let* () = Configuration.save ~force ~data_dir config in
@@ -147,7 +150,7 @@ let run_command =
     ~desc:
       "Run the sequencer node daemon. Arguments overwrite values provided in \
        the configuration file."
-    (args14
+    (args15
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -159,6 +162,7 @@ let run_command =
        injector_attempts_arg
        injection_ttl_arg
        index_buffer_size_arg
+       irmin_cache_size_arg
        log_kernel_debug_arg
        log_kernel_debug_file_arg
        boot_sector_file_arg)
@@ -176,6 +180,7 @@ let run_command =
            injector_attempts,
            injection_ttl,
            index_buffer_size,
+           irmin_cache_size,
            log_kernel_debug,
            log_kernel_debug_file,
            boot_sector_file )
@@ -200,11 +205,13 @@ let run_command =
           ~sc_rollup_address:(Some sc_rollup_address)
           ~sc_rollup_node_operators:[sc_sequencer_operator]
           ~index_buffer_size
+          ~irmin_cache_size
           ~log_kernel_debug
           ~boot_sector_file
       in
       Sc_rollup_node.Daemon.run
         ~data_dir
+        ~irmin_cache_size:Configuration.default_irmin_cache_size
         ~index_buffer_size:Configuration.default_index_buffer_size
         ?log_kernel_debug_file
         configuration

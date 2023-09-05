@@ -138,6 +138,7 @@ val get_fee_parameter :
 val init :
   #Client_context.full ->
   data_dir:string ->
+  irmin_cache_size:int ->
   index_buffer_size:int ->
   ?log_kernel_debug_file:string ->
   'a Store_sigs.mode ->

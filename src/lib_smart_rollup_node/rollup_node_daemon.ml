@@ -520,7 +520,7 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? constants, plugin = protocol_info cctxt current_protocol block.hash in
   return (constants, current_protocol, plugin)
 
-let run ~data_dir ~index_buffer_size ?log_kernel_debug_file
+let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
@@ -583,6 +583,7 @@ let run ~data_dir ~index_buffer_size ?log_kernel_debug_file
     Node_context.init
       cctxt
       ~data_dir
+      ~irmin_cache_size
       ~index_buffer_size
       ?log_kernel_debug_file
       Read_write

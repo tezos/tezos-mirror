@@ -486,8 +486,8 @@ end
 
 let run
     ?(daemon_components : (module Daemon_components.S) =
-      (module Rollup_node_daemon_components)) ~data_dir ~index_buffer_size
-    ?log_kernel_debug_file (configuration : Configuration.t)
+      (module Rollup_node_daemon_components)) ~data_dir ~irmin_cache_size
+    ~index_buffer_size ?log_kernel_debug_file (configuration : Configuration.t)
     (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
@@ -546,6 +546,7 @@ let run
     Node_context.init
       cctxt
       ~data_dir
+      ~irmin_cache_size
       ~index_buffer_size
       ?log_kernel_debug_file
       Read_write
