@@ -570,17 +570,19 @@ type 'uri generate_protocol_parameters_file = {
   dal : dal_parameters;
 }
 
+type generate_protocol_parameters_r = {filename : string}
+
 type (_, _) Remote_procedure.t +=
   | Generate_protocol_parameters_file :
       'uri generate_protocol_parameters_file
-      -> (string, 'uri) Remote_procedure.t
+      -> (generate_protocol_parameters_r, 'uri) Remote_procedure.t
 
 module Generate_protocol_parameters_file = struct
   let name = "tezos.generate_protocol_parameters_file"
 
   type 'uri t = 'uri generate_protocol_parameters_file
 
-  type r = string
+  type r = generate_protocol_parameters_r
 
   let of_remote_procedure :
       type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
@@ -603,9 +605,12 @@ module Generate_protocol_parameters_file = struct
 
   let r_encoding =
     let open Data_encoding in
-    obj1 (req "filename" string)
+    conv
+      (fun {filename} -> filename)
+      (fun filename -> {filename})
+      (obj1 (req "filename" string))
 
-  let tvalue_of_r filename = Tstr filename
+  let tvalue_of_r {filename} = Tobj [("filename", Tstr filename)]
 
   let expand ~self ~run base =
     let basefile =
@@ -657,7 +662,7 @@ module Generate_protocol_parameters_file = struct
     in
     let agent_dir = Agent_state.home_dir state in
     let* () = Helpers.exec "mv" [params_file; agent_dir] in
-    Lwt.return (Filename.concat agent_dir "parameters.json")
+    Lwt.return {filename = Filename.concat agent_dir "parameters.json"}
 
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ _ = ()
 end
