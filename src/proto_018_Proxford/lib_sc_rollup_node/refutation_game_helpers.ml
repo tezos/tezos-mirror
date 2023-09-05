@@ -66,17 +66,21 @@ let page_membership_proof params page_index slot_data =
       be unconfirmed on L1, this function returns [None]. If the data of the
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
-let page_info_from_pvm_state (node_ctxt : _ Node_context.t) ~dal_attestation_lag
+let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
     (dal_params : Dal.parameters) start_state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-     Use constants for correct protocol. *)
+  let dal_attestation_lag = constants.Rollup_constants.dal.attestation_lag in
   let is_reveal_enabled =
-    node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-    |> Sc_rollup.is_reveal_enabled_predicate
+    match constants.sc_rollup.reveal_activation_level with
+    | Some reveal_activation_level ->
+        Sc_rollup.is_reveal_enabled_predicate
+          (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+             reveal_activation_level)
+    | None ->
+        (* For older protocol, constants don't have the notion of reveal
+           activation level. *)
+        fun ~current_block_level:_ _ -> true
   in
   let*! input_request = PVM.is_input_state ~is_reveal_enabled start_state in
   match input_request with
@@ -149,22 +153,15 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
-  let* parametric_constants =
-    let cctxt = node_ctxt.cctxt in
-    Protocol.Constants_services.parametric
-      (new Protocol_client_context.wrap_full cctxt)
-      (cctxt#chain, `Level snapshot_level_int32)
+  let* constants =
+    Protocol_plugins.get_constants_of_level node_ctxt snapshot_level_int32
   in
-  let dal_l1_parameters = parametric_constants.dal in
+  let dal_l1_parameters = constants.dal in
   let dal_parameters = dal_l1_parameters.cryptobox_parameters in
   let dal_attestation_lag = dal_l1_parameters.attestation_lag in
 
   let* page_info =
-    page_info_from_pvm_state
-      ~dal_attestation_lag
-      node_ctxt
-      dal_parameters
-      start_state
+    page_info_from_pvm_state constants node_ctxt dal_parameters start_state
   in
   let module P = struct
     include PVM
@@ -242,9 +239,17 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let metadata = metadata node_ctxt in
   let*! start_tick = PVM.get_tick start_state in
   let is_reveal_enabled =
-    Sc_rollup.is_reveal_enabled_predicate
-      parametric_constants.sc_rollup.reveal_activation_level
+    match constants.sc_rollup.reveal_activation_level with
+    | Some reveal_activation_level ->
+        Sc_rollup.is_reveal_enabled_predicate
+          (Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+             reveal_activation_level)
+    | None ->
+        (* For older protocol, constants don't have the notion of reveal
+            activation level. *)
+        fun ~current_block_level:_ _ -> true
   in
+
   let* proof =
     trace
       (Sc_rollup_node_errors.Cannot_produce_proof

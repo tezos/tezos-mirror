@@ -75,6 +75,8 @@ let sub_level level decrement =
   if r < 0l then None else Some r
 
 let sc_rollup_commitment_period node_ctxt =
+  (* Publishing commitments is done w.r.t. the period in the protocol in which
+     the commitment is published, and not the one for the inbox level. *)
   node_ctxt.Node_context.current_protocol.constants.sc_rollup
     .commitment_period_in_blocks
 

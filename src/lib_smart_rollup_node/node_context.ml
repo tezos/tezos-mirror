@@ -773,6 +773,23 @@ let last_seen_protocol node_ctxt =
   | None | Some [] -> None
   | Some (p :: _) -> Some p.protocol
 
+let protocol_activation_level node_ctxt protocol_hash =
+  let open Lwt_result_syntax in
+  let* protocols = Store.Protocols.read node_ctxt.store.protocols in
+  match
+    Option.bind
+      protocols
+      (List.find_map (function Store.Protocols.{protocol; level; _} ->
+           if Protocol_hash.(protocol_hash = protocol) then Some level else None))
+  with
+  | None ->
+      failwith
+        "Could not determine the activation level of a previously unseen \
+         protocol %a"
+        Protocol_hash.pp
+        protocol_hash
+  | Some l -> return l
+
 let save_protocol_info node_ctxt (block : Layer1.header)
     ~(predecessor : Layer1.header) =
   let open Lwt_result_syntax in
@@ -943,7 +960,8 @@ let save_confirmed_slots_histories {store; _} block hist =
   Store.Dal_confirmed_slots_histories.add store.irmin_store block hist
 
 module Internal_for_tests = struct
-  let create_node_context cctxt current_protocol ~data_dir kind =
+  let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
+      kind =
     let open Lwt_result_syntax in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let index_buffer_size = Configuration.default_index_buffer_size in
@@ -966,6 +984,18 @@ module Internal_for_tests = struct
     let l1_ctxt = Layer1.Internal_for_tests.dummy cctxt in
     let lcc = Reference.new_ {commitment = Commitment.Hash.zero; level = 0l} in
     let lpc = Reference.new_ None in
+    let* () =
+      Store.Protocols.write
+        store.protocols
+        [
+          Store.Protocols.
+            {
+              level = Activation_level 0l;
+              proto_level = current_protocol.proto_level;
+              protocol = current_protocol.hash;
+            };
+        ]
+    in
     return
       {
         cctxt = (cctxt :> Client_context.full);

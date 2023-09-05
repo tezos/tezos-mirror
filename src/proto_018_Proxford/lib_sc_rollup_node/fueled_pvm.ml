@@ -77,19 +77,20 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let open Delayed_write_monad.Lwt_result_syntax in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/5871
-       Use constants for correct protocol. *)
+    let* constants =
+      Protocol_plugins.get_constants_of_level node_ctxt (Int32.of_int level)
+    in
     let is_reveal_enabled =
-      node_ctxt.current_protocol.constants.sc_rollup.reveal_activation_level
-      |> WithExceptions.Option.get ~loc:__LOC__
-      |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-      |> Sc_rollup.is_reveal_enabled_predicate
+      match constants.sc_rollup.reveal_activation_level with
+      | None -> fun ~current_block_level:_ _ -> true
+      | Some reveal_activation_level ->
+          reveal_activation_level
+          |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+          |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
     in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.current_protocol.constants.dal.attestation_lag
-    in
+    let dal_attestation_lag = constants.dal.attestation_lag in
     let decode_reveal (Tezos_scoru_wasm.Wasm_pvm_state.Reveal_raw payload) =
       match
         Data_encoding.Binary.of_string_opt

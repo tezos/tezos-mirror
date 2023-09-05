@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** {2 Protocol registration logic} *)
+
 type proto_plugin = (module Protocol_plugin_sig.S)
 
 (** Register a protocol plugin for a specific protocol to be used by the
@@ -51,3 +53,27 @@ val proto_plugin_for_block :
 (** Returns the plugin corresponding to the last protocol seen by the rollup
     node. *)
 val last_proto_plugin : _ Node_context.t -> proto_plugin tzresult Lwt.t
+
+(** {2 Safe protocol specific constants}
+
+    These functions provide a way to retrieve constants in a safe manner,
+    depending on the context.
+*)
+
+(** Retrieve constants for a given protocol (values are cached). *)
+val get_constants_of_protocol :
+  _ Node_context.t ->
+  Protocol_hash.t ->
+  Rollup_constants.protocol_constants tzresult Lwt.t
+
+(** Retrieve constants for a given level (values are cached). *)
+val get_constants_of_level :
+  _ Node_context.t ->
+  int32 ->
+  Rollup_constants.protocol_constants tzresult Lwt.t
+
+(** Retrieve constants for a given block hash (values are cached). *)
+val get_constants_of_block_hash :
+  _ Node_context.t ->
+  Block_hash.t ->
+  Rollup_constants.protocol_constants tzresult Lwt.t

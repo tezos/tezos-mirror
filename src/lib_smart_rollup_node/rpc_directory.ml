@@ -139,18 +139,25 @@ let () =
          ((last_commitment - inbox_level) / commitment_period
           * commitment_period)
       v}
-  *)
+*)
 let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level =
-  let open Option_syntax in
-  let+ last_published_commitment = Reference.get node_ctxt.lpc in
-  let commitment_period =
-    Int32.of_int
-      node_ctxt.current_protocol.constants.sc_rollup.commitment_period_in_blocks
+  let open Lwt_result_syntax in
+  let last_published_commitment = Reference.get node_ctxt.lpc in
+  let+ constants =
+    Protocol_plugins.get_constants_of_level node_ctxt inbox_level
   in
-  let last_published = last_published_commitment.inbox_level in
-  let open Int32 in
-  div (sub last_published inbox_level) commitment_period
-  |> mul commitment_period |> sub last_published
+  let commitment_period =
+    Int32.of_int constants.sc_rollup.commitment_period_in_blocks
+  in
+  Option.map
+    (fun last_published_commitment ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6246
+         fix and test last_published_inbox_level in RPC dir. *)
+      let last_published = last_published_commitment.Commitment.inbox_level in
+      let open Int32 in
+      div (sub last_published inbox_level) commitment_period
+      |> mul commitment_period |> sub last_published)
+    last_published_commitment
 
 let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
   let open Lwt_result_syntax in
@@ -185,7 +192,7 @@ let () =
                 let* finalized, cemented =
                   inbox_info_of_level node_ctxt l1_level
                 in
-                let commitment_level =
+                let* commitment_level =
                   commitment_level_of_inbox_level node_ctxt l1_level
                 in
                 match commitment_level with

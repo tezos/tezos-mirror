@@ -89,7 +89,7 @@ module type S = sig
   val install_boot_sector :
     Kind.t -> Context.tree -> string -> Context.tree Lwt.t
 
-  val get_status : _ Node_context.t -> Context.tree -> string Lwt.t
+  val get_status : _ Node_context.t -> Context.tree -> string tzresult Lwt.t
 
   val get_current_level : Kind.t -> Context.tree -> int32 option Lwt.t
 
