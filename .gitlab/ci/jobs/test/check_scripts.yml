@@ -15,7 +15,7 @@ script:snapshot_alpha_and_link:
     - "build_x86_64-released"
     - "build_x86_64-exp-dev-extra"
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-snapshot-alpha-and-link
+    - ./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh
   rules:
     # We only need to run this if protocol Alpha or if the scripts changed.
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -59,4 +59,5 @@ check_scripts_b58_prefix:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci check-scripts-b58-prefix
+    - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest scripts/b58_prefix/test_b58_prefix.py

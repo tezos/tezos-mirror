@@ -23,5 +23,7 @@ documentation:linkcheck:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-linkcheck
+    - make all
+    - make -C docs redirectcheck
+    - make -C docs linkcheck
   allow_failure: true

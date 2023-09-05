@@ -12,7 +12,9 @@
   # underlying tests have been fixed.
   retry: 2
   script:
-    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci opam-configure
+    - opam remote add dev-repo ./_opam-repo-for-release
+    - opam install --yes ${package}.dev
+    - opam reinstall --yes --with-test ${package}.dev
   needs: [opam:prepare]
   dependencies: [opam:prepare]
   after_script:
@@ -43,7 +45,10 @@ opam:prepare:
   stage: packaging
   needs: [trigger]
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-prepare
+    - git init _opam-repo-for-release
+    - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+    - git -C _opam-repo-for-release add packages
+    - git -C _opam-repo-for-release commit -m "tezos packages"
   artifacts:
     paths:
       - _opam-repo-for-release/

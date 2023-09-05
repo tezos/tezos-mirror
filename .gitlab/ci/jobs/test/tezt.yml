@@ -31,7 +31,33 @@ include: .gitlab/ci/jobs/test/common.yml
     # certain tests can be blacklisted by adding it to this variable
     when: always
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt
+    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}"'
+    # For Tezt tests, there are multiple timeouts:
+    # - --global-timeout is the internal timeout of Tezt, which only works if tests
+    #   are cooperative;
+    # - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
+    #   in case tests are not cooperative;
+    # - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
+    #   Tezt is still stuck;
+    # - the CI timeout.
+    # The use of the "timeout" command is to make sure that Tezt eventually exits,
+    # because if the CI timeout is reached, there are no artefacts,
+    # and thus no logs to investigate.
+    # See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
+    - timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe
+        ${TESTS}
+        --color
+        --log-buffer-size 5000
+        --log-file tezt.log
+        --global-timeout 1800
+        --on-unknown-regression-files fail
+        --junit ${JUNIT}
+        --from-record tezt/records
+        --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+        --record tezt-results-${CI_NODE_INDEX}.json
+        --job-count 3
+        --retry 1
+    - ./scripts/ci/merge_coverage.sh
 
 tezt:
   extends:
@@ -82,7 +108,20 @@ tezt:static-binaries:
   # Note that the set of tests that are run for static executables
   # is a subset, so this should not reduce apparent coverage.
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-static-binaries
+    - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}"'
+    - timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe
+        ${TESTS}
+        --color
+        --log-buffer-size 5000
+        --log-file tezt.log
+        --global-timeout 1800
+        --on-unknown-regression-files fail
+        --junit ${JUNIT}
+        --from-record tezt/records
+        --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+        --record tezt-results-${CI_NODE_INDEX}.json
+        --job-count 3
+        --retry 1
 
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #

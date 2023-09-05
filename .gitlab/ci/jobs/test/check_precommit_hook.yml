@@ -8,4 +8,6 @@ check_precommit_hook:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci check-precommit
+    - poetry run pylint scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle scripts/pre_commit/pre_commit.py
+    - poetry run mypy scripts/pre_commit/pre_commit.py

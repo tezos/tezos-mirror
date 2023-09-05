@@ -23,6 +23,6 @@ publish:documentation:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-publish
+    - ./scripts/ci/doc_publish.sh
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

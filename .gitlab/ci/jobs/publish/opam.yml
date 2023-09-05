@@ -10,4 +10,4 @@ opam:release:
     - gitlab:release
   script:
   # create opam release and push to github (also pushes latest master branch)
-  - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-release
+  - ./scripts/ci/opam-release.sh

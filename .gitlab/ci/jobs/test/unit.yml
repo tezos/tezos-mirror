@@ -83,4 +83,4 @@ unit:js_components:
 unit:protocol_compiles:
   extends: .unit_test_template_x86_64
   script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-protocol-compiles
+    - dune build @runtest_compile_protocol
