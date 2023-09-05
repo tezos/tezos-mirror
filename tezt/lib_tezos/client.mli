@@ -2878,6 +2878,19 @@ val get_timestamp :
 val spawn_get_timestamp :
   ?endpoint:endpoint -> ?block:string -> ?seconds:bool -> t -> Process.t
 
+(** Run [octez-client publish dal commitment <commitment> from <src> for slot
+    <slot_index> with proof <proof>]. *)
+val publish_dal_commitment :
+  ?hooks:Process_hooks.t ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  commitment:string ->
+  slot_index:int ->
+  proof:string ->
+  t ->
+  unit Runnable.process
+
 (** Return the information stored in the given endpoint as a foreign
     endpoint. *)
 val as_foreign_endpoint : endpoint -> Foreign_endpoint.t
