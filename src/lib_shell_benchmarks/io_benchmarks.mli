@@ -116,3 +116,18 @@ module Write_random_keys_bench : sig
 
   include Benchmark.Simple_with_num with type config := config
 end
+
+module Shared : sig
+  type config = {
+    tezos_data_dir : string;
+    cache_dir : string;
+    memory_available : float;
+    runs : int;
+  }
+
+  val config_encoding : config Data_encoding.t
+end
+
+module Read_bench : Benchmark.Simple_with_num with type config := Shared.config
+
+module Write_bench : Benchmark.Simple_with_num with type config := Shared.config

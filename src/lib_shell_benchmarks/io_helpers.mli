@@ -44,13 +44,18 @@ val prepare_empty_context : string -> (Context_hash.t, tztrace) result Lwt.t
 val load_context_from_disk :
   string -> Context_hash.t -> Context.t * Tezos_context.Context.index
 
+val load_context_from_disk_lwt :
+  string ->
+  Context_hash.t ->
+  (Tezos_protocol_environment.Context.t * Tezos_context.Context.index) Lwt.t
+
 val with_context :
-  base_dir:string ->
+  context_dir:string ->
   context_hash:Context_hash.t ->
   (Context.t -> 'a Lwt.t) ->
   'a
 
-val prepare_base_dir : string -> unit
+val prepare_context_dir : string -> unit
 
 (** This function updates the context with random bytes at a given depth. *)
 val initialize_key :
