@@ -29,6 +29,22 @@ include Internal_event.Simple
 let section = ["node"; "store"]
 
 (* Info *)
+let init_store =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"init_store"
+    ~msg:"initializing the store (readonly:{ro})"
+    ("ro", Data_encoding.bool)
+
+let end_init_store =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"end_init_store"
+    ~msg:"store initialized"
+    ()
+
 let set_head =
   declare_1
     ~section
