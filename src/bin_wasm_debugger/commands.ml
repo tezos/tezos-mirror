@@ -219,8 +219,7 @@ let rec commands_docs =
          from PVM.";
     };
     {
-      parse =
-        (fun command -> match command with ["stop"] -> Some Stop | _ -> None);
+      parse = (function ["stop"] -> Some Stop | _ -> None);
       documentation = "stop: Stops the execution of the current session.";
     };
     {
@@ -655,7 +654,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let* tree, ticks, inboxes, level = eval level inboxes config kind tree in
     let*! () = Lwt_io.printf "Evaluation took %Ld ticks so far\n" ticks in
     let*! () = show_status tree in
-    return (tree, inboxes, level)
+    return_some (tree, inboxes, level)
 
   (* [show_inbox tree] prints the current input buffer and the number of messages
      it contains. *)
@@ -951,7 +950,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     let open Lwt_result_syntax in
     let command = parse_commands c in
     let return ?(tree = tree) ?(inboxes = inboxes) () =
-      return (tree, inboxes, level)
+      return_some (tree, inboxes, level)
     in
     let rec go = function
       | Time cmd ->
@@ -964,7 +963,9 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
               (Format.asprintf "%a" Ptime.Span.pp (Ptime.diff t' t))
           in
           Lwt_result_syntax.return res
-      | Load_inputs -> load_inputs inboxes level tree
+      | Load_inputs ->
+          let+ ctx = load_inputs inboxes level tree in
+          Some ctx
       | Show_status ->
           let*! () = show_status tree in
           return ()
@@ -1010,7 +1011,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
               function_symbols
               tree
           in
-          Lwt.return_ok (tree, inboxes, level)
+          return_some (tree, inboxes, level)
       | Unknown s ->
           let*! () = Lwt_io.eprintf "Unknown command `%s`\n%!" s in
           return ()
@@ -1022,7 +1023,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
               commands_docs
           in
           return ()
-      | Stop -> return ()
+      | Stop -> return_none
     in
     go command
 end
