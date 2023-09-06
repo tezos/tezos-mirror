@@ -8,11 +8,11 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-017-PtNairob
   octez-libs.tezos-base-test-helpers
-  octez-protocol-017-PtNairob-libs.tezos-baking-017-PtNairob.mockup-simulator
-  octez-protocol-017-PtNairob-libs.tezos-baking-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-bakings.mockup-simulator
+  octez-protocol-017-PtNairob-libs.tezos-baking
   tezos-protocol-017-PtNairob.parameters
   octez-libs.tezos-crypto
   octez-alcotezt

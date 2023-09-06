@@ -8,11 +8,11 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client
   tezos-protocol-alpha
   octez-libs.tezos-base-test-helpers
-  octez-protocol-alpha-libs.tezos-baking-alpha.mockup-simulator
-  octez-protocol-alpha-libs.tezos-baking-alpha
+  octez-protocol-alpha-libs.tezos-bakings.mockup-simulator
+  octez-protocol-alpha-libs.tezos-baking
   tezos-protocol-alpha.parameters
   octez-libs.tezos-crypto
   octez-alcotezt

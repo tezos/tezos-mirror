@@ -3,8 +3,7 @@
 
 (library
  (name tezos_client_sapling_011_PtHangz2)
- (public_name
-  octez-protocol-011-PtHangz2-libs.tezos-client-011-PtHangz2.sapling)
+ (public_name octez-protocol-011-PtHangz2-libs.tezos-client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -13,8 +12,8 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-signer-backends
-  octez-protocol-011-PtHangz2-libs.tezos-client-011-PtHangz2
-  octez-protocol-011-PtHangz2-libs.tezos-client-011-PtHangz2.commands
+  octez-protocol-011-PtHangz2-libs.tezos-client
+  octez-protocol-011-PtHangz2-libs.tezos-client.commands
   tezos-protocol-011-PtHangz2)
  (library_flags (:standard -linkall))
  (flags

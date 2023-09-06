@@ -9,14 +9,14 @@
   octez-libs.tezos-base
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-micheline
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   octez-shell-libs.tezos-client-base
   tezos-protocol-018-Proxford.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix
   tezos-protocol-018-Proxford
   octez-libs.tezos-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers
+  octez-protocol-018-Proxford-libs.tezos-test-helpers
   octez-alcotezt
   octez-l2-libs.tezos-scoru-wasm-helpers
   octez-libs.tezos-stdlib

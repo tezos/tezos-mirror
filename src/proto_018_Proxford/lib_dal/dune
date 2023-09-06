@@ -3,17 +3,17 @@
 
 (library
  (name tezos_dal_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.tezos-dal-018-Proxford)
+ (public_name octez-protocol-018-Proxford-libs.tezos-dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-protocol-compiler.registerer
   octez-libs.tezos-stdlib-unix
   tezos-dal-node-lib
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   tezos-embedded-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-layer2-utils-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-layer2-utils
   tezos-protocol-018-Proxford)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

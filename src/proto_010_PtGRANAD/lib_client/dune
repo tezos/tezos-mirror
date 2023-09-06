@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_010_PtGRANAD)
- (public_name octez-protocol-010-PtGRANAD-libs.tezos-client-010-PtGRANAD)
+ (public_name octez-protocol-010-PtGRANAD-libs.tezos-client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -13,7 +13,7 @@
   tezos-protocol-010-PtGRANAD
   tezos-protocol-010-PtGRANAD.lifted
   octez-shell-libs.tezos-signer-backends
-  octez-protocol-010-PtGRANAD-libs.tezos-protocol-plugin-010-PtGRANAD
+  octez-protocol-010-PtGRANAD-libs.tezos-protocol-plugin
   octez-libs.tezos-rpc
   uri)
  (inline_tests (flags -verbose) (modes native))

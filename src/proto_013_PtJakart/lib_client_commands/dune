@@ -3,8 +3,7 @@
 
 (library
  (name tezos_client_013_PtJakart_commands)
- (public_name
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart.commands)
+ (public_name octez-protocol-013-PtJakart-libs.tezos-client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -18,11 +17,11 @@
   octez-shell-libs.tezos-mockup-registration
   octez-shell-libs.tezos-mockup-commands
   octez-shell-libs.tezos-client-base
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart
+  octez-protocol-013-PtJakart-libs.tezos-client
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
   octez-shell-libs.tezos-client-base-unix
-  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin-013-PtJakart
+  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -43,7 +42,7 @@
 (library
  (name tezos_client_013_PtJakart_commands_registration)
  (public_name
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart.commands-registration)
+  octez-protocol-013-PtJakart-libs.tezos-client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -53,12 +52,12 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart
+  octez-protocol-013-PtJakart-libs.tezos-client
   octez-shell-libs.tezos-client-commands
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart.commands
-  octez-protocol-013-PtJakart-libs.tezos-client-013-PtJakart.sapling
+  octez-protocol-013-PtJakart-libs.tezos-client.commands
+  octez-protocol-013-PtJakart-libs.tezos-client.sapling
   octez-libs.tezos-rpc
-  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin-013-PtJakart)
+  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

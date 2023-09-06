@@ -8,11 +8,11 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   tezos-protocol-018-Proxford
   octez-libs.tezos-base-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford.mockup-simulator
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-bakings.mockup-simulator
+  octez-protocol-018-Proxford-libs.tezos-baking
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-crypto
   octez-alcotezt

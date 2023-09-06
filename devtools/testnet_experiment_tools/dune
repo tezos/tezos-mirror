@@ -10,7 +10,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  octez-protocol-alpha-libs.tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client
   tezos-protocol-alpha)
  (link_flags
   (:standard)
@@ -32,17 +32,17 @@
   octez-libs.tezos-base.unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
-  octez-protocol-017-PtNairob-libs.tezos-baking-017-PtNairob
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob.commands
+  octez-protocol-017-PtNairob-libs.tezos-baking
+  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.tezos-client.commands
   tezos-protocol-017-PtNairob
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford.commands
+  octez-protocol-018-Proxford-libs.tezos-baking
+  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.tezos-client.commands
   tezos-protocol-018-Proxford
-  octez-protocol-alpha-libs.tezos-baking-alpha
-  octez-protocol-alpha-libs.tezos-client-alpha
-  octez-protocol-alpha-libs.tezos-client-alpha.commands
+  octez-protocol-alpha-libs.tezos-baking
+  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.tezos-client.commands
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
  (flags

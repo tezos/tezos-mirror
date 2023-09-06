@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_plugin_007_PsDELPH1)
- (public_name
-  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin-007-PsDELPH1)
+ (public_name octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin)
  (libraries
   octez-libs.tezos-base
   tezos-protocol-007-PsDELPH1)
@@ -20,11 +19,11 @@
 (library
  (name tezos_protocol_plugin_007_PsDELPH1_registerer)
  (public_name
-  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin-007-PsDELPH1-registerer)
+  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin-registerer)
  (libraries
   octez-libs.tezos-base
   tezos-embedded-protocol-007-PsDELPH1
-  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin-007-PsDELPH1
+  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-validation)
  (flags
   (:standard)

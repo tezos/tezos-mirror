@@ -19,10 +19,10 @@
   octez-libs.tezos-crypto
   octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-alpha-test-helpers
+  octez-protocol-alpha-libs.tezos-test-helpers
   octez-libs.tezos-sapling
-  octez-protocol-alpha-libs.tezos-client-alpha
-  octez-protocol-alpha-libs.tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags

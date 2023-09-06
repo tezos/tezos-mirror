@@ -11,10 +11,10 @@
   octez-shell-libs.tezos-client-commands
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   octez-l2-libs.octez-smart-rollup
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup-layer2-018-Proxford)
+  octez-protocol-018-Proxford-libs.tezos-smart-rollup
+  octez-protocol-018-Proxford-libs.tezos-smart-rollup-layer2)
  (flags
   (:standard)
   -open Tezos_base

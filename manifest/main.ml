@@ -5716,7 +5716,8 @@ let hash = Protocol.hash
     let octez_sc_rollup =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-smart-rollup-%s" name_dash)
+        "tezos-smart-rollup"
+        ~internal_name:(sf "tezos_smart_rollup_%s" name_dash)
         ~path:(path // "lib_sc_rollup")
         ~synopsis:
           "Protocol specific library of helpers for `tezos-smart-rollup`"
@@ -5727,7 +5728,8 @@ let hash = Protocol.hash
     let plugin =
       only_if (N.(number >= 007) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-protocol-plugin-%s" name_dash)
+        "tezos-protocol-plugin"
+        ~internal_name:(sf "tezos_protocol_plugin_%s" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Protocol plugin"
         ~documentation:
@@ -5745,7 +5747,8 @@ let hash = Protocol.hash
     let plugin_registerer =
       opt_map plugin @@ fun plugin ->
       octez_protocol_lib
-        (sf "tezos-protocol-plugin-%s-registerer" name_dash)
+        "tezos-protocol-plugin-registerer"
+        ~internal_name:(sf "tezos_protocol_plugin_%s_registerer" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Protocol plugin registerer"
         ~release_status:optional_library_release_status
@@ -5763,7 +5766,8 @@ let hash = Protocol.hash
     let client =
       only_if not_overridden @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-client-%s" name_dash)
+        "tezos-client"
+        ~internal_name:(sf "tezos_client_%s" name_dash)
         ~path:(path // "lib_client")
         ~synopsis:"Protocol specific library for `tezos-client`"
         ~release_status:optional_library_release_status
@@ -5793,9 +5797,8 @@ let hash = Protocol.hash
     in
     let test_helpers =
       only_if active @@ fun () ->
-      let name = sf "tezos-%s-test-helpers" name_dash in
       octez_protocol_lib
-        name
+        "tezos-test-helpers"
         ~path:
           (if active then path // "lib_protocol/test/helpers"
           else path // "lib_protocol")
@@ -5880,7 +5883,8 @@ let hash = Protocol.hash
     let client_commands =
       only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-client-%s.commands" name_dash)
+        "tezos-client.commands"
+        ~internal_name:(sf "tezos_client_%s_commands" name_dash)
         ~path:(path // "lib_client_commands")
         ~deps:
           [
@@ -5914,7 +5918,7 @@ let hash = Protocol.hash
     let client_sapling =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-client-%s.sapling" name_dash)
+        "tezos-client.sapling"
         ~internal_name:(sf "tezos_client_sapling_%s" name_underscore)
         ~path:(path // "lib_client_sapling")
         ~deps:
@@ -5936,7 +5940,8 @@ let hash = Protocol.hash
     let client_commands_registration =
       only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-client-%s.commands-registration" name_dash)
+        "tezos-client.commands-registration"
+        ~internal_name:(sf "tezos_client_%s_commands_registration" name_dash)
         ~path:(path // "lib_client_commands")
         ~deps:
           [
@@ -5965,7 +5970,8 @@ let hash = Protocol.hash
     let baking =
       only_if active @@ fun () ->
       octez_protocol_lib
-        ("tezos-baking-" ^ name_dash)
+        "tezos-baking"
+        ~internal_name:("tezos_baking_" ^ name_dash)
         ~path:(path // "lib_delegate")
         ~synopsis:
           (if N.(number <= 011) then
@@ -6008,7 +6014,7 @@ let hash = Protocol.hash
     let tenderbrute =
       only_if (active && N.(number >= 013)) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-baking-%s.tenderbrute" name_dash)
+        "tezos-baking.tenderbrute"
         ~internal_name:(sf "tenderbrute_%s" name_underscore)
         ~path:(path // "lib_delegate/test/tenderbrute/lib")
         ~deps:
@@ -6050,7 +6056,7 @@ let hash = Protocol.hash
       let mockup_simulator =
         only_if N.(number >= 012) @@ fun () ->
         octez_protocol_lib
-          (sf "tezos-baking-%s.mockup-simulator" name_dash)
+          "tezos-bakings.mockup-simulator"
           ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
           ~path:(path // "lib_delegate/test/mockup_simulator")
           ~deps:
@@ -6099,7 +6105,8 @@ let hash = Protocol.hash
     let baking_commands =
       only_if active @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-baking-%s-commands" name_dash)
+        "tezos-baking-commands"
+        ~internal_name:(sf "tezos_baking_%s_commands" name_dash)
         ~path:(path // "lib_delegate")
         ~synopsis:"Protocol-specific commands for baking"
         ~deps:
@@ -6128,7 +6135,8 @@ let hash = Protocol.hash
     let baking_commands_registration =
       only_if active @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-baking-%s-commands.registration" name_dash)
+        "tezos-baking-commands.registration"
+        ~internal_name:(sf "tezos_baking_%s_commands_registration" name_dash)
         ~path:(path // "lib_delegate")
         ~deps:
           [
@@ -6178,7 +6186,8 @@ let hash = Protocol.hash
     let layer2_utils =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-layer2-utils-%s" name_dash)
+        "tezos-layer2-utils"
+        ~internal_name:(sf "tezos_layer2_utils_%s" name_dash)
         ~path:(path // "lib_layer2_utils")
         ~synopsis:"Protocol specific library for Layer 2 utils"
         ~deps:
@@ -6193,7 +6202,8 @@ let hash = Protocol.hash
     let injector =
       only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-injector-%s" name_dash)
+        "tezos-injector"
+        ~internal_name:(sf "tezos_injector_%s" name_dash)
         ~path:(path // "lib_injector")
         ~synopsis:"Protocol specific library building injectors"
         ~deps:
@@ -6218,7 +6228,8 @@ let hash = Protocol.hash
     let dal =
       only_if (active && N.(number >= 016)) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-dal-%s" name_dash)
+        "tezos-dal"
+        ~internal_name:(sf "tezos_dal_%s" name_dash)
         ~path:(path // "lib_dal")
         ~synopsis:"Protocol specific library for the Data availability Layer"
         ~deps:
@@ -6269,7 +6280,8 @@ let hash = Protocol.hash
          plugin cannot be resolved. *)
       only_if (active && N.(number >= 017)) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-dac-%s" name_dash)
+        "tezos-dac"
+        ~internal_name:(sf "tezos_dac_%s" name_dash)
         ~path:(path // "lib_dac_plugin")
         ~synopsis:
           "Protocol specific library for the Data availability Committee"
@@ -6315,7 +6327,8 @@ let hash = Protocol.hash
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-smart-rollup-layer2-%s" name_dash)
+        "tezos-smart-rollup-layer2"
+        ~internal_name:(sf "tezos_smart_rollup_layer2_%s" name_dash)
         ~path:(path // "lib_sc_rollup_layer2")
         ~synopsis:"Protocol specific library for `tezos-smart-rollup`"
         ~deps:
@@ -6488,7 +6501,8 @@ let hash = Protocol.hash
     let tx_rollup =
       only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       octez_protocol_lib
-        (sf "tezos-tx-rollup-%s" name_dash)
+        "tezos-tx-rollup"
+        ~internal_name:(sf "tezos_tx_rollup_%s" name_dash)
         ~path:(path // "lib_tx_rollup")
         ~synopsis:"Protocol specific library for `tezos-tx-rollup`"
         ~deps:

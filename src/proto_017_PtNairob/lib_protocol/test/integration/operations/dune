@@ -10,10 +10,10 @@
   octez-alcotezt
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
-  octez-protocol-017-PtNairob-libs.tezos-017-PtNairob-test-helpers
+  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin-017-PtNairob)
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

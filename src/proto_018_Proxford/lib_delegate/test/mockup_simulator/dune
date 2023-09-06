@@ -3,21 +3,20 @@
 
 (library
  (name tezos_018_Proxford_mockup_simulator)
- (public_name
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford.mockup-simulator)
+ (public_name octez-protocol-018-Proxford-libs.tezos-bakings.mockup-simulator)
  (libraries
   octez-libs.tezos-base
   tezos-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   octez-shell-libs.tezos-client-commands
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-baking
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base-unix
   tezos-protocol-018-Proxford.parameters
   octez-shell-libs.tezos-mockup
   octez-shell-libs.tezos-mockup-proxy
   octez-shell-libs.tezos-mockup-commands
-  octez-protocol-018-Proxford-libs.tezos-baking-018-Proxford.tenderbrute)
+  octez-protocol-018-Proxford-libs.tezos-baking.tenderbrute)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
