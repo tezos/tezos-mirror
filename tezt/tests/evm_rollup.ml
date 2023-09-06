@@ -317,11 +317,18 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?legacy_dictator ()
 
 type kernel_installee = {base_installee : string; installee : string}
 
+let set_storage_version_in_config (`Config instrs) =
+  `Config
+    (Installer_kernel_config.Set
+       {value = "0000000000000000"; to_ = "/evm/storage_version"}
+    :: instrs)
+
 let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ?legacy_dictator ~admin protocol =
+    ?(with_administrator = true) ?legacy_dictator
+    ?(ghostnet_storage_version = false) ~admin protocol =
   let* node, client = setup_l1 protocol in
   let* l1_contracts =
     match admin with
@@ -347,6 +354,16 @@ let setup_evm_kernel ?config ?kernel_installee
           ?administrator
           ?legacy_dictator
           ()
+  in
+  let config =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6296
+       This corner case where we need to set a specific storage version
+       is required because ghostnet doesn't have a storage version set in
+       the storage.
+       Upgrading on ghostnet should lead to the removal of this code. *)
+    if ghostnet_storage_version then
+      Option.map set_storage_version_in_config config
+    else config
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -418,7 +435,8 @@ let setup_evm_kernel ?config ?kernel_installee
     }
 
 let setup_past_genesis ?with_administrator ?kernel_installee ?originator_key
-    ?rollup_operator_key ~admin ?legacy_dictator protocol =
+    ?rollup_operator_key ~admin ?legacy_dictator ?ghostnet_storage_version
+    protocol =
   let* ({node; client; sc_rollup_node; _} as full_setup) =
     setup_evm_kernel
       ?kernel_installee
@@ -426,6 +444,7 @@ let setup_past_genesis ?with_administrator ?kernel_installee ?originator_key
       ?rollup_operator_key
       ?with_administrator
       ?legacy_dictator
+      ?ghostnet_storage_version
       ~admin
       protocol
   in
@@ -2193,6 +2212,7 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
         }
       ~admin:(Some admin)
       ~legacy_dictator
+      ~ghostnet_storage_version:true
       protocol
   in
   (* Load the EVM rollup's storage and sanity check results. *)
