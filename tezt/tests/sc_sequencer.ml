@@ -93,7 +93,7 @@ let setup_sequencer_kernel
   in
   let sc_sequencer_node =
     Sc_rollup_node.create
-      Custom
+      Batcher
       node
       ~path:"./octez-smart-rollup-sequencer-node"
       ~data_dir

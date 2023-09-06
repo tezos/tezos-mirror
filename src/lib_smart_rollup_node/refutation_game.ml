@@ -69,7 +69,12 @@ let inject_next_move node_ctxt source ~refutation ~opponent =
     L1_operation.Refute
       {rollup = node_ctxt.Node_context.rollup_address; refutation; opponent}
   in
-  let* _hash = Injector.add_pending_operation ~source refute_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.mode
+      ~source
+      refute_operation
+  in
   return_unit
 
 type pvm_intermediate_state =
@@ -233,7 +238,12 @@ let play_timeout (node_ctxt : _ Node_context.t) self stakers =
   let timeout_operation =
     L1_operation.Timeout {rollup = node_ctxt.rollup_address; stakers}
   in
-  let* _hash = Injector.add_pending_operation ~source:self timeout_operation in
+  let* _hash =
+    Injector.check_and_add_pending_operation
+      node_ctxt.mode
+      ~source:self
+      timeout_operation
+  in
   return_unit
 
 let play node_ctxt ~self game opponent =

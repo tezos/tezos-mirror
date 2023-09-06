@@ -24,6 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The kind of operations that can be injected by the rollup node. *)
+type operation_kind =
+  | Publish
+  | Add_messages
+  | Cement
+  | Timeout
+  | Refute
+  | Recover
+
 (** Mode for the rollup node *)
 type mode =
   | Observer  (** Only follows the chain and reconstructs inboxes *)
@@ -33,18 +42,9 @@ type mode =
   | Batcher  (** Accept transactions in its queue and batches them on the L1 *)
   | Maintenance  (** Follows the chain and publishes commitments *)
   | Operator  (** Equivalent to maintenance + batcher  *)
-  | Custom
-      (** This mode allows to tweak which operations are injected by selecting
-          the signers *)
-
-(** The kind of operations that can be injected by the rollup node. *)
-type operation_kind =
-  | Publish
-  | Add_messages
-  | Cement
-  | Timeout
-  | Refute
-  | Recover
+  | Custom of operation_kind list
+      (** In this mode, the system handles only the specific operation kinds
+        defined by the user, allowing for tailored control and flexibility. *)
 
 (** Purposes for operators, indicating their role and thus the kinds of
     operations that they sign. *)
@@ -212,9 +212,23 @@ val description_of_mode : mode -> string
     the configration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
 
+(** [purposes_of_operation_kinds op_kinds] map a list of operation kinds 
+    to their corresponding purposes based on their presence in the input list *)
+val purposes_of_operation_kinds : operation_kind list -> purpose list
+
 (** [check_mode config] ensures the operators correspond to the chosen mode and
     removes the extra ones. *)
 val check_mode : t -> t tzresult
+
+(** [purposes_of_mode mode] returns purposes associated with the provided mode. *)
+val purposes_of_mode : mode -> purpose list
+
+(** [operation_kinds_of_mode mode] returns operation kinds with the provided mode. *)
+val operation_kinds_of_mode : mode -> operation_kind list
+
+(** [can_inject mode op_kind] determines if a given operation kind can 
+    be injected based on the configuration settings. *)
+val can_inject : mode -> operation_kind -> bool
 
 (** Number of levels the refutation player waits until trying to play
     for a game state it already played before. *)
