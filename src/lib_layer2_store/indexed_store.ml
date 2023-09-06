@@ -699,15 +699,28 @@ struct
       | Error err -> tzfail (Decoding_error err)
   end
 
-  type _ t = {
+  type internal_store = {
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
-    scheduler : Lwt_idle_waiter.t;
-    readonly : bool;
-    cache : (V.t * V.Header.t, tztrace) Cache.t;
     index_path : string;
     data_path : string;
   }
+
+  type _ t = {
+    fresh : internal_store;
+    stales : internal_store list;
+    scheduler : Lwt_idle_waiter.t;
+    readonly : bool;
+    index_buffer_size : int;
+    path : string;
+    cache : (V.t * V.Header.t, tztrace) Cache.t;
+  }
+
+  let internal_stores ?(only_stale = false) store =
+    if only_stale then store.stales else store.fresh :: store.stales
+
+  let unsafe_mem store k =
+    List.exists (fun s -> Header_index.mem s.index k) (internal_stores store)
 
   let mem store key =
     let open Lwt_result_syntax in
@@ -719,7 +732,23 @@ struct
       Cache.bind store.cache key (fun v -> Lwt.return (Result.is_ok v))
     in
     let*! cached = Option.value cached ~default:Lwt.return_false in
-    return (cached || Header_index.mem store.index key)
+    return (cached || unsafe_mem store key)
+
+  let find_index i k = try Some (Header_index.find i k) with Not_found -> None
+
+  let unsafe_find_header ?only_stale store k =
+    List.find_map
+      (fun s ->
+        Option.map
+          (fun h -> (h, s))
+          (try find_index s.index k
+           with e ->
+             Format.kasprintf
+               Stdlib.failwith
+               "cannot access index %s : %s"
+               s.index_path
+               (Printexc.to_string e)))
+      (internal_stores ?only_stale store)
 
   let header store key =
     let open Lwt_result_syntax in
@@ -735,22 +764,31 @@ struct
     match cached with
     | Some header -> Lwt_result.map Option.some header
     | None -> (
-        match Header_index.find store.index key with
-        | exception Not_found -> return_none
-        | {header; _} -> return_some header)
+        match unsafe_find_header store key with
+        | None -> return_none
+        | Some ({header; _}, _store) -> return_some header)
+
+  let unsafe_read_from_disk_opt ?only_stale store key =
+    let open Lwt_result_syntax in
+    match unsafe_find_header ?only_stale store key with
+    | None -> return_none
+    | Some ({IHeader.offset; header}, internal_store) ->
+        let+ value, _ofs =
+          Values_file.pread_value internal_store.fd ~file_offset:offset
+        in
+        Some (value, header)
+
+  let unsafe_read_from_disk store key =
+    let open Lwt_result_syntax in
+    let* r = unsafe_read_from_disk_opt store key in
+    match r with None -> tzfail (Exn Not_found) | Some r -> return r
 
   let read store key =
+    trace (Cannot_read_from_store IHeader.name)
+    @@ protect
+    @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    let read_from_disk key =
-      let open Lwt_result_syntax in
-      match Header_index.find store.index key with
-      | exception Not_found -> tzfail (Exn Not_found)
-      | {IHeader.offset; header} ->
-          let+ value, _ofs =
-            Values_file.pread_value store.fd ~file_offset:offset
-          in
-          (value, header)
-    in
+    let read_from_disk key = unsafe_read_from_disk store key in
     let open Lwt_result_syntax in
     Cache.bind_or_put store.cache key read_from_disk @@ function
     | Ok value -> return_some value
@@ -771,17 +809,43 @@ struct
     Header_index.replace store.index key {offset; header} ;
     return value_length
 
-  let append ?(flush = true) store ~key ~header ~(value : V.t) =
+  let unsafe_append_internal ?(flush = true) store ~key ~header ~value =
+    let open Lwt_result_syntax in
+    let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
+    let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
+    if flush then Header_index.flush store.index ;
+    return_unit
+
+  let append ?(flush = true) store ~key ~header ~value =
     trace (Cannot_write_to_store N.name)
     @@ protect
     @@ fun () ->
     let open Lwt_result_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
     Cache.put store.cache key (return (value, header)) ;
-    let*! offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
-    let*! _written_len = locked_write_value store ~offset ~value ~key ~header in
-    if flush then Header_index.flush store.index ;
-    return_unit
+    unsafe_append_internal ~flush store.fresh ~key ~header ~value
+
+  let stale_path path n = Filename.concat path (string_of_int n)
+
+  let tmp_path path = Filename.concat path "tmp"
+
+  let data_path path = Filename.concat path "data"
+
+  let index_path path = Filename.concat path "index"
+
+  let load_internal_store ~index_buffer_size ~readonly path =
+    let open Lwt_syntax in
+    let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
+    let* () = Lwt_utils_unix.create_dir path in
+    let data_path = data_path path in
+    let* fd =
+      Lwt_unix.openfile data_path [Unix.O_CREAT; O_CLOEXEC; flag] 0o644
+    in
+    let index_path = index_path path in
+    let index =
+      Header_index.v ~log_size:index_buffer_size ~readonly index_path
+    in
+    return {index; fd; index_path; data_path}
 
   let load (type a) ~path ~index_buffer_size ~cache_size (mode : a mode) :
       a t tzresult Lwt.t =
@@ -789,26 +853,37 @@ struct
     trace (Cannot_load_store {name = N.name; path})
     @@ protect
     @@ fun () ->
-    let*! () = Lwt_utils_unix.create_dir path in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
-    let data_path = Filename.concat path "data" in
-    let*! fd =
-      Lwt_unix.openfile data_path [Unix.O_CREAT; O_CLOEXEC; flag] 0o644
+    let*! fresh = load_internal_store ~index_buffer_size ~readonly path in
+    (* Loading stale stores if they exist on disk (stale stores are created by
+       GC operations). *)
+    let rec load_stales acc n =
+      let open Lwt_syntax in
+      let stale_path = stale_path path n in
+      let*! exists = Lwt_unix.file_exists stale_path in
+      if exists then
+        let*! stale =
+          load_internal_store ~index_buffer_size ~readonly:true stale_path
+        in
+        load_stales (stale :: acc) (n + 1)
+      else return acc
     in
-    let index_path = Filename.concat path "index" in
-    let index =
-      Header_index.v ~log_size:index_buffer_size ~readonly index_path
-    in
+    let*! stales = load_stales [] 1 in
     let scheduler = Lwt_idle_waiter.create () in
     let cache = Cache.create cache_size in
-    return {index; fd; scheduler; readonly; cache; index_path; data_path}
+    return {fresh; stales; scheduler; readonly; index_buffer_size; path; cache}
+
+  let close_internal_store store =
+    (try Header_index.close store.index with Index.Closed -> ()) ;
+    Lwt_utils_unix.safe_close store.fd
 
   let close store =
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try Header_index.close store.index with Index.Closed -> ()) ;
-    Lwt_utils_unix.safe_close store.fd
+    let open Lwt_result_syntax in
+    let* () = close_internal_store store.fresh
+    and* () = List.iter_ep close_internal_store store.stales in
+    return_unit
 
   let readonly x = (x :> [`Read] t)
 end
