@@ -710,7 +710,7 @@ let only_if_dal_feature_enabled state ~default_value f =
     | Some ctxt -> f ctxt
   else return default_value
 
-let get_dal_attestations state ~level =
+let get_dal_attestations state ~attestation_level =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
       let delegates =
@@ -726,7 +726,7 @@ let get_dal_attestations state ~level =
               Node_rpc.get_attestable_slots
                 dal_node_rpc_ctxt
                 (signing_key delegate)
-                ~level
+                ~level:attestation_level
             in
             match tz_res with
             | Error errs ->
@@ -767,7 +767,7 @@ let get_dal_attestations state ~level =
               {
                 attestor = signing_key delegate;
                 attestation;
-                level = Raw_level.of_int32_exn level;
+                level = Raw_level.of_int32_exn attestation_level;
               },
             published_level ))
         attestations
@@ -775,9 +775,9 @@ let get_dal_attestations state ~level =
 
 let get_and_inject_dal_attestations state =
   let open Lwt_result_syntax in
-  let level = Int32.succ state.level_state.current_level in
-  let* attestations = get_dal_attestations state ~level in
-  inject_dal_attestations state attestations ~attestation_level:level
+  let attestation_level = Int32.succ state.level_state.current_level in
+  let* attestations = get_dal_attestations state ~attestation_level in
+  inject_dal_attestations state attestations ~attestation_level
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =

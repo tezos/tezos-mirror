@@ -117,7 +117,7 @@ val sign_dal_attestations :
 
 val get_dal_attestations :
   state ->
-  level:Int32.t ->
+  attestation_level:Int32.t ->
   (consensus_key_and_delegate * Dal.Attestation.operation * int32) list tzresult
   Lwt.t
 

@@ -546,9 +546,9 @@ let rec baking_minimal_timestamp ~count state
       current_mempool
       (List.map (fun (_, x, _, _) -> x) signed_attestations)
   in
-  let next_level = Int32.succ latest_proposal.block.shell.level in
+  let attestation_level = Int32.succ latest_proposal.block.shell.level in
   let* own_dal_attestations =
-    Baking_actions.get_dal_attestations state ~level:next_level
+    Baking_actions.get_dal_attestations state ~attestation_level
   in
   let* signed_dal_attestations =
     Baking_actions.sign_dal_attestations state own_dal_attestations
@@ -587,7 +587,7 @@ let rec baking_minimal_timestamp ~count state
         (fun proposal ->
           Lwt.return
             Compare.Int32.(
-              proposal.Baking_state.block.shell.level <> next_level))
+              proposal.Baking_state.block.shell.level <> attestation_level))
         block_stream
     in
     let*! next_level_proposal =
