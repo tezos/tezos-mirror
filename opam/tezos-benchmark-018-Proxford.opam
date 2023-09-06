@@ -16,7 +16,7 @@ depends: [
   "tezos-benchmark-type-inference-018-Proxford"
   "tezos-protocol-018-Proxford"
   "hashcons"
-  "tezos-018-Proxford-test-helpers"
+  "octez-protocol-018-Proxford-libs"
   "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [

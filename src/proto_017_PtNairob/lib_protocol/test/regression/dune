@@ -9,9 +9,9 @@
   octez-libs.tezos-base
   tezt-tezos
   tezos-protocol-017-PtNairob
-  tezos-client-017-PtNairob
-  tezos-protocol-plugin-017-PtNairob
-  tezos-017-PtNairob-test-helpers
+  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
+  octez-protocol-017-PtNairob-libs.tezos-test-helpers
   octez-libs.tezos-micheline)
  (library_flags (:standard -linkall))
  (flags

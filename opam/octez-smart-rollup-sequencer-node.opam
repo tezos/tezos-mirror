@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "octez-smart-rollup-node-lib"
-  "tezos-client-alpha"
+  "octez-protocol-alpha-libs"
   "octez-smart-rollup-node-alpha"
   "octez-smart-rollup-sequencer"
 ]

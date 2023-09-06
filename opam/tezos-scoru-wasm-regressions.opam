@@ -15,7 +15,7 @@ depends: [
   "octez-libs"
   "octez-l2-libs"
   "tezos-protocol-alpha"
-  "tezos-smart-rollup-alpha"
+  "octez-protocol-alpha-libs"
   "tezt" { >= "3.1.1" }
 ]
 build: [

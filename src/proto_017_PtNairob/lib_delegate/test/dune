@@ -8,11 +8,11 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-017-PtNairob
   octez-libs.tezos-base-test-helpers
-  tezos-baking-017-PtNairob.mockup-simulator
-  tezos-baking-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-bakings.mockup-simulator
+  octez-protocol-017-PtNairob-libs.tezos-baking
   tezos-protocol-017-PtNairob.parameters
   octez-libs.tezos-crypto
   octez-alcotezt
@@ -46,7 +46,7 @@
 
 (rule
  (alias runtest)
- (package tezos-baking-017-PtNairob)
+ (package octez-protocol-017-PtNairob-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

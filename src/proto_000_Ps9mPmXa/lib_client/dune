@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_000_Ps9mPmXa)
- (public_name tezos-client-000-Ps9mPmXa)
+ (public_name octez-protocol-000-Ps9mPmXa-libs.tezos-client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic

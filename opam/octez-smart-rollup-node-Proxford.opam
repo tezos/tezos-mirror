@@ -12,18 +12,13 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-shell-libs"
-  "tezos-client-018-Proxford"
+  "octez-protocol-018-Proxford-libs"
   "tezos-protocol-018-Proxford"
-  "tezos-protocol-plugin-018-Proxford"
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
-  "tezos-dac-018-Proxford"
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-l2-libs"
-  "tezos-smart-rollup-018-Proxford"
-  "tezos-smart-rollup-layer2-018-Proxford"
-  "tezos-layer2-utils-018-Proxford"
   "octez-crawler"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }

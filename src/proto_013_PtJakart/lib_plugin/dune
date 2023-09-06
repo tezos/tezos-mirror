@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_plugin_013_PtJakart)
- (public_name tezos-protocol-plugin-013-PtJakart)
+ (public_name octez-protocol-013-PtJakart-libs.tezos-protocol-plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,14 +15,17 @@
   -open Tezos_protocol_013_PtJakart)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-013-PtJakart-libs))
+
 (library
  (name tezos_protocol_plugin_013_PtJakart_registerer)
- (public_name tezos-protocol-plugin-013-PtJakart-registerer)
+ (public_name
+  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-embedded-protocol-013-PtJakart
-  tezos-protocol-plugin-013-PtJakart
+  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-validation)
  (flags
   (:standard)

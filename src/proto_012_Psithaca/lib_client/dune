@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_012_Psithaca)
- (public_name tezos-client-012-Psithaca)
+ (public_name octez-protocol-012-Psithaca-libs.tezos-client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,7 +15,7 @@
   octez-shell-libs.tezos-mockup-registration
   octez-shell-libs.tezos-proxy
   octez-shell-libs.tezos-signer-backends
-  tezos-protocol-plugin-012-Psithaca
+  octez-protocol-012-Psithaca-libs.tezos-protocol-plugin
   tezos-protocol-012-Psithaca.parameters
   octez-libs.tezos-rpc
   uri)

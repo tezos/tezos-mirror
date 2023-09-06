@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_plugin_014_PtKathma)
- (public_name tezos-protocol-plugin-014-PtKathma)
+ (public_name octez-protocol-014-PtKathma-libs.tezos-protocol-plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,14 +15,17 @@
   -open Tezos_protocol_014_PtKathma)
  (modules (:standard \ Plugin_registerer)))
 
+(documentation (package octez-protocol-014-PtKathma-libs))
+
 (library
  (name tezos_protocol_plugin_014_PtKathma_registerer)
- (public_name tezos-protocol-plugin-014-PtKathma-registerer)
+ (public_name
+  octez-protocol-014-PtKathma-libs.tezos-protocol-plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-embedded-protocol-014-PtKathma
-  tezos-protocol-plugin-014-PtKathma
+  octez-protocol-014-PtKathma-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-validation)
  (flags
   (:standard)

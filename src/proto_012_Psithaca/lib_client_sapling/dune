@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_sapling_012_Psithaca)
- (public_name tezos-client-012-Psithaca.sapling)
+ (public_name octez-protocol-012-Psithaca-libs.tezos-client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -12,8 +12,8 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-signer-backends
-  tezos-client-012-Psithaca
-  tezos-client-012-Psithaca.commands
+  octez-protocol-012-Psithaca-libs.tezos-client
+  octez-protocol-012-Psithaca-libs.tezos-client.commands
   tezos-protocol-012-Psithaca)
  (library_flags (:standard -linkall))
  (flags

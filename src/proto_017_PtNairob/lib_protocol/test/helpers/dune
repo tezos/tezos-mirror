@@ -3,7 +3,7 @@
 
 (library
  (name tezos_017_PtNairob_test_helpers)
- (public_name tezos-017-PtNairob-test-helpers)
+ (public_name octez-protocol-017-PtNairob-libs.tezos-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
@@ -12,10 +12,10 @@
   octez-libs.tezos-micheline
   octez-libs.tezos-stdlib-unix
   tezos-protocol-017-PtNairob
-  tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-017-PtNairob.parameters
   octez-proto-libs.tezos-protocol-environment
-  tezos-protocol-plugin-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-shell-services
   octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal)

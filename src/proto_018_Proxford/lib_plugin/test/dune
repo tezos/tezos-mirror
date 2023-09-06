@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  tezos-protocol-plugin-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   tezos-protocol-018-Proxford
   tezos-protocol-018-Proxford.parameters
-  tezos-018-Proxford-test-helpers)
+  octez-protocol-018-Proxford-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -54,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-plugin-018-Proxford-tests)
+ (package octez-protocol-018-Proxford-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

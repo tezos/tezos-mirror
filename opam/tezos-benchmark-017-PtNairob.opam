@@ -16,7 +16,7 @@ depends: [
   "tezos-benchmark-type-inference-017-PtNairob"
   "tezos-protocol-017-PtNairob"
   "hashcons"
-  "tezos-017-PtNairob-test-helpers"
+  "octez-protocol-017-PtNairob-libs"
   "prbnmcn-stats" { = "0.0.6" }
 ]
 build: [
