@@ -76,6 +76,8 @@ type error +=
 
 type error += Operator_not_in_whitelist
 
+type error += Exit_bond_recovered_bailout_mode
+
 let () =
   register_error_kind
     `Permanent
@@ -399,4 +401,18 @@ let () =
     `Permanent
     Data_encoding.unit
     (function Operator_not_in_whitelist -> Some () | _ -> None)
-    (fun () -> Operator_not_in_whitelist)
+    (fun () -> Operator_not_in_whitelist) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.exiting_bailout_mode"
+    ~title:"The rollup node is exiting."
+    ~description:
+      "The rollup node is exiting after recovering the bond of the operator."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "The rollup node is exiting after bailout mode.")
+    `Permanent
+    Data_encoding.unit
+    (function Exit_bond_recovered_bailout_mode -> Some () | _ -> None)
+    (fun () -> Exit_bond_recovered_bailout_mode)

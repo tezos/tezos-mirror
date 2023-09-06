@@ -142,6 +142,14 @@ module Simple = struct
          commitments."
       ~level:Error
       ()
+
+  let exit_bailout_mode =
+    declare_0
+      ~section
+      ~name:"sc_rollup_daemon_exit_bailout_mode"
+      ~msg:"Stakes have been recovered, and the node is exiting safely now."
+      ~level:Error
+      ()
 end
 
 let head_processing hash level = Simple.(emit head_processing (hash, level))
@@ -184,3 +192,5 @@ let migration ~catching_up (old_protocol, old_protocol_level)
 let error e = Simple.(emit error) e
 
 let degraded_mode () = Simple.(emit degraded_mode) ()
+
+let exit_bailout_mode () = Simple.(emit exit_bailout_mode) ()

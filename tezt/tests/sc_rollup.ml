@@ -6023,11 +6023,12 @@ let bailout_mode_not_publish ~kind =
       sc_rollup_node
       "sc_rollup_node_recover_bond.v0"
       (Fun.const (Some ()))
-  in
-  let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:100. in
-  let* published_commitment_after =
-    get_last_published_commitment ~__LOC__ ~hooks sc_rollup_client
-  in
+  and* () =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "sc_rollup_daemon_exit_bailout_mode.v0"
+      (Fun.const (Some ()))
+  and* exit_error = Sc_rollup_node.wait sc_rollup_node in
   let* lcc_hash, _level =
     Sc_rollup_helpers.last_cemented_commitment_hash_with_level
       ~sc_rollup
@@ -6040,26 +6041,23 @@ let bailout_mode_not_publish ~kind =
       ~error_msg:
         "Published commitment is not the same as the cemented commitment hash."
   in
-  Log.info "Check the last published commitment is the same as before." ;
-  let () =
-    Check.(
-      published_commitment_after.commitment_and_hash.hash
-      = published_commitment_before.commitment_and_hash.hash)
-      Check.string
-      ~error_msg:"Last published commitment have been updated."
-  in
   Log.info
     "The node has submitted the recover_bond operation, and the operator is no \
      longer staked." ;
-  let* operator_balance = contract_balances ~pkh:operator tezos_client in
+  let* frozen_balance =
+    RPC.Client.call tezos_client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:operator ()
+  in
   let () =
     Check.(
-      (operator_balance.frozen = 0)
+      (Tez.to_mutez frozen_balance = 0)
         int
         ~error_msg:
           "The operator should not have a stake nor holds a frozen balance.")
   in
-  unit
+  match exit_error with
+  | WEXITED 0 -> unit
+  | _ -> failwith "rollup node did not stop gracefully"
 
 let custom_mode_empty_operation_kinds ~kind =
   test_l1_scenario
