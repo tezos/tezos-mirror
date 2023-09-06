@@ -698,6 +698,20 @@ module Actions = struct
       ("published_level", Data_encoding.int32)
       ("attestation_level", Data_encoding.int32)
 
+  let dal_attestation_void =
+    declare_3
+      ~section
+      ~name:"dal_attestation_void"
+      ~level:Notice
+      ~msg:
+        "Skipping the injection of the DAL attestation for attestation level \
+         {attestation_level}, as no slot published at level {published_level} \
+         is attestable."
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ("attestation_level", Data_encoding.int32)
+      ("published_level", Data_encoding.int32)
+
   let synchronizing_round =
     declare_1
       ~section

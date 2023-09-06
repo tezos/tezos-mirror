@@ -744,6 +744,12 @@ let get_dal_attestations state ~attestation_level =
                     else
                       (* No slot is attested, no need to send an attestation, at least
                          for now. *)
+                      let*! () =
+                        Events.(
+                          emit
+                            dal_attestation_void
+                            (delegate, attestation_level, published_level))
+                      in
                       return acc))
           []
           delegates
