@@ -252,25 +252,28 @@ module Temp_ids = struct
   let fold_s :
       type i a u.
       (i, a, u) kind -> ('acc -> i -> 'acc Lwt.t) -> t -> 'acc -> 'acc Lwt.t =
-   fun kind f temp_ids acc ->
-    let helper (type j) (module Temp_id : TEMP_ID with type t = j) ~last f =
-      let rec aux acc id =
-        if Temp_id.equal id last then Lwt.return acc
-        else f acc id >>= fun acc -> aux acc (Temp_id.next id)
+    let open Lwt_syntax in
+    fun kind f temp_ids acc ->
+      let helper (type j) (module Temp_id : TEMP_ID with type t = j) ~last f =
+        let rec aux acc id =
+          if Temp_id.equal id last then Lwt.return acc
+          else
+            let* acc = f acc id in
+            aux acc (Temp_id.next id)
+        in
+        aux acc Temp_id.init
       in
-      aux acc Temp_id.init
-    in
-    match kind with
-    | Big_map ->
-        helper
-          (module Big_map.Temp_id)
-          ~last:temp_ids.big_map
-          (fun acc temp_id -> f acc (temp_id :> i))
-    | Sapling_state ->
-        helper
-          (module Sapling_state.Temp_id)
-          ~last:temp_ids.sapling_state
-          (fun acc temp_id -> f acc (temp_id :> i))
+      match kind with
+      | Big_map ->
+          helper
+            (module Big_map.Temp_id)
+            ~last:temp_ids.big_map
+            (fun acc temp_id -> f acc (temp_id :> i))
+      | Sapling_state ->
+          helper
+            (module Sapling_state.Temp_id)
+            ~last:temp_ids.sapling_state
+            (fun acc temp_id -> f acc (temp_id :> i))
 end
 
 module IdSet = struct
