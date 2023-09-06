@@ -1,0 +1,50 @@
+{ parameter (or (pair %burn (contract unit) (ticket unit)) (contract %mint (ticket unit))) ;
+  storage unit ;
+  code { CAR ;
+         IF_LEFT
+           { UNPAIR ;
+             PUSH mutez 0 ;
+             AMOUNT ;
+             COMPARE ;
+             GT ;
+             IF { DROP 2 ; PUSH string "Burn does not accept tez." ; FAILWITH }
+                { SWAP ;
+                  READ_TICKET ;
+                  SWAP ;
+                  DROP ;
+                  UNPAIR ;
+                  SWAP ;
+                  CDR ;
+                  SELF_ADDRESS ;
+                  DIG 2 ;
+                  COMPARE ;
+                  NEQ ;
+                  IF { DROP 2 ; PUSH string "Burn only accepts tez tickets." ; FAILWITH }
+                     { PUSH mutez 1 ;
+                       SWAP ;
+                       MUL ;
+                       UNIT ;
+                       NIL operation ;
+                       DIG 3 ;
+                       DIG 3 ;
+                       UNIT ;
+                       TRANSFER_TOKENS ;
+                       CONS ;
+                       PAIR } } }
+           { PUSH mutez 1 ;
+             AMOUNT ;
+             EDIV ;
+             IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
+             CAR ;
+             UNIT ;
+             TICKET ;
+             IF_NONE { PUSH string "Could not mint ticket." ; FAILWITH } {} ;
+             UNIT ;
+             NIL operation ;
+             DIG 3 ;
+             PUSH mutez 0 ;
+             DIG 4 ;
+             TRANSFER_TOKENS ;
+             CONS ;
+             PAIR } } }
+
