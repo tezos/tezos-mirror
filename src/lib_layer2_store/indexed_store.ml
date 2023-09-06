@@ -215,12 +215,22 @@ end
 module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
 
+  type internal_index = {index : I.t; index_path : string}
+
   type _ t = {
-    index : I.t;
+    mutable fresh : internal_index;
+    mutable stales : internal_index list;
     scheduler : Lwt_idle_waiter.t;
     readonly : bool;
+    index_buffer_size : int;
     path : string;
   }
+
+  let internal_indexes ?(only_stale = false) store =
+    if only_stale then store.stales else store.fresh :: store.stales
+
+  let unsafe_mem store k =
+    List.exists (fun i -> I.mem i.index k) (internal_indexes store)
 
   let mem store k =
     let open Lwt_result_syntax in
@@ -228,7 +238,21 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    return (I.mem store.index k)
+    return (unsafe_mem store k)
+
+  let find_index i k = try Some (I.find i k) with Not_found -> None
+
+  let unsafe_find ?only_stale store k =
+    List.find_map
+      (fun i ->
+        try find_index i.index k
+        with e ->
+          Format.kasprintf
+            Stdlib.failwith
+            "cannot access index %s : %s"
+            i.index_path
+            (Printexc.to_string e))
+      (internal_indexes ?only_stale store)
 
   let find store k =
     let open Lwt_result_syntax in
@@ -236,8 +260,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    let v = try Some (I.find store.index k) with Not_found -> None in
-    return v
+    return (unsafe_find store k)
 
   let add ?(flush = true) store k v =
     let open Lwt_result_syntax in
@@ -245,9 +268,17 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    I.replace store.index k v ;
-    if flush then I.flush store.index ;
+    I.replace store.fresh.index k v ;
+    if flush then I.flush store.fresh.index ;
     return_unit
+
+  let stale_path path n = String.concat "." [path; string_of_int n]
+
+  let tmp_path path = String.concat "." [path; "tmp"]
+
+  let load_internal_index ~index_buffer_size ~readonly index_path =
+    let index = I.v ~log_size:index_buffer_size ~readonly index_path in
+    {index; index_path}
 
   let load (type a) ~path ~index_buffer_size (mode : a mode) :
       a t tzresult Lwt.t =
@@ -257,15 +288,32 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     @@ fun () ->
     let*! () = Lwt_utils_unix.create_dir (Filename.dirname path) in
     let readonly = match mode with Read_only -> true | Read_write -> false in
-    let index = I.v ~log_size:index_buffer_size ~readonly path in
+    let fresh = load_internal_index ~index_buffer_size ~readonly path in
+    (* Loading stale indexes if they exist on disk (stale indexes are created by
+       GC operations). *)
+    let rec load_stales acc n =
+      let open Lwt_syntax in
+      let stale_path = stale_path path n in
+      let*! exists = Lwt_unix.file_exists stale_path in
+      if exists then
+        let stale =
+          load_internal_index ~index_buffer_size ~readonly:true stale_path
+        in
+        load_stales (stale :: acc) (n + 1)
+      else return acc
+    in
+    let*! stales = load_stales [] 1 in
     let scheduler = Lwt_idle_waiter.create () in
-    return {index; scheduler; readonly; path}
+    return {fresh; stales; scheduler; readonly; index_buffer_size; path}
+
+  let close_internal_index i = try I.close i.index with Index.Closed -> ()
 
   let close store =
-    let open Lwt_result_syntax in
     protect @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try I.close store.index with Index.Closed -> ()) ;
+    let open Lwt_result_syntax in
+    close_internal_index store.fresh ;
+    List.iter close_internal_index store.stales ;
     return_unit
 
   let readonly x = (x :> [`Read] t)
@@ -326,11 +374,11 @@ struct
     @@ protect
     @@ fun () ->
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    let exists = I.mem store.index k in
+    let exists = unsafe_mem store k in
     if not exists then return_unit
     else (
-      I.replace store.index k None ;
-      if flush then I.flush store.index ;
+      I.replace store.fresh.index k None ;
+      if flush then I.flush store.fresh.index ;
       return_unit)
 end
 
