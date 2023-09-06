@@ -385,6 +385,10 @@ let make_index node required_version =
       : Tezos_version.Node_version.commit_info)
   in
   let shell_dir = Node.build_rpc_directory ~version ~commit_info node in
+  let shell_dir =
+    Tezos_rpc.Directory.register0 shell_dir Node_services.S.config (fun () () ->
+        Lwt.return_ok Config_file.default_config)
+  in
   let protocol_dirs =
     List.map
       (fun (version, name, intro, hash) ->
