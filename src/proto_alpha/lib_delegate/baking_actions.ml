@@ -729,7 +729,7 @@ let get_dal_attestations state ~level =
                 match res with
                 | Tezos_dal_node_services.Services.Types.Not_in_committee ->
                     return acc
-                | Attestable_slots attestation ->
+                | Attestable_slots {slots = attestation; published_level = _} ->
                     if List.exists Fun.id attestation then
                       return ((delegate, attestation) :: acc)
                     else

@@ -45,10 +45,7 @@ module Types = struct
   (* Declaration of types used as inputs and/or outputs. *)
   type slot_id = {slot_level : level; slot_index : slot_index}
 
-  (** A set of slots, represented by a list of booleans (false for not in the
-      set). It is used for instance to record which slots are deemed available
-      by an attestor. *)
-  type slot_set = bool list
+  type slot_set = {slots : bool list; published_level : int32}
 
   type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
@@ -99,11 +96,17 @@ module Types = struct
         case
           ~title:"attestable_slots_set"
           (Tag 0)
-          (obj2
+          (obj3
              (req "kind" (constant "attestable_slots_set"))
-             (req "attestable_slots_set" Data_encoding.(list bool)))
-          (function Attestable_slots slots -> Some ((), slots) | _ -> None)
-          (function (), slots -> Attestable_slots slots);
+             (req "attestable_slots_set" Data_encoding.(list bool))
+             (req "published_level" int32))
+          (function
+            | Attestable_slots {slots; published_level} ->
+                Some ((), slots, published_level)
+            | _ -> None)
+          (function
+            | (), slots, published_level ->
+                Attestable_slots {slots; published_level});
         case
           ~title:"not_in_committee"
           (Tag 1)
