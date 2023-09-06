@@ -556,7 +556,9 @@ let rec baking_minimal_timestamp ~count state
   let pool =
     Operation_pool.add_operations
       pool
-      (List.map (fun (_delegate, op, _bitset) -> op) signed_dal_attestations)
+      (List.map
+         (fun (_delegate, op, _bitset, _published_level) -> op)
+         signed_dal_attestations)
   in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =

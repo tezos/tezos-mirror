@@ -681,18 +681,22 @@ module Actions = struct
       ("round", Round.encoding)
 
   let dal_attestation_injected =
-    declare_3
+    declare_5
       ~section
       ~name:"dal_attestation_injected"
       ~level:Notice
       ~msg:
-        "injected DAL attestation {ophash} with bitset {bitset} for {delegate}"
+        "injected DAL attestation {ophash} for level {attestation_level} with \
+         bitset {bitset} for {delegate} to attest slots published at level \
+         {published_level}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp3:Z.pp_print
       ("bitset", Data_encoding.n)
+      ("published_level", Data_encoding.int32)
+      ("attestation_level", Data_encoding.int32)
 
   let synchronizing_round =
     declare_1
