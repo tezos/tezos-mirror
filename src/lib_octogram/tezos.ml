@@ -27,6 +27,15 @@ open Jingoo.Jg_types
 open Agent_state
 open Services_cache
 
+let int_of_string level =
+  try int_of_string level
+  with _err -> Test.fail "Bad input: %s is not a valid integer@." level
+
+let positive_int_of_string level =
+  let level = int_of_string level in
+  if level < 0 then Test.fail "Bad input: integer %d is negative@." level ;
+  level
+
 let parse_endpoint str =
   match str =~*** rex {|^(https?)://(.*):(\d+)|} with
   | Some (scheme, host, port_str) ->
@@ -128,6 +137,65 @@ module Dal_node_key = struct
 end
 
 let () = Agent_state.register_key (module Dal_node_key)
+
+let mk_rpc_config endpoint =
+  let open RPC_client_unix in
+  let rpc_config =
+    {default_config with endpoint = Foreign_endpoint.to_uri endpoint}
+  in
+  new http_ctxt rpc_config Tezos_rpc_http.Media_type.all_media_types
+
+(* Returns the current level of the node whose endpoint is given. *)
+let current_level endpoint =
+  let rpc_ctxt = mk_rpc_config endpoint in
+  let* header_res = Block_services.Empty.header rpc_ctxt () in
+  match header_res with
+  | Error _ ->
+      Test.fail
+        "Error while retrieving the current level from server %s"
+        (Foreign_endpoint.as_string endpoint)
+  | Ok {shell = {level; _}; _} -> return @@ Int32.to_int level
+
+(* This function fetches L1 blocks (heads) published to the stream returned by
+   calling RPC [/monitor/heads/main/] at address [endpoint] and checks whether
+   [target_level] is reached or not. When reached (or exceeded), the level from
+   the last received block is returned. *)
+let wait_for_l1_level_on_endpoint target_level endpoint =
+  let rpc_ctxt = mk_rpc_config endpoint in
+  let* heads = Monitor_services.heads rpc_ctxt `Main in
+  match heads with
+  | Error _e ->
+      Test.fail
+        "Monitoring L1 level %d with RPC server %s failed when calling the RPC!"
+        target_level
+        (Foreign_endpoint.as_string endpoint)
+  | Ok (stream, stopper) ->
+      let rec loop () =
+        let* v = Lwt_stream.get stream in
+        match v with
+        | None ->
+            stopper () ;
+            Test.fail
+              "Monitoring L1 level %d with RPC server %s failed. Stream closed!"
+              target_level
+              (Foreign_endpoint.as_string endpoint)
+        | Some (_hash, {shell = {level; _}; _}) ->
+            let level = Int32.to_int level in
+            if level >= target_level then (
+              stopper () ;
+              return level)
+            else loop ()
+      in
+      loop ()
+
+let wait_for_l1_level cli_endpoint level =
+  match cli_endpoint with
+  | Client.Node node -> Node.wait_for_level node level
+  | Client.Proxy_server proxy_server ->
+      Proxy_server.as_foreign_rpc_endpoint proxy_server
+      |> wait_for_l1_level_on_endpoint level
+  | Client.Foreign_endpoint endpoint ->
+      wait_for_l1_level_on_endpoint level endpoint
 
 let octez_endpoint state endpoint =
   match endpoint with
@@ -2917,6 +2985,232 @@ module Start_octez_baker = struct
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()
 end
 
+type publish_dal_slot_r = {commitment : string}
+
+type publish_slot_info = {
+  slot_index : string;
+  slot_size : string;
+  payload : string;
+}
+
+let publish_slot_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {slot_index; slot_size; payload} -> (slot_index, slot_size, payload))
+    (fun (slot_index, slot_size, payload) -> {slot_index; slot_size; payload})
+    (obj3
+       (req "slot_index" string)
+       (req "slot_size" string)
+       (req "payload" string))
+
+type 'uri publish_dal_slot = {
+  slot_info : publish_slot_info;
+  target_published_level : string option;
+      (** We target the inclusion of the publish slot header operation at this
+          level, so the operation should be inject at least one level before. *)
+  l1_node_uri : 'uri;
+      (** An URI to a Layer 1 node. If [None], we target the next level. *)
+  dal_node_uri : 'uri;  (** An URI to a DAL node used for injection. *)
+  base_dir : 'uri;
+  source : string;  (** The alias of the account that signs the operation. *)
+  path_client : 'uri;
+}
+
+type (_, _) Remote_procedure.t +=
+  | Publish_dal_slot :
+      'uri publish_dal_slot
+      -> (publish_dal_slot_r, 'uri) Remote_procedure.t
+
+module Publish_dal_slot : Remote_procedure.S = struct
+  let name = "tezos.publish_dal_slot"
+
+  type 'uri t = 'uri publish_dal_slot
+
+  type r = publish_dal_slot_r
+
+  let of_remote_procedure :
+      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+    | Publish_dal_slot args -> Some args
+    | _ -> None
+
+  let to_remote_procedure args = Publish_dal_slot args
+
+  let unify : type a. (a, 'uri) Remote_procedure.t -> (a, r) Remote_procedure.eq
+      = function
+    | Publish_dal_slot _ -> Eq
+    | _ -> Neq
+
+  let encoding uri_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             slot_info;
+             target_published_level;
+             l1_node_uri;
+             dal_node_uri;
+             base_dir;
+             source;
+             path_client;
+           } ->
+        ( slot_info,
+          target_published_level,
+          l1_node_uri,
+          dal_node_uri,
+          base_dir,
+          source,
+          path_client ))
+      (fun ( slot_info,
+             target_published_level,
+             l1_node_uri,
+             dal_node_uri,
+             base_dir,
+             source,
+             path_client ) ->
+        {
+          slot_info;
+          target_published_level;
+          l1_node_uri;
+          dal_node_uri;
+          base_dir;
+          source;
+          path_client;
+        })
+      (obj7
+         (req "slot_info" publish_slot_info_encoding)
+         (opt "target_published_level" string)
+         (req "l1_node_uri" uri_encoding)
+         (req "dal_node_uri" uri_encoding)
+         (req "base_dir" uri_encoding)
+         (req "source" string)
+         (req "path_client" uri_encoding))
+
+  let r_encoding =
+    let open Data_encoding in
+    conv
+      (fun {commitment} -> commitment)
+      (fun commitment -> {commitment})
+      (obj1 (req "commitment" string))
+
+  let tvalue_of_r ({commitment} : r) = Tobj [("commitment", Tstr commitment)]
+
+  let expand ~self ~run
+      {
+        slot_info = {slot_index; slot_size; payload};
+        target_published_level;
+        l1_node_uri;
+        dal_node_uri;
+        base_dir;
+        source;
+        path_client;
+      } =
+    let slot_info =
+      {
+        slot_index = run slot_index;
+        slot_size = run slot_size;
+        payload = run payload;
+      }
+    in
+    let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
+    {
+      slot_info;
+      target_published_level = Option.map run target_published_level;
+      l1_node_uri = uri_run l1_node_uri;
+      dal_node_uri = uri_run dal_node_uri;
+      base_dir = uri_run base_dir;
+      source = run source;
+      path_client = uri_run path_client;
+    }
+
+  let resolve ~self (resolver : Uri_resolver.t)
+      {
+        slot_info;
+        target_published_level;
+        l1_node_uri;
+        dal_node_uri;
+        base_dir;
+        source;
+        path_client;
+      } =
+    {
+      slot_info;
+      target_published_level;
+      l1_node_uri = resolve_octez_rpc_global_uri ~self ~resolver l1_node_uri;
+      dal_node_uri = resolve_dal_rpc_global_uri ~self ~resolver dal_node_uri;
+      base_dir = Remote_procedure.file_agent_uri ~self ~resolver base_dir;
+      source;
+      path_client = Remote_procedure.file_agent_uri ~self ~resolver path_client;
+    }
+
+  let run state
+      {
+        slot_info = {slot_index; slot_size; payload};
+        target_published_level;
+        l1_node_uri;
+        dal_node_uri;
+        base_dir;
+        source;
+        path_client;
+      } =
+    let mk_path =
+      Http_client.local_path_from_agent_uri (Agent_state.http_client state)
+    in
+    let* path_client = mk_path path_client in
+    let* base_dir = mk_path base_dir in
+    let endpoint = octez_endpoint state l1_node_uri in
+    let dal_endpoint = dal_foreign_endpoint state dal_node_uri in
+    let client = Client.create ~path:path_client ~endpoint ~base_dir () in
+
+    (* step 1: we publish the slot to the DAL node even before [injection_level]
+       is reached, as the crypto part takes time. *)
+    let* commitment, proof =
+      Dal_common.Helpers.(
+        make_slot ~slot_size:(positive_int_of_string slot_size) payload
+        |> store_slot ~with_proof:true (Either.Right dal_endpoint))
+    in
+
+    let* publish_to_l1 =
+      match target_published_level with
+      | None ->
+          (* step 2.a: if no target_published_level is given, we publish to L1
+             after waiting for a new block with an increasing level. *)
+          let* current_level =
+            Client.as_foreign_endpoint endpoint |> current_level
+          in
+          let* _ = wait_for_l1_level endpoint (current_level + 1) in
+          return true
+      | Some target_published_level ->
+          let injection_level =
+            positive_int_of_string target_published_level - 1
+          in
+          (* step 2.b: if a target_published_level is given, we wait until level
+             [target_published_level - 1] to publish to L1. If the current level
+             is expected one, the operations will be injected and will (hopefully)
+             be included in the next block. Otherwise, the current level is greater
+             than the expected level, and we don't publish. *)
+          let* current_level = wait_for_l1_level endpoint injection_level in
+          return (current_level = injection_level)
+    in
+    let* () =
+      if publish_to_l1 then
+        (* step 3: Now, we publish the corresponding DAL commitment to L1. Note
+           that the operation can be branch-delayed if there is another pending
+           commitment for the previous level from the same source. *)
+        let*! () =
+          Client.publish_dal_commitment
+            ~src:source
+            ~slot_index:(positive_int_of_string slot_index)
+            ~commitment
+            ~proof
+            client
+        in
+        unit
+      else unit
+    in
+    return {commitment}
+
+  let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_res : r) = ()
+end
+
 let register_procedures () =
   Remote_procedure.register (module Generate_keys) ;
   Remote_procedure.register (module Start_octez_node) ;
@@ -2931,4 +3225,5 @@ let register_procedures () =
   Remote_procedure.register (module Start_dac_node) ;
   Remote_procedure.register (module Dac_post_file) ;
   Remote_procedure.register (module Start_octez_dal_node) ;
-  Remote_procedure.register (module Start_octez_baker)
+  Remote_procedure.register (module Start_octez_baker) ;
+  Remote_procedure.register (module Publish_dal_slot)
