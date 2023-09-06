@@ -750,7 +750,7 @@ let ir_model instr_or_cont =
           (list_enter_body_model, list_enter_body_model) |> m2 name
       | N_KList_exit_body -> (const1_model, const1_model) |> m2 name
       | N_KMap_enter_body -> (empty_branch_model, empty_branch_model) |> m2 name
-      | N_KMap_exit_body -> (nlogm_model, nlogm_model) |> m2 name
+      | N_KMap_exit_body -> (nlogm_model, update_alloc_model) |> m2 name
       | N_KLog -> (const1_model, const1_model) |> m2 name)
 
 let gas_unit_per_allocation_word = 4
