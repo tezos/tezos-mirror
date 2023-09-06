@@ -37,11 +37,11 @@
   irmin-pack.unix
   irmin
   prometheus-app
-  octez-protocol-017-PtNairob-libs.tezos-dal-017-PtNairob
-  octez-protocol-018-Proxford-libs.tezos-dal-018-Proxford
-  (select void_for_linking-octez-protocol-alpha-libs-tezos-dal-alpha from
-   (octez-protocol-alpha-libs.tezos-dal-alpha -> void_for_linking-octez-protocol-alpha-libs-tezos-dal-alpha.empty)
-   (-> void_for_linking-octez-protocol-alpha-libs-tezos-dal-alpha.empty)))
+  octez-protocol-017-PtNairob-libs.tezos-dal
+  octez-protocol-018-Proxford-libs.tezos-dal
+  (select void_for_linking-octez-protocol-alpha-libs-tezos-dal from
+   (octez-protocol-alpha-libs.tezos-dal -> void_for_linking-octez-protocol-alpha-libs-tezos-dal.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-tezos-dal.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -71,4 +71,4 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-dal-alpha.empty ""))))
+   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-dal.empty ""))))

@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-017-PtNairob
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers

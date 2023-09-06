@@ -3,7 +3,7 @@
 
 (library
  (name tezos_dac_alpha)
- (public_name octez-protocol-alpha-libs.tezos-dac-alpha)
+ (public_name octez-protocol-alpha-libs.tezos-dac)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -11,7 +11,7 @@
   octez-libs.tezos-stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  octez-protocol-alpha-libs.tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client
   tezos-embedded-protocol-alpha
   tezos-protocol-alpha)
  (inline_tests (flags -verbose) (modes native))

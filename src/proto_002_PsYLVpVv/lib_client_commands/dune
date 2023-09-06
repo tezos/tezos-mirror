@@ -3,8 +3,7 @@
 
 (library
  (name tezos_client_002_PsYLVpVv_commands)
- (public_name
-  octez-protocol-002-PsYLVpVv-libs.tezos-client-002-PsYLVpVv.commands)
+ (public_name octez-protocol-002-PsYLVpVv-libs.tezos-client.commands)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -13,7 +12,7 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  octez-protocol-002-PsYLVpVv-libs.tezos-client-002-PsYLVpVv
+  octez-protocol-002-PsYLVpVv-libs.tezos-client
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
@@ -32,7 +31,7 @@
 (library
  (name tezos_client_002_PsYLVpVv_commands_registration)
  (public_name
-  octez-protocol-002-PsYLVpVv-libs.tezos-client-002-PsYLVpVv.commands-registration)
+  octez-protocol-002-PsYLVpVv-libs.tezos-client.commands-registration)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -40,9 +39,9 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  octez-protocol-002-PsYLVpVv-libs.tezos-client-002-PsYLVpVv
+  octez-protocol-002-PsYLVpVv-libs.tezos-client
   octez-shell-libs.tezos-client-commands
-  octez-protocol-002-PsYLVpVv-libs.tezos-client-002-PsYLVpVv.commands
+  octez-protocol-002-PsYLVpVv-libs.tezos-client.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags

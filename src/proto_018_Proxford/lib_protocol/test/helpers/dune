@@ -3,8 +3,7 @@
 
 (library
  (name tezos_018_Proxford_test_helpers)
- (public_name
-  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers)
+ (public_name octez-protocol-018-Proxford-libs.tezos-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
@@ -13,14 +12,14 @@
   octez-libs.tezos-micheline
   octez-libs.tezos-stdlib-unix
   tezos-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   tezos-protocol-018-Proxford.parameters
   octez-proto-libs.tezos-protocol-environment
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-shell-services
   octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup-018-Proxford)
+  octez-protocol-018-Proxford-libs.tezos-smart-rollup)
  (flags
   (:standard)
   -open Tezos_test_helpers

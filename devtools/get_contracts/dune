@@ -8,11 +8,11 @@
   octez-libs.tezos-base
   octez-shell-libs.tezos-store
   tezos-protocol-017-PtNairob
-  octez-protocol-017-PtNairob-libs.tezos-client-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   tezos-protocol-alpha
-  octez-protocol-alpha-libs.tezos-client-alpha)
+  octez-protocol-alpha-libs.tezos-client)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

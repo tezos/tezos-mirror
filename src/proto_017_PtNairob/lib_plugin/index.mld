@@ -1,6 +1,6 @@
 {0 Octez-protocol-017-PtNairob-libs: octez protocol 017-PtNairob libraries}
 
-This is a package containing some libraries by the Tezos 017-PtNairob protocol.
+This is a package containing some libraries related to the Tezos 017-PtNairob protocol.
 
 It contains the following libraries:
 
@@ -9,7 +9,10 @@ It contains the following libraries:
 - {{!module-Tezos_017_PtNairob_test_helpers}Tezos_017_PtNairob_test_helpers}: Protocol testing framework
 - {{!module-Tezos_baking_017_PtNairob}Tezos_baking_017_PtNairob}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_017_PtNairob_commands}Tezos_baking_017_PtNairob_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_baking_017_PtNairob_commands_registration}Tezos_baking_017_PtNairob_commands_registration}
 - {{!module-Tezos_client_017_PtNairob}Tezos_client_017_PtNairob}: Protocol specific library for `tezos-client`
+- {{!module-Tezos_client_017_PtNairob_commands}Tezos_client_017_PtNairob_commands}
+- {{!module-Tezos_client_017_PtNairob_commands_registration}Tezos_client_017_PtNairob_commands_registration}
 - {{!module-Tezos_client_sapling_017_PtNairob}Tezos_client_sapling_017_PtNairob}
 - {{!module-Tezos_dac_017_PtNairob}Tezos_dac_017_PtNairob}: Protocol specific library for the Data availability Committee
 - {{!module-Tezos_dal_017_PtNairob}Tezos_dal_017_PtNairob}: Protocol specific library for the Data availability Layer

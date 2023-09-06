@@ -3,8 +3,7 @@
 
 (library
  (name tezos_smart_rollup_017_PtNairob)
- (public_name
-  octez-protocol-017-PtNairob-libs.tezos-smart-rollup-017-PtNairob)
+ (public_name octez-protocol-017-PtNairob-libs.tezos-smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

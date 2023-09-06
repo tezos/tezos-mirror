@@ -9,9 +9,9 @@
   octez-libs.tezos-base
   tezt-tezos
   tezos-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-018-Proxford-test-helpers
+  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
+  octez-protocol-018-Proxford-libs.tezos-test-helpers
   octez-libs.tezos-micheline)
  (library_flags (:standard -linkall))
  (flags

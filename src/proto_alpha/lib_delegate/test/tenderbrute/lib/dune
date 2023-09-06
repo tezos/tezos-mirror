@@ -3,14 +3,14 @@
 
 (library
  (name tenderbrute_alpha)
- (public_name octez-protocol-alpha-libs.tezos-baking-alpha.tenderbrute)
+ (public_name octez-protocol-alpha-libs.tezos-baking.tenderbrute)
  (libraries
   data-encoding
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   tezos-protocol-alpha
   octez-shell-libs.tezos-client-base
-  octez-protocol-alpha-libs.tezos-client-alpha)
+  octez-protocol-alpha-libs.tezos-client)
  (flags
   (:standard)
   -open Data_encoding

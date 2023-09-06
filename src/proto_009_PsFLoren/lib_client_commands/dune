@@ -3,8 +3,7 @@
 
 (library
  (name tezos_client_009_PsFLoren_commands)
- (public_name
-  octez-protocol-009-PsFLoren-libs.tezos-client-009-PsFLoren.commands)
+ (public_name octez-protocol-009-PsFLoren-libs.tezos-client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -14,11 +13,11 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  octez-protocol-009-PsFLoren-libs.tezos-client-009-PsFLoren
+  octez-protocol-009-PsFLoren-libs.tezos-client
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-rpc
   octez-shell-libs.tezos-client-base-unix
-  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-009-PsFLoren)
+  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -37,7 +36,7 @@
 (library
  (name tezos_client_009_PsFLoren_commands_registration)
  (public_name
-  octez-protocol-009-PsFLoren-libs.tezos-client-009-PsFLoren.commands-registration)
+  octez-protocol-009-PsFLoren-libs.tezos-client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -46,11 +45,11 @@
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  octez-protocol-009-PsFLoren-libs.tezos-client-009-PsFLoren
+  octez-protocol-009-PsFLoren-libs.tezos-client
   octez-shell-libs.tezos-client-commands
-  octez-protocol-009-PsFLoren-libs.tezos-client-009-PsFLoren.commands
+  octez-protocol-009-PsFLoren-libs.tezos-client.commands
   octez-libs.tezos-rpc
-  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-009-PsFLoren)
+  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

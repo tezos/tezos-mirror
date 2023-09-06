@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_001_PtCJ7pwo)
- (public_name octez-protocol-001-PtCJ7pwo-libs.tezos-client-001-PtCJ7pwo)
+ (public_name octez-protocol-001-PtCJ7pwo-libs.tezos-client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic

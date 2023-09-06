@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client
   tezos-protocol-alpha
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers

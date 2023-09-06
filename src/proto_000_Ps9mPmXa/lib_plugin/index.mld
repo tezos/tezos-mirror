@@ -1,6 +1,6 @@
 {0 Octez-protocol-000-Ps9mPmXa-libs: octez protocol 000-Ps9mPmXa libraries}
 
-This is a package containing some libraries by the Tezos 000-Ps9mPmXa protocol.
+This is a package containing some libraries related to the Tezos 000-Ps9mPmXa protocol.
 
 It contains the following libraries:
 

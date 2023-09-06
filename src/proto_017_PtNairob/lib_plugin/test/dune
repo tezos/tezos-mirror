@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
   tezos-protocol-017-PtNairob
   tezos-protocol-017-PtNairob.parameters
-  octez-protocol-017-PtNairob-libs.tezos-017-PtNairob-test-helpers)
+  octez-protocol-017-PtNairob-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

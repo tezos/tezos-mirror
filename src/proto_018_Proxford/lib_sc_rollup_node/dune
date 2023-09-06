@@ -10,11 +10,11 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix
-  octez-protocol-018-Proxford-libs.tezos-client-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http
@@ -22,14 +22,14 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-018-Proxford-libs.tezos-dac-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-dac
   tezos-dac-lib
   tezos-dac-client-lib
   octez-shell-libs.tezos-shell-services
   octez-l2-libs.octez-smart-rollup
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup-layer2-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-layer2-utils-018-Proxford
+  octez-protocol-018-Proxford-libs.tezos-smart-rollup
+  octez-protocol-018-Proxford-libs.tezos-smart-rollup-layer2
+  octez-protocol-018-Proxford-libs.tezos-layer2-utils
   octez-l2-libs.tezos_layer2_store
   octez-crawler
   octez-libs.tezos-tree-encoding
