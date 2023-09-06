@@ -94,10 +94,13 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
       let*! input = Option.catch_s (fun () -> Lwt_io.read_line Lwt_io.stdin) in
       match input with
       | Some command ->
-          let* tree, inboxes, level =
+          let* ctx =
             Commands.handle_command command config tree inboxes level
           in
-          loop tree inboxes level
+          Option.fold_f
+            ~none:(fun () -> return tree)
+            ~some:(fun (tree, inboxes, level) -> loop tree inboxes level)
+            ctx
       | None -> return tree
     in
     loop tree (List.to_seq inboxes) level
