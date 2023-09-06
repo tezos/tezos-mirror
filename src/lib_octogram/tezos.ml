@@ -2580,7 +2580,7 @@ type 'uri start_dal_node = {
   metrics_port : string option;
   net_port : string option;
   l1_node_uri : 'uri;
-  peers : 'uri list;
+  peers : string list;
   bootstrap_profile : bool;
   attestor_profiles : dal_attestor_profile list;
   producer_profiles : dal_producer_profile list;
@@ -2664,7 +2664,7 @@ module Start_octez_dal_node = struct
          (opt "metrics_port" string)
          (opt "net_port" string)
          (req "l1_node_uri" uri_encoding)
-         (dft "peers" (list uri_encoding) [])
+         (dft "peers" (list string) [])
          (dft "bootstrap_profile" bool false)
          (dft
             "attestor_profiles"
@@ -2715,7 +2715,7 @@ module Start_octez_dal_node = struct
       metrics_port = Option.map run metrics_port;
       net_port = Option.map run net_port;
       l1_node_uri = uri_run l1_node_uri;
-      peers = List.map uri_run peers;
+      peers = List.map run peers;
       bootstrap_profile;
       attestor_profiles;
       producer_profiles;
@@ -2741,7 +2741,7 @@ module Start_octez_dal_node = struct
       metrics_port;
       net_port;
       l1_node_uri = resolve_octez_rpc_global_uri ~self ~resolver l1_node_uri;
-      peers = List.map (resolve_dal_rpc_global_uri ~self ~resolver) peers;
+      peers;
       bootstrap_profile;
       attestor_profiles;
       producer_profiles;
@@ -2770,12 +2770,6 @@ module Start_octez_dal_node = struct
       | None -> Port.fresh ()
     in
     let mk_addr port = Format.sprintf "0.0.0.0:%d" port in
-    let peers =
-      List.map
-        (fun peer ->
-          dal_foreign_endpoint state peer |> Foreign_endpoint.as_string)
-        peers
-    in
     let attestor_profiles =
       List.map
         Tezos_crypto.Signature.Public_key_hash.to_b58check
