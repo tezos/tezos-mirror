@@ -74,3 +74,7 @@ val class_spec_of_attr :
   ?enums:(string * EnumSpec.t) list ->
   AttrSpec.t ->
   ClassSpec.t
+
+(** [default_instance_spec ~id expr] returns a default instance specification for
+    of a given [id] and [expr]. *)
+val default_instance_spec : id:string -> Ast.t -> InstanceSpec.t

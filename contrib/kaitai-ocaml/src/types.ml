@@ -45,9 +45,18 @@ module Ast = struct
     | BitXor
     | BitAnd
 
+  let operator_to_string = function
+    | BitAnd -> "&"
+    | RShift -> ">>"
+    | _ -> failwith "not implemented"
+
   type unaryop = Invert | Not | Minus
 
   type cmpop = Eq | NotEq | Lt | LtE | Gt | GtE
+
+  let cmpop_to_string = function
+    | NotEq -> "!="
+    | _ -> failwith "not implemented"
 
   type t =
     | Raw of string
@@ -77,7 +86,26 @@ module Ast = struct
 
   type expr = t
 
-  let to_string = function Name name -> name | _ -> failwith "not implemented"
+  let rec to_string = function
+    | Name name -> name
+    | UnaryOp {op; operand} ->
+        (match op with
+        | Not -> "not"
+        | _ -> failwith "unary operator not supported")
+        ^ to_string operand
+    | BinOp {left; op; right} ->
+        Format.sprintf
+          "(%s %s %s)"
+          (to_string left)
+          (operator_to_string op)
+          (to_string right)
+    | Compare {left; ops; right} ->
+        Format.sprintf
+          "(%s %s %s)"
+          (to_string left)
+          (cmpop_to_string ops)
+          (to_string right)
+    | _ -> failwith "not implemented"
 end
 
 type processExpr =

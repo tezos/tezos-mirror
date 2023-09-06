@@ -109,4 +109,15 @@ module Class : sig
 
   (** [string] returns [ClassSpec.t] definition of [Data_encoding.string]. *)
   val string : encoding_name:string -> ClassSpec.t
+
+  (** [byte_group] represents a user defined type for a variable-length sequence
+      of bytes encoding a Zarith natural number. It is used for describing
+      encoding such as [Data_encoding.Z] and [Data_encoding.N].
+
+      As from the [Data_encoding] documentation: "each byte has a running unary
+      size bit: the most significant bit of each byte indicates whether this is
+      the last byte in the sequence (0) or whether the sequence continues (1).
+      Size bits ignored, the data is the binary representation of the number 
+      in little-endian order." *)
+  val byte_group : ClassSpec.t
 end

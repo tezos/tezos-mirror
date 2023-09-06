@@ -187,4 +187,29 @@ module Class = struct
   let bytes ~encoding_name = class_spec_of_attr ~encoding_name Attr.bytes
 
   let string ~encoding_name = class_spec_of_attr ~encoding_name Attr.string
+
+  let byte_group =
+    {
+      (default_class_spec ~encoding_name:"group") with
+      seq = [{Attr.u1 with id = "b"}];
+      instances =
+        [
+          ( "has_next",
+            default_instance_spec
+              ~id:"has_next"
+              Ast.(
+                Compare
+                  {
+                    left =
+                      BinOp {left = Name "b"; op = BitAnd; right = IntNum 128};
+                    ops = NotEq;
+                    right = IntNum 0;
+                  }) );
+          ( "value",
+            default_instance_spec
+              ~id:"value"
+              (BinOp {left = Name "b"; op = BitAnd; right = IntNum 127}) );
+        ];
+      isTopLevel = false;
+    }
 end
