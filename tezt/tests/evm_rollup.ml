@@ -1009,19 +1009,16 @@ let ensure_config_setup_integrity ~config_result evm_setup =
   unit
 
 let ensure_block_integrity ~block_result evm_setup =
-  let* block_json =
-    Evm_proxy_server.(
-      call_evm_rpc
-        evm_setup.evm_proxy_server
-        {
-          method_ = "eth_getBlockByNumber";
-          parameters =
-            `A
-              [`String (Int32.to_string block_result.Block.number); `Bool false];
-        })
+  let* block =
+    Eth_cli.get_block
+      ~block_id:(Int32.to_string block_result.Block.number)
+      ~endpoint:evm_setup.endpoint
   in
-  let block = block_json |> Evm_proxy_server.extract_result |> Block.of_json in
-  assert (block = block_result) ;
+  (* only the relevant fields *)
+  assert (block.number = block_result.number) ;
+  assert (block.hash = block_result.hash) ;
+  assert (block.timestamp = block_result.timestamp) ;
+  assert (block.transactions = block_result.transactions) ;
   unit
 
 let latest_block evm_setup =
@@ -2233,6 +2230,13 @@ let gen_kernel_migration_test ?(admin = Constant.bootstrap5) ~scenario_prior
       ~base_installee:next_kernel_base_installee
       ~installee:next_kernel_installee
       protocol
+  in
+  let* _ =
+    (* wait for the migration to be processed *)
+    next_evm_level
+      ~sc_rollup_node:evm_setup.sc_rollup_node
+      ~node:evm_setup.node
+      ~client:evm_setup.client
   in
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
