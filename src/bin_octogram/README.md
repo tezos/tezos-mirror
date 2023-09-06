@@ -77,3 +77,20 @@ issues, while improving the performances of running large experiments.
   ControlMaster auto
   ControlPersist 2h
 ```
+
+### Octogram keeps asking if the host can be trusted
+
+When using Octogram against an infrastructure automatically deployed using
+tools like Terraform, it is likely that your local SSH client will not know the
+servers’ SSH keys.
+
+As a consequence, you will be asked if you trust the SSH key fingerprints are
+the one expected. This can be unpractical when you run a very large experiment
+on hundreds of agents. It might be interesting to disable host key checking
+**for this case only**. Be wary that host key checking is a security practice
+that should not be disabled in the general case, as disabling it may facilitate
+man-in-the-middle attacks.
+
+```
+  StrictHostKeyChecking no
+```
