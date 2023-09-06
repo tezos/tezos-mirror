@@ -67,11 +67,25 @@ pub struct EthereumTransactionCommon {
     pub chain_id: U256,
     /// A scalar value equal to the number of transactions sent by the sender
     pub nonce: U256,
-    /// A scalar value equal to the number of
-    /// Wei to be paid per unit of gas for all computation
-    /// costs incurred as a result of the execution of this
-    /// transaction
-    pub gas_price: U256,
+
+    /// Amount of fee to be paid per gas in addition
+    /// to the base_fee_per_gas in order
+    /// to incentivize miners to include the transaction.
+    /// base_fee_per_gas is re-evaluated every block
+    /// from the actual usage of gas in the previous block.
+    /// More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
+    pub max_priority_fee_per_gas: U256,
+    /// Maximum amount of fee to be paid per gas.
+    /// Thus, as a transaction might be included in the block
+    /// with higher base_fee_per_gas then one
+    /// at the moment of the creation of tx,
+    /// this value is protection for user that
+    /// they won't pay for a tx more than they wanted to pay.
+    /// Given this cap, effective priority fee will be equal to
+    /// min(max_priority_fee_per_gas, max_fee_per_gas - base_fee_per_gas).
+    /// More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
+    pub max_fee_per_gas: U256,
+
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
@@ -179,7 +193,8 @@ impl EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id,
             nonce,
-            gas_price,
+            max_fee_per_gas: gas_price,
+            max_priority_fee_per_gas: gas_price,
             gas_limit,
             to,
             value,
@@ -221,7 +236,50 @@ impl EthereumTransactionCommon {
             type_: TransactionType::Eip2930,
             chain_id,
             nonce,
-            gas_price,
+            max_fee_per_gas: gas_price,
+            max_priority_fee_per_gas: gas_price,
+            gas_limit,
+            to,
+            value,
+            data,
+            access_list,
+            signature,
+        })
+    }
+
+    fn rlp_decode_eip1559_tx(decoder: &Rlp) -> Result<Self, DecoderError> {
+        // It's either:
+        // - 9 fields fields for an unsigned tx
+        // - 12 fields for a signed tx
+        if decoder.item_count() != Ok(9) && decoder.item_count() != Ok(12) {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let chain_id: U256 = decode_field(&next(&mut it)?, "chain_id")?;
+        let nonce: U256 = decode_field(&next(&mut it)?, "nonce")?;
+        let max_priority_fee_per_gas =
+            decode_field(&next(&mut it)?, "max_priority_fee_per_gas")?;
+        let max_fee_per_gas = decode_field(&next(&mut it)?, "max_fee_per_gas")?;
+        let gas_limit: u64 = decode_field(&next(&mut it)?, "gas_limit")?;
+        let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+        let value: U256 = decode_field(&next(&mut it)?, "value")?;
+        let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+        let access_list: AccessList = decode_list(&next(&mut it)?, "access_list")?;
+
+        let vrs = Self::rlp_decode_vrs(&mut it)?;
+        let signature = match vrs {
+            Some((v, r, s)) => TxSignature::new(v, r, s)
+                .map(Option::Some)
+                .map_err(|_| DecoderError::Custom("Invalid signature")),
+            None => Ok(None),
+        }?;
+        Ok(EthereumTransactionCommon {
+            type_: TransactionType::Eip1559,
+            chain_id,
+            nonce,
+            max_priority_fee_per_gas,
+            max_fee_per_gas,
             gas_limit,
             to,
             value,
@@ -241,7 +299,7 @@ impl EthereumTransactionCommon {
         let tx = match tx_version {
             TransactionType::Legacy => Self::rlp_decode_legacy_tx(decoder),
             TransactionType::Eip2930 => Self::rlp_decode_eip2930_tx(decoder),
-            _ => panic!("Unsupported tx type in RLP decoding"),
+            TransactionType::Eip1559 => Self::rlp_decode_eip1559_tx(decoder),
         }?;
         Ok(tx)
     }
@@ -249,7 +307,8 @@ impl EthereumTransactionCommon {
     fn rlp_encode_legacy_tx(&self, stream: &mut RlpStream) {
         stream.begin_list(9);
         stream.append(&self.nonce);
-        stream.append(&self.gas_price);
+        // self.max_fee_per_gas has to be equal to gas_price
+        stream.append(&self.max_fee_per_gas);
         stream.append(&self.gas_limit);
         append_option(stream, self.to);
         stream.append(&self.value);
@@ -267,7 +326,7 @@ impl EthereumTransactionCommon {
 
     fn rlp_encode_eip2930_tx(&self, stream: &mut RlpStream) {
         if self.signature.is_some() {
-            // If there is a signature, there will be 1 fields
+            // If there is a signature, there will be 11 fields
             stream.begin_list(11);
         } else {
             // Otherwise, there won't be signature
@@ -275,7 +334,33 @@ impl EthereumTransactionCommon {
         }
         stream.append(&self.chain_id);
         stream.append(&self.nonce);
-        stream.append(&self.gas_price);
+        // self.max_fee_per_gas has to be equal to gas_price
+        stream.append(&self.max_fee_per_gas);
+        stream.append(&self.gas_limit);
+        append_option(stream, self.to);
+        stream.append(&self.value);
+        append_vec(stream, self.data.clone());
+        stream.append_list(&self.access_list);
+
+        match &self.signature {
+            Some(sig) => sig.rlp_append(stream),
+            // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
+            None => (),
+        }
+    }
+
+    fn rlp_encode_eip1559_tx(&self, stream: &mut RlpStream) {
+        if self.signature.is_some() {
+            // If there is a signature, there will be 12 fields
+            stream.begin_list(12);
+        } else {
+            // Otherwise, there won't be signature
+            stream.begin_list(9);
+        }
+        stream.append(&self.chain_id);
+        stream.append(&self.nonce);
+        stream.append(&self.max_priority_fee_per_gas);
+        stream.append(&self.max_fee_per_gas);
         stream.append(&self.gas_limit);
         append_option(stream, self.to);
         stream.append(&self.value);
@@ -293,7 +378,7 @@ impl EthereumTransactionCommon {
         match &self.type_ {
             TransactionType::Legacy => self.rlp_encode_legacy_tx(stream),
             TransactionType::Eip2930 => self.rlp_encode_eip2930_tx(stream),
-            _ => panic!("Unsupported tx type in RLP encoding"),
+            TransactionType::Eip1559 => self.rlp_encode_eip1559_tx(stream),
         }
     }
 
@@ -365,6 +450,9 @@ impl EthereumTransactionCommon {
         if first == 0x01 {
             let decoder = Rlp::new(&bytes[1..]);
             Self::from_rlp_any(&decoder, TransactionType::Eip2930)
+        } else if first == 0x02 {
+            let decoder = Rlp::new(&bytes[1..]);
+            Self::from_rlp_any(&decoder, TransactionType::Eip1559)
         } else {
             let decoder = Rlp::new(bytes);
             Self::from_rlp_any(&decoder, TransactionType::Legacy)
@@ -389,11 +477,11 @@ impl EthereumTransactionCommon {
         let mut rlp_enc = stream.out().to_vec();
         match self.type_ {
             TransactionType::Legacy => rlp_enc,
-            TransactionType::Eip2930 => {
-                rlp_enc.insert(0, 1);
+            TransactionType::Eip2930 | TransactionType::Eip1559 => {
+                let tag = From::from(self.type_);
+                rlp_enc.insert(0, tag);
                 rlp_enc
             }
-            _ => panic!("Unsupported tx version"),
         }
     }
 }
@@ -469,7 +557,8 @@ mod test {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(9),
-            gas_price: U256::from(20000000000u64),
+            max_fee_per_gas: U256::from(20000000000u64),
+            max_priority_fee_per_gas: U256::from(20000000000u64),
             gas_limit: 21000u64,
             to: address_from_str("3535353535353535353535353535353535353535"),
             value: U256::from(1000000000000000000u64),
@@ -499,7 +588,8 @@ mod test {
             type_: TransactionType::Eip2930,
             chain_id: U256::from(1900),
             nonce: U256::from(34),
-            gas_price: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
             gas_limit: 100000,
             to: address_from_str("09616C3d61b3331fc4109a9E41a8BDB7d9776609"),
             value: U256::from(0x5af3107a4000_u64),
@@ -519,6 +609,30 @@ mod test {
                 ),
                 string_to_h256_unsafe(
                     "51e9af653b8eb98e74e894a766cf88904dbdb10b0bc1fbd12f18f661fa2797a4",
+                ),
+            )),
+        }
+    }
+
+    fn eip1559_tx() -> EthereumTransactionCommon {
+        EthereumTransactionCommon {
+            type_: TransactionType::Eip1559,
+            chain_id: U256::one(),
+            nonce: U256::from(4142),
+            max_priority_fee_per_gas: U256::from(1000000000),
+            max_fee_per_gas: U256::from(28750000000_i64),
+            gas_limit: 37262,
+            to: address_from_str("9f8f72aa9304c8b593d555f12ef6589cc3a579a2"),
+            value: U256::from(0),
+            data: hex::decode("a9059cbb000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43000000000000000000000000000000000000000000000000f020482e89b73c14").unwrap(),
+            access_list: vec![],
+            signature: Some(TxSignature::new_unsafe(
+                0,
+                string_to_h256_unsafe(
+                    "f876cca0898a15f2eaf17ee8a0ac33ec7933b17db612bd5aaf5925774da84fad",
+                ),
+                string_to_h256_unsafe(
+                    "5c7310fa69b650d583fa5a66fbcfd720e96d9eacadc18632595cb6423e2f613f",
                 ),
             )),
         }
@@ -669,7 +783,8 @@ mod test {
             type_: TransactionType::Legacy,
             chain_id,
             nonce,
-            gas_price,
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit,
             to,
             value,
@@ -740,7 +855,8 @@ mod test {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce,
-            gas_price,
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit,
             to,
             value,
@@ -800,7 +916,8 @@ mod test {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce,
-            gas_price,
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit,
             to,
             value,
@@ -844,7 +961,8 @@ mod test {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce,
-            gas_price,
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit,
             to,
             value,
@@ -876,12 +994,13 @@ mod test {
         // r: bb03310570362eef497a09dd6e4ef42f56374965cfb09cc4e055a22a2eeac7ad
         // s: 6053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
         // tx: 0xf869018506fc23ac0083100000944e1b2c985d729ae6e05ef7974013eeb48f394449843b9aca008026a0bb03310570362eef497a09dd6e4ef42f56374965cfb09cc4e055a22a2eeac7ada06053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
-
+        let gas_price = U256::from(30000000000u64);
         let expected_transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(1),
-            gas_price: U256::from(30000000000u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 1048576u64,
             to: address_from_str("4e1b2c985d729ae6e05ef7974013eeb48f394449"),
             value: U256::from(1000000000u64),
@@ -922,11 +1041,13 @@ mod test {
         // s: 6053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
         // tx: 0xf869018506fc23ac0083100000944e1b2c985d729ae6e05ef7974013eeb48f394449843b9aca008026a0bb03310570362eef497a09dd6e4ef42f56374965cfb09cc4e055a22a2eeac7ada06053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
 
+        let gas_price = U256::from(30000000000u64);
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(1),
-            gas_price: U256::from(30000000000u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 1048576u64,
             to: address_from_str("4e1b2c985d729ae6e05ef7974013eeb48f394449"),
             value: U256::from(1000000000u64),
@@ -966,12 +1087,14 @@ mod test {
         // s: 6053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
         // tx: 0xf869018506fc23ac0083100000944e1b2c985d729ae6e05ef7974013eeb48f394449843b9aca008026a0bb03310570362eef497a09dd6e4ef42f56374965cfb09cc4e055a22a2eeac7ada06053c1bd83abb30c109801844709202208736d598649afe2a53f024b61b3383f
 
+        let gas_price = U256::from(30000000000u64);
         // setup
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(1),
-            gas_price: U256::from(30000000000u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 1048576u64,
             to: address_from_str("4e1b2c985d729ae6e05ef7974013eeb48f394449"),
             value: U256::from(1000000000u64),
@@ -1084,11 +1207,13 @@ mod test {
         // setup
         let data: Vec<u8> = hex::decode("3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").unwrap();
 
+        let gas_price = U256::from(29075052730u64);
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(46),
-            gas_price: U256::from(29075052730u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 274722u64,
             to: address_from_str("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b"),
             value: U256::from(760460536160301065u64),
@@ -1119,12 +1244,13 @@ mod test {
 
         // setup
         let data: Vec<u8> = hex::decode("3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").unwrap();
-
+        let gas_price = U256::from(29075052730u64);
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(46),
-            gas_price: U256::from(29075052730u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 274722u64,
             to: address_from_str("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b"),
             value: U256::from(760460536160301065u64),
@@ -1152,12 +1278,13 @@ mod test {
         // inspired by 0xf598016f51e0544187088ddd50fd37818fd268a0363a17281576425f3ee334cb
         // private key dcdff53b4f013dbcdc717f89fe3bf4d8b10512aae282b48e01d7530470382701
         let data: Vec<u8> = hex::decode("3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").unwrap();
-
+        let gas_price = U256::from(29075052730u64);
         let transaction = EthereumTransactionCommon {
             type_: TransactionType::Legacy,
             chain_id: U256::one(),
             nonce: U256::from(46),
-            gas_price: U256::from(29075052730u64),
+            max_priority_fee_per_gas: gas_price,
+            max_fee_per_gas: gas_price,
             gas_limit: 274722u64,
             to: address_from_str("ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b"),
             value: U256::from(760460536160301065u64),
@@ -1410,6 +1537,31 @@ mod test {
             "ea38506c4afe4bb402e030877fbe1011fa1da47aabcf215db8da8fee5d3af086",
             "51e9af653b8eb98e74e894a766cf88904dbdb10b0bc1fbd12f18f661fa2797a4",
             0,
+        );
+    }
+
+    #[test]
+    fn test_eip1559_enc_dec() {
+        let signed_tx = "02f8b20182102e843b9aca008506b1a22f8082918e949f8f72aa9304c8b593d555f12ef6589cc3a579a280b844a9059cbb000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43000000000000000000000000000000000000000000000000f020482e89b73c14c080a0f876cca0898a15f2eaf17ee8a0ac33ec7933b17db612bd5aaf5925774da84fada05c7310fa69b650d583fa5a66fbcfd720e96d9eacadc18632595cb6423e2f613f".to_string();
+        let parsed = EthereumTransactionCommon::from_hex(signed_tx.clone()).unwrap();
+        let expected = eip1559_tx();
+        assert_eq!(expected, parsed);
+
+        assert_eq!(signed_tx, hex::encode(parsed.to_bytes()))
+    }
+
+    #[test]
+    fn test_eip1559_unsigned_enc_dec() {
+        let unsigned_tx = EthereumTransactionCommon {
+            signature: None,
+            ..eip1559_tx()
+        };
+        let tx_encoding = "02f86f0182102e843b9aca008506b1a22f8082918e949f8f72aa9304c8b593d555f12ef6589cc3a579a280b844a9059cbb000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43000000000000000000000000000000000000000000000000f020482e89b73c14c0";
+        assert_eq!(tx_encoding, hex::encode(unsigned_tx.to_bytes()));
+        assert_eq!(
+            unsigned_tx,
+            EthereumTransactionCommon::from_bytes(&hex::decode(tx_encoding).unwrap())
+                .unwrap()
         );
     }
 }

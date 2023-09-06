@@ -42,10 +42,18 @@ impl Transaction {
         }
     }
 
-    fn gas_price(&self) -> U256 {
+    // This function returns effective_gas_price
+    // For more details see the first paragraph here https://eips.ethereum.org/EIPS/eip-1559#specification
+    fn gas_price(&self, block_base_fee_per_gas: U256) -> U256 {
         match &self.content {
             TransactionContent::Deposit(Deposit { gas_price, .. }) => *gas_price,
-            TransactionContent::Ethereum(transaction) => transaction.gas_price,
+            TransactionContent::Ethereum(transaction) => {
+                let priority_fee_per_gas = U256::min(
+                    transaction.max_priority_fee_per_gas,
+                    transaction.max_fee_per_gas - block_base_fee_per_gas,
+                );
+                priority_fee_per_gas + block_base_fee_per_gas
+            }
         }
     }
 
@@ -115,11 +123,12 @@ fn make_object_info(
     from: H160,
     index: u32,
     gas_used: U256,
+    block_base_fee_per_gas: U256,
 ) -> TransactionObjectInfo {
     TransactionObjectInfo {
         from,
         gas_used,
-        gas_price: transaction.gas_price(),
+        gas_price: transaction.gas_price(block_base_fee_per_gas),
         hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
@@ -308,7 +317,13 @@ pub fn apply_transaction<Host: Runtime>(
                 caller,
                 to,
             );
-            let object_info = make_object_info(transaction, caller, index, gas_used);
+            let object_info = make_object_info(
+                transaction,
+                caller,
+                index,
+                gas_used,
+                block_constants.base_fee_per_gas,
+            );
             index_new_accounts(host, accounts_index, &receipt_info)?;
             Ok(Some((receipt_info, object_info)))
         }
