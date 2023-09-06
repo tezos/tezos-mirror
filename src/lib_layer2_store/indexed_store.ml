@@ -215,7 +215,12 @@ end
 module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
   module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
 
-  type _ t = {index : I.t; scheduler : Lwt_idle_waiter.t}
+  type _ t = {
+    index : I.t;
+    scheduler : Lwt_idle_waiter.t;
+    readonly : bool;
+    path : string;
+  }
 
   let mem store k =
     let open Lwt_result_syntax in
@@ -254,7 +259,7 @@ module Make_indexable (N : NAME) (K : Index.Key.S) (V : Index.Value.S) = struct
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let index = I.v ~log_size:index_buffer_size ~readonly path in
     let scheduler = Lwt_idle_waiter.create () in
-    return {index; scheduler}
+    return {index; scheduler; readonly; path}
 
   let close store =
     let open Lwt_result_syntax in
@@ -474,11 +479,14 @@ struct
       | Error err -> tzfail (Decoding_error err)
   end
 
-  type +'a t = {
+  type _ t = {
     index : Header_index.t;
     fd : Lwt_unix.file_descr;
     scheduler : Lwt_idle_waiter.t;
+    readonly : bool;
     cache : (V.t * V.Header.t, tztrace) Cache.t;
+    index_path : string;
+    data_path : string;
   }
 
   let mem store key =
@@ -564,21 +572,17 @@ struct
     let*! () = Lwt_utils_unix.create_dir path in
     let readonly = match mode with Read_only -> true | Read_write -> false in
     let flag = if readonly then Unix.O_RDONLY else Unix.O_RDWR in
+    let data_path = Filename.concat path "data" in
     let*! fd =
-      Lwt_unix.openfile
-        (Filename.concat path "data")
-        [Unix.O_CREAT; O_CLOEXEC; flag]
-        0o644
+      Lwt_unix.openfile data_path [Unix.O_CREAT; O_CLOEXEC; flag] 0o644
     in
+    let index_path = Filename.concat path "index" in
     let index =
-      Header_index.v
-        ~log_size:index_buffer_size
-        ~readonly
-        (Filename.concat path "index")
+      Header_index.v ~log_size:index_buffer_size ~readonly index_path
     in
     let scheduler = Lwt_idle_waiter.create () in
     let cache = Cache.create cache_size in
-    return {index; fd; scheduler; cache}
+    return {index; fd; scheduler; readonly; cache; index_path; data_path}
 
   let close store =
     protect @@ fun () ->
