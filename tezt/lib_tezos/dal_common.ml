@@ -365,21 +365,20 @@ module Dal_RPC = struct
         (Either.Left node)
         rpc
 
-    let call_raw ?(log_request = true) ?(log_response_status = true)
-        ?(log_response_body = true) node rpc =
+    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
       call_raw
-        ~log_request
-        ~log_response_status
-        ~log_response_body
+        ?log_request
+        ?log_response_status
+        ?log_response_body
         (Either.Left node)
         rpc
 
-    let call_json ?log_request ?log_response_status ?(log_response_body = true)
-        node rpc =
+    let call_json ?log_request ?log_response_status ?log_response_body node rpc
+        =
       call_json
         ?log_request
         ?log_response_status
-        ~log_response_body
+        ?log_response_body
         (Either.Left node)
         rpc
   end
@@ -394,21 +393,20 @@ module Dal_RPC = struct
         (Either.Right node)
         rpc
 
-    let call_raw ?(log_request = true) ?(log_response_status = true)
-        ?(log_response_body = true) node rpc =
+    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
       call_raw
-        ~log_request
-        ~log_response_status
-        ~log_response_body
+        ?log_request
+        ?log_response_status
+        ?log_response_body
         (Either.Right node)
         rpc
 
-    let call_json ?log_request ?log_response_status ?(log_response_body = true)
-        node rpc =
+    let call_json ?log_request ?log_response_status ?log_response_body node rpc
+        =
       call_json
         ?log_request
         ?log_response_status
-        ~log_response_body
+        ?log_response_body
         (Either.Right node)
         rpc
   end
