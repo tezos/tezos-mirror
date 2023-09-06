@@ -12,18 +12,12 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs"
-  "tezos-client-base"
+  "octez-shell-libs"
   "tezos-protocol-018-Proxford"
-  "tezos-mockup-registration"
-  "tezos-proxy"
-  "tezos-signer-backends"
   "tezos-protocol-plugin-018-Proxford"
   "tezos-smart-rollup-018-Proxford"
   "uri" { >= "3.1.0" }
-  "tezos-mockup"
-  "tezos-mockup-commands"
-  "tezos-client-commands"
-  "tezos-client-base-unix"
+  "octez-proto-libs"
   "tezt" { with-test & >= "3.1.1" }
   "octez-alcotezt" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }

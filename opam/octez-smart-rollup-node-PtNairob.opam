@@ -11,19 +11,17 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "tezos-client-base"
-  "tezos-client-base-unix"
+  "octez-shell-libs"
   "tezos-client-017-PtNairob"
   "tezos-protocol-017-PtNairob"
   "tezos-protocol-plugin-017-PtNairob"
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
   "tezos-dac-lib"
-  "octez-smart-rollup"
+  "octez-l2-libs"
   "tezos-smart-rollup-017-PtNairob"
   "tezos-smart-rollup-layer2-017-PtNairob"
   "tezos-layer2-utils-017-PtNairob"
-  "tezos-layer2-store"
   "octez-crawler"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
@@ -32,9 +30,7 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "octez-injector"
   "octez-smart-rollup-node-lib"
-  "tezos-scoru-wasm-fast"
   "tezos-version"
-  "tezos-client-commands"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }

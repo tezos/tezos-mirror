@@ -5,8 +5,8 @@
  (name testnet_experiment_tools)
  (libraries
   tezt
-  octez-libs.tezt-tezos
-  tezos-client-base-unix
+  tezt-tezos
+  octez-shell-libs.tezos-client-base-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix

@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-libs.tezt-tezos
+  tezt-tezos
   tezos-protocol-017-PtNairob
   tezos-client-017-PtNairob
   tezos-protocol-plugin-017-PtNairob

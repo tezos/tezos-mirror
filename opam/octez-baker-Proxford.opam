@@ -13,9 +13,8 @@ depends: [
   "octez-libs"
   "tezos-protocol-018-Proxford"
   "tezos-client-018-Proxford"
-  "tezos-client-commands"
+  "octez-shell-libs"
   "tezos-baking-018-Proxford-commands"
-  "tezos-client-base-unix"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

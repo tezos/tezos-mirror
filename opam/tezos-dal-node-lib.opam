@@ -12,9 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-dal-node-services"
-  "tezos-client-base"
-  "tezos-protocol-updater"
-  "tezos-client-base-unix"
+  "octez-shell-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

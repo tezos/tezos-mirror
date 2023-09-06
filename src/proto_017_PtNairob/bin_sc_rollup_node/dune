@@ -10,10 +10,10 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-017-PtNairob
-  octez-libs.tezos-shell-services
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-client-commands
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.tezos-client-commands
   tezos-client-017-PtNairob
   octez-smart-rollup-node-lib
   octez_smart_rollup_node_PtNairob)

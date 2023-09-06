@@ -8,13 +8,13 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-protocol-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.lifted
-  tezos-mockup-registration
-  tezos-proxy
-  tezos-signer-backends
+  octez-shell-libs.tezos-mockup-registration
+  octez-shell-libs.tezos-proxy
+  octez-shell-libs.tezos-signer-backends
   tezos-protocol-plugin-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters
   octez-libs.tezos-rpc

@@ -15,10 +15,11 @@ depends: [
   "tezos-benchmark"
   "tezos-benchmark-018-Proxford"
   "tezos-benchmark-type-inference-018-Proxford"
-  "tezos-shell-benchmarks"
+  "octez-shell-libs"
   "tezos-018-Proxford-test-helpers"
   "tezos-client-018-Proxford"
   "tezos-protocol-plugin-018-Proxford"
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

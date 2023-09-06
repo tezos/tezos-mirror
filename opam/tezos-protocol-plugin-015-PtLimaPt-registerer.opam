@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "tezos-embedded-protocol-015-PtLimaPt"
   "tezos-protocol-plugin-015-PtLimaPt"
-  "tezos-validation"
+  "octez-shell-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

@@ -2,7 +2,7 @@
 # Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: ["Tezos devteam" "WebAssembly Authors"]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
@@ -52,12 +52,8 @@ depends: [
   "mtime" { >= "1.4.0" & < "2.0.0" }
   "conf-libev"
   "uutf"
-  "lwt-watcher" { = "0.2" }
   "ringo" { >= "1.0.0" }
-  "prometheus" { >= "1.2" }
-  "tezt" { >= "3.1.1" }
-  "cohttp-lwt-unix" { >= "5.2.0" }
-  "astring" {with-test}
+  "tezt" { with-test & >= "3.1.1" }
   "qcheck-core" {with-test}
   "irmin" { >= "3.7.2" & < "3.8.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }
@@ -66,9 +62,10 @@ depends: [
   "integers_stubs_js"
   "tezos-rust-libs" { = "1.6" }
   "tezos-sapling-parameters" { >= "1.1.0" }
-  "class_group_vdf" { >= "0.0.4" }
+  "lwt-watcher" { = "0.2" }
   "resto-cohttp" { >= "1.2" }
   "resto-cohttp-client" { >= "1.2" }
+  "cohttp-lwt-unix" { >= "5.2.0" }
   "resto-cohttp-server" { >= "1.2" }
   "resto-acl" { >= "1.2" }
   "bigstring" {with-test}

@@ -9,7 +9,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
@@ -33,7 +33,7 @@
 
 (rule
  (alias runtest)
- (package octez-libs)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 
@@ -53,7 +53,7 @@
 
 (rule
  (alias runtest_js)
- (package octez-libs)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run node %{dep:./main_js.bc.js})))
 

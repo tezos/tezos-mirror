@@ -3,15 +3,15 @@
 
 (library
  (name tezos_protocol_updater)
- (public_name tezos-protocol-updater)
+ (public_name octez-shell-libs.tezos-protocol-updater)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  octez-libs.tezos-shell-services
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-shell-context
+  octez-shell-libs.tezos-shell-services
+  octez-proto-libs.tezos-protocol-environment
+  octez-shell-libs.tezos-shell-context
   octez-protocol-compiler.registerer
   octez-protocol-compiler.native
   octez-libs.tezos-context

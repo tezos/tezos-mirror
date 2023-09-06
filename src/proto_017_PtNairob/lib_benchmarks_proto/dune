@@ -17,13 +17,13 @@
   tezos-benchmark-type-inference-017-PtNairob
   tezos-protocol-017-PtNairob
   octez-libs.tezos-crypto
-  tezos-shell-benchmarks
+  octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline
   tezos-017-PtNairob-test-helpers
   octez-libs.tezos-sapling
   tezos-client-017-PtNairob
   tezos-protocol-plugin-017-PtNairob
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

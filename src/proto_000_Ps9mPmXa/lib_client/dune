@@ -7,12 +7,12 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-libs.tezos-shell-services
-  tezos-client-base
+  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.tezos-client-base
   tezos-protocol-000-Ps9mPmXa
   tezos-protocol-000-Ps9mPmXa.lifted
   octez-libs.tezos-rpc
-  tezos-client-commands
+  octez-shell-libs.tezos-client-commands
   octez-libs.tezos-stdlib-unix)
  (library_flags (:standard -linkall))
  (flags

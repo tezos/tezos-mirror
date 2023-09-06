@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-shell-context
+  octez-shell-libs.tezos-shell-context
   octez-alcotezt
   octez-libs.tezos-test-helpers
   octez-libs.tezos-base
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -32,7 +32,7 @@
 
 (rule
  (alias runtest)
- (package tezos-shell-context-test)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

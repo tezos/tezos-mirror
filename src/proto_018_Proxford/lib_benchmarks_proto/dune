@@ -17,13 +17,13 @@
   tezos-benchmark-type-inference-018-Proxford
   tezos-protocol-018-Proxford
   octez-libs.tezos-crypto
-  tezos-shell-benchmarks
+  octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline
   tezos-018-Proxford-test-helpers
   octez-libs.tezos-sapling
   tezos-client-018-Proxford
   tezos-protocol-plugin-018-Proxford
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

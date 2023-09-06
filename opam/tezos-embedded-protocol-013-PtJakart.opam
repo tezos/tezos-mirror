@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "ocaml" { >= "4.14" }
   "tezos-protocol-013-PtJakart"
-  "tezos-protocol-updater"
-  "octez-libs"
+  "octez-shell-libs"
+  "octez-proto-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

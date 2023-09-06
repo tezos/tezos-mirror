@@ -12,9 +12,9 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "tezos-protocol-017-PtNairob"
-  "tezos-client-base"
+  "octez-proto-libs"
+  "octez-shell-libs"
   "tezos-client-017-PtNairob"
-  "tezos-client-commands"
   "tezos-baking-017-PtNairob"
   "uri" { >= "3.1.0" }
 ]

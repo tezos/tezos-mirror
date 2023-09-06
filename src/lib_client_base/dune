@@ -5,13 +5,13 @@
 
 (library
  (name tezos_client_base)
- (public_name tezos-client-base)
+ (public_name octez-shell-libs.tezos-client-base)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
   octez-libs.tezos-rpc
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-sapling
   uri)
  (js_of_ocaml)

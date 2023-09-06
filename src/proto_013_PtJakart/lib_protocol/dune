@@ -6,7 +6,7 @@
  (public_name tezos-protocol-013-PtJakart.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment)
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_013_PtJakart))
 
@@ -218,8 +218,8 @@
  (public_name tezos-protocol-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-013-PtJakart.raw)
  (flags
   (:standard)
@@ -437,8 +437,8 @@
  (public_name tezos-protocol-013-PtJakart.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs
   tezos-protocol-013-PtJakart)
  (flags
   (:standard)
@@ -457,8 +457,8 @@
 (library
  (name tezos_protocol_013_PtJakart_functor)
  (libraries
-  octez-libs.tezos-protocol-environment
-  octez-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -51
@@ -661,8 +661,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-013-PtJakart
-  tezos-protocol-updater
-  octez-libs.tezos-protocol-environment)
+  octez-shell-libs.tezos-protocol-updater
+  octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

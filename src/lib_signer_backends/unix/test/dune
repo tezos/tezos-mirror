@@ -9,8 +9,8 @@
   octez-libs.tezos-error-monad
   octez-libs.tezos-stdlib
   octez-libs.tezos-crypto
-  tezos-client-base
-  tezos-signer-backends.unix
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-signer-backends.unix
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -37,7 +37,7 @@
 
 (rule
  (alias runtest)
- (package tezos-signer-backends)
+ (package octez-shell-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

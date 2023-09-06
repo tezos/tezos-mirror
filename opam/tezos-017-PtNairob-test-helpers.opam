@@ -14,7 +14,9 @@ depends: [
   "octez-libs"
   "tezos-protocol-017-PtNairob"
   "tezos-client-017-PtNairob"
+  "octez-proto-libs"
   "tezos-protocol-plugin-017-PtNairob"
+  "octez-shell-libs"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

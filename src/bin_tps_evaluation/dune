@@ -15,11 +15,11 @@
   lwt
   tezos-baking-alpha
   tezos-client-alpha.commands
-  tezos-client-base-unix
+  octez-shell-libs.tezos-client-base-unix
   tezos-protocol-alpha
   tezt
-  octez-libs.tezt-tezos
-  octez-libs.tezt-performance-regression
+  tezt-tezos
+  tezt-tezos.tezt-performance-regression
   uri)
  (link_flags
   (:standard)
@@ -30,7 +30,7 @@
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos
-  -open Tezt_performance_regression))
+  -open Tezt_tezos_tezt_performance_regression))
 
 (rule
  (targets sql.ml)

@@ -10,8 +10,8 @@
   octez-libs.tezos-rpc-http
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  tezos-client-base
-  tezos-shell)
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-shell)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

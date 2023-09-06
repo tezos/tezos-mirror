@@ -3,16 +3,16 @@
 
 (library
  (name tezos_signer_backends)
- (public_name tezos-signer-backends)
+ (public_name octez-shell-libs.tezos-signer-backends)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-stdlib
-  tezos-client-base
+  octez-shell-libs.tezos-client-base
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-client
-  tezos-signer-services
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-signer-services
+  octez-shell-libs.tezos-shell-services
   uri)
  (flags
   (:standard)

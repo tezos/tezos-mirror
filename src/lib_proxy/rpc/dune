@@ -3,14 +3,14 @@
 
 (library
  (name tezos_proxy_rpc)
- (public_name tezos-proxy.rpc)
+ (public_name octez-shell-libs.tezos-proxy.rpc)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-client-base
-  tezos-mockup-proxy
+  octez-shell-libs.tezos-client-base
+  octez-shell-libs.tezos-mockup-proxy
   octez-libs.tezos-rpc
-  tezos-proxy
+  octez-shell-libs.tezos-proxy
   uri)
  (flags
   (:standard)

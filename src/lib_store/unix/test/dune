@@ -8,15 +8,15 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-crypto
-  tezos-context-ops
-  tezos-store.shared
-  tezos-store.unix
-  tezos-store.unix-reconstruction
-  tezos-store.unix-snapshots
-  octez-libs.tezos-shell-services
+  octez-shell-libs.tezos-context-ops
+  octez-shell-libs.tezos-store.shared
+  octez-shell-libs.tezos-store.unix
+  octez-shell-libs.tezos-store.unix-reconstruction
+  octez-shell-libs.tezos-store.unix-snapshots
+  octez-shell-libs.tezos-shell-services
   octez-libs.tezos-stdlib-unix
-  tezos-validation
-  tezos-protocol-updater
+  octez-shell-libs.tezos-validation
+  octez-shell-libs.tezos-protocol-updater
   tezos-embedded-protocol-demo-noops
   tezos-embedded-protocol-genesis
   tezos-embedded-protocol-alpha
@@ -73,7 +73,7 @@
 
 (rule
  (alias runtest)
- (package tezos-store)
+ (package octez-store-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

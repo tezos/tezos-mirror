@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-error-monad
-  tezos_layer2_store
+  octez-l2-libs.tezos_layer2_store
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))
@@ -31,7 +31,7 @@
 
 (rule
  (alias runtest)
- (package tezos-layer2-store)
+ (package octez-l2-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

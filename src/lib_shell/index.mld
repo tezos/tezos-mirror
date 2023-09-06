@@ -1,9 +1,27 @@
-{0 tezos-shell index}
+{0 Octez-shell-libs: octez shell libraries}
 
-{1 Library tezos-shell}
+This is a package containing some libraries used by the shell of Octez.
 
-The entry point of this library is the module: {!Tezos_shell}.
+It contains the following libraries:
 
-{1 Prevalidator implementation overview}
-
-You can find the implementation overview of the prevalidator {{!page-prevalidator} here}.
+- {{!module-Mocked}Mocked}
+- {{!module-Tezos_client_base}Tezos_client_base}: Tezos: common helpers for `tezos-client`
+- {{!module-Tezos_client_base_unix}Tezos_client_base_unix}: Tezos: common helpers for `tezos-client` (unix-specific fragment)
+- {{!module-Tezos_client_commands}Tezos_client_commands}: Tezos: protocol agnostic commands for `tezos-client`
+- {{!module-Tezos_context_ops}Tezos_context_ops}: Backend-agnostic operations on contexts
+- {{!module-Tezos_mockup}Tezos_mockup}: Tezos: library of auto-documented RPCs (mockup mode)
+- {{!module-Tezos_mockup_commands}Tezos_mockup_commands}: Tezos: library of auto-documented RPCs (commands)
+- {{!module-Tezos_mockup_proxy}Tezos_mockup_proxy}: Tezos: local RPCs
+- {{!module-Tezos_mockup_registration}Tezos_mockup_registration}: Tezos: protocol registration for the mockup mode
+- {{!module-Tezos_p2p}Tezos_p2p}: Library for a pool of P2P connections
+- {{!module-Tezos_p2p_test_common}Tezos_p2p_test_common}
+- {{!module-Tezos_protocol_updater}Tezos_protocol_updater}: Economic-protocol dynamic loading for `octez-node`
+- {{!module-Tezos_proxy}Tezos_proxy}: Tezos: proxy
+- {{!page-tezos_shell}Tezos_shell}: Core of `octez-node` (gossip, validation scheduling, mempool, ...)
+- {{!module-Tezos_shell_benchmarks}Tezos_shell_benchmarks}: Tezos: shell benchmarks
+- {{!module-Tezos_shell_context}Tezos_shell_context}
+- {{!module-Tezos_shell_services}Tezos_shell_services}: Descriptions of RPCs exported by [tezos-shell]
+- {{!module-Tezos_signer_backends}Tezos_signer_backends}: Tezos: remote-signature backends for `tezos-client`
+- {{!module-Tezos_signer_services}Tezos_signer_services}: Tezos: descriptions of RPCs exported by `tezos-signer`
+- {{!module-Tezos_store}Tezos_store}: Store for `octez-node`
+- {{!module-Tezos_validation}Tezos_validation}: Library for block validation
