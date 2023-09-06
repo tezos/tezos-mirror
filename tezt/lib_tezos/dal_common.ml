@@ -103,6 +103,8 @@ module RPC_legacy = struct
 
   type local_uri_provider = Dal_node.t
 
+  type remote_uri_provider = Foreign_endpoint.t
+
   let call = RPC_core.call
 
   let call_raw = RPC_core.call_raw
@@ -379,6 +381,35 @@ module Dal_RPC = struct
         ?log_response_status
         ~log_response_body
         (Either.Left node)
+        rpc
+  end
+
+  module Remote : CALLERS with type input_uri_provider := remote_uri_provider =
+  struct
+    let call ?log_request ?log_response_status ?log_response_body node rpc =
+      call
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (Either.Right node)
+        rpc
+
+    let call_raw ?(log_request = true) ?(log_response_status = true)
+        ?(log_response_body = true) node rpc =
+      call_raw
+        ~log_request
+        ~log_response_status
+        ~log_response_body
+        (Either.Right node)
+        rpc
+
+    let call_json ?log_request ?log_response_status ?(log_response_body = true)
+        node rpc =
+      call_json
+        ?log_request
+        ?log_response_status
+        ~log_response_body
+        (Either.Right node)
         rpc
   end
 end

@@ -90,6 +90,8 @@ module RPC_legacy : sig
 
   type local_uri_provider = Dal_node.t
 
+  type remote_uri_provider = Foreign_endpoint.t
+
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
   val slot_pages : string -> (default_uri_provider, string list) RPC_core.t
 
@@ -259,6 +261,8 @@ module RPC : sig
   include CALLERS with type input_uri_provider := default_uri_provider
 
   module Local : CALLERS with type input_uri_provider := local_uri_provider
+
+  module Remote : CALLERS with type input_uri_provider := remote_uri_provider
 end
 
 module Commitment : sig
