@@ -46,6 +46,7 @@ type simulate_input = {
   messages : string list;
   reveal_pages : string list option;
   insight_requests : insight_request list;
+  log_kernel_debug_file : string option;
 }
 
 type commitment_info = {
@@ -115,11 +116,11 @@ module Encodings = struct
 
   let simulate_input =
     conv
-      (fun {messages; reveal_pages; insight_requests} ->
-        (messages, reveal_pages, insight_requests))
-      (fun (messages, reveal_pages, insight_requests) ->
-        {messages; reveal_pages; insight_requests})
-    @@ obj3
+      (fun {messages; reveal_pages; insight_requests; log_kernel_debug_file} ->
+        (messages, reveal_pages, insight_requests, log_kernel_debug_file))
+      (fun (messages, reveal_pages, insight_requests, log_kernel_debug_file) ->
+        {messages; reveal_pages; insight_requests; log_kernel_debug_file})
+    @@ obj4
          (req
             "messages"
             (list hex_string)
@@ -133,6 +134,13 @@ module Encodings = struct
             (list insight_request)
             []
             ~description:"Paths in the PVM to inspect after the simulation")
+         (opt
+            "log_kernel_debug_file"
+            string
+            ~description:
+              "File in which to emit kernel logs. This file will be created in \
+               <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
+               data directory of the rollup node.")
 
   let commitment_info =
     conv

@@ -32,6 +32,7 @@ type info_per_level = {
 
 (** Type of the state for a simulation. *)
 type t = {
+  node_ctxt : Node_context.ro;
   ctxt : Context.ro;
   inbox_level : int32;
   state : Context.tree;
@@ -42,21 +43,23 @@ type t = {
   plugin : (module Protocol_plugin_sig.S);
 }
 
-(** [start_simulation node_ctxt reveal_source block] starts a new simulation {e
-    on top} of [block], i.e. for an hypothetical new inbox (level).  *)
+(** [start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file block] starts
+    a new simulation {e on top} of [block], i.e. for an hypothetical new inbox
+    (level). If [log_kernel_debug_file] is provided, kernel logs will be written
+    to [node_ctxt.data_dir/simulation_kernel_logs/log_kernel_debug_file]. *)
 val start_simulation :
   Node_context.ro ->
   reveal_map:string Utils.Reveal_hash_map.t option ->
+  ?log_kernel_debug_file:string ->
   Layer1.head ->
   t tzresult Lwt.t
 
-(** [simulate_messages node_ctxt sim messages] runs a simulation of new
-    [messages] in the given simulation (state) [sim] and returns a new
-    simulation state, the remaining fuel (when [?fuel] is provided) and the
-    number of ticks that happened. *)
-val simulate_messages :
-  Node_context.ro -> t -> string list -> (t * Z.t) tzresult Lwt.t
+(** [simulate_messages sim messages] runs a simulation of new [messages] in the
+    given simulation (state) [sim] and returns a new simulation state, the
+    remaining fuel (when [?fuel] is provided) and the number of ticks that
+    happened. *)
+val simulate_messages : t -> string list -> (t * Z.t) tzresult Lwt.t
 
-(** [end_simulation node_ctxt sim] adds and [End_of_level] message and marks the
+(** [end_simulation sim] adds and [End_of_level] message and marks the
     simulation as ended. *)
-val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
+val end_simulation : t -> (t * Z.t) tzresult Lwt.t

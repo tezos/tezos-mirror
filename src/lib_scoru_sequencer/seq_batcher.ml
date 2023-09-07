@@ -155,7 +155,7 @@ let produce_batch_sequences state head =
       Message_queue.clear state.messages ;
       return_unit
 
-let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
+let simulate simulation_ctxt (messages : L2_message.t list) =
   let open Lwt_result_syntax in
   let*? ext_messages =
     Environment.wrap_tzresult
@@ -168,7 +168,7 @@ let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
          messages
   in
   let+ simulation_ctxt, _ticks =
-    Simulation.simulate_messages node_ctxt simulation_ctxt ext_messages
+    Simulation.simulate_messages simulation_ctxt ext_messages
   in
   simulation_ctxt
 
@@ -201,9 +201,7 @@ let on_register_messages state (messages : string list) =
       messages
   in
   let* simulation_ctxt = get_simulation_context state in
-  let* advanced_simulation_ctxt =
-    simulate state.node_ctxt simulation_ctxt messages
-  in
+  let* advanced_simulation_ctxt = simulate simulation_ctxt messages in
   state.simulation_ctxt <- Some advanced_simulation_ctxt ;
   let*! () = Batcher_events.(emit queue) (List.length messages) in
   let hashes =

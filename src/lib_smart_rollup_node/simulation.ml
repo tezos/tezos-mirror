@@ -31,6 +31,7 @@ type info_per_level = {
 }
 
 type t = {
+  node_ctxt : Node_context.ro;
   ctxt : Context.ro;
   inbox_level : int32;
   state : Context.tree;
@@ -49,8 +50,30 @@ let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
   let predecessor_timestamp = pred_header.timestamp in
   return {predecessor_timestamp; predecessor}
 
-let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
+let set_simulation_kernel_log ?log_kernel_debug_file
+    (node_ctxt : _ Node_context.t) =
+  let open Lwt_syntax in
+  let* kernel_debug_logger, finaliser =
+    match (node_ctxt.config.log_kernel_debug, log_kernel_debug_file) with
+    | true, Some file ->
+        let logs_dir =
+          Filename.concat node_ctxt.data_dir "simulation_kernel_logs"
+        in
+        let log_kernel_debug_file = Filename.concat logs_dir file in
+        Node_context.make_kernel_logger
+          Event.simulation_kernel_debug
+          ~log_kernel_debug_file
+          logs_dir
+    | _ -> return (Event.simulation_kernel_debug, fun () -> return_unit)
+  in
+  return {node_ctxt with kernel_debug_logger; finaliser}
+
+let start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file
+    (Layer1.{hash; level} as head) =
   let open Lwt_result_syntax in
+  let*! node_ctxt =
+    set_simulation_kernel_log ?log_kernel_debug_file node_ctxt
+  in
   let inbox_level = Int32.succ level in
   let* plugin = Protocol_plugins.proto_plugin_for_level node_ctxt inbox_level in
   let*? () =
@@ -71,6 +94,7 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
   in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in
   {
+    node_ctxt;
     ctxt;
     inbox_level;
     state;
@@ -81,8 +105,9 @@ let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     plugin;
   }
 
-let simulate_messages_no_checks (node_ctxt : Node_context.ro)
+let simulate_messages_no_checks
     ({
+       node_ctxt;
        ctxt;
        state;
        inbox_level;
@@ -119,7 +144,7 @@ let simulate_messages_no_checks (node_ctxt : Node_context.ro)
   let nb_messages_inbox = nb_messages_inbox + num_messages in
   return ({sim with ctxt; state; nb_messages_inbox}, num_ticks)
 
-let simulate_messages (node_ctxt : Node_context.ro) sim messages =
+let simulate_messages sim messages =
   let open Lwt_result_syntax in
   let open (val sim.plugin) in
   (* Build new inbox *)
@@ -136,10 +161,10 @@ let simulate_messages (node_ctxt : Node_context.ro) sim messages =
       :: messages
     else messages
   in
-  let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
+  let+ sim, num_ticks = simulate_messages_no_checks sim messages in
   ({sim with level_position = Middle}, num_ticks)
 
-let end_simulation node_ctxt sim =
+let end_simulation sim =
   let open Lwt_result_syntax in
   let open (val sim.plugin) in
   let*? () =
@@ -147,7 +172,8 @@ let end_simulation node_ctxt sim =
       (sim.level_position = End)
       (Exn (Failure "Level for simulation is ended"))
   in
-  let+ sim, num_ticks =
-    simulate_messages_no_checks node_ctxt sim [Pvm.end_of_level_serialized]
+  let* sim, num_ticks =
+    simulate_messages_no_checks sim [Pvm.end_of_level_serialized]
   in
-  ({sim with level_position = End}, num_ticks)
+  let*! () = sim.node_ctxt.finaliser () in
+  return ({sim with level_position = End}, num_ticks)

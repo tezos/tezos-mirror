@@ -165,7 +165,7 @@ let simulate state simulation_ctxt (messages : L2_message.t list) =
       messages
   in
   let+ simulation_ctxt, _ticks =
-    Simulation.simulate_messages state.node_ctxt simulation_ctxt ext_messages
+    Simulation.simulate_messages simulation_ctxt ext_messages
   in
   simulation_ctxt
 

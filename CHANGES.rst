@@ -84,6 +84,11 @@ Smart Rollup node
   possible, after which the node exits gracefully. (MR :gl:`!9721`, MR
   :gl:`!9817`, MR :gl:`!9835`)
 
+- RPC ``/global/block/<block-id>/simulate`` accepts inputs with a new optional
+  field ``"log_kernel_debug_file"`` which allows to specify a file in which
+  kernel logs should be written (this file is in
+  ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
+
 Smart Rollup client
 -------------------
 

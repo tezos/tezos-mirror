@@ -112,7 +112,7 @@ let get_state (node_ctxt : _ Node_context.t) block_hash =
   match state with None -> failwith "No state" | Some state -> return state
 
 let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
-    ~insight_requests messages =
+    ~insight_requests ~log_kernel_debug_file messages =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
@@ -138,12 +138,11 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     Simulation.start_simulation
       node_ctxt
       ~reveal_map
+      ?log_kernel_debug_file
       Layer1.{hash = block; level}
   in
-  let* sim, num_ticks_0 = Simulation.simulate_messages node_ctxt sim messages in
-  let* {state; inbox_level; _}, num_ticks_end =
-    Simulation.end_simulation node_ctxt sim
-  in
+  let* sim, num_ticks_0 = Simulation.simulate_messages sim messages in
+  let* {state; inbox_level; _}, num_ticks_end = Simulation.end_simulation sim in
   let*! insights =
     List.map_p
       (function
@@ -254,8 +253,17 @@ let () =
 
 let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate
-  @@ fun (node_ctxt, block) () {messages; reveal_pages; insight_requests} ->
-  simulate_messages node_ctxt block ~reveal_pages ~insight_requests messages
+  @@ fun (node_ctxt, block)
+             ()
+             {messages; reveal_pages; insight_requests; log_kernel_debug_file}
+    ->
+  simulate_messages
+    node_ctxt
+    block
+    ~reveal_pages
+    ~insight_requests
+    ~log_kernel_debug_file
+    messages
 
 let block_directory (node_ctxt : _ Node_context.t) =
   let module PVM = (val Pvm_rpc.of_kind node_ctxt.kind) in

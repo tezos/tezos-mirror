@@ -40,6 +40,7 @@ type current_protocol = {
 }
 
 type 'a t = {
+  config : Configuration.t;
   cctxt : Client_context.full;
   dal_cctxt : Dal_node_client.cctxt option;
   dac_client : Dac_observer_client.t option;
@@ -123,17 +124,28 @@ let unlock {lockfile; _} =
     (fun () -> Lwt_unix.lockf lockfile Unix.F_ULOCK 0)
     (fun () -> Lwt_unix.close lockfile)
 
-let make_kernel_logger ?log_kernel_debug_file data_dir =
+let make_kernel_logger event ?log_kernel_debug_file logs_dir =
   let open Lwt_syntax in
   let path =
     match log_kernel_debug_file with
-    | None -> Filename.concat data_dir "kernel.log"
+    | None -> Filename.concat logs_dir "kernel.log"
     | Some path -> path
   in
-  let+ fd =
+  let path_dir = Filename.dirname path in
+  let* () = Lwt_utils_unix.create_dir path_dir in
+  let* fd =
     Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
   in
-  Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+  let chan =
+    Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+  in
+  let kernel_debug msg =
+    let* () = Lwt_io.write chan msg in
+    let* () = Lwt_io.flush chan in
+    let* () = event msg in
+    return_unit
+  in
+  return (kernel_debug, fun () -> Lwt_io.close chan)
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file mode l1_ctxt genesis_info ~lcc
@@ -193,20 +205,13 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
   in
   let*! kernel_debug_logger, kernel_debug_finaliser =
     let open Lwt_syntax in
-    let kernel_debug = Event.kernel_debug in
     if configuration.log_kernel_debug then
-      let+ chan = make_kernel_logger ?log_kernel_debug_file data_dir in
-      let kernel_debug msg =
-        let* () = Lwt_io.write chan msg in
-        let* () = Lwt_io.flush chan in
-        let* () = kernel_debug msg in
-        return_unit
-      in
-      (kernel_debug, fun () -> Lwt_io.close chan)
-    else return (kernel_debug, fun () -> return_unit)
+      make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
+    else return (Event.kernel_debug, fun () -> return_unit)
   in
   return
     {
+      config = configuration;
       cctxt = (cctxt :> Client_context.full);
       dal_cctxt;
       dac_client;
@@ -966,9 +971,39 @@ module Internal_for_tests = struct
   let create_node_context cctxt (current_protocol : current_protocol) ~data_dir
       kind =
     let open Lwt_result_syntax in
+    let rollup_address = Address.zero in
+    let operators = Configuration.Operator_purpose_map.empty in
+    let loser_mode = Loser_mode.no_failures in
+    let l1_blocks_cache_size = Configuration.default_l1_blocks_cache_size in
     let l2_blocks_cache_size = Configuration.default_l2_blocks_cache_size in
     let index_buffer_size = Configuration.default_index_buffer_size in
     let irmin_cache_size = Configuration.default_irmin_cache_size in
+    let config =
+      Configuration.
+        {
+          sc_rollup_address = rollup_address;
+          boot_sector_file = None;
+          sc_rollup_node_operators = operators;
+          rpc_addr = Configuration.default_rpc_addr;
+          rpc_port = Configuration.default_rpc_port;
+          metrics_addr = None;
+          reconnection_delay = 5.;
+          fee_parameters = Configuration.default_fee_parameters;
+          mode = Observer;
+          loser_mode;
+          dal_node_endpoint = None;
+          dac_observer_endpoint = None;
+          dac_timeout = None;
+          batcher = Configuration.default_batcher;
+          injector = Configuration.default_injector;
+          l1_blocks_cache_size;
+          l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
+          prefetch_blocks = None;
+          log_kernel_debug = false;
+        }
+    in
     let* lockfile = lock ~data_dir in
     let* store =
       Store.load
@@ -1001,15 +1036,16 @@ module Internal_for_tests = struct
     in
     return
       {
+        config;
         cctxt = (cctxt :> Client_context.full);
         dal_cctxt = None;
         dac_client = None;
         data_dir;
         l1_ctxt;
-        rollup_address = Address.zero;
+        rollup_address;
         boot_sector_file = None;
         mode = Observer;
-        operators = Configuration.Operator_purpose_map.empty;
+        operators;
         genesis_info;
         lcc;
         lpc;
@@ -1018,7 +1054,7 @@ module Internal_for_tests = struct
         block_finality_time = 2;
         fee_parameters = Configuration.default_fee_parameters;
         current_protocol;
-        loser_mode = Loser_mode.no_failures;
+        loser_mode;
         lockfile;
         store;
         context;

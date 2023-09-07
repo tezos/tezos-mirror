@@ -45,7 +45,10 @@ type current_protocol = {
       (** Protocol constants retrieved from the Tezos node. *)
 }
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6316
+   Refactor this type with more structure and less redundancy. *)
 type 'a t = {
+  config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt option;
       (** DAL client context to query the dal node, if the rollup node supports
@@ -485,6 +488,18 @@ val find_confirmed_slots_histories :
 
 val save_confirmed_slots_histories :
   rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
+
+(** {2 Helpers} *)
+
+(** [make_kernel_logger event ?log_kernel_debug_file logs_dir] returns two
+    functions [kernel_debug_logger] and [finaliser], to be used in the node
+    context. [kernel_debug_logger] writes kernel logs to
+    [logs_dir/log_kernel_debug_file] and emits them with the [event]. *)
+val make_kernel_logger :
+  (string -> unit Lwt.t) ->
+  ?log_kernel_debug_file:string ->
+  string ->
+  ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
 
 (**/**)
 
