@@ -103,13 +103,10 @@ let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
     (fun {operation_timeout; max_refused_operations; operations_batch_size} ->
-      (operation_timeout, max_refused_operations, operations_batch_size, false))
-    (fun ( operation_timeout,
-           max_refused_operations,
-           operations_batch_size,
-           _disable_precheck ) ->
+      (operation_timeout, max_refused_operations, operations_batch_size))
+    (fun (operation_timeout, max_refused_operations, operations_batch_size) ->
       {operation_timeout; max_refused_operations; operations_batch_size})
-    (obj4
+    (obj3
        (dft
           "operations_request_timeout"
           timeout_encoding
@@ -121,10 +118,7 @@ let prevalidator_limits_encoding =
        (dft
           "operations_batch_size"
           int31
-          default_prevalidator_limits.operations_batch_size)
-       (dft "disable_precheck" bool false))
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/5767
-   Remove "disable_precheck" from this encoding in Octez V19. *)
+          default_prevalidator_limits.operations_batch_size))
 
 type peer_validator_limits = {
   new_head_request_timeout : Time.System.Span.t;
