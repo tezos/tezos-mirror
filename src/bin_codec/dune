@@ -17,8 +17,6 @@
   octez-libs.tezos-event-logging
   octez-shell-libs.tezos-signer-services
   tezos-version.value
-  kaitai.kaitai-of-data-encoding
-  kaitai.ast
   (select void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client from
    (octez-protocol-005-PsBabyM1-libs.tezos-client -> void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client.empty)
    (-> void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client.empty))
@@ -96,5 +94,3 @@
    (write-file void_for_linking-octez-protocol-017-PtNairob-libs-tezos-client.empty "")
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-tezos-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-tezos-client.empty ""))))
-
-(cram (deps codec.exe) (package octez-codec))

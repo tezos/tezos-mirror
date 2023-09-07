@@ -416,12 +416,9 @@ opam:bls12-381:
 
 # Ignoring unreleased package internal-devtools.
 
-opam:kaitai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
-  variables:
-    package: kaitai
+# Ignoring unreleased package kaitai.
+
+# Ignoring unreleased package kaitai-of-data-encoding.
 
 opam:octez-accuser-Proxford:
   extends:

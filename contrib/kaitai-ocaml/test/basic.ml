@@ -39,9 +39,9 @@ seq:
     doc: The actual data.
 |}
   in
-  let k = Kaitai_ast.Parse.parse s in
+  let k = Kaitai.Parse.parse s in
   print_endline "Parsing ok" ;
-  let s = Kaitai_ast.Print.print k in
+  let s = Kaitai.Print.print k in
   print_endline "Serialization ok" ;
   print_endline s ;
   [%expect

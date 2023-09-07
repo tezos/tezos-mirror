@@ -24,9 +24,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [from_data_encoding ~encoding_name encoding] generates a formal description
-    of [encoding] as a kaitai [ClassSpec].
+(* This test suite is meant to test translation of ground encodings
+   to [Kaitai.Types.ClassSpec.t] *)
 
-    @param [encoding_name] is added to the "meta" section of the class-spec. *)
-val from_data_encoding :
-  encoding_name:string -> 'a Data_encoding.t -> Kaitai_ast.Types.ClassSpec.t
+let%expect_test "test uint8 translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_uint8"
+      Data_encoding.uint8
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_uint8
+    seq:
+    - id: uint8
+      type: u1
+  |}]
+
+let%expect_test "test bool translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_bool"
+      Data_encoding.bool
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_bool
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: bool
+      type: u1
+      enum: bool
+  |}]

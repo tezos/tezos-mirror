@@ -24,30 +24,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [default_doc_spec] is without summary and references.  *)
-val default_doc_spec : Kaitai_ast.Types.DocSpec.t
+open Kaitai.Types
 
-(** [Enum] module defines enum definitions needed for describing data-encoding
-    ground types. *)
-module Enum : sig
-  (** [map] describes mapping of enum id (string) with the corresponding
-      [EnumSpec.t]. *)
-  type map = (string * Kaitai_ast.Types.EnumSpec.t) list
+let default_doc_spec = DocSpec.{summary = None; refs = []}
 
-  (** [bool] is a mapping for boolean type. *)
-  val bool : string * Kaitai_ast.Types.EnumSpec.t
+let cond_no_cond =
+  AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
-  (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
-      [enum], then new list with it is returned, otherwise existing [enums] list
-      is returned. *)
-  val add : map -> string * Kaitai_ast.Types.EnumSpec.t -> map
+module Enum = struct
+  type map = (string * Kaitai.Types.EnumSpec.t) list
+
+  let add enums ((k, e) as enum) =
+    let rec add = function
+      | [] -> enum :: enums
+      | ee :: _ when enum = ee ->
+          (* [enum] is already present in [enums] *)
+          enums
+      | (kk, ee) :: _ when String.equal kk k && not (ee = e) ->
+          (* [enum] key is already present in [enums], but for a different
+             [enum]. *)
+          raise (Invalid_argument "Enum.add: duplicate keys")
+      | _ :: enums -> add enums
+    in
+    add enums
+
+  let bool =
+    ( "bool",
+      EnumSpec.
+        {
+          path = [];
+          map =
+            [
+              (0, EnumValueSpec.{name = "false"; doc = default_doc_spec});
+              (255, EnumValueSpec.{name = "true"; doc = default_doc_spec});
+            ];
+        } )
 end
 
-(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
-module Attr : sig
-  (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
-  val bool : Kaitai_ast.Types.AttrSpec.t
+module Attr = struct
+  let bool =
+    AttrSpec.
+      {
+        path = [];
+        id = "bool";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
+        doc = default_doc_spec;
+        enum = Some (fst Enum.bool);
+      }
 
-  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
-  val u1 : Kaitai_ast.Types.AttrSpec.t
+  let u1 =
+    AttrSpec.
+      {
+        path = [];
+        id = "uint8";
+        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+        cond = cond_no_cond;
+        valid = None;
+        doc = default_doc_spec;
+        enum = None;
+      }
 end
