@@ -7,6 +7,9 @@
 
 #![allow(dead_code)]
 use std::str::FromStr;
+use lalrpop_util::ParseError;
+
+use crate::ast::*;
 
 grammar;
 
@@ -15,37 +18,60 @@ match {
   _
 }
 
-number: i32 = <s:r"([+-]?)[0-9]+"> => i32::from_str(s).unwrap();
+number: i32 = <s:r"([+-]?)[0-9]+"> =>? i32::from_str(s)
+  .map_err(|_| ParseError::User { error : "parsing of numeric literal failed." } );
 
-type_: () = {
-  "int" => (),
-  "nat" => ()
+usize: usize = {
+  <n:number> =>? usize::try_from(n)
+    .map_err(|_| ParseError::User { error : "argument is out of range." } )
 }
 
-value: () = {
-  <n:number> => ()
+type_: Type = {
+  "int" => Type::Int,
+  "nat" => Type::Nat,
 }
 
-instruction: () = {
-  "PUSH" <t:type_> <v:value> => (),
-  "INT" => (),
-  "GT" => (),
-  "LOOP" <ib: instructionBlock> => (),
-  "DIP" <n:number?> <ib: instructionBlock> => (),
-  "ADD" => (),
-  "DROP" <n:number?> => (),
-  "SWAP" => (),
-  "IF" <ibt: instructionBlock> <ibf: instructionBlock> => (),
-  "DUP" <n:number> => ()
+use Value::*;
+value: Value = {
+  <n:number> => NumberValue(n)
 }
 
-instructionSeq: () = {
-  <(<instruction>";")*><instruction?> => ()
+use Instruction::*;
+instruction: Instruction = {
+  "PUSH" <t:type_> <v:value> => Push(t, v),
+  "INT" => Int,
+  "GT" => Gt,
+  "LOOP" <ib: instructionBlock> => Loop(ib),
+  "DIP" <n:usize> <ib: instructionBlock> => DipN(n, ib),
+  "DIP" <ib: instructionBlock> => Dip(ib),
+  "ADD" => Add,
+  "DROP" <n:usize> => DropN(n),
+  "DROP" => Drop,
+  "SWAP" => Swap,
+  "IF" <t: instructionBlock> <f: instructionBlock> => If(t, f),
+  "DUP" <n:usize> => DupN(n),
+  "DUP" => Dup
+}
+
+instructionSeq: Vec<Instruction> = {
+  <mut ib:(<instruction>";")*><i:instruction?> => {
     // A sequence of instruction-followed-by-a-semicolon matched by
-    // `(<instruction>";")*`, which can be optionally followed by a
-    // single trailing instruction, matched by `<i:instruction?>.
+    // `(<instruction>";")*` resulting in `Vec<instruction>` and bound to `ib`,
+    // which can be optionally followed by a single trailing instruction,
+    // matched by `<i:instruction?>.
+
+    match i {
+      Some(instr) => {
+        ib.push(instr);
+        ib
+      },
+      None => {
+        ib
+      }
+    }
+  }
 }
 
-pub instructionBlock: () = {
-  "{" <is:instructionSeq> "}" => ()
+pub instructionBlock: InstructionBlock = {
+  "{" <is:instructionSeq> "}" => is,
 }
