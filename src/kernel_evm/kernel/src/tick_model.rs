@@ -56,14 +56,8 @@ fn ticks_of_deposit() -> u64 {
 }
 
 pub fn ticks_of_gas(gas: u64) -> u64 {
-    // the ticks used in crypto are not derived from gas
-    // the base fee (for all transaction) represent those ticks
-    // so the minimum amount is deduced from the gas
-    let gas_execution = gas.saturating_sub(constants::BASE_GAS);
-    gas_execution
-        .saturating_mul(constants::TICKS_PER_GAS)
+    gas.saturating_mul(constants::TICKS_PER_GAS)
         .saturating_add(constants::TRANSACTION_OVERHEAD)
-        .saturating_add(constants::TICKS_FOR_CRYPTO)
 }
 
 /// Check that a transaction can fit inside the tick limit
