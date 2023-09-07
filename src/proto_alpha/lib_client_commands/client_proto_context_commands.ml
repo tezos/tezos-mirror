@@ -3559,7 +3559,7 @@ let commands_rw () =
         return_unit);
     command
       ~group
-      ~desc:"Publish a DAL commitment on L1 for the given level and slot index"
+      ~desc:"Publish a DAL commitment on L1 for the given slot index"
       (args7
          fee_arg
          dry_run_switch
@@ -3582,13 +3582,6 @@ let commands_rw () =
            ~name:"DAL slot index"
            ~desc:"The index of the DAL slot."
            int_parameter
-      @@ prefixes ["at"; "level"]
-      @@ param
-           ~name:"publication level"
-           ~desc:
-             "The publication level is the level at which the commitment is \
-              expected to be included in an L1 block."
-           (raw_level_parameter ())
       @@ prefixes ["with"; "proof"]
       @@ param
            ~name:"commitment proof"
@@ -3605,15 +3598,12 @@ let commands_rw () =
            commitment
            source
            slot_index
-           published_level
            commitment_proof
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* {parametric = {dal = {number_of_slots; _}; _}; _} =
-          Alpha_services.Constants.all
-            cctxt
-            (cctxt#chain, `Level (Raw_level.to_int32 published_level))
+          Alpha_services.Constants.all cctxt (cctxt#chain, `Head 0)
         in
         let* slot_index =
           match

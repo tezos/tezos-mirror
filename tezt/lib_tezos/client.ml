@@ -4026,6 +4026,32 @@ let get_timestamp ?endpoint ?block ?seconds client =
   in
   return (String.trim output)
 
+let publish_dal_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~commitment
+    ~slot_index ~proof client =
+  let process =
+    spawn_command
+      ?hooks
+      client
+      (["--wait"; wait]
+      @ [
+          "publish";
+          "dal";
+          "commitment";
+          commitment;
+          "from";
+          src;
+          "for";
+          "slot";
+          string_of_int slot_index;
+          "with";
+          "proof";
+          proof;
+        ]
+      @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  in
+  let parse process = Process.check process in
+  {value = process; run = parse}
+
 let as_foreign_endpoint = function
   | Node node -> Node.as_foreign_rpc_endpoint node
   | Foreign_endpoint fe -> fe
