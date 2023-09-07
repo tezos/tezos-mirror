@@ -78,7 +78,6 @@ type argument =
   | Disable_p2p_swap  (** [--disable-p2p-swap] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
-  | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
   | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
   | Metrics_addr of string  (** [--metrics-addr] *)
@@ -321,7 +320,6 @@ module Config_file : sig
     ?operations_request_timeout:float ->
     ?max_refused_operations:int ->
     ?operations_batch_size:int ->
-    ?disable_operations_precheck:bool ->
     JSON.t ->
     JSON.t
 
