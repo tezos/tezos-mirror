@@ -41,7 +41,7 @@ pub mod constants {
     pub const INITIALISATION_OVERHEAD: u64 = 1_000_000_000;
 
     /// The minimum amount of gas for an ethereum transaction.
-    pub const BASE_GAS: u64 = evm::Config::london().gas_transaction_call;
+    pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 }
 
 pub fn estimate_ticks_for_transaction(transaction: &Transaction) -> u64 {
