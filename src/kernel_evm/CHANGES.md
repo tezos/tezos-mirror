@@ -9,6 +9,7 @@
 - Store the `base_gas_per_fee` and use a default value of 21000. (!10234)
 - Transaction can no longer be overwritten nor reincluded (implicit transaction size limit now
   becomes ~1200 chunks). (!10337)
+- Produce outbox messages withdrawing funds. (!10063)
 
 ### EVM Node
 
@@ -90,7 +91,6 @@
 - Make it possible for any precompiled contract to generate withdrawals. (!9910)
 - A precompiled contract for withdrawing funds at address 0x00...20. (!10022)
 - Remove artificial minimal gas cost for simulation. (!10169)
-- Remove POW related fields from L2 blocks. (!10421)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
