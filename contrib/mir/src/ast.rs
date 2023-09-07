@@ -24,7 +24,7 @@ impl Type {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Value {
     NumberValue(i32),
     BooleanValue(bool),
