@@ -14,7 +14,6 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "tezos-version"
-  "kaitai"
 ]
 depopts: [
   "octez-protocol-005-PsBabyM1-libs"
@@ -34,7 +33,7 @@ depopts: [
   "octez-protocol-alpha-libs"
 ]
 build: [
-  ["rm" "-r" "vendors"]
+  ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

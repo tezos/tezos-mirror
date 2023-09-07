@@ -27,12 +27,6 @@ open Tezos_clic
 
 let group = {name = "encoding"; title = "Commands to handle encodings"}
 
-let raw_id_parameter =
-  parameter (fun (cctxt : #Client_context.printer) id ->
-      match Data_encoding.Registration.find id with
-      | Some _ -> Lwt.return_ok id
-      | None -> cctxt#error "Unknown encoding id: %s" id)
-
 let id_parameter =
   parameter (fun (cctxt : #Client_context.printer) id ->
       match Data_encoding.Registration.find id with
@@ -422,39 +416,4 @@ let commands () =
         | Ok slices ->
             let* () = cctxt#message "%a\n" (pp_slices format) slices in
             Lwt_result_syntax.return_unit);
-    command
-      ~group
-      ~desc:"Dump a Kaitai Struct specification of a given registered encoding."
-      no_options
-      (prefix "dump" @@ prefix "kaitai" @@ prefix "for"
-      @@ param ~name:"id" ~desc:"Encoding identifier" raw_id_parameter
-      @@ stop)
-      (fun () encoding_id cctxt ->
-        let open Lwt_syntax in
-        let introspectable =
-          Data_encoding.Registration.find_introspectable encoding_id
-        in
-        let* kaitai_spec =
-          match introspectable with
-          | None -> cctxt#error "Error retrieving introspectable"
-          | Some (Any encoding) ->
-              let escape_encoding_id id =
-                id |> String.split '.' |> String.concat "__"
-              in
-              return
-              @@ Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-                   ~encoding_name:(escape_encoding_id encoding_id)
-                   encoding
-        in
-        let* () =
-          cctxt#answer
-            "%a"
-            (fun fmt s ->
-              if s.[String.length s - 1] = '\n' then
-                let w, _ = Format.pp_get_formatter_output_functions fmt () in
-                w s 0 (String.length s - 1)
-              else Format.pp_print_string fmt s)
-            (Kaitai_ast.Print.print kaitai_spec)
-        in
-        Lwt_result_syntax.return_unit);
   ]

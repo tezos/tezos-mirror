@@ -24,42 +24,100 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This test suite is meant to test translation of ground encodings
-   to [Kaitai.Types.ClassSpec.t] *)
-
-let%expect_test "test uint8 translation" =
+let%expect_test "test tuple translation" =
   let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_uint8"
-      Data_encoding.uint8
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"simple_tuple"
+      Data_encoding.(tup2 bool uint8)
   in
-  print_endline (Kaitai_ast.Print.print s) ;
+  print_endline (Kaitai.Print.print s) ;
   [%expect
     {|
     meta:
-      id: ground_uint8
-    seq:
-    - id: uint8
-      type: u1
-  |}]
-
-let%expect_test "test bool translation" =
-  let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"ground_bool"
-      Data_encoding.bool
-  in
-  print_endline (Kaitai_ast.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: ground_bool
+      id: simple_tuple
     enums:
       bool:
         0: false
         255: true
     seq:
-    - id: bool
+    - id: field_0
       type: u1
       enum: bool
+    - id: field_1
+      type: u1
   |}]
+
+let%expect_test "test long tuple translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"simple_tuple"
+      Data_encoding.(tup5 bool uint8 bool uint8 uint8)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: simple_tuple
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: field_0
+      type: u1
+      enum: bool
+    - id: field_1
+      type: u1
+    - id: field_2
+      type: u1
+      enum: bool
+    - id: field_3
+      type: u1
+    - id: field_4
+      type: u1 |}]
+
+let%expect_test "test tup1 tuple translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"tup1"
+      Data_encoding.(tup1 uint8)
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: tup1
+    seq:
+    - id: uint8
+      type: u1
+  |}]
+
+let%expect_test "test tuples with tup1 translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"tup1tup"
+      Data_encoding.(
+        tup3 (tup1 bool) (tup2 uint8 bool) (tup2 (tup1 uint8) uint8))
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: tup1tup
+    enums:
+      bool:
+        0: false
+        255: true
+    seq:
+    - id: field_0
+      type: u1
+      enum: bool
+    - id: field_1
+      type: u1
+    - id: field_2
+      type: u1
+      enum: bool
+    - id: field_3
+      type: u1
+    - id: field_4
+      type: u1 |}]

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name kaitai_ast)
- (public_name kaitai.ast)
+ (name kaitai)
+ (public_name kaitai)
  (instrumentation (backend bisect_ppx))
  (libraries
   yaml))

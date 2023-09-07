@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Kaitai_ast.Types
+open Kaitai.Types
 
 (* We need to access the definition of data-encoding's [descr] type. For this
    reason we open the private/internal module [Data_encoding__Encoding] (rather
@@ -117,5 +117,4 @@ let rec from_data_encoding :
       in
       {(default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
-  | Describe {encoding; _} -> from_data_encoding ~encoding_name encoding
   | _ -> failwith "Not implemented"

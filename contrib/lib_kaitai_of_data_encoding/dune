@@ -2,9 +2,9 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name kaitai_kaitai_of_data_encoding)
- (public_name kaitai.kaitai-of-data-encoding)
+ (name kaitai_of_data_encoding)
+ (public_name kaitai-of-data-encoding)
  (libraries
   yaml
   data-encoding
-  kaitai.ast))
+  kaitai))

@@ -24,100 +24,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let%expect_test "test tuple translation" =
-  let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"simple_tuple"
-      Data_encoding.(tup2 bool uint8)
-  in
-  print_endline (Kaitai_ast.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: simple_tuple
-    enums:
-      bool:
-        0: false
-        255: true
-    seq:
-    - id: field_0
-      type: u1
-      enum: bool
-    - id: field_1
-      type: u1
-  |}]
+(** [default_doc_spec] is without summary and references.  *)
+val default_doc_spec : Kaitai.Types.DocSpec.t
 
-let%expect_test "test long tuple translation" =
-  let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"simple_tuple"
-      Data_encoding.(tup5 bool uint8 bool uint8 uint8)
-  in
-  print_endline (Kaitai_ast.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: simple_tuple
-    enums:
-      bool:
-        0: false
-        255: true
-    seq:
-    - id: field_0
-      type: u1
-      enum: bool
-    - id: field_1
-      type: u1
-    - id: field_2
-      type: u1
-      enum: bool
-    - id: field_3
-      type: u1
-    - id: field_4
-      type: u1 |}]
+(** [Enum] module defines enum definitions needed for describing data-encoding
+    ground types. *)
+module Enum : sig
+  (** [map] describes mapping of enum id (string) with the corresponding
+      [EnumSpec.t]. *)
+  type map = (string * Kaitai.Types.EnumSpec.t) list
 
-let%expect_test "test tup1 tuple translation" =
-  let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"tup1"
-      Data_encoding.(tup1 uint8)
-  in
-  print_endline (Kaitai_ast.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: tup1
-    seq:
-    - id: uint8
-      type: u1
-  |}]
+  (** [bool] is a mapping for boolean type. *)
+  val bool : string * Kaitai.Types.EnumSpec.t
 
-let%expect_test "test tuples with tup1 translation" =
-  let s =
-    Kaitai_kaitai_of_data_encoding.Translate.from_data_encoding
-      ~encoding_name:"tup1tup"
-      Data_encoding.(
-        tup3 (tup1 bool) (tup2 uint8 bool) (tup2 (tup1 uint8) uint8))
-  in
-  print_endline (Kaitai_ast.Print.print s) ;
-  [%expect
-    {|
-    meta:
-      id: tup1tup
-    enums:
-      bool:
-        0: false
-        255: true
-    seq:
-    - id: field_0
-      type: u1
-      enum: bool
-    - id: field_1
-      type: u1
-    - id: field_2
-      type: u1
-      enum: bool
-    - id: field_3
-      type: u1
-    - id: field_4
-      type: u1 |}]
+  (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
+      [enum], then new list with it is returned, otherwise existing [enums] list
+      is returned. *)
+  val add : map -> string * Kaitai.Types.EnumSpec.t -> map
+end
+
+(** [Attr] is module for getting [AttrSpec.t] of ground types. *)
+module Attr : sig
+  (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
+  val bool : Kaitai.Types.AttrSpec.t
+
+  (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
+  val u1 : Kaitai.Types.AttrSpec.t
+end
