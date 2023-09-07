@@ -16,6 +16,7 @@ use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -25,15 +26,15 @@ pub const SIMULATION_SIMPLE_TAG: u8 = 1;
 pub const SIMULATION_CREATE_TAG: u8 = 2;
 // SIMULATION/CHUNK/NUM 2B/CHUNK
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
-/// Maximum gas used by the simulation. Bounded to limit DOS on the rollup node
+/// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
 /// Is used as default value if no gas is set.
-pub const MAX_SIMULATION_GAS: u64 = 1_000_000_000u64;
+pub const MAX_EVALUATION_GAS: u64 = 1_000_000_000u64;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
 ///
 /// They are transmitted in RLP encoded form, in messages of the form\
-/// `\parsing::SIMULATION_TAG \SIMULATION_SIMPLE_TAG \<rlp encoded Simulation>`\
+/// `\parsing::SIMULATION_TAG \SIMULATION_SIMPLE_TAG \<rlp encoded Evaluation>`\
 /// or in chunks if they are bigger than what the inbox can receive, with a
 /// first message giving the number of chunks\
 /// `\parsing::SIMULATION_TAG \SIMULATION_CREATE_TAG \XXXX`
@@ -41,11 +42,11 @@ pub const MAX_SIMULATION_GAS: u64 = 1_000_000_000u64;
 /// chunks:\
 /// `\parsing::SIMULATION_TAG \SIMULATION_CHUNK_TAG \XXXX \<bytes>`\
 /// where `XXXX` is the number of the chunk over 2 bytes, and the rest is a
-/// chunk of the rlp encoded simulation.
+/// chunk of the rlp encoded evaluation.
 ///
 /// Ethereum doc: https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Simulation {
+pub struct Evaluation {
     /// (optional) The address the transaction is sent from.\
     /// Encoding: 20 bytes or empty (0x80)
     pub from: Option<H160>,
@@ -68,14 +69,14 @@ pub struct Simulation {
     pub data: Vec<u8>,
 }
 
-impl Simulation {
+impl Evaluation {
     /// Unserialize bytes as RLP encoded data.
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Simulation, DecoderError> {
+    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Evaluation, DecoderError> {
         let decoder = Rlp::new(bytes);
-        Simulation::decode(&decoder)
+        Evaluation::decode(&decoder)
     }
 
-    /// Execute the simulation
+    /// Execute the evaluation
     pub fn run<Host: Runtime>(&self, host: &mut Host) -> Result<ExecutionOutcome, Error> {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
@@ -94,8 +95,8 @@ impl Simulation {
             self.from.unwrap_or(default_caller),
             self.data.clone(),
             self.gas
-                .map(|gas| u64::max(gas, MAX_SIMULATION_GAS))
-                .or(Some(MAX_SIMULATION_GAS)), // gas could be omitted
+                .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
+                .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
             self.value,
         )
         .map_err(Error::Simulation)?;
@@ -103,7 +104,7 @@ impl Simulation {
     }
 }
 
-impl Decodable for Simulation {
+impl Decodable for Evaluation {
     fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
         // the proxynode works preferably with little endian
         let u64_from_le = |v: Vec<u8>| u64::from_le_bytes(parsable!(v.try_into().ok()));
@@ -137,7 +138,7 @@ impl Decodable for Simulation {
     }
 }
 
-impl TryFrom<&[u8]> for Simulation {
+impl TryFrom<&[u8]> for Evaluation {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
@@ -145,13 +146,86 @@ impl TryFrom<&[u8]> for Simulation {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct TxValidation {
+    transaction: EthereumTransactionCommon,
+}
+
+enum TxValidationOutcome {
+    Valid,
+    NonceTooLow,
+    NonceTooHigh,
+    NotCorrectSignature,
+}
+
+impl TxValidation {
+    /// Execute the simulation
+    pub fn run<Host: Runtime>(
+        &self,
+        host: &mut Host,
+    ) -> Result<TxValidationOutcome, anyhow::Error> {
+        let tx = &self.transaction;
+        let evm_account_storage = account_storage::init_account_storage()?;
+        // Get the caller
+        let Ok(caller) = tx.caller() else {return Ok(TxValidationOutcome::NotCorrectSignature)};
+        // Get the caller account
+        let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
+        let caller_account = evm_account_storage.get(host, &caller_account_path)?;
+        // Get the nonce of the caller
+        let caller_nonce = match &caller_account {
+            Some(account) => account.nonce(host)?,
+            None => U256::zero(),
+        };
+        // Check if nonce is too low
+        if tx.nonce < caller_nonce {
+            return Ok(TxValidationOutcome::NonceTooLow);
+        }
+        // Check if the nonce is too high
+        if tx.nonce > caller_nonce {
+            return Ok(TxValidationOutcome::NonceTooHigh);
+        }
+        Ok(TxValidationOutcome::Valid)
+    }
+}
+
+impl TryFrom<&[u8]> for TxValidation {
+    type Error = DecoderError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        let transaction = EthereumTransactionCommon::from_bytes(bytes)?;
+        Ok(Self { transaction })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Message {
+    Evaluation(Evaluation),
+    TxValidation(TxValidation),
+}
+
+impl TryFrom<&[u8]> for Message {
+    type Error = DecoderError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if let Ok(simulation) = Evaluation::try_from(bytes) {
+            return Ok(Message::Evaluation(simulation));
+        }
+
+        if let Ok(tx_validation) = TxValidation::try_from(bytes) {
+            return Ok(Message::TxValidation(tx_validation));
+        }
+
+        Err(DecoderError::Custom("Unknown message to simulate"))
+    }
+}
+
 #[derive(Default, Debug, PartialEq)]
 enum Input {
     #[default]
     Unparsable,
-    SimpleSimulation(Simulation),
-    NewChunkedSimulation(u16),
-    SimulationChunk {
+    Simple(Box<Message>),
+    NewChunked(u16),
+    Chunk {
         i: u16,
         data: Vec<u8>,
     },
@@ -160,19 +234,20 @@ enum Input {
 impl Input {
     fn parse_new_chunk_simulation(bytes: &[u8]) -> Self {
         let num_chunks = u16::from_le_bytes(parsable!(bytes.try_into().ok()));
-        Self::NewChunkedSimulation(num_chunks)
+        Self::NewChunked(num_chunks)
     }
 
     fn parse_simulation_chunk(bytes: &[u8]) -> Self {
         let (num, remaining) = parsable!(parsing::split_at(bytes, 2));
         let i = u16::from_le_bytes(num.try_into().unwrap());
-        Self::SimulationChunk {
+        Self::Chunk {
             i,
             data: remaining.to_vec(),
         }
     }
     fn parse_simple_simulation(bytes: &[u8]) -> Self {
-        Input::SimpleSimulation(parsable!(bytes.try_into().ok()))
+        let message = parsable!(bytes.try_into().ok());
+        Input::Simple(Box::new(message))
     }
 
     // Internal custom message structure :
@@ -199,11 +274,11 @@ impl Input {
 fn read_chunks<Host: Runtime>(
     host: &mut Host,
     num_chunks: u16,
-) -> Result<Simulation, Error> {
+) -> Result<Message, Error> {
     let mut buffer: Vec<u8> = Vec::new();
     for n in 0..num_chunks {
         match read_input(host)? {
-            Input::SimulationChunk { i, data } => {
+            Input::Chunk { i, data } => {
                 if i != n {
                     return Err(Error::InvalidConversion);
                 } else {
@@ -223,12 +298,12 @@ fn read_input<Host: Runtime>(host: &mut Host) -> Result<Input, Error> {
     }
 }
 
-fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
+fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
     // we just received simulation tag
     // next message is either a simulation or the nb of chunks needed
     match read_input(host)? {
-        Input::SimpleSimulation(s) => Ok(s),
-        Input::NewChunkedSimulation(num_chunks) => {
+        Input::Simple(s) => Ok(*s),
+        Input::NewChunked(num_chunks) => {
             // loop to find the chunks
             read_chunks(host, num_chunks)
         }
@@ -236,29 +311,70 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Simulation, Error> {
     }
 }
 
-pub fn start_simulation_mode<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    log!(host, Debug, "Starting simulation mode ");
-    let simulation = parse_inbox(host)?;
-    let outcome = simulation.run(host)?;
+fn store_simulation_outcome<Host: Runtime>(
+    host: &mut Host,
+    outcome: ExecutionOutcome,
+) -> Result<(), anyhow::Error> {
     log!(host, Debug, "outcome={:?} ", outcome);
     storage::store_simulation_status(host, outcome.is_success)?;
-    storage::store_simulation_gas(host, outcome.gas_used)?;
+    storage::store_evaluation_gas(host, outcome.gas_used)?;
     storage::store_simulation_result(host, outcome.result)
+}
+
+fn store_tx_validation_outcome<Host: Runtime>(
+    host: &mut Host,
+    outcome: TxValidationOutcome,
+) -> Result<(), anyhow::Error> {
+    match outcome {
+        TxValidationOutcome::Valid => storage::store_simulation_status(host, true),
+        TxValidationOutcome::NonceTooLow => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Nonce too low.".to_vec()))
+        }
+        TxValidationOutcome::NonceTooHigh => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Nonce too high.".to_vec()))
+        }
+        TxValidationOutcome::NotCorrectSignature => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Incorrect signature.".to_vec()))
+        }
+    }
+}
+
+pub fn start_simulation_mode<Host: Runtime>(
+    host: &mut Host,
+) -> Result<(), anyhow::Error> {
+    log!(host, Debug, "Starting simulation mode ");
+    let simulation = parse_inbox(host)?;
+    match simulation {
+        Message::Evaluation(simulation) => {
+            let outcome = simulation.run(host)?;
+            store_simulation_outcome(host, outcome)
+        }
+        Message::TxValidation(tx_validation) => {
+            let outcome = tx_validation.run(host)?;
+            store_tx_validation_outcome(host, outcome)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use tezos_ethereum::block::BlockConstants;
+    use primitive_types::H256;
+    use tezos_ethereum::{
+        block::BlockConstants, transaction::TransactionType, tx_signature::TxSignature,
+    };
     use tezos_smart_rollup_mock::MockHost;
 
     use crate::current_timestamp;
 
     use super::*;
 
-    impl Simulation {
+    impl Evaluation {
         /// Unserialize an hex string as RLP encoded data.
-        pub fn from_rlp(e: String) -> Result<Simulation, DecoderError> {
+        pub fn from_rlp(e: String) -> Result<Evaluation, DecoderError> {
             let tx = hex::decode(e)
                 .or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
             Self::from_rlp_bytes(&tx)
@@ -275,7 +391,7 @@ mod tests {
         let input_string =
             "da8094353535353535353535353535353535353535353580808080".to_string();
         let address = address_of_str("3535353535353535353535353535353535353535");
-        let expected = Simulation {
+        let expected = Evaluation {
             from: None,
             to: address,
             gas: None,
@@ -284,12 +400,12 @@ mod tests {
             data: vec![],
         };
 
-        let simulation = Simulation::from_rlp(input_string);
+        let evaluation = Evaluation::from_rlp(input_string);
 
-        assert!(simulation.is_ok(), "Simulation input should be decodable");
+        assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
             expected,
-            simulation.unwrap(),
+            evaluation.unwrap(),
             "The decoded result is not the one expected"
         );
     }
@@ -301,7 +417,7 @@ mod tests {
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
-        let expected = Simulation {
+        let expected = Evaluation {
             from,
             to,
             gas: Some(11111),
@@ -310,12 +426,12 @@ mod tests {
             data,
         };
 
-        let simulation = Simulation::from_rlp(input_string);
+        let evaluation = Evaluation::from_rlp(input_string);
 
-        assert!(simulation.is_ok(), "Simulation input should be decodable");
+        assert!(evaluation.is_ok(), "Simulation input should be decodable");
         assert_eq!(
             expected,
-            simulation.unwrap(),
+            evaluation.unwrap(),
             "The decoded result is not the one expected"
         );
     }
@@ -366,8 +482,8 @@ mod tests {
         let mut host = MockHost::default();
         let new_address = create_contract(&mut host);
 
-        // run simulation num
-        let simulation = Simulation {
+        // run evaluation num
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -375,9 +491,9 @@ mod tests {
             gas: Some(10000),
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
-        assert!(outcome.is_ok(), "simulation should have succeeded");
+        assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
@@ -386,7 +502,7 @@ mod tests {
         );
 
         // run simulation get
-        let simulation = Simulation {
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -394,25 +510,25 @@ mod tests {
             gas: Some(10000),
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
             outcome.result,
-            "simulation result should be 0"
+            "evaluation result should be 0"
         );
     }
 
     #[test]
-    fn simulation_result_no_gas() {
+    fn evaluation_result_no_gas() {
         // setup
         let mut host = MockHost::default();
         let new_address = create_contract(&mut host);
 
-        // run simulation num
-        let simulation = Simulation {
+        // run evaluation num
+        let evaluation = Evaluation {
             from: None,
             gas_price: None,
             to: Some(new_address),
@@ -420,14 +536,14 @@ mod tests {
             gas: None,
             value: None,
         };
-        let outcome = simulation.run(&mut host);
+        let outcome = evaluation.run(&mut host);
 
-        assert!(outcome.is_ok(), "simulation should have succeeded");
+        assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
             outcome.result,
-            "simulation result should be 0"
+            "evaluation result should be 0"
         );
     }
 
@@ -436,7 +552,7 @@ mod tests {
         let to = address_of_str("3535353535353535353535353535353535353535");
         let from = address_of_str("2424242424242424242424242424242424242424");
         let data = hex::decode("1616").unwrap();
-        let expected = Simulation {
+        let expected = Evaluation {
             from,
             to,
             gas: Some(11111),
@@ -453,7 +569,7 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::SimpleSimulation(expected),
+            Input::Simple(Box::new(Message::Evaluation(expected))),
             parsed,
             "should have been parsed as complete simulation"
         );
@@ -468,7 +584,7 @@ mod tests {
         let to = Some(new_address);
         let data = hex::decode(STORAGE_CONTRACT_CALL_GET).unwrap();
         let gas = Some(11111);
-        let expected = Simulation {
+        let expected = Evaluation {
             from: None,
             to,
             gas,
@@ -484,17 +600,18 @@ mod tests {
 
         let parsed = Input::parse(&encoded);
         assert_eq!(
-            Input::SimpleSimulation(expected),
+            Input::Simple(Box::new(Message::Evaluation(expected))),
             parsed,
             "should have been parsed as complete simulation"
         );
 
-        if let Input::SimpleSimulation(s) = parsed {
-            let res = s.run(&mut host).expect("simulation should run");
-            assert!(res.is_success, "simulation should have succeeded");
-        } else {
-            panic!("Parsing failed")
+        if let Input::Simple(box_simple) = parsed {
+            if let Message::Evaluation(s) = *box_simple {
+                let res = s.run(&mut host).expect("simulation should run");
+                return assert!(res.is_success, "simulation should have succeeded");
+            }
         }
+        panic!("Parsing failed")
     }
 
     #[test]
@@ -506,7 +623,7 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(
-            Input::NewChunkedSimulation(42),
+            Input::NewChunked(42),
             parsed,
             "should have parsed start of chunked simulation"
         );
@@ -519,7 +636,7 @@ mod tests {
         input.extend(i.to_le_bytes());
         input.extend(hex::decode("aaaaaa").unwrap());
 
-        let expected = Input::SimulationChunk {
+        let expected = Input::Chunk {
             i: 20,
             data: vec![170u8; 3],
         };
@@ -527,5 +644,62 @@ mod tests {
         let parsed = Input::parse(&input);
 
         assert_eq!(expected, parsed, "should have parsed a chunk");
+    }
+
+    #[test]
+    fn parse_tx_validation() {
+        let expected = {
+            let v = 2710.into();
+
+            let r = H256::from_slice(
+                &hex::decode(
+                    "0c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5",
+                )
+                .unwrap(),
+            );
+
+            let s = H256::from_slice(
+                &hex::decode(
+                    "630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e",
+                )
+                .unwrap(),
+            );
+
+            let signature = TxSignature::new(v, r, s).unwrap();
+
+            EthereumTransactionCommon {
+                type_: TransactionType::Legacy,
+                chain_id: 1337.into(),
+                nonce: 0.into(),
+                max_priority_fee_per_gas: U256::default(),
+                max_fee_per_gas: U256::default(),
+                gas_limit: 2000000,
+                to: Some(H160::default()),
+                value: U256::default(),
+                data: vec![],
+                signature: Some(signature),
+                access_list: Vec::default(),
+            }
+        };
+
+        let hex = "f8628080831e84809400000000000000000000000000000000000000008080820a96a00c4604516693aafd2e74a993c280455fcad144a414f5aa580d96f3c51d4428e5a0630fb7fc1af4c1c1a82cabb4ef9d12f8fc2e54a047eb3e3bdffc9d23cd07a94e";
+        let data = hex::decode(hex).unwrap();
+        let tx = EthereumTransactionCommon::from_bytes(&data).unwrap();
+
+        assert_eq!(tx, expected);
+
+        let mut encoded = hex::decode(hex).unwrap();
+        let mut input = vec![parsing::SIMULATION_TAG, SIMULATION_SIMPLE_TAG];
+        input.append(&mut encoded);
+
+        let parsed = Input::parse(&input);
+
+        assert_eq!(
+            Input::Simple(Box::new(Message::TxValidation(TxValidation {
+                transaction: expected
+            }))),
+            parsed,
+            "should have been parsed as complete tx validation"
+        );
     }
 }

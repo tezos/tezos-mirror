@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 #![allow(dead_code)]
@@ -286,15 +287,14 @@ pub fn store_current_block<Host: Runtime>(
 pub fn store_simulation_result<Host: Runtime>(
     host: &mut Host,
     result: Option<Vec<u8>>,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     if let Some(result) = result {
-        host.store_write(&SIMULATION_RESULT, &result, 0)
-            .map_err(Error::from)?;
+        host.store_write(&SIMULATION_RESULT, &result, 0)?
     }
     Ok(())
 }
 
-pub fn store_simulation_gas<Host: Runtime>(
+pub fn store_evaluation_gas<Host: Runtime>(
     host: &mut Host,
     result: u64,
 ) -> Result<(), Error> {
@@ -304,9 +304,9 @@ pub fn store_simulation_gas<Host: Runtime>(
 pub fn store_simulation_status<Host: Runtime>(
     host: &mut Host,
     result: bool,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
-        .map_err(Error::from)
+        .context("Failed to write the simulation status.")
 }
 
 pub fn store_transaction_receipt<Host: Runtime>(

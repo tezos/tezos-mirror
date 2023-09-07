@@ -52,6 +52,8 @@ let rlp_encode call =
   (* we aim to use [String.chunk_bytes] *)
   Rlp.encode rlp_form
 
+let tx_rlp_encode tx_raw = `Hex tx_raw |> Hex.to_bytes_exn
+
 type simulation_message =
   | Start
   | Simple of string
@@ -102,6 +104,11 @@ let encode_message = function
 let encode call =
   let open Result_syntax in
   let* messages = call |> rlp_encode |> split_in_messages in
+  return @@ List.map encode_message messages
+
+let encode_tx tx =
+  let open Result_syntax in
+  let* messages = tx |> tx_rlp_encode |> split_in_messages in
   return @@ List.map encode_message messages
 
 module Encodings = struct
@@ -206,22 +213,30 @@ end
 
 let parse_insights decode (r : Data_encoding.json) =
   let s = Data_encoding.Json.destruct Encodings.eval_result r in
-  match s.insights with
-  | Some b :: _ -> Lwt.return_ok (decode b)
-  | _ ->
+  match decode s.insights with
+  | Some insight -> Lwt.return_ok insight
+  | None ->
       Error_monad.failwith
         "Couldn't parse insights: %s"
         (Data_encoding.Json.to_string r)
 
-let call_result =
-  parse_insights (fun b ->
+let decode_call_result bytes =
+  match bytes with
+  | Some b :: _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Hash v)
+      Some (Hash v)
+  | _ -> None
+
+let call_result json = parse_insights decode_call_result json
+
+let decode_gas_estimation bytes =
+  match bytes with
+  | Some b :: _ -> b |> Bytes.to_string |> Z.of_bits |> Option.some
+  | _ -> None
 
 let gas_estimation json =
   let open Lwt_result_syntax in
-  let decode b = b |> Bytes.to_string |> Z.of_bits in
-  let* simulated_amount = parse_insights decode json in
+  let* simulated_amount = parse_insights decode_gas_estimation json in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
      remove this once the gas is accounted correctly *)
   (* minimum gas for any Ethereum transaction *)
@@ -232,3 +247,21 @@ let gas_estimation json =
       else simulated_amount)
   in
   return @@ quantity_of_z @@ Z.max simulated_amount amount
+
+let decode_is_valid bytes =
+  match bytes with
+  | [Some b; error_msg] -> (
+      let is_valid =
+        b |> Data_encoding.Binary.of_bytes_exn Data_encoding.bool
+      in
+      let error_msg = error_msg |> Option.map Bytes.to_string in
+      match (is_valid, error_msg) with
+      | true, None -> Some (Ok ())
+      | false, Some reason -> Some (Error reason)
+      | _, _ -> None)
+  | _ -> None
+
+let is_tx_valid json =
+  let open Lwt_result_syntax in
+  let* result = parse_insights decode_is_valid json in
+  return result

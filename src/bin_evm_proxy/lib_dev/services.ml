@@ -142,11 +142,22 @@ let dispatch_input
     | Get_transaction_by_hash.Input (Some tx_hash) ->
         let* transaction_object = Rollup_node_rpc.transaction_object tx_hash in
         return (Get_transaction_by_hash.Output (Ok transaction_object))
-    | Send_raw_transaction.Input (Some tx_raw) ->
-        let* tx_hash =
-          Rollup_node_rpc.inject_raw_transaction ~smart_rollup_address tx_raw
-        in
-        return (Send_raw_transaction.Output (Ok tx_hash))
+    | Send_raw_transaction.Input (Some tx_raw) -> (
+        let* is_valid = Rollup_node_rpc.is_tx_valid tx_raw in
+        match is_valid with
+        | Ok () ->
+            let* tx_hash =
+              Rollup_node_rpc.inject_raw_transaction
+                ~smart_rollup_address
+                tx_raw
+            in
+            return (Send_raw_transaction.Output (Ok tx_hash))
+        | Error reason ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
+            return
+              (Send_raw_transaction.Output
+                 (Error {code = -32000; message = reason; data = None}))
+        (* By default, the current dispatch handles the inputs *))
     | Send_transaction.Input _ ->
         return (Send_transaction.Output (Ok Mockup.transaction_hash))
     | Eth_call.Input (Some (call, _)) ->

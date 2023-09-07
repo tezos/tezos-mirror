@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
 use crate::block_in_progress::BlockInProgress;
 use crate::inbox::{read_inbox, KernelUpgrade, Transaction, TransactionContent};
-use crate::Error;
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -64,7 +64,7 @@ pub fn fetch<Host: Runtime>(
     chain_id: U256,
     ticketer: Option<ContractKt1Hash>,
     admin: Option<ContractKt1Hash>,
-) -> Result<Queue, Error> {
+) -> Result<Queue, anyhow::Error> {
     let inbox_content = read_inbox(host, smart_rollup_address, ticketer, admin)?;
     let transactions = filter_invalid_chain_id(inbox_content.transactions, chain_id);
     let blueprint = QueueElement::Blueprint(Blueprint { transactions });

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -91,6 +92,9 @@ val batch_evm_rpc : t -> request list -> JSON.t Lwt.t
 
 (** [extract_result json] expects a JSON-RPC `result` and returns the value. *)
 val extract_result : JSON.t -> JSON.t
+
+(** [extract_error_message json] expects a JSON-RPC `error.message` and returns the value. *)
+val extract_error_message : JSON.t -> JSON.t
 
 (** [fetch_contract_code proxy_server contract] returns the code associated to
     the given contract in the rollup. *)
