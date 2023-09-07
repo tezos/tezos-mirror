@@ -297,17 +297,6 @@ let save_solution s fn =
   save_solution_in_binary s fn ;
   save_solution_in_json s (fn ^ ".json")
 
-let load_exclusions exclude_fn =
-  (* one model name like N_IXxx_yyy__alpha per line *)
-  let open In_channel in
-  with_open_text exclude_fn (fun ic ->
-      let rec loop acc =
-        match input_line ic with
-        | None -> acc
-        | Some l -> loop (String.Set.add l acc)
-      in
-      loop String.Set.empty)
-
 (* ------------------------------------------------------------------------- *)
 
 (* [Parsetree.structure_item] has no construction for comment *)
@@ -445,43 +434,26 @@ let codegen (Model.Model model) (sol : solution)
       code = generate_let_binding ~takes_saturation_reprs fun_name expr;
     }
 
-let get_codegen_destinations
+let get_codegen_destination
     Registration.{model = Model.Model (module M); from = local_models_info} =
-  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then []
+  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then None
   else
-    List.filter_map
+    List.find_map
       (fun Registration.{bench_name; _} ->
         let open Option_syntax in
         let* (module B : Benchmark.S) =
           Registration.find_benchmark bench_name
         in
-        let destination =
-          match B.purpose with Generate_code d -> Some d | _ -> None
-        in
-        destination)
+        match B.purpose with Generate_code d -> Some d | _ -> None)
       local_models_info
-    |> List.sort_uniq String.compare
 
-let codegen_models models sol transform ~exclusions =
-  let generate_with_exclusions model_name info =
-    let benchmark_destinations = get_codegen_destinations info in
-    if
-      String.Set.mem (Namespace.to_string model_name) exclusions
-      || List.is_empty benchmark_destinations
-    then []
-    else
+let codegen_models models sol transform =
+  List.map
+    (fun (model_name, info) ->
+      let benchmark_destination = get_codegen_destination info in
       let code = codegen info.model sol transform model_name in
-      List.map (fun destination -> (destination, code)) benchmark_destinations
-  in
-  if String.Set.is_empty exclusions then
-    List.map
-      (fun (model_name, info) ->
-        ("auto_build", codegen info.Registration.model sol transform model_name))
-      models
-  else
-    List.concat_map
-      (fun (model_name, info) -> generate_with_exclusions model_name info)
-      models
+      (benchmark_destination, code))
+    models
 
 let%expect_test "basic_printing" =
   let open Codegen in

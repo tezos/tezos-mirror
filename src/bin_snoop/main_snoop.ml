@@ -619,13 +619,26 @@ let codegen_cmd solution_fn model_name codegen_options =
       stdout_or_file codegen_options.save_to (fun ppf ->
           Format.fprintf ppf "%a@." Codegen.pp_code code)
 
-let generate_code_for_models sol models codegen_options ~exclusions =
+(** It returns [(destination, code list) map] *)
+let generate_code_for_models sol models codegen_options =
   (* The order of the models is pretty random.  It is better to sort them. *)
   let models =
     List.sort (fun (n1, _) (n2, _) -> Namespace.compare n1 n2) models
   in
   let transform = code_transform codegen_options in
-  Codegen.codegen_models models sol transform ~exclusions
+  let generated = Codegen.codegen_models models sol transform in
+  if codegen_options.split then
+    List.fold_left
+      (fun m -> function
+        | Some dest, code ->
+            String.Map.update
+              dest
+              (function None -> Some [code] | Some x -> Some (x @ [code]))
+              m
+        | None, _ -> m)
+      String.Map.empty
+      generated
+  else String.Map.singleton "auto_build" (List.map snd generated)
 
 (* Try to convert the given file name "*_costs_generated.ml" to "*_costs.ml" *)
 let convert_costs_file_name path =
@@ -651,17 +664,7 @@ let save_code_list_as_a_module save_to code_list =
   let result = Codegen.make_toplevel_module code_list in
   stdout_or_file save_to (fun ppf -> Codegen.pp_module ppf result)
 
-let generate_code codegen_options generated_code =
-  let generated =
-    List.fold_left
-      (fun acc (destination, code) ->
-        String.Map.update
-          destination
-          (function None -> Some [code] | Some x -> Some (x @ [code]))
-          acc)
-      String.Map.empty
-      generated_code
-  in
+let generate_code codegen_options generated =
   let make_destination destination_module save_to =
     let is_split = codegen_options.Cmdline.split in
     let dirname, destination =
@@ -728,28 +731,16 @@ let generate_code codegen_options generated_code =
       save_code_list_as_a_module (save_to k) v)
     generated
 
-let get_exclusions () =
-  Registration.all_models ()
-  |> List.filter_map (fun (name, info) ->
-         let is_excluded =
-           List.is_empty @@ Codegen.get_codegen_destinations info
-         in
-         if is_excluded then Some (Namespace.to_string name) else None)
-  |> String.Set.of_list
-
 let codegen_all_cmd solution_fn regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
-  let exclusions = get_exclusions () in
   let regexp = Str.regexp regexp in
   let ok (name, _) = Str.string_match regexp (Namespace.to_string name) 0 in
   let sol = Codegen.load_solution solution_fn in
   let models = List.filter ok (Registration.all_models ()) in
-  let generated =
-    generate_code_for_models sol models codegen_options ~exclusions
-  in
+  let generated = generate_code_for_models sol models codegen_options in
   generate_code codegen_options generated
 
-let codegen_for_a_solution solution codegen_options ~exclusions =
+let codegen_for_a_solution solution codegen_options =
   let fvs_of_codegen_model model =
     let (Model.Model model) = model in
     let module Model = (val model) in
@@ -762,29 +753,27 @@ let codegen_for_a_solution solution codegen_options ~exclusions =
       (fun fv -> Free_variable.Map.mem fv solution.Codegen.map)
       fvs
   in
-  let is_generate_all info =
-    if String.Set.is_empty exclusions then true
-    else not @@ List.is_empty @@ Codegen.get_codegen_destinations info
-  in
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter (fun (_model_name, ({Registration.model; from = _} as info)) ->
-        model_fvs_included_in_sol model && is_generate_all info)
+    List.filter (fun (_model_name, {Registration.model; from = _}) ->
+        model_fvs_included_in_sol model)
     @@ Registration.all_models ()
   in
-  generate_code_for_models solution codegen_models codegen_options ~exclusions
+  generate_code_for_models solution codegen_models codegen_options
 
-let save_codegen_for_solutions solutions codegen_options ~exclusions =
+let save_codegen_for_solutions solutions codegen_options =
   let generated =
-    List.concat_map
-      (fun solution ->
-        codegen_for_a_solution solution codegen_options ~exclusions)
+    List.fold_left
+      (fun m solution ->
+        let m' = codegen_for_a_solution solution codegen_options in
+        String.Map.merge (fun _dest -> Option.merge (fun a b -> a @ b)) m m')
+      String.Map.empty
       solutions
   in
   generate_code codegen_options generated
 
 let codegen_for_solutions_cmd ?(build_all = false) solution_fns codegen_options
-    ~exclusions =
+    =
   let is_dir, solution_dir =
     match solution_fns with
     | x :: [] -> (Sys.is_directory x, x)
@@ -797,13 +786,8 @@ let codegen_for_solutions_cmd ?(build_all = false) solution_fns codegen_options
       |> List.map (fun x -> Filename.concat solution_dir x)
     else solution_fns
   in
-  let exclusions' =
-    if codegen_options.Cmdline.split then
-      String.Set.union exclusions @@ get_exclusions ()
-    else String.Set.empty
-  in
   let solutions = List.map Codegen.load_solution solutions in
-  save_codegen_for_solutions solutions codegen_options ~exclusions:exclusions' ;
+  save_codegen_for_solutions solutions codegen_options ;
   if build_all then
     let transform =
       Option.fold
@@ -811,10 +795,7 @@ let codegen_for_solutions_cmd ?(build_all = false) solution_fns codegen_options
         ~some:(fun _ -> None)
         codegen_options.transform
     in
-    save_codegen_for_solutions
-      solutions
-      {codegen_options with transform}
-      ~exclusions:exclusions'
+    save_codegen_for_solutions solutions {codegen_options with transform}
 
 let save_solutions_in_text out_fn nsolutions =
   stdout_or_file out_fn @@ fun ppf ->
@@ -1161,11 +1142,11 @@ module Auto_build = struct
       [(solution_fn, solution)] ;
     solution
 
-  let codegen ~split mkfilename solution ~exclusions =
+  let codegen ~split mkfilename solution =
     let codegen_options =
       Cmdline.{transform = None; save_to = Some (mkfilename ".ml"); split}
     in
-    save_codegen_for_solutions [solution] codegen_options ~exclusions ;
+    save_codegen_for_solutions [solution] codegen_options ;
     let codegen_options =
       Cmdline.
         {
@@ -1179,7 +1160,7 @@ module Auto_build = struct
           split;
         }
     in
-    save_codegen_for_solutions [solution] codegen_options ~exclusions
+    save_codegen_for_solutions [solution] codegen_options
 
   let cmd ?(split = false) targets
       Cmdline.{destination_directory; infer_parameters; measure_options} =
@@ -1252,12 +1233,11 @@ module Auto_build = struct
     let solution =
       infer ~outdir mkfilename measurements providers infer_parameters
     in
-    let exclusions = if split then get_exclusions () else String.Set.empty in
     let mkfilename ext =
       if split then outdir else Filename.concat outdir "auto_build" ^ ext
     in
     (* Codegen *)
-    codegen ~split mkfilename solution ~exclusions
+    codegen ~split mkfilename solution
 end
 
 (* -------------------------------------------------------------------------- *)
@@ -1286,14 +1266,10 @@ let () =
           codegen_cmd solution model_name codegen_options
       | Codegen_all {solution; matching; codegen_options} ->
           codegen_all_cmd solution matching codegen_options
-      | Codegen_inferred {solution; codegen_options; exclusions} ->
-          codegen_for_solutions_cmd [solution] codegen_options ~exclusions
-      | Codegen_for_solutions {solutions; codegen_options; exclusions} ->
-          codegen_for_solutions_cmd
-            ~build_all:true
-            solutions
-            codegen_options
-            ~exclusions
+      | Codegen_inferred {solution; codegen_options} ->
+          codegen_for_solutions_cmd [solution] codegen_options
+      | Codegen_for_solutions {solutions; codegen_options} ->
+          codegen_for_solutions_cmd ~build_all:true solutions codegen_options
       | Codegen_check_definitions {files} -> codegen_check_definitions_cmd files
       | Solution_print solutions -> solution_print_cmd None solutions
       | Auto_build {targets; auto_build_options; split} ->
