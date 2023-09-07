@@ -597,7 +597,7 @@ let block_from_rlp bytes =
         difficulty = Qty Z.zero;
         totalDifficulty = Qty Z.zero;
         extraData = "";
-        size = Qty Z.zero;
+        size = Qty (Z.of_int (Bytes.length bytes));
         gasLimit = Qty Z.zero;
         gasUsed = gas_used;
         timestamp;
