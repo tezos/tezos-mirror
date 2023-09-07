@@ -1,0 +1,100 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name codec)
+ (public_name octez-codec-kaitai)
+ (package octez-codec-kaitai)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  data-encoding
+  kaitai-of-data-encoding
+  kaitai
+  octez-libs.tezos-base
+  octez-libs.tezos-base.unix
+  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.tezos-client-base
+  octez-libs.tezos-clic
+  octez-libs.tezos-stdlib-unix
+  octez-libs.tezos-event-logging
+  octez-shell-libs.tezos-signer-services
+  tezos-version.value
+  (select void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client from
+   (octez-protocol-005-PsBabyM1-libs.tezos-client -> void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-006-PsCARTHA-libs-tezos-client from
+   (octez-protocol-006-PsCARTHA-libs.tezos-client -> void_for_linking-octez-protocol-006-PsCARTHA-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-006-PsCARTHA-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-client from
+   (octez-protocol-007-PsDELPH1-libs.tezos-client -> void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-client from
+   (octez-protocol-008-PtEdo2Zk-libs.tezos-client -> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-client from
+   (octez-protocol-009-PsFLoren-libs.tezos-client -> void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-client from
+   (octez-protocol-010-PtGRANAD-libs.tezos-client -> void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-client from
+   (octez-protocol-011-PtHangz2-libs.tezos-client -> void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-012-Psithaca-libs-tezos-client from
+   (octez-protocol-012-Psithaca-libs.tezos-client -> void_for_linking-octez-protocol-012-Psithaca-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-012-Psithaca-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-013-PtJakart-libs-tezos-client from
+   (octez-protocol-013-PtJakart-libs.tezos-client -> void_for_linking-octez-protocol-013-PtJakart-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-013-PtJakart-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-014-PtKathma-libs-tezos-client from
+   (octez-protocol-014-PtKathma-libs.tezos-client -> void_for_linking-octez-protocol-014-PtKathma-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-014-PtKathma-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-client from
+   (octez-protocol-015-PtLimaPt-libs.tezos-client -> void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-client from
+   (octez-protocol-016-PtMumbai-libs.tezos-client -> void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-017-PtNairob-libs-tezos-client from
+   (octez-protocol-017-PtNairob-libs.tezos-client -> void_for_linking-octez-protocol-017-PtNairob-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-017-PtNairob-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-018-Proxford-libs-tezos-client from
+   (octez-protocol-018-Proxford-libs.tezos-client -> void_for_linking-octez-protocol-018-Proxford-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-018-Proxford-libs-tezos-client.empty))
+  (select void_for_linking-octez-protocol-alpha-libs-tezos-client from
+   (octez-protocol-alpha-libs.tezos-client -> void_for_linking-octez-protocol-alpha-libs-tezos-client.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-tezos-client.empty)))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Data_encoding
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base_unix
+  -open Tezos_client_base
+  -open Tezos_stdlib_unix
+  -open Tezos_event_logging))
+
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-octez-protocol-005-PsBabyM1-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-006-PsCARTHA-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-012-Psithaca-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-013-PtJakart-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-014-PtKathma-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-017-PtNairob-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-018-Proxford-libs-tezos-client.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-client.empty ""))))
+
+(cram (deps codec.exe) (package octez-codec))
