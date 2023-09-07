@@ -2399,9 +2399,34 @@ let test_deposit_before_and_after_migration =
   in
   gen_kernel_migration_test ~admin ~scenario_prior ~scenario_after protocol
 
+let test_block_storage_before_and_after_migration =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "block"; "storage"]
+    ~title:"Block storage before and after migration"
+  @@ fun protocol ->
+  let scenario_prior ~evm_setup:{endpoint; _} =
+    let* (block : Block.t) = Eth_cli.get_block ~block_id:"0" ~endpoint in
+    return block
+  in
+  let scenario_after ~evm_setup:{endpoint; sc_rollup_node; node; client; _}
+      ~(sanity_check : Block.t) =
+    (* We need to wait for one more block for migration to take place *)
+    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
+    let* (block : Block.t) = Eth_cli.get_block ~block_id:"0" ~endpoint in
+    (* Compare fields stored before migration *)
+    assert (block.number = sanity_check.number) ;
+    assert (block.hash = sanity_check.hash) ;
+    assert (block.timestamp = sanity_check.timestamp) ;
+    assert (block.transactions = sanity_check.transactions) ;
+    unit
+  in
+  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
+
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
-  test_deposit_before_and_after_migration protocols
+  test_deposit_before_and_after_migration protocols ;
+  test_block_storage_before_and_after_migration protocols
 
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;

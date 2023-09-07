@@ -130,6 +130,17 @@ pub fn decode_transaction_hash(
     Ok(hash.into())
 }
 
+pub fn decode_transaction_hash_list(
+    decoder: &Rlp<'_>,
+    field_name: &'static str,
+) -> Result<Vec<TransactionHash>, DecoderError> {
+    let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
+    decoder
+        .iter()
+        .map(|rlp| decode_h256(&rlp).map(|h| h.into()))
+        .collect::<Result<Vec<TransactionHash>, DecoderError>>()
+        .map_err(custom_err)
+}
 pub fn decode_transaction_type(
     decoder: &Rlp<'_>,
 ) -> Result<TransactionType, DecoderError> {
@@ -144,4 +155,15 @@ pub fn decode_transaction_status(
     let tag: u8 = decode_field(decoder, "transaction_status")?;
     TransactionStatus::try_from(&tag)
         .map_err(|_| (DecoderError::Custom("Transaction status cannot be decoded")))
+}
+
+pub trait FromRlpBytes: Decodable {
+    fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError>;
+}
+
+impl<T: Decodable> FromRlpBytes for T {
+    fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
+        let decoder = Rlp::new(bytes);
+        Self::decode(&decoder)
+    }
 }

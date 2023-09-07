@@ -179,13 +179,6 @@ impl Encodable for TransactionReceipt {
     }
 }
 
-impl TransactionReceipt {
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
-        let decoder = Rlp::new(bytes);
-        Self::decode(&decoder)
-    }
-}
-
 impl TryFrom<&[u8]> for TransactionReceipt {
     type Error = DecoderError;
 
@@ -287,13 +280,6 @@ impl Encodable for TransactionObject {
         stream.append(&self.index);
         append_u256_le(stream, self.value);
         rlp_append_opt(&self.signature, stream);
-    }
-}
-
-impl TransactionObject {
-    pub fn from_rlp_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
-        let decoder = Rlp::new(bytes);
-        Self::decode(&decoder)
     }
 }
 

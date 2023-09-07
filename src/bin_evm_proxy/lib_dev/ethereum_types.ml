@@ -287,7 +287,7 @@ let transaction_receipt_from_rlp bytes =
         status;
         contractAddress = contract_address;
       }
-  | _ -> raise (Invalid_argument "Expected a RlpList of 12 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 12 elements")
 
 let transaction_receipt_encoding =
   let open Data_encoding in
@@ -433,7 +433,7 @@ let transaction_object_from_rlp bytes =
         r;
         s;
       }
-  | _ -> raise (Invalid_argument "Expected a RlpList of 14 elements")
+  | _ -> raise (Invalid_argument "Expected a List of 14 elements")
 
 let transaction_object_encoding =
   let open Data_encoding in
@@ -554,6 +554,55 @@ type block = {
   transactions : block_transactions;
   uncles : hash list;
 }
+
+let decode_list decoder list =
+  List.map
+    Rlp.(
+      function
+      | Value r -> decoder r
+      | List _ -> raise (Invalid_argument "Expected a list of atomic data"))
+    list
+
+let block_from_rlp bytes =
+  match Rlp.decode bytes with
+  | Ok
+      (Rlp.List
+        [
+          Value number;
+          Value hash;
+          Value parent_hash;
+          List transactions;
+          Value timestamp;
+        ]) ->
+      let (Qty number) = decode_number number in
+      let hash = decode_block_hash hash in
+      let parent_hash = decode_block_hash parent_hash in
+      let transactions = TxHash (decode_list decode_hash transactions) in
+      let timestamp = decode_number timestamp in
+      {
+        number = Some (Block_height number);
+        hash = Some hash;
+        parent = parent_hash;
+        nonce = Hash (String.make 16 'a');
+        sha3Uncles = Hash (String.make 64 'a');
+        logsBloom = Some (Hash (String.make 512 'a'));
+        transactionRoot = Hash (String.make 64 'a');
+        stateRoot = Hash (String.make 64 'a');
+        receiptRoot = Hash (String.make 64 'a');
+        (* We need the following dummy value otherwise eth-cli will complain
+           that miner's address is not a valid Ethereum address. *)
+        miner = Hash "6471A723296395CF1Dcc568941AFFd7A390f94CE";
+        difficulty = Qty Z.zero;
+        totalDifficulty = Qty Z.zero;
+        extraData = "";
+        size = Qty Z.zero;
+        gasLimit = Qty Z.zero;
+        gasUsed = Qty Z.zero;
+        timestamp;
+        transactions;
+        uncles = [];
+      }
+  | _ -> raise (Invalid_argument "Expected a List of 5 elements")
 
 let block_encoding =
   let open Data_encoding in
