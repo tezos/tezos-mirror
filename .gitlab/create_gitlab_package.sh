@@ -45,7 +45,12 @@ gitlab_upload() {
 # Target directory (checkout Makefile)
 cd output/
 
-# Upload all JSON files
+# Upload a tarball with all 4 json files for automatic provisioning
+tar zcvf "${gitlab_package_name}.tgz" ./*.json
+gitlab_upload "${gitlab_package_name}.tgz" "${gitlab_package_name}.tgz"
+
+# Upload all JSON files indivially to allow users to import the dashboard
+# manually from the grafana interface
 for file in *.json
 do
   gitlab_upload "${file}" "${file}"
