@@ -232,3 +232,32 @@ let%expect_test "test fixed size string translation" =
     - id: fixed size (uint30) bytes
       type: fixed_bytes
   |}]
+
+let%expect_test "test big numbers translation" =
+  let s =
+    Kaitai_of_data_encoding.Translate.from_data_encoding
+      ~encoding_name:"ground_n"
+      Data_encoding.n
+  in
+  print_endline (Kaitai.Print.print s) ;
+  [%expect
+    {|
+    meta:
+      id: ground_n
+      endian: be
+    types:
+      group:
+        instances:
+          has_next:
+            value: ((b & 128) != 0)
+          value:
+            value: (b & 127)
+        seq:
+        - id: b
+          type: u1
+    seq:
+    - id: groups
+      type: group
+      repeat: until
+      repeat-until: not (_.has_next)
+  |}]

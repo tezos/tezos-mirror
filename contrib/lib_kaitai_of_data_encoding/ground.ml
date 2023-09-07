@@ -212,4 +212,27 @@ module Class = struct
         ];
       isTopLevel = false;
     }
+
+  let repeat_until_end_bytes_group_attr =
+    {
+      default_attr_spec with
+      id = "groups";
+      dataType = DataType.(ComplexDataType (UserType byte_group));
+      cond =
+        AttrSpec.ConditionalSpec.
+          {
+            ifExpr = None;
+            repeat =
+              RepeatSpec.RepeatUntil
+                Ast.(
+                  UnaryOp
+                    {
+                      op = Not;
+                      operand = Attribute {value = Name "_"; attr = "has_next"};
+                    });
+          };
+    }
+
+  let n ~encoding_name =
+    class_spec_of_attr ~encoding_name repeat_until_end_bytes_group_attr
 end

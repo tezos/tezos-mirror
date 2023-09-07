@@ -120,4 +120,7 @@ module Class : sig
       Size bits ignored, the data is the binary representation of the number 
       in little-endian order." *)
   val byte_group : ClassSpec.t
+
+  (** [n] returns [ClassSpec.t] for [Data_encoding.N]. *)
+  val n : encoding_name:string -> ClassSpec.t
 end

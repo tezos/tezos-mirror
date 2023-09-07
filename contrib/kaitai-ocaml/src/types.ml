@@ -87,12 +87,12 @@ module Ast = struct
   type expr = t
 
   let rec to_string = function
+    | IntNum n -> Int.to_string n
     | Name name -> name
-    | UnaryOp {op; operand} ->
-        (match op with
-        | Not -> "not"
+    | UnaryOp {op; operand} -> (
+        match op with
+        | Not -> "not " ^ to_string operand
         | _ -> failwith "unary operator not supported")
-        ^ to_string operand
     | BinOp {left; op; right} ->
         Format.sprintf
           "(%s %s %s)"
@@ -105,6 +105,7 @@ module Ast = struct
           (to_string left)
           (cmpop_to_string ops)
           (to_string right)
+    | Attribute {value; attr} -> Format.sprintf "(%s.%s)" (to_string value) attr
     | _ -> failwith "not implemented"
 end
 
