@@ -1,0 +1,49 @@
+//****************************************************************************//
+//                                                                            //
+// SPDX-License-Identifier: MIT                                               //
+// Copyright (c) [2023] Serokell <hi@serokell.io>                             //
+//                                                                            //
+//****************************************************************************//
+
+#![allow(dead_code)]
+use std::str::FromStr;
+
+grammar;
+
+match {
+  r"(?-u:\s)+" => {}, // more or less same as default, but required to build w/o unicode
+  _
+}
+
+number: i32 = <s:r"([+-]?)[0-9]+"> => i32::from_str(s).unwrap();
+
+type_: () = {
+  "int" => (),
+  "nat" => ()
+}
+
+value: () = {
+  <n:number> => ()
+}
+
+instruction: () = {
+  "PUSH" <t:type_> <v:value> => (),
+  "INT" => (),
+  "GT" => (),
+  "LOOP" <ib: instructionBlock> => (),
+  "DIP" <n:number?> <ib: instructionBlock> => (),
+  "ADD" => (),
+  "DROP" <n:number?> => (),
+  "SWAP" => (),
+  "IF" <ibt: instructionBlock> <ibf: instructionBlock> => (),
+  "DUP" <n:number> => ()
+}
+
+instructionSeq: () = {
+  <ia:instruction> => (),
+  <ia:instruction>";"<ib:instructionSeq> => ()
+}
+
+pub instructionBlock: () = {
+  "{" <is:instructionSeq> "}" => ()
+}
