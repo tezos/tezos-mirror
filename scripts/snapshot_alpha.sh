@@ -88,10 +88,11 @@ mv src/proto_${version} src/proto_${version}_${short_hash}
 # fix versioned links (in labels, references, and paths) in docs
 echo "Fixing versioned links in docs"
 cd docs/${label}
-sed -i.old -e s/_alpha:/_${label}:/g \
+sed -i.old \
        -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
        -e s,tezos-protocol-alpha/,tezos-protocol-${version}-${short_hash}/,g \
        -e s,raw_protocol_alpha/,raw_protocol_${version}_${short_hash}/,g \
+       -e s/_alpha:/_${label}:/g \
        -e s/_alpha\>/_${label}\>/g \
        -e s/_alpha\`/_${label}\`/g \
        -e s/-alpha.html/-${label}.html/g \
@@ -100,17 +101,14 @@ cd ../..
 
 # generate docs/protocols/042_jeanmichel.rst from docs/protocols/alpha.rst
 echo "Copying+fixing docs/protocols/alpha.rst to docs/protocols/${version}_${label}.rst"
-sed -e s/_alpha:/_${version}_${label}:/g \
+sed -e "s/^Protocol Alpha/Protocol ${capitalized_label}/" \
     -e s,src/proto_alpha,src/proto_${version}_${short_hash},g \
-    -e s/_alpha\>/_${version}\>/g \
-    -e s/_alpha\`/_${version}\`/g \
-    -e s/-alpha.html/-${version}.html/g \
     docs/protocols/alpha.rst > "docs/protocols/${version}_${label}.rst"
 
 # add entries in the doc index
 # copy from alpha rather from previous protocol because there may be newly added items
 echo "Add entries in the doc index"
-alpha_line='Alpha Development Protocol'
+alpha_line='Alpha Dev Protocol doc'
 doc_index="docs/index.rst"
 (
     set -e
@@ -119,7 +117,7 @@ doc_index="docs/index.rst"
     grep -A9999 -F "$alpha_line" "$doc_index" \
       | grep -B9999 -F 'toctree' -m1 \
       | head -n-1 \
-      | sed -e "s/Alpha Development/${capitalized_label}/g" \
+      | sed -e "s/Alpha Dev/${capitalized_label}/g" \
             -e "s,alpha/,${label}/,g"
     grep -B9999 -F "$alpha_line" "$doc_index" \
       | tac \
