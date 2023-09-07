@@ -79,6 +79,7 @@ let init config store gs_worker transport_layer cctxt metrics_server =
   }
 
 let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
+  let open Result_syntax in
   match ctxt.status with
   | Starting ->
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
@@ -87,6 +88,11 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
          (for a given cryptobox). *)
       let shards_proofs_precomputation =
         Cryptobox.precompute_shards_proofs cryptobox
+      in
+      let* () =
+        Profile_manager.validate_slot_indexes
+          ctxt.profile_ctxt
+          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
       in
       ctxt.status <-
         Ready
@@ -97,7 +103,8 @@ let set_ready ctxt plugin cryptobox proto_parameters plugin_proto =
             shards_proofs_precomputation;
             plugin_proto;
             last_seen_head = None;
-          }
+          } ;
+      return_unit
   | Ready _ -> raise Status_already_ready
 
 let update_plugin_in_ready ctxt plugin proto =

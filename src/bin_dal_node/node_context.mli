@@ -79,7 +79,7 @@ val set_ready :
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
   int ->
-  unit
+  unit tzresult
 
 (** Updates the plugin and the protocol level. *)
 val update_plugin_in_ready :

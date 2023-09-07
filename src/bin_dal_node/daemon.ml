@@ -176,12 +176,14 @@ module Handler = struct
             in
             return @@ Node_context.set_profile_ctxt ctxt pctxt
           in
-          Node_context.set_ready
-            ctxt
-            plugin
-            cryptobox
-            proto_parameters
-            block_header.Block_header.shell.proto_level ;
+          let*? () =
+            Node_context.set_ready
+              ctxt
+              plugin
+              cryptobox
+              proto_parameters
+              block_header.Block_header.shell.proto_level
+          in
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4441
 
              The hook below should be called each time cryptobox parameters

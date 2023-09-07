@@ -25,7 +25,10 @@
 
 (** Extention of the open type [error] with the errors that could be raised by
     the DAL node. *)
-type error += Decoding_failed of Types.kind | Profile_incompatibility
+type error +=
+  | Decoding_failed of Types.kind
+  | Profile_incompatibility
+  | Invalid_slot_index of {slot_index : int; number_of_slots : int}
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
@@ -56,7 +59,25 @@ let () =
        profiles."
     Data_encoding.empty
     (function Profile_incompatibility -> Some () | _ -> None)
-    (fun () -> Profile_incompatibility)
+    (fun () -> Profile_incompatibility) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_slot_index"
+    ~title:"Invalid slot index"
+    ~description:"Invalid slot index provided for the producer profile"
+    ~pp:(fun ppf (slot_index, number_of_slots) ->
+      Format.fprintf
+        ppf
+        "The slot index (%d) should be smaller than the number of slots (%d)"
+        slot_index
+        number_of_slots)
+    Data_encoding.(obj2 (req "slot_index" int16) (req "number_of_slots" int16))
+    (function
+      | Invalid_slot_index {slot_index; number_of_slots} ->
+          Some (slot_index, number_of_slots)
+      | _ -> None)
+    (fun (slot_index, number_of_slots) ->
+      Invalid_slot_index {slot_index; number_of_slots})
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 
