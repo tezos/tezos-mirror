@@ -27,13 +27,20 @@ usize: usize = {
 }
 
 type_: Type = {
-  "int" => Type::Int,
-  "nat" => Type::Nat,
+  "int"  => Type::Int,
+  "nat"  => Type::Nat,
+  "bool" => Type::Bool,
+}
+
+boolean: bool = {
+  "True" => true,
+  "False" => false,
 }
 
 use Value::*;
 value: Value = {
-  <n:number> => NumberValue(n)
+  <n:number> => NumberValue(n),
+  <b:boolean> => BooleanValue(b)
 }
 
 use Instruction::*;
