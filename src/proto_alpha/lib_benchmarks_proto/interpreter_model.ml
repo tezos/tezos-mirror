@@ -510,6 +510,34 @@ module Models = struct
     (module M : Model.Model_impl
       with type arg_type = int * (int * (int * (int * unit))))
 
+  let join_tickets_alloc_model name =
+    let module M = struct
+      type arg_type = int * (int * (int * (int * unit)))
+
+      let takes_saturation_reprs = false
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size -> size -> size -> size -> size
+
+        let arity = Model.Succ_arity Model.arity_3
+
+        let model =
+          lam ~name:"content_size_x" @@ fun (_ : size repr) ->
+          lam ~name:"content_size_y" @@ fun (_ : size repr) ->
+          lam ~name:"amount_size_x" @@ fun amount_size_x ->
+          lam ~name:"amount_size_y" @@ fun amount_size_y ->
+          free ~name:(fv (sf "%s_const" name))
+          + free ~name:(fv (sf "%s_add_coeff" name))
+            * max amount_size_x amount_size_y
+      end
+
+      let name = ns name
+    end in
+    (module M : Model.Model_impl
+      with type arg_type = int * (int * (int * (int * unit))))
+
   (* Almost [Model.bilinear_affine] but the intercept is not at 0s
      but size1=0 and size2=1 *)
   let lsl_bytes_model name =
@@ -584,7 +612,6 @@ let ir_model instr_or_cont =
   let open Interpreter_workload in
   let open Models in
   let name = name_of_instr_or_cont instr_or_cont in
-  let m s = TimeModel s in
   let m2 name (time, alloc) =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/6072
        Change naming convention.
@@ -697,19 +724,21 @@ let ir_model instr_or_cont =
           (affine_offset_model ~offset:2, affine_model) |> m2 name
       | N_IComb_get | N_IComb_set -> (affine_model, affine_model) |> m2 name
       | N_ITicket | N_IRead_ticket -> (const1_model, const1_model) |> m2 name
-      | N_ISplit_ticket -> linear_max_model name |> m
-      | N_IJoin_tickets -> join_tickets_model name |> m
-      | N_ISapling_verify_update -> verify_update_model name |> m
+      | N_ISplit_ticket -> (linear_max_model, const1_skip2_model) |> m2 name
+      | N_IJoin_tickets ->
+          (join_tickets_model, join_tickets_alloc_model) |> m2 name
+      | N_ISapling_verify_update ->
+          (verify_update_model, verify_update_model) |> m2 name
       | N_IList_map -> (const1_model, const1_model) |> m2 name
       | N_IList_iter | N_IIter -> (const1_model, const1_model) |> m2 name
-      | N_IMap_map -> affine_model name |> m
-      | N_IMap_iter -> affine_model name |> m
-      | N_ISet_iter -> affine_model name |> m
+      | N_IMap_map -> (affine_model, const1_skip1_model) |> m2 name
+      | N_IMap_iter -> (affine_model, const1_skip1_model) |> m2 name
+      | N_ISet_iter -> (affine_model, const1_skip1_model) |> m2 name
       | N_IHalt -> (const1_model, const1_model) |> m2 name
-      | N_IApply -> lambda_model name |> m
+      | N_IApply -> (lambda_model, lambda_model) |> m2 name
       | N_ILambda_lam | N_ILambda_lamrec | N_ILog ->
           (const1_model, const1_model) |> m2 name
-      | N_IOpen_chest -> open_chest_model name |> m
+      | N_IOpen_chest -> (open_chest_model, open_chest_model) |> m2 name
       | N_IEmit | N_IOpt_map_none | N_IOpt_map_some ->
           (const1_model, const1_model) |> m2 name)
   | Cont_name cont -> (
