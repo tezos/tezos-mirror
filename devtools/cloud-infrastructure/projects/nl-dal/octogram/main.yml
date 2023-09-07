@@ -113,21 +113,9 @@ stages:
           path_client: self://./octez-client
           endpoint: self://node
 
-      - name: Start octez-baker-alpha
-        tezos.start_baker:
-          name: my-unique-baker
-          protocol: alpha
-          base_dir: 'self://my-unique-baker/{{ vars.keys_base_dir }}'
-          node_uri: self://node
-          delegates:
-           - bootstrap1
-           - bootstrap2
-           - bootstrap3
-           - bootstrap4
-           - bootstrap5
-
       - name: Start octez-dal-node
         tezos.start_dal_node:
+          name: dal_node
           path_node: self://./octez-dal-node
           rpc_port: '30011'
           metrics_port: '30012'
@@ -143,3 +131,17 @@ stages:
            - 3
            - 55
            - 94
+
+      - name: Start octez-baker-alpha
+        tezos.start_baker:
+          name: my-unique-baker
+          protocol: alpha
+          base_dir: 'self://my-unique-baker/{{ vars.keys_base_dir }}'
+          node_uri: self://node
+          dal_node_uri: self://dal_node
+          delegates:
+           - bootstrap1
+           - bootstrap2
+           - bootstrap3
+           - bootstrap4
+           - bootstrap5
