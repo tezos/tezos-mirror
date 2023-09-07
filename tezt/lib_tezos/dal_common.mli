@@ -79,22 +79,35 @@ module Helpers : sig
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
   val store_slot :
-    Dal_node.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
+    (Dal_node.t, Foreign_endpoint.t) Either.t ->
+    ?with_proof:bool ->
+    slot ->
+    (string * string) Lwt.t
 end
 
 module RPC_legacy : sig
+  type default_uri_provider = (Dal_node.t, Foreign_endpoint.t) Either.t
+
+  type local_uri_provider = Dal_node.t
+
+  type remote_uri_provider = Foreign_endpoint.t
+
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
-  val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
+  val slot_pages : string -> (default_uri_provider, string list) RPC_core.t
 
   (** [shard ~slot_header ~shard_id] gets a shard from
         a given slot header and shard id *)
   val shard :
-    slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
+    slot_header:string ->
+    shard_id:int ->
+    (default_uri_provider, string) RPC_core.t
 
   (** [shards ~slot_header shard_ids] gets a subset of shards from a given
         slot header *)
   val shards :
-    slot_header:string -> int list -> (Dal_node.t, string list) RPC_core.t
+    slot_header:string ->
+    int list ->
+    (default_uri_provider, string list) RPC_core.t
 end
 
 module RPC : sig
@@ -129,7 +142,8 @@ module RPC : sig
 
   (** Call RPC "POST /commitments" to store a slot and retrun the commitment
         in case of success. *)
-  val post_commitment : Helpers.slot -> (Dal_node.t, commitment) RPC_core.t
+  val post_commitment :
+    Helpers.slot -> (default_uri_provider, commitment) RPC_core.t
 
   (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
         whose commitment is given. *)
@@ -137,39 +151,43 @@ module RPC : sig
     commitment ->
     slot_level:int ->
     slot_index:int ->
-    (Dal_node.t, unit) RPC_core.t
+    (default_uri_provider, unit) RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
-  val get_commitment_slot : commitment -> (Dal_node.t, Helpers.slot) RPC_core.t
+  val get_commitment_slot :
+    commitment -> (default_uri_provider, Helpers.slot) RPC_core.t
 
   (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
         shards of the slot whose commitment is given, using the current DAL
         parameters. Note that [with_proof], whose default value is [false], is
         provided as input to the RPC. *)
   val put_commitment_shards :
-    ?with_proof:bool -> commitment -> (Dal_node.t, unit) RPC_core.t
+    ?with_proof:bool -> commitment -> (default_uri_provider, unit) RPC_core.t
 
   type commitment_proof = string
 
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)
   val get_commitment_proof :
-    commitment -> (Dal_node.t, commitment_proof) RPC_core.t
+    commitment -> (default_uri_provider, commitment_proof) RPC_core.t
 
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
         the commitment associated to the given level and index. *)
   val get_level_index_commitment :
-    slot_level:int -> slot_index:int -> (Dal_node.t, commitment) RPC_core.t
+    slot_level:int ->
+    slot_index:int ->
+    (default_uri_provider, commitment) RPC_core.t
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-  val patch_profiles : operator_profiles -> (Dal_node.t, unit) RPC_core.t
+  val patch_profiles :
+    operator_profiles -> (default_uri_provider, unit) RPC_core.t
 
   (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)
-  val get_profiles : unit -> (Dal_node.t, profiles) RPC_core.t
+  val get_profiles : unit -> (default_uri_provider, profiles) RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
         statuses know about the given commitment. The resulting list can be filtered by a
@@ -178,19 +196,19 @@ module RPC : sig
     ?slot_level:int ->
     ?slot_index:int ->
     commitment ->
-    (Dal_node.t, slot_header list) RPC_core.t
+    (default_uri_provider, slot_header list) RPC_core.t
 
   (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
         to get shard ids assigned to the given public key hash at the given
         level. *)
   val get_assigned_shard_indices :
-    level:int -> pkh:string -> (Dal_node.t, int list) RPC_core.t
+    level:int -> pkh:string -> (default_uri_provider, int list) RPC_core.t
 
   (** Call RPC "GET /levels/<published_level>/headers?status" to get the known
         headers with the given published level. *)
   val get_published_level_headers :
-    ?status:string -> int -> (Dal_node.t, slot_header list) RPC_core.t
+    ?status:string -> int -> (default_uri_provider, slot_header list) RPC_core.t
 
   type slot_set = bool list
 
@@ -207,7 +225,44 @@ module RPC : sig
   val get_attestable_slots :
     attestor:Account.key ->
     attested_level:int ->
-    (Dal_node.t, attestable_slots) RPC_core.t
+    (default_uri_provider, attestable_slots) RPC_core.t
+
+  module type CALLERS = sig
+    type input_uri_provider
+
+    (** See {!RPC_core.call} *)
+    val call :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      'result Lwt.t
+
+    (** See {!RPC_core.call_raw} *)
+    val call_raw :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      string RPC_core.response Lwt.t
+
+    (** See {!RPC_core.call_json} *)
+    val call_json :
+      ?log_request:bool ->
+      ?log_response_status:bool ->
+      ?log_response_body:bool ->
+      input_uri_provider ->
+      (default_uri_provider, 'result) RPC_core.t ->
+      JSON.t RPC_core.response Lwt.t
+  end
+
+  include CALLERS with type input_uri_provider := default_uri_provider
+
+  module Local : CALLERS with type input_uri_provider := local_uri_provider
+
+  module Remote : CALLERS with type input_uri_provider := remote_uri_provider
 end
 
 module Commitment : sig

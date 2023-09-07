@@ -36,6 +36,13 @@
 
 module Dal = Dal_common
 
+module Dal_RPC = struct
+  include Dal.RPC
+
+  (* We override call_xx RPCs in Dal.RPC to use a DAL node in this file. *)
+  include Dal.RPC.Local
+end
+
 let measurement = "time-to-produce-and-propagate-shards"
 
 let grafana_panels : Grafana.panel list =
@@ -120,11 +127,10 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attestor_profiles = [])
 let store_slot_to_dal_node ~slot_size dal_node =
   let slot = Dal.Helpers.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
-  let* commitment = RPC.call dal_node (Dal.RPC.post_commitment slot) in
+  let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
   (* Compute and save the shards of the slot. *)
   let* () =
-    RPC.call dal_node
-    @@ Dal.RPC.put_commitment_shards ~with_proof:true commitment
+    Dal_RPC.(call dal_node @@ put_commitment_shards ~with_proof:true commitment)
   in
   let commitment_hash =
     match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
@@ -133,7 +139,7 @@ let store_slot_to_dal_node ~slot_size dal_node =
   in
   (* Compute the proof for the commitment. *)
   let* proof =
-    let* proof = RPC.call dal_node @@ Dal.RPC.get_commitment_proof commitment in
+    let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
     Dal.Commitment.proof_of_string proof |> return
   in
   return (commitment_hash, proof)

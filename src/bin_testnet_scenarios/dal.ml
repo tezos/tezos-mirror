@@ -26,6 +26,13 @@
 open Dal_helpers
 module Dal = Dal_common
 
+module Dal_RPC = struct
+  include Dal.RPC
+
+  (* We override call_xx RPCs in Dal.RPC to use a DAL node in this file. *)
+  include Dal.RPC.Local
+end
+
 (* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
    or Mondaynet), and it publishes slots for a number of levels and a number of
    slot producers (both given as arguments to the test). At the end of the test,
@@ -195,10 +202,10 @@ let scenario network =
         "Publishing a slot at level %d with index %d..."
         current_level
         slot_index ;
-      let* commitment = RPC.call dal_node (Dal.RPC.post_commitment slot) in
+      let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
       let* () =
-        RPC.call dal_node
-        @@ Dal.RPC.put_commitment_shards ~with_proof:true commitment
+        Dal_RPC.(
+          call dal_node @@ put_commitment_shards ~with_proof:true commitment)
       in
       let commitment_hash =
         match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
@@ -207,7 +214,7 @@ let scenario network =
       in
       let* proof =
         let* proof =
-          RPC.call dal_node @@ Dal.RPC.get_commitment_proof commitment
+          Dal_RPC.(call dal_node @@ get_commitment_proof commitment)
         in
         Dal.Commitment.proof_of_string proof |> return
       in
@@ -244,11 +251,11 @@ let scenario network =
   let check_attestations level =
     let module Map = Map.Make (String) in
     let* slot_headers =
-      RPC.call dal_node (Dal.RPC.get_published_level_headers level)
+      Dal_RPC.(call dal_node @@ get_published_level_headers level)
     in
     let map =
       List.fold_left
-        (fun acc Dal.RPC.{status; slot_index; _} ->
+        (fun acc Dal_RPC.{status; slot_index; _} ->
           Map.update
             status
             (function
