@@ -52,6 +52,8 @@ let mapping l =
 
 let ( @? ) x xs = match x with None -> xs | Some x -> x :: xs
 
+let ( @@? ) xs ys = match xs with None -> ys | Some xs -> xs @ ys
+
 let metaSpec (t : MetaSpec.t) =
   mapping
   @@ Option.map (fun id -> ("id", scalar id)) t.id
@@ -80,6 +82,16 @@ let attr_type_if_not_any attr =
   if attr.AttrSpec.dataType = AnyType then None
   else Some ("type", scalar (DataType.to_string attr.AttrSpec.dataType))
 
+let repeat_spec =
+  let open RepeatSpec in
+  function
+  | NoRepeat -> None
+  | RepeatUntil expr ->
+      Some
+        (("repeat", scalar "until")
+        :: [("repeat-until", scalar (Ast.to_string expr))])
+  | _ -> failwith "not supported"
+
 let attr_spec attr =
   match attr.AttrSpec.dataType with
   (* [BytesType] attr require size header. *)
@@ -95,7 +107,8 @@ let attr_spec attr =
         mapping
           (Some ("id", scalar attr.AttrSpec.id)
           @? attr_type_if_not_any attr
-          @? Option.map (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
+          @? repeat_spec attr.cond.repeat
+          @@? Option.map (fun enum -> ("enum", scalar enum)) attr.AttrSpec.enum
           @? []);
       ]
 
