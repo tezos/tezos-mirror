@@ -604,7 +604,7 @@ let sign_dal_attestations state attestations =
     }
   in
   List.filter_map_es
-    (fun (((consensus_key, _) as delegate), consensus_content) ->
+    (fun (((consensus_key, _) as delegate), consensus_content, published_level) ->
       let watermark = Operation.(to_watermark (Dal_attestation chain_id)) in
       let contents = Single (Dal_attestation consensus_content) in
       let unsigned_operation = (shell, Contents_list contents) in
@@ -630,7 +630,10 @@ let sign_dal_attestations state attestations =
           in
           let operation : Operation.packed = {shell; protocol_data} in
           return_some
-            (delegate, operation, consensus_content.Dal.Attestation.attestation))
+            ( delegate,
+              operation,
+              consensus_content.Dal.Attestation.attestation,
+              published_level ))
     attestations
 
 let inject_attestations state ~attestations =
@@ -657,13 +660,16 @@ let inject_attestations state ~attestations =
           return_unit))
     signed_operations
 
-let inject_dal_attestations state attestations =
+let inject_dal_attestations state attestations ~attestation_level =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let* signed_operations = sign_dal_attestations state attestations in
   List.iter_ep
-    (fun (delegate, signed_operation, (attestation : Dal.Attestation.t)) ->
+    (fun ( delegate,
+           signed_operation,
+           (attestation : Dal.Attestation.t),
+           published_level ) ->
       let encoded_op =
         Data_encoding.Binary.to_bytes_exn Operation.encoding signed_operation
       in
@@ -675,7 +681,10 @@ let inject_dal_attestations state attestations =
       in
       let bitset_int = Bitset.to_z (attestation :> Bitset.t) in
       let*! () =
-        Events.(emit dal_attestation_injected (oph, delegate, bitset_int))
+        Events.(
+          emit
+            dal_attestation_injected
+            (oph, delegate, bitset_int, published_level, attestation_level))
       in
       return_unit)
     signed_operations
@@ -701,7 +710,7 @@ let only_if_dal_feature_enabled state ~default_value f =
     | Some ctxt -> f ctxt
   else return default_value
 
-let get_dal_attestations state ~level =
+let get_dal_attestations state ~attestation_level =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled state ~default_value:[] (fun dal_node_rpc_ctxt ->
       let delegates =
@@ -717,7 +726,7 @@ let get_dal_attestations state ~level =
               Node_rpc.get_attestable_slots
                 dal_node_rpc_ctxt
                 (signing_key delegate)
-                ~level
+                ~level:attestation_level
             in
             match tz_res with
             | Error errs ->
@@ -729,12 +738,18 @@ let get_dal_attestations state ~level =
                 match res with
                 | Tezos_dal_node_services.Services.Types.Not_in_committee ->
                     return acc
-                | Attestable_slots attestation ->
+                | Attestable_slots {slots = attestation; published_level} ->
                     if List.exists Fun.id attestation then
-                      return ((delegate, attestation) :: acc)
+                      return ((delegate, attestation, published_level) :: acc)
                     else
                       (* No slot is attested, no need to send an attestation, at least
                          for now. *)
+                      let*! () =
+                        Events.(
+                          emit
+                            dal_attestation_void
+                            (delegate, attestation_level, published_level))
+                      in
                       return acc))
           []
           delegates
@@ -743,7 +758,7 @@ let get_dal_attestations state ~level =
         state.global_state.constants.parametric.dal.number_of_slots
       in
       List.map
-        (fun (delegate, attestation_flags) ->
+        (fun (delegate, attestation_flags, published_level) ->
           let attestation =
             List.fold_left_i
               (fun i acc flag ->
@@ -758,16 +773,17 @@ let get_dal_attestations state ~level =
               {
                 attestor = signing_key delegate;
                 attestation;
-                level = Raw_level.of_int32_exn level;
-              } ))
+                level = Raw_level.of_int32_exn attestation_level;
+              },
+            published_level ))
         attestations
       |> return)
 
 let get_and_inject_dal_attestations state =
   let open Lwt_result_syntax in
-  let level = Int32.succ state.level_state.current_level in
-  let* attestations = get_dal_attestations state ~level in
-  inject_dal_attestations state attestations
+  let attestation_level = Int32.succ state.level_state.current_level in
+  let* attestations = get_dal_attestations state ~attestation_level in
+  inject_dal_attestations state attestations ~attestation_level
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =

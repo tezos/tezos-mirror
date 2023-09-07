@@ -55,9 +55,11 @@ module Types : sig
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4562
      Use a bitset instead, when available in the standard library. *)
 
-  (** A set of slots, represented by a list of 0s and 1s. It is used for
-      instance to record which slots are deemed available by an attestor. *)
-  type slot_set = bool list
+  (** A set of slots, represented by a list of booleans (false for not in the
+      set). It is used for instance to record which slots are deemed available
+      by an attestor. The level at which the slots have been published is also
+      given. *)
+  type slot_set = {slots : bool list; published_level : int32}
 
   (** The set of attestable slots of an attestor (which may not necessarily be
       in the committee for a given level). *)

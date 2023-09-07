@@ -159,4 +159,4 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
       Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
     in
     let* flags = List.map_es are_shards_stored all_slot_indexes in
-    return (Services.Types.Attestable_slots flags)
+    return (Services.Types.Attestable_slots {slots = flags; published_level})
