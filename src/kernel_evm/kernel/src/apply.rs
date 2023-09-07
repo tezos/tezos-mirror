@@ -199,6 +199,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
                 hex::encode(transaction_hash),
                 err
             );
+            log!(host, Debug, "Transaction status: ERROR_SIGNATURE.");
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
             return Ok(None);
@@ -206,6 +207,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     };
     if !check_nonce(host, caller, transaction.nonce, evm_account_storage) {
         // Transactions with invalid nonces are ignored.
+        log!(host, Debug, "Transaction status: ERROR_NONCE.");
         return Ok(None);
     }
     let to = transaction.to;
@@ -235,8 +237,19 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     };
 
     let gas_used = match &execution_outcome {
-        Some(execution_outcome) => execution_outcome.gas_used.into(),
-        None => U256::zero(),
+        Some(execution_outcome) => {
+            log!(
+                host,
+                Debug,
+                "Transaction status: OK_{}.",
+                execution_outcome.is_success
+            );
+            execution_outcome.gas_used.into()
+        }
+        None => {
+            log!(host, Debug, "Transaction status: OK_UNKNOWN.");
+            U256::zero()
+        }
     };
 
     Ok(Some((caller, execution_outcome, gas_used)))
