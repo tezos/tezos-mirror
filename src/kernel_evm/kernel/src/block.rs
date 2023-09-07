@@ -1163,7 +1163,7 @@ mod tests {
         let mut proposals = vec![];
         for n in 1..TOO_MANY_TRANSACTIONS {
             transactions.push(dummy_transaction(n));
-            if n.rem(100) == 0 {
+            if n.rem(80) == 0 {
                 proposals.push(blueprint(transactions));
                 transactions = vec![];
             }

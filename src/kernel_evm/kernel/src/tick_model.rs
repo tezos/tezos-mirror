@@ -77,8 +77,10 @@ pub fn top_level_overhead_ticks() -> u64 {
 /// An invalid transaction could not be transmitted to the VM, eg. the nonce
 /// was wrong, or the signature verification failed.
 pub fn ticks_of_invalid_transaction() -> u64 {
-    // invalid transaction only cost crypto ticks
-    constants::TICKS_FOR_CRYPTO + constants::TRANSACTION_OVERHEAD
+    // If the transaction is invalid, only the base cost is considered.
+    constants::BASE_GAS
+        .saturating_mul(constants::TICKS_PER_GAS)
+        .saturating_add(constants::TRANSACTION_OVERHEAD)
 }
 
 pub fn ticks_of_valid_transaction(
