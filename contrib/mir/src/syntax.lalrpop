@@ -40,8 +40,10 @@ instruction: () = {
 }
 
 instructionSeq: () = {
-  <ia:instruction> => (),
-  <ia:instruction>";"<ib:instructionSeq> => ()
+  <(<instruction>";")*><instruction?> => ()
+    // A sequence of instruction-followed-by-a-semicolon matched by
+    // `(<instruction>";")*`, which can be optionally followed by a
+    // single trailing instruction, matched by `<i:instruction?>.
 }
 
 pub instructionBlock: () = {
