@@ -214,11 +214,7 @@ module Unstaked_frozen = struct
 
   let get_total account unstaked = Frozen_tez.get account (fold unstaked)
 
-  let sum_current l =
-    List.fold_left
-      (fun acc (_, st) -> Tez.(acc +! Frozen_tez.total_current st))
-      Tez.zero
-      l
+  let sum_current unstaked = Frozen_tez.total_current (fold unstaked)
 
   (* Happens each unstake operation *)
   let rec add_unstake cycle amount account = function
@@ -232,7 +228,11 @@ module Unstaked_frozen = struct
   let rec pop_cycle cycle = function
     | [] -> (Frozen_tez.zero, [])
     | (c, a) :: t ->
-        if Cycle.equal c cycle then (a, t)
+        if Cycle.(c = cycle) then (a, t)
+        else if Cycle.(c < cycle) then
+          Stdlib.failwith
+            "Unstaked_frozen: found unfinalized cycle before given [cycle]. \
+             Make sure to call [apply_unslashable] every cycle"
         else
           let amount, rest = pop_cycle cycle t in
           (amount, (c, a) :: rest)
