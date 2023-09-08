@@ -2461,15 +2461,13 @@ let test_block_storage_before_and_after_migration =
     ~tags:["evm"; "migration"; "block"; "storage"]
     ~title:"Block storage before and after migration"
   @@ fun protocol ->
+  let block_id = "1" in
   let scenario_prior ~evm_setup:{endpoint; _} =
-    let* (block : Block.t) = Eth_cli.get_block ~block_id:"0" ~endpoint in
+    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint in
     return block
   in
-  let scenario_after ~evm_setup:{endpoint; sc_rollup_node; node; client; _}
-      ~(sanity_check : Block.t) =
-    (* We need to wait for one more block for migration to take place *)
-    let* _level = next_evm_level ~sc_rollup_node ~node ~client in
-    let* (block : Block.t) = Eth_cli.get_block ~block_id:"0" ~endpoint in
+  let scenario_after ~evm_setup:{endpoint; _} ~(sanity_check : Block.t) =
+    let* (block : Block.t) = Eth_cli.get_block ~block_id ~endpoint in
     (* Compare fields stored before migration *)
     assert (block.number = sanity_check.number) ;
     assert (block.hash = sanity_check.hash) ;
