@@ -386,7 +386,7 @@ let test_level protocol client =
   let* contract =
     originate client ~storage:"9999999" protocol ["opcodes"; "level"]
   in
-  (* Note: we're using mockup mode so no need to wait. *)
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   let bake () = Client.bake_for ~minimal_timestamp:true client in
   (* Now at level 1 *)
   let* () = transfer client ~contract in

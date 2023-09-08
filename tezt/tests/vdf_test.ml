@@ -140,8 +140,7 @@ let bake_vdf_revelation_stage nonce_revelation_threshold level max_level client
       client
       Nonce_revelation_stage
   in
-  let* () = Client.bake_for client in
-  let* level = Node.wait_for_level node (level + 1) in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     assert_computation_status
       nonce_revelation_threshold
