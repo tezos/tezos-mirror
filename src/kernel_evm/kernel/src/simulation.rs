@@ -29,6 +29,10 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 /// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
 /// Is used as default value if no gas is set.
 pub const MAX_EVALUATION_GAS: u64 = 1_000_000_000u64;
+/// Tag indicating simulation is an evaluation.
+pub const EVALUATION_TAG: u8 = 0x00;
+/// Tag indicating simulation is a validation.
+pub const VALIDATION_TAG: u8 = 0x01;
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -214,15 +218,14 @@ impl TryFrom<&[u8]> for Message {
     type Error = DecoderError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if let Ok(simulation) = Evaluation::try_from(bytes) {
-            return Ok(Message::Evaluation(simulation));
-        }
+        let Some(&tag) = bytes.first() else {return Err(DecoderError::Custom("Empty simulation message"))};
+        let Some(bytes) = bytes.get(1..) else {return Err(DecoderError::Custom("Empty simulation message"))};
 
-        if let Ok(tx_validation) = TxValidation::try_from(bytes) {
-            return Ok(Message::TxValidation(tx_validation));
+        match tag {
+            EVALUATION_TAG => Evaluation::try_from(bytes).map(Message::Evaluation),
+            VALIDATION_TAG => TxValidation::try_from(bytes).map(Message::TxValidation),
+            _ => Err(DecoderError::Custom("Unknown message to simulate")),
         }
-
-        Err(DecoderError::Custom("Unknown message to simulate"))
     }
 }
 
@@ -574,7 +577,11 @@ mod tests {
 
         let mut encoded =
             hex::decode("f84894242424242424242424242424242424242424242494353535353535353535353535353535353535353588672b00000000000088ce56000000000000883582000000000000821616").unwrap();
-        let mut input = vec![parsing::SIMULATION_TAG, SIMULATION_SIMPLE_TAG];
+        let mut input = vec![
+            parsing::SIMULATION_TAG,
+            SIMULATION_SIMPLE_TAG,
+            EVALUATION_TAG,
+        ];
         input.append(&mut encoded);
 
         let parsed = Input::parse(&input);
@@ -605,7 +612,7 @@ mod tests {
         };
 
         let encoded = hex::decode(
-            "ff01e68094907823e0a92f94355968feb2cbf0fbb594fe321488672b0000000000008080846d4ce63c",
+            "ff0100e68094907823e0a92f94355968feb2cbf0fbb594fe321488672b0000000000008080846d4ce63c",
         )
         .unwrap();
 
@@ -700,7 +707,11 @@ mod tests {
         assert_eq!(tx, expected);
 
         let mut encoded = hex::decode(hex).unwrap();
-        let mut input = vec![parsing::SIMULATION_TAG, SIMULATION_SIMPLE_TAG];
+        let mut input = vec![
+            parsing::SIMULATION_TAG,
+            SIMULATION_SIMPLE_TAG,
+            VALIDATION_TAG,
+        ];
         input.append(&mut encoded);
 
         let parsed = Input::parse(&input);
