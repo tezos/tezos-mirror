@@ -2305,7 +2305,11 @@ module Generate_keys = struct
   let run state {base_dir; kind} =
     let client = Agent_state.http_client state in
     let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
-    let* () = Lwt_unix.mkdir base_dir 0x755 in
+    let* base_dir_exists = Lwt_unix.file_exists base_dir in
+    let* () =
+      (* this distinction is only needed in the Fresh case *)
+      if not base_dir_exists then Lwt_unix.mkdir base_dir 0x755 else unit
+    in
     match kind with
     | Default ->
         Account.write Constant.all_secret_keys ~base_dir ;
