@@ -354,7 +354,24 @@ let test_worker_filter_messages_for_app rng limits parameters =
   in
   Worker.shutdown worker
 
+(** Test that [is_subscribed] returns [true] after joining a topic. *)
+let test_worker_join rng limits parameters =
+  Tezt_core.Test.register
+    ~__FILE__
+    ~title:"GS worker: Join topic"
+    ~tags:["gossipsub"; "worker"; "join"]
+  @@ fun () ->
+  let worker = Worker.make rng limits parameters in
+  let worker = Worker.start [] worker in
+  let () = Worker.app_input worker (Join "topic") in
+  Check.(
+    (Worker.is_subscribed worker "topic" = true)
+      bool
+      ~error_msg:"Expected is_subscribed to return %R, got %L") ;
+  unit
+
 let register rng limits parameters =
   test_worker_start_and_stop rng limits parameters ;
   test_worker_connect_and_graft rng limits parameters ;
-  test_worker_filter_messages_for_app rng limits parameters
+  test_worker_filter_messages_for_app rng limits parameters ;
+  test_worker_join rng limits parameters
