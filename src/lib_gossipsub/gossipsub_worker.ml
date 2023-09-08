@@ -551,8 +551,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let event_loop_handle = event_loop t in
         let status = Running {heartbeat_handle; event_loop_handle} in
         t.status <- status ;
-        List.iter (fun topic -> app_input t (Join topic)) topics ;
-        t
+        List.iter (fun topic -> app_input t (Join topic)) topics
     | Running _ ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5166
 

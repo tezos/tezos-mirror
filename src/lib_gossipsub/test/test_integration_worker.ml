@@ -148,7 +148,7 @@ let test_worker_start_and_stop rng limits parameters =
   let expected_app_output = Queue.create () in
   let worker = Worker.make rng limits parameters in
   let heartbeat_span = limits.heartbeat_interval in
-  let worker = Worker.start ["1"; "2"; "3"] worker in
+  let () = Worker.start ["1"; "2"; "3"] worker in
   let context =
     {worker; expected_p2p_output; expected_app_output; heartbeat_span}
   in
@@ -190,7 +190,7 @@ let test_worker_connect_and_graft rng limits parameters =
   let worker = Worker.make rng limits parameters in
   let heartbeat_span = limits.heartbeat_interval in
   (* 1. The worker joins topic "1" at startup. *)
-  let worker = Worker.start [topic] worker in
+  let () = Worker.start [topic] worker in
   let context =
     {worker; expected_p2p_output; expected_app_output; heartbeat_span}
   in
@@ -275,7 +275,7 @@ let test_worker_filter_messages_for_app rng limits parameters =
   let expected_app_output = Queue.create () in
   let worker = Worker.make rng limits parameters in
   (* 1. The worker joins topic "1" at startup. *)
-  let worker = Worker.start [topic] worker in
+  let () = Worker.start [topic] worker in
   let heartbeat_span = limits.heartbeat_interval in
   let context =
     {worker; expected_p2p_output; expected_app_output; heartbeat_span}
@@ -362,7 +362,7 @@ let test_worker_join rng limits parameters =
     ~tags:["gossipsub"; "worker"; "join"]
   @@ fun () ->
   let worker = Worker.make rng limits parameters in
-  let worker = Worker.start [] worker in
+  let () = Worker.start [] worker in
   let () = Worker.app_input worker (Join "topic") in
   Check.(
     (Worker.is_subscribed worker "topic" = true)
