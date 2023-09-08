@@ -112,11 +112,11 @@ pub fn produce<Host: Runtime>(
     let mut tick_counter = TickCounter::new(tick_model::top_level_overhead_ticks());
 
     for proposal in queue.proposals {
-        let mut block_in_progress = bip_from_queue_element(
+        let mut block_in_progress = BlockInProgress::from_queue_element(
             proposal,
             current_block_number,
             &current_constants,
-            tick_counter,
+            tick_counter.c,
         );
 
         match compute(
@@ -153,30 +153,6 @@ pub fn produce<Host: Runtime>(
         }
     }
     Ok(())
-}
-
-fn bip_from_queue_element(
-    proposal: crate::blueprint::QueueElement,
-    current_block_number: U256,
-    constants: &BlockConstants,
-    tick_counter: TickCounter,
-) -> BlockInProgress {
-    match proposal {
-        crate::blueprint::QueueElement::Blueprint(proposal) => {
-            // proposal is turn into a ring to allow poping from the front
-            let ring = proposal.transactions.into();
-            BlockInProgress::new_with_ticks(
-                current_block_number,
-                constants.gas_price,
-                ring,
-                tick_counter.c,
-            )
-        }
-        crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
-            bip.estimated_ticks = tick_counter.c;
-            bip
-        }
-    }
 }
 
 #[cfg(test)]
