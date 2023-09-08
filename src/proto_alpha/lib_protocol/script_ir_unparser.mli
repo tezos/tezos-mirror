@@ -74,49 +74,43 @@ val unparse_parameter_ty :
   entrypoints:'a entrypoints ->
   ('loc Script.michelson_node, 'trace) Gas_monad.t
 
-(** [unparse_bls12_381_g1 ~loc ctxt bls] returns the Micheline representation
-    of [bls] and consumes gas from [ctxt]. *)
+(** [unparse_bls12_381_g1 ~loc bls] returns the Micheline representation
+    of [bls] and consumes gas. *)
 val unparse_bls12_381_g1 :
   loc:'loc ->
-  context ->
   Script_bls.G1.t ->
-  ('loc Script.michelson_node * context, error trace) result
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
-(** [unparse_bls12_381_g1 ~loc ctxt bls] returns the Micheline representation
-    of [bls] and consumes gas from [ctxt]. *)
+(** [unparse_bls12_381_g1 ~loc bls] returns the Micheline representation
+    of [bls] and consumes gas. *)
 val unparse_bls12_381_g2 :
   loc:'loc ->
-  context ->
   Script_bls.G2.t ->
-  ('loc Script.michelson_node * context, error trace) result
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
-(** [unparse_bls12_381_g1 ~loc ctxt bls] returns the Micheline representation
-    of [bls] and consumes gas from [ctxt]. *)
+(** [unparse_bls12_381_g1 ~loc bls] returns the Micheline representation
+    of [bls] and consumes gas. *)
 val unparse_bls12_381_fr :
   loc:'loc ->
-  context ->
   Script_bls.Fr.t ->
-  ('loc Script.michelson_node * context, error trace) result
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
-(** [unparse_operation ~loc ctxt op] returns the Micheline representation of
-    [op] and consumes gas from [ctxt]. Useful only for producing execution
+(** [unparse_operation ~loc op] returns the Micheline representation of
+    [op] and consumes gas. Useful only for producing execution
     traces in the interpreter. *)
 val unparse_operation :
   loc:'loc ->
-  context ->
   Script_typed_ir.operation ->
-  ('loc Script.michelson_node * context, error trace) result
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
-(** [unparse_with_data_encoding ~loc ctxt v gas_cost enc] returns the bytes
-    representation of [v] wrapped in [Micheline.Bytes], consuming [gas_cost]
-    from [ctxt]. *)
+(** [unparse_with_data_encoding ~loc v gas_cost enc] returns the bytes
+    representation of [v] wrapped in [Micheline.Bytes], consuming [gas_cost]. *)
 val unparse_with_data_encoding :
   loc:'loc ->
-  context ->
   'a ->
   Gas.cost ->
   'a Data_encoding.t ->
-  ('loc Script.michelson_node * context, error trace) result Lwt.t
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
 (** [unparse_comparable_data ctxt unparsing_mode ty v] returns the
     Micheline representation of [v] of type [ty], consuming gas from
@@ -128,15 +122,14 @@ val unparse_comparable_data :
   'a ->
   (Script.expr * context) tzresult Lwt.t
 
-(** [unparse_contract ~loc ctxt unparsin_mode contract] returns a Micheline
-    representation of a given contract in a given [unparsing_mode]. Consumes
-    gas [ctxt]. *)
+(** [unparse_contract ~loc unparsin_mode contract] returns a Micheline
+    representation of a given contract in a given [unparsing_mode], and consumes
+    gas. *)
 val unparse_contract :
   loc:'loc ->
-  context ->
   unparsing_mode ->
   'b typed_contract ->
-  ('loc Script.michelson_node * context, error trace) result
+  ('loc Script.michelson_node, 'trace) Gas_monad.t
 
 (** Lambdas are normalized at parsing and also at unparsing. These
     normalizations require to parse and unparse data appearing inside
