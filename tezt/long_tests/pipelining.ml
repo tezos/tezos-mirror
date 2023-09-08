@@ -543,15 +543,13 @@ let operation_and_block_validation protocol manager_kind tag =
     measure_and_check_regression ~margin reclassify_title !reclassification_time
   in
 
-  Log.info "Ensure that the mempool contains %d operations" number_of_operations ;
-  let* json =
-    RPC.Client.call ~endpoint:(Node node2) client
-    @@ RPC.get_chain_mempool_pending_operations ()
-  in
-  let json_list = JSON.(json |-> "applied" |> as_list) in
-  Check.(List.length json_list = number_of_operations)
+  Log.info
+    "Ensure that the mempool contains %d validated operations"
+    number_of_operations ;
+  let* mempool = Mempool.get_mempool client in
+  Check.(List.length mempool.validated = number_of_operations)
     Check.int
-    ~error_msg:"Expected %R operations in block. Got %L" ;
+    ~error_msg:"Expected %R validated operations in the mempool. Got %L" ;
 
   (* Setting up a event watchers on validation and application of blocks to
      measure the time needed to validate and apply a block *)
