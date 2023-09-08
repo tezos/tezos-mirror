@@ -168,17 +168,17 @@ let pack_comparable_data ctxt ty data =
   let+ unparsed, ctxt = unparse_comparable_data ctxt Optimized_legacy ty data in
   pack_node unparsed ctxt
 
-let hash_bytes ctxt bytes =
-  let open Result_syntax in
-  let+ ctxt =
-    Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
+let hash_bytes bytes =
+  let open Gas_monad.Syntax in
+  let+ () =
+    Gas_monad.consume_gas (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
   in
-  (Script_expr_hash.(hash_bytes [bytes]), ctxt)
+  Script_expr_hash.(hash_bytes [bytes])
 
 let hash_comparable_data ctxt ty data =
   let open Lwt_result_syntax in
   let* bytes, ctxt = pack_comparable_data ctxt ty data in
-  Lwt.return @@ hash_bytes ctxt bytes
+  Lwt.return @@ Gas_monad.run_pure ctxt @@ hash_bytes bytes
 
 (* ---- Tickets ------------------------------------------------------------ *)
 
@@ -5384,7 +5384,7 @@ let pack_data_with_mode ctxt ty data ~mode =
 let hash_data ctxt ty data =
   let open Lwt_result_syntax in
   let* bytes, ctxt = pack_data_with_mode ctxt ty data ~mode:Optimized_legacy in
-  Lwt.return @@ hash_bytes ctxt bytes
+  Lwt.return @@ Gas_monad.run_pure ctxt @@ hash_bytes bytes
 
 let pack_data ctxt ty data =
   pack_data_with_mode ctxt ty data ~mode:Optimized_legacy
