@@ -151,13 +151,14 @@ impl Default for L2Block {
 
 impl Encodable for L2Block {
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(5);
+        s.begin_list(6);
         s.append(&self.number);
         s.append(&self.hash);
         s.append(&self.parent_hash);
         let transactions_bytes: Vec<Vec<u8>> =
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
+        s.append(&self.gas_used);
         s.append(&self.timestamp.i64().to_le_bytes().to_vec());
     }
 }
@@ -165,7 +166,7 @@ impl Encodable for L2Block {
 impl Decodable for L2Block {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         if decoder.is_list() {
-            if Ok(5) == decoder.item_count() {
+            if Ok(6) == decoder.item_count() {
                 let mut it = decoder.iter();
                 let number: U256 = decode_field_u256_le(&next(&mut it)?, "number")?;
                 let hash: H256 = decode_field_h256(&next(&mut it)?, "hash")?;
@@ -173,6 +174,7 @@ impl Decodable for L2Block {
                     decode_field_h256(&next(&mut it)?, "parent_hash")?;
                 let transactions: Vec<TransactionHash> =
                     decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
+                let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
                 let timestamp_bytes =
                     decode_field::<Vec<u8>>(&next(&mut it)?, "timestamp")?;
                 let timestamp: Timestamp =
@@ -186,6 +188,7 @@ impl Decodable for L2Block {
                     number,
                     hash,
                     parent_hash,
+                    gas_used,
                     timestamp,
                     transactions,
                     ..Default::default()

@@ -8,12 +8,11 @@
 var Wallet = require('ethereumjs-wallet');
 
 
-const create_wallet = function () {
-    if (process.argv.length <= 2) {
+const create_wallet = function (privateKey) {
+    if (arguments.length == 0) {
         return Wallet.default.generate();
     } else {
 
-        let privateKey = process.argv[2]
         // remove 0x if present
         if (privateKey.indexOf('0x') === 0) privateKey = privateKey.substr(2)
         var array = new Uint8Array(privateKey.match(/../g).map(h => parseInt(h, 16)))
@@ -38,7 +37,7 @@ const create_player = function (wallet) {
         addr: wallet.getAddressString(),
         privateKey: wallet.getPrivateKeyString(),
         publicKey: wallet.getPublicKeyString(),
-        nonce: 1
+        nonce: 0
     }
 
 }

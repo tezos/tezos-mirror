@@ -49,6 +49,12 @@ fn compute<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
 ) -> Result<ComputationResult, anyhow::Error> {
+    log!(
+        host,
+        Debug,
+        "Queue length {}.",
+        block_in_progress.queue_length()
+    );
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         // is reboot necessary ?
@@ -122,7 +128,12 @@ pub fn produce<Host: Runtime>(
             &mut accounts_index,
         )? {
             ComputationResult::RebootNeeded => {
-                log!(host, Info, "Ask for reboot");
+                log!(
+                    host,
+                    Info,
+                    "Ask for reboot, ticks consumed: {}",
+                    &block_in_progress.estimated_ticks
+                );
                 storage::store_block_in_progress(host, &block_in_progress)?;
                 storage::add_reboot_flag(host)?;
                 host.mark_for_reboot()?;

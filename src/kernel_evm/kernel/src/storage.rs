@@ -271,9 +271,10 @@ pub fn store_current_block<Host: Runtime>(
             log!(
                 host,
                 Debug,
-                "Storing block {} containing {} transaction(s).",
+                "Storing block {} containing {} transaction(s) for {} gas used.",
                 block.number,
-                block.transactions.len()
+                block.transactions.len(),
+                U256::to_string(&block.gas_used)
             );
             Ok(())
         }

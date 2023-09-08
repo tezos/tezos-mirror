@@ -11,6 +11,12 @@
 // dependency: npm install ethereumjs-wallet --save
 
 const addr = require('./lib/address')
-let wallet = addr.create_wallet();
-addr.print_wallet(wallet)
 
+var wallet;
+if (process.argv.length == 3) {
+    wallet = addr.create_wallet(process.argv[2]);
+} else {
+    wallet = addr.create_wallet();
+}
+
+addr.print_wallet(wallet)

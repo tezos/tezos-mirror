@@ -213,7 +213,8 @@ benchmark_scripts = [
     "benchmarks/bench_keccak.js",
     "benchmarks/bench_verifySignature.js",
     "benchmarks/bench_erc20tok.js",
-    "benchmarks/bench_loop.js",
+    "benchmarks/bench_loop_progressive.js",
+    "benchmarks/bench_loop_expensive.js",
 ]
 
 run_all_benchmarks(benchmark_scripts);
