@@ -31,9 +31,9 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
 name = "auto_impl"
-version = "0.5.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7862e21c893d65a1650125d157eaeec691439379a1cee17ee49031b79236ada4"
+checksum = "fee3da8ef1276b0bee5dd1c7258010d8fffd31801447323115a25560e1327b89"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -363,12 +363,12 @@ dependencies = [
 
 [[package]]
 name = "ethbloom"
-version = "0.12.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11da94e443c60508eb62cf256243a64da87304c2802ac2528847f79d750007ef"
+checksum = "c22d4b5885b6aa2fe5e8b9329fb8d232bf739e434e6b87347c63bdd00c120f60"
 dependencies = [
  "crunchy",
- "fixed-hash 0.7.0",
+ "fixed-hash",
  "impl-codec",
  "impl-rlp",
  "scale-info",
@@ -376,41 +376,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "ethbloom"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c22d4b5885b6aa2fe5e8b9329fb8d232bf739e434e6b87347c63bdd00c120f60"
-dependencies = [
- "crunchy",
- "fixed-hash 0.8.0",
- "impl-rlp",
- "tiny-keccak",
-]
-
-[[package]]
 name = "ethereum"
-version = "0.12.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23750149fe8834c0e24bb9adcbacbe06c45b9861f15df53e09f26cb7c4ab91ef"
+checksum = "6a89fb87a9e103f71b903b80b670200b54cc67a07578f070681f1fffb7396fb7"
 dependencies = [
  "bytes",
  "ethereum-types",
  "hash-db",
  "hash256-std-hasher",
  "rlp",
- "rlp-derive",
  "sha3",
  "triehash",
 ]
 
 [[package]]
 name = "ethereum-types"
-version = "0.13.1"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2827b94c556145446fcce834ca86b7abf0c39a805883fe20e72c5bfdb5a0dc6"
+checksum = "02d215cbf040552efcbe99a38372fe80ab9d00268e20012b79fcd0f073edd8ee"
 dependencies = [
- "ethbloom 0.12.1",
- "fixed-hash 0.7.0",
+ "ethbloom",
+ "fixed-hash",
  "impl-codec",
  "impl-rlp",
  "primitive-types",
@@ -420,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "evm"
-version = "0.35.0"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be8ff320c1e25e7f6d676858f16ffd9b0493d2cc67c3d900c6f2ed027b747f43"
+checksum = "a49a4e11987c51220aa89dbe1a5cc877f5079fa6864c0a5b4533331db44e9365"
 dependencies = [
  "auto_impl",
  "ethereum",
@@ -437,9 +424,9 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.35.0"
+version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d4537041d3a3438d59b2d01bd950ce89fb1ccb3cf21d9331193c10be12e849f"
+checksum = "4f1f13264b044cb66f0602180f0bc781c29accb41ff560669a3ec15858d5b606"
 dependencies = [
  "primitive-types",
 ]
@@ -476,9 +463,9 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.35.0"
+version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6181da8734c86873ac9b3f9886d4e00105361039dcfb9f621be9a0ddb8f43961"
+checksum = "8d43eadc395bd1a52990787ca1495c26b0248165444912be075c28909a853b8c"
 dependencies = [
  "evm-core",
  "evm-runtime",
@@ -487,9 +474,9 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.35.0"
+version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6157af91ca70fcf3581afaea1fa25974a71b9ef63d454c08dfba93ab0c7715d"
+checksum = "2aa5b32f59ec582a5651978004e5c784920291263b7dcb6de418047438e37f4f"
 dependencies = [
  "auto_impl",
  "evm-core",
@@ -553,21 +540,12 @@ checksum = "e825f6987101665dea6ec934c09ec6d721de7bc1bf92248e1d5810c8cd636b77"
 
 [[package]]
 name = "fixed-hash"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfcf0ed7fe52a17a03854ec54a9f76d6d84508d1c0e66bc1793301c73fc8493c"
-dependencies = [
- "byteorder",
- "rustc-hex",
- "static_assertions",
-]
-
-[[package]]
-name = "fixed-hash"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835c052cb0c08c1acf6ffd71c022172e18723949c8282f2b9f27efbc51e64534"
 dependencies = [
+ "byteorder",
+ "rustc-hex",
  "static_assertions",
 ]
 
@@ -1050,11 +1028,11 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "primitive-types"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e28720988bff275df1f51b171e1b2a18c30d194c4d2b61defdacecd625a5d94a"
+checksum = "9f3486ccba82358b11a77516035647c34ba167dfa53312630de83b12bd4f3d66"
 dependencies = [
- "fixed-hash 0.7.0",
+ "fixed-hash",
  "impl-codec",
  "impl-rlp",
  "scale-info",
@@ -1269,6 +1247,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
  "bytes",
+ "rlp-derive",
  "rustc-hex",
 ]
 
@@ -1665,7 +1644,7 @@ dependencies = [
 name = "tezos_ethereum"
 version = "0.1.0"
 dependencies = [
- "ethbloom 0.13.0",
+ "ethbloom",
  "ethereum",
  "hex",
  "libsecp256k1",

@@ -1015,13 +1015,13 @@ mod test {
         let target = H160::from_low_u64_be(4u64);
         let mut evm_account_storage = init_evm_account_storage().unwrap();
         let caller = H160::from_low_u64_be(118u64);
-        let data = [0u8; 32]; // Need some data to make it a contract call
+        let data = [1u8; 32]; // Need some data to make it a contract call
 
         set_balance(
             &mut mock_runtime,
             &mut evm_account_storage,
             &caller,
-            21006.into(),
+            22006.into(),
         );
 
         // Act
@@ -1034,18 +1034,18 @@ mod test {
             Some(target),
             caller,
             data.to_vec(),
-            Some(21001),
+            Some(22001),
             None,
             true,
         );
 
         // Assert
         let expected_result = Ok(Some(ExecutionOutcome {
-            gas_used: 21000,
+            gas_used: 21018,
             is_success: true,
             new_address: None,
             logs: vec![],
-            result: Some(vec![0u8; 32]),
+            result: Some(vec![1u8; 32]),
             withdrawals: vec![],
         }));
 

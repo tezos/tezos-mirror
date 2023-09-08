@@ -14,10 +14,10 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # types
-primitive-types = { version = "0.11.1", default-features = false }
+primitive-types = { version = "0.12.1", default-features = false }
 num-bigint = "0.3"
 num-traits = "0.2.8"
-ethereum = { version = "0.12.0", default-features = false }
+ethereum = { version = "0.14.0", default-features = false }
 ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
 
 # serialization
@@ -28,7 +28,7 @@ const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 
 # ethereum VM
-evm = { version = "0.35.0", default-features = false }
+evm = { version = "0.39.1", default-features = false }
 
 # crypto stuff
 sha2 = { version = "0.10.6", default-features = false }
