@@ -126,19 +126,33 @@ module Durable_storage_path = struct
   end
 
   module Block = struct
+    type number = Current | Nth of Z.t
+
     let blocks = EVM.make "/blocks"
+
+    let hash = "/hash"
 
     let number = "/number"
 
-    type number = Current | Nth of Z.t
-
-    let number_to_string = function
-      | Current -> "current"
-      | Nth i -> Z.to_string i
-
-    let by_number block_number = blocks ^ "/" ^ number_to_string block_number
+    let by_hash (Block_hash hash) = blocks ^ "/" ^ hash
 
     let current_number = blocks ^ "/current" ^ number
+
+    let _current_hash = blocks ^ "/current" ^ hash
+  end
+
+  module Indexes = struct
+    let indexes = EVM.make "/indexes"
+
+    let blocks = "/blocks"
+
+    let blocks = indexes ^ blocks
+
+    let number_to_string = function
+      | Block.Current -> "current"
+      | Nth i -> Z.to_string i
+
+    let blocks_by_number number = blocks ^ "/" ^ number_to_string number
   end
 
   module Transaction_receipt = struct
@@ -291,6 +305,8 @@ module RPC = struct
 
   exception Invalid_block_structure of string
 
+  exception Invalid_block_index of Z.t
+
   let block_number base n =
     let open Lwt_result_syntax in
     match n with
@@ -344,31 +360,40 @@ module RPC = struct
         TxFull objects
     | TxFull _ -> return transactions
 
-  let block ~full_transaction_object ~number base =
+  let blocks_by_number ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
     let* (Ethereum_types.Block_height level) = block_number base number in
-    let* block_opt =
+    let* block_hash_opt =
       inspect_durable_and_decode_opt
         base
-        (Durable_storage_path.Block.by_number (Nth level))
-        Ethereum_types.block_from_rlp
+        (Durable_storage_path.Indexes.blocks_by_number (Nth level))
+        decode_block_hash
     in
-    match block_opt with
-    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-    | Some block ->
-        if full_transaction_object then
-          let* transactions = full_transactions block.transactions base in
-          return {block with transactions}
-        else return block
+    match block_hash_opt with
+    | None -> raise @@ Invalid_block_index level
+    | Some block_hash -> (
+        let* block_opt =
+          inspect_durable_and_decode_opt
+            base
+            (Durable_storage_path.Block.by_hash block_hash)
+            Ethereum_types.block_from_rlp
+        in
+        match block_opt with
+        | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+        | Some block ->
+            if full_transaction_object then
+              let* transactions = full_transactions block.transactions base in
+              return {block with transactions}
+            else return block)
 
   let current_block base ~full_transaction_object =
-    block
+    blocks_by_number
       ~full_transaction_object
       ~number:Durable_storage_path.Block.Current
       base
 
   let nth_block base ~full_transaction_object n =
-    block
+    blocks_by_number
       ~full_transaction_object
       ~number:Durable_storage_path.Block.(Nth n)
       base
