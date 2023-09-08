@@ -33,28 +33,6 @@ stages:
     with_agents: 'localhost'
     run_agents: concurrent
     jobs:
-      - name: Upload protocol parameters file
-        copy:
-          local_path: 'src/proto_alpha/parameters/{{ vars.network }}-parameters.json'
-          remote_path: '.'
-
-      - name: Generate protocol parameters file
-        tezos.generate_protocol_parameters_file:
-          # generates the file 'parameters.json' in the agent's home dir
-          # use output_file_name: <other_file_name> to change that
-          base_file: 'self://{{ vars.network }}-parameters.json'
-          minimal_block_delay: '{{ vars.minimal_block_delay }}'
-          dal:
-            feature_enable: 'true'
-            number_of_shards: '{{ vars.number_of_shards }}'
-            page_size: '{{ vars.page_size }}'
-            slot_size: '{{ vars.slot_size }}'
-            redundancy_factor: '{{ vars.redundancy_factor }}'
-            attestation_lag: '{{ vars.attestation_lag }}'
-            attestation_threshold: '{{ vars.attestation_threshold }}'
-            number_of_slots: '{{ vars.number_of_slots }}'
-            blocks_per_epoch: '{{ vars.blocks_per_epoch }}'
-
       - name: Upload octez-client
         copy:
           local_path: octez-client
@@ -76,6 +54,28 @@ stages:
           contents: '{{ vars.keys_base_dir }}'
           archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
           action: create
+
+      - name: Upload protocol parameters file
+        copy:
+          local_path: 'src/proto_alpha/parameters/{{ vars.network }}-parameters.json'
+          remote_path: '.'
+
+      - name: Generate protocol parameters file
+        tezos.generate_protocol_parameters_file:
+          # generates the file 'parameters.json' in the agent's home dir
+          # use output_file_name: <other_file_name> to change that
+          base_file: 'self://{{ vars.network }}-parameters.json'
+          minimal_block_delay: '{{ vars.minimal_block_delay }}'
+          dal:
+            feature_enable: 'true'
+            number_of_shards: '{{ vars.number_of_shards }}'
+            page_size: '{{ vars.page_size }}'
+            slot_size: '{{ vars.slot_size }}'
+            redundancy_factor: '{{ vars.redundancy_factor }}'
+            attestation_lag: '{{ vars.attestation_lag }}'
+            attestation_threshold: '{{ vars.attestation_threshold }}'
+            number_of_slots: '{{ vars.number_of_slots }}'
+            blocks_per_epoch: '{{ vars.blocks_per_epoch }}'
 
       - name: Start HTTP server
         builtins.start_http_server:
