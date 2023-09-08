@@ -50,7 +50,7 @@ let () =
                 RANDOM_SEED' in your terminal?"
                v))
   in
-  Printf.printf "Random seed: %d\n" seed ;
+  Format.printf "lib_bls12_381_polynomial random seed: %d%!" seed ;
   Random.init seed ;
   Alcotest.run
     ~__FILE__
