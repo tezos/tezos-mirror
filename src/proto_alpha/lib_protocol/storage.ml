@@ -209,9 +209,8 @@ module Unstake_request = struct
          (req "requests" requests_encoding))
 
   let add cycle amount requests =
-    let rec loop rev_prefix =
-      let open Result_syntax in
-      function
+    let open Result_syntax in
+    let rec loop rev_prefix = function
       | [] ->
           (* cycle does not exist -> add at the head *)
           Ok ((cycle, amount) :: requests)
@@ -379,36 +378,41 @@ module Contract = struct
       Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract >>=? fun (ctxt, value) ->
-      Lwt.return
-        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
+      let open Lwt_result_syntax in
+      let* ctxt, value = I.get ctxt contract in
+      let*? ctxt = consume_deserialize_gas ctxt value in
+      return (ctxt, value)
 
     let find ctxt contract =
-      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
-      Lwt.return
-      @@
+      let open Lwt_result_syntax in
+      let* ctxt, value_opt = I.find ctxt contract in
       match value_opt with
-      | None -> ok (ctxt, None)
+      | None -> return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+          let*? ctxt = consume_deserialize_gas ctxt value in
+          return (ctxt, value_opt)
 
     let update ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.update ctxt contract value
 
     let add_or_remove ctxt contract value_opt =
+      let open Lwt_result_syntax in
       match value_opt with
       | None -> I.add_or_remove ctxt contract None
       | Some value ->
-          consume_serialize_gas ctxt value >>?= fun ctxt ->
+          let*? ctxt = consume_serialize_gas ctxt value in
           I.add_or_remove ctxt contract value_opt
 
     let init ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.init ctxt contract value
 
     let add ctxt contract value =
-      consume_serialize_gas ctxt value >>?= fun ctxt ->
+      let open Lwt_result_syntax in
+      let*? ctxt = consume_serialize_gas ctxt value in
       I.add ctxt contract value
 
     let keys_unaccounted = I.keys_unaccounted
@@ -575,9 +579,10 @@ module Big_map = struct
         (Lazy_storage_kind.Big_map.Id)
 
     let incr ctxt =
-      Storage.get ctxt >>=? fun i ->
-      Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) >|=? fun ctxt ->
-      (ctxt, i)
+      let open Lwt_result_syntax in
+      let* i = Storage.get ctxt in
+      let* ctxt = Storage.update ctxt (Lazy_storage_kind.Big_map.Id.next i) in
+      return (ctxt, i)
 
     let init ctxt = Storage.init ctxt Lazy_storage_kind.Big_map.Id.init
   end
@@ -676,18 +681,19 @@ module Big_map = struct
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
 
     let get ctxt contract =
-      I.get ctxt contract >>=? fun (ctxt, value) ->
-      Lwt.return
-        (consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value))
+      let open Lwt_result_syntax in
+      let* ctxt, value = I.get ctxt contract in
+      let*? ctxt = consume_deserialize_gas ctxt value in
+      return (ctxt, value)
 
     let find ctxt contract =
-      I.find ctxt contract >>=? fun (ctxt, value_opt) ->
-      Lwt.return
-      @@
+      let open Lwt_result_syntax in
+      let* ctxt, value_opt = I.find ctxt contract in
       match value_opt with
-      | None -> ok (ctxt, None)
+      | None -> return (ctxt, None)
       | Some value ->
-          consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+          let*? ctxt = consume_deserialize_gas ctxt value in
+          return (ctxt, value_opt)
 
     let keys_unaccounted = I.keys_unaccounted
   end
@@ -711,9 +717,12 @@ module Sapling = struct
         (Lazy_storage_kind.Sapling_state.Id)
 
     let incr ctxt =
-      Storage.get ctxt >>=? fun i ->
-      Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
-      >|=? fun ctxt -> (ctxt, i)
+      let open Lwt_result_syntax in
+      let* i = Storage.get ctxt in
+      let* ctxt =
+        Storage.update ctxt (Lazy_storage_kind.Sapling_state.Id.next i)
+      in
+      return (ctxt, i)
 
     let init ctxt = Storage.init ctxt Lazy_storage_kind.Sapling_state.Id.init
   end
@@ -801,8 +810,11 @@ module Sapling = struct
       (Sapling.Hash)
 
   let commitments_init ctx id =
-    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
+    in
+    ctx
 
   module Ciphertexts :
     Non_iterable_indexed_carbonated_data_storage
@@ -848,8 +860,11 @@ module Sapling = struct
       (Sapling.Ciphertext)
 
   let ciphertexts_init ctx id =
-    Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["commitments"]
+    in
+    ctx
 
   module Nullifiers_size =
     Make_single_data_storage (Registered) (Indexed_context.Raw_context)
@@ -945,11 +960,15 @@ module Sapling = struct
          end))
 
   let nullifiers_init ctx id =
-    Nullifiers_size.add (ctx, id) Int64.zero >>= fun ctx ->
-    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
-    >>= fun (ctx, id) ->
-    Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
-    >|= fun (ctx, _id) -> ctx
+    let open Lwt_syntax in
+    let* ctx = Nullifiers_size.add (ctx, id) Int64.zero in
+    let* ctx, id =
+      Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_ordered"]
+    in
+    let+ ctx, (_id : id) =
+      Indexed_context.Raw_context.remove (ctx, id) ["nullifiers_hashed"]
+    in
+    ctx
 
   module Roots :
     Non_iterable_indexed_data_storage
@@ -1556,7 +1575,8 @@ module Seed = struct
     let get = Cycle.Seed.get
 
     let update ctxt cycle seed status =
-      Cycle.Seed.update ctxt cycle seed >>=? fun ctxt ->
+      let open Lwt_result_syntax in
+      let* ctxt = Cycle.Seed.update ctxt cycle seed in
       Seed_status.update ctxt status
 
     let remove_existing = Cycle.Seed.remove_existing
@@ -1645,10 +1665,12 @@ module Pending_migration = struct
       end)
 
   let remove ctxt =
+    let open Lwt_result_syntax in
     let balance_updates ctxt =
-      Balance_updates.find ctxt >>=? function
+      let* balance_updates_opt = Balance_updates.find ctxt in
+      match balance_updates_opt with
       | Some balance_updates ->
-          Balance_updates.remove ctxt >>= fun ctxt ->
+          let*! ctxt = Balance_updates.remove ctxt in
           (* When applying balance updates in a migration, we must attach receipts.
              The balance updates returned from here will be applied in the first
              block of the new protocol. *)
@@ -1656,14 +1678,15 @@ module Pending_migration = struct
       | None -> return (ctxt, [])
     in
     let operation_results ctxt =
-      Operation_results.find ctxt >>=? function
+      let* operation_results_opt = Operation_results.find ctxt in
+      match operation_results_opt with
       | Some operation_results ->
-          Operation_results.remove ctxt >>= fun ctxt ->
+          let*! ctxt = Operation_results.remove ctxt in
           return (ctxt, operation_results)
       | None -> return (ctxt, [])
     in
-    balance_updates ctxt >>=? fun (ctxt, balance_updates) ->
-    operation_results ctxt >>=? fun (ctxt, operation_results) ->
+    let* ctxt, balance_updates = balance_updates ctxt in
+    let* ctxt, operation_results = operation_results ctxt in
     return (ctxt, balance_updates, operation_results)
 end
 
