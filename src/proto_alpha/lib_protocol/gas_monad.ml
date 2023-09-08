@@ -86,6 +86,13 @@ let run ctxt m =
           return (res, ctxt)
       | None -> tzfail Gas.Operation_quota_exceeded)
 
+type no_error = |
+
+let run_pure ctxt (m : ('a, no_error) t) : ('a * context) tzresult =
+  let open Result_syntax in
+  let* res, ctxt = run ctxt m in
+  match res with Ok x -> return (x, ctxt) | Error _ -> .
+
 let record_trace_eval :
     type error_trace error_context.
     error_details:(error_context, error_trace) Script_tc_errors.error_details ->
