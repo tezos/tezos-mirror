@@ -29,33 +29,41 @@ open Per_block_votes_repr
 let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 
 let get_toggle_ema ctxt =
-  Storage.Liquidity_baking.Toggle_ema.get ctxt >>=? fun ema ->
+  let open Lwt_result_syntax in
+  let* ema = Storage.Liquidity_baking.Toggle_ema.get ctxt in
   Liquidity_baking_toggle_EMA.of_int32 ema
 
 let on_cpmm_exists ctxt f =
-  get_cpmm_address ctxt >>=? fun cpmm_contract ->
-  Contract_storage.exists ctxt (Contract_repr.Originated cpmm_contract)
-  >>= function
+  let open Lwt_result_syntax in
+  let* cpmm_contract = get_cpmm_address ctxt in
+  let*! exists =
+    Contract_storage.exists ctxt (Contract_repr.Originated cpmm_contract)
+  in
+  match exists with
   | false ->
       (* do nothing if the cpmm is not found *)
       return (ctxt, [])
   | true -> f ctxt cpmm_contract
 
 let update_toggle_ema ctxt ~per_block_vote =
-  get_toggle_ema ctxt >>=? fun old_ema ->
+  let open Lwt_result_syntax in
+  let* old_ema = get_toggle_ema ctxt in
   let new_ema = compute_new_liquidity_baking_ema ~per_block_vote old_ema in
-  Storage.Liquidity_baking.Toggle_ema.update
-    ctxt
-    (Liquidity_baking_toggle_EMA.to_int32 new_ema)
-  >|=? fun ctxt -> (ctxt, new_ema)
+  let+ ctxt =
+    Storage.Liquidity_baking.Toggle_ema.update
+      ctxt
+      (Liquidity_baking_toggle_EMA.to_int32 new_ema)
+  in
+  (ctxt, new_ema)
 
 let check_ema_below_threshold ctxt ema =
   Liquidity_baking_toggle_EMA.(
     ema < Constants_storage.liquidity_baking_toggle_ema_threshold ctxt)
 
 let on_subsidy_allowed ctxt ~per_block_vote f =
-  update_toggle_ema ctxt ~per_block_vote >>=? fun (ctxt, toggle_ema) ->
+  let open Lwt_result_syntax in
+  let* ctxt, toggle_ema = update_toggle_ema ctxt ~per_block_vote in
   if check_ema_below_threshold ctxt toggle_ema then
-    on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
+    let+ ctxt, operation_results = on_cpmm_exists ctxt f in
     (ctxt, operation_results, toggle_ema)
   else return (ctxt, [], toggle_ema)
