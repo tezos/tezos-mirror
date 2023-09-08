@@ -159,10 +159,10 @@ let unparse_ty ~loc ty =
   let+ () = Gas_monad.consume_gas (Unparse_costs.unparse_type ty) in
   unparse_ty_uncarbonated ~loc ty
 
-let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
-  let open Result_syntax in
-  let+ ctxt = Gas.consume ctxt (Unparse_costs.unparse_type ty) in
-  (unparse_ty_and_entrypoints_uncarbonated ~loc ty entrypoints.root, ctxt)
+let unparse_parameter_ty ~loc ty ~entrypoints =
+  let open Gas_monad.Syntax in
+  let+ () = Gas_monad.consume_gas (Unparse_costs.unparse_type ty) in
+  unparse_ty_and_entrypoints_uncarbonated ~loc ty entrypoints.root
 
 let serialize_ty_for_error ty =
   (*
