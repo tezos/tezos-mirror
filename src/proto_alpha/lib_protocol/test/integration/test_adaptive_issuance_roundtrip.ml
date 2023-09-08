@@ -175,7 +175,6 @@ let default_params =
 module State = struct
   (** Type of the state *)
   type t = {
-    account_names : string list;
     account_map : account_map;
     total_supply : Tez.t;
     constants : Protocol.Alpha_context.Constants.Parametric.t;
@@ -718,7 +717,6 @@ let begin_test ~activate_ai
       let state =
         State.
           {
-            account_names = delegates_name_list;
             account_map;
             total_supply;
             constants;
@@ -770,7 +768,6 @@ let add_account name : (t, t) scenarios =
         init_account ~pkh ~contract ~parameters:default_params ()
       in
       let state = State.update_account name account_state state in
-      let state = {state with account_names = name :: state.account_names} in
       return state)
 
 (** Reveal operation *)
