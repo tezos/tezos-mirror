@@ -854,7 +854,9 @@ module Scripts = struct
         match (sty, x, st) with
         | Bot_t, EmptyCell, EmptyCell -> return ([], ctxt)
         | Item_t (ty, sty), x, (y, st) ->
-            let*? ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc ctxt ty in
+            let*? ty_node, ctxt =
+              Gas_monad.run_pure ctxt @@ Script_ir_unparser.unparse_ty ~loc ty
+            in
             let* data_node, ctxt =
               Script_ir_translator.unparse_data ctxt unparsing_mode ty x
             in

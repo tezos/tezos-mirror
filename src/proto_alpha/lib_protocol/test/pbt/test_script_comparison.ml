@@ -199,7 +199,9 @@ let ctxt =
 
 let unparse_comparable_ty ty =
   Micheline.strip_locations
-    (fst (assert_ok Script_ir_unparser.(unparse_ty ~loc:() ctxt ty)))
+    (fst
+       (assert_ok
+          (Gas_monad.run_pure ctxt Script_ir_unparser.(unparse_ty ~loc:() ty))))
 
 let unparse_comparable_data ty x =
   fst (assert_return Script_ir_translator.(unparse_data ctxt Readable ty x))

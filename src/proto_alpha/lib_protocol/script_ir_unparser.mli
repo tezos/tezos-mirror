@@ -51,13 +51,10 @@ val serialize_ty_for_error : ('a, 'b) ty -> Script.expr
     in [ctxt]. Otherwise returns an empty list. *)
 val serialize_stack_for_error : context -> ('a, 'b) stack_ty -> Script.expr list
 
-(** [unparse_ty ~loc ctxt ty] returns the Micheline representation of a given
-    type and an update context, where gas has been properly consumed. *)
+(** [unparse_ty ~loc ty] returns the Micheline representation of a given
+    type. *)
 val unparse_ty :
-  loc:'loc ->
-  context ->
-  ('b, 'c) ty ->
-  ('loc Script.michelson_node * context, error trace) result
+  loc:'loc -> ('b, 'c) ty -> ('loc Script.michelson_node, 'trace) Gas_monad.t
 
 (** [unparse_comparable_ty_uncarbonated ~loc ty] returns the Michelson
     representation of comparable type [ty] without consuming gas. *)
