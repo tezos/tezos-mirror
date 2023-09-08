@@ -917,8 +917,7 @@ removed. The Michelson type-checker will reject any contract using them.
     :: key_hash : option key_hash : bool : bool : mutez : 'g : 'S
     ⇒ operation : address : 'S
 
-See the documentation of the new ``CREATE_CONTRACT`` instruction. The
-first, third, and fourth parameters are ignored.
+There is a new version of this instruction, see its `documentation <https://tezos.gitlab.io/michelson-reference/#instr-CREATE_CONTRACT>`__.
 
 -  ``CREATE_ACCOUNT``: Forge an account creation operation.
 
