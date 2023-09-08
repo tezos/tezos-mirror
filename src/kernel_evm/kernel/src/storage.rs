@@ -46,8 +46,9 @@ const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progres
 const REBOOTED: RefPath = RefPath::assert_from(b"/reboot");
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
-const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
+pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
+const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
 const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/transactions_receipts");
@@ -169,11 +170,11 @@ fn write_u256(
     host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
-pub fn block_path(number: U256) -> Result<OwnedPath, Error> {
-    let number: &str = &number.to_string();
-    let raw_number_path: Vec<u8> = format!("/{}", &number).into();
-    let number_path = OwnedPath::try_from(raw_number_path)?;
-    concat(&EVM_BLOCKS, &number_path).map_err(Error::from)
+pub fn block_path(hash: H256) -> Result<OwnedPath, Error> {
+    let hash = hex::encode(hash);
+    let raw_hash_path: Vec<u8> = format!("/{}", &hash).into();
+    let hash_path = OwnedPath::try_from(raw_hash_path)?;
+    concat(&EVM_BLOCKS, &hash_path).map_err(Error::from)
 }
 
 pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
@@ -197,6 +198,13 @@ pub fn read_current_block_number<Host: Runtime>(host: &mut Host) -> Result<U256,
     Ok(U256::from_little_endian(&buffer))
 }
 
+pub fn read_current_block_hash<Host: Runtime>(host: &mut Host) -> Result<H256, Error> {
+    let path = concat(&EVM_CURRENT_BLOCK, &BLOCK_HASH)?;
+    let mut buffer = [0_u8; 32];
+    store_read_slice(host, &path, &mut buffer, 32)?;
+    Ok(H256::from_slice(&buffer))
+}
+
 fn store_rlp<T: Encodable, Host: Runtime>(
     src: &T,
     host: &mut Host,
@@ -215,21 +223,24 @@ fn read_rlp<T: Decodable, Host: Runtime>(
 }
 
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
-    let number = read_current_block_number(host)?;
-    let block_path = block_path(number)?;
+    let hash = read_current_block_hash(host)?;
+    let block_path = block_path(hash)?;
     let block = read_rlp(host, &block_path)?;
     Ok(block)
 }
 
-fn store_current_block_number<Host: Runtime>(
+fn store_current_block_number_and_hash<Host: Runtime>(
     host: &mut Host,
     block_path: &OwnedPath,
     block_number: U256,
+    block_hash: H256,
 ) -> Result<(), Error> {
-    let path = concat(block_path, &BLOCK_NUMBER)?;
+    let number_path = concat(block_path, &BLOCK_NUMBER)?;
+    let hash_path = concat(block_path, &BLOCK_HASH)?;
     let mut le_block_number: [u8; 32] = [0; 32];
     block_number.to_little_endian(&mut le_block_number);
-    host.store_write(&path, &le_block_number, 0)
+    host.store_write(&number_path, &le_block_number, 0)?;
+    host.store_write(&hash_path, block_hash.as_bytes(), 0)
         .map_err(Error::from)
 }
 
@@ -243,11 +254,11 @@ fn store_block<Host: Runtime>(
     store_rlp(block, host, block_path)
 }
 
-pub fn store_block_by_number<Host: Runtime>(
+pub fn store_block_by_hash<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
 ) -> Result<(), Error> {
-    let block_path = block_path(block.number)?;
+    let block_path = block_path(block.hash)?;
     store_block(host, block, &block_path)
 }
 
@@ -256,10 +267,15 @@ fn store_current_block_nodebug<Host: Runtime>(
     block: &L2Block,
 ) -> Result<(), Error> {
     let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
-    // We only need to store current block's number so we avoid the storage of duplicate informations.
-    store_current_block_number(host, &current_block_path, block.number)?;
-    // When storing the current block's infos we need to store it under the [evm/blocks/<block_number>]
-    store_block_by_number(host, block)
+    // We only need to store current block's number and hash so we avoid the storage of duplicate informations.
+    store_current_block_number_and_hash(
+        host,
+        &current_block_path,
+        block.number,
+        block.hash,
+    )?;
+    // When storing the current block's infos we need to store it under the [evm/blocks/<block_hash>]
+    store_block_by_hash(host, block)
 }
 
 pub fn store_current_block<Host: Runtime>(

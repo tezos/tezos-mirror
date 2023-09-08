@@ -6,14 +6,14 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    read_current_block_number, read_storage_version, store_block_by_number,
+    read_current_block_number, read_storage_version, store_block_by_hash,
     store_storage_version, STORAGE_VERSION,
 };
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod old_storage {
     use crate::error::Error;
-    use crate::storage::{block_path, store_read_slice};
+    use crate::storage::{store_read_slice, EVM_BLOCKS};
     use crate::OwnedPath;
     use crate::Timestamp;
     use primitive_types::U256;
@@ -24,6 +24,13 @@ mod old_storage {
 
     const BLOCK_TRANSACTIONS: RefPath = RefPath::assert_from(b"/transactions");
     const BLOCK_TIMESTAMP: RefPath = RefPath::assert_from(b"/timestamp");
+
+    fn block_path(number: U256) -> Result<OwnedPath, Error> {
+        let number: &str = &number.to_string();
+        let raw_hash_path: Vec<u8> = format!("/{}", &number).into();
+        let hash_path = OwnedPath::try_from(raw_hash_path)?;
+        concat(&EVM_BLOCKS, &hash_path).map_err(Error::from)
+    }
 
     fn read_timestamp_path<Host: Runtime>(
         host: &mut Host,
@@ -91,7 +98,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
         let head_number = read_current_block_number(host)?;
         for number in 0..(head_number.as_usize() + 1) {
             let block = old_storage::read_and_remove_l2_block(host, number.into())?;
-            store_block_by_number(host, &block)?
+            store_block_by_hash(host, &block)?
         }
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?
