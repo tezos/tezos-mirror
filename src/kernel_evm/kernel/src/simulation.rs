@@ -156,6 +156,7 @@ enum TxValidationOutcome {
     NonceTooLow,
     NonceTooHigh,
     NotCorrectSignature,
+    InvalidChainId,
 }
 
 impl TxValidation {
@@ -176,6 +177,8 @@ impl TxValidation {
             Some(account) => account.nonce(host)?,
             None => U256::zero(),
         };
+        // Get the chain_id
+        let chain_id = storage::read_chain_id(host)?;
         // Check if nonce is too low
         if tx.nonce < caller_nonce {
             return Ok(TxValidationOutcome::NonceTooLow);
@@ -183,6 +186,10 @@ impl TxValidation {
         // Check if the nonce is too high
         if tx.nonce > caller_nonce {
             return Ok(TxValidationOutcome::NonceTooHigh);
+        }
+        // Check if the chain id is correct
+        if tx.chain_id != chain_id {
+            return Ok(TxValidationOutcome::InvalidChainId);
         }
         Ok(TxValidationOutcome::Valid)
     }
@@ -338,6 +345,10 @@ fn store_tx_validation_outcome<Host: Runtime>(
         TxValidationOutcome::NotCorrectSignature => {
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Incorrect signature.".to_vec()))
+        }
+        TxValidationOutcome::InvalidChainId => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Invalid chain id.".to_vec()))
         }
     }
 }

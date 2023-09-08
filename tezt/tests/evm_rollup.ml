@@ -2478,6 +2478,24 @@ let test_block_storage_before_and_after_migration =
   in
   gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
 
+let test_rpc_sendRawTransaction_invalid_chain_id =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "chain_id"]
+    ~title:"Returns an error if the chainId is not correct."
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  (* Nonce: 0, chainId: 4242*)
+  let raw_tx =
+    "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
+  in
+  let* result = send_raw_transaction evm_proxy_server raw_tx in
+  let error_message = Result.get_error result in
+  Check.(
+    ((error_message = "Invalid chain id.") string)
+      ~error_msg:"The transaction should fail") ;
+  unit
+
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
@@ -2523,7 +2541,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
-  test_rpc_sendRawTransaction_nonce_too_high protocols
+  test_rpc_sendRawTransaction_nonce_too_high protocols ;
+  test_rpc_sendRawTransaction_invalid_chain_id protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
