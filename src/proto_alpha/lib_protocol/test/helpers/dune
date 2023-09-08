@@ -3,7 +3,7 @@
 
 (library
  (name tezos_alpha_test_helpers)
- (public_name tezos-alpha-test-helpers)
+ (public_name octez-protocol-alpha-libs.tezos-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
@@ -12,14 +12,14 @@
   octez-libs.tezos-micheline
   octez-libs.tezos-stdlib-unix
   tezos-protocol-alpha
-  tezos-client-alpha
+  octez-protocol-alpha-libs.tezos-client
   tezos-protocol-alpha.parameters
   octez-proto-libs.tezos-protocol-environment
-  tezos-protocol-plugin-alpha
+  octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-shell-services
   octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal
-  tezos-smart-rollup-alpha)
+  octez-protocol-alpha-libs.tezos-smart-rollup)
  (flags
   (:standard)
   -open Tezos_test_helpers

@@ -13,10 +13,8 @@ depends: [
   "octez-libs"
   "tezos-protocol-017-PtNairob"
   "octez-shell-libs"
-  "tezos-client-017-PtNairob"
+  "octez-protocol-017-PtNairob-libs"
   "octez-l2-libs"
-  "tezos-smart-rollup-017-PtNairob"
-  "tezos-smart-rollup-layer2-017-PtNairob"
   "tezos-version"
 ]
 build: [

@@ -13,10 +13,8 @@ depends: [
   "octez-libs"
   "tezos-protocol-018-Proxford"
   "octez-shell-libs"
-  "tezos-client-018-Proxford"
+  "octez-protocol-018-Proxford-libs"
   "octez-l2-libs"
-  "tezos-smart-rollup-018-Proxford"
-  "tezos-smart-rollup-layer2-018-Proxford"
   "tezos-version"
 ]
 build: [

@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  tezos-protocol-plugin-017-PtNairob
+  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
   tezos-protocol-017-PtNairob
   tezos-protocol-017-PtNairob.parameters
-  tezos-017-PtNairob-test-helpers)
+  octez-protocol-017-PtNairob-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -54,7 +54,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-plugin-017-PtNairob-tests)
+ (package octez-protocol-017-PtNairob-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

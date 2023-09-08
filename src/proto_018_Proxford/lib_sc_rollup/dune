@@ -3,7 +3,7 @@
 
 (library
  (name tezos_smart_rollup_018_Proxford)
- (public_name tezos-smart-rollup-018-Proxford)
+ (public_name octez-protocol-018-Proxford-libs.tezos-smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

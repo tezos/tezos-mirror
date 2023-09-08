@@ -16,9 +16,7 @@ depends: [
   "tezos-benchmark-018-Proxford"
   "tezos-benchmark-type-inference-018-Proxford"
   "octez-shell-libs"
-  "tezos-018-Proxford-test-helpers"
-  "tezos-client-018-Proxford"
-  "tezos-protocol-plugin-018-Proxford"
+  "octez-protocol-018-Proxford-libs"
   "octez-proto-libs"
 ]
 build: [

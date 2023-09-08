@@ -16,8 +16,7 @@ depends: [
   "caqti-lwt"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt" { >= "5.6.0" }
-  "tezos-baking-alpha"
-  "tezos-client-alpha"
+  "octez-protocol-alpha-libs"
   "octez-shell-libs"
   "tezos-protocol-alpha"
   "tezt" { >= "3.1.1" }

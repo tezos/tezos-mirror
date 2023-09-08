@@ -1,0 +1,6 @@
+{0 Octez-protocol-008-PtEdoTez-libs: octez protocol 008-PtEdoTez libraries}
+
+This is a package containing some libraries related to the Tezos 008-PtEdoTez protocol.
+
+It contains the following libraries:
+

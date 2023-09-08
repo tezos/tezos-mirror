@@ -13,8 +13,8 @@
   caqti-lwt
   data-encoding
   lwt
-  tezos-baking-alpha
-  tezos-client-alpha.commands
+  octez-protocol-alpha-libs.tezos-baking
+  octez-protocol-alpha-libs.tezos-client.commands
   octez-shell-libs.tezos-client-base-unix
   tezos-protocol-alpha
   tezt

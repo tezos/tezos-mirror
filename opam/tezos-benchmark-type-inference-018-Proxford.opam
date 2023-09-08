@@ -14,7 +14,7 @@ depends: [
   "tezos-micheline-rewriting"
   "tezos-protocol-018-Proxford"
   "hashcons"
-  "tezos-client-018-Proxford" {with-test}
+  "octez-protocol-018-Proxford-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

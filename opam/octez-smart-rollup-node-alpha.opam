@@ -12,18 +12,13 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-shell-libs"
-  "tezos-client-alpha"
+  "octez-protocol-alpha-libs"
   "tezos-protocol-alpha"
-  "tezos-protocol-plugin-alpha"
   "tezos-dal-node-services"
   "tezos-dal-node-lib"
-  "tezos-dac-alpha"
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-l2-libs"
-  "tezos-smart-rollup-alpha"
-  "tezos-smart-rollup-layer2-alpha"
-  "tezos-layer2-utils-alpha"
   "octez-crawler"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }

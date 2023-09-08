@@ -16,7 +16,7 @@
   octez-libs.tezos-crypto
   tezos-protocol-017-PtNairob.parameters
   hashcons
-  tezos-017-PtNairob-test-helpers
+  octez-protocol-017-PtNairob-libs.tezos-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags

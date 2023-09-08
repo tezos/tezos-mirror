@@ -14,7 +14,7 @@ depends: [
   "tezos-micheline-rewriting"
   "tezos-protocol-alpha"
   "hashcons"
-  "tezos-client-alpha" {with-test}
+  "octez-protocol-alpha-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
