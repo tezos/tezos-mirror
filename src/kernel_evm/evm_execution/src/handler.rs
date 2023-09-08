@@ -329,9 +329,24 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         &mut self,
         runtime: &mut evm::Runtime,
     ) -> Result<ExitReason, EthereumError> {
-        match runtime.run(self) {
-            Capture::Exit(reason) => Ok(reason),
-            Capture::Trap(_) => Err(EthereumError::InternalTrapError),
+        loop {
+            // This decomposition allows both benchmarking the ticks per gas
+            // consumption of opcode and implement the tick model at the opcode
+            // level. At the end of each step if the kernel takes more than the
+            // allocated ticks the transaction is marked as failed.
+            let _opcode = runtime.machine().inspect().map(|p| p.0);
+
+            let _gas_before = self.gas_used();
+
+            let step_result = runtime.step(self);
+
+            let _gas_after = self.gas_used();
+
+            match step_result {
+                Ok(()) => (),
+                Err(Capture::Exit(reason)) => return Ok(reason),
+                Err(Capture::Trap(_)) => return Err(EthereumError::InternalTrapError),
+            }
         }
     }
 
