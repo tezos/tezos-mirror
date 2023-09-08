@@ -107,8 +107,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
   type t = {
-    gossip_state : GS.state;
-    status : worker_status;
+    mutable gossip_state : GS.state;
+    mutable status : worker_status;
     events_stream : event Stream.t;
     p2p_output_stream : p2p_output Stream.t;
     app_output_stream : app_output Stream.t;
@@ -523,14 +523,18 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let emit_app_output = rev_push t.app_output_stream in
     let events_stream = t.events_stream in
     let events_logging = t.events_logging in
-    let rec loop gossip_state =
+    let rec loop t =
       let* event = Stream.pop events_stream in
       if !shutdown then return ()
       else
         let* () = events_logging event in
-        loop @@ apply_event ~emit_p2p_output ~emit_app_output gossip_state event
+        let gossip_state =
+          apply_event ~emit_p2p_output ~emit_app_output t.gossip_state event
+        in
+        t.gossip_state <- gossip_state ;
+        loop t
     in
-    let promise = loop t.gossip_state in
+    let promise = loop t in
     let schedule_cancellation () =
       shutdown := true ;
       promise
@@ -546,7 +550,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let heartbeat_handle = heartbeat_events_producer ~heartbeat_span t in
         let event_loop_handle = event_loop t in
         let status = Running {heartbeat_handle; event_loop_handle} in
-        let t = {t with status} in
+        t.status <- status ;
         List.iter (fun topic -> app_input t (Join topic)) topics ;
         t
     | Running _ ->
