@@ -5,8 +5,8 @@
 
 use crate::eth_gen::OwnedHash;
 use crate::rlp_helpers::{
-    decode_field, decode_field_h256, decode_field_u256_le, decode_transaction_hash_list,
-    next,
+    append_u256_le, decode_field, decode_field_h256, decode_field_u256_le,
+    decode_transaction_hash_list, next,
 };
 use crate::transaction::TransactionHash;
 use primitive_types::{H160, H256, U256};
@@ -152,7 +152,7 @@ impl Default for L2Block {
 impl Encodable for L2Block {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(6);
-        s.append(&self.number);
+        append_u256_le(s, self.number);
         s.append(&self.hash);
         s.append(&self.parent_hash);
         let transactions_bytes: Vec<Vec<u8>> =
