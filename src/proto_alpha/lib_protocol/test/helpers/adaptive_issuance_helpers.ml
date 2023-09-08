@@ -505,14 +505,14 @@ let add_frozen_rewards amount account_name account_map =
   update_account ~f account_name account_map
 
 let apply_transfer amount src_name dst_name account_map =
-  if Tez.(equal amount zero) then account_map
-  else
-    match
-      ( String.Map.find src_name account_map,
-        String.Map.find dst_name account_map )
-    with
-    | Some src, Some _ ->
-        let amount = Tez.min src.liquid amount in
+  match
+    (String.Map.find src_name account_map, String.Map.find dst_name account_map)
+  with
+  | Some src, Some _ ->
+      if Tez.(src.liquid < amount) then
+        (* Invalid amount: operation will fail *)
+        account_map
+      else
         let f_src src =
           let liquid = Tez.(src.liquid -! amount) in
           {src with liquid}
@@ -523,18 +523,21 @@ let apply_transfer amount src_name dst_name account_map =
         in
         let account_map = update_account ~f:f_src src_name account_map in
         update_account ~f:f_dst dst_name account_map
-    | _ -> raise Not_found
+  | _ -> raise Not_found
 
 let apply_stake amount staker_name account_map =
-  if Tez.(equal amount zero) then account_map
-  else
-    match String.Map.find staker_name account_map with
-    | None -> raise Not_found
-    | Some staker -> (
-        match staker.delegate with
-        | None -> account_map
-        | Some delegate_name ->
-            let amount = Tez.min staker.liquid amount in
+  match String.Map.find staker_name account_map with
+  | None -> raise Not_found
+  | Some staker -> (
+      match staker.delegate with
+      | None ->
+          (* Invalid operation: no delegate *)
+          account_map
+      | Some delegate_name ->
+          if Tez.(staker.liquid < amount) then
+            (* Invalid amount: operation will fail *)
+            account_map
+          else
             let f_staker staker =
               let liquid = Tez.(staker.liquid -! amount) in
               {staker with liquid}
@@ -554,38 +557,36 @@ let apply_stake amount staker_name account_map =
             update_account ~f:f_delegate delegate_name account_map)
 
 let apply_unstake cycle amount staker_name account_map =
-  if Tez.(equal amount zero) then account_map
-  else
-    match String.Map.find staker_name account_map with
-    | None -> raise Not_found
-    | Some staker -> (
-        match staker.delegate with
-        | None -> account_map
-        | Some delegate_name -> (
-            match String.Map.find delegate_name account_map with
-            | None -> raise Not_found
-            | Some delegate ->
-                let frozen_deposits, amount_unstaked =
-                  Frozen_tez.sub_current
-                    amount
+  match String.Map.find staker_name account_map with
+  | None -> raise Not_found
+  | Some staker -> (
+      match staker.delegate with
+      | None -> (* Invalid operation: no delegate *) account_map
+      | Some delegate_name -> (
+          match String.Map.find delegate_name account_map with
+          | None -> raise Not_found
+          | Some delegate ->
+              let frozen_deposits, amount_unstaked =
+                Frozen_tez.sub_current
+                  amount
+                  staker_name
+                  delegate.frozen_deposits
+              in
+              let delegate = {delegate with frozen_deposits} in
+              let account_map =
+                String.Map.add delegate_name delegate account_map
+              in
+              let f delegate =
+                let unstaked_frozen =
+                  Unstaked_frozen.add_unstake
+                    cycle
+                    amount_unstaked
                     staker_name
-                    delegate.frozen_deposits
+                    delegate.unstaked_frozen
                 in
-                let delegate = {delegate with frozen_deposits} in
-                let account_map =
-                  String.Map.add delegate_name delegate account_map
-                in
-                let f delegate =
-                  let unstaked_frozen =
-                    Unstaked_frozen.add_unstake
-                      cycle
-                      amount_unstaked
-                      staker_name
-                      delegate.unstaked_frozen
-                  in
-                  {delegate with unstaked_frozen}
-                in
-                update_account ~f delegate_name account_map))
+                {delegate with unstaked_frozen}
+              in
+              update_account ~f delegate_name account_map))
 
 (* Updates unstaked unslashable values in all accounts *)
 let apply_unslashable cycle account_map =
