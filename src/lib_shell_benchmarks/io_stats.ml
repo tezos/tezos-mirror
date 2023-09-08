@@ -90,14 +90,14 @@ let load_tree context key =
   Context.fold
     context
     key
-    ~order:`Sorted
+    ~order:`Undefined
     ~init:Io_helpers.Key_map.empty
     ~f:(fun path t tree ->
       let+ o = Context.Tree.to_value t in
       match o with
       | Some bytes ->
           let len = Bytes.length bytes in
-          Io_helpers.Key_map.insert path len tree
+          Io_helpers.Key_map.insert (key @ path) len tree
       | None -> tree)
 
 let context_statistics base_dir context_hash =

@@ -179,14 +179,17 @@ module Key_map = struct
         | None -> None
         | Some subtree -> find_opt tl subtree)
 
-  let rec to_seq path acc tree =
+  let rec to_seq :
+      String_map.key list ->
+      (String_map.key list * 'a) Seq.t ->
+      'a t ->
+      (String_map.key list * 'a) Seq.t =
+   fun path acc tree ->
     match tree with
     | Leaf v -> fun () -> Seq.Cons ((List.rev path, v), acc)
     | Node map ->
-        String_map.fold
-          (fun seg subtree acc -> to_seq (seg :: path) acc subtree)
-          map
-          acc
+        Seq.concat_map (fun (seg, subtree) -> to_seq (seg :: path) acc subtree)
+        @@ String_map.to_seq map
 
   let to_seq tree = to_seq [] Seq.empty tree
 

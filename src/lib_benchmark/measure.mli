@@ -82,3 +82,13 @@ val make_timing_probe :
   (module Compare.COMPARABLE with type t = 't) -> 't Generator.probe
 
 val get_free_variable_set : packed_measurement -> Free_variable.Set.t
+
+module Time : sig
+  (** All return nano seconds *)
+
+  val measure : (unit -> unit) -> float
+
+  val measure_and_return : (unit -> 'a) -> float * 'a
+
+  val measure_lwt : (unit -> 'a Lwt.t) -> (float * 'a) Lwt.t
+end

@@ -372,6 +372,15 @@ module Time = struct
     dt
     [@@inline always]
 
+  let measure_lwt f =
+    let open Lwt.Syntax in
+    let bef = get_time_ns () in
+    let+ res = f () in
+    let aft = get_time_ns () in
+    let dt = Int64.(to_float (sub aft bef)) in
+    (dt, res)
+    [@@inline always]
+
   let measure_and_return f =
     let bef = get_time_ns () in
     let x = f () in
@@ -457,8 +466,15 @@ let perform_benchmark (type c t) (options : options)
     List.fold_left
       (fun workload_data benchmark_fun ->
         progress () ;
-        set_gc_increment () ;
-        Gc.compact () ;
+        let bench = benchmark_fun () in
+        (match bench with
+        | Generator.Calculated _ ->
+            (* Calculated already gets its measures.
+               No need to perform GC. *)
+            ()
+        | _ ->
+            set_gc_increment () ;
+            Gc.compact ()) ;
         let measure_plain_benchmark workload closure =
           let measures =
             compute_empirical_timing_distribution
@@ -469,7 +485,7 @@ let perform_benchmark (type c t) (options : options)
           in
           {workload; measures} :: workload_data
         in
-        match benchmark_fun () with
+        match bench with
         | Generator.Calculated {workload; measure} ->
             let measures = Array.init options.nsamples (fun _ -> measure ()) in
             let measures = Maths.vector_of_array measures in
