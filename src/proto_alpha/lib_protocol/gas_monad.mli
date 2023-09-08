@@ -57,9 +57,10 @@ val of_result : ('a, 'trace) result -> ('a, 'trace) t
     returns an error. See the {!Alpha_context.Gas} module for details.*)
 val consume_gas : Alpha_context.Gas.cost -> (unit, 'trace) t
 
-(** [run ctxt m] runs [m] using the given context and returns the result along
-    with the new context with updated gas. The given context has [unlimited]
-    mode enabled, through [Gas.set_unlimited], no gas is consumed. *)
+(** [run ctxt m] runs [m] using the given context and returns the
+    result along with the new context with updated gas. If the given
+    context has [unlimited] mode enabled, through [Gas.set_unlimited],
+    no gas is consumed. *)
 val run :
   Alpha_context.context ->
   ('a, 'trace) t ->
