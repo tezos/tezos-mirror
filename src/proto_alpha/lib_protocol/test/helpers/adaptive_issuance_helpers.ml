@@ -282,7 +282,6 @@ type staking_parameters = {
 
 (** Abstract information of accounts *)
 type account_state = {
-  name : string;
   pkh : Signature.Public_key_hash.t;
   contract : Protocol.Alpha_context.Contract.t;
   delegate : string option;
@@ -298,12 +297,11 @@ type account_state = {
   unstaked_finalizable : Unstaked_finalizable.t;
 }
 
-let init_account ?delegate ~name ~pkh ~contract ~parameters ?(liquid = Tez.zero)
+let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(bonds = Tez.zero) ?(frozen_deposits = Frozen_tez.zero)
     ?(unstaked_frozen = Unstaked_frozen.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero) () =
   {
-    name;
     pkh;
     contract;
     delegate;

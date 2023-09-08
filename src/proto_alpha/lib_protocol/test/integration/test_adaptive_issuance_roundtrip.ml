@@ -207,9 +207,7 @@ module State = struct
     let acc = find_account account_name state in
     match acc.delegate with
     | None -> false
-    | Some d ->
-        let del = find_account d state in
-        String.equal del.name acc.name
+    | Some del_name -> String.equal del_name account_name
 
   let update_map ?(log_updates = []) ~(f : account_map -> account_map)
       (state : t) : t =
@@ -254,7 +252,7 @@ module State = struct
         Protocol.Alpha_context.Raw_level.diff current_level last_level_rewards
         |> Int32.to_int
       in
-      let ({parameters; _} as baker) = find_account state.baker state in
+      let {parameters; _} = find_account state.baker state in
       let delta_rewards = Tez.mul_exn rewards_per_block delta_time in
       if delta_time = 1 then
         Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
@@ -274,10 +272,10 @@ module State = struct
       let to_liquid = Partial_tez.to_tez ~round_up:true to_liquid in
       let to_frozen = Tez.(delta_rewards -! to_liquid) in
       let state =
-        update_map ~f:(add_liquid_rewards to_liquid baker.name) state
+        update_map ~f:(add_liquid_rewards to_liquid state.baker) state
       in
       let state =
-        update_map ~f:(add_frozen_rewards to_frozen baker.name) state
+        update_map ~f:(add_frozen_rewards to_frozen state.baker) state
       in
       let* total_supply = Tez.(total_supply + delta_rewards) in
       return {state with last_level_rewards = current_level; total_supply}
@@ -485,9 +483,9 @@ let check_all_balances block state : unit tzresult Lwt.t =
   let State.{account_map; total_supply; _} = state in
   let* () =
     String.Map.iter_es
-      (fun _name account ->
-        log_debug_balance account.name account_map ;
-        assert_balance_check ~loc:__LOC__ (B block) account.name account_map)
+      (fun name _account ->
+        log_debug_balance name account_map ;
+        assert_balance_check ~loc:__LOC__ (B block) name account_map)
       account_map
   in
   let* actual_total_supply = Context.get_total_supply (B block) in
@@ -696,7 +694,6 @@ let begin_test ~activate_ai
             let pkh = Context.Contract.pkh contract in
             let account =
               init_account
-                ~name
                 ~delegate:name
                 ~pkh
                 ~contract
@@ -745,7 +742,7 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
       Log.info
         ~color:action_color
         "[Set delegate parameters for \"%s\"]"
-        delegate.name ;
+        delegate_name ;
       (* Define the operation *)
       let* operation =
         set_delegate_parameters (B block) delegate.contract ~parameters
@@ -770,7 +767,7 @@ let add_account name : (t, t) scenarios =
       let pkh = new_account.pkh in
       let contract = Protocol.Alpha_context.Contract.Implicit pkh in
       let account_state =
-        init_account ~name ~pkh ~contract ~parameters:default_params ()
+        init_account ~pkh ~contract ~parameters:default_params ()
       in
       let state = State.update_account name account_state state in
       let state = {state with account_names = name :: state.account_names} in
@@ -781,7 +778,7 @@ let reveal name : (t, t) scenarios =
   exec_op (fun (block, state) ->
       let open Lwt_result_syntax in
       let account = State.find_account name state in
-      Log.info ~color:action_color "[Reveal \"%s\"]" account.name ;
+      Log.info ~color:action_color "[Reveal \"%s\"]" name ;
       let* acc = Account.find account.pkh in
       let* operation =
         Op.revelation ~fee:Protocol.Alpha_context.Tez.zero (B block) acc.pk
@@ -798,14 +795,14 @@ let transfer src_name dst_name amount : (t, t) scenarios =
       Log.info
         ~color:action_color
         "[Transfer \"%s\" -> \"%s\" (%aꜩ)]"
-        src.name
-        dst.name
+        src_name
+        dst_name
         Tez.pp
         amount ;
       let* operation =
         Op.transaction ~fee:Tez.zero (B block) src.contract dst.contract amount
       in
-      let state = State.apply_transfer amount src.name dst.name state in
+      let state = State.apply_transfer amount src_name dst_name state in
       return (state, [operation]))
 
 (** Set delegate for src. If [delegate_name_opt = None], then unset current delegate *)
@@ -816,15 +813,15 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       let delegate_pkh_opt =
         match delegate_name_opt with
         | None ->
-            Log.info ~color:action_color "[Unset delegate of \"%s\"]" src.name ;
+            Log.info ~color:action_color "[Unset delegate of \"%s\"]" src_name ;
             None
         | Some delegate_name ->
             let delegate = State.find_account delegate_name state in
             Log.info
               ~color:action_color
               "[Set delegate \"%s\" for \"%s\"]"
-              delegate.name
-              src.name ;
+              delegate_name
+              src_name ;
             Some delegate.pkh
       in
       let cycle = Block.current_cycle block in
@@ -850,7 +847,7 @@ let stake src_name stake_value : (t, t) scenarios =
       Log.info
         ~color:action_color
         "[Stake for \"%s\" (%a)]"
-        src.name
+        src_name
         tez_quantity_pp
         stake_value ;
       (* Stake applies finalize *before* the stake *)
@@ -868,7 +865,7 @@ let unstake src_name unstake_value : (t, t) scenarios =
       Log.info
         ~color:action_color
         "[Unstake for \"%s\" (%a)]"
-        src.name
+        src_name
         tez_quantity_pp
         unstake_value ;
       let stake_balance =
@@ -892,7 +889,7 @@ let finalize_unstake src_name : (t, t) scenarios =
   exec_op (fun (block, state) ->
       let open Lwt_result_syntax in
       let src = State.find_account src_name state in
-      Log.info ~color:action_color "[Finalize_unstake for \"%s\"]" src.name ;
+      Log.info ~color:action_color "[Finalize_unstake for \"%s\"]" src_name ;
       let* operation = finalize_unstake (B block) src.contract in
       let state = State.apply_finalize src_name state in
       return (state, [operation]))
