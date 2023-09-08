@@ -276,8 +276,8 @@ end
 
 (** Abstraction of the staking parameters for tests *)
 type staking_parameters = {
-  limit_of_staking_over_baking : int;
-  edge_of_baking_over_staking : int;
+  limit_of_staking_over_baking : Q.t;
+  edge_of_baking_over_staking : Q.t;
 }
 
 (** Abstract information of accounts *)
@@ -707,15 +707,21 @@ let stake ctxt contract amount =
     contract
     amount
 
-let set_delegate_parameters ctxt delegate ~limit_of_staking_over_baking
-    ~edge_of_baking_over_staking_billionth =
+let set_delegate_parameters ctxt delegate
+    ~parameters:{limit_of_staking_over_baking; edge_of_baking_over_staking} =
   let entrypoint = Protocol.Alpha_context.Entrypoint.set_delegate_parameters in
+  let limit_of_staking_over_baking_millionth =
+    Q.mul limit_of_staking_over_baking (Q.of_int 1_000_000) |> Q.to_int
+  in
+  let edge_of_baking_over_staking_billionth =
+    Q.mul edge_of_baking_over_staking (Q.of_int 1_000_000_000) |> Q.to_int
+  in
   let parameters =
     Protocol.Alpha_context.Script.lazy_expr
       (Expr.from_string
          (Printf.sprintf
             "Pair %d (Pair %d Unit)"
-            limit_of_staking_over_baking
+            limit_of_staking_over_baking_millionth
             edge_of_baking_over_staking_billionth))
   in
   Op.transaction

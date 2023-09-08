@@ -166,9 +166,9 @@ let default_params =
   in
   {
     limit_of_staking_over_baking =
-      Int32.to_int limit_of_staking_over_baking_millionth;
+      Q.(Int32.to_int limit_of_staking_over_baking_millionth // 1_000_000);
     edge_of_baking_over_staking =
-      Int32.to_int edge_of_baking_over_staking_billionth;
+      Q.(Int32.to_int edge_of_baking_over_staking_billionth // 1_000_000_000);
   }
 
 (** Module for the [State.t] type of asserted information about the system during a test. *)
@@ -269,9 +269,7 @@ module State = struct
           rewards_per_block
       else assert false ;
       let to_liquid =
-        Tez.mul_q
-          delta_rewards
-          (Q.of_ints parameters.edge_of_baking_over_staking 1_000_000_000)
+        Tez.mul_q delta_rewards parameters.edge_of_baking_over_staking
       in
       let to_liquid = Partial_tez.to_tez ~round_up:true to_liquid in
       let to_frozen = Tez.(delta_rewards -! to_liquid) in
@@ -738,7 +736,7 @@ let begin_test ~activate_ai
       return (block, state))
 
 (** Set delegate parameters for the given delegate *)
-let set_delegate_params delegate_name params : (t, t) scenarios =
+let set_delegate_params delegate_name parameters : (t, t) scenarios =
   exec_op (fun (block, state) ->
       let open Lwt_result_syntax in
       (* Simple example of action_atom definition: *)
@@ -749,19 +747,15 @@ let set_delegate_params delegate_name params : (t, t) scenarios =
         delegate.name ;
       (* Define the operation *)
       let* operation =
-        set_delegate_parameters
-          (B block)
-          delegate.contract
-          ~limit_of_staking_over_baking:params.limit_of_staking_over_baking
-          ~edge_of_baking_over_staking_billionth:
-            params.edge_of_baking_over_staking
+        set_delegate_parameters (B block) delegate.contract ~parameters
       in
       (* Update state *)
       let cd = state.constants.preserved_cycles - 1 in
       let state =
         {
           state with
-          param_requests = (delegate_name, params, cd) :: state.param_requests;
+          param_requests =
+            (delegate_name, parameters, cd) :: state.param_requests;
         }
       in
       (* Return both *)
@@ -1049,10 +1043,7 @@ let init_constants ?reward_per_block () =
 let init_scenario ?reward_per_block () =
   let constants = init_constants ?reward_per_block () in
   let init_params =
-    {
-      limit_of_staking_over_baking = 1_000_000;
-      edge_of_baking_over_staking = 1_000_000_000;
-    }
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   let begin_test ~activate_ai ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
@@ -1193,8 +1184,8 @@ module Roundtrip = struct
     let constants = init_constants () in
     let init_params =
       {
-        limit_of_staking_over_baking = 1_000_000;
-        edge_of_baking_over_staking = 1_000_000_000;
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
       }
     in
     begin_test ~activate_ai:true constants ["delegate1"; "delegate2"]
@@ -1216,8 +1207,8 @@ module Roundtrip = struct
     let constants = init_constants () in
     let init_params =
       {
-        limit_of_staking_over_baking = 1_000_000;
-        edge_of_baking_over_staking = 1_000_000_000;
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
       }
     in
     begin_test ~activate_ai:true constants ["delegate"]
@@ -1244,14 +1235,14 @@ module Roundtrip = struct
     let constants = init_constants () in
     let init_params =
       {
-        limit_of_staking_over_baking = 1_000_000;
-        edge_of_baking_over_staking = 1_000_000_000;
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
       }
     in
     let no_costake_params =
       {
-        limit_of_staking_over_baking = 0;
-        edge_of_baking_over_staking = 1_000_000_000;
+        limit_of_staking_over_baking = Q.zero;
+        edge_of_baking_over_staking = Q.one;
       }
     in
     let amount = Amount (Tez.of_mutez 1_000_000L) in
