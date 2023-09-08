@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_environment_004_Pt24m4xi)
- (public_name
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.environment)
+ (public_name tezos-protocol-004-Pt24m4xi.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -20,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_004_Pt24m4xi)
- (public_name tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.raw)
+ (public_name tezos-protocol-004-Pt24m4xi.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.environment)
+  tezos-protocol-004-Pt24m4xi.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -105,12 +104,12 @@
 
 (library
  (name tezos_protocol_004_Pt24m4xi)
- (public_name tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi)
+ (public_name tezos-protocol-004-Pt24m4xi.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.raw)
+  tezos-protocol-004-Pt24m4xi.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -217,12 +216,12 @@
 
 (library
  (name tezos_protocol_004_Pt24m4xi_lifted)
- (public_name tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.lifted)
+ (public_name tezos-protocol-004-Pt24m4xi.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi)
+  tezos-protocol-004-Pt24m4xi.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -328,11 +327,10 @@
 
 (library
  (name tezos_embedded_protocol_004_Pt24m4xi)
- (public_name
-  tezos-protocol-004-Pt24m4xi.tezos-embedded-protocol-004-Pt24m4xi)
+ (public_name tezos-protocol-004-Pt24m4xi.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi
+  tezos-protocol-004-Pt24m4xi.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

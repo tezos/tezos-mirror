@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-libs.tezos-test-helpers
   octez-protocol-alpha-libs.tezos-smart-rollup-layer2
   octez_smart_rollup_node_alpha

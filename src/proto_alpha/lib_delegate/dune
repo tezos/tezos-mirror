@@ -9,8 +9,8 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-version.value
-  tezos-protocol-alpha.tezos-protocol-alpha
-  tezos-protocol-alpha.tezos-protocol-alpha.lifted
+  tezos-protocol-alpha.protocol
+  tezos-protocol-alpha.protocol.lifted
   octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
@@ -56,7 +56,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -88,7 +88,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base

@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -46,7 +46,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services

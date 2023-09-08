@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   octez-protocol-018-Proxford-libs.tezos-client
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
   octez-alcotezt

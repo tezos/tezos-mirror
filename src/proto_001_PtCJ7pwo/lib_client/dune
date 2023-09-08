@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo
-  tezos-protocol-001-PtCJ7pwo.tezos-protocol-001-PtCJ7pwo.lifted
+  tezos-protocol-001-PtCJ7pwo.protocol
+  tezos-protocol-001-PtCJ7pwo.protocol.lifted
   octez-shell-libs.tezos-signer-backends
   octez-libs.tezos-rpc
   uri)

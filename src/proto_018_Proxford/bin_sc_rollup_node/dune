@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-base-unix

@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-signer-backends
   octez-protocol-013-PtJakart-libs.tezos-client
   octez-protocol-013-PtJakart-libs.tezos-client.commands
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart.protocol
   octez-protocol-013-PtJakart-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags

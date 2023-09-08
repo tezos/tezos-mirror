@@ -14,7 +14,7 @@
   tezos-protocol-018-Proxford.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-libs.tezos-stdlib-unix
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-libs.tezos-test-helpers
   octez-protocol-018-Proxford-libs.tezos-test-helpers
   octez-alcotezt

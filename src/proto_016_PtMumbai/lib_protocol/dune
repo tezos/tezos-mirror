@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_environment_016_PtMumbai)
- (public_name
-  tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai.environment)
+ (public_name tezos-protocol-016-PtMumbai.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -20,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_016_PtMumbai)
- (public_name tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai.raw)
+ (public_name tezos-protocol-016-PtMumbai.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai.environment)
+  tezos-protocol-016-PtMumbai.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -279,12 +278,12 @@
 
 (library
  (name tezos_protocol_016_PtMumbai)
- (public_name tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai)
+ (public_name tezos-protocol-016-PtMumbai.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai.raw)
+  tezos-protocol-016-PtMumbai.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -565,12 +564,12 @@
 
 (library
  (name tezos_protocol_016_PtMumbai_lifted)
- (public_name tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai.lifted)
+ (public_name tezos-protocol-016-PtMumbai.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai)
+  tezos-protocol-016-PtMumbai.protocol)
  (flags
   (:standard)
   -nopervasives
@@ -854,11 +853,10 @@
 
 (library
  (name tezos_embedded_protocol_016_PtMumbai)
- (public_name
-  tezos-protocol-016-PtMumbai.tezos-embedded-protocol-016-PtMumbai)
+ (public_name tezos-protocol-016-PtMumbai.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-016-PtMumbai.tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

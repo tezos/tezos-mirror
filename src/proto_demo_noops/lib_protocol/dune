@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_demo_noops)
- (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.environment)
+ (public_name tezos-protocol-demo-noops.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_demo_noops)
- (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.raw)
+ (public_name tezos-protocol-demo-noops.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-noops.tezos-protocol-demo-noops.environment)
+  tezos-protocol-demo-noops.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -35,12 +35,12 @@
 
 (library
  (name tezos_protocol_demo_noops)
- (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops)
+ (public_name tezos-protocol-demo-noops.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-noops.tezos-protocol-demo-noops.raw)
+  tezos-protocol-demo-noops.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -72,12 +72,12 @@
 
 (library
  (name tezos_protocol_demo_noops_lifted)
- (public_name tezos-protocol-demo-noops.tezos-protocol-demo-noops.lifted)
+ (public_name tezos-protocol-demo-noops.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-demo-noops.tezos-protocol-demo-noops)
+  tezos-protocol-demo-noops.protocol)
  (flags
   (:standard)
   -nopervasives
@@ -113,10 +113,10 @@
 
 (library
  (name tezos_embedded_protocol_demo_noops)
- (public_name tezos-protocol-demo-noops.tezos-embedded-protocol-demo-noops)
+ (public_name tezos-protocol-demo-noops.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-demo-noops.tezos-protocol-demo-noops
+  tezos-protocol-demo-noops.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

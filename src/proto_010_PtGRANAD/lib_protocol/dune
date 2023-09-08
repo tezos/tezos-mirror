@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_environment_010_PtGRANAD)
- (public_name
-  tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD.environment)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -20,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_010_PtGRANAD)
- (public_name tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD.raw)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD.environment)
+  tezos-protocol-010-PtGRANAD.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -121,12 +120,12 @@
 
 (library
  (name tezos_protocol_010_PtGRANAD)
- (public_name tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD)
+ (public_name tezos-protocol-010-PtGRANAD.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD.raw)
+  tezos-protocol-010-PtGRANAD.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -249,12 +248,12 @@
 
 (library
  (name tezos_protocol_010_PtGRANAD_lifted)
- (public_name tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD.lifted)
+ (public_name tezos-protocol-010-PtGRANAD.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD)
+  tezos-protocol-010-PtGRANAD.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -376,11 +375,10 @@
 
 (library
  (name tezos_embedded_protocol_010_PtGRANAD)
- (public_name
-  tezos-protocol-010-PtGRANAD.tezos-embedded-protocol-010-PtGRANAD)
+ (public_name tezos-protocol-010-PtGRANAD.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-010-PtGRANAD.tezos-protocol-010-PtGRANAD
+  tezos-protocol-010-PtGRANAD.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

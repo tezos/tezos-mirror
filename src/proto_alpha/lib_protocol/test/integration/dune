@@ -11,7 +11,7 @@
   octez-alcotezt
   octez-libs.tezos-base
   octez-protocol-alpha-libs.tezos-client
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers)

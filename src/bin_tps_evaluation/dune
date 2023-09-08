@@ -16,7 +16,7 @@
   octez-protocol-alpha-libs.tezos-baking
   octez-protocol-alpha-libs.tezos-client.commands
   octez-shell-libs.tezos-client-base-unix
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   tezt
   tezt-tezos
   tezt-tezos.tezt-performance-regression
