@@ -11,7 +11,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   octez-libs.tezos-stdlib-unix
-  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.tezos-client
   tezos-protocol-017-PtNairob.parameters
   octez-proto-libs.tezos-protocol-environment

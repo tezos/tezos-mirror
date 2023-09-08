@@ -15,7 +15,7 @@
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-libs.tezos-crypto
   octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline

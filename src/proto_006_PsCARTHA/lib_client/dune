@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-006-PsCARTHA.tezos-protocol-006-PsCARTHA
-  tezos-protocol-006-PsCARTHA.tezos-protocol-006-PsCARTHA.lifted
+  tezos-protocol-006-PsCARTHA.protocol
+  tezos-protocol-006-PsCARTHA.protocol.lifted
   octez-shell-libs.tezos-signer-backends
   octez-libs.tezos-rpc
   uri)

@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez_smart_rollup_client_Proxford
   tezos-version.value)
  (link_flags

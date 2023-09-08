@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_environment_013_PtJakart)
- (public_name
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart.environment)
+ (public_name tezos-protocol-013-PtJakart.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -20,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_013_PtJakart)
- (public_name tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart.raw)
+ (public_name tezos-protocol-013-PtJakart.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart.environment)
+  tezos-protocol-013-PtJakart.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -216,12 +215,12 @@
 
 (library
  (name tezos_protocol_013_PtJakart)
- (public_name tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart)
+ (public_name tezos-protocol-013-PtJakart.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart.raw)
+  tezos-protocol-013-PtJakart.protocol.raw)
  (flags
   (:standard)
   -w -51
@@ -435,12 +434,12 @@
 
 (library
  (name tezos_protocol_013_PtJakart_lifted)
- (public_name tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart.lifted)
+ (public_name tezos-protocol-013-PtJakart.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart)
+  tezos-protocol-013-PtJakart.protocol)
  (flags
   (:standard)
   -w -51
@@ -658,11 +657,10 @@
 
 (library
  (name tezos_embedded_protocol_013_PtJakart)
- (public_name
-  tezos-protocol-013-PtJakart.tezos-embedded-protocol-013-PtJakart)
+ (public_name tezos-protocol-013-PtJakart.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-013-PtJakart.tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

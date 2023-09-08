@@ -5252,7 +5252,7 @@ end = struct
       in
       let environment =
         tezos_protocol_sub_lib
-          (sf "tezos-protocol-%s.environment" name_dash)
+          "protocol.environment"
           ~internal_name:(sf "tezos_protocol_environment_%s" name_underscore)
           ~path:(path // "lib_protocol")
           ~modules:[sf "Tezos_protocol_environment_%s" name_underscore]
@@ -5279,7 +5279,7 @@ include Tezos_protocol_environment.V%d.Make(Name)()
       in
       let raw_protocol =
         tezos_protocol_sub_lib
-          (sf "tezos-protocol-%s.raw" name_dash)
+          "protocol.raw"
           ~internal_name:(sf "tezos_raw_protocol_%s" name_underscore)
           ~path:(path // "lib_protocol")
           ~linkall:true
@@ -5298,7 +5298,8 @@ include Tezos_protocol_environment.V%d.Make(Name)()
       in
       let main =
         tezos_protocol_sub_lib
-          (sf "tezos-protocol-%s" name_dash)
+          "protocol"
+          ~internal_name:(sf "tezos_protocol-%s" name_dash)
           ~path:(path // "lib_protocol")
           ~synopsis:
             (match number with
@@ -5389,7 +5390,8 @@ module Protocol = Protocol
       in
       let lifted =
         tezos_protocol_sub_lib
-          (sf "tezos-protocol-%s.lifted" name_dash)
+          "protocol.lifted"
+          ~internal_name:(sf "tezos_protocol-%s.lifted" name_dash)
           ~path:(path // "lib_protocol")
           ~modules:["Lifted_protocol"]
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
@@ -5468,7 +5470,7 @@ let hash = Protocol.hash
       in
       let embedded =
         tezos_protocol_sub_lib
-          (sf "tezos-embedded-protocol-%s" name_dash)
+          "embedded-protocol"
           ~internal_name:(sf "tezos_embedded_protocol_%s" name_underscore)
           ~path:(path // "lib_protocol")
           ~synopsis:

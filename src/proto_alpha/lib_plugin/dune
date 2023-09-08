@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.tezos-smart-rollup)
  (flags
   (:standard)
@@ -25,7 +25,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-embedded-protocol-alpha
+  tezos-protocol-alpha.embedded-protocol
   octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-validation)
  (flags

@@ -7,7 +7,7 @@
   octez-libs.tezos-base
   octez-shell-libs.tezos-client-base
   octez-protocol-017-PtNairob-libs.tezos-client
-  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.tezos-baking.tenderbrute)
  (link_flags
   (:standard)

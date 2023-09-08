@@ -8,7 +8,7 @@
   tezt.core
   octez-alcotezt
   octez-libs.tezos-base
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers)
  (library_flags (:standard -linkall))

@@ -3,8 +3,7 @@
 
 (library
  (name tezos_protocol_environment_008_PtEdo2Zk)
- (public_name
-  tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk.environment)
+ (public_name tezos-protocol-008-PtEdo2Zk.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -20,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_008_PtEdo2Zk)
- (public_name tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk.raw)
+ (public_name tezos-protocol-008-PtEdo2Zk.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk.environment)
+  tezos-protocol-008-PtEdo2Zk.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -113,12 +112,12 @@
 
 (library
  (name tezos_protocol_008_PtEdo2Zk)
- (public_name tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk)
+ (public_name tezos-protocol-008-PtEdo2Zk.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk.raw)
+  tezos-protocol-008-PtEdo2Zk.protocol.raw)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -233,12 +232,12 @@
 
 (library
  (name tezos_protocol_008_PtEdo2Zk_lifted)
- (public_name tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk.lifted)
+ (public_name tezos-protocol-008-PtEdo2Zk.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk)
+  tezos-protocol-008-PtEdo2Zk.protocol)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -352,11 +351,10 @@
 
 (library
  (name tezos_embedded_protocol_008_PtEdo2Zk)
- (public_name
-  tezos-protocol-008-PtEdo2Zk.tezos-embedded-protocol-008-PtEdo2Zk)
+ (public_name tezos-protocol-008-PtEdo2Zk.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-008-PtEdo2Zk.tezos-protocol-008-PtEdo2Zk
+  tezos-protocol-008-PtEdo2Zk.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

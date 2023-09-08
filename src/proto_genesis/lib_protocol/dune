@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_genesis)
- (public_name tezos-protocol-genesis.tezos-protocol-genesis.environment)
+ (public_name tezos-protocol-genesis.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment)
@@ -19,10 +19,10 @@
 
 (library
  (name tezos_raw_protocol_genesis)
- (public_name tezos-protocol-genesis.tezos-protocol-genesis.raw)
+ (public_name tezos-protocol-genesis.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-genesis.tezos-protocol-genesis.environment)
+  tezos-protocol-genesis.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -35,12 +35,12 @@
 
 (library
  (name tezos_protocol_genesis)
- (public_name tezos-protocol-genesis.tezos-protocol-genesis)
+ (public_name tezos-protocol-genesis.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-genesis.tezos-protocol-genesis.raw)
+  tezos-protocol-genesis.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
@@ -74,12 +74,12 @@
 
 (library
  (name tezos_protocol_genesis_lifted)
- (public_name tezos-protocol-genesis.tezos-protocol-genesis.lifted)
+ (public_name tezos-protocol-genesis.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.tezos-protocol-environment
   octez-proto-libs.tezos-protocol-environment.sigs
-  tezos-protocol-genesis.tezos-protocol-genesis)
+  tezos-protocol-genesis.protocol)
  (flags
   (:standard)
   -nopervasives
@@ -117,10 +117,10 @@
 
 (library
  (name tezos_embedded_protocol_genesis)
- (public_name tezos-protocol-genesis.tezos-embedded-protocol-genesis)
+ (public_name tezos-protocol-genesis.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-genesis.tezos-protocol-genesis
+  tezos-protocol-genesis.protocol
   octez-shell-libs.tezos-protocol-updater
   octez-proto-libs.tezos-protocol-environment)
  (library_flags (:standard -linkall))

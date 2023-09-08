@@ -9,7 +9,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez_smart_rollup_client_PtNairob
   tezos-version.value)
  (link_flags

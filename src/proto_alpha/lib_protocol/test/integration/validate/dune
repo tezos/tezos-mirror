@@ -8,7 +8,7 @@
   tezt.core
   octez-alcotezt
   octez-libs.tezos-base
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   qcheck-alcotest
   octez-protocol-alpha-libs.tezos-client
   octez-libs.tezos-test-helpers

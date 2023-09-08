@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   octez-protocol-017-PtNairob-libs.tezos-client
-  tezos-protocol-017-PtNairob.tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-base-test-helpers
   octez-protocol-017-PtNairob-libs.tezos-bakings.mockup-simulator
   octez-protocol-017-PtNairob-libs.tezos-baking

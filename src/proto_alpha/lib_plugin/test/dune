@@ -15,7 +15,7 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
   octez-protocol-alpha-libs.tezos-protocol-plugin
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.tezos-test-helpers)
  (library_flags (:standard -linkall))

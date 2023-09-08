@@ -13,7 +13,7 @@
   octez-protocol-018-Proxford-libs.tezos-client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-rpc

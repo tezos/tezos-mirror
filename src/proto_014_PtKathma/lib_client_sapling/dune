@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-signer-backends
   octez-protocol-014-PtKathma-libs.tezos-client
   octez-protocol-014-PtKathma-libs.tezos-client.commands
-  tezos-protocol-014-PtKathma.tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.protocol
   octez-protocol-014-PtKathma-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags

@@ -15,7 +15,7 @@
   tezos-benchmark
   tezos-benchmark-018-Proxford
   tezos-benchmark-type-inference-018-Proxford
-  tezos-protocol-018-Proxford.tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-libs.tezos-crypto
   octez-shell-libs.tezos-shell-benchmarks
   octez-libs.tezos-micheline

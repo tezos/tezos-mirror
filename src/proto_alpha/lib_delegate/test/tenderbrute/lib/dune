@@ -8,7 +8,7 @@
   data-encoding
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  tezos-protocol-alpha.tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-shell-libs.tezos-client-base
   octez-protocol-alpha-libs.tezos-client)
  (flags

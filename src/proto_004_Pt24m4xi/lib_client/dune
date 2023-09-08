@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi
-  tezos-protocol-004-Pt24m4xi.tezos-protocol-004-Pt24m4xi.lifted
+  tezos-protocol-004-Pt24m4xi.protocol
+  tezos-protocol-004-Pt24m4xi.protocol.lifted
   octez-shell-libs.tezos-signer-backends
   octez-libs.tezos-rpc
   uri)
