@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
     read_current_block_number, read_storage_version, store_block_by_hash,
-    store_storage_version, STORAGE_VERSION,
+    store_current_block, store_storage_version, STORAGE_VERSION,
 };
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -98,7 +98,13 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
         let head_number = read_current_block_number(host)?;
         for number in 0..(head_number.as_usize() + 1) {
             let block = old_storage::read_and_remove_l2_block(host, number.into())?;
-            store_block_by_hash(host, &block)?
+
+            if number == head_number.as_usize() {
+                // Needed to migrate current hash
+                store_current_block(host, &block)?
+            } else {
+                store_block_by_hash(host, &block)?
+            }
         }
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?
