@@ -7,7 +7,7 @@
             octez-protocol-alpha-libs.tezos-test-helpers
             octez-libs.tezos-micheline
             tezos-openapi
-            tezos-protocol-alpha
+            tezos-protocol-alpha.protocol
             qcheck-core
             tezos-time-measurement
             data-encoding

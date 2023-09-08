@@ -3,7 +3,7 @@
  (libraries octez-libs.tezos-stdlib
             octez-protocol-alpha-libs.tezos-test-helpers
             octez-libs.tezos-micheline
-            tezos-protocol-alpha
+            tezos-protocol-alpha.protocol
             tezt-tezos
             ptime)
  (flags (:standard
