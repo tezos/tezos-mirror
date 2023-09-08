@@ -36,7 +36,7 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
-let default_param_cd, default_unstake_cd =
+let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in
   let pc = constants.preserved_cycles in
   let msp = constants.max_slashing_period in
@@ -188,10 +188,10 @@ module State = struct
   }
 
   (** Expected number of cycles before staking parameters get applied *)
-  let param_cd state = state.constants.preserved_cycles + 1
+  let param_wait state = state.constants.preserved_cycles + 1
 
   (** Expected number of cycles before staking unstaked funds get unfrozen *)
-  let unstake_cd state =
+  let unstake_wait state =
     let pc = state.constants.preserved_cycles in
     let msp = state.constants.max_slashing_period in
     pc + msp
@@ -308,18 +308,19 @@ module State = struct
   (** When reaching a new cycle: apply unstakes and parameters changes.
     We expect these changes after applying the last block of a cycle *)
   let apply_end_cycle new_cycle state : t =
-    let unstake_cd = unstake_cd state in
+    let unstake_wait = unstake_wait state in
     (* Prepare finalizable unstakes *)
     let state =
-      match Cycle.sub new_cycle unstake_cd with
+      match Cycle.sub new_cycle unstake_wait with
       | None -> state
       | Some cycle -> apply_unslashable cycle state
     in
     (* Apply parameter changes *)
     let state, param_requests =
       List.fold_left
-        (fun (state, remaining_requests) (name, params, cd) ->
-          if cd > 0 then (state, (name, params, cd - 1) :: remaining_requests)
+        (fun (state, remaining_requests) (name, params, wait) ->
+          if wait > 0 then
+            (state, (name, params, wait - 1) :: remaining_requests)
           else
             let src = find_account name state in
             let state =
@@ -750,12 +751,12 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
         set_delegate_parameters (B block) delegate.contract ~parameters
       in
       (* Update state *)
-      let cd = state.constants.preserved_cycles - 1 in
+      let wait = state.constants.preserved_cycles - 1 in
       let state =
         {
           state with
           param_requests =
-            (delegate_name, parameters, cd) :: state.param_requests;
+            (delegate_name, parameters, wait) :: state.param_requests;
         }
       in
       (* Return both *)
@@ -1071,9 +1072,9 @@ module Roundtrip = struct
     --> (Tag "no wait after stake" --> Empty
         |+ Tag "wait after stake" --> wait_n_cycles 2)
 
-  let wait_for_unfreeze_and_check cd =
+  let wait_for_unfreeze_and_check wait =
     snapshot_balances "wait snap" ["staker"]
-    --> wait_n_cycles (cd - 1)
+    --> wait_n_cycles (wait - 1)
     (* Balance didn't change yet, but will change next cycle *)
     --> check_snapshot_balances "wait snap"
     --> next_cycle
@@ -1088,7 +1089,7 @@ module Roundtrip = struct
     stake_init
     --> (Tag "full unstake" --> unstake "staker" All
         |+ Tag "half unstake" --> unstake "staker" Half)
-    --> wait_for_unfreeze_and_check default_unstake_cd
+    --> wait_for_unfreeze_and_check default_unstake_wait
     --> finalize "staker" --> next_cycle
 
   let double_roundtrip =
@@ -1097,7 +1098,7 @@ module Roundtrip = struct
          --> unstake "staker" All
         |+ Tag "half then half unstake" --> wait_n_cycles 2
            --> unstake "staker" Half)
-    --> wait_for_unfreeze_and_check (default_unstake_cd - 2)
+    --> wait_for_unfreeze_and_check (default_unstake_wait - 2)
     --> wait_for_unfreeze_and_check 2
     --> finalize "staker" --> next_cycle
 
@@ -1113,13 +1114,13 @@ module Roundtrip = struct
            --> unstake "staker" (Amount amount_1)
            --> next_cycle
            --> unstake "staker" (Amount amount_2))
-    --> wait_n_cycles default_unstake_cd
+    --> wait_n_cycles default_unstake_wait
     --> finalize "staker"
     --> check_snapshot_balances "init"
 
   let scenario_finalize =
     no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" Half
-    --> wait_n_cycles (default_unstake_cd + 2)
+    --> wait_n_cycles (default_unstake_wait + 2)
     --> assert_failure
           (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
     --> (Tag "finalize with finalize" --> finalize_unstake "staker"
@@ -1132,7 +1133,7 @@ module Roundtrip = struct
   (* Todo: there might be other cases... like changing delegates *)
   let scenario_not_finalize =
     no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" All
-    --> wait_n_cycles (default_unstake_cd + 2)
+    --> wait_n_cycles (default_unstake_wait + 2)
     --> assert_failure
           (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
     --> snapshot_balances "not finalize" ["staker"]
@@ -1164,7 +1165,7 @@ module Roundtrip = struct
   let full_balance_in_finalizable =
     add_account_with_funds "dummy" "staker" (Amount (Tez.of_mutez 10_000_000L))
     --> stake "staker" All_but_one --> next_cycle --> unstake "staker" All
-    --> wait_n_cycles (default_unstake_cd + 2)
+    --> wait_n_cycles (default_unstake_wait + 2)
     (* At this point, almost all the balance (but one mutez) of the stake is in finalizable *)
     (* Staking is possible, but not transfer *)
     --> assert_failure
@@ -1200,7 +1201,7 @@ module Roundtrip = struct
     --> set_delegate "staker" (Some "delegate2")
     --> next_cycle
     --> assert_failure (stake "staker" Half)
-    --> wait_n_cycles (default_unstake_cd + 1)
+    --> wait_n_cycles (default_unstake_wait + 1)
     --> stake "staker" Half
 
   let unset_delegate =
@@ -1228,7 +1229,7 @@ module Roundtrip = struct
     --> transfer "staker" "dummy" All
     (* staker has an empty liquid balance, but still has unstaked frozen tokens,
        so it doesn't get deactivated *)
-    --> wait_n_cycles (default_unstake_cd + 1)
+    --> wait_n_cycles (default_unstake_wait + 1)
     --> finalize_unstake "staker"
 
   let forbid_costaking =
@@ -1262,7 +1263,7 @@ module Roundtrip = struct
     (* The changes are not immediate *)
     --> stake "staker" amount
     (* The parameters change is applied exactly [preserved_cycles + 1] after the request *)
-    --> wait_n_cycles (default_param_cd - 1)
+    --> wait_n_cycles (default_param_wait - 1)
     (* Not yet... *)
     --> stake "staker" amount
     --> next_cycle
@@ -1272,11 +1273,11 @@ module Roundtrip = struct
     --> stake "delegate" amount
     (* Can still unstake *)
     --> unstake "staker" Half
-    --> wait_n_cycles (default_unstake_cd + 1)
+    --> wait_n_cycles (default_unstake_wait + 1)
     --> finalize_unstake "staker"
     (* Can authorize stake again *)
     --> set_delegate_params "delegate" init_params
-    --> wait_n_cycles (default_param_cd - 1)
+    --> wait_n_cycles (default_param_wait - 1)
     (* Not yet... *)
     --> assert_failure (stake "staker" amount)
     --> next_cycle
