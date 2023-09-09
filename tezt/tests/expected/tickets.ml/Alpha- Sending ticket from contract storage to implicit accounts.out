@@ -119,7 +119,7 @@ Contract memorized as tickets_bag_implicit.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 1'
 Node is bootstrapped.
-Estimated gas: 1858.564 units (will add 100 for safety)
+Estimated gas: 1858.607 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -171,7 +171,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 tickets from bootstrap1 to '[CONTRACT_HASH]' with entrypoint save and contents '"Ticket"' and type string and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 3176.242 units (will add 100 for safety)
+Estimated gas: 3176.285 units (will add 100 for safety)
 Estimated storage: 44 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -237,7 +237,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint send --arg '"[PUBLIC_KEY_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2511.120 units (will add 100 for safety)
+Estimated gas: 2511.163 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'

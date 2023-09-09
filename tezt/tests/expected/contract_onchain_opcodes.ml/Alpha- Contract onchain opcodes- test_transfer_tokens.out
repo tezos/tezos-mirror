@@ -143,7 +143,7 @@ Contract memorized as transfer_tokens.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.348 units (will add 100 for safety)
+Estimated gas: 2948.391 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -186,7 +186,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.348 units (will add 100 for safety)
+Estimated gas: 2948.391 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'

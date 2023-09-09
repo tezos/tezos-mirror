@@ -11,7 +11,7 @@ Pair 1
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint mintOrBurn --arg '(Pair 100000000 "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2374.653 units (will add 100 for safety)
+Estimated gas: 2374.696 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'op3fbYoco7etNiu89X3QFJqodn1m1Ea7GemESAneUXKYkczu2xE'
@@ -50,7 +50,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap1 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2376.356 units (will add 100 for safety)
+Estimated gas: 2376.399 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'opANXwv88P4Mb2Sfvt9Bg4qvQw7mTYqqvsFb4F2w2K3swQkkS8T'
@@ -90,7 +90,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap2 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2376.356 units (will add 100 for safety)
+Estimated gas: 2376.399 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'ooqn5ft3czqM3bqc167hs3P3wk7kR9GFDDqZZXkrnu9SH7QVRsY'
@@ -130,7 +130,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap3 --entrypoint approve --arg '(Pair "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" 1000000000)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 2376.356 units (will add 100 for safety)
+Estimated gas: 2376.399 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'onuiJr9rFdnn2XZVfDHiaYVPjrPSsSpMNeBxBJ12QkHA6Eq3sWV'
@@ -170,7 +170,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 9001 from bootstrap1 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint addLiquidity --arg '(Pair "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 1000000000 "2050-01-01T00:00:00Z")'
 Node is bootstrapped.
-Estimated gas: 9493.340 units (will add 100 for safety)
+Estimated gas: 9493.383 units (will add 100 for safety)
 Estimated storage: 147 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'ooq5MoFVGaiUSrivqYfZ4s9ozY2A5NFiWygcPdbDV6GPkZjpWPq'
@@ -252,7 +252,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 9001 from bootstrap2 to KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 --burn-cap 10 --entrypoint xtzToToken --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" 0 "2050-01-01T00:00:00Z")'
 Node is bootstrapped.
-Estimated gas: 6067.079 units (will add 100 for safety)
+Estimated gas: 6067.122 units (will add 100 for safety)
 Estimated storage: 327 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'oo4QPZR8f2NuHShxU4qYmyjNgp3gJhoL2gEajuzvBCduwf6tL8R'
@@ -326,7 +326,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN from bootstrap2 --entrypoint transfer --arg '(Pair "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN" "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100)' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 3074.725 units (will add 100 for safety)
+Estimated gas: 3074.768 units (will add 100 for safety)
 Estimated storage: 68 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'op89Drr7PGKxzy5hFL8suaz5mviEyw3ijEbsA6pCtvarA3gaARU'
@@ -368,7 +368,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup call KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5 from bootstrap3 --entrypoint tokenToXtz --arg '(Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" 100 0 "2050-01-01T00:00:00Z")' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 7064.095 units (will add 100 for safety)
+Estimated gas: 7064.138 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is 'opaftcuoSBnXMV23RwWfzp9oVDyZjgTyRRW6QYEnVgjpnjG31Pe'
