@@ -1150,12 +1150,7 @@ module Auto_build = struct
     let codegen_options =
       Cmdline.
         {
-          transform =
-            Some
-              {
-                Fixed_point_transform.default_options with
-                max_relative_error = 0.5;
-              };
+          transform = Some Fixed_point_transform.default_options;
           save_to = Some (mkfilename ".ml");
           split;
         }
