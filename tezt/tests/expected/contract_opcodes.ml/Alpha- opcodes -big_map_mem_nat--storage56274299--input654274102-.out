@@ -9,7 +9,7 @@ big_map diff
   Set map(4)[1] to 4
   Set map(4)[2] to 11
 trace
-  - location: 12 (just consumed gas: 11.546)
+  - location: 12 (just consumed gas: 11.552)
     [ (Pair 3 { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ 3

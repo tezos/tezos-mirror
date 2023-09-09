@@ -67,7 +67,7 @@ Contract memorized as split_string.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"abc"'
 Node is bootstrapped.
-Estimated gas: 1319.890 units (will add 100 for safety)
+Estimated gas: 1319.891 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -94,7 +94,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" }
       Storage size: 272 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 1320.383
+      Consumed gas: 1320.384
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
@@ -105,7 +105,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"def"'
 Node is bootstrapped.
-Estimated gas: 1322.578 units (will add 100 for safety)
+Estimated gas: 1322.582 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -132,7 +132,7 @@ This sequence of operations was run:
       Updated storage: { "a" ; "b" ; "c" ; "d" ; "e" ; "f" }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 1323.071
+      Consumed gas: 1323.075
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045

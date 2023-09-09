@@ -23,7 +23,7 @@ trace
     [ 1
       {}
       {} ]
-  - location: 17 (just consumed gas: 0.720)
+  - location: 17 (just consumed gas: 0.722)
     [ False
       {} ]
   - location: 18 (just consumed gas: 0.010)

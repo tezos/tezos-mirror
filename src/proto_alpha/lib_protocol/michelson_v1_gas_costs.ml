@@ -37,13 +37,6 @@ module S = Saturation_repr
    be replaced by the generated versions.
 *)
 
-(* generated code is not usable: not possible to generate the same coeff *)
-(* model N_IPairing_check_bls12_381 *)
-(* when benchmarking, compile bls12-381 without ADX *)
-let cost_N_IPairing_check_bls12_381 size =
-  let open S.Syntax in
-  S.safe_int 450_000 + (S.safe_int 342_500 * S.safe_int size)
-
 (* generated code is not usable: the const is not on a grid point *)
 (* model N_ILsl_nat *)
 (* Allocates at most [size + 256] bytes *)
@@ -51,13 +44,6 @@ let cost_N_ILsl_nat size =
   let open S.Syntax in
   let v0 = S.safe_int size in
   S.safe_int 128 + (v0 lsr 1)
-
-(* generated code is not usable: the const is not on a grid point *)
-(* model CHECK_PRINTABLE *)
-(* Inferred: fun size -> (0. + (1.42588022179 * size)) *)
-let cost_CHECK_PRINTABLE size =
-  let open S.Syntax in
-  S.safe_int 14 + (S.safe_int 10 * S.safe_int size)
 
 (* generated code is not usable: the actual code and the model differ *)
 (* model N_ILsl_bytes *)
@@ -68,138 +54,6 @@ let cost_N_ILsl_bytes size shift =
   let v1 = S.safe_int size in
   let v0 = S.safe_int shift in
   S.safe_int 65 + (v1 lsr 1) + (v1 lsr 2) + (v0 lsr 4)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* Model N_ICompare *)
-(* Approximating 0.024413 x term *)
-let cost_N_ICompare size1 size2 =
-  let open S.Syntax in
-  let v0 = S.safe_int (Compare.Int.min size1 size2) in
-  S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for big_map_get *)
-(* model N_IMap_get *)
-(* Approximating 0.048359 x term *)
-let cost_N_IMap_get size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let v0 = size1 * log2 size2 in
-  S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for big_map_get_and_update *)
-(* model N_IMap_get_and_update *)
-(* Approximating 0.145661 x term *)
-let cost_N_IMap_get_and_update size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let v0 = size1 * log2 size2 in
-  S.safe_int 75 + (v0 lsr 3) + (v0 lsr 6)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for map_get_and_update *)
-(* model N_IMap_get_and_update *)
-let cost_N_IMap_get_and_update' size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let intercept = S.safe_int 80 in
-  (* The 3 factor reflects the update vs mem overhead as benchmarked
-     on non-structured data *)
-  intercept + (S.safe_int 3 * log2 size2 * size1)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for bigmap_update *)
-(* model N_IMap_update *)
-(* Approximating 0.097072 x term *)
-let cost_N_IMap_update size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let v0 = size1 * log2 size2 in
-  S.safe_int 55 + (v0 lsr 4) + (v0 lsr 5)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for map_update *)
-(* model N_IMap_update *)
-let cost_N_IMap_update' size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let intercept = S.safe_int 80 in
-  (* The 2 factor reflects the update vs mem overhead as benchmarked
-     on non-structured data *)
-  intercept + (S.safe_int 2 * log2 size2 * size1)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for bigmap_mem *)
-(* model N_IMap_mem *)
-(* Approximating 0.048446 x term *)
-let cost_N_IMap_mem size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let v0 = size1 * log2 size2 in
-  S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* used for map_mem *)
-(* model N_IMap_mem *)
-let cost_N_IMap_mem' size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let intercept = S.safe_int 80 in
-  intercept + (log2 size2 * size1)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* model interpreter/N_ISet_mem *)
-let cost_N_ISet_mem size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let intercept = S.safe_int 115 in
-  intercept + (log2 size2 * size1)
-
-(* generated code is not usable: the actual code and the model differ *)
-let cost_N_ISet_update size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let intercept = S.safe_int 130 in
-  (* The 2 factor reflects the update vs mem overhead as benchmarked
-     on non-structured data *)
-  intercept + (S.safe_int 2 * log2 size2 * size1)
-
-let cost_mul size1 size2 =
-  let open S.Syntax in
-  let a = S.safe_int size1 + S.safe_int size2 in
-  let v0 = a * log2 a in
-  S.safe_int 55 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4)
-
-(* generated code is not usable: the actual code and the model differ *)
-(* model N_IMul_int *)
-(* Approximating 0.857931 x term *)
-let cost_N_IMul_int = cost_mul
-
-(* generated code is not usable: the actual code and the model differ *)
-(* model N_IMul_nat *)
-(* Approximating 0.861823 x term *)
-let cost_N_IMul_nat = cost_mul
-
-(* generated code is not usable: not possible to generate the same coeff *)
-(* model interpreter/N_ISapling_verify_update *)
-(* fun size1 -> fun size2 -> ((432200.469784 + (5738377.05148 * size1)) + (4634026.28586 * size2)) *)
-let cost_N_ISapling_verify_update size1 size2 =
-  let open S.Syntax in
-  let size1 = S.safe_int size1 in
-  let size2 = S.safe_int size2 in
-  let v1 = size1 in
-  let v0 = size2 in
-  S.safe_int 432500 + (v1 * S.safe_int 5740000) + (v0 * S.safe_int 4635000)
 
 (* ------------------------------------------------------------------------ *)
 
@@ -237,13 +91,6 @@ let cost_N_KList_enter_body xs size_ys =
       let v0 = S.safe_int size_ys in
       S.safe_int 30 + (v0 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4))
   | _ :: _ -> S.safe_int 30
-
-(* model translator/TY_EQ *)
-(* fun size -> (31.1882471167 + (21.8805791266 * size)) *)
-let cost_TY_EQ size =
-  let open S.Syntax in
-  let v0 = size in
-  S.safe_int 35 + (v0 * S.safe_int 22)
 
 (* model PARSE_TYPE
    This is the cost of one iteration of parse_ty, extracted by hand from the
