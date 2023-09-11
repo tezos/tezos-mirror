@@ -651,6 +651,7 @@ type 'uri generate_protocol_parameters_file = {
   wallet : 'uri option; (* directory containing bootstrap keys *)
   pk_revealed_accounts_prefix : string option;
   pk_unrevealed_accounts_prefix : string option;
+  default_balance : string option;
   dal : dal_parameters;
   minimal_block_delay : string option;
 }
@@ -690,6 +691,7 @@ module Generate_protocol_parameters_file = struct
              wallet;
              pk_revealed_accounts_prefix;
              pk_unrevealed_accounts_prefix;
+             default_balance;
              dal;
              minimal_block_delay;
            } ->
@@ -698,6 +700,7 @@ module Generate_protocol_parameters_file = struct
           wallet,
           pk_revealed_accounts_prefix,
           pk_unrevealed_accounts_prefix,
+          default_balance,
           dal,
           minimal_block_delay ))
       (fun ( base_file,
@@ -705,6 +708,7 @@ module Generate_protocol_parameters_file = struct
              wallet,
              pk_revealed_accounts_prefix,
              pk_unrevealed_accounts_prefix,
+             default_balance,
              dal,
              minimal_block_delay ) ->
         {
@@ -713,15 +717,17 @@ module Generate_protocol_parameters_file = struct
           wallet;
           pk_revealed_accounts_prefix;
           pk_unrevealed_accounts_prefix;
+          default_balance;
           dal;
           minimal_block_delay;
         })
-      (obj7
+      (obj8
          (req "base_file" uri_encoding)
          (opt "output_file_name" string)
          (opt "wallet" uri_encoding)
          (opt "pk_revealed_accounts_prefix" string)
          (opt "pk_unrevealed_accounts_prefix" string)
+         (opt "default_balance" string)
          (req "dal" dal_parameters_encoding)
          (opt "minimal_block_delay" string))
 
@@ -749,6 +755,7 @@ module Generate_protocol_parameters_file = struct
     let pk_unrevealed_accounts_prefix =
       Option.map run base.pk_unrevealed_accounts_prefix
     in
+    let default_balance = Option.map run base.default_balance in
     let dal =
       {
         feature_enable = run base.dal.feature_enable;
@@ -766,6 +773,7 @@ module Generate_protocol_parameters_file = struct
       wallet;
       pk_revealed_accounts_prefix;
       pk_unrevealed_accounts_prefix;
+      default_balance;
       dal;
       minimal_block_delay;
     }
@@ -786,6 +794,7 @@ module Generate_protocol_parameters_file = struct
         wallet;
         pk_revealed_accounts_prefix;
         pk_unrevealed_accounts_prefix;
+        default_balance;
         dal;
         minimal_block_delay;
       } =
@@ -828,7 +837,11 @@ module Generate_protocol_parameters_file = struct
     in
     let* pk_revealed_accounts = to_accounts pk_aliases in
     let* pk_unrevealed_accounts = to_accounts pkh_aliases in
-    let default_balance = Protocol.default_bootstrap_balance in
+    let default_balance =
+      match default_balance with
+      | None -> Protocol.default_bootstrap_balance
+      | Some str -> int_of_string str
+    in
     let bootstrap_accounts_overrides =
       let json_accounts : JSON.u list =
         (pk_revealed_accounts
