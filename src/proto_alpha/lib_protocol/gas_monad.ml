@@ -109,6 +109,8 @@ let record_trace_eval :
 
 let fail e = of_result (Error e) [@@ocaml.inline always]
 
+let tzfail e = of_result (Result_syntax.tzfail e) [@@ocaml.inline always]
+
 module Syntax = struct
   let return = return
 
@@ -125,6 +127,8 @@ module Syntax = struct
   let return_false = return false
 
   let fail = fail
+
+  let tzfail = tzfail
 
   let ( let* ) = bind
 

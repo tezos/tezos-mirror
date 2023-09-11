@@ -87,6 +87,9 @@ val record_trace_eval :
 (** [fail e] is [of_result (Error e)] . *)
 val fail : 'trace -> ('a, 'trace) t
 
+(** [tzfail e] is [of_result (Result_syntax.tzfail e)] . *)
+val tzfail : 'err -> ('a, 'err Error_monad.trace) t
+
 (** Syntax module for the {!Gas_monad}. This is intended to be opened locally in
     functions. Within the scope of this module, the code can include binding
     operators, leading to a [let]-style syntax. Similar to {!Lwt_result_syntax}
@@ -115,6 +118,9 @@ module Syntax : sig
 
   (** [fail e] is [of_result (Error e)] . *)
   val fail : 'trace -> ('a, 'trace) t
+
+  (** [tzfail e] is [of_result (Result_syntax.tzfail e)] . *)
+  val tzfail : 'err -> ('a, 'err Error_monad.trace) t
 
   (** [let*] is a binding operator alias for {!bind}. *)
   val ( let* ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t

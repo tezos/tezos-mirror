@@ -54,15 +54,7 @@ let assert_inner_errors ~loc ctxt gas_monad ~errors ~remaining_gas =
   match GM.run ctxt gas_monad with
   | Ok (Error e, ctxt) ->
       let open Lwt_result_syntax in
-      let* () =
-        Assert.assert_equal_list
-          ~loc
-          ( = )
-          "Inner error"
-          Format.pp_print_string
-          e
-          errors
-      in
+      let* () = Assert.equal_string ~loc e errors in
       assert_equal_gas
         ~loc
         (Gas.remaining_operation_gas ctxt)
@@ -105,7 +97,7 @@ let test_gas_exhaustion_before_error () =
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
-    let* () = GM.of_result (error "Oh no") in
+    let* () = GM.of_result (Error "Oh no") in
     let* y = GM.return 2 in
     GM.return (x + y)
   in
@@ -145,7 +137,7 @@ let test_inner_error () =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
-    let* () = GM.of_result (error "Oh no") in
+    let* () = GM.of_result (Error "Oh no") in
     let* y = GM.return 2 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
     GM.return (x + y)
@@ -154,7 +146,7 @@ let test_inner_error () =
     ~loc:__LOC__
     ctxt
     gas_monad
-    ~errors:["Oh no"]
+    ~errors:"Oh no"
     ~remaining_gas:5
 
 (* Test that no gas-exhaustion error is produced and that no gas is consumed
