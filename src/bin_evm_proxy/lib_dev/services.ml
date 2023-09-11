@@ -85,6 +85,16 @@ let get_block_by_number ~full_transaction_object block_param
   | Latest | Earliest | Pending ->
       Rollup_node_rpc.current_block ~full_transaction_object
 
+let get_transaction_from_index block index
+    (module Rollup_node_rpc : Rollup_node.S) =
+  let open Lwt_result_syntax in
+  match block.Ethereum_types.transactions with
+  | TxHash l -> (
+      match List.nth_opt l index with
+      | None -> return_none
+      | Some hash -> Rollup_node_rpc.transaction_object hash)
+  | TxFull l -> return @@ List.nth_opt l index
+
 let dispatch_input
     ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
     =
@@ -147,6 +157,39 @@ let dispatch_input
     | Get_transaction_by_hash.Input (Some tx_hash) ->
         let* transaction_object = Rollup_node_rpc.transaction_object tx_hash in
         return (Get_transaction_by_hash.Output (Ok transaction_object))
+    | Get_transaction_by_block_hash_and_index.Input
+        (Some (block_hash, Qty index)) ->
+        let* block =
+          Rollup_node_rpc.block_by_hash
+            ~full_transaction_object:false
+            block_hash
+        in
+        let* transaction_object =
+          get_transaction_from_index
+            block
+            (Z.to_int index)
+            (module Rollup_node_rpc)
+        in
+        return
+          (Get_transaction_by_block_hash_and_index.Output
+             (Ok transaction_object))
+    | Get_transaction_by_block_number_and_index.Input
+        (Some (block_number, Qty index)) ->
+        let* block =
+          get_block_by_number
+            ~full_transaction_object:false
+            block_number
+            (module Rollup_node_rpc)
+        in
+        let* transaction_object =
+          get_transaction_from_index
+            block
+            (Z.to_int index)
+            (module Rollup_node_rpc)
+        in
+        return
+          (Get_transaction_by_block_number_and_index.Output
+             (Ok transaction_object))
     | Send_raw_transaction.Input (Some tx_raw) -> (
         let* is_valid = Rollup_node_rpc.is_tx_valid tx_raw in
         match is_valid with

@@ -242,6 +242,16 @@ module Get_transaction_by_hash :
     with type m_input = Ethereum_types.hash
      and type m_output = Ethereum_types.transaction_object option
 
+module Get_transaction_by_block_hash_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_hash * Ethereum_types.quantity
+     and type m_output = Ethereum_types.transaction_object option
+
+module Get_transaction_by_block_number_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_param * Ethereum_types.quantity
+     and type m_output = Ethereum_types.transaction_object option
+
 module Send_raw_transaction :
   METHOD
     with type m_input = Ethereum_types.hash

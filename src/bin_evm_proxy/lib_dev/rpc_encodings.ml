@@ -375,6 +375,34 @@ module Get_transaction_by_hash = MethodMaker (struct
   let method_ = "eth_getTransactionByHash"
 end)
 
+module Get_transaction_by_block_hash_and_index = MethodMaker (struct
+  open Ethereum_types
+
+  type input = block_hash * quantity
+
+  type output = transaction_object option
+
+  let input_encoding = Data_encoding.tup2 block_hash_encoding quantity_encoding
+
+  let output_encoding = Data_encoding.option transaction_object_encoding
+
+  let method_ = "eth_getTransactionByBlockHashAndIndex"
+end)
+
+module Get_transaction_by_block_number_and_index = MethodMaker (struct
+  open Ethereum_types
+
+  type input = block_param * quantity
+
+  type output = transaction_object option
+
+  let input_encoding = Data_encoding.tup2 block_param_encoding quantity_encoding
+
+  let output_encoding = Data_encoding.option transaction_object_encoding
+
+  let method_ = "eth_getTransactionByBlockNumberAndIndex"
+end)
+
 module Send_raw_transaction = MethodMaker (struct
   open Ethereum_types
 
@@ -473,6 +501,8 @@ let methods : (module METHOD) list =
     (module Get_transaction_count);
     (module Get_transaction_receipt);
     (module Get_transaction_by_hash);
+    (module Get_transaction_by_block_hash_and_index);
+    (module Get_transaction_by_block_number_and_index);
     (module Send_transaction);
     (module Send_raw_transaction);
     (module Eth_call);
