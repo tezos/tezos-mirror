@@ -125,7 +125,12 @@ let dispatch_input
         return
           (Get_block_by_number.Output
              (Ok Mockup.(block (TxHash [transaction_hash]))))
-    | Get_block_by_hash.Input _ ->
+    | Get_block_by_hash.Input (Some (block_hash, full_transaction_object)) ->
+        let* block =
+          Rollup_node_rpc.block_by_hash ~full_transaction_object block_hash
+        in
+        return (Get_block_by_number.Output (Ok block))
+    | Get_block_by_hash.Input None ->
         return
           (Get_block_by_hash.Output
              (Ok Mockup.(block (TxHash [transaction_hash]))))
