@@ -123,6 +123,84 @@ impl<'config> TransactionLayerData<'config> {
     }
 }
 
+mod benchmarks {
+
+    use super::*;
+
+    /// These values encodes the result of an evaluation step of the virtual
+    /// machine. They can be used to filter some data that can be seen as non
+    /// conclusive or irrelevant for the ticks model, or simply for data
+    /// analysis.
+    const STEP_CONTINUE: u8 = 0;
+    const SUCCEED_STOP: u8 = 1;
+    const SUCCEED_RETURN: u8 = 2;
+    const SUCCEED_SUICIDE: u8 = 3;
+    const EXIT_ERROR: u8 = 4;
+    const EXIT_REVERT: u8 = 5;
+    const EXIT_FATAL: u8 = 6;
+    const TRAP: u8 = 7;
+
+    #[inline(always)]
+    fn step_exit_reason<T>(capture: &Result<(), Capture<ExitReason, T>>) -> u8 {
+        match capture {
+            Ok(()) => STEP_CONTINUE,
+            Err(Capture::Exit(ExitReason::Succeed(ExitSucceed::Stopped))) => SUCCEED_STOP,
+            Err(Capture::Exit(ExitReason::Succeed(ExitSucceed::Returned))) => {
+                SUCCEED_RETURN
+            }
+            Err(Capture::Exit(ExitReason::Succeed(ExitSucceed::Suicided))) => {
+                SUCCEED_SUICIDE
+            }
+            Err(Capture::Exit(ExitReason::Error(_))) => EXIT_ERROR,
+            Err(Capture::Exit(ExitReason::Revert(_))) => EXIT_REVERT,
+            Err(Capture::Exit(ExitReason::Fatal(_))) => EXIT_FATAL,
+            Err(Capture::Trap(_)) => TRAP,
+        }
+    }
+
+    // About the two `static mut` below and their usage
+    //
+    // Low key optimisation to avoid the formatting: we know that the data are
+    // always 1 byte for the opcode, 8 bytes pour the gas (u64), 1 byte for the
+    // step exit reason. The messages are preallocated and updated with the
+    // correct values each time they are called. It avoid using the formatting.
+    // The overhead of formatting is significative.
+
+    // The start section for the opcodes expects a single byte which is the
+    // current opcode.
+    static mut START_SECTION_MSG: [u8; 35] = *b"__wasm_debugger__::start_section(\0)";
+
+    #[inline(always)]
+    pub fn start_section<Host: Runtime>(host: &mut Host, opcode: &Opcode) {
+        unsafe {
+            START_SECTION_MSG[33] = opcode.as_u8();
+            host.write_debug(core::str::from_utf8_unchecked(&START_SECTION_MSG));
+        }
+    }
+
+    // The value of the ending sections are:
+    // - 8 bytes for the gas, in little endian
+    // - 1 byte that describes the continuation of the evaluation: it either
+    //   continues to the next opcode (`STEP_CONTINUE`) or stops for a given
+    //   reason, this reason being encoded in a byte. These values are described
+    //   at the beginning of the `benchmarks` module.
+    static mut END_SECTION_MSG: [u8; 41] =
+        *b"__wasm_debugger__::end_section(\0\0\0\0\0\0\0\0\0)";
+
+    #[inline(always)]
+    pub fn end_section<Host: Runtime, T>(
+        host: &mut Host,
+        gas: u64,
+        step_result: &Result<(), Capture<ExitReason, T>>,
+    ) {
+        unsafe {
+            END_SECTION_MSG[31..39].copy_from_slice(&gas.to_le_bytes());
+            END_SECTION_MSG[39] = step_exit_reason(step_result);
+            host.write_debug(core::str::from_utf8_unchecked(&END_SECTION_MSG));
+        }
+    }
+}
+
 /// The implementation of the SputnikVM [Handler] trait
 pub struct EvmHandler<'a, Host: Runtime> {
     /// The host
@@ -325,6 +403,8 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     }
 
     /// Execute a SputnikVM runtime with this handler
+    // Never inlined to ensure we can see it in the profiling results
+    #[inline(never)]
     fn execute(
         &mut self,
         runtime: &mut evm::Runtime,
@@ -334,13 +414,21 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // consumption of opcode and implement the tick model at the opcode
             // level. At the end of each step if the kernel takes more than the
             // allocated ticks the transaction is marked as failed.
-            let _opcode = runtime.machine().inspect().map(|p| p.0);
+            let opcode = runtime.machine().inspect().map(|p| p.0);
 
-            let _gas_before = self.gas_used();
+            if let Some(opcode) = opcode {
+                benchmarks::start_section(self.host, &opcode);
+            }
+            let gas_before = self.gas_used();
 
             let step_result = runtime.step(self);
 
-            let _gas_after = self.gas_used();
+            let gas_after = self.gas_used();
+
+            if opcode.is_some() {
+                let gas = gas_after - gas_before;
+                benchmarks::end_section(self.host, gas, &step_result);
+            };
 
             match step_result {
                 Ok(()) => (),
