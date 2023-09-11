@@ -33,6 +33,10 @@ let get r = !r
 
 let set r v = r := v
 
+let map f r =
+  let v = get r in
+  set r (f v)
+
 let new_ v = ref v
 
 let readonly r = r
