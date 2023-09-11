@@ -32,7 +32,7 @@ This document describes Adaptive Issuance and Staking, two new features of the O
 
 .. note::
 
-  For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/p/4ff0c50a57a8>`__.
+  For operational details about the new staking mechanism and its configuration, see `a new staking mechanism tutorial <https://medium.com/the-aleph/a-walkthrough-of-tezos-new-staking-mechanism-4ff0c50a57a8>`__.
 
 .. _adaptive_issuance_alpha:
 

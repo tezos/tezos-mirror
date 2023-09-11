@@ -223,9 +223,9 @@ Note, if you use filecheck for storage monitoring, you need to configure your da
 Logs
 ~~~~
 
-Eventually, you may want to gather the logs from the different Octez executables. To do so, we suggest to use `Loki <https://grafana.com/docs/loki/latest/>`_ and `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_. Promtail is used to gather the logs from each executable of Octez and pushes them to a Loki instance, for indexing metadata about the logs.
+Eventually, you may want to gather the logs from the different Octez executables. To do so, we suggest to use `Loki <https://grafana.com/docs/loki/latest/>`_ and `Promtail <https://grafana.com/docs/loki/latest/send-data/promtail/>`_. Promtail is used to gather the logs from each executable of Octez and pushes them to a Loki instance, for indexing metadata about the logs.
 
-You first need to install both tools, following `their installation instructions <https://grafana.com/docs/loki/latest/installation/local/>`_.
+You first need to install both tools, following `their installation instructions <https://grafana.com/docs/loki/latest/setup/install/local/>`_.
 
 A configuration file will be required, which can be downloaded with:
 

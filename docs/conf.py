@@ -224,6 +224,7 @@ linkcheck_ignore = [
     r'^\.\./',
     # flaky servers, to remove one day if they got more predictable
     r'^https://opentezos\.com/',
+    r'^https://crates.io/crates/tezos-smart-rollup',
 ]
 linkcheck_allowed_redirects = dict(
     [
