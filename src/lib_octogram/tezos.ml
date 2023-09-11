@@ -567,7 +567,12 @@ let dal_parameters_encoding =
 
 type 'uri generate_protocol_parameters_file = {
   base_file : 'uri;
+  (* the existing protocol parameters file whose parameters
+     will be adjusted *)
   output_file_name : string option;
+  wallet : 'uri option; (* directory containing bootstrap keys *)
+  pk_revealed_accounts_prefix : string option;
+  pk_unrevealed_accounts_prefix : string option;
   dal : dal_parameters;
   minimal_block_delay : string option;
 }
@@ -601,13 +606,44 @@ module Generate_protocol_parameters_file = struct
   let encoding uri_encoding =
     let open Data_encoding in
     conv
-      (fun {base_file; output_file_name; dal; minimal_block_delay} ->
-        (base_file, output_file_name, dal, minimal_block_delay))
-      (fun (base_file, output_file_name, dal, minimal_block_delay) ->
-        {base_file; output_file_name; dal; minimal_block_delay})
-      (obj4
+      (fun {
+             base_file;
+             output_file_name;
+             wallet;
+             pk_revealed_accounts_prefix;
+             pk_unrevealed_accounts_prefix;
+             dal;
+             minimal_block_delay;
+           } ->
+        ( base_file,
+          output_file_name,
+          wallet,
+          pk_revealed_accounts_prefix,
+          pk_unrevealed_accounts_prefix,
+          dal,
+          minimal_block_delay ))
+      (fun ( base_file,
+             output_file_name,
+             wallet,
+             pk_revealed_accounts_prefix,
+             pk_unrevealed_accounts_prefix,
+             dal,
+             minimal_block_delay ) ->
+        {
+          base_file;
+          output_file_name;
+          wallet;
+          pk_revealed_accounts_prefix;
+          pk_unrevealed_accounts_prefix;
+          dal;
+          minimal_block_delay;
+        })
+      (obj7
          (req "base_file" uri_encoding)
          (opt "output_file_name" string)
+         (opt "wallet" uri_encoding)
+         (opt "pk_revealed_accounts_prefix" string)
+         (opt "pk_unrevealed_accounts_prefix" string)
          (req "dal" dal_parameters_encoding)
          (opt "minimal_block_delay" string))
 
@@ -625,6 +661,16 @@ module Generate_protocol_parameters_file = struct
       Remote_procedure.global_uri_of_string ~self ~run base.base_file
     in
     let output_file_name = Option.map run base.output_file_name in
+    let wallet =
+      base.wallet
+      |> Option.map (Remote_procedure.global_uri_of_string ~self ~run)
+    in
+    let pk_revealed_accounts_prefix =
+      Option.map run base.pk_revealed_accounts_prefix
+    in
+    let pk_unrevealed_accounts_prefix =
+      Option.map run base.pk_unrevealed_accounts_prefix
+    in
     let dal =
       {
         feature_enable = run base.dal.feature_enable;
@@ -636,19 +682,100 @@ module Generate_protocol_parameters_file = struct
       }
     in
     let minimal_block_delay = Option.map run base.minimal_block_delay in
-    {base_file; output_file_name; dal; minimal_block_delay}
+    {
+      base_file;
+      output_file_name;
+      wallet;
+      pk_revealed_accounts_prefix;
+      pk_unrevealed_accounts_prefix;
+      dal;
+      minimal_block_delay;
+    }
 
   let resolve ~self resolver base =
     let base_file =
       Remote_procedure.file_agent_uri ~self ~resolver base.base_file
     in
-    {base with base_file}
+    let wallet =
+      base.wallet |> Option.map (resolve_octez_rpc_global_uri ~self ~resolver)
+    in
+    {base with base_file; wallet}
 
-  let run state {base_file; output_file_name; dal; minimal_block_delay} =
+  let run state
+      {
+        base_file;
+        output_file_name;
+        wallet;
+        pk_revealed_accounts_prefix;
+        pk_unrevealed_accounts_prefix;
+        dal;
+        minimal_block_delay;
+      } =
     let* base_file =
       Http_client.local_path_from_agent_uri
         (Agent_state.http_client state)
         base_file
+    in
+    let* base_dir =
+      match wallet with
+      | None -> return None
+      | Some dir ->
+          let* dir =
+            Http_client.local_path_from_agent_uri
+              (Agent_state.http_client state)
+              dir
+          in
+          return (Some dir)
+    in
+    let client = Client.create ?base_dir () in
+    let* all_addresses = Client.list_known_addresses client in
+    let filter_by_prefix prefix =
+      List.filter_map
+        (fun (alias, _pkh) ->
+          if String.starts_with ~prefix alias then Some alias else None)
+        all_addresses
+    in
+    let pk_aliases =
+      match pk_revealed_accounts_prefix with
+      | None -> List.map fst all_addresses
+      | Some prefix -> filter_by_prefix prefix
+    in
+    let pkh_aliases =
+      match pk_unrevealed_accounts_prefix with
+      | None -> []
+      | Some prefix -> filter_by_prefix prefix
+    in
+    let to_accounts =
+      Lwt_list.map_p (fun alias -> Client.show_address ~alias client)
+    in
+    let* pk_revealed_accounts = to_accounts pk_aliases in
+    let* pk_unrevealed_accounts = to_accounts pkh_aliases in
+    let default_balance = Protocol.default_bootstrap_balance in
+    let bootstrap_accounts_overrides =
+      let json_accounts : JSON.u list =
+        (pk_revealed_accounts
+        |> List.map (fun (account : Account.key) ->
+               `A
+                 [
+                   (* We pass the public key of the account, therefore it will
+                      not have to be revealed later. *)
+                   `String account.public_key;
+                   `String (string_of_int default_balance);
+                 ]))
+        @ (pk_unrevealed_accounts
+          |> List.map (fun (account : Account.key) ->
+                 `A
+                   [
+                     (* We only pass the public key hash of the account,
+                        therefore the public key will be considered as not yet
+                        revealed for these accounts. *)
+                     `String account.public_key_hash;
+                     `String (string_of_int default_balance);
+                   ]))
+      in
+      let key = ["bootstrap_accounts"] in
+      let path = key in
+      (path, `A json_accounts)
     in
     let dal_overrides : string list * JSON.u =
       let value =
@@ -673,7 +800,8 @@ module Generate_protocol_parameters_file = struct
         minimal_block_delay
     in
     let overrides =
-      ([dal_overrides] @ minimal_block_delay_overrides
+      ([bootstrap_accounts_overrides; dal_overrides]
+       @ minimal_block_delay_overrides
         :> Protocol.parameter_overrides)
     in
     let* params_file =
@@ -2305,7 +2433,11 @@ module Generate_keys = struct
   let run state {base_dir; kind} =
     let client = Agent_state.http_client state in
     let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
-    let* () = Lwt_unix.mkdir base_dir 0x755 in
+    let* base_dir_exists = Lwt_unix.file_exists base_dir in
+    let* () =
+      (* this distinction is only needed in the Fresh case *)
+      if not base_dir_exists then Lwt_unix.mkdir base_dir 0x755 else unit
+    in
     match kind with
     | Default ->
         Account.write Constant.all_secret_keys ~base_dir ;
