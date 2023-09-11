@@ -97,10 +97,11 @@ let string_list_of_ex_tickets ctxt tickets =
 
 let make_ex_ticket ctxt ~ticketer ~type_exp ~content_exp ~amount =
   let open Lwt_result_wrap_syntax in
-  let*?@ Script_ir_translator.Ex_comparable_ty cty, ctxt =
+  let*?@ res, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    Script_ir_translator.parse_comparable_ty ctxt node
+    Gas_monad.run ctxt @@ Script_ir_translator.parse_comparable_ty node
   in
+  let*?@ (Script_ir_translator.Ex_comparable_ty cty) = res in
   let*?@ ticketer = Contract.of_b58check ticketer in
   let*@ contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
@@ -125,11 +126,12 @@ let assert_equals_ex_tickets ctxt ~loc ex_tickets expected =
 
 let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
   let open Lwt_result_wrap_syntax in
-  let Script_typed_ir.Ex_ty ty, ctxt =
+  let*?@ res, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
-    Result.value_f
-      ~default:(fun () -> Stdlib.failwith "Failed to parse")
-      (Script_ir_translator.parse_any_ty ctxt ~legacy:false node)
+    Gas_monad.run ctxt @@ Script_ir_translator.parse_any_ty ~legacy:false node
+  in
+  let (Script_typed_ir.Ex_ty ty) =
+    Result.value_f ~default:(fun () -> Stdlib.failwith "Failed to parse") res
   in
   let node = Micheline.root @@ Expr.from_string value_exp in
   let*@ value, ctxt =

@@ -86,9 +86,11 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
     individual parts submitted as part of a Zk_rollup_publish operation. *)
 let parse_ticket ~ticketer ~contents ~ty ctxt =
   let open Lwt_result_syntax in
-  let*? Ex_comparable_ty contents_type, ctxt =
-    Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+  let*? res, ctxt =
+    Gas_monad.run ctxt
+    @@ Script_ir_translator.parse_comparable_ty (Micheline.root ty)
   in
+  let*? (Ex_comparable_ty contents_type) = res in
   let* contents, ctxt =
     Script_ir_translator.parse_comparable_data
       ctxt

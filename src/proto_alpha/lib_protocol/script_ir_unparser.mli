@@ -170,11 +170,10 @@ module type MICHELSON_PARSER = sig
     tzresult
 
   val parse_packable_ty :
-    context ->
     stack_depth:int ->
     legacy:bool ->
     Script.node ->
-    (ex_ty * context) tzresult
+    (ex_ty, error trace) Gas_monad.t
 
   val parse_data :
     unparse_code_rec:unparse_code_rec ->
