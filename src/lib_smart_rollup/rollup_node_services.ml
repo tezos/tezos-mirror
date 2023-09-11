@@ -4,6 +4,7 @@
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -355,6 +356,13 @@ module Global = struct
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash)
       (path / "last_stored_commitment")
+
+  let global_block_watcher =
+    Tezos_rpc.Service.get_service
+      ~description:"Monitor and streaming the L2 blocks"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Sc_rollup_block.encoding
+      (path / "monitor_blocks")
 end
 
 module Local = struct

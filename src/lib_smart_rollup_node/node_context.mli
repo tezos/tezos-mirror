@@ -95,6 +95,9 @@ type 'a t = {
   mutable current_protocol : current_protocol;
       (** Information about the current protocol. This value is changed in place
           on protocol upgrades. *)
+  global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
+      (** Watcher for the L2 chain, which enables RPC services to access
+          a stream of L2 blocks. *)
 }
 
 (** Read/write node context {!t}. *)
