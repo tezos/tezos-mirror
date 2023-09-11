@@ -196,10 +196,12 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
       txs
   in
   let* hashes = Evm_proxy_server.batch_evm_rpc evm_proxy_server requests in
-  let first_hash =
-    hashes |> JSON.as_list |> List.hd |> Evm_proxy_server.extract_result
-    |> JSON.as_string
+  let hashes =
+    hashes |> JSON.as_list
+    |> List.map (fun json ->
+           Evm_proxy_server.extract_result json |> JSON.as_string)
   in
+  let first_hash = List.hd hashes in
   (* Let's wait until one of the transactions is injected into a block, and
       test this block contains the `n` transactions as expected. *)
   let* receipt =
@@ -212,7 +214,7 @@ let send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs =
          ~transaction_hash:first_hash)
       ()
   in
-  return (requests, receipt)
+  return (requests, receipt, hashes)
 
 let setup_l1_contracts ~admin client =
   (* Originates the exchanger. *)
@@ -1280,7 +1282,7 @@ let test_full_blocks =
     |> List.filteri (fun i _ -> i < 5)
     |> List.map (fun (tx, _hash) -> tx)
   in
-  let* _requests, receipt =
+  let* _requests, receipt, _hashes =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
   in
   let* block =
@@ -1379,7 +1381,7 @@ let test_inject_100_transactions =
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
-  let* requests, receipt =
+  let* requests, receipt, _hashes =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
   in
   let* block_with_100tx =
@@ -2173,6 +2175,80 @@ let test_rpc_sendRawTransaction =
     ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
   unit
 
+let get_transaction_by_block_arg_and_index_request ~by arg index =
+  let by = match by with `Hash -> "Hash" | `Number -> "Number" in
+  Evm_proxy_server.
+    {
+      method_ = "eth_getTransactionByBlock" ^ by ^ "AndIndex";
+      parameters = `A [`String arg; `String index];
+    }
+
+let get_transaction_by_block_arg_and_index ~by proxy_server block_hash index =
+  let* transaction_object =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (get_transaction_by_block_arg_and_index_request ~by block_hash index)
+  in
+  return
+    JSON.(
+      transaction_object |-> "result" |> Transaction.transaction_object_of_json)
+
+let test_rpc_getTransactionByBlockArgAndIndex ~by protocol =
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
+  let* _, _, hashes =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_proxy_server
+      (List.map fst txs)
+  in
+  Lwt_list.iter_s
+    (fun transaction_hash ->
+      let* receipt =
+        wait_for_application
+          ~sc_rollup_node
+          ~node
+          ~client
+          (wait_for_transaction_receipt ~evm_proxy_server ~transaction_hash)
+          ()
+      in
+      let block_arg, index =
+        ( (match by with
+          | `Hash -> receipt.blockHash
+          | `Number -> Int32.to_string receipt.blockNumber),
+          receipt.transactionIndex )
+      in
+      let* transaction_object =
+        get_transaction_by_block_arg_and_index
+          ~by
+          evm_proxy_server
+          block_arg
+          (Int32.to_string index)
+      in
+      Check.(
+        ((transaction_object.hash = transaction_hash) string)
+          ~error_msg:"Incorrect transaction hash, should be %R, but got %L.") ;
+      unit)
+    hashes
+
+let test_rpc_getTransactionByBlockHashAndIndex =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_transaction_by"; "block_hash_and_index"]
+    ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
+  @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
+
+let test_rpc_getTransactionByBlockNumberAndIndex =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_transaction_by"; "block_number_and_index"]
+    ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
+  @@ test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
+
 type storage_migration_results = {
   transfer_result : transfer_result;
   block_result : Block.t;
@@ -2550,7 +2626,7 @@ let test_reboot =
     read_file (kernel_inputs_path ^ "/100-loops")
     |> String.trim |> String.split_on_char '\n'
   in
-  let* requests, receipt =
+  let* requests, receipt, _hashes =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs
   in
   let* block_with_many_txs =
@@ -2632,6 +2708,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
   test_rpc_sendRawTransaction_nonce_too_high protocols ;
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
+  test_rpc_getTransactionByBlockHashAndIndex protocols ;
+  test_rpc_getTransactionByBlockNumberAndIndex protocols ;
   test_reboot protocols
 
 let register ~protocols =
