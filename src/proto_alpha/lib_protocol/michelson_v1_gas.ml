@@ -385,10 +385,12 @@ module Cost_of = struct
     let dupn n = atomic_step_cost (cost_N_IDupN n)
 
     let sapling_verify_update ~inputs ~outputs ~bound_data =
-      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs bound_data)
+      atomic_step_cost
+        (cost_N_ISapling_verify_update_with_blake2b inputs outputs bound_data)
 
     let sapling_verify_update_deprecated ~inputs ~outputs =
-      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs 0)
+      atomic_step_cost
+        (cost_N_ISapling_verify_update_with_blake2b inputs outputs 0)
 
     let sapling_empty_state = atomic_step_cost cost_N_ISapling_empty_state
 
@@ -787,7 +789,7 @@ module Cost_of = struct
     (* The gas cost for comparing a type with a type of size 1 *)
     let ty_eq_prim = atomic_step_cost (cost_TY_EQ (Saturation_repr.safe_int 1))
 
-    let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE
+    let parse_type_cycle = atomic_step_cost cost_PARSE_TYPE1
 
     let parse_instr_cycle = atomic_step_cost cost_TYPECHECKING_CODE
 

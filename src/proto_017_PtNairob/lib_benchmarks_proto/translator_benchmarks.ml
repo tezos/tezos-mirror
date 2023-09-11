@@ -596,7 +596,7 @@ module Ty_eq : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
-      ~model:(Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
+      (Model.affine ~name ~intercept:intercept_var ~coeff:coeff_var)
 
   let models = [("size_translator_model", size_model)]
 
@@ -766,12 +766,10 @@ module Parse_type_benchmark : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
+      (Model.affine
+         ~name
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 
@@ -819,12 +817,10 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let size_model =
     Model.make
       ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
+      (Model.affine
+         ~name
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 

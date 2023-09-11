@@ -34,7 +34,7 @@ let fv s = Free_variable.of_namespace (ns s)
 let const_time_model ~const_name ~name =
   Model.make
     ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~name ~const:(fv const_name))
+    (Model.unknown_const1 ~name ~const:(fv const_name))
 
 let make_bench ~name ~info ~model ~generator ~make_bench : Benchmark.simple =
   let module Bench = struct

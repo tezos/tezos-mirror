@@ -250,7 +250,7 @@ module Context_size_dependent_shared = struct
       ~conv:(function
         | Random_context_random_access {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
-      ~model:read_model
+      read_model
 
   let group = Benchmark.Group "io_read"
 end
@@ -608,7 +608,7 @@ module Irmin_pack_read_bench : Benchmark.Simple = struct
       ~conv:(function
         | Irmin_pack_read {depth; storage_bytes; _} ->
             (depth, (storage_bytes, ())))
-      ~model:read_model
+      read_model
 
   let group = Benchmark.Group "io_read"
 
@@ -786,7 +786,7 @@ module Irmin_pack_write_bench : Benchmark.Simple = struct
       ~conv:(function
         | Irmin_pack_write {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:write_model
+      write_model
 
   let group = Benchmark.Group "io_write"
 
@@ -936,7 +936,7 @@ module Read_random_key_bench : Benchmark.Simple_with_num = struct
     Model.make
       ~conv:(function
         | Read_random_key {depth; storage_bytes} -> (depth, (storage_bytes, ())))
-      ~model:read_model
+      read_model
 
   let make_bench rng_state config keys () =
     let card = Array.length keys in
@@ -1087,7 +1087,7 @@ module Write_random_keys_bench : Benchmark.Simple_with_num = struct
       ~conv:(function
         | Write_random_keys {keys_written; storage_bytes; _} ->
             (keys_written, (storage_bytes, ())))
-      ~model:write_model
+      write_model
 
   let write_storage context key bytes =
     Lwt_main.run (Context.add context key bytes)

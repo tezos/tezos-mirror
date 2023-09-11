@@ -24,25 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Skip_list_costs_generated
 
-(* Cannot use the generated [cost_next] because of the type difference *)
+(* generated code is not usable: the model is different *)
 (* model skip_list/next *)
-(* fun size -> (19.813850951 * (log2 (1 + size))) *)
+(* fun size -> (19.2125537461 * (log2 (1 + size))) *)
 let cost_next size =
   let open S.Syntax in
   let v0 = log2 (S.safe_int 1 + size) in
   v0 * S.safe_int 20
 
 let model_next ~length = cost_next (S.safe_z length)
-
-(* Cannot use the generated [cost_hash_cell] because of the type difference *)
-(* model skip_list/hash_cell *)
-(* fun size -> (242.202299543 + (56.9693504823 * size)) *)
-let cost_hash_cell size =
-  let open S.Syntax in
-  let v0 = size in
-  S.safe_int 250 + (v0 * S.safe_int 57)
 
 let model_hash_cell ~backpointers_count =
   cost_hash_cell (S.safe_int backpointers_count)

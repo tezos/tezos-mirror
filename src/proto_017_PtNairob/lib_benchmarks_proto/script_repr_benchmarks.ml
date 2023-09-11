@@ -87,16 +87,12 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
   let size_based_model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
-      ~model:
-        (Model.affine
-           ~name
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (fv
-                (Format.asprintf
-                   "%s_ns_per_node_coeff"
-                   (Namespace.basename name))))
+      (Model.affine
+         ~name
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:
+           (fv
+              (Format.asprintf "%s_ns_per_node_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_based_model)]
 
@@ -131,7 +127,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
     Model.(
       make
         ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
-        ~model:(linear ~name ~coeff:(fv "nodes")))
+        (linear ~name ~coeff:(fv "nodes")))
 
   let models = [("strip_annotations_model", strip_annotations_model)]
 

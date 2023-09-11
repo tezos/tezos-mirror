@@ -61,7 +61,7 @@ module Size_benchmarks_shared_config = struct
     Model.make
       ~name
       ~conv:(function {size} -> (size, ()))
-      ~model:(Model.affine ~intercept:intercept_variable ~coeff:coeff_variable)
+      (Model.affine ~intercept:intercept_variable ~coeff:coeff_variable)
 end
 
 module Value_size_benchmark : Tezos_benchmark.Benchmark.S = struct
@@ -281,15 +281,11 @@ module Node_size_benchmark : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(function {micheline_nodes} -> (micheline_nodes, ()))
-      ~model:
-        (Model.affine
-           ~intercept:
-             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (fv
-                (Format.asprintf
-                   "%s_ns_per_node_coeff"
-                   (Namespace.basename name))))
+      (Model.affine
+         ~intercept:(fv (Format.asprintf "%s_const" (Namespace.basename name)))
+         ~coeff:
+           (fv
+              (Format.asprintf "%s_ns_per_node_coeff" (Namespace.basename name))))
 
   let micheline_nodes_benchmark node =
     let open Cache_memory_helpers in

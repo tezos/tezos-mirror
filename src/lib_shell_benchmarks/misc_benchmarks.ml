@@ -34,7 +34,7 @@ let lwt_variable = fv "lwt_main_run"
 let lwt_model ~name =
   Model.make
     ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~name ~const:lwt_variable)
+    (Model.unknown_const1 ~name ~const:lwt_variable)
 
 module Lwt_main_run_bench : Benchmark.Simple = struct
   type config = unit

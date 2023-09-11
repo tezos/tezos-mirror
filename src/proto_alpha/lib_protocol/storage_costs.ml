@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Storage_costs_generated
+
 (* The model for read accesses is the following:
 
    cost(path_length, read_bytes) = 200_000 + 5000 * path_length + 2 * read_bytes
@@ -43,6 +45,7 @@ let write_access ~written_bytes =
   Gas_limit_repr.atomic_step_cost
     (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
 
+(* generated code is not usable: the coeff is not generatable *)
 (* model storage/List_key_values *)
 (* fun size -> (470. + (117. * size)) *)
 let cost_List_key_values size =

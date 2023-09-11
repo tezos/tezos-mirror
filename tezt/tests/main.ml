@@ -221,7 +221,6 @@ let register_protocol_specific_because_regression_tests () =
   Dal.register ~protocols:[Alpha] ;
   Evm_rollup.register ~protocols:[Alpha] ;
   Sc_sequencer.register ~protocols:[Alpha] ;
-  Snoop_codegen.register ~protocols:[Alpha] ;
   (* This can be safely removed after Nairobi is frozen *)
   Timelock_disabled.register ~protocols:[Nairobi]
 

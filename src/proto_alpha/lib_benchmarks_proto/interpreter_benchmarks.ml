@@ -198,7 +198,7 @@ let make_default_samplers ?(algo = `Default) cfg :
 
 (* Register only a model for code generation *)
 let register_model_for_code_generation model =
-  let model = Model.make ~conv:Fun.id ~model in
+  let model = Model.make ~conv:Fun.id model in
   Registration.register_model_for_code_generation "interpreter" model
 
 let register_time_alloc_codegen_model instr_or_cont_name =

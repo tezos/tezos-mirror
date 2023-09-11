@@ -78,12 +78,11 @@ module Apply_diff_bench : Benchmark.S = struct
   let model =
     Model.make
       ~conv:(fun {nb_input; nb_output; _} -> (nb_input, (nb_output, ())))
-      ~model:
-        (Model.bilinear_affine
-           ~name
-           ~intercept:(fv "apply_diff_const")
-           ~coeff1:(fv "apply_diff_inputs")
-           ~coeff2:(fv "apply_diff_outputs"))
+      (Model.bilinear_affine
+         ~name
+         ~intercept:(fv "apply_diff_const")
+         ~coeff1:(fv "apply_diff_inputs")
+         ~coeff2:(fv "apply_diff_outputs"))
 
   let models = [("apply_diff", model)]
 

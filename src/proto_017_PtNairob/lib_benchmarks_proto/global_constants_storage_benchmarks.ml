@@ -322,7 +322,7 @@ module Set_add : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(logn ~name ~coeff:(fv "set_add_coeff"))) );
+            (logn ~name ~coeff:(fv "set_add_coeff"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -378,7 +378,7 @@ module Set_elements : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~name ~coeff:(fv "set_elements_coeff"))) );
+            (linear ~name ~coeff:(fv "set_elements_coeff"))) );
     ]
 
   module Int_set = Set.Make (Int)
@@ -442,11 +442,10 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
         Model.(
           make
             ~conv:(fun Micheline_sampler.{nodes; _} -> (nodes, ()))
-            ~model:
-              (Model.affine
-                 ~name
-                 ~intercept:(fv "b58_check_intercept")
-                 ~coeff:(fv "b58_check_coeff"))) );
+            (Model.affine
+               ~name
+               ~intercept:(fv "b58_check_intercept")
+               ~coeff:(fv "b58_check_coeff"))) );
     ]
 
   (* To create realistic benchmarks, we generate a random Micheline expression,
@@ -506,7 +505,7 @@ struct
         Model.(
           make
             ~conv:(fun size -> (size, ()))
-            ~model:(linear ~name ~coeff:(fv "blake2b_hash_coeff"))) );
+            (linear ~name ~coeff:(fv "blake2b_hash_coeff"))) );
     ]
 
   let create_benchmark rng_state _config () =
@@ -594,7 +593,7 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:(linear ~name ~coeff:(fv "storage_exp_cst_coeff"))) );
+              (linear ~name ~coeff:(fv "storage_exp_cst_coeff"))) );
       ]
 
     (* To test Branch 2 as nearly as possible, we generate a Micheline Seq
@@ -677,11 +676,10 @@ module Global_constants_storage_expand_models = struct
           Model.(
             make
               ~conv:(fun size -> (size, ()))
-              ~model:
-                (nlogn
-                   ~name
-                   ~intercept:(fv "storage_exp_no_cst_intercept")
-                   ~coeff:(fv "storage_exp_no_cst_coeff"))) );
+              (nlogn
+                 ~name
+                 ~intercept:(fv "storage_exp_no_cst_intercept")
+                 ~coeff:(fv "storage_exp_no_cst_coeff"))) );
       ]
 
     (** We benchmark this by generating a random Micheline expression without constants

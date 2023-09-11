@@ -110,20 +110,18 @@ module Micheline_common = struct
     Model.make
       ~conv:(fun {size = {Size.traversal; int_bytes; string_bytes}; _} ->
         (traversal, (int_bytes, (string_bytes, ()))))
-      ~model:
-        (Model.trilinear
-           ~name:(ns name)
-           ~coeff1:(fv (Format.asprintf "%s_micheline_traversal" name))
-           ~coeff2:(fv (Format.asprintf "%s_micheline_int_bytes" name))
-           ~coeff3:(fv (Format.asprintf "%s_micheline_string_bytes" name)))
+      (Model.trilinear
+         ~name:(ns name)
+         ~coeff1:(fv (Format.asprintf "%s_micheline_traversal" name))
+         ~coeff2:(fv (Format.asprintf "%s_micheline_int_bytes" name))
+         ~coeff3:(fv (Format.asprintf "%s_micheline_string_bytes" name)))
 
   let model_bytes name =
     Model.make
       ~conv:(fun {bytes; _} -> (bytes, ()))
-      ~model:
-        (Model.linear
-           ~name:(ns name)
-           ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
+      (Model.linear
+         ~name:(ns name)
+         ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
 
   let models name =
     [("micheline", model_size name); ("micheline_bytes", model_bytes name)]

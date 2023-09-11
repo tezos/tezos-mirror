@@ -24,8 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Sapling_storage_costs_generated
 
+(* generated code is not usable: the coeff is not generatable *)
 (* model sapling/SAPLING_APPLY_DIFF *)
 (* fun size1 -> fun size2 -> 1300000 + 5000 * size1 + 55000 * size2 *)
 let cost_SAPLING_APPLY_DIFF size1 size2 =

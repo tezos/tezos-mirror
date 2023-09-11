@@ -94,10 +94,7 @@ module Model : sig
   open Model
 
   val make :
-    name:Namespace.t ->
-    conv:('a -> 'b) ->
-    model:(Namespace.t -> 'b model) ->
-    'a t
+    name:Namespace.t -> conv:('a -> 'b) -> (Namespace.t -> 'b model) -> 'a t
 
   val affine :
     ?intercept:Free_variable.t ->

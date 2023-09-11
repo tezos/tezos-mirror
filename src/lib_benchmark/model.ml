@@ -149,7 +149,17 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
   let model elim = apply X.int arity model elim
 end
 
-let make ~conv ~model = Abstract {conv; model}
+let set_takes_saturation_reprs (type a) b ((module Model) : a model) : a model =
+  let module Model' = struct
+    include Model
+
+    let takes_saturation_reprs = b
+  end in
+  (module Model')
+
+let make ?(takes_saturation_reprs = false) ~conv model =
+  let model = set_takes_saturation_reprs takes_saturation_reprs model in
+  Abstract {conv; model}
 
 let make_aggregated ~model ~sub_models = Aggregate {model; sub_models}
 
@@ -242,20 +252,6 @@ let get_free_variable_set_applied (type workload) (model : workload t)
   let module T1 = Costlang.Beta_normalize (T0) in
   let module R = M (T1) in
   T0.prj @@ T1.prj R.applied
-
-let set_takes_saturation_reprs' (type a) b ((module Model) : a model) : a model
-    =
-  let module Model' = struct
-    include Model
-
-    let takes_saturation_reprs = b
-  end in
-  (module Model')
-
-let set_takes_saturation_reprs b = function
-  | Abstract {conv; model} ->
-      Abstract {conv; model = set_takes_saturation_reprs' b model}
-  | _ -> invalid_arg "set_takes_saturation_reprs"
 
 (* -------------------------------------------------------------------------- *)
 (* Commonly used models *)

@@ -24,16 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Carbonated_map_costs_generated
 open S.Syntax
-
-(* model carbonated_map/fold *)
-(* fun size -> (50. + (24 * size)) *)
-let cost_fold size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 50 + (v0 * S.safe_int 24)
 
 type cost = Saturation_repr.may_saturate Saturation_repr.t
 

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
+include Script_typed_ir_size_costs_generated
 
 (* [coeff] should be the maximum of
     [script_typed_ir_size/KINSTR_SIZE_size_coeff]

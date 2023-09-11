@@ -121,7 +121,8 @@ module Model = struct
 
   type 'workload t = 'workload Model.t
 
-  let make ~name ~conv ~model = make ~conv ~model:(model name)
+  let make ?takes_saturation_reprs ~name ~conv model =
+    make ?takes_saturation_reprs ~conv (model name)
 
   let unknown_const1 ?const name =
     let ns s = Free_variable.of_namespace (Namespace.cons name s) in

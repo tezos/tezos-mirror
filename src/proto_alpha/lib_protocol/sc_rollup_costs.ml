@@ -24,31 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module S = Saturation_repr
-
-(* model sc_rollup/Sc_rollup_verify_output_proof_benchmark *)
-(* [fun size -> (103413.141163 + (6.85566158429 * size))] *)
-let cost_Sc_rollup_verify_output_proof_benchmark size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 103450 + (v0 * S.safe_int 7)
-
-(* model sc_rollup/Sc_rollup_install_boot_sector_benchmark *)
-(* fun size -> (13535.257218 + (3.68260983358 * size)) *)
-let cost_Sc_rollup_install_boot_sector_benchmark size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 13550 + ((v0 lsr 1) + (v0 * S.safe_int 3))
-
-(* model sc_rollup/Sc_rollup_deserialize_output_proof_benchmark *)
-(* fun size -> (7086.16259141 + (6.04996016914 * size)) *)
-let cost_Sc_rollup_deserialize_output_proof_benchmark size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  S.safe_int 7100 + (v0 * S.safe_int 6)
+include Sc_rollup_costs_generated
 
 module Constants = struct
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.contract_optimized *)
