@@ -86,6 +86,49 @@ mod old_storage {
     }
 }
 
+mod migration_block_helpers {
+    use crate::error::Error;
+    use primitive_types::U256;
+    use tezos_smart_rollup_host::{
+        path::RefPath,
+        runtime::{Runtime, RuntimeError},
+    };
+
+    const NEXT_BLOCK_NUMBER_TO_MIGRATE: RefPath =
+        RefPath::assert_from(b"/__migration/block_number");
+
+    pub fn store_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+        block_number: U256,
+    ) -> Result<(), Error> {
+        let mut le_block_number: [u8; 32] = [0; 32];
+        block_number.to_little_endian(&mut le_block_number);
+        host.store_write_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE, &le_block_number)
+            .map_err(Error::from)
+    }
+
+    pub fn read_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+    ) -> Result<U256, Error> {
+        match host.store_read_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+            Ok(next_block_number_to_migrate) => {
+                Ok(U256::from_little_endian(&next_block_number_to_migrate))
+            }
+            Err(RuntimeError::PathNotFound) => Ok(U256::zero()),
+            Err(e) => Err(Error::from(e)),
+        }
+    }
+
+    pub fn delete_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+    ) -> Result<(), Error> {
+        match host.store_delete(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+            Err(e) => Err(Error::from(e)),
+        }
+    }
+}
+
 // The workflow for migration is the following:
 //
 // - bump `storage::STORAGE_VERSION` by one
