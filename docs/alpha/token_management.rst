@@ -82,13 +82,7 @@ The field ``kind`` allows to identify the type of container account, it can have
 * ``"contract"`` represents implicit or originated accounts, and comes with the additional field (also called) ``contract`` whose value is the public key hash of the implicit or originated account.
 * ``"freezer"`` represents frozen accounts, and comes with the additional field ``category`` that can have one of the following values:
 
-  - ``"legacy_deposits"``, ``"legacy_fees"``, or ``"legacy_rewards"`` represent the accounts of frozen deposits, frozen fees or frozen rewards up to protocol HANGZHOU.
-    Accounts in this category are further identified by the following additional fields:
-
-    - the field ``delegate`` contains the public key hash of the delegate who owns the frozen funds
-    - the field ``cycle`` contains the cycle at which the funds have been deposited or granted.
-
-  - ``"deposits"`` represents the accounts of frozen deposits in subsequent protocols (replacing the legacy container account ``"legacy_deposits"`` above).
+  - ``"deposits"`` represents the accounts of frozen deposits.
     Accounts in this category are further identified by the additional field ``delegate`` whose value is the public key hash of the delegate who owns the frozen funds.
 
   - ``"bonds"`` represents the accounts of frozen bonds.
