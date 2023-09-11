@@ -11,6 +11,14 @@ use crate::storage::{
 };
 use tezos_smart_rollup_host::runtime::Runtime;
 
+// The lowest(*) benchmarked number was 14453, but we let some margin in case
+// there is some unexpected overhead.
+// Other reason is that during the reboots, some block can be bigger than others
+// resulting in more ticks consumed.
+//
+// (*): lowest meaning "before reaching the maximum number of ticks"
+pub const MAX_MIGRATABLE_BLOCKS_PER_REBOOT: usize = 10000;
+
 mod old_storage {
     use crate::error::Error;
     use crate::storage::{store_read_slice, EVM_BLOCKS};
