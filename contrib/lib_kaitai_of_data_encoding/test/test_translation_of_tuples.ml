@@ -35,6 +35,7 @@ let%expect_test "test tuple translation" =
     {|
     meta:
       id: simple_tuple
+      endian: be
     enums:
       bool:
         0: false
@@ -58,6 +59,7 @@ let%expect_test "test long tuple translation" =
     {|
     meta:
       id: simple_tuple
+      endian: be
     enums:
       bool:
         0: false
@@ -87,6 +89,7 @@ let%expect_test "test tup1 tuple translation" =
     {|
     meta:
       id: tup1
+      endian: be
     seq:
     - id: uint8
       type: u1
@@ -104,6 +107,7 @@ let%expect_test "test tuples with tup1 translation" =
     {|
     meta:
       id: tup1tup
+      endian: be
     enums:
       bool:
         0: false

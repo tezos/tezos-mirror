@@ -24,30 +24,60 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Kaitai.Types
+
 (** [default_doc_spec] is without summary and references.  *)
-val default_doc_spec : Kaitai.Types.DocSpec.t
+val default_doc_spec : DocSpec.t
 
 (** [Enum] module defines enum definitions needed for describing data-encoding
     ground types. *)
 module Enum : sig
   (** [map] describes mapping of enum id (string) with the corresponding
       [EnumSpec.t]. *)
-  type map = (string * Kaitai.Types.EnumSpec.t) list
+  type map = (string * EnumSpec.t) list
 
   (** [bool] is a mapping for boolean type. *)
-  val bool : string * Kaitai.Types.EnumSpec.t
+  val bool : string * EnumSpec.t
 
   (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
       [enum], then new list with it is returned, otherwise existing [enums] list
       is returned. *)
-  val add : map -> string * Kaitai.Types.EnumSpec.t -> map
+  val add : map -> string * EnumSpec.t -> map
 end
 
 (** [Attr] is module for getting [AttrSpec.t] of ground types. *)
 module Attr : sig
   (** [bool] returns [AttrSpec.t] definition of bool ground type. *)
-  val bool : Kaitai.Types.AttrSpec.t
+  val bool : AttrSpec.t
 
   (** [u1] returns [AttrSpec.t] definition of 8-bit unsigned integer. *)
-  val u1 : Kaitai.Types.AttrSpec.t
+  val u1 : AttrSpec.t
+
+  (** [s1] returns [AttrSpec.t] definition of 8-bit signed integer. *)
+  val s1 : AttrSpec.t
+
+  (** [u2] returns [AttrSpec.t] definition of 16-bit unsigned integer. *)
+  val u2 : AttrSpec.t
+
+  (** [s2] returns [AttrSpec.t] definition of 16-bit signed integer. *)
+  val s2 : AttrSpec.t
+
+  (** [s4] returns [AttrSpec.t] definition of 32-bit signed integer. *)
+  val s4 : AttrSpec.t
+
+  (** [s8] returns [AttrSpec.t] definition of 64-bit signed integer. *)
+  val s8 : AttrSpec.t
+
+  (** [int31] returns [AttrSpec.t] definition of 31-bit signed integer.
+      For more about this type see [Data_encoding.int31]. *)
+  val int31 : AttrSpec.t
+
+  (** [f8] returns [AttrSpec.t] definition of 64-bit float. *)
+  val f8 : AttrSpec.t
+
+  (** [bytes] returns [AttrSpec.t] definition of [Data_encoding.bytes]. *)
+  val bytes : AttrSpec.t
+
+  (** [string] returns [AttrSpec.t] definition of [Data_encoding.string]. *)
+  val string : AttrSpec.t
 end

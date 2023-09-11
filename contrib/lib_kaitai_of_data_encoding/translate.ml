@@ -37,7 +37,7 @@ let default_meta_spec ~encoding_name =
       path = [];
       isOpaque = false;
       id = Some encoding_name;
-      endian = None;
+      endian = Some `BE;
       bitEndian = None;
       encoding = None;
       forceDebug = false;
@@ -95,14 +95,21 @@ let rec seq_field_of_data_encoding :
 let rec from_data_encoding :
     type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
  fun ~encoding_name {encoding; json_encoding = _} ->
+  let class_spec_of_ground ?(enums = []) ground =
+    {(default_class_spec ~encoding_name) with seq = [ground]; enums}
+  in
   match encoding with
-  | Bool ->
-      {
-        (default_class_spec ~encoding_name) with
-        seq = [Ground.Attr.bool];
-        enums = [Ground.Enum.bool];
-      }
-  | Uint8 -> {(default_class_spec ~encoding_name) with seq = [Ground.Attr.u1]}
+  | Bool -> class_spec_of_ground ~enums:[Ground.Enum.bool] Ground.Attr.bool
+  | Uint8 -> class_spec_of_ground Ground.Attr.u1
+  | Int8 -> class_spec_of_ground Ground.Attr.s1
+  | Uint16 -> class_spec_of_ground Ground.Attr.u2
+  | Int16 -> class_spec_of_ground Ground.Attr.s2
+  | Int32 -> class_spec_of_ground Ground.Attr.s4
+  | Int64 -> class_spec_of_ground Ground.Attr.s8
+  | Int31 -> class_spec_of_ground Ground.Attr.int31
+  | Float -> class_spec_of_ground Ground.Attr.f8
+  | Bytes (_kind_length, _) -> class_spec_of_ground Ground.Attr.bytes
+  | String (_kind_length, _) -> class_spec_of_ground Ground.Attr.string
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
@@ -117,4 +124,7 @@ let rec from_data_encoding :
       in
       {(default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
+  | Describe {encoding; _} -> from_data_encoding ~encoding_name encoding
+  | Dynamic_size {kind = _; encoding} ->
+      from_data_encoding ~encoding_name encoding
   | _ -> failwith "Not implemented"

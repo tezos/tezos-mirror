@@ -31,6 +31,18 @@ let default_doc_spec = DocSpec.{summary = None; refs = []}
 let cond_no_cond =
   AttrSpec.ConditionalSpec.{ifExpr = None; repeat = RepeatSpec.NoRepeat}
 
+let default_attr_spec =
+  AttrSpec.
+    {
+      path = [];
+      id = "";
+      dataType = DataType.AnyType;
+      cond = cond_no_cond;
+      valid = None;
+      doc = default_doc_spec;
+      enum = None;
+    }
+
 module Enum = struct
   type map = (string * Kaitai.Types.EnumSpec.t) list
 
@@ -63,26 +75,93 @@ end
 
 module Attr = struct
   let bool =
-    AttrSpec.
-      {
-        path = [];
-        id = "bool";
-        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-        cond = cond_no_cond;
-        valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
-        doc = default_doc_spec;
-        enum = Some (fst Enum.bool);
-      }
+    {
+      default_attr_spec with
+      id = "bool";
+      dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
+      valid = Some (ValidationAnyOf [IntNum 0; IntNum 255]);
+      enum = Some (fst Enum.bool);
+    }
 
-  let u1 =
-    AttrSpec.
-      {
-        path = [];
-        id = "uint8";
-        dataType = DataType.(NumericType (Int_type (Int1Type {signed = false})));
-        cond = cond_no_cond;
-        valid = None;
-        doc = default_doc_spec;
-        enum = None;
-      }
+  let int1_type_attr_spec ~signed =
+    {
+      default_attr_spec with
+      id = (if signed then "int8" else "uint8");
+      dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
+    }
+
+  let int_multi_type_atrr_spec ~id ~signed width =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          NumericType (Int_type (IntMultiType {signed; width; endian = None})));
+    }
+
+  let float_multi_type_attr_spec ~id =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          NumericType
+            (Float_type
+               (FloatMultiType
+                  {
+                    (* Data-encoding supports only 64-bit floats. *)
+                    width = DataType.W8;
+                    endian = None;
+                  })));
+    }
+
+  let bytes_limit_type_attr_spec ~id =
+    {
+      default_attr_spec with
+      id;
+      dataType =
+        DataType.(
+          BytesType
+            (BytesLimitType
+               {
+                 size = Name "size";
+                 terminator = None;
+                 include_ = false;
+                 padRight = None;
+                 process = None;
+               }));
+    }
+
+  let u1 = int1_type_attr_spec ~signed:false
+
+  let s1 = int1_type_attr_spec ~signed:true
+
+  let u2 = int_multi_type_atrr_spec ~id:"uint16" ~signed:false DataType.W2
+
+  let s2 = int_multi_type_atrr_spec ~id:"int16" ~signed:true DataType.W2
+
+  let s4 = int_multi_type_atrr_spec ~id:"int32" ~signed:true DataType.W4
+
+  let s8 = int_multi_type_atrr_spec ~id:"int64" ~signed:true DataType.W8
+
+  let int31 =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6261
+             There should be a validation that [Int31] is in the appropriate
+             range. *)
+    int_multi_type_atrr_spec ~id:"int31" ~signed:true DataType.W4
+
+  let f8 = float_multi_type_attr_spec ~id:"float"
+
+  let bytes =
+    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
+              We fix size header to [`Uint30] for now. This corresponds to
+              size header of ground bytes encoding. Later on we want to add
+              support for [`Uint16], [`Uint8] and [`N]. *)
+    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
+
+  let string =
+    (* TODO:  https://gitlab.com/tezos/tezos/-/issues/6260
+              Same as with [Bytes] above, i.e. we need to add support for [`Uint16],
+              [`Uint8] and [`N] size header as well. *)
+    bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
 end
