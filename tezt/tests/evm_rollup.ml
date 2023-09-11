@@ -591,6 +591,21 @@ let test_rpc_getBlockByNumber =
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
   unit
 
+let test_l2_block_size_non_zero =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "block"; "size"]
+    ~title:"Block size is greater than zero"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* block =
+    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
+  in
+  Check.((block.size > 0l) int32)
+    ~error_msg:"Unexpected block size, should be > 0, but got %%L" ;
+  unit
+
 let transaction_count_request address =
   Evm_proxy_server.
     {
@@ -2560,6 +2575,7 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getTransactionCount protocols ;
   test_rpc_getTransactionCountBatch protocols ;
   test_rpc_batch protocols ;
+  test_l2_block_size_non_zero protocols ;
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
