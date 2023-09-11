@@ -145,16 +145,27 @@ let mk_rpc_config endpoint =
   in
   new http_ctxt rpc_config Tezos_rpc_http.Media_type.all_media_types
 
-(* Returns the current level of the node whose endpoint is given. *)
+(* Returns the current level of the node whose endpoint is given. We use
+   {!Monitor_services.heads} because {!Block_services.Empty.header} doesn't work
+   and we don't want to instantiate the {!Block_services.Make} with a particular
+   protocol. *)
 let current_level endpoint =
   let rpc_ctxt = mk_rpc_config endpoint in
-  let* header_res = Block_services.Empty.header rpc_ctxt () in
-  match header_res with
-  | Error _ ->
+  let* heads = Monitor_services.heads rpc_ctxt `Main in
+  match heads with
+  | Error _e ->
       Test.fail
-        "Error while retrieving the current level from server %s"
+        "Monitoring L1 blocks with RPC server %s failed when calling the RPC!"
         (Foreign_endpoint.as_string endpoint)
-  | Ok {shell = {level; _}; _} -> return @@ Int32.to_int level
+  | Ok (stream, stopper) -> (
+      let* v = Lwt_stream.get stream in
+      match v with
+      | None ->
+          stopper () ;
+          Test.fail
+            "Monitoring L1 blocks with RPC server %s failed. Stream closed!"
+            (Foreign_endpoint.as_string endpoint)
+      | Some (_hash, {shell = {level; _}; _}) -> return @@ Int32.to_int level)
 
 (* This function fetches L1 blocks (heads) published to the stream returned by
    calling RPC [/monitor/heads/main/] at address [endpoint] and checks whether
