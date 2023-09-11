@@ -43,8 +43,8 @@ module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
         Ethereum_types.hex
-        -> (Ethereum_types.hash, error trace) t
-    | New_l2_head : Ethereum_types.block_height -> (unit, error trace) t
+        -> ((Ethereum_types.hash, string) result, tztrace) t
+    | New_l2_head : Ethereum_types.block_height -> (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -91,13 +91,19 @@ let on_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
   let {rollup_node = (module Rollup_node); _} = state in
-  let (Ethereum_types.Hex raw_tx) = tx_raw in
-  Message_queue.replace state.messages raw_tx raw_tx ;
-  (* compute the hash *)
-  let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
-  let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
-  let hash = Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show) in
-  return hash
+  let* is_valid = Rollup_node.is_tx_valid tx_raw in
+  match is_valid with
+  | Error err -> return (Error err)
+  | Ok _ ->
+      let (Ethereum_types.Hex raw_tx) = tx_raw in
+      Message_queue.replace state.messages raw_tx raw_tx ;
+      (* compute the hash *)
+      let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
+      let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+      let hash =
+        Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+      in
+      return (Ok hash)
 
 let on_head state block_height =
   let open Lwt_result_syntax in
