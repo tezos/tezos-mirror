@@ -359,7 +359,7 @@ with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for `implicit accounts <def_implicit_account_oxford>`__.
+the same name introduced for :ref:`implicit accounts <def_implicit_account_oxford>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
