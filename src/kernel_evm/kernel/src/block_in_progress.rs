@@ -15,7 +15,7 @@ use anyhow::Context;
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
-use tezos_ethereum::block::L2Block;
+use tezos_ethereum::block::{BlockConstants, L2Block};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     TransactionObject, TransactionReceipt, TransactionStatus, TransactionType,
@@ -170,6 +170,30 @@ impl BlockInProgress {
             transactions,
             tick_model::top_level_overhead_ticks(),
         )
+    }
+
+    pub fn from_queue_element(
+        proposal: crate::blueprint::QueueElement,
+        current_block_number: U256,
+        constants: &BlockConstants,
+        tick_counter: u64,
+    ) -> BlockInProgress {
+        match proposal {
+            crate::blueprint::QueueElement::Blueprint(proposal) => {
+                // proposal is turn into a ring to allow poping from the front
+                let ring = proposal.transactions.into();
+                BlockInProgress::new_with_ticks(
+                    current_block_number,
+                    constants.gas_price,
+                    ring,
+                    tick_counter,
+                )
+            }
+            crate::blueprint::QueueElement::BlockInProgress(mut bip) => {
+                bip.estimated_ticks = tick_counter;
+                bip
+            }
+        }
     }
 
     pub fn register_valid_transaction<Host: Runtime>(
