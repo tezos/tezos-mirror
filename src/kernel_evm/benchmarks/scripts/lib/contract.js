@@ -50,7 +50,8 @@ const compile_contract_file = function (directory, contract_file) {
     var contracts = [];
     for (var contractName in output.contracts['contract.sol']) {
         let contract = output.contracts['contract.sol'][contractName];
-        let infos = { bytecode : "0x" + contract.evm.bytecode.object,
+        let infos = { name: contractName,
+                      bytecode : "0x" + contract.evm.bytecode.object,
                       interface : new ethers.Interface(contract.abi) };
         contracts.push(infos);
     }
@@ -58,4 +59,12 @@ const compile_contract_file = function (directory, contract_file) {
     return contracts;
 }
 
-module.exports = { legacy_contract_address, contracts_directory, compile_contract_file }
+const find_contract = function (contracts, name) {
+    for (const i in contracts) {
+        if (contracts[i].name == name) {
+            return contracts[i]
+        }
+    }
+}
+
+module.exports = { legacy_contract_address, contracts_directory, compile_contract_file, find_contract }
