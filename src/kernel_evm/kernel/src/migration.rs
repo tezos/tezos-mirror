@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::cmp;
+
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
@@ -18,6 +20,12 @@ use tezos_smart_rollup_host::runtime::Runtime;
 //
 // (*): lowest meaning "before reaching the maximum number of ticks"
 pub const MAX_MIGRATABLE_BLOCKS_PER_REBOOT: usize = 10000;
+
+pub enum MigrationStatus {
+    None,
+    InProgress,
+    Done,
+}
 
 mod old_storage {
     use crate::error::Error;
@@ -136,7 +144,7 @@ mod migration_block_helpers {
 //   needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
-fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
@@ -147,7 +155,16 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
         // Migrate L2Block storage
         let head_number = read_current_block_number(host)?;
-        for number in 0..(head_number.as_usize() + 1) {
+        let next_block_number_to_migrate =
+            migration_block_helpers::read_next_block_number_to_migrate(host)?.as_usize();
+
+        let max_migration_threshold =
+            next_block_number_to_migrate + MAX_MIGRATABLE_BLOCKS_PER_REBOOT - 1;
+        let last_block_to_migrate =
+            cmp::min(max_migration_threshold, head_number.as_usize());
+        let keep_migrating = max_migration_threshold < head_number.as_usize();
+
+        for number in next_block_number_to_migrate..(last_block_to_migrate + 1) {
             let block = old_storage::read_and_remove_l2_block(host, number.into())?;
 
             if number == head_number.as_usize() {
@@ -157,17 +174,31 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
                 store_block_by_hash(host, &block)?
             }
         }
-        // MIGRATION CODE - END
-        store_storage_version(host, STORAGE_VERSION)?
+
+        if keep_migrating {
+            migration_block_helpers::store_next_block_number_to_migrate(
+                host,
+                (last_block_to_migrate + 1).into(),
+            )?;
+            host.mark_for_reboot()?;
+            return Ok(MigrationStatus::InProgress);
+        } else {
+            migration_block_helpers::delete_next_block_number_to_migrate(host)?;
+
+            // MIGRATION CODE - END
+            store_storage_version(host, STORAGE_VERSION)?;
+            return Ok(MigrationStatus::Done);
+        }
     }
-    Ok(())
+    Ok(MigrationStatus::None)
 }
 
-pub fn storage_migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    if migration(host).is_err() {
+pub fn storage_migration<Host: Runtime>(
+    host: &mut Host,
+) -> Result<MigrationStatus, Error> {
+    let migration_result = migration(host);
+    migration_result.map_err(|_|
         // Something went wrong during the migration.
         // The fallback mechanism is triggered to retrograde to the previous kernel.
-        Err(Error::UpgradeError(Fallback))?
-    }
-    Ok(())
+        Error::UpgradeError(Fallback))
 }

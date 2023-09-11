@@ -7,6 +7,7 @@
 
 use anyhow::Context;
 use evm_execution::Config;
+use migration::MigrationStatus;
 use primitive_types::U256;
 use storage::{
     read_admin, read_chain_id, read_kernel_version, read_last_info_per_level_timestamp,
@@ -57,7 +58,7 @@ pub const CONFIG: Config = Config::london();
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
-pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     log!(host, Info, "Entering stage zero.");
     init_storage_versioning(host)?;
     storage_migration(host)
@@ -228,16 +229,21 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
         fetch_queue_left(host)?
     } else {
         // first kernel run of the level
-        stage_zero(host)?;
-        set_kernel_version(host)?;
-        let smart_rollup_address = retrieve_smart_rollup_address(host)
-            .context("Failed to retrieve smart rollup address")?;
-        let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
-        let ticketer = read_ticketer(host);
-        let admin = read_admin(host);
+        match stage_zero(host)? {
+            MigrationStatus::None | MigrationStatus::Done => {
+                set_kernel_version(host)?;
+                let smart_rollup_address = retrieve_smart_rollup_address(host)
+                    .context("Failed to retrieve smart rollup address")?;
+                let chain_id =
+                    retrieve_chain_id(host).context("Failed to retrieve chain id")?;
+                let ticketer = read_ticketer(host);
+                let admin = read_admin(host);
 
-        stage_one(host, smart_rollup_address, chain_id, ticketer, admin)
-            .context("Failed during stage 1")?
+                stage_one(host, smart_rollup_address, chain_id, ticketer, admin)
+                    .context("Failed during stage 1")?
+            }
+            MigrationStatus::InProgress => return Ok(()),
+        }
     };
 
     stage_two(host, queue).context("Failed during stage 2")
