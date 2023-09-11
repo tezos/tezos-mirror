@@ -125,6 +125,9 @@ type bootstrap_contract = {
   hash : string option;
 }
 
+(** The value is the same as the one in src/proto_alpha/lib_parameters/default_parameters.ml. *)
+val default_bootstrap_balance : int
+
 (** Write a protocol parameter file.
 
     This function first builds a default parameter file from the [base]
