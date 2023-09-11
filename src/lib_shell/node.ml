@@ -110,6 +110,11 @@ let init_p2p chain_name p2p_params disable_mempool =
         P2p.create
           ~config
           ~limits
+          ~received_msg_hook:
+            Shell_metrics.Distributed_db.Messages.on_received_msg
+          ~sent_msg_hook:Shell_metrics.Distributed_db.Messages.on_sent_msg
+          ~broadcasted_msg_hook:
+            Shell_metrics.Distributed_db.Messages.on_broadcasted_msg
           peer_metadata_cfg
           conn_metadata_cfg
           message_cfg

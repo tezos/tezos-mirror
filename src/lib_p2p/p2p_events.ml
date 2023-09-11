@@ -1066,12 +1066,13 @@ module P2p = struct
       ("error", Error_monad.trace_encoding)
 
   let message_trysent =
-    declare_1
+    declare_2
       ~section
       ~name:"message_trysent"
       ~level:Debug
-      ~msg:"message trysent to {peer}"
+      ~msg:"message trysent to {peer} resulting to {result}"
       ("peer", P2p_peer.Id.encoding)
+      ("result", Data_encoding.bool)
 
   let trysending_message_error =
     declare_2

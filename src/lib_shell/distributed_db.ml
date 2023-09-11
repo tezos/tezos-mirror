@@ -441,6 +441,7 @@ module Request = struct
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     ignore
       (P2p.broadcast
+         chain_db.global_db.p2p
          chain_db.reader_chain_db.active_connections
          (Get_current_head chain_id))
 
@@ -455,6 +456,7 @@ module Advertise = struct
   let current_head chain_db ?(mempool = Mempool.empty) head =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     P2p.broadcast
+      chain_db.global_db.p2p
       ~alt:
         (let if_conn conn =
            let {Connection_metadata.disable_mempool; _} =
@@ -483,6 +485,7 @@ module Advertise = struct
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
     let msg = Message.Current_head (chain_id, header, mempool) in
     P2p.broadcast
+      chain_db.global_db.p2p
       ~except:(fun conn -> not (acceptable_version conn))
       chain_db.reader_chain_db.active_connections
       msg
