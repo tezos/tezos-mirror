@@ -1752,4 +1752,66 @@ mod test {
             0.into()
         );
     }
+
+    #[test]
+    fn test_chain_id() {
+        // Arrange
+        let mut mock_runtime = MockHost::default();
+        let chain_id = U256::from(42);
+        let mut chain_id_bytes = [0u8; 32];
+        chain_id.to_big_endian(&mut chain_id_bytes);
+        let block = BlockConstants::first_block(U256::zero(), chain_id);
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+        let target = H160::from_low_u64_be(117u64);
+        let caller = H160::from_low_u64_be(118u64);
+        let data = [0u8; 32]; // Need some data to make it a call
+        let code = vec![
+            Opcode::CHAINID.as_u8(),
+            Opcode::PUSH1.as_u8(), // push ost
+            0,
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(), // push len
+            32,
+            Opcode::PUSH1.as_u8(), // push ost
+            0,
+            Opcode::RETURN.as_u8(),
+        ];
+        let all_the_gas = 21_017_u64;
+
+        set_balance(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            &caller,
+            all_the_gas.into(),
+        );
+
+        set_account_code(&mut mock_runtime, &mut evm_account_storage, &target, &code);
+
+        // Act
+        let result = run_transaction(
+            &mut mock_runtime,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(target),
+            caller,
+            data.to_vec(),
+            Some(all_the_gas),
+            None,
+            true,
+        );
+
+        // Assert
+        let expected_result = Ok(Some(ExecutionOutcome {
+            gas_used: 21017,
+            is_success: true,
+            new_address: None,
+            logs: vec![],
+            result: Some(chain_id_bytes.into()),
+            withdrawals: vec![],
+        }));
+        assert_eq!(result, expected_result);
+    }
 }
