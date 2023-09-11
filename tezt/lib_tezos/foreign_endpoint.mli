@@ -35,3 +35,6 @@ val rpc_scheme : t -> string
 
 (** Encode the given foreign endpoint as a string value. *)
 val as_string : t -> string
+
+(** Encode the given foreign endpoint as a {!Uri.t} *)
+val to_uri : t -> Uri.t

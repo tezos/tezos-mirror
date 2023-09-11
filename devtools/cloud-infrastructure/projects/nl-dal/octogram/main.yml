@@ -111,6 +111,12 @@ stages:
           archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
           action: extract
 
+      - name: Uncompress generated keys
+        builtins.tar:
+          contents: 'slot-producers'
+          archive: 'self://{{ vars.keys_base_dir }}.tar.gz'
+          action: extract
+
       - name: Upload octez binaries
         run_items: concurrent
         copy:
@@ -181,3 +187,36 @@ stages:
            - '{{ vars.pk_revealed_accounts_prefix }}000002'
            - '{{ vars.pk_revealed_accounts_prefix }}000003'
            - '{{ vars.pk_revealed_accounts_prefix }}000004'
+
+      - name: Publish a DAL slot where target_published_level is set
+        run_items: sequential
+        tezos.publish_dal_slot:
+          slot_info:
+            slot_index: '1'
+            slot_size: '{{ vars.slot_size }}'
+            payload: 'slot content for level {{ item }} and slot index 1'
+          target_published_level: '{{ item }}'
+          # We can either provide "Self/Owned" nodes or foreign RPC address
+          l1_node_uri: self://node
+          dal_node_uri: self://dal_node
+          path_client: self://./octez-client
+          base_dir: 'self://slot-producers/{{ vars.keys_base_dir }}'
+          source: delegate_000001
+        with_items:
+         - '5..9'
+
+      - name: Publish a DAL slot where target_published_level is not set
+        run_items: sequential
+        tezos.publish_dal_slot:
+          slot_info:
+            slot_index: '2'
+            slot_size: '{{ vars.slot_size }}'
+            payload: 'slot content for level {{ item }} and slot index 2'
+          # We can either provide "Self/Owned" nodes or foreign RPC address
+          l1_node_uri: self://node
+          dal_node_uri: self://dal_node
+          path_client: self://./octez-client
+          base_dir: 'self://slot-producers/{{ vars.keys_base_dir }}'
+          source: delegate_000002
+        with_items:
+         - '10..14'

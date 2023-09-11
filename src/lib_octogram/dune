@@ -6,12 +6,16 @@
  (public_name octogram)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-shell-libs.tezos-shell-services
+  octez-libs.tezos-rpc-http-client-unix
   tezt
   tezt-tezos
   jingoo
   dmap)
  (flags
   (:standard)
+  -open Tezos_shell_services
+  -open Tezos_rpc_http_client_unix
   -open Tezt
   -open Tezt.Base
   -open Tezt_tezos

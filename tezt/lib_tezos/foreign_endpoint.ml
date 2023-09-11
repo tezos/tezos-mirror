@@ -33,3 +33,5 @@ let rpc_scheme {scheme; _} = scheme
 
 let as_string {scheme; host; port} =
   Printf.sprintf "%s://%s:%d" scheme host port
+
+let to_uri v = as_string v |> Uri.of_string
