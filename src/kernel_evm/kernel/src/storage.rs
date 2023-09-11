@@ -86,6 +86,9 @@ const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
+/// Subpath from where blocks' data is retrieved for migration.
+pub const BLOCKS_TO_MIGRATE: RefPath = EVM_BLOCKS;
+
 /// The size of an address. Size in bytes.
 const ADDRESS_SIZE: usize = 20;
 /// The size of a 256 bit hash. Size in bytes.

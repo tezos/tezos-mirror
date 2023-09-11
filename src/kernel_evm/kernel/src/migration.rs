@@ -95,7 +95,7 @@ mod old_storage {
 }
 
 mod migration_block_helpers {
-    use crate::error::Error;
+    use crate::{error::Error, storage::BLOCKS_TO_MIGRATE};
     use primitive_types::U256;
     use tezos_smart_rollup_host::{
         path::RefPath,
@@ -135,6 +135,25 @@ mod migration_block_helpers {
             Err(e) => Err(Error::from(e)),
         }
     }
+
+    const TMP_BLOCK_MIGRATION: RefPath = RefPath::assert_from(b"/__migration/blocks");
+
+    pub fn store_old_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+        host.store_copy(&BLOCKS_TO_MIGRATE, &TMP_BLOCK_MIGRATION)
+            .map_err(Error::from)
+    }
+
+    pub fn commit_block_migration_changes<Host: Runtime>(
+        host: &mut Host,
+        success: bool,
+    ) -> Result<(), Error> {
+        if success {
+            host.store_delete(&TMP_BLOCK_MIGRATION).map_err(Error::from)
+        } else {
+            host.store_move(&TMP_BLOCK_MIGRATION, &BLOCKS_TO_MIGRATE)
+                .map_err(Error::from)
+        }
+    }
 }
 
 // The workflow for migration is the following:
@@ -157,6 +176,9 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
         let head_number = read_current_block_number(host)?;
         let next_block_number_to_migrate =
             migration_block_helpers::read_next_block_number_to_migrate(host)?.as_usize();
+        if next_block_number_to_migrate == 0 {
+            migration_block_helpers::store_old_blocks(host)?
+        }
 
         let max_migration_threshold =
             next_block_number_to_migrate + MAX_MIGRATABLE_BLOCKS_PER_REBOOT - 1;
@@ -187,6 +209,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
 
             // MIGRATION CODE - END
             store_storage_version(host, STORAGE_VERSION)?;
+            migration_block_helpers::commit_block_migration_changes(host, true)?;
             return Ok(MigrationStatus::Done);
         }
     }
@@ -197,8 +220,15 @@ pub fn storage_migration<Host: Runtime>(
     host: &mut Host,
 ) -> Result<MigrationStatus, Error> {
     let migration_result = migration(host);
-    migration_result.map_err(|_|
+    migration_result.map_err(|_| {
         // Something went wrong during the migration.
         // The fallback mechanism is triggered to retrograde to the previous kernel.
-        Error::UpgradeError(Fallback))
+
+        // We revert every changes made by the migration.
+        // The following **CAN NOT** fail. We can not recover from it if
+        // an error occurs.
+        let _ = migration_block_helpers::commit_block_migration_changes(host, false);
+
+        Error::UpgradeError(Fallback)
+    })
 }
