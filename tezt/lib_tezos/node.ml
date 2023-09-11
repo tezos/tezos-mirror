@@ -50,7 +50,6 @@ type argument =
   | Disable_p2p_swap
   | Peer of string
   | No_bootstrap_peers
-  | Disable_operations_precheck
   | Media_type of media_type
   | Metadata_size_limit of int option
   | Metrics_addr of string
@@ -79,7 +78,6 @@ let make_argument = function
   | Disable_p2p_swap -> ["--disable-p2p-swap"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
-  | Disable_operations_precheck -> ["--disable-mempool-precheck"]
   | Media_type media_type -> ["--media-type"; string_of_media_type media_type]
   | Metadata_size_limit None -> ["--metadata-size-limit"; "unlimited"]
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
@@ -106,7 +104,6 @@ let is_redundant = function
   | Disable_p2p_maintenance, Disable_p2p_maintenance
   | Disable_p2p_swap, Disable_p2p_swap
   | No_bootstrap_peers, No_bootstrap_peers
-  | Disable_operations_precheck, Disable_operations_precheck
   | Media_type _, Media_type _
   | Metadata_size_limit _, Metadata_size_limit _
   | Version, Version ->
@@ -125,7 +122,6 @@ let is_redundant = function
   | Disable_p2p_maintenance, _
   | Disable_p2p_swap, _
   | No_bootstrap_peers, _
-  | Disable_operations_precheck, _
   | Media_type _, _
   | Metadata_size_limit _, _
   | Peer _, _
@@ -298,8 +294,8 @@ module Config_file = struct
   let update node update = read node |> update |> write node
 
   let set_prevalidator ?(operations_request_timeout = 10.)
-      ?(max_refused_operations = 1000) ?(operations_batch_size = 50)
-      ?(disable_operations_precheck = false) old_config =
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
+      =
     let prevalidator =
       `O
         [
@@ -307,7 +303,6 @@ module Config_file = struct
           ( "max_refused_operations",
             `Float (float_of_int max_refused_operations) );
           ("operations_batch_size", `Float (float_of_int operations_batch_size));
-          ("disable_precheck", `Bool disable_operations_precheck);
         ]
       |> JSON.annotate ~origin:"set_prevalidator"
     in

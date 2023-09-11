@@ -48,6 +48,12 @@ Node
 
 - Added metrics about distributed data base messages sent, broadcasted or received
 
+- **Breaking change** Removed the deprecated
+  ``disable-mempool-precheck`` configuration flag and
+  ``disable_precheck`` field of ``prevalidator`` in the shell limits
+  of the configuration file. They already had no effect on the node
+  anymore. (MR :gl:`!10030`)
+
 Client
 ------
 

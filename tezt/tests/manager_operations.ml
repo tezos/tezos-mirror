@@ -207,12 +207,8 @@ module Helpers = struct
       client
 
   (** Initialize a network with two nodes *)
-  let init ?(disable_operation_precheck = false)
-      ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
-    let args =
-      [Node.Synchronisation_threshold 0; Connections 1]
-      @ if disable_operation_precheck then [Disable_operations_precheck] else []
-    in
+  let init ?(event_sections_levels = [("prevalidator", `Debug)]) ~protocol () =
+    let args = [Node.Synchronisation_threshold 0; Connections 1] in
     let node1 = Node.create args in
     let node2 = Node.create args in
     let* client1 = Client.init ~endpoint:(Node node1) ()
