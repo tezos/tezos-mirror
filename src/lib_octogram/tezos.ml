@@ -2569,9 +2569,10 @@ type start_dal_node_r = {
   net_port : int;
 }
 
-type dal_attestor_profile = Tezos_crypto.Signature.Public_key_hash.t
+type dal_attestor_profile = string (* a public key hash or an alias *)
 
-type dal_producer_profile = int
+type dal_producer_profile =
+  string (* slot index, as a string to be able to expand it. *)
 
 type 'uri start_dal_node = {
   name : string option;
@@ -2584,6 +2585,8 @@ type 'uri start_dal_node = {
   bootstrap_profile : bool;
   attestor_profiles : dal_attestor_profile list;
   producer_profiles : dal_producer_profile list;
+  path_client : 'uri option; (* Needed if some attestor profiles are aliases. *)
+  base_dir : 'uri option; (* Needed if some attestor profiles are aliases. *)
 }
 
 type (_, _) Remote_procedure.t +=
@@ -2624,27 +2627,31 @@ module Start_octez_dal_node = struct
              bootstrap_profile;
              attestor_profiles;
              producer_profiles;
+             path_client;
+             base_dir;
            } ->
-        ( name,
-          path_node,
-          rpc_port,
-          metrics_port,
-          net_port,
-          l1_node_uri,
-          peers,
-          bootstrap_profile,
-          attestor_profiles,
-          producer_profiles ))
-      (fun ( name,
-             path_node,
-             rpc_port,
-             metrics_port,
-             net_port,
-             l1_node_uri,
-             peers,
-             bootstrap_profile,
-             attestor_profiles,
-             producer_profiles ) ->
+        ( ( name,
+            path_node,
+            rpc_port,
+            metrics_port,
+            net_port,
+            l1_node_uri,
+            peers,
+            bootstrap_profile,
+            attestor_profiles,
+            producer_profiles ),
+          (path_client, base_dir) ))
+      (fun ( ( name,
+               path_node,
+               rpc_port,
+               metrics_port,
+               net_port,
+               l1_node_uri,
+               peers,
+               bootstrap_profile,
+               attestor_profiles,
+               producer_profiles ),
+             (path_client, base_dir) ) ->
         {
           name;
           path_node;
@@ -2656,21 +2663,22 @@ module Start_octez_dal_node = struct
           bootstrap_profile;
           attestor_profiles;
           producer_profiles;
+          path_client;
+          base_dir;
         })
-      (obj10
-         (opt "name" string)
-         (req "path_node" uri_encoding)
-         (opt "rpc_port" string)
-         (opt "metrics_port" string)
-         (opt "net_port" string)
-         (req "l1_node_uri" uri_encoding)
-         (dft "peers" (list string) [])
-         (dft "bootstrap_profile" bool false)
-         (dft
-            "attestor_profiles"
-            (list Tezos_crypto.Signature.Public_key_hash.encoding)
-            [])
-         (dft "producer_profiles" (list uint16) []))
+      (merge_objs
+         (obj10
+            (opt "name" string)
+            (req "path_node" uri_encoding)
+            (opt "rpc_port" string)
+            (opt "metrics_port" string)
+            (opt "net_port" string)
+            (req "l1_node_uri" uri_encoding)
+            (dft "peers" (list string) [])
+            (dft "bootstrap_profile" bool false)
+            (dft "attestor_profiles" (list string) [])
+            (dft "producer_profiles" (list string) []))
+         (obj2 (opt "path_client" uri_encoding) (opt "base_dir" uri_encoding)))
 
   let r_encoding =
     Data_encoding.(
@@ -2706,6 +2714,8 @@ module Start_octez_dal_node = struct
         bootstrap_profile;
         attestor_profiles;
         producer_profiles;
+        path_client;
+        base_dir;
       } =
     let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
     {
@@ -2717,8 +2727,10 @@ module Start_octez_dal_node = struct
       l1_node_uri = uri_run l1_node_uri;
       peers = List.map run peers;
       bootstrap_profile;
-      attestor_profiles;
-      producer_profiles;
+      attestor_profiles = List.map run attestor_profiles;
+      producer_profiles = List.map run producer_profiles;
+      path_client = Option.map uri_run path_client;
+      base_dir = Option.map uri_run base_dir;
     }
 
   let resolve ~self resolver
@@ -2733,10 +2745,13 @@ module Start_octez_dal_node = struct
         bootstrap_profile;
         attestor_profiles;
         producer_profiles;
+        path_client;
+        base_dir;
       } =
+    let file_agent_uri = Remote_procedure.file_agent_uri ~self ~resolver in
     {
       name;
-      path_node = Remote_procedure.file_agent_uri ~self ~resolver path_node;
+      path_node = file_agent_uri path_node;
       rpc_port;
       metrics_port;
       net_port;
@@ -2745,6 +2760,8 @@ module Start_octez_dal_node = struct
       bootstrap_profile;
       attestor_profiles;
       producer_profiles;
+      path_client = Option.map file_agent_uri path_client;
+      base_dir = Option.map file_agent_uri base_dir;
     }
 
   let run state
@@ -2759,8 +2776,10 @@ module Start_octez_dal_node = struct
         bootstrap_profile;
         attestor_profiles;
         producer_profiles;
+        path_client;
+        base_dir;
       } =
-    let* path =
+    let* path_dal_node =
       Http_client.local_path_from_agent_uri
         (Agent_state.http_client state)
         path_node
@@ -2770,9 +2789,40 @@ module Start_octez_dal_node = struct
       | None -> Port.fresh ()
     in
     let mk_addr port = Format.sprintf "0.0.0.0:%d" port in
-    let attestor_profiles =
-      List.map
-        Tezos_crypto.Signature.Public_key_hash.to_b58check
+    let producer_profiles = List.map positive_int_of_string producer_profiles in
+    let* client_opt =
+      match (path_client, base_dir) with
+      | Some path_client, Some base_dir ->
+          let* base_dir =
+            (Http_client.local_path_from_agent_uri
+               (Agent_state.http_client state))
+              base_dir
+          in
+          let* path_client =
+            (Http_client.local_path_from_agent_uri
+               (Agent_state.http_client state))
+              path_client
+          in
+          Client.create ~path:path_client ~base_dir () |> Option.some |> return
+      | _ -> return None
+    in
+    let* attestor_profiles =
+      Lwt_list.map_s
+        (fun attestor ->
+          match
+            ( Tezos_crypto.Signature.Public_key_hash.of_b58check_opt attestor,
+              client_opt )
+          with
+          | Some _, _ -> return attestor (* a valid tz address is given *)
+          | None, Some client ->
+              (* not a valid tz address. Probably an alias. *)
+              let* account = Client.show_address ~alias:attestor client in
+              return account.Account.public_key_hash
+          | None, None ->
+              Test.fail
+                "A client_path and a base_dir are needed to retrieve the pkh \
+                 of the attestor profile with alias %s"
+                attestor)
         attestor_profiles
     in
     let rpc_port = get_port_or_fresh rpc_port in
@@ -2780,7 +2830,7 @@ module Start_octez_dal_node = struct
     let net_port = get_port_or_fresh net_port in
     let dal_node =
       Dal_node.create_from_endpoint
-        ~path
+        ~path:path_dal_node
         ?name
         ~rpc_port
         ~listen_addr:(mk_addr net_port)
