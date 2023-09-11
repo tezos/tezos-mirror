@@ -63,9 +63,9 @@ module type S = sig
 
   (** [current_block ~full_transaction_object] returns the most recent
         processed and stored block.
-  
-        If [full_transaction_object] is [true], returns the transaction objects,
-        the transactions hashes otherwise.
+
+      If [full_transaction_object] is [true], returns the transaction objects,
+      the transactions hashes otherwise.
     *)
   val current_block :
     full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
@@ -76,12 +76,23 @@ module type S = sig
 
   (** [nth_block ~full_transaction_object n] returns the [n]th processed and
         stored block.
-  
-        If [full_transaction_object] is [true], returns the transaction objects,
-        the transactions hashes otherwise.
+
+      If [full_transaction_object] is [true], returns the transaction objects,
+      the transactions hashes otherwise.
     *)
   val nth_block :
     full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
+
+  (** [block_by_hash ~full_transaction_object hash] returns the block with the
+      given [hash].
+
+      If [full_transaction_object] is [true], returns the transaction objects,
+      the transactions hashes otherwise.
+    *)
+  val block_by_hash :
+    full_transaction_object:bool ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.block tzresult Lwt.t
 
   (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
   val transaction_receipt :
