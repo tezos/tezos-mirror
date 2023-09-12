@@ -28,7 +28,7 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);
         assert!(typechecker::typecheck(&ast, &mut Gas::default(), &mut stack).is_ok());
-        assert!(stack == VecDeque::from([Type::Int]));
+        assert_eq!(stack, VecDeque::from([Type::Int]));
     }
 
     #[test]
@@ -38,6 +38,17 @@ mod tests {
         let mut gas = Gas::new(11460);
         assert!(typechecker::typecheck(&ast, &mut gas, &mut stack).is_ok());
         assert_eq!(gas.milligas(), 0);
+    }
+
+    #[test]
+    fn typecheck_out_of_gas() {
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let mut stack = VecDeque::from([Type::Nat]);
+        let mut gas = Gas::new(1000);
+        assert_eq!(
+            typechecker::typecheck(&ast, &mut gas, &mut stack),
+            Err(typechecker::TcError::OutOfGas)
+        );
     }
 
     #[test]
