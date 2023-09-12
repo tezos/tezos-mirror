@@ -457,4 +457,42 @@ let commands () =
             (Kaitai.Print.print kaitai_spec)
         in
         Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:"Dump Kaitai Struct specifications for all registered encodings."
+      no_options
+      (prefix "dump" @@ prefix "kaitai" @@ prefix "specs" @@ prefix "in"
+      @@ string ~name:"dir" ~desc:"Directory in which to output the ksy files"
+      @@ stop)
+      (fun () dir (cctxt : #Client_context.printer) ->
+        let open Lwt_syntax in
+        let* () =
+          List.iter_s
+            (fun (id, _registered) ->
+              let escape_encoding_id id =
+                id |> String.split '.' |> String.concat "__"
+              in
+              (* TODO: avoid this lookup by exporting `t -> introspectable` *)
+              match Data_encoding.Registration.find_introspectable id with
+              | None ->
+                  (* [id] is from iterating over the list of registered encodings *)
+                  assert false
+              | Some (Any e) -> (
+                  match
+                    Kaitai_of_data_encoding.Translate.from_data_encoding
+                      ~encoding_name:(escape_encoding_id id)
+                      e
+                  with
+                  | exception _ ->
+                      (* TODO: offer a [result] variant of conversion function *)
+                      cctxt#warning "Failed to generate ksy file for %s" id
+                  | spec ->
+                      let yml = Kaitai.Print.print spec in
+                      Lwt_io.with_file
+                        ~mode:Output
+                        (dir ^ "/" ^ escape_encoding_id id ^ ".ksy")
+                        (fun oc -> Lwt_io.write oc yml)))
+            (Data_encoding.Registration.list ())
+        in
+        return_ok_unit);
   ]
