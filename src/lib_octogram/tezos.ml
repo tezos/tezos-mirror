@@ -856,8 +856,12 @@ module Generate_protocol_parameters_file = struct
       | None -> []
       | Some prefix -> filter_by_prefix prefix
     in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6377
+
+       Reading the public_keys, public_key_hashes and secret_keys files would be
+       more time-efficient in case we have many keys.*)
     let to_accounts =
-      Lwt_list.map_p (fun alias -> Client.show_address ~alias client)
+      Lwt_list.map_s (fun alias -> Client.show_address ~alias client)
     in
     let* pk_revealed_accounts = to_accounts pk_aliases in
     let* pk_unrevealed_accounts = to_accounts pkh_aliases in
