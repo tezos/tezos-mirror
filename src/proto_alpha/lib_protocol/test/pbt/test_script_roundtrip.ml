@@ -101,9 +101,29 @@ let ex_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
   let x = Samplers.Random_value.value ty random_state in
   Ex_data (ty, x)
 
-(* There is no particular reason not to define a proper shrinker here,
-   we just haven't needed it yet. *)
+let big_map_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
+ fun random_state ->
+  let size =
+    Tezos_benchmark.Base_samplers.sample_in_interval
+      ~range:{min = 1; max = 20}
+      random_state
+  in
+  let (Ex_comparable_ty kty) =
+    Samplers.Random_type.m_comparable_type ~size random_state
+  in
+  let (Ex_comparable_ty vty) =
+    Samplers.Random_type.m_comparable_type ~size random_state
+  in
+  let ty = assert_ok @@ big_map_t 0 kty vty in
+  let x = Samplers.Random_value.value ty random_state in
+  Ex_data (ty, x)
+
+(* There is no particular reason not to define proper shrinkers here,
+   we just haven't needed them yet. *)
 let data_generator =
+  QCheck2.Gen.make_primitive ~gen:ex_data_sampler ~shrink:(fun _ -> Seq.empty)
+
+let big_map_data_generator =
   QCheck2.Gen.make_primitive ~gen:ex_data_sampler ~shrink:(fun _ -> Seq.empty)
 
 let dummy_code unparsed_ty =
@@ -234,8 +254,28 @@ let test_roundtrip_size =
         x
         (assert_return @@ roundtrip ty x lazy_storage_diff ctxt))
 
+(* Same but on big maps.
+ *)
+let test_roundtrip_size_big_map =
+  QCheck2.Test.make
+    ~count:100
+    ~name:"roundtrip_size_big_map"
+    big_map_data_generator
+    (fun (Ex_data (ty, x)) ->
+      let x, lazy_storage_diff, _ctxt =
+        assert_return @@ extract_lazy_storage_diff ty x ctxt
+      in
+      qcheck_eq
+        ~cmp:(value_size_compare ty)
+        ~pp:(pp_data_with_size ty)
+        x
+        (assert_return @@ roundtrip ty x lazy_storage_diff ctxt))
+
 let () =
   Alcotest.run
     ~__FILE__
     Protocol.name
-    [("roundtrip_size", qcheck_wrap [test_roundtrip_size])]
+    [
+      ("roundtrip_size", qcheck_wrap [test_roundtrip_size]);
+      ("roundtrip_size_big_map", qcheck_wrap [test_roundtrip_size_big_map]);
+    ]
