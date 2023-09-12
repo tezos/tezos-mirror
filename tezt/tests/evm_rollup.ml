@@ -47,6 +47,9 @@ let bridge_path () =
 
 let admin_path () = Base.(project_root // "src/kernel_evm/l1_bridge/admin.tz")
 
+let withdrawal_abi_path () =
+  Base.(project_root // "src/kernel_evm/l1_bridge/withdrawal.abi")
+
 type l1_contracts = {exchanger : string; bridge : string; admin : string}
 
 type full_evm_setup = {
@@ -333,8 +336,9 @@ let setup_evm_kernel ?config ?kernel_installee
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(with_administrator = true) ~admin protocol =
-  let* node, client = setup_l1 protocol in
+    ?(with_administrator = true) ~admin ?commitment_period ?challenge_window
+    protocol =
+  let* node, client = setup_l1 ?commitment_period ?challenge_window protocol in
   let* l1_contracts =
     match admin with
     | Some admin ->
@@ -1870,6 +1874,97 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~sc_rollup_node
   let* _ = next_evm_level ~sc_rollup_node ~node ~client in
   unit
 
+let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
+    ~sc_rollup_node ~sc_rollup_client ~sc_rollup_address ~node ~client ~endpoint
+    =
+  let* withdrawal_level = Client.level client in
+
+  (* Call the withdrawal precompiled contract. *)
+  let* () =
+    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
+  in
+  let call_withdraw =
+    Eth_cli.contract_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:"withdraw"
+      ~address:"0x0000000000000000000000000000000000000020"
+      ~method_call:(sf {|withdraw_base58("%s")|} receiver)
+      ~value:amount_wei
+  in
+  let* _tx =
+    wait_for_application ~sc_rollup_node ~node ~client call_withdraw ()
+  in
+
+  (* Bake enough levels to have a commitment. *)
+  let* _ =
+    repeat commitment_period (fun () ->
+        let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  (* Bake enough levels to cement the commitment. *)
+  let* _ =
+    repeat (challenge_window + 1) (fun () ->
+        let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+
+  (* Construct and execute the outbox proof. *)
+  let find_outbox level =
+    let rec aux level' =
+      if level' > level + 10 then
+        Test.fail "Looked for an outbox for 10 levels, stopping the loop"
+      else
+        let*! outbox =
+          Sc_rollup_client.outbox
+            ~outbox_level:(withdrawal_level + 2)
+            sc_rollup_client
+        in
+        if JSON.is_null outbox then aux (level + 1) else return (outbox, level)
+    in
+    aux level
+  in
+  let* outbox, withdrawal_level = find_outbox withdrawal_level in
+
+  let outbox_message =
+    JSON.(outbox |=> 0 |-> "message" |-> "transactions" |=> 0)
+  in
+  let parameters_json = JSON.(outbox_message |-> "parameters") in
+  let* parameters =
+    Client.convert_data
+      ~data:(JSON.encode parameters_json)
+      ~src_format:`Json
+      ~dst_format:`Michelson
+      client
+  in
+  let* outbox_proof =
+    Sc_rollup_client.outbox_proof_single
+      sc_rollup_client
+      ~message_index:0
+      ~outbox_level:(withdrawal_level + 2)
+      ~destination:JSON.(outbox_message |-> "destination" |> as_string)
+      ~parameters
+      ~entrypoint:JSON.(outbox_message |-> "entrypoint" |> as_string)
+  in
+  let Sc_rollup_client.{proof; commitment_hash} =
+    match outbox_proof with
+    | Some r -> r
+    | None -> Test.fail "No outbox proof found for the withdrawal"
+  in
+  let*! () =
+    Client.Sc_rollup.execute_outbox_message
+      ~hooks
+      ~burn_cap:(Tez.of_int 10)
+      ~rollup:sc_rollup_address
+      ~src:Constant.bootstrap1.alias
+      ~commitment_hash
+      ~proof
+      client
+  in
+  let* _ = next_evm_level ~sc_rollup_node ~node ~client in
+  unit
+
 let check_balance ~receiver ~endpoint expected_balance =
   let* balance = Eth_cli.balance ~account:receiver ~endpoint in
   let balance = Wei.truncate_to_mutez balance in
@@ -1877,20 +1972,29 @@ let check_balance ~receiver ~endpoint expected_balance =
     ~error_msg:(sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
   unit
 
-let test_deposit =
-  Protocol.register_test ~__FILE__ ~tags:["evm"; "deposit"] ~title:"Deposit tez"
+let test_deposit_and_withdraw =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "deposit"; "withdraw"]
+    ~title:"Deposit and withdraw tez"
   @@ fun protocol ->
   let admin = Constant.bootstrap5 in
+  let commitment_period = 5 and challenge_window = 5 in
   let* {
          client;
          sc_rollup_address;
          l1_contracts;
          sc_rollup_node;
+         sc_rollup_client;
          node;
          endpoint;
          _;
        } =
-    setup_evm_kernel ~admin:(Some admin) protocol
+    setup_evm_kernel
+      ~admin:(Some admin)
+      ~commitment_period
+      ~challenge_window
+      protocol
   in
   let {bridge; admin = _; exchanger = _} =
     match l1_contracts with
@@ -1899,7 +2003,16 @@ let test_deposit =
   in
 
   let amount_mutez = Tez.of_mutez_int 100_000_000 in
-  let receiver = "0x119811f34EF4491014Fbc3C969C426d37067D6A4" in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+        public_key =
+          "0466ed90f9a86c0908746475fbe0a40c72237de22d89076302e22c2a8da259b4aba5c7ee1f3dc3fd0b240645462620ae62b6fe8fe5b3464c3b1b4ae6c06c97b7b6";
+      }
+  in
 
   let* () =
     deposit
@@ -1907,12 +2020,43 @@ let test_deposit =
       ~sc_rollup_address
       ~bridge
       ~depositor:admin
-      ~receiver
+      ~receiver:receiver.address
       ~sc_rollup_node
       ~node
       client
   in
-  check_balance ~receiver ~endpoint amount_mutez
+  let* () = check_balance ~receiver:receiver.address ~endpoint amount_mutez in
+
+  let amount_wei : Wei.t =
+    Tez.mutez_int64 amount_mutez
+    |> Z.of_int64
+    |> Z.mul Z.(pow (of_int 10) 12)
+    |> Wei.to_wei_z
+  in
+  (* Keep a small amount to pay for the gas. *)
+  let amount_wei = Wei.(amount_wei - one) in
+
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+  let* _tx =
+    withdraw
+      ~sc_rollup_address
+      ~sc_rollup_client
+      ~commitment_period
+      ~challenge_window
+      ~amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~node
+      ~sc_rollup_node
+      ~client
+      ~endpoint
+  in
+
+  let* balance = Client.get_balance_for ~account:withdraw_receiver client in
+  let expected_balance = Tez.(amount_mutez - one) in
+  Check.((balance = expected_balance) Tez.typ)
+    ~error_msg:(sf "Expected %%R amount instead of %%L after withdrawal") ;
+  return ()
 
 let get_kernel_boot_wasm ~sc_rollup_client =
   let hooks : Process_hooks.t =
@@ -3193,7 +3337,7 @@ let register_evm_proxy_server ~protocols =
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
   test_preinitialized_evm_kernel protocols ;
-  test_deposit protocols ;
+  test_deposit_and_withdraw protocols ;
   test_estimate_gas protocols ;
   test_estimate_gas_additionnal_field protocols ;
   test_kernel_upgrade_to_debug protocols ;
