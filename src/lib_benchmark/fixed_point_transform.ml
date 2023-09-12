@@ -358,6 +358,8 @@ end)
 end = struct
   type size = X.size
 
+  let size_ty = X.size_ty
+
   type 'a repr = Term : 'a X.repr -> 'a repr | Float : float -> X.size repr
 
   let {precision; max_relative_error; cast_mode; inverse_scaling; resolution} =
@@ -439,10 +441,13 @@ end = struct
 
   let eq = lift_binop X.eq
 
-  let lam (type a b) ~name (f : a repr -> b repr) : (a -> b) repr =
+  let lam' (type a b) ~name (ty : a Costlang.Ty.t) (f : a repr -> b repr) :
+      (a -> b) repr =
     Term
-      (X.lam ~name (fun x ->
+      (X.lam' ~name ty (fun x ->
            match f (Term x) with Term y -> y | Float f -> X.float f))
+
+  let lam ~name = lam' ~name size_ty
 
   let app (type a b) (fn : (a -> b) repr) (arg : a repr) : b repr =
     match (fn, arg) with

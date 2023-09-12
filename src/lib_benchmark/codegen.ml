@@ -73,6 +73,8 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   type size = int
 
+  let size_ty = Costlang.Ty.int
+
   open Codegen_helpers
   open Ast_helper
 
@@ -113,10 +115,12 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let shift_right i bits = call ["lsr"] [i; Exp.constant (Const.int bits)]
 
-  let lam ~name f =
+  let lam' ~name _ty f =
     let patt = pvar name in
     let var = ident name in
     Exp.fun_ Nolabel None patt (f var)
+
+  let lam ~name = lam' ~name size_ty
 
   let app x y = Exp.apply x [(Nolabel, y)]
 
@@ -574,8 +578,8 @@ let%expect_test "module_generation" =
 let%expect_test "takes_saturation_reprs" =
   let open Codegen in
   let term =
-    lam ~name:"x" @@ fun x ->
-    lam ~name:"y" @@ fun y ->
+    lam' ~name:"x" Costlang.Ty.num @@ fun x ->
+    lam' ~name:"y" Costlang.Ty.num @@ fun y ->
     let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
     let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
   in
