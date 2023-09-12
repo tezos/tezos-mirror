@@ -108,7 +108,26 @@ let on_transaction state tx_raw =
 let on_head state block_height =
   let open Lwt_result_syntax in
   let open Types in
+  let (module Rollup_node) = state.rollup_node in
+  let smart_rollup_address = state.smart_rollup_address in
   state.level <- block_height ;
+  (* Sends all transactions to the batcher *)
+  let* () =
+    Message_queue.fold_es
+      (fun tx_hash raw_tx _ ->
+        let raw_tx = Ethereum_types.Hex raw_tx in
+        let*! result =
+          Rollup_node.inject_raw_transaction ~smart_rollup_address raw_tx
+        in
+        match result with
+        | Ok _hash ->
+            (* Removes successfull transaction from the pool *)
+            Message_queue.remove state.messages tx_hash ;
+            return_unit
+        | Error _ -> return_unit)
+      state.messages
+      ()
+  in
   return_unit
 
 module Handlers = struct
