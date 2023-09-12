@@ -443,8 +443,7 @@ taken at level ``1617344``, and we want
 to trigger the migration three levels after the level at which the snapshot file
 was taken, we can use::
 
-  $ ./scripts/prepare_migration_test.sh d_012 1617347 \
-    ~/snapshot-mainnet.rolling
+  $ ./scripts/prepare_migration_test.sh d_012 1617347 ~/snapshot-mainnet.rolling
 
 In the latter case both the context and the yes-wallet folder will be placed in
 the system's temp directory. In our example the temp directory is ``/tmp``, and
