@@ -506,9 +506,12 @@ let run ~data_dir configuration_override =
           }
       | Operator _ -> limits
     in
-    Gossipsub.Worker.(
-      make ~events_logging:Logging.event rng limits peer_filter_parameters
-      |> start [])
+    let gs_worker =
+      Gossipsub.Worker.(
+        make ~events_logging:Logging.event rng limits peer_filter_parameters)
+    in
+    Gossipsub.Worker.start [] gs_worker ;
+    gs_worker
   in
   (* Create a transport (P2P) layer instance. *)
   let* transport_layer =

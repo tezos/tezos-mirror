@@ -1129,7 +1129,7 @@ module type WORKER = sig
 
   (** [start topics state] runs the (not already started) worker whose [state]
       is given together with the initial list of [topics] the caller is interested in. *)
-  val start : GS.Topic.t list -> t -> t
+  val start : GS.Topic.t list -> t -> unit
 
   (** [shutdown state] allows stopping the worker whose [state] is given. *)
   val shutdown : t -> unit Monad.t
