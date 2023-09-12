@@ -755,7 +755,7 @@ let codegen_for_a_solution solution codegen_options =
   in
   (* Model's free variables must be included in the solution's keys *)
   let codegen_models =
-    List.filter (fun (_model_name, {Registration.model; from = _}) ->
+    List.filter (fun (_model_name, {Registration.model; _}) ->
         model_fvs_included_in_sol model)
     @@ Registration.all_models ()
   in

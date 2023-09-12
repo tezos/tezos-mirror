@@ -38,7 +38,11 @@ exception Parameter_not_found of Free_variable.t
 
 type benchmark_info = Benchmark.t
 
-type model_info = {model : Model.packed_model; from : local_model_info list}
+type model_info = {
+  model : Model.packed_model;
+  from : local_model_info list;
+  codegen_destination : string option;
+}
 
 and local_model_info = {bench_name : Namespace.t; local_model_name : string}
 
@@ -80,8 +84,17 @@ let register_param_from_model (model : Model.packed_model) =
       let fv_set = Model.get_free_variable_set model in
       Free_variable.Set.iter (register_parameter M.name) fv_set
 
-let register_model (type a) bench_name local_model_name (model : a Model.t) :
-    unit =
+let fix_codegen_destination destination =
+  if String.contains destination '/' then destination
+  else
+    Filename.concat "src/proto_alpha/lib_protocol"
+    @@ destination ^ "_costs_generated.ml"
+
+let register_model (type a) ?codegen_destination bench_name local_model_name
+    (model : a Model.t) : unit =
+  let codegen_destination =
+    Option.map fix_codegen_destination codegen_destination
+  in
   let register_local_model bench_name local_model_name : unit =
     match String.Hashtbl.find_opt local_model_table local_model_name with
     | None ->
@@ -107,8 +120,12 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
             Name_table.add
               model_table
               name
-              {model; from = [{bench_name; local_model_name}]}
-        | Some {model = Model m'; from} ->
+              {
+                model;
+                from = [{bench_name; local_model_name}];
+                codegen_destination;
+              }
+        | Some {model = Model m'; from; _} ->
             (* Check equality of models by their free variables *)
             if
               not
@@ -123,17 +140,23 @@ let register_model (type a) bench_name local_model_name (model : a Model.t) :
             Name_table.replace
               model_table
               name
-              {model; from = {bench_name; local_model_name} :: from})
+              {
+                model;
+                from = {bench_name; local_model_name} :: from;
+                codegen_destination;
+              })
   in
   (* We don't register aggregated models, only their sub-models *)
   match model with
   | Aggregate {sub_models; _} -> List.iter register_packed_model sub_models
   | Abstract {model; _} -> register_packed_model (Model.Model model)
 
-let register_model_for_code_generation local_model_name model =
-  (* Expected there is no benchmark has this model.
-     So it gives the benchmark name as "no_benchmark" *)
-  register_model (Namespace.of_string "no_benchmark") local_model_name model
+let register_model_for_code_generation ?destination local_model_name model =
+  register_model
+    ?codegen_destination:destination
+    (Namespace.of_string "no_benchmark")
+    local_model_name
+    model
 
 let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
   if Name_table.mem bench_table Bench.name then (
@@ -170,10 +193,7 @@ let register ?(add_timer = true) ((module Bench) : Benchmark.t) =
       match purpose with
       | Other_purpose _ -> purpose
       | Generate_code destination ->
-          let destination =
-            Filename.concat "src/proto_alpha/lib_protocol"
-            @@ destination ^ "_costs_generated.ml"
-          in
+          let destination = fix_codegen_destination destination in
           Generate_code destination
   end in
   List.iter
