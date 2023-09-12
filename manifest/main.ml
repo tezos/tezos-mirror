@@ -8098,6 +8098,7 @@ let evm_proxy_lib_dev =
         octez_workers |> open_;
         octez_rpc_http_client_unix;
         octez_version_value;
+        octez_stdlib_unix |> open_;
         lwt_exit;
       ]
 
