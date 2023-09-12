@@ -992,6 +992,7 @@ module Auto_build = struct
   let override_measure_options ~outdir ~bench_name measure_options =
     let open Measure in
     let {bench_number; nsamples; config_file; _} = measure_options in
+    let bench_name_tokens = Namespace.to_list bench_name in
     (* override [config_file] for sapling and michelson encoding benchmarks *)
     let config_file =
       Option.either_f config_file @@ fun () ->
@@ -1000,7 +1001,7 @@ module Auto_build = struct
         @@ Namespace.to_filename bench_name
         ^ "_benchmark.config"
       in
-      match Namespace.to_list bench_name with
+      match bench_name_tokens with
       | "." :: "sapling" :: _ -> make_sapling_benchmark_config dest bench_name
       | "." :: "interpreter" :: n :: _
         when String.starts_with ~prefix:"ISapling" n ->
@@ -1024,9 +1025,14 @@ module Auto_build = struct
           make_io_write_random_keys_benchmark_config dest bench_name
       | _ -> None
     in
+    (* override [nsamples] for "alloc"s *)
+    let nsamples =
+      if List.mem ~equal:String.equal "alloc" bench_name_tokens then 1
+      else nsamples
+    in
     (* override [bench_number] and [nsamples] for intercept and TIMER_LATENCY *)
     let bench_number, nsamples =
-      match Namespace.to_list bench_name with
+      match bench_name_tokens with
       | "." :: "io" :: _ ->
           (* Currently, IO benchmarks reloads the context and purges the disk cache only
              once for each benchmark.  [nsamples] must be 1 otherwise the second and later
