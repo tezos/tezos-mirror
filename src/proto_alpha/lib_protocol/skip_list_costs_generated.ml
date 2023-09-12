@@ -10,7 +10,7 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model skip_list/hash_cell *)
-(* fun size -> (250. + (57. * size)) *)
+(* fun size -> 250. + (57. * size) *)
 let cost_hash_cell size =
   let v0 = size in
   S.safe_int 250 + (v0 * S.safe_int 57)
