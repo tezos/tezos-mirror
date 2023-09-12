@@ -533,19 +533,19 @@ the node using the context imported from the snapshot file. Since importing a
 snapshot file is very time consuming, we will leave the original folder
 unchanged, and every time we want to run the test, we will copy its contents to
 a fresh test folder. In our example, we can do this by taking advantage of an
-environment variable ``test-directory`` and the tool ``mktemp`` as follows::
+environment variable ``test_directory`` and the tool ``mktemp`` as follows::
 
   $ test_directory=$(mktemp -d -t "octez-node-mainnet-XXXX") && cp -r "/tmp/octez-node-mainnet/." "$test_directory"
 
 This command creates a fresh test folder in the system's temp directory (in our
 example ``/tmp``) whose name is ``octez-node-mainnet-XXXX``,
 where the ``XXXX`` are four random alphanumerical characters, and sets the
-environment variable ``test-directory`` to the path of the test folder, such
+environment variable ``test_directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
 of the original context folder into the test folder.
 
 Now, we can run the ``octez-node`` command by specifying the test folder
-``$test-directory`` as the data directory. We will also specify the RPC address
+``$test_directory`` as the data directory. We will also specify the RPC address
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
