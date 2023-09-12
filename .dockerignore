@@ -80,6 +80,7 @@ target
 
 evm_kernel.wasm
 sequenced_kernel.wasm
+tx-demo-collector
 
 # Terraform
 
