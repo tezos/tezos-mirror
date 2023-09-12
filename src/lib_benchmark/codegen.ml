@@ -208,11 +208,6 @@ let generate_let_binding =
     Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
 
 (* ------------------------------------------------------------------------- *)
-
-(* Precompose pretty-printing by let-lifting *)
-module Lift_then_print = Costlang.Let_lift (Codegen)
-
-(* ------------------------------------------------------------------------- *)
 type solution = {
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
@@ -405,38 +400,35 @@ let codegen (Model.Model model) (sol : solution)
     | None -> raise (Codegen_error (Variable_not_found fv))
     | Some f -> f
   in
-  let module T = (val transform) in
-  let module Impl = T (Lift_then_print) in
-  let module Subst_impl =
-    Costlang.Subst
-      (struct
-        let subst = subst
-      end)
-      (Impl)
-  in
   let module M = (val model) in
   let takes_saturation_reprs = M.takes_saturation_reprs in
   let comments =
-    let module Sub =
-      Costlang.Subst
-        (struct
-          let subst = subst
-        end)
-        (Costlang.Pp)
-    in
-    let module M = M.Def (Sub) in
-    let expr = Sub.prj M.model in
+    let open Costlang in
+    let module Transform = Subst (struct
+      let subst = subst
+    end) in
+    let module X = Transform (Pp) in
+    let module M = M.Def (X) in
+    let expr = X.prj M.model in
     ["model " ^ Namespace.to_string model_name; expr]
   in
-  let module M = M.Def (Subst_impl) in
-  let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
   let fun_name = function_name model_name in
-  Item
-    {
-      comments;
-      name = Some fun_name;
-      code = generate_let_binding ~takes_saturation_reprs fun_name expr;
-    }
+  let code =
+    let open Costlang in
+    let ( ++ ) = compose in
+    let ((module Transform) : transform) =
+      (module Let_lift)
+      ++ transform
+      ++ (module Subst (struct
+           let subst = subst
+         end))
+    in
+    let module X = Transform (Codegen) in
+    let module M = M.Def (X) in
+    let expr = X.prj M.model in
+    generate_let_binding ~takes_saturation_reprs fun_name expr
+  in
+  Item {comments; name = Some fun_name; code}
 
 let get_codegen_destination
     Registration.{model = Model.Model (module M); from = local_models_info} =
