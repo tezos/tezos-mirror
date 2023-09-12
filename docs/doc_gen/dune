@@ -1,12 +1,12 @@
 (executables
  (names rpc_doc
         p2p_doc)
- (libraries octez-libs.tezos-base
-            octez-libs.tezos-rpc
-            octez-libs.tezos-stdlib-unix
+ (libraries octez-libs.base
+            octez-libs.rpc
+            octez-libs.stdlib-unix
             octez-shell-libs.shell
-            octez-libs.tezos-rpc-http-server
-            octez_node_config
+            octez-libs.rpc-http-server
+	    octez_node_config
             octez-shell-libs.protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-protocol-genesis.embedded-protocol
