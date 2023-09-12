@@ -5,11 +5,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Tx = struct
+  type t = string
+
+  let equal a b = a = b
+
+  let hash t = Ethereum_types.hash_raw_tx t |> Hashtbl.hash
+end
+
+module Message_queue = Hash_queue.Make (Tx) (String)
+
 module Types = struct
   type state = {
     rollup_node : (module Rollup_node.S);
     smart_rollup_address : string;
     mutable level : Ethereum_types.block_height;
+    messages : Message_queue.t;
   }
 
   type parameters = (module Rollup_node.S) * string
@@ -30,7 +41,9 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Add_transaction : string -> (unit, error trace) t
+    | Add_transaction :
+        Ethereum_types.hex
+        -> (Ethereum_types.hash, error trace) t
     | New_l2_head : Ethereum_types.block_height -> (unit, error trace) t
 
   type view = View : _ t -> view
@@ -46,7 +59,7 @@ module Request = struct
           ~title:"Add_transaction"
           (obj2
              (req "request" (constant "add_transaction"))
-             (req "transaction" string))
+             (req "transaction" Ethereum_types.hex_encoding))
           (function
             | View (Add_transaction messages) -> Some ((), messages) | _ -> None)
           (fun ((), messages) -> View (Add_transaction messages));
@@ -63,7 +76,8 @@ module Request = struct
   let pp ppf (View r) =
     match r with
     | Add_transaction transaction ->
-        Format.fprintf ppf "Add [%s] to tx-pool" transaction
+        let (Ethereum_types.Hex transaction) = transaction in
+        Format.fprintf ppf "Add [%s] tx to tx-pool" transaction
     | New_l2_head block_height ->
         let (Ethereum_types.Block_height block_height) = block_height in
         Format.fprintf ppf "New L2 head: %s" (Z.to_string block_height)
@@ -73,7 +87,17 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let on_transaction _state _raw_tx = Lwt_result_syntax.return_unit
+let on_transaction state tx_raw =
+  let open Lwt_result_syntax in
+  let open Types in
+  let {rollup_node = (module Rollup_node); _} = state in
+  let (Ethereum_types.Hex raw_tx) = tx_raw in
+  Message_queue.replace state.messages raw_tx raw_tx ;
+  (* compute the hash *)
+  let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
+  let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+  let hash = Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show) in
+  return hash
 
 let on_head state block_height =
   let open Lwt_result_syntax in
@@ -100,7 +124,13 @@ module Handlers = struct
 
   let on_launch _w () (rollup_node, smart_rollup_address) =
     let state =
-      Types.{rollup_node; smart_rollup_address; level = Block_height Z.zero}
+      Types.
+        {
+          rollup_node;
+          smart_rollup_address;
+          level = Block_height Z.zero;
+          messages = Message_queue.create 100_000 (* ~ 400MB *);
+        }
     in
     Lwt_result_syntax.return state
 
@@ -121,11 +151,23 @@ let worker_promise, worker_waker = Lwt.task ()
 
 type error += No_tx_pool
 
+type error += Tx_pool_terminated
+
 let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
     | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
+
+let handle_request_error rq =
+  let open Lwt_syntax in
+  let* rq in
+  match rq with
+  | Ok res -> return_ok res
+  | Error (Worker.Request_error errs) -> Lwt.return_error errs
+  | Error (Closed None) -> Lwt.return_error [Tx_pool_terminated]
+  | Error (Closed (Some errs)) -> Lwt.return_error errs
+  | Error (Any exn) -> Lwt.return_error [Exn exn]
 
 (** Sends New_l2_level each time there is a new l2 level 
 TODO: https://gitlab.com/tezos/tezos/-/issues/6079
@@ -171,3 +213,9 @@ let shutdown () =
       (* There is no tx-pool, nothing to do *)
       Lwt.return_unit
   | Ok w -> Worker.shutdown w
+
+let add raw_tx =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w (Request.Add_transaction raw_tx)
+  |> handle_request_error

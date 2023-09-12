@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -228,6 +229,7 @@ let dispatch_input ~verbose
         (* A block cannot have uncles. *)
         return (Get_uncle_by_block_number_and_index.Output (Ok None))
     | Send_raw_transaction.Input (Some tx_raw) -> (
+        let*! _ = Tx_pool.add tx_raw in
         let* is_valid = Rollup_node_rpc.is_tx_valid tx_raw in
         match is_valid with
         | Ok () ->
