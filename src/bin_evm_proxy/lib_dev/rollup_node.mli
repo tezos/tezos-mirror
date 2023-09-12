@@ -33,7 +33,7 @@
     necessary. *)
 val make_encoded_messages :
   smart_rollup_address:string ->
-  Ethereum_types.hash ->
+  Ethereum_types.hex ->
   (string * string list, 'a) result
 
 (** List of services supported to communicate with a rollup node. *)
@@ -48,7 +48,7 @@ module type S = sig
   val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
   (** [code address] returns the [address]'s code. *)
-  val code : Ethereum_types.address -> Ethereum_types.hash tzresult Lwt.t
+  val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 
   (** [inject_raw_transaction ~smart_rollup_address tx_raw] crafts the hash of [tx_raw] and sends to
         the injector a message consisting of:
@@ -58,7 +58,7 @@ module type S = sig
     *)
   val inject_raw_transaction :
     smart_rollup_address:string ->
-    Ethereum_types.hash ->
+    Ethereum_types.hex ->
     Ethereum_types.hash tzresult Lwt.t
 
   (** [current_block ~full_transaction_object] returns the most recent
@@ -127,7 +127,7 @@ module type S = sig
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
   (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks if the nonce is correct. *)
-  val is_tx_valid : Ethereum_types.hash -> (unit, string) result tzresult Lwt.t
+  val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
 end
 
 (** Instantiate a module of type {!S} that communicates with a rollup

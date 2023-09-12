@@ -310,11 +310,11 @@ module Get_code = MethodMaker (struct
 
   type input = address * block_param
 
-  type output = hash
+  type output = hex
 
   let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
 
-  let output_encoding = hash_encoding
+  let output_encoding = hex_encoding
 
   let method_ = "eth_getCode"
 end)
@@ -406,11 +406,11 @@ end)
 module Send_raw_transaction = MethodMaker (struct
   open Ethereum_types
 
-  type input = hash
+  type input = hex
 
   type output = hash
 
-  let input_encoding = Data_encoding.tup1 hash_encoding
+  let input_encoding = Data_encoding.tup1 hex_encoding
 
   let output_encoding = hash_encoding
 

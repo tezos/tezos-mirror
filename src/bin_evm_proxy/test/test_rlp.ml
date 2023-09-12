@@ -50,7 +50,7 @@ let decode_maybe_invalid_rlp = function
   | json -> Some (decode_rlp_in_vector json)
 
 let decode_out_in_vector out =
-  let stripped = Evm_proxy_lib_dev.Ethereum_types.strip_0x out in
+  let (Hex stripped) = Evm_proxy_lib_dev.Ethereum_types.hex_of_string out in
   match Hex.to_bytes (`Hex stripped) with
   | Some b -> b
   | None -> Test.fail "Illformed JSON test vector"

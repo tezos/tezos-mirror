@@ -329,7 +329,7 @@ let make_dev_messages ~smart_rollup_address s =
   let*? _, messages =
     Rollup_node.make_encoded_messages
       ~smart_rollup_address
-      (Hash (Ethereum_types.strip_0x s))
+      (Ethereum_types.hex_of_string s)
   in
   return messages
 

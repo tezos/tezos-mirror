@@ -26,7 +26,7 @@
 open Ethereum_types
 
 (** [hex_string_to_bytes s] transforms a hex string [s] into a byte string. *)
-let hex_string_to_bytes s = `Hex s |> Hex.to_bytes_exn
+let hex_string_to_bytes (Hex s) = `Hex s |> Hex.to_bytes_exn
 
 (** Encoding used to forward the call to the kernel, to be used in simulation
      mode only. *)
@@ -245,7 +245,7 @@ let decode_call_result bytes =
   match bytes with
   | Some b :: _ ->
       let v = b |> Hex.of_bytes |> Hex.show in
-      Some (Hash v)
+      Some (Hash (Hex v))
   | _ -> None
 
 let call_result json = parse_insights decode_call_result json

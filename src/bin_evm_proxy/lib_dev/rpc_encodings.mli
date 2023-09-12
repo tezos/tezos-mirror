@@ -222,7 +222,7 @@ module Get_block_by_hash :
 module Get_code :
   METHOD
     with type m_input = Ethereum_types.address * Ethereum_types.block_param
-     and type m_output = Ethereum_types.hash
+     and type m_output = Ethereum_types.hex
 
 module Gas_price :
   METHOD with type m_input = unit and type m_output = Ethereum_types.quantity
@@ -254,7 +254,7 @@ module Get_transaction_by_block_number_and_index :
 
 module Send_raw_transaction :
   METHOD
-    with type m_input = Ethereum_types.hash
+    with type m_input = Ethereum_types.hex
      and type m_output = Ethereum_types.hash
 
 module Send_transaction :

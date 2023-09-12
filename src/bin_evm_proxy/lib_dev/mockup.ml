@@ -59,7 +59,7 @@ let block_height () = block_height_of_z @@ Z.of_int !block_height_counter
 let balance = qty_f @@ Conv.to_wei 1000
 
 let code _ =
-  hash_f
+  hex_of_string
     "0x608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
   |> Lwt_result_syntax.return
 
@@ -76,20 +76,21 @@ let transaction_hash =
   hash_f @@ "0xf837c23ac7150b486be21fc00e3e2ad118e12bec1e2bca401b999f544eabc402"
 
 let block_hash =
-  Block_hash "d28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8"
+  Block_hash
+    (Hex "d28d009fef5019bd9b353d7d9d881bde4870d3c5e418b1faf05fd9f7540994d8")
 
 let block transactions =
   {
     number = Some (block_height ());
     hash = Some block_hash;
-    parent = Block_hash (String.make 64 'a');
-    nonce = hash_f @@ String.make 16 'a';
+    parent = Block_hash (Hex (String.make 64 'a'));
+    nonce = Hex (String.make 16 'a');
     sha3Uncles = hash_f @@ String.make 64 'a';
-    logsBloom = Some (hash_f @@ String.make 512 'a');
+    logsBloom = Some (Hex (String.make 512 'a'));
     transactionRoot = hash_f @@ String.make 64 'a';
     stateRoot = hash_f @@ String.make 64 'a';
     receiptRoot = hash_f @@ String.make 64 'a';
-    miner = hash_f @@ String.make 40 'b';
+    miner = Hex (String.make 40 'b');
     difficulty = qty_f Z.one;
     totalDifficulty = qty_f Z.one;
     extraData = "";
@@ -121,7 +122,7 @@ let transaction_receipt () =
     effectiveGasPrice = gas_price;
     gasUsed = gas_price;
     logs = [];
-    logsBloom = hash_f @@ String.make 512 'a';
+    logsBloom = Hex (String.make 512 'a');
     type_ = qty_f Z.zero;
     status = qty_f Z.one;
   }
@@ -194,7 +195,8 @@ let tx_pending =
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;
     hash =
-      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08586";
+      Hash
+        (Hex "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08586");
     input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some bootstrap_address2;
@@ -213,7 +215,8 @@ let tx_queued =
     gas = qty_f Z.zero;
     gasPrice = qty_f Z.zero;
     hash =
-      Hash "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08588";
+      Hash
+        (Hex "af953a2d01f55cfe080c0c94150a60105e8ac3d51153058a1f03dd239dd08588");
     input = empty_hash;
     nonce = qty_f Z.zero;
     to_ = Some bootstrap_address;
