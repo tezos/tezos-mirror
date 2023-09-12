@@ -107,38 +107,42 @@ module Event = struct
       ("port", Data_encoding.uint16)
 end
 
-let prod_directory ~rollup_node_endpoint =
+let rollup_node_config_prod ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_prod in
-  let* rollup_node_config =
-    match rollup_node_endpoint with
-    | Endpoint endpoint ->
-        let module Rollup_node_rpc = Rollup_node.Make (struct
-          let base = endpoint
-        end) in
-        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-    | Mockup ->
-        let* smart_rollup_address = Mockup.smart_rollup_address in
-        return ((module Mockup : Rollup_node.S), smart_rollup_address)
-  in
-  return @@ Services.directory rollup_node_config
+  match rollup_node_endpoint with
+  | Endpoint endpoint ->
+      let module Rollup_node_rpc = Rollup_node.Make (struct
+        let base = endpoint
+      end) in
+      let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+      return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+  | Mockup ->
+      let* smart_rollup_address = Mockup.smart_rollup_address in
+      return ((module Mockup : Rollup_node.S), smart_rollup_address)
 
-let dev_directory ~verbose ~rollup_node_endpoint =
+let rollup_node_config_dev ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_dev in
-  let* rollup_node_config =
-    match rollup_node_endpoint with
-    | Endpoint endpoint ->
-        let module Rollup_node_rpc = Rollup_node.Make (struct
-          let base = endpoint
-        end) in
-        let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
-        return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
-    | Mockup ->
-        let* smart_rollup_address = Mockup.smart_rollup_address in
-        return ((module Mockup : Rollup_node.S), smart_rollup_address)
-  in
+  match rollup_node_endpoint with
+  | Endpoint endpoint ->
+      let module Rollup_node_rpc = Rollup_node.Make (struct
+        let base = endpoint
+      end) in
+      let* smart_rollup_address = Rollup_node_rpc.smart_rollup_address in
+      return ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+  | Mockup ->
+      let* smart_rollup_address = Mockup.smart_rollup_address in
+      return ((module Mockup : Rollup_node.S), smart_rollup_address)
+
+let prod_directory rollup_node_config =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_prod in
+  return @@ Services.directory rollup_node_config
+
+let dev_directory ~verbose rollup_node_config =
+  let open Lwt_result_syntax in
+  let open Evm_proxy_lib_dev in
   return @@ Services.directory ~verbose rollup_node_config
 
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
@@ -314,12 +318,21 @@ let main_command =
           ~verbose
           ()
       in
-      let* directory =
+      let* server =
         match config.mode with
-        | Prod -> prod_directory ~rollup_node_endpoint
-        | Dev -> dev_directory ~verbose:config.verbose ~rollup_node_endpoint
+        | Prod ->
+            let* rollup_config =
+              rollup_node_config_prod ~rollup_node_endpoint
+            in
+            let* directory = prod_directory rollup_config in
+            start config ~directory
+        | Dev ->
+            let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
+            let* directory =
+              dev_directory ~verbose:config.verbose rollup_config
+            in
+            start config ~directory
       in
-      let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in
