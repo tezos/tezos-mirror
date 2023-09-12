@@ -123,4 +123,7 @@ module Class : sig
 
   (** [n] returns [ClassSpec.t] for [Data_encoding.N]. *)
   val n : encoding_name:string -> ClassSpec.t
+
+  (** [z] returns [ClassSpec.t] for [Data_encoding.Z]. *)
+  val z : encoding_name:string -> ClassSpec.t
 end

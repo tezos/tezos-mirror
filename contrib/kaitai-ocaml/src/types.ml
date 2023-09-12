@@ -56,6 +56,7 @@ module Ast = struct
 
   let cmpop_to_string = function
     | NotEq -> "!="
+    | Eq -> "=="
     | _ -> failwith "not implemented"
 
   type t =
@@ -106,6 +107,8 @@ module Ast = struct
           (cmpop_to_string ops)
           (to_string right)
     | Attribute {value; attr} -> Format.sprintf "(%s.%s)" (to_string value) attr
+    | Subscript {value; idx} ->
+        Format.sprintf "%s[%s]" (to_string value) (to_string idx)
     | _ -> failwith "not implemented"
 end
 

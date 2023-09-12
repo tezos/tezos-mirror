@@ -235,4 +235,37 @@ module Class = struct
 
   let n ~encoding_name =
     class_spec_of_attr ~encoding_name repeat_until_end_bytes_group_attr
+
+  let z ~encoding_name =
+    let instances =
+      [
+        ( "is_negative",
+          default_instance_spec
+            ~id:"is_negative"
+            Ast.(
+              Compare
+                {
+                  left =
+                    BinOp
+                      {
+                        left =
+                          Attribute
+                            {
+                              value =
+                                Subscript
+                                  {value = Name "groups"; idx = IntNum 0};
+                              attr = "value";
+                            };
+                        op = RShift;
+                        right = IntNum 6;
+                      };
+                  ops = Eq;
+                  right = IntNum 1;
+                }) );
+      ]
+    in
+    class_spec_of_attr
+      ~encoding_name
+      repeat_until_end_bytes_group_attr
+      ~instances
 end
