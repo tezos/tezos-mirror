@@ -34,17 +34,8 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> bool {
             }
             _ => unimplemented!(),
         },
-        DipN(_, nested) | Dip(nested) => {
-            let h = {
-                // Extract the height of the protected stack if the
-                // instruction is DipN, or default to 1 if it is Dip.
-                if let DipN(h, _) = i {
-                    *h
-                } else {
-                    1
-                }
-            };
-            let protected_height: usize = usize::try_from(h).unwrap();
+        Dip(opt_height, nested) => {
+            let protected_height: usize = opt_height.unwrap_or(1);
 
             if ensure_stack_len(stack, protected_height) {
                 // Here we split the stack into protected and live segments, and after typechecking
@@ -61,15 +52,8 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> bool {
                 false
             }
         }
-        DropN(_) | Drop => {
-            let h = {
-                if let DropN(h) = i {
-                    *h
-                } else {
-                    1
-                }
-            };
-            let drop_height: usize = usize::try_from(h).unwrap();
+        Drop(opt_height) => {
+            let drop_height: usize = opt_height.unwrap_or(1);
             if ensure_stack_len(&stack, drop_height) {
                 *stack = stack.split_off(drop_height);
                 true
@@ -77,19 +61,12 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> bool {
                 false
             }
         }
-        DupN(0) => {
+        Dup(Some(0)) => {
             // DUP instruction requires an argument that is > 0.
             false
         }
-        DupN(_) | Dup => {
-            let h = {
-                if let DupN(h) = i {
-                    *h
-                } else {
-                    1
-                }
-            };
-            let dup_height: usize = usize::try_from(h).unwrap();
+        Dup(opt_height) => {
+            let dup_height: usize = opt_height.unwrap_or(1);
             if ensure_stack_len(stack, dup_height) {
                 stack.push_front(stack.get(dup_height - 1).unwrap().to_owned());
                 true
@@ -97,15 +74,13 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> bool {
                 false
             }
         }
-        Gt => {
-            match stack.make_contiguous() {
-                [Type::Int, ..] => {
-                    stack[0] = Type::Bool;
-                    true
-                }
-                _ => false,
+        Gt => match stack.make_contiguous() {
+            [Type::Int, ..] => {
+                stack[0] = Type::Bool;
+                true
             }
-        }
+            _ => false,
+        },
         If(nested_t, nested_f) => match stack.make_contiguous() {
             // Check if top is bool and bind the tail to `t`.
             [Type::Bool, t @ ..] => {
@@ -133,7 +108,8 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> bool {
                 *val = Type::Int;
                 true
             }
-        }
+            _ => false,
+        },
         Loop(nested) => match stack.make_contiguous() {
             // Check if top is bool and bind the tail to `t`.
             [Bool, t @ ..] => {
@@ -203,7 +179,7 @@ mod typecheck_tests {
     fn test_dup() {
         let mut stack = VecDeque::from([Type::Nat]);
         let expected_stack = VecDeque::from([Type::Nat, Type::Nat]);
-        typecheck_instruction(&DupN(1), &mut stack);
+        typecheck_instruction(&Dup(Some(1)), &mut stack);
         assert!(stack == expected_stack);
     }
 
@@ -211,7 +187,7 @@ mod typecheck_tests {
     fn test_dup_n() {
         let mut stack = VecDeque::from([Type::Nat, Type::Int]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat, Type::Int]);
-        typecheck_instruction(&DupN(2), &mut stack);
+        typecheck_instruction(&Dup(Some(2)), &mut stack);
         assert!(stack == expected_stack);
     }
 
@@ -243,7 +219,7 @@ mod typecheck_tests {
     fn test_drop_n() {
         let mut stack = VecDeque::from([Type::Nat, Type::Int]);
         let expected_stack = VecDeque::from([]);
-        typecheck_instruction(&DropN(2), &mut stack);
+        typecheck_instruction(&Drop(Some(2)), &mut stack);
         assert!(stack == expected_stack);
     }
 
@@ -267,7 +243,7 @@ mod typecheck_tests {
     fn test_dip() {
         let mut stack = VecDeque::from([Type::Int, Type::Bool]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat, Type::Bool]);
-        typecheck_instruction(&DipN(1, parse("{PUSH nat 6}").unwrap()), &mut stack);
+        typecheck_instruction(&Dip(Some(1), parse("{PUSH nat 6}").unwrap()), &mut stack);
         assert!(stack == expected_stack);
     }
 

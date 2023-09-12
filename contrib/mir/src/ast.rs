@@ -23,12 +23,9 @@ pub type InstructionBlock = Vec<Instruction>;
 #[derive(Debug, Eq, PartialEq)]
 pub enum Instruction {
     Add,
-    Dip(InstructionBlock),
-    DipN(usize, InstructionBlock),
-    Drop,
-    DropN(usize),
-    Dup,
-    DupN(usize),
+    Dip(Option<usize>, InstructionBlock),
+    Drop(Option<usize>),
+    Dup(Option<usize>),
     Gt,
     If(InstructionBlock, InstructionBlock),
     Int,

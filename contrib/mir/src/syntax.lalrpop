@@ -49,15 +49,12 @@ instruction: Instruction = {
   "INT" => Int,
   "GT" => Gt,
   "LOOP" <ib: instructionBlock> => Loop(ib),
-  "DIP" <n:usize> <ib: instructionBlock> => DipN(n, ib),
-  "DIP" <ib: instructionBlock> => Dip(ib),
+  "DIP" <n:usize?> <ib: instructionBlock> => Dip(n, ib),
   "ADD" => Add,
-  "DROP" <n:usize> => DropN(n),
-  "DROP" => Drop,
+  "DROP" <n:usize?> => Drop(n),
   "SWAP" => Swap,
   "IF" <t: instructionBlock> <f: instructionBlock> => If(t, f),
-  "DUP" <n:usize> => DupN(n),
-  "DUP" => Dup
+  "DUP" <n:usize?> => Dup(n),
 }
 
 instructionSeq: Vec<Instruction> = {

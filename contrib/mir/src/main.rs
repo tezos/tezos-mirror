@@ -83,13 +83,16 @@ mod tests {
             0,
         ),
     ),
-    DupN(
-        2,
+    Dup(
+        Some(
+            2,
+        ),
     ),
     Gt,
     If(
         [
             Dip(
+                None,
                 [
                     Push(
                         Int,
@@ -106,19 +109,25 @@ mod tests {
                     1,
                 ),
             ),
-            DupN(
-                3,
+            Dup(
+                Some(
+                    3,
+                ),
             ),
             Gt,
             Loop(
                 [
                     Swap,
-                    DupN(
-                        2,
+                    Dup(
+                        Some(
+                            2,
+                        ),
                     ),
                     Add,
-                    DipN(
-                        2,
+                    Dip(
+                        Some(
+                            2,
+                        ),
                         [
                             Push(
                                 Int,
@@ -129,24 +138,32 @@ mod tests {
                             Add,
                         ],
                     ),
-                    DupN(
-                        3,
+                    Dup(
+                        Some(
+                            3,
+                        ),
                     ),
                     Gt,
                 ],
             ),
             Dip(
+                None,
                 [
-                    DropN(
-                        2,
+                    Drop(
+                        Some(
+                            2,
+                        ),
                     ),
                 ],
             ),
         ],
         [
             Dip(
+                None,
                 [
-                    Drop,
+                    Drop(
+                        None,
+                    ),
                 ],
             ),
         ],
