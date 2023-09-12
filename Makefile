@@ -189,6 +189,10 @@ clean-old-names:
 	@rm -f octez-accuser-015-PtLimaPt
 	@rm -f octez-tx-rollup-node-015-PtLimaPt
 	@rm -f octez-tx-rollup-client-015-PtLimaPt
+	@rm -f octez-smart-rollup-node-PtMumbai
+	@rm -f octez-smart-rollup-node-PtNairob
+	@rm -f octez-smart-rollup-node-Proxford
+	@rm -f octez-smart-rollup-node-alpha
 
 # See comment of clean-old-names for an explanation regarding why we do not try
 # to generate the symbolic links from *_EXECUTABLES.
@@ -206,6 +210,10 @@ endif
 		@copy-parameters
 	@mkdir -p $(OCTEZ_BIN_DIR)/
 	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
+	@cd $(OCTEZ_BIN_DIR)/; \
+		ln -s octez-smart-rollup-node octez-smart-rollup-node-PtNairob; \
+		ln -s octez-smart-rollup-node octez-smart-rollup-node-Proxford; \
+		ln -s octez-smart-rollup-node octez-smart-rollup-node-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
