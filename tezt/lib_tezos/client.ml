@@ -781,10 +781,10 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     client
   |> Process.check ?expect_failure
 
-let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+let bake_for_and_wait_level ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path ?node ?dal_node_endpoint
-    client =
+    ?mempool ?ignore_node_mempool ?force ?context_path ?level_before ?node
+    ?dal_node_endpoint client =
   let node =
     match node with
     | Some n -> n
@@ -793,7 +793,13 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
         | Some n -> n
         | None -> Test.fail "No node found for bake_for_and_wait")
   in
-  let level_before = Node.get_last_seen_level node in
+  let actual_level_before = Node.get_last_seen_level node in
+  Option.iter
+    (fun level_before ->
+      Check.(actual_level_before = level_before)
+        Check.int
+        ~error_msg:"bake_for_and_wait: level before is %L, expected %R")
+    level_before ;
   let* () =
     bake_for
       ?endpoint
@@ -810,7 +816,30 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
       ?dal_node_endpoint
       client
   in
-  let* _lvl = Node.wait_for_level node (level_before + 1) in
+  Node.wait_for_level node (actual_level_before + 1)
+
+let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
+    ?mempool ?ignore_node_mempool ?force ?context_path ?level_before ?node
+    ?dal_node_endpoint client =
+  let* (_level : int) =
+    bake_for_and_wait_level
+      ?endpoint
+      ?protocol
+      ?keys
+      ?minimal_fees
+      ?minimal_nanotez_per_gas_unit
+      ?minimal_nanotez_per_byte
+      ?minimal_timestamp
+      ?mempool
+      ?ignore_node_mempool
+      ?force
+      ?context_path
+      ?level_before
+      ?node
+      ?dal_node_endpoint
+      client
+  in
   unit
 
 (* Handle attesting and preattesting similarly *)

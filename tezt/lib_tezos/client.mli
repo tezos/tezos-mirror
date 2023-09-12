@@ -543,7 +543,10 @@ val bake_for :
 
     Uses the node provided via argument [node] if any. Otherwise, it
     searches for a node in the client's mode, and fails if no node is
-    found. *)
+    found.
+
+    @param level_before If provided, check that the node is at this
+    level before baking. *)
 val bake_for_and_wait :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
@@ -556,10 +559,30 @@ val bake_for_and_wait :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
   t ->
   unit Lwt.t
+
+(** Same as {!bake_for_and_wait}, but return the new level. *)
+val bake_for_and_wait_level :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?ignore_node_mempool:bool ->
+  ?force:bool ->
+  ?context_path:string ->
+  ?level_before:int ->
+  ?node:Node.t ->
+  ?dal_node_endpoint:string ->
+  t ->
+  int Lwt.t
 
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :

@@ -108,8 +108,7 @@ let bake_until min_starting_level max_level client node status_check
     nonce_revelation_threshold =
   let rec loop level =
     if level < max_level then
-      let* () = Client.bake_for client in
-      let* level = Node.wait_for_level node (level + 1) in
+      let* level = Client.bake_for_and_wait_level ~level_before:level client in
       let* () =
         if status_check then
           assert_not_computation_status
@@ -140,7 +139,7 @@ let bake_vdf_revelation_stage nonce_revelation_threshold level max_level client
       client
       Nonce_revelation_stage
   in
-  let* () = Client.bake_for_and_wait client in
+  let* level = Client.bake_for_and_wait_level ~level_before:level client in
   let* () =
     assert_computation_status
       nonce_revelation_threshold
@@ -201,8 +200,7 @@ let check_cycle (blocks_per_cycle, nonce_revelation_threshold) starting_level
 
   (* Bake one more block, and check that it is the first block of
    * the following cycle *)
-  let* () = Client.bake_for client in
-  let* level = Node.wait_for_level node (starting_level + blocks_per_cycle) in
+  let* level = Client.bake_for_and_wait_level ~level_before:level client in
   let* () = assert_level client level (starting_level + blocks_per_cycle) in
   return level
 
@@ -256,8 +254,7 @@ let vdf_cycles : Protocol.t list -> unit =
    * checked using [check_n_cycles] *)
 
   (* Bake and check that we are in the nonce revelation stage *)
-  let* () = Client.bake_for client in
-  let* level = Node.wait_for_level node 1 in
+  let* level = Client.bake_for_and_wait_level client in
   let* () =
     assert_computation_status
       nonce_revelation_threshold
@@ -288,7 +285,7 @@ let vdf_cycles : Protocol.t list -> unit =
       node
       injected
   in
-  let* _level = Node.wait_for_level node blocks_per_cycle in
+  let* level = Node.wait_for_level node blocks_per_cycle in
   let* () =
     assert_computation_status
       nonce_revelation_threshold
@@ -297,8 +294,7 @@ let vdf_cycles : Protocol.t list -> unit =
   in
 
   (* Bake, check that we are in the first block of the following cycle *)
-  let* () = Client.bake_for client in
-  let* level = Node.wait_for_level node (blocks_per_cycle + 1) in
+  let* level = Client.bake_for_and_wait_level ~level_before:level client in
   let* () = assert_level client level (blocks_per_cycle + 1) in
 
   (* Check correct behaviour for the following [n_cycles] cycles *)
@@ -352,8 +348,7 @@ let vdf_cancel : Protocol.t list -> unit =
   let injected = ref false in
 
   (* Bake and check that we are in the nonce revelation stage *)
-  let* () = Client.bake_for client in
-  let* level = Node.wait_for_level node 1 in
+  let* level = Client.bake_for_and_wait_level client in
   let* () =
     assert_computation_status
       nonce_revelation_threshold
