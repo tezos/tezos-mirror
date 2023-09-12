@@ -30,7 +30,7 @@ let deposit request ({exchanger; request_deposit}: storage) : return =
     | Some _ -> failwith "deposit locked"
   in
   let amount = Tezos.get_amount () in
-  let callback: tez_ticket contract = Tezos.self("%callback") in
+  let callback = Tezos.address (Tezos.self("%callback")) in
   match Tezos.get_entrypoint_opt "%mint" exchanger with
   | None -> failwith "Invalid tez ticket contract"
   | Some contract ->

@@ -35,8 +35,9 @@
              IF_NONE {} { DROP ; PUSH string "deposit locked" ; FAILWITH } ;
              AMOUNT ;
              SELF %callback ;
+             ADDRESS ;
              DUP 3 ;
-             CONTRACT %mint (contract (ticket unit)) ;
+             CONTRACT %mint address ;
              IF_NONE
                { DROP 4 ; PUSH string "Invalid tez ticket contract" ; FAILWITH }
                { DUG 2 ;
