@@ -25,6 +25,8 @@
 - Use different files to store kernel logs, differenciate the different kind of
   simulations. (!9664)
 - Add support for `eth_getBlockByHash`. (!10061)
+- Add support for `eth_getTransactionByBlockHashAndIndex` and `eth_getTransactionByBlockNumberAndIndex`. (!10068)
+
 
 ### Bug fixes
 
