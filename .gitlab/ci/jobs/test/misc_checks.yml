@@ -2,8 +2,8 @@ misc_checks:
   extends:
     - .test_template
   # These tests are not flaky at all so we overwrite the retry value
+  retry: 0
   needs: [trigger]
-  retry: 1
   before_script:
     - . ./scripts/version.sh
     # Load the environment poetry previously created in the docker image.
