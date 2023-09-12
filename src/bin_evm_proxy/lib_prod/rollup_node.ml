@@ -493,7 +493,12 @@ module RPC = struct
         simulation
         ()
         ()
-        {messages; reveal_pages = None; insight_requests}
+        {
+          messages;
+          reveal_pages = None;
+          insight_requests;
+          log_kernel_debug_file = Some "simulate_call";
+        }
     in
     Simulation.call_result r
 
@@ -514,7 +519,12 @@ module RPC = struct
         simulation
         ()
         ()
-        {messages; reveal_pages = None; insight_requests}
+        {
+          messages;
+          reveal_pages = None;
+          insight_requests;
+          log_kernel_debug_file = Some "estimate_gas";
+        }
     in
     Simulation.gas_estimation r
 end

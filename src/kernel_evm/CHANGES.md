@@ -22,6 +22,8 @@
   to the one on development. (!9940)
 - `eth_sendRawTransaction` checks that the nonce of the transaction is neither too low nor too high. (!9679)
 - `eth_sendRawTransaction` checks if the chain id is correct. (!9752)
+- Use different files to store kernel logs, differenciate the different kind of
+  simulations. (!9664)
 
 ### Bug fixes
 
