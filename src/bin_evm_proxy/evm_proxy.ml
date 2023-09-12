@@ -328,6 +328,7 @@ let main_command =
             start config ~directory
         | Dev ->
             let* rollup_config = rollup_node_config_dev ~rollup_node_endpoint in
+            let* () = Evm_proxy_lib_dev.Tx_pool.start rollup_config in
             let* directory =
               dev_directory ~verbose:config.verbose rollup_config
             in
