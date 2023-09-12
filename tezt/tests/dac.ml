@@ -560,7 +560,7 @@ module Full_infrastructure = struct
 
   (** [run_and_subscribe_nodes coordinator_node dac_nodes] runs all [dac_nodes].
       Additionally, it blocks until all nodes are successfully subscribed to
-      [coordinator_node]. *)
+      [coordinator_node] and synchronized with L1. *)
   let run_and_subscribe_nodes coordinator_node dac_nodes =
     let wait_for_node_subscribed_to_data_streamer () =
       wait_for_handle_new_subscription_to_hash_streamer coordinator_node
@@ -571,12 +571,16 @@ module Full_infrastructure = struct
        we cannot wait for multiple subscription to the hash streamer, as
        events of this kind are indistinguishable one from the other.
        Instead, we wait for the subscription of one observer/committe_member
-       node to be notified before running the next node. *)
+       node to be notified before running the next node.
+       In addition to that, we also wait for the dac_nodes to be
+       synchronized with the L1's current head. *)
     Lwt_list.iter_s
       (fun node ->
         let node_is_subscribed = wait_for_node_subscribed_to_data_streamer () in
+        let wait_for_level = wait_for_layer1_new_head node in
         let* () = Dac_node.run ~wait_ready:true node in
         let* () = check_liveness_and_readiness node in
+        let* () = wait_for_level in
         node_is_subscribed)
       dac_nodes
 
