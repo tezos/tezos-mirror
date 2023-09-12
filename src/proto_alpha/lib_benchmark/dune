@@ -12,7 +12,7 @@
   tezos-micheline-rewriting
   tezos-benchmark
   tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-libs.tezos-crypto
   tezos-protocol-alpha.parameters
   hashcons

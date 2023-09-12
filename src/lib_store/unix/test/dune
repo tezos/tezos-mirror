@@ -17,9 +17,9 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.tezos-validation
   octez-shell-libs.tezos-protocol-updater
-  tezos-embedded-protocol-demo-noops
-  tezos-embedded-protocol-genesis
-  tezos-embedded-protocol-alpha
+  tezos-protocol-demo-noops.embedded-protocol
+  tezos-protocol-genesis.embedded-protocol
+  tezos-protocol-alpha.embedded-protocol
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-alcotezt

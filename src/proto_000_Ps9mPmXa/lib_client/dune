@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-000-Ps9mPmXa
-  tezos-protocol-000-Ps9mPmXa.lifted
+  tezos-protocol-000-Ps9mPmXa.protocol
+  tezos-protocol-000-Ps9mPmXa.protocol.lifted
   octez-libs.tezos-rpc
   octez-shell-libs.tezos-client-commands
   octez-libs.tezos-stdlib-unix)

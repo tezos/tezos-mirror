@@ -8,7 +8,7 @@
   tezt.core
   octez-libs.tezos-base
   octez-protocol-017-PtNairob-libs.tezos-dac
-  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-base-test-helpers
   octez-protocol-017-PtNairob-libs.tezos-test-helpers
   tezos-dac-lib

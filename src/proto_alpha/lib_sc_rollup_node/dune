@@ -13,7 +13,7 @@
   octez-protocol-alpha-libs.tezos-client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
-  tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.tezos-protocol-plugin
   tezos-protocol-alpha.parameters
   octez-libs.tezos-rpc

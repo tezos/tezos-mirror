@@ -13,7 +13,6 @@ depends: [
   "ppx_expect"
   "octez-libs"
   "tezos-protocol-018-Proxford"
-  "tezos-embedded-protocol-018-Proxford"
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
   "qcheck-alcotest" { >= "0.20" }

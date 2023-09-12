@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-005-PsBabyM1
-  tezos-protocol-005-PsBabyM1.lifted
+  tezos-protocol-005-PsBabyM1.protocol
+  tezos-protocol-005-PsBabyM1.protocol.lifted
   octez-shell-libs.tezos-signer-backends
   octez-libs.tezos-rpc
   uri)

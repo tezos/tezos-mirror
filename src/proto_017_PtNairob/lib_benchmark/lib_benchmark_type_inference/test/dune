@@ -7,7 +7,7 @@
   octez-libs.tezos-micheline
   tezos-micheline-rewriting
   tezos-benchmark-type-inference-017-PtNairob
-  tezos-protocol-017-PtNairob
+  tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-error-monad
   octez-protocol-017-PtNairob-libs.tezos-client)
  (link_flags

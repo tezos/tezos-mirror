@@ -10,7 +10,7 @@
   octez-l2-libs.tezos-scoru-wasm
   octez-l2-libs.tezos-scoru-wasm-helpers
   octez-libs.tezos-test-helpers
-  tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.tezos-smart-rollup
   tezos-protocol-alpha.parameters
   tezt)

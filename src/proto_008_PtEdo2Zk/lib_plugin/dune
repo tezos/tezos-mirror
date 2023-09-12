@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-008-PtEdo2Zk)
+  tezos-protocol-008-PtEdo2Zk.protocol)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -24,7 +24,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-embedded-protocol-008-PtEdo2Zk
+  tezos-protocol-008-PtEdo2Zk.embedded-protocol
   octez-protocol-008-PtEdo2Zk-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-validation)
  (flags

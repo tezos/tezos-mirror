@@ -5232,6 +5232,16 @@ end = struct
       let dirname = path // "lib_protocol" in
       let tezos_protocol_filename = dirname // "TEZOS_PROTOCOL" in
       let tezos_protocol = Tezos_protocol.of_file_exn tezos_protocol_filename in
+      (* Container of the registered sublibraries of [octez-protocol-libs] *)
+      let registered_tezos_protocol : Sub_lib.container =
+        Sub_lib.make_container ()
+      in
+      let tezos_protocol_sub_lib : Sub_lib.maker =
+        Sub_lib.sub_lib
+          ~package_synopsis:(sf "Tezos protocol %s package" name_dash)
+          ~container:registered_tezos_protocol
+          ~package:(sf "tezos-protocol-%s" name_dash)
+      in
       let modules_as_deps =
         let basenames_of_module module_ =
           [".ml"; ".mli"]
@@ -5271,11 +5281,10 @@ end = struct
             else [6; 7; 9; 16; 29; 32; 51; 68]
       in
       let environment =
-        public_lib
-          (sf "tezos-protocol-%s.environment" name_dash)
+        tezos_protocol_sub_lib
+          "protocol.environment"
           ~internal_name:(sf "tezos_protocol_environment_%s" name_underscore)
           ~path:(path // "lib_protocol")
-          ~opam:(sf "tezos-protocol-%s" name_dash)
           ~modules:[sf "Tezos_protocol_environment_%s" name_underscore]
           ~linkall:true
           ~deps:[octez_protocol_environment]
@@ -5299,11 +5308,10 @@ include Tezos_protocol_environment.V%d.Make(Name)()
               ]
       in
       let raw_protocol =
-        public_lib
-          (sf "tezos-protocol-%s.raw" name_dash)
+        tezos_protocol_sub_lib
+          "protocol.raw"
           ~internal_name:(sf "tezos_raw_protocol_%s" name_underscore)
           ~path:(path // "lib_protocol")
-          ~opam:(sf "tezos-protocol-%s" name_dash)
           ~linkall:true
           ~modules:tezos_protocol.modules
           ~flags:
@@ -5319,8 +5327,9 @@ include Tezos_protocol_environment.V%d.Make(Name)()
             ]
       in
       let main =
-        public_lib
-          (sf "tezos-protocol-%s" name_dash)
+        tezos_protocol_sub_lib
+          "protocol"
+          ~internal_name:(sf "tezos_protocol-%s" name_dash)
           ~path:(path // "lib_protocol")
           ~synopsis:
             (match number with
@@ -5346,7 +5355,7 @@ include Tezos_protocol_environment.V%d.Make(Name)()
             Dune.
               [
                 install
-                  [as_ "TEZOS_PROTOCOL" "raw/TEZOS_PROTOCOL"]
+                  [as_ "TEZOS_PROTOCOL" "protocol/raw/TEZOS_PROTOCOL"]
                   ~package:(sf "tezos-protocol-%s" name_dash)
                   ~section:"lib";
                 targets_rule
@@ -5410,10 +5419,10 @@ module Protocol = Protocol
               ]
       in
       let lifted =
-        public_lib
-          (sf "tezos-protocol-%s.lifted" name_dash)
+        tezos_protocol_sub_lib
+          "protocol.lifted"
+          ~internal_name:(sf "tezos_protocol-%s.lifted" name_dash)
           ~path:(path // "lib_protocol")
-          ~opam:(sf "tezos-protocol-%s" name_dash)
           ~modules:["Lifted_protocol"]
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~deps:
@@ -5490,8 +5499,8 @@ let hash = Protocol.hash
               ]
       in
       let embedded =
-        public_lib
-          (sf "tezos-embedded-protocol-%s" name_dash)
+        tezos_protocol_sub_lib
+          "embedded-protocol"
           ~internal_name:(sf "tezos_embedded_protocol_%s" name_underscore)
           ~path:(path // "lib_protocol")
           ~synopsis:

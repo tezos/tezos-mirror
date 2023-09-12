@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.protocol
   tezos-protocol-016-PtMumbai.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -46,7 +46,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-016-PtMumbai
+  tezos-protocol-016-PtMumbai.protocol
   tezos-protocol-016-PtMumbai.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services

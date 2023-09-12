@@ -7,7 +7,7 @@
   octez-libs.tezos-base
   octez-shell-libs.tezos-client-base
   octez-protocol-018-Proxford-libs.tezos-client
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.tezos-baking.tenderbrute)
  (link_flags
   (:standard)
