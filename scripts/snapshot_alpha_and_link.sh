@@ -8,7 +8,7 @@ $ ./scripts/snapshot_alpha_and_link.sh <version_number> <name>
 
 This packs the current proto_alpha directory in a new
 proto_<version_number>_<hash> directory with all the necessary renamings.
-It then updates .gitlab-ci.yml and links the protocol in the node, client and codec."
+It then links the protocol in the node, client and codec."
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 cd "$script_dir"/..
