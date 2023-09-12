@@ -80,7 +80,7 @@ stages:
           pk_revealed_accounts_prefix: '{{ vars.pk_revealed_accounts_prefix }}'
           pk_unrevealed_accounts_prefix: '{{ vars.pk_unrevealed_accounts_prefix }}'
           default_balance: '1_000_000_000_000'
-          balance_updates: [['delegate_0', 2_000_000_000_000]]
+          balance_updates: [['delegate_0', '2_000_000_000_000']]
           minimal_block_delay: '{{ vars.minimal_block_delay }}'
           dal:
             feature_enable: 'true'
