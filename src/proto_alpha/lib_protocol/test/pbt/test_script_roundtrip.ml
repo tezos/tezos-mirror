@@ -76,10 +76,28 @@ let ctxt =
 
 let ex_data_sampler : ex_data Tezos_benchmark.Base_samplers.sampler =
  fun random_state ->
-  (* TODO: https://gitlab.com/tezos/tezos/-/merge_requests/9541
-
-     cover non-trivial types *)
-  let ty = unit_t in
+  let size =
+    Tezos_benchmark.Base_samplers.sample_in_interval
+      ~range:{min = 1; max = 20}
+      random_state
+  in
+  let blacklist = function
+    | `TUnit | `TInt | `TNat | `TSignature | `TString | `TBytes | `TMutez
+    | `TKey_hash | `TKey | `TTimestamp | `TAddress | `TBool | `TPair | `TOr
+    | `TOption | `TList | `TSet | `TMap | `TChain_id | `TBls12_381_g1
+    | `TBls12_381_g2 | `TBls12_381_fr | `TBig_map | `TTicket ->
+        false
+    | `TOperation (* Forbidden in storage *)
+    | `TContract (* Forbidden in storage *)
+    | `TSapling_transaction (* Not yet supported *)
+    | `TSapling_transaction_deprecated (* Not yet supported *)
+    | `TSapling_state (* Not yet supported *)
+    | `TLambda (* Not yet supported *) ->
+        true
+  in
+  let (Ex_ty ty) =
+    Samplers.Random_type.m_type ~size ~blacklist () random_state
+  in
   let x = Samplers.Random_value.value ty random_state in
   Ex_data (ty, x)
 
