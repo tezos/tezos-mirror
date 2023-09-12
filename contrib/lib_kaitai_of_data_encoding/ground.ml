@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Kaitai.Types
+open Helpers
 
 let default_doc_spec = DocSpec.{summary = None; refs = []}
 
@@ -164,4 +165,29 @@ module Attr = struct
               Same as with [Bytes] above, i.e. we need to add support for [`Uint16],
               [`Uint8] and [`N] size header as well. *)
     bytes_limit_type_attr_spec ~id:"fixed size (uint30) bytes"
+end
+
+module Class = struct
+  let bool ~encoding_name =
+    class_spec_of_attr ~encoding_name ~enums:[Enum.bool] Attr.bool
+
+  let uint8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u1
+
+  let int8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s1
+
+  let uint16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u2
+
+  let int16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s2
+
+  let int32 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s4
+
+  let int64 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s8
+
+  let int31 ~encoding_name = class_spec_of_attr ~encoding_name Attr.int31
+
+  let float ~encoding_name = class_spec_of_attr ~encoding_name Attr.f8
+
+  let bytes ~encoding_name = class_spec_of_attr ~encoding_name Attr.bytes
+
+  let string ~encoding_name = class_spec_of_attr ~encoding_name Attr.string
 end

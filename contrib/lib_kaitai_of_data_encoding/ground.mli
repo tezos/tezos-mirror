@@ -78,3 +78,40 @@ module Attr : sig
   (** [string] returns [AttrSpec.t] definition of [Data_encoding.string]. *)
   val string : AttrSpec.t
 end
+
+(** [Class] module consists of [ClassSpec.t] for ground types. *)
+module Class : sig
+  (** [bool] returns [ClassSpec.t] definition of bool ground type. *)
+  val bool : encoding_name:string -> ClassSpec.t
+
+  (** [uint8] returns [ClassSpec.t] definition of 8-bit unsigned integer. *)
+  val uint8 : encoding_name:string -> ClassSpec.t
+
+  (** [int8] returns [ClassSpec.t] definition of 8-bit signed integer. *)
+  val int8 : encoding_name:string -> ClassSpec.t
+
+  (** [uin16] returns [ClassSpec.t] definition of 16-bit unsigned integer. *)
+  val uint16 : encoding_name:string -> ClassSpec.t
+
+  (** [int16] returns [ClassSpec.t] definition of 16-bit signed integer. *)
+  val int16 : encoding_name:string -> ClassSpec.t
+
+  (** [int32] returns [ClassSpec.t] definition of 32-bit signed integer. *)
+  val int32 : encoding_name:string -> ClassSpec.t
+
+  (** [int64] returns [ClassSpec.t] definition of 64-bit signed integer. *)
+  val int64 : encoding_name:string -> ClassSpec.t
+
+  (** [int31] returns [ClassSpec.t] definition of 31-bit signed integer.
+      For more about this type see [Data_encoding.int31]. *)
+  val int31 : encoding_name:string -> ClassSpec.t
+
+  (** [float] returns [ClassSpec.t] definition of 64-bit float. *)
+  val float : encoding_name:string -> ClassSpec.t
+
+  (** [bytes] returns [ClassSpec.t] definition of [Data_encoding.bytes]. *)
+  val bytes : encoding_name:string -> ClassSpec.t
+
+  (** [string] returns [ClassSpec.t] definition of [Data_encoding.string]. *)
+  val string : encoding_name:string -> ClassSpec.t
+end

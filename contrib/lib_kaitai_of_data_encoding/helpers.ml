@@ -54,3 +54,6 @@ let default_class_spec ~encoding_name =
       instances = [];
       enums = [];
     }
+
+let class_spec_of_attr ~encoding_name ?(enums = []) attr =
+  {(default_class_spec ~encoding_name) with seq = [attr]; enums}

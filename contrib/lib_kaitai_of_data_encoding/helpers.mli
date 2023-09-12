@@ -50,3 +50,14 @@ val default_meta_spec : encoding_name:string -> MetaSpec.t
 
     @param ~encoding_name is added to meta section as [id]. *)
 val default_class_spec : encoding_name:string -> ClassSpec.t
+
+(** [class_spec_of_attr ~encoding_name ?enums attr] returns a [ClassSpet.t]
+    for [attr].
+
+   @param ~encoding_name is added to meta section as [id].
+   @param ?enums are added to class specification if present. *)
+val class_spec_of_attr :
+  encoding_name:string ->
+  ?enums:(string * EnumSpec.t) list ->
+  AttrSpec.t ->
+  ClassSpec.t
