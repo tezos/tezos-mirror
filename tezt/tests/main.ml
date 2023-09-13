@@ -151,6 +151,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Global_constants.register ~protocols ;
   Hash_data.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
+  Injector_test.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
   Liquidity_baking_per_block_votes.register ~protocols ;

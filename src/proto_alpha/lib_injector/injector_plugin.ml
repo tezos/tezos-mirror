@@ -1,92 +1,27 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2023 Functori, <contact@functori.com>                       *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 open Injector_sigs
+open Injector_server
+open Injector_server_operation
 module Block_cache =
   Aches_lwt.Lache.Make_result
     (Aches.Rache.Transfer (Aches.Rache.LRU) (Block_hash))
 
-let injector_operation_to_manager :
-    L1_operation.t -> Protocol.Alpha_context.packed_manager_operation = function
-  | Add_messages {messages} -> Manager (Sc_rollup_add_messages {messages})
-  | Cement {rollup; commitment = _} ->
-      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      Manager (Sc_rollup_cement {rollup})
-  | Publish {rollup; commitment} ->
-      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      let commitment = Sc_rollup_proto_types.Commitment.of_octez commitment in
-      Manager (Sc_rollup_publish {rollup; commitment})
-  | Refute {rollup; opponent; refutation} ->
-      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      let refutation =
-        Sc_rollup_proto_types.Game.refutation_of_octez refutation
-      in
-      Manager (Sc_rollup_refute {rollup; opponent; refutation})
-  | Timeout {rollup; stakers} ->
-      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      let stakers = Sc_rollup_proto_types.Game.index_of_octez stakers in
-      Manager (Sc_rollup_timeout {rollup; stakers})
-  | Recover_bond {rollup; staker} ->
-      let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
-
-let injector_operation_of_manager :
-    type kind.
-    kind Protocol.Alpha_context.manager_operation -> L1_operation.t option =
-  function
-  | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
-  | Sc_rollup_cement {rollup} ->
-      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
-      let commitment = Octez_smart_rollup.Commitment.Hash.zero in
-      (* Just for printing *)
-      Some (Cement {rollup; commitment})
-  | Sc_rollup_publish {rollup; commitment} ->
-      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
-      let commitment = Sc_rollup_proto_types.Commitment.to_octez commitment in
-      Some (Publish {rollup; commitment})
-  | Sc_rollup_refute {rollup; opponent; refutation} ->
-      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
-      let refutation =
-        Sc_rollup_proto_types.Game.refutation_to_octez refutation
-      in
-      Some (Refute {rollup; opponent; refutation})
-  | Sc_rollup_timeout {rollup; stakers} ->
-      let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
-      let stakers = Sc_rollup_proto_types.Game.index_to_octez stakers in
-      Some (Timeout {rollup; stakers})
-  | _ -> None
-
 module Proto_client = struct
-  open Protocol_client_context
+  open Tezos_micheline
 
-  type operation = L1_operation.t
+  type operation = Injector_server_operation.t
 
-  type state = Injector.state
+  type state = Injector_server.state
 
   type unsigned_operation =
     Tezos_base.Operation.shell_header * packed_contents_list
@@ -94,6 +29,65 @@ module Proto_client = struct
   let max_operation_data_length = Constants.max_operation_data_length
 
   let manager_pass = Operation_repr.manager_pass
+
+  let to_manager_operation : t -> packed_manager_operation = function
+    | Transaction {amount; destination; parameters} ->
+        let destination =
+          Contract.of_b58check destination
+          |> WithExceptions.Result.to_exn_f ~error:(fun _trace ->
+                 Stdlib.failwith
+                   "Injector_plugin.to_manager_operation: invalid destination")
+        in
+        let entrypoint, parameters =
+          match parameters with
+          | Some {entrypoint; value} ->
+              let entrypoint =
+                Entrypoint.of_string_lax entrypoint
+                |> WithExceptions.Result.to_exn_f ~error:(fun _trace ->
+                       Stdlib.failwith
+                         "Injector_plugin.to_manager_operation: invalid \
+                          entrypoint")
+              in
+              let expr =
+                Michelson_v1_parser.parse_expression value
+                |> Micheline_parser.no_parsing_error
+                |> WithExceptions.Result.to_exn_f ~error:(fun _trace ->
+                       Stdlib.failwith
+                         "Injector_plugin.to_manager_operation: invalid \
+                          parameters")
+              in
+              (entrypoint, Script.lazy_expr expr.expanded)
+          | None -> (Entrypoint.default, Script.unit_parameter)
+        in
+        Manager
+          (Transaction
+             {
+               amount = Tez.of_mutez_exn amount;
+               destination;
+               parameters;
+               entrypoint;
+             })
+
+  let of_manager_operation : type kind. kind manager_operation -> t option =
+    function
+    | Transaction {amount; parameters; entrypoint; destination} ->
+        Option.bind (Data_encoding.force_decode parameters) (fun parameters ->
+            Some
+              (Transaction
+                 {
+                   amount = Tez.to_mutez amount;
+                   destination = Contract.to_b58check destination;
+                   parameters =
+                     Some
+                       {
+                         value =
+                           Michelson_v1_printer.micheline_string_of_expression
+                             ~zero_loc:true
+                             parameters;
+                         entrypoint = Entrypoint.to_string entrypoint;
+                       };
+                 }))
+    | _ -> None
 
   let manager_operation_size (Manager operation) =
     let contents =
@@ -107,10 +101,11 @@ module Proto_client = struct
           storage_limit = Z.zero;
         }
     in
-    Data_encoding.Binary.length Operation.contents_encoding (Contents contents)
+    Data_encoding.Binary.length
+      Operation.contents_encoding_with_legacy_attestation_name
+      (Contents contents)
 
-  let operation_size op =
-    manager_operation_size (injector_operation_to_manager op)
+  let operation_size op = manager_operation_size (to_manager_operation op)
 
   (* The operation size overhead is an upper bound (in practice) of the overhead
      that will be added to a manager operation. To compute it we can use any
@@ -138,7 +133,7 @@ module Proto_client = struct
     in
     let dummy_size =
       Data_encoding.Binary.length
-        Operation.contents_encoding
+        Operation.contents_encoding_with_legacy_attestation_name
         (Contents dummy_contents)
     in
     dummy_size - manager_operation_size (Manager dummy_operation)
@@ -220,9 +215,9 @@ module Proto_client = struct
             operations)
         Lwt.return
 
-  let operation_status {Injector.cctxt; _} block_hash operation_hash ~index =
+  let operation_status (node_ctxt : state) block_hash operation_hash ~index =
     let open Lwt_result_syntax in
-    let* operations = get_block_operations cctxt block_hash in
+    let* operations = get_block_operations node_ctxt.cctxt block_hash in
     match Operation_hash.Map.find_opt operation_hash operations with
     | None -> return_none
     | Some operation -> (
@@ -260,7 +255,7 @@ module Proto_client = struct
     let annotated_operations =
       List.map
         (fun operation ->
-          let (Manager operation) = injector_operation_to_manager operation in
+          let (Manager operation) = to_manager_operation operation in
           Annotated_manager_operation
             (Injection.prepare_manager_operation
                ~fee:Limit.unknown
@@ -335,7 +330,9 @@ module Proto_client = struct
       ((shell, Contents_list contents) as unsigned_op) =
     let open Lwt_result_syntax in
     let unsigned_bytes =
-      Data_encoding.Binary.to_bytes_exn Operation.unsigned_encoding unsigned_op
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding_with_legacy_attestation_name
+        unsigned_op
     in
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
@@ -353,10 +350,11 @@ module Proto_client = struct
         protocol_data = Operation_data {contents; signature = Some signature};
       }
     in
-    Data_encoding.Binary.to_bytes_exn Operation.encoding op
+    Data_encoding.Binary.to_bytes_exn
+      Operation.encoding_with_legacy_attestation_name
+      op
 
-  let time_until_next_block
-      {Injector.minimal_block_delay; delay_increment_per_round; _}
+  let time_until_next_block {minimal_block_delay; delay_increment_per_round; _}
       (header : Tezos_base.Block_header.shell_header option) =
     let open Result_syntax in
     match header with
@@ -391,15 +389,14 @@ module Proto_client = struct
           (Time.System.of_protocol_exn next_level_timestamp)
           (Time.System.now ())
 
-  let check_fee_parameters Injector.{fee_parameters; _} =
-    let check_value operation_kind name compare to_string mempool_default value
-        =
+  let check_fee_parameters {fee_parameters; _} =
+    let check_value purpose name compare to_string mempool_default value =
       if compare mempool_default value > 0 then
         error_with
           "Bad configuration fee_parameter.%s for %s. It must be at least %s \
            for operations of the injector to be propagated."
           name
-          (Configuration.string_of_operation_kind operation_kind)
+          (Configuration.string_of_purpose purpose)
           (to_string mempool_default)
       else Ok ()
     in
@@ -441,9 +438,9 @@ module Proto_client = struct
       in
       ()
     in
-    Configuration.Operation_kind_map.iter_e check fee_parameters
+    check Transaction fee_parameters
 
   let checks state = check_fee_parameters state
 end
 
-let () = Injector.register_proto_client Protocol.hash (module Proto_client)
+let () = register_proto_client Protocol.hash (module Proto_client)
