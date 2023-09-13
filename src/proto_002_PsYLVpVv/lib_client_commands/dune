@@ -9,7 +9,7 @@
   octez-libs.tezos-clic
   tezos-protocol-002-PsYLVpVv.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-002-PsYLVpVv-libs.tezos-client
@@ -36,7 +36,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-002-PsYLVpVv.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-002-PsYLVpVv-libs.tezos-client

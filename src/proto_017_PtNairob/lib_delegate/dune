@@ -11,7 +11,7 @@
   tezos-version.value
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-017-PtNairob-libs.tezos-client
@@ -56,7 +56,7 @@
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-017-PtNairob-libs.tezos-client
@@ -86,7 +86,7 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-017-PtNairob-libs.tezos-client

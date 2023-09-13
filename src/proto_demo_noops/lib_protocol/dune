@@ -6,7 +6,7 @@
  (public_name tezos-protocol-demo-noops.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_demo_noops))
 
@@ -38,8 +38,8 @@
  (public_name tezos-protocol-demo-noops.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-demo-noops.protocol.raw)
  (flags
   (:standard)
@@ -75,8 +75,8 @@
  (public_name tezos-protocol-demo-noops.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-demo-noops.protocol)
  (flags
   (:standard)
@@ -94,8 +94,8 @@
 (library
  (name tezos_protocol_demo_noops_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -118,7 +118,7 @@
  (libraries
   tezos-protocol-demo-noops.protocol
   octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 

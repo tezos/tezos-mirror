@@ -12,7 +12,7 @@
   tezos-protocol-alpha.protocol
   tezos-protocol-alpha.protocol.lifted
   octez-protocol-alpha-libs.tezos-protocol-plugin
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-alpha-libs.tezos-client
@@ -59,7 +59,7 @@
   tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-alpha-libs.tezos-client
@@ -89,7 +89,7 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-alpha.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-alpha-libs.tezos-client

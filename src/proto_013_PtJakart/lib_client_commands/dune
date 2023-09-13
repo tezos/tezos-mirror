@@ -11,7 +11,7 @@
   tezos-protocol-013-PtJakart.protocol
   tezos-protocol-013-PtJakart.parameters
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-mockup
   octez-shell-libs.tezos-mockup-registration
@@ -49,7 +49,7 @@
   octez-libs.tezos-clic
   tezos-protocol-013-PtJakart.protocol
   tezos-protocol-013-PtJakart.parameters
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-013-PtJakart-libs.tezos-client

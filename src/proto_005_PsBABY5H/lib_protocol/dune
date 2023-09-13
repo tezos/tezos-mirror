@@ -6,7 +6,7 @@
  (public_name tezos-protocol-005-PsBABY5H.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_005_PsBABY5H))
 
@@ -108,8 +108,8 @@
  (public_name tezos-protocol-005-PsBABY5H.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-005-PsBABY5H.protocol.raw)
  (flags
   (:standard)
@@ -221,8 +221,8 @@
  (public_name tezos-protocol-005-PsBABY5H.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-005-PsBABY5H.protocol)
  (flags
   (:standard)
@@ -241,8 +241,8 @@
 (library
  (name tezos_protocol_005_PsBABY5H_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -335,7 +335,7 @@
  (libraries
   tezos-protocol-005-PsBABY5H.protocol
   octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

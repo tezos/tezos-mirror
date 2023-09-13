@@ -6,7 +6,7 @@
  (public_name tezos-protocol-004-Pt24m4xi.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_004_Pt24m4xi))
 
@@ -107,8 +107,8 @@
  (public_name tezos-protocol-004-Pt24m4xi.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-004-Pt24m4xi.protocol.raw)
  (flags
   (:standard)
@@ -219,8 +219,8 @@
  (public_name tezos-protocol-004-Pt24m4xi.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-004-Pt24m4xi.protocol)
  (flags
   (:standard)
@@ -239,8 +239,8 @@
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
@@ -332,7 +332,7 @@
  (libraries
   tezos-protocol-004-Pt24m4xi.protocol
   octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-shell-services
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   uri)
  (flags
   (:standard)
@@ -29,7 +29,7 @@
   octez-libs.tezos-rpc
   octez-libs.tezos-p2p-services
   octez-shell-libs.tezos-p2p
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-client

@@ -12,7 +12,7 @@
   octez-protocol-alpha-libs.tezos-client
   octez-shell-libs.tezos-client-base
   tezos-protocol-alpha.parameters
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-libs.tezos-stdlib-unix
   tezos-protocol-alpha.protocol
   octez-libs.tezos-test-helpers
