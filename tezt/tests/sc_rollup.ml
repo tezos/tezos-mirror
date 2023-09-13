@@ -5851,6 +5851,38 @@ let test_bootstrap_smart_rollup_originated =
       ~error_msg:"Expected %R bootstrapped smart rollups, got %L") ;
   unit
 
+let test_bootstrap_private_smart_rollup_originated =
+  register_test
+    ~supports:(From_protocol 019)
+    ~__FILE__
+    ~tags:["bootstrap"; "parameter"; "private"]
+    ~title:"Bootstrap private smart rollups are private"
+  @@ fun protocol ->
+  let whitelist = Some [Constant.bootstrap1.public_key_hash] in
+  let bootstrap_arith : Protocol.bootstrap_smart_rollup =
+    {
+      address = "sr1RYurGZtN8KNSpkMcCt9CgWeUaNkzsAfXf";
+      pvm_kind = "arith";
+      boot_sector = "";
+      parameters_ty = `O [("prim", `String "unit")];
+      whitelist;
+    }
+  in
+  let bootstrap_smart_rollups = [bootstrap_arith] in
+  let* _node, client =
+    setup_l1 ~bootstrap_smart_rollups ~whitelist_enable:true protocol
+  in
+  let* found_whitelist =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist
+         bootstrap_arith.address
+  in
+  Check.(
+    (whitelist = found_whitelist)
+      (option (list string))
+      ~error_msg:"Expected %R whitelist for bootstrapped smart rollups , got %L") ;
+  unit
+
 let test_rollup_node_missing_preimage_exit_at_initialisation =
   register_test
     ~supports:(From_protocol 016)
@@ -6561,6 +6593,7 @@ let register ~protocols =
   register ~kind:"arith" ~protocols ;
   (* Both Arith and Wasm PVM tezts *)
   test_bootstrap_smart_rollup_originated protocols ;
+  test_bootstrap_private_smart_rollup_originated protocols ;
   (* Private rollup node *)
   test_private_rollup_whitelisted_staker protocols ;
   test_private_rollup_non_whitelisted_staker protocols ;
