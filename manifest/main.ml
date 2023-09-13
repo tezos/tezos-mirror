@@ -4928,7 +4928,7 @@ end = struct
             ("test_typechecking", true);
             ("test_lambda_normalization", N.(number >= 016));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -4982,7 +4982,7 @@ end = struct
             ("test_transfer_ticket", N.(number >= 016));
             ("test_tx_rollup", N.(number <= 016));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -5047,7 +5047,7 @@ end = struct
             ("test_storage", true);
             ("test_token", true);
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -5165,7 +5165,7 @@ end = struct
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
