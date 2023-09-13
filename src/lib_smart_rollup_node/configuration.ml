@@ -826,6 +826,26 @@ let purposes_of_operation_kinds (operation_kinds : operation_kind list) :
         operation_kinds)
     purposes
 
+(** Maps a mode to their corresponding purposes. The Custom mode
+    returns each purposes where it has at least one operation kind
+    from (i.e. {!purposes_of_operation_kinds}). *)
+let purposes_of_mode mode =
+  match mode with
+  | Observer -> []
+  | Batcher -> [Batching]
+  | Accuser -> [Operating]
+  | Bailout -> [Operating; Cementing; Recovering]
+  | Maintenance -> [Operating; Cementing]
+  | Operator -> [Operating; Cementing; Batching]
+  | Custom op_kinds -> purposes_of_operation_kinds op_kinds
+
+let operation_kinds_of_mode mode =
+  match mode with
+  | Custom op_kinds -> op_kinds
+  | _ ->
+      let purposes = purposes_of_mode mode in
+      List.map operation_kinds_of_purpose purposes |> List.flatten
+
 let check_mode config =
   let open Result_syntax in
   let check_purposes purposes =
@@ -851,32 +871,8 @@ let check_mode config =
     return {config with sc_rollup_node_operators}
   in
   match config.mode with
-  | Observer -> narrow_purposes []
-  | Batcher -> narrow_purposes [Batching]
-  | Accuser -> narrow_purposes [Operating]
-  | Bailout -> narrow_purposes [Operating; Cementing; Recovering]
-  | Maintenance -> narrow_purposes [Operating; Cementing]
-  | Operator -> narrow_purposes [Operating; Cementing; Batching]
-  | Custom operation_kinds ->
-      if operation_kinds = [] then tzfail Empty_operation_kinds_for_custom_mode
-      else narrow_purposes (purposes_of_operation_kinds operation_kinds)
-
-let purposes_of_mode mode =
-  match mode with
-  | Observer -> []
-  | Batcher -> [Batching]
-  | Accuser -> [Operating]
-  | Bailout -> [Operating; Cementing]
-  | Maintenance -> [Operating; Cementing]
-  | Operator -> [Operating; Cementing; Batching]
-  | Custom _op_kinds -> []
-
-let operation_kinds_of_mode mode =
-  match mode with
-  | Custom op_kinds -> op_kinds
-  | _ ->
-      let purposes = purposes_of_mode mode in
-      List.map operation_kinds_of_purpose purposes |> List.flatten
+  | Custom [] -> tzfail Empty_operation_kinds_for_custom_mode
+  | _ as mode -> narrow_purposes (purposes_of_mode mode)
 
 let can_inject mode (op_kind : operation_kind) =
   let allowed_operations = operation_kinds_of_mode mode in
