@@ -77,7 +77,7 @@ let dispatch_service =
     ~output:(request_encoding Output.encoding)
     Path.(root)
 
-let get_block ~full_transaction_object block_param
+let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Rollup_node.S) =
   match block_param with
   | Ethereum_types.(Hash_param (Block_height n)) ->
@@ -115,7 +115,7 @@ let dispatch_input
         return (Block_number.Output (Ok block_number))
     | Get_block_by_number.Input (Some (block_param, full_transaction_object)) ->
         let* block =
-          get_block
+          get_block_by_number
             ~full_transaction_object
             block_param
             (module Rollup_node_rpc)

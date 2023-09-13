@@ -40,6 +40,7 @@
 - Refactor `EthereumTransactionCommon` and transactions' signatures modules. (!9590)
 - Add data type fore representing withdrawals as they'll be produced through transactions. (!9902)
 - Slightly refactor the tick model and reboot scheduling. (!10040)
+- L2 Blocks are stored by hash instead of by number. (!10044)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
