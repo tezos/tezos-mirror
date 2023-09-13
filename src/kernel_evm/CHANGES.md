@@ -30,6 +30,8 @@
 - Add support for `eth_getTransactionByBlockHashAndIndex` and `eth_getTransactionByBlockNumberAndIndex`. (!10068)
 - Add an optional `--verbose` argument. Displays the responses to requests before
   returning them. (!10116)
+- Add support for `eth_getBlockTransactionCountByHash` and `eth_getBlockTransactionCountByNumber`. (!10101)
+
 
 ### Bug fixes
 
