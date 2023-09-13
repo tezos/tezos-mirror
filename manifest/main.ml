@@ -4588,6 +4588,7 @@ let octez_smart_rollup_node_lib =
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
         cohttp_lwt_unix;
+        octez_openapi;
         octez_node_config;
         prometheus_app;
         camlzip;

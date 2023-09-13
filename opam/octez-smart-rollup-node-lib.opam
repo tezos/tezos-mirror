@@ -13,6 +13,7 @@ depends: [
   "octez-libs"
   "octez-shell-libs"
   "cohttp-lwt-unix" { >= "5.2.0" }
+  "tezos-openapi"
   "octez-node-config"
   "prometheus-app" { >= "1.2" }
   "camlzip" { >= "1.11" & < "1.12" }

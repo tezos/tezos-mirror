@@ -13,6 +13,7 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   cohttp-lwt-unix
+  tezos-openapi
   octez-node-config
   prometheus-app
   camlzip
