@@ -238,6 +238,7 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
@@ -265,8 +266,15 @@ test-nonproto-unit:
 		scripts/test_wrapper.sh test-nonproto-unit \
 		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_DIRS)))
 
+.PHONY: test-other-unit
+test-other-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-other-unit \
+		$(addprefix @, $(addsuffix /runtest,$(OTHER_DIRS)))
+
 .PHONY: test-unit
-test-unit: test-nonproto-unit test-proto-unit
+test-unit: test-nonproto-unit test-proto-unit test-other-unit
 
 .PHONY: test-unit-alpha
 test-unit-alpha:

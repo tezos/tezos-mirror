@@ -473,6 +473,8 @@ opam:octez-codec:
   variables:
     package: octez-codec
 
+# Ignoring unreleased package octez-codec-kaitai.
+
 opam:octez-crawler:
   extends:
     - .opam_template

@@ -15,6 +15,7 @@
 (package (name octez-baker-alpha))
 (package (name octez-client))
 (package (name octez-codec))
+(package (name octez-codec-kaitai))
 (package (name octez-crawler))
 (package (name octez-dac-client))
 (package (name octez-dac-node))

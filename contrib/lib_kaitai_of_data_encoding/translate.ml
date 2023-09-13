@@ -124,7 +124,9 @@ let rec from_data_encoding :
       in
       {(default_class_spec ~encoding_name) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
-  | Describe {encoding; _} -> from_data_encoding ~encoding_name encoding
+  | Describe {encoding; _} ->
+      (* TODO: patch the documentation to include available information *)
+      from_data_encoding ~encoding_name encoding
   | Dynamic_size {kind = _; encoding} ->
       from_data_encoding ~encoding_name encoding
   | _ -> failwith "Not implemented"
