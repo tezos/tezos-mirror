@@ -4791,6 +4791,7 @@ module Parameters : sig
     pvm_kind : Sc_rollup.Kind.t;
     boot_sector : string;
     parameters_ty : Script.lazy_expr;
+    whitelist : Sc_rollup.Whitelist.t option;
   }
 
   type t = {

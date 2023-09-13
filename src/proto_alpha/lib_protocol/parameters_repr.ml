@@ -44,6 +44,7 @@ type bootstrap_smart_rollup = {
   pvm_kind : Sc_rollups.Kind.t;
   boot_sector : string;
   parameters_ty : Script_repr.lazy_expr;
+  whitelist : Sc_rollup_whitelist_repr.t option;
 }
 
 type t = {
@@ -222,15 +223,16 @@ let bootstrap_contract_encoding =
 let bootstrap_smart_rollup_encoding =
   let open Data_encoding in
   conv
-    (fun {address; pvm_kind; boot_sector; parameters_ty} ->
-      (address, pvm_kind, boot_sector, parameters_ty))
-    (fun (address, pvm_kind, boot_sector, parameters_ty) ->
-      {address; pvm_kind; boot_sector; parameters_ty})
-    (obj4
+    (fun {address; pvm_kind; boot_sector; parameters_ty; whitelist} ->
+      (address, pvm_kind, boot_sector, parameters_ty, whitelist))
+    (fun (address, pvm_kind, boot_sector, parameters_ty, whitelist) ->
+      {address; pvm_kind; boot_sector; parameters_ty; whitelist})
+    (obj5
        (req "address" Sc_rollup_repr.Address.encoding)
        (req "pvm_kind" Sc_rollups.Kind.encoding)
        (req "kernel" (string Hex))
-       (req "parameters_ty" Script_repr.lazy_expr_encoding))
+       (req "parameters_ty" Script_repr.lazy_expr_encoding)
+       (opt "whitelist" Sc_rollup_whitelist_repr.encoding))
 
 let encoding =
   let open Data_encoding in
