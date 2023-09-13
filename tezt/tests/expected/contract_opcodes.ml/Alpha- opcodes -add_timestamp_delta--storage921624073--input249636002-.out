@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 10 (just consumed gas: 8.077)
+  - location: 10 (just consumed gas: 8.093)
     [ (Pair (Pair "1970-01-01T00:01:40Z" 100) None) ]
   - location: 10 (just consumed gas: 0.010)
     [ (Pair "1970-01-01T00:01:40Z" 100) ]

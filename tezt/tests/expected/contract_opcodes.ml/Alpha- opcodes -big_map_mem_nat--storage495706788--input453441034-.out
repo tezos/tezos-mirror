@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   New map(4) of type (big_map nat nat)
 trace
-  - location: 12 (just consumed gas: 9.626)
+  - location: 12 (just consumed gas: 9.644)
     [ (Pair 1 {} None) ]
   - location: 12 (just consumed gas: 0.010)
     [ 1

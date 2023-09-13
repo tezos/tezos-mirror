@@ -34,23 +34,6 @@ let cost_expr_to_address_in_context size =
   let v0 = S.safe_int size in
   S.safe_int 200 + (v0 + (v0 lsr 2))
 
-(* generated code is not usable: the coeff 4095 is not generatable *)
-(* model global_constants_storage/expand_constant_branch *)
-(* fun size -> (4095. * size) *)
-let cost_expand_constant_branch size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = size in
-  v0 * S.safe_int 4095
-
-(* generated code is not usable: a different model is used *)
-(* model global_constants_storage/expand_no_constant_branch *)
-(* Approximating 100 + 4.639474 * n*log(n) *)
-let cost_expand_no_constant_branch size =
-  let size = S.safe_int size in
-  let v0 = size * log2 size in
-  S.safe_int 100 + (v0 * S.safe_int 4) + (v0 lsr 1) + (v0 lsr 3)
-
 let expr_to_address_in_context_cost bytes =
   cost_expr_to_address_in_context (Bytes.length bytes)
   |> Gas_limit_repr.atomic_step_cost
