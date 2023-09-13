@@ -354,27 +354,32 @@ let directory node_ctxt =
     Tezos_rpc.Path.(
       open_root / "global" / "block" /: Rollup_node_services.Arg.block_id)
   in
-  Tezos_rpc.Directory.register_dynamic_directory
-    ~descr:"Dynamic protocol specific RPC directory for the rollup node"
-    (top_directory node_ctxt)
-    path
-    (fun ((), block_id) ->
-      let open Lwt_syntax in
-      let+ dir =
-        let open Lwt_result_syntax in
-        let* level =
-          Block_directory_helpers.block_level_of_id node_ctxt block_id
+  let dir =
+    Tezos_rpc.Directory.register_dynamic_directory
+      ~descr:"Dynamic protocol specific RPC directory for the rollup node"
+      (top_directory node_ctxt)
+      path
+      (fun ((), block_id) ->
+        let open Lwt_syntax in
+        let+ dir =
+          let open Lwt_result_syntax in
+          let* level =
+            Block_directory_helpers.block_level_of_id node_ctxt block_id
+          in
+          let* () = Node_context.check_level_available node_ctxt level in
+          let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
+          Plugin.RPC_directory.block_directory node_ctxt
         in
-        let* () = Node_context.check_level_available node_ctxt level in
-        let+ (module Plugin) = get_proto_plugin_of_level node_ctxt level in
-        Plugin.RPC_directory.block_directory node_ctxt
-      in
-      match dir with
-      | Ok dir -> dir
-      | Error e ->
-          Format.kasprintf
-            Stdlib.failwith
-            "Could not load block directory for block %s: %a"
-            (Rollup_node_services.Arg.construct_block_id block_id)
-            pp_print_trace
-            e)
+        match dir with
+        | Ok dir -> dir
+        | Error e ->
+            Format.kasprintf
+              Stdlib.failwith
+              "Could not load block directory for block %s: %a"
+              (Rollup_node_services.Arg.construct_block_id block_id)
+              pp_print_trace
+              e)
+  in
+  Tezos_rpc.Directory.register_describe_directory_service
+    dir
+    Tezos_rpc.Service.description_service
