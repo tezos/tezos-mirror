@@ -6,7 +6,7 @@
  (public_name octogram)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.shell-services
   octez-libs.tezos-rpc-http-client-unix
   tezt
   tezt-tezos

@@ -10,7 +10,7 @@
   tezos-protocol-alpha.protocol
   octez-injector
   octez-protocol-alpha-libs.tezos-client
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.client-base
   octez-protocol-alpha-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags

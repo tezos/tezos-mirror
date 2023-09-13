@@ -8,14 +8,14 @@
   octez-libs.tezos-base
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-protocol-018-Proxford-libs.tezos-baking
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base-unix
   tezos-protocol-018-Proxford.parameters
-  octez-shell-libs.tezos-mockup
-  octez-shell-libs.tezos-mockup-proxy
-  octez-shell-libs.tezos-mockup-commands
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
   octez-protocol-018-Proxford-libs.tezos-baking.tenderbrute)
  (flags
   (:standard)

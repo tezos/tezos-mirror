@@ -14,12 +14,12 @@
   cmdliner
   lwt-exit
   lwt.unix
-  octez-shell-libs.tezos-proxy
+  octez-shell-libs.proxy
   tezos-proxy-server-config
   octez-libs.tezos-rpc-http-client-unix
   octez-libs.tezos-rpc-http-server
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-shell-context
+  octez-shell-libs.shell-services
+  octez-shell-libs.shell-context
   tezos-version.value
   uri
   (select void_for_linking-tezos-client-genesis from

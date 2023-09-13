@@ -19,11 +19,11 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-stdlib
-  octez-shell-libs.tezos-p2p
+  octez-shell-libs.p2p
   octez-libs.tezos-test-helpers
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-event-logging-test-helpers
-  octez-shell-libs.tezos_p2p_test_common
+  octez-shell-libs.p2p_test_common
   octez-libs.tezos-p2p-services
   tezt-tezos
   tezt

@@ -2343,7 +2343,8 @@ let octez_merkle_proof_encoding =
 
 let octez_shell_services =
   octez_shell_lib
-    "tezos-shell-services"
+    "shell-services"
+    ~internal_name:"tezos_shell_services"
     ~path:"src/lib_shell_services"
     ~synopsis:"Descriptions of RPCs exported by [tezos-shell]"
     ~deps:
@@ -2406,7 +2407,8 @@ let _octez_tooling_opam_lint =
 
 let octez_p2p =
   octez_shell_lib
-    "tezos-p2p"
+    "p2p"
+    ~internal_name:"tezos_p2p"
     ~path:"src/lib_p2p"
     ~synopsis:"Library for a pool of P2P connections"
     ~deps:
@@ -2456,7 +2458,8 @@ let tezt_tezos =
 
 let octez_p2p_test_common =
   octez_shell_lib
-    "tezos_p2p_test_common"
+    "p2p_test_common"
+    ~internal_name:"tezos_p2p_test_common"
     ~path:"src/lib_p2p/test/common"
     ~deps:
       [
@@ -2970,7 +2973,8 @@ let octez_protocol_environment =
 
 let octez_shell_context =
   octez_shell_lib
-    "tezos-shell-context"
+    "shell-context"
+    ~internal_name:"tezos_shell_context"
     ~path:"src/lib_protocol_environment/shell_context"
     ~deps:
       [
@@ -3003,7 +3007,8 @@ let _octez_protocol_environment_tests =
 
 let octez_context_ops =
   octez_shell_lib
-    "tezos-context-ops"
+    "context-ops"
+    ~internal_name:"tezos_context_ops"
     ~path:"src/lib_protocol_environment/context_ops"
     ~synopsis:"Backend-agnostic operations on contexts"
     ~deps:
@@ -3178,7 +3183,8 @@ let octez_protocol_compiler_native =
 
 let octez_protocol_updater =
   octez_shell_lib
-    "tezos-protocol-updater"
+    "protocol-updater"
+    ~internal_name:"tezos_protocol_updater"
     ~path:"src/lib_protocol_updater"
     ~synopsis:"Economic-protocol dynamic loading for `octez-node`"
     ~deps:
@@ -3198,7 +3204,8 @@ let octez_protocol_updater =
 
 let octez_validation =
   octez_shell_lib
-    "tezos-validation"
+    "validation"
+    ~internal_name:"tezos_validation"
     ~path:"src/lib_validation"
     ~synopsis:"Library for block validation"
     ~time_measurement_ppx:true
@@ -3218,7 +3225,8 @@ let octez_validation =
 
 let octez_store_shared =
   octez_shell_lib
-    "tezos-store.shared"
+    "store.shared"
+    ~internal_name:"tezos_store_shared"
     ~path:"src/lib_store/shared"
     ~deps:
       [
@@ -3242,7 +3250,8 @@ let octez_store_shared =
 
 let octez_store_unix =
   octez_shell_lib
-    "tezos-store.unix"
+    "store.unix"
+    ~internal_name:"tezos_store_unix"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3285,7 +3294,8 @@ let octez_store_unix =
 
 let octez_store_unix_reconstruction =
   octez_shell_lib
-    "tezos-store.unix-reconstruction"
+    "store.unix-reconstruction"
+    ~internal_name:"tezos_store_unix_reconstruction"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3303,7 +3313,8 @@ let octez_store_unix_reconstruction =
 
 let octez_store_unix_snapshots =
   octez_shell_lib
-    "tezos-store.unix-snapshots"
+    "store.unix-snapshots"
+    ~internal_name:"tezos_store_unix_snapshots"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3320,7 +3331,8 @@ let octez_store_unix_snapshots =
 
 let octez_store =
   octez_shell_lib
-    "tezos-store"
+    "store"
+    ~internal_name:"tezos_store"
     ~path:"src/lib_store"
     ~synopsis:"Store for `octez-node`"
     ~deps:
@@ -3335,11 +3347,12 @@ let octez_store =
         octez_store_shared |> open_;
       ]
     ~virtual_modules:["store"]
-    ~default_implementation:"octez-shell-libs.tezos-store.real"
+    ~default_implementation:"octez-shell-libs.store.real"
 
 let _octez_store_real =
   octez_shell_lib
-    "tezos-store.real"
+    "store.real"
+    ~internal_name:"tezos_store_real"
     ~path:"src/lib_store/real"
     ~deps:[octez_store_unix |> open_]
     ~implements:octez_store
@@ -3393,7 +3406,8 @@ let _octez_requester_tests =
 
 let octez_shell =
   octez_shell_lib
-    "tezos-shell"
+    "shell"
+    ~internal_name:"tezos_shell"
     ~path:"src/lib_shell"
     ~synopsis:
       "Core of `octez-node` (gossip, validation scheduling, mempool, ...)"
@@ -3503,7 +3517,8 @@ let _octez_rpc_http_server_tests =
 
 let octez_client_base =
   octez_shell_lib
-    "tezos-client-base"
+    "client-base"
+    ~internal_name:"tezos_client_base"
     ~path:"src/lib_client_base"
     ~synopsis:"Tezos: common helpers for `tezos-client`"
     ~deps:
@@ -3550,7 +3565,8 @@ let _bip39_generator =
 
 let octez_signer_services =
   octez_shell_lib
-    "tezos-signer-services"
+    "signer-services"
+    ~internal_name:"tezos_signer_services"
     ~path:"src/lib_signer_services"
     ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-signer`"
     ~deps:
@@ -3564,7 +3580,8 @@ let octez_signer_services =
 
 let octez_signer_backends =
   octez_shell_lib
-    "tezos-signer-backends"
+    "signer-backends"
+    ~internal_name:"tezos_signer_backends"
     ~path:"src/lib_signer_backends"
     ~synopsis:"Tezos: remote-signature backends for `tezos-client`"
     ~deps:
@@ -3600,7 +3617,8 @@ let _octez_signer_backends_tests =
 
 let octez_signer_backends_unix =
   octez_shell_lib
-    "tezos-signer-backends.unix"
+    "signer-backends.unix"
+    ~internal_name:"tezos_signer_backends_unix"
     ~path:"src/lib_signer_backends/unix"
     ~deps:
       [
@@ -3644,7 +3662,8 @@ let _octez_signer_backends_unix_tests =
 
 let octez_client_commands =
   octez_shell_lib
-    "tezos-client-commands"
+    "client-commands"
+    ~internal_name:"tezos_client_commands"
     ~path:"src/lib_client_commands"
     ~synopsis:"Tezos: protocol agnostic commands for `tezos-client`"
     ~deps:
@@ -3666,7 +3685,8 @@ let octez_client_commands =
 
 let octez_mockup_registration =
   octez_shell_lib
-    "tezos-mockup-registration"
+    "mockup-registration"
+    ~internal_name:"tezos_mockup_registration"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: protocol registration for the mockup mode"
     ~deps:
@@ -3681,7 +3701,8 @@ let octez_mockup_registration =
 
 let octez_mockup_proxy =
   octez_shell_lib
-    "tezos-mockup-proxy"
+    "mockup-proxy"
+    ~internal_name:"tezos_mockup_proxy"
     ~path:"src/lib_mockup_proxy"
     ~synopsis:"Tezos: local RPCs"
     ~deps:
@@ -3699,7 +3720,8 @@ let octez_mockup_proxy =
 (* Depends on tezos_p2p to register the relevant RPCs. *)
 let octez_mockup =
   octez_shell_lib
-    "tezos-mockup"
+    "mockup"
+    ~internal_name:"tezos_mockup"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: library of auto-documented RPCs (mockup mode)"
     ~deps:
@@ -3730,7 +3752,8 @@ let octez_mockup =
 
 let octez_mockup_commands =
   octez_shell_lib
-    "tezos-mockup-commands"
+    "mockup-commands"
+    ~internal_name:"tezos_mockup_commands"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: library of auto-documented RPCs (commands)"
     ~deps:
@@ -3765,7 +3788,8 @@ let _octez_mockup_tests =
 
 let octez_proxy =
   octez_shell_lib
-    "tezos-proxy"
+    "proxy"
+    ~internal_name:"tezos_proxy"
     ~path:"src/lib_proxy"
     ~synopsis:"Tezos: proxy"
     ~deps:
@@ -3784,7 +3808,8 @@ let octez_proxy =
 
 let octez_proxy_rpc =
   octez_shell_lib
-    "tezos-proxy.rpc"
+    "proxy.rpc"
+    ~internal_name:"tezos_proxy_rpc"
     ~path:"src/lib_proxy/rpc"
     ~deps:
       [
@@ -3882,7 +3907,8 @@ let _octez_proxy_server_config_tests =
 
 let octez_client_base_unix =
   octez_shell_lib
-    "tezos-client-base-unix"
+    "client-base-unix"
+    ~internal_name:"tezos_client_base_unix"
     ~path:"src/lib_client_base_unix"
     ~synopsis:
       "Tezos: common helpers for `tezos-client` (unix-specific fragment)"
@@ -4014,7 +4040,8 @@ let octez_micheline_rewriting =
 
 let octez_shell_benchmarks =
   octez_shell_lib
-    "tezos-shell-benchmarks"
+    "shell-benchmarks"
+    ~internal_name:"tezos_shell_benchmarks"
     ~path:"src/lib_shell_benchmarks"
     ~synopsis:"Tezos: shell benchmarks"
     ~deps:

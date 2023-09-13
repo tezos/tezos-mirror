@@ -17,7 +17,7 @@
   tezos-benchmark-type-inference-017-PtNairob
   tezos-protocol-017-PtNairob.protocol
   octez-libs.tezos-crypto
-  octez-shell-libs.tezos-shell-benchmarks
+  octez-shell-libs.shell-benchmarks
   octez-libs.tezos-micheline
   octez-protocol-017-PtNairob-libs.tezos-test-helpers
   octez-libs.tezos-sapling

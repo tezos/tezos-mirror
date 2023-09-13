@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-shell-libs.tezos-protocol-updater)
+  octez-shell-libs.protocol-updater)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

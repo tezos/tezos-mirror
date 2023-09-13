@@ -121,7 +121,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-genesis.protocol
-  octez-shell-libs.tezos-protocol-updater
+  octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))

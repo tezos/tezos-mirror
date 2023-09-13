@@ -3,17 +3,17 @@
 
 (library
  (name tezos_store)
- (public_name octez-shell-libs.tezos-store)
+ (public_name octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-crypto
   octez-libs.tezos-rpc
   lwt-watcher
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-validation
-  octez-shell-libs.tezos-context-ops
-  octez-shell-libs.tezos-store.shared)
+  octez-shell-libs.shell-services
+  octez-shell-libs.validation
+  octez-shell-libs.context-ops
+  octez-shell-libs.store.shared)
  (flags
   (:standard)
   -open Tezos_base
@@ -24,4 +24,4 @@
   -open Tezos_context_ops
   -open Tezos_store_shared)
  (virtual_modules store)
- (default_implementation octez-shell-libs.tezos-store.real))
+ (default_implementation octez-shell-libs.store.real))

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_p2p)
- (public_name octez-shell-libs.tezos-p2p)
+ (public_name octez-shell-libs.p2p)
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt-watcher

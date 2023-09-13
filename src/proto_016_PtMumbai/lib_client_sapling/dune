@@ -10,8 +10,8 @@
   octez-libs.tezos-clic
   octez-libs.tezos-crypto
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-signer-backends
+  octez-shell-libs.client-base
+  octez-shell-libs.signer-backends
   octez-protocol-016-PtMumbai-libs.tezos-client
   octez-protocol-016-PtMumbai-libs.tezos-client.commands
   tezos-protocol-016-PtMumbai.protocol
