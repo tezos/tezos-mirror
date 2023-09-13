@@ -36,10 +36,14 @@ let encoding =
   check_size (Constants_repr.sc_rollup_message_size_limit - 2)
   @@ list Signature.Public_key_hash.encoding
 
-let pp =
-  Format.pp_print_list
-    ~pp_sep:Format.pp_print_space
-    Signature.Public_key_hash.pp_short
+let pp ppf =
+  let open Format in
+  fprintf
+    ppf
+    "@[<hv>@[<hv 2>[@,%a@]@,]@]"
+    (pp_print_list
+       ~pp_sep:(fun ppf () -> fprintf ppf ";@ ")
+       Signature.Public_key_hash.pp_short)
 
 type last_whitelist_update = {
   message_index : Z.t;
