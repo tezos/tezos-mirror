@@ -5825,6 +5825,7 @@ let test_bootstrap_smart_rollup_originated =
       pvm_kind = "arith";
       boot_sector = "";
       parameters_ty = `O [("prim", `String "unit")];
+      whitelist = None;
     }
   in
   let bootstrap_wasm : Protocol.bootstrap_smart_rollup =
@@ -5833,6 +5834,7 @@ let test_bootstrap_smart_rollup_originated =
       pvm_kind = "wasm_2_0_0";
       boot_sector = "";
       parameters_ty = `O [("prim", `String "unit")];
+      whitelist = None;
     }
   in
   let bootstrap_smart_rollups = [bootstrap_arith; bootstrap_wasm] in

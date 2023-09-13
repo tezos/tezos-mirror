@@ -84,6 +84,7 @@ let setup_sequencer_kernel
       pvm_kind = "wasm_2_0_0";
       boot_sector;
       parameters_ty;
+      whitelist = None;
     }
   in
 

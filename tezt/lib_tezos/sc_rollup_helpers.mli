@@ -78,7 +78,7 @@ val prepare_installer_kernel :
   string ->
   string Lwt.t
 
-(** [prepare_installer_kernel ?runner ?base_installee ~preimages_dir 
+(** [prepare_installer_kernel ?runner ?base_installee ~preimages_dir
     ?display_root_hash ?config installee] will behave just as
     {!Sc_rollup_helpers.prepare_installer_kernel} but will also output
     the preimage root hash if [display_root_hash] is set to [true]. *)
@@ -161,6 +161,7 @@ val setup_bootstrap_smart_rollup :
   ?name:string ->
   address:string ->
   ?parameters_ty:string ->
+  ?whitelist:string list ->
   ?base_installee:string ->
   installee:string ->
   ?config:[< `Config of Installer_kernel_config.t | `Path of string] ->
