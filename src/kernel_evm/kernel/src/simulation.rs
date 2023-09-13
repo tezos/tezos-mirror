@@ -7,6 +7,7 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
+use crate::tick_model::constants::MAX_TRANSACTION_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
 
 use crate::{current_timestamp, parsable, parsing, retrieve_chain_id, CONFIG};
@@ -28,7 +29,7 @@ pub const SIMULATION_CREATE_TAG: u8 = 2;
 pub const SIMULATION_CHUNK_TAG: u8 = 3;
 /// Maximum gas used by the evaluation. Bounded to limit DOS on the rollup node
 /// Is used as default value if no gas is set.
-pub const MAX_EVALUATION_GAS: u64 = 1_000_000_000u64;
+pub const MAX_EVALUATION_GAS: u64 = MAX_TRANSACTION_GAS_LIMIT;
 /// Tag indicating simulation is an evaluation.
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
@@ -166,6 +167,7 @@ enum TxValidationOutcome {
     NonceTooHigh,
     NotCorrectSignature,
     InvalidChainId,
+    GasLimitTooHigh,
 }
 
 impl TxValidation {
@@ -199,6 +201,10 @@ impl TxValidation {
         // Check if the chain id is correct
         if tx.chain_id != chain_id {
             return Ok(TxValidationOutcome::InvalidChainId);
+        }
+        // Check if the gas limit is not too high
+        if tx.gas_limit > MAX_TRANSACTION_GAS_LIMIT {
+            return Ok(TxValidationOutcome::GasLimitTooHigh);
         }
         Ok(TxValidationOutcome::Valid)
     }
@@ -362,6 +368,10 @@ fn store_tx_validation_outcome<Host: Runtime>(
         TxValidationOutcome::InvalidChainId => {
             storage::store_simulation_status(host, false)?;
             storage::store_simulation_result(host, Some(b"Invalid chain id.".to_vec()))
+        }
+        TxValidationOutcome::GasLimitTooHigh => {
+            storage::store_simulation_status(host, false)?;
+            storage::store_simulation_result(host, Some(b"Gas limit too high.".to_vec()))
         }
     }
 }
