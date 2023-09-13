@@ -70,23 +70,30 @@ let consume_gas cost gas =
   | None -> None
   | Some gas -> Some (Ok (), gas)
 
+let run_on_gas_counter gas_counter m =
+  let open Result_syntax in
+  match m gas_counter with
+  | Some (res, new_gas_counter) -> return (res, new_gas_counter)
+  | None -> tzfail Gas.Operation_quota_exceeded
+
 let run ctxt m =
   let open Local_gas_counter in
   let open Result_syntax in
   match Gas.level ctxt with
-  | Gas.Unaccounted -> (
-      match m (Local_gas_counter (Saturation_repr.saturated :> int)) with
-      | Some (res, _new_gas_counter) -> return (res, ctxt)
-      | None -> tzfail Gas.Operation_quota_exceeded)
-  | Limited {remaining = _} -> (
+  | Gas.Unaccounted ->
+      let+ res, _new_gas_counter =
+        run_on_gas_counter
+          (Local_gas_counter (Saturation_repr.saturated :> int))
+          m
+      in
+      (res, ctxt)
+  | Limited {remaining = _} ->
       let gas_counter, outdated_ctxt =
         local_gas_counter_and_outdated_context ctxt
       in
-      match m gas_counter with
-      | Some (res, new_gas_counter) ->
-          let ctxt = update_context new_gas_counter outdated_ctxt in
-          return (res, ctxt)
-      | None -> tzfail Gas.Operation_quota_exceeded)
+      let+ res, new_gas_counter = run_on_gas_counter gas_counter m in
+      let ctxt = update_context new_gas_counter outdated_ctxt in
+      (res, ctxt)
 
 type no_error = |
 
