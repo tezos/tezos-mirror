@@ -19,6 +19,7 @@
       - src/proto_*/parameters/*.json
       - _build/default/src/lib_protocol_compiler/bin/main_native.exe
       - _build/default/tezt/tests/main.exe
+      - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     expire_in: 1 day
     when: on_success
 
