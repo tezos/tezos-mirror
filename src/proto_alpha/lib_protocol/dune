@@ -180,6 +180,7 @@
   Token
   Fees_storage
   Adaptive_issuance_costs
+  Issuance_bonus_repr
   Adaptive_issuance_storage
   Delegate_staking_parameters
   Delegate_consensus_key
@@ -466,6 +467,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  issuance_bonus_repr.ml issuance_bonus_repr.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
@@ -754,6 +756,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  issuance_bonus_repr.ml issuance_bonus_repr.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
@@ -1026,6 +1029,7 @@
   token.ml token.mli
   fees_storage.ml fees_storage.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
+  issuance_bonus_repr.ml issuance_bonus_repr.mli
   adaptive_issuance_storage.ml adaptive_issuance_storage.mli
   delegate_staking_parameters.ml delegate_staking_parameters.mli
   delegate_consensus_key.ml delegate_consensus_key.mli

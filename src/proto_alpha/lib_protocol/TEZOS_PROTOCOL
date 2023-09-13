@@ -163,6 +163,7 @@
         "Token",
         "Fees_storage",
         "Adaptive_issuance_costs",
+        "Issuance_bonus_repr",
         "Adaptive_issuance_storage",
         "Delegate_staking_parameters",
         "Delegate_consensus_key",
