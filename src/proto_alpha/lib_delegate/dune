@@ -13,17 +13,17 @@
   tezos-protocol-alpha.protocol.lifted
   octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-protocol-alpha-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-libs.tezos-stdlib
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-shell-context
+  octez-shell-libs.shell-context
   octez-libs.tezos-context
   octez-libs.tezos-context.memory
   octez-libs.tezos-rpc-http-client-unix
-  octez-shell-libs.tezos-context-ops
+  octez-shell-libs.context-ops
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http
   tezos-dal-node-services
@@ -60,10 +60,10 @@
   tezos-protocol-alpha.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-protocol-alpha-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-protocol-alpha-libs.tezos-baking
   octez-libs.tezos-rpc
   uri)
@@ -90,10 +90,10 @@
   octez-libs.tezos-base
   tezos-protocol-alpha.protocol
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-protocol-alpha-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-protocol-alpha-libs.tezos-baking
   octez-protocol-alpha-libs.tezos-baking-commands
   octez-libs.tezos-rpc)

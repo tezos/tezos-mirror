@@ -10,10 +10,10 @@
   tezos-protocol-002-PsYLVpVv.protocol
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-protocol-002-PsYLVpVv-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
@@ -37,10 +37,10 @@
   octez-libs.tezos-clic
   tezos-protocol-002-PsYLVpVv.protocol
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-protocol-002-PsYLVpVv-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.client-commands
   octez-protocol-002-PsYLVpVv-libs.tezos-client.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))

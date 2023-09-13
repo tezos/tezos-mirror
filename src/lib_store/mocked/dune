@@ -4,17 +4,17 @@
 (library
  (name mocked)
  (public_name octez-shell-libs.mocked)
- (implements octez-shell-libs.tezos-store)
+ (implements octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-crypto
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.shell-services
   octez-libs.tezos-context.memory
-  octez-shell-libs.tezos-context-ops
-  octez-shell-libs.tezos-validation
+  octez-shell-libs.context-ops
+  octez-shell-libs.validation
   octez-proto-libs.protocol-environment
-  octez-shell-libs.tezos-store.shared)
+  octez-shell-libs.store.shared)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

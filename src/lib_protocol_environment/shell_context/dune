@@ -3,7 +3,7 @@
 
 (library
  (name tezos_shell_context)
- (public_name octez-shell-libs.tezos-shell-context)
+ (public_name octez-shell-libs.shell-context)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base

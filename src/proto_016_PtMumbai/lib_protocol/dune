@@ -857,7 +857,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-016-PtMumbai.protocol
-  octez-shell-libs.tezos-protocol-updater
+  octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))

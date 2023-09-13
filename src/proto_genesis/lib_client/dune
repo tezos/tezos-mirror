@@ -7,13 +7,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   octez-proto-libs.protocol-environment
   tezos-protocol-genesis.protocol
   tezos-protocol-genesis.protocol.lifted
-  octez-shell-libs.tezos-client-commands
-  octez-shell-libs.tezos-proxy
+  octez-shell-libs.client-commands
+  octez-shell-libs.proxy
   octez-libs.tezos-stdlib-unix)
  (library_flags (:standard -linkall))
  (flags

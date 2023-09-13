@@ -12,13 +12,13 @@
   octez-libs.tezos-clic
   octez-libs.tezos-rpc-http-client
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-commands
-  octez-shell-libs.tezos-mockup-commands
-  octez-shell-libs.tezos-proxy
-  octez-shell-libs.tezos-client-base-unix
-  octez-shell-libs.tezos-signer-backends.unix
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-shell-libs.client-commands
+  octez-shell-libs.mockup-commands
+  octez-shell-libs.proxy
+  octez-shell-libs.client-base-unix
+  octez-shell-libs.signer-backends.unix
   uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)

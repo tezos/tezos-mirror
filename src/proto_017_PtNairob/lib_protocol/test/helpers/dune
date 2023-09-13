@@ -16,7 +16,7 @@
   tezos-protocol-017-PtNairob.parameters
   octez-proto-libs.protocol-environment
   octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.shell-services
   octez-libs.octez-plompiler
   octez-libs.tezos-crypto-dal)
  (flags

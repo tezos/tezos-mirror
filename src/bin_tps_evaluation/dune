@@ -15,7 +15,7 @@
   lwt
   octez-protocol-alpha-libs.tezos-baking
   octez-protocol-alpha-libs.tezos-client.commands
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base-unix
   tezos-protocol-alpha.protocol
   tezt
   tezt-tezos

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_p2p_test_common)
- (public_name octez-shell-libs.tezos_p2p_test_common)
+ (public_name octez-shell-libs.p2p_test_common)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt
@@ -11,7 +11,7 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-stdlib
-  octez-shell-libs.tezos-p2p
+  octez-shell-libs.p2p
   octez-libs.tezos-p2p-services)
  (flags
   (:standard)

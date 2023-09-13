@@ -9,12 +9,12 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.shell-services
   octez-libs.tezos-rpc-http
   octez-libs.tezos-rpc-http-server
   octez-libs.tezos-context
-  octez-shell-libs.tezos-store
-  octez-shell-libs.tezos-validation)
+  octez-shell-libs.store
+  octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

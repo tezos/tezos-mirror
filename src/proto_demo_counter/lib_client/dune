@@ -7,9 +7,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-commands
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-shell-libs.client-commands
   tezos-protocol-demo-counter.protocol
   tezos-protocol-demo-counter.protocol.lifted)
  (library_flags (:standard -linkall))

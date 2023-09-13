@@ -8,15 +8,15 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-crypto
-  octez-shell-libs.tezos-context-ops
-  octez-shell-libs.tezos-store.shared
-  octez-shell-libs.tezos-store.unix
-  octez-shell-libs.tezos-store.unix-reconstruction
-  octez-shell-libs.tezos-store.unix-snapshots
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.context-ops
+  octez-shell-libs.store.shared
+  octez-shell-libs.store.unix
+  octez-shell-libs.store.unix-reconstruction
+  octez-shell-libs.store.unix-snapshots
+  octez-shell-libs.shell-services
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-validation
-  octez-shell-libs.tezos-protocol-updater
+  octez-shell-libs.validation
+  octez-shell-libs.protocol-updater
   tezos-protocol-demo-noops.embedded-protocol
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-alpha.embedded-protocol

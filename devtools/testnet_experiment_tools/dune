@@ -6,7 +6,7 @@
  (libraries
   tezt
   tezt-tezos
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
