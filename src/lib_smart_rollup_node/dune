@@ -20,10 +20,10 @@
   tezos-dac-client-lib
   octez-injector
   tezos-version.value
-  octez-l2-libs.tezos_layer2_store
+  octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tezos-workers
-  octez-l2-libs.octez-smart-rollup)
+  octez-l2-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

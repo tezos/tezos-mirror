@@ -3,13 +3,13 @@
 
 (library
  (name tezos_scoru_wasm)
- (public_name octez-l2-libs.tezos-scoru-wasm)
+ (public_name octez-l2-libs.scoru-wasm)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-tree-encoding
   octez-libs.tezos-lazy-containers
-  octez-l2-libs.tezos-webassembly-interpreter
+  octez-l2-libs.webassembly-interpreter
   octez-libs.tezos-context.sigs
   octez-libs.tezos-context.memory
   octez-libs.tezos-lwt-result-stdlib

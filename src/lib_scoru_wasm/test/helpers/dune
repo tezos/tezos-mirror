@@ -3,7 +3,7 @@
 
 (library
  (name tezos_scoru_wasm_test_helpers)
- (public_name octez-l2-libs.tezos_scoru_wasm_test_helpers)
+ (public_name octez-l2-libs.scoru_wasm_test_helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -12,13 +12,13 @@
   octez-libs.tezos-context.disk
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
-  octez-l2-libs.tezos-scoru-wasm
-  octez-l2-libs.tezos_scoru_wasm_durable_snapshot
-  octez-l2-libs.tezos-scoru-wasm-fast
-  octez-l2-libs.tezos-scoru-wasm-helpers
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru_wasm_durable_snapshot
+  octez-l2-libs.scoru-wasm-fast
+  octez-l2-libs.scoru-wasm-helpers
   qcheck-alcotest
   octez-alcotezt
-  octez-l2-libs.tezos-webassembly-interpreter-extra)
+  octez-l2-libs.webassembly-interpreter-extra)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (flags
   (:standard)

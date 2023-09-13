@@ -2167,7 +2167,8 @@ let _lazy_containers_tests =
 
 let octez_webassembly_interpreter =
   octez_l2_lib
-    "tezos-webassembly-interpreter"
+    "webassembly-interpreter"
+    ~internal_name:"tezos_webassembly_interpreter"
     ~path:"src/lib_webassembly"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
     ~deps:
@@ -2182,7 +2183,8 @@ let octez_webassembly_interpreter =
 
 let octez_webassembly_interpreter_extra =
   octez_l2_lib
-    "tezos-webassembly-interpreter-extra"
+    "webassembly-interpreter-extra"
+    ~internal_name:"tezos_webassembly_interpreter_extra"
     ~path:"src/lib_webassembly/extra"
     ~license:"Apache-2.0"
     ~extra_authors:["WebAssembly Authors"]
@@ -2583,7 +2585,8 @@ let _octez_gossipsub_test =
 
 let octez_wasmer =
   octez_l2_lib
-    "tezos-wasmer"
+    "wasmer"
+    ~internal_name:"tezos_wasmer"
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
     ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; tezos_rust_lib]
@@ -2658,7 +2661,8 @@ let octez_context_memory =
 
 let octez_scoru_wasm =
   octez_l2_lib
-    "tezos-scoru-wasm"
+    "scoru-wasm"
+    ~internal_name:"tezos_scoru_wasm"
     ~path:"src/lib_scoru_wasm"
     ~deps:
       [
@@ -2674,7 +2678,8 @@ let octez_scoru_wasm =
 
 let octez_scoru_wasm_fast =
   octez_l2_lib
-    "tezos-scoru-wasm-fast"
+    "scoru-wasm-fast"
+    ~internal_name:"tezos_scoru_wasm_fast"
     ~path:"src/lib_scoru_wasm/fast"
     ~synopsis:"WASM functionality for SCORU Fast Execution"
     ~deps:
@@ -4124,9 +4129,10 @@ let _octez_embedded_protocol_packer =
 
 let octez_layer2_store =
   octez_l2_lib
-    "tezos_layer2_store"
+    "layer2_store"
+    ~internal_name:"tezos_layer2_store"
     ~path:"src/lib_layer2_store"
-    ~synopsis:"Tezos: layer2 storage utils"
+    ~synopsis:"layer2 storage utils"
     ~deps:
       [
         index;
@@ -4337,9 +4343,10 @@ let octez_injector =
 
 let octez_smart_rollup_lib =
   octez_l2_lib
-    "octez-smart-rollup"
+    "smart-rollup"
+    ~internal_name:"octez_smart_rollup"
     ~path:"src/lib_smart_rollup"
-    ~synopsis:"Octez: library for Smart Rollups"
+    ~synopsis:"Library for Smart Rollups"
     ~documentation:[Dune.[S "package"; S "octez-l2-libs"]]
     ~deps:
       [
@@ -4380,7 +4387,8 @@ let octez_smart_rollup_node_lib =
 
 let octez_scoru_wasm_helpers =
   octez_l2_lib
-    "tezos-scoru-wasm-helpers"
+    "scoru-wasm-helpers"
+    ~internal_name:"tezos_scoru_wasm_helpers"
     ~path:"src/lib_scoru_wasm/helpers"
     ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
     ~deps:
@@ -4397,7 +4405,8 @@ let octez_scoru_wasm_helpers =
 
 let octez_scoru_wasm_durable_snapshot =
   octez_l2_lib
-    "tezos_scoru_wasm_durable_snapshot"
+    "scoru_wasm_durable_snapshot"
+    ~internal_name:"tezos_scoru_wasm_durable_snapshot"
     ~path:"src/lib_scoru_wasm/test/durable_snapshot"
     ~synopsis:"Durable storage reference implementation"
     ~deps:
@@ -4410,7 +4419,8 @@ let octez_scoru_wasm_durable_snapshot =
 
 let octez_scoru_wasm_tests_helpers =
   octez_l2_lib
-    "tezos_scoru_wasm_test_helpers"
+    "scoru_wasm_test_helpers"
+    ~internal_name:"tezos_scoru_wasm_test_helpers"
     ~path:"src/lib_scoru_wasm/test/helpers"
     ~synopsis:"Helpers for test of the smart rollup wasm functionality"
     ~deps:
@@ -4433,7 +4443,8 @@ let octez_scoru_wasm_tests_helpers =
 
 let octez_scoru_wasm_benchmark =
   octez_l2_lib
-    "octez_smart_rollup_wasm_benchmark_lib"
+    "smart_rollup_wasm_benchmark_lib"
+    ~internal_name:"octez_smart_rollup_wasm_benchmark_lib"
     ~path:"src/lib_scoru_wasm/bench"
     ~synopsis:"Smart Rollup WASM benchmark library"
     ~deps:

@@ -7,8 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-l2-libs.tezos-scoru-wasm
-  octez-l2-libs.tezos-scoru-wasm-helpers
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-helpers
   octez-libs.tezos-test-helpers
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.tezos-smart-rollup
