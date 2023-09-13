@@ -2686,6 +2686,72 @@ let test_reboot =
     ~error_msg:"Expected gas used %L to be superior to %R" ;
   unit
 
+let block_transaction_count_by ~by arg =
+  let method_ =
+    "eth_getBlockTransactionCountBy"
+    ^ match by with `Hash -> "Hash" | `Number -> "Number"
+  in
+  Evm_proxy_server.{method_; parameters = `A [`String arg]}
+
+let get_block_transaction_count_by proxy_server ~by arg =
+  let* transaction_count =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (block_transaction_count_by ~by arg)
+  in
+  return JSON.(transaction_count |-> "result" |> as_int64)
+
+let test_rpc_getBlockTransactionCountBy =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_block_transaction_count_by"]
+    ~title:
+      "RPC methods eth_getBlockTransactionCountByHash and \
+       eth_getBlockTransactionCountByNumber"
+  @@ fun protocol ->
+  let* {evm_proxy_server; sc_rollup_node; node; client; _} =
+    setup_past_genesis ~admin:None protocol
+  in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
+  let* _, receipt, _ =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_proxy_server
+      (List.map fst txs)
+  in
+  let* block =
+    Eth_cli.get_block
+      ~block_id:receipt.blockHash
+      ~endpoint:evm_proxy_server_endpoint
+  in
+  let expected_count =
+    match block.transactions with
+    | Empty -> 0L
+    | Hash l -> Int64.of_int @@ List.length l
+    | Full l -> Int64.of_int @@ List.length l
+  in
+  let* transaction_count =
+    get_block_transaction_count_by evm_proxy_server ~by:`Hash receipt.blockHash
+  in
+  Check.((transaction_count = expected_count) int64)
+    ~error_msg:
+      "Expected %R transactions with eth_getBlockTransactionCountByHash, but \
+       got %L" ;
+  let* transaction_count =
+    get_block_transaction_count_by
+      evm_proxy_server
+      ~by:`Number
+      (Int32.to_string receipt.blockNumber)
+  in
+  Check.((transaction_count = expected_count) int64)
+    ~error_msg:
+      "Expected %R transactions with eth_getBlockTransactionCountByNumber, but \
+       got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2732,7 +2798,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
-  test_reboot protocols
+  test_reboot protocols ;
+  test_rpc_getBlockTransactionCountBy protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
