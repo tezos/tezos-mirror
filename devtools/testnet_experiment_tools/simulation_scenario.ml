@@ -86,6 +86,21 @@ let round_duration_arg =
       | Some i when i > 0 -> return i
       | _ -> failwith "Parameter should be a positive integer literal" )
 
+let op_per_mempool_arg =
+  let open Lwt_result_syntax in
+  default_arg
+    ~doc:
+      "Number of operations that the injector will try to maintain in the \
+       mempool at all time."
+    ~short:'n'
+    ~long:"op-per-mempool"
+    ~default:"2500"
+    ~placeholder:"integer"
+    ( parameter @@ fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i > 0 -> return i
+      | _ -> failwith "Parameter should be a positive integer literal" )
+
 let pp_spaced_int ppf i =
   let s = Format.sprintf "%d" i |> String.to_seq |> List.of_seq |> List.rev in
   List.fold_left
@@ -238,10 +253,11 @@ let sync_node (cctxt : Client_context.full) round_duration_target =
   let*! () = cctxt#message "Synchronizing the node to a low round time." in
   Tool.sync_node cctxt ?round_duration_target ()
 
-let run_injector (cctxt : Client_context.full) ~operations_file_path =
+let run_injector (cctxt : Client_context.full) ~op_per_mempool
+    ~operations_file_path =
   let open Lwt_result_syntax in
   let* (module Tool) = find_proto_tool cctxt in
-  Tool.start_injector cctxt ~operations_file_path
+  Tool.start_injector cctxt ~op_per_mempool ~operations_file_path
 
 let commands =
   let open Lwt_result_syntax in
@@ -291,11 +307,11 @@ let commands =
       ~desc:
         "Run a simulation scenario on a yes-node with the given operation file \
          by injecting operations in the node's mempool. This tool will try to \
-         target 1000 manager operations present in the mempool at all time."
-      no_options
+         target 2500 manager operations present in the mempool at all time."
+      (args1 op_per_mempool_arg)
       (prefixes ["run"; "simulation"] @@ operations_file_param @@ stop)
-      (fun () operations_file_path (cctxt : Client_context.full) ->
-        let* () = run_injector cctxt ~operations_file_path in
+      (fun op_per_mempool operations_file_path (cctxt : Client_context.full) ->
+        let* () = run_injector cctxt ~op_per_mempool ~operations_file_path in
         return_unit);
   ]
 
