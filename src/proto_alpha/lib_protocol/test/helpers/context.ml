@@ -281,6 +281,15 @@ let get_vdf_revelation_tip ctxt =
        csts
        ~reward_kind:Vdf_revelation_tip)
 
+let get_ai_current_yearly_rate ctxt =
+  Adaptive_issuance_services.current_yearly_rate rpc_ctxt ctxt
+
+let get_ai_current_yearly_rate_exact ctxt =
+  Adaptive_issuance_services.current_yearly_rate_exact rpc_ctxt ctxt
+
+let get_ai_expected_issuance ctxt =
+  Adaptive_issuance_services.expected_issuance rpc_ctxt ctxt
+
 (* Voting *)
 
 module Vote = struct
