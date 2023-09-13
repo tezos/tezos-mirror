@@ -13,7 +13,6 @@ depends: [
   "ppx_expect"
   "octez-libs"
   "tezos-protocol-017-PtNairob"
-  "tezos-embedded-protocol-017-PtNairob"
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
   "qcheck-alcotest" { >= "0.20" }

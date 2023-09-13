@@ -11,9 +11,9 @@
   octez-shell-libs.tezos-store
   octez-shell-libs.tezos-shell-context
   octez-libs.tezos-context
-  tezos-protocol-017-PtNairob
-  tezos-protocol-018-Proxford
-  tezos-protocol-alpha)
+  tezos-protocol-017-PtNairob.protocol
+  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

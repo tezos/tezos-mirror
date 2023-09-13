@@ -12,9 +12,9 @@
   tezos-dal-node-lib
   octez-protocol-alpha-libs.tezos-client
   octez-protocol-alpha-libs.tezos-protocol-plugin
-  tezos-embedded-protocol-alpha
+  tezos-protocol-alpha.embedded-protocol
   octez-protocol-alpha-libs.tezos-layer2-utils
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

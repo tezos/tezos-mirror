@@ -11,7 +11,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha
+  tezos-protocol-alpha.protocol
   tezos-benchmark
   tezos-benchmark-type-inference-alpha
   tezos-benchmark-alpha

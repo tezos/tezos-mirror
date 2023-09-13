@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-proto-libs.tezos-protocol-environment
-  tezos-protocol-011-PtHangz2)
+  tezos-protocol-011-PtHangz2.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-proto-libs.tezos-protocol-environment
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -21,7 +21,7 @@
  (libraries
   octez-libs.tezos-base
   tezos-protocol-alpha.parameters
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)

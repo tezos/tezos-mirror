@@ -9,8 +9,8 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-version.value
-  tezos-protocol-018-Proxford
-  tezos-protocol-018-Proxford.lifted
+  tezos-protocol-018-Proxford.protocol
+  tezos-protocol-018-Proxford.protocol.lifted
   octez-protocol-018-Proxford-libs.tezos-protocol-plugin
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
@@ -56,7 +56,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -89,7 +89,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base

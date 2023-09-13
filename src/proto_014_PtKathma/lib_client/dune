@@ -10,8 +10,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-014-PtKathma
-  tezos-protocol-014-PtKathma.lifted
+  tezos-protocol-014-PtKathma.protocol
+  tezos-protocol-014-PtKathma.protocol.lifted
   octez-shell-libs.tezos-mockup-registration
   octez-shell-libs.tezos-proxy
   octez-shell-libs.tezos-signer-backends

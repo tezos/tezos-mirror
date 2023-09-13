@@ -12,8 +12,8 @@
   tezos-dac-lib
   tezos-dac-client-lib
   octez-protocol-alpha-libs.tezos-client
-  tezos-embedded-protocol-alpha
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.embedded-protocol
+  tezos-protocol-alpha.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

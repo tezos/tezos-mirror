@@ -12,9 +12,9 @@
   tezos-dal-node-lib
   octez-protocol-018-Proxford-libs.tezos-client
   octez-protocol-018-Proxford-libs.tezos-protocol-plugin
-  tezos-embedded-protocol-018-Proxford
+  tezos-protocol-018-Proxford.embedded-protocol
   octez-protocol-018-Proxford-libs.tezos-layer2-utils
-  tezos-protocol-018-Proxford)
+  tezos-protocol-018-Proxford.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

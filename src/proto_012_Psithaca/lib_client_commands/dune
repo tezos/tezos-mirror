@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-012-Psithaca
+  tezos-protocol-012-Psithaca.protocol
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
@@ -45,7 +45,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-012-Psithaca
+  tezos-protocol-012-Psithaca.protocol
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base

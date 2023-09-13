@@ -8,7 +8,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.protocol
   tezos-protocol-014-PtKathma.parameters
   octez-libs.tezos-stdlib-unix
   octez-proto-libs.tezos-protocol-environment
@@ -47,7 +47,7 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.protocol
   tezos-protocol-014-PtKathma.parameters
   octez-proto-libs.tezos-protocol-environment
   octez-shell-libs.tezos-shell-services

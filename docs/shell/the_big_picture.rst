@@ -220,7 +220,7 @@ The Embedded Economic Protocols
 Three kinds of economic protocols are included in the main Octez repository.
 
   - The genesis protocol. :package:`tezos-protocol-genesis`
-    (:package:`tezos-embedded-protocol-genesis`) is the protocol of
+    (:package-api:`tezos-embedded-protocol-genesis <tezos-protocol-genesis/Tezos_embedded_protocol_genesis/index.html>`) is the protocol of
     the genesis block. It accepts a single block, signed by an
     activator whose public key is hardcoded, and whose single action is to
     switch to a new protocol chosen by the activator.
@@ -233,16 +233,14 @@ Three kinds of economic protocols are included in the main Octez repository.
     at some point, where ``nnn`` is a counter starting at 0 and
     ``hhhhhhhh`` is a prefix of the hash of the protocol code.
     Also, :package:`tezos-protocol-alpha`
-    (:package:`tezos-embedded-protocol-alpha`) on the ``master``
+    (:package-api:`tezos-embedded-protocol-alpha <tezos-protocol-alpha/Tezos_embedded_protocol_alpha/index.html>`) on the ``master``
     branch is the protocol currently under development
     (see :ref:`here<node-protocol>` for more details).
     A :doc:`tutorial<../developer/entering_alpha>` is available to start reading
     the protocol's code.
-  - Demo protocols. :package:`tezos-protocol-demo-noops`
-    (:package:`tezos-embedded-protocol-demo-noops`) is just a demo
+  - Demo protocols. :package-api:`tezos-embedded-protocol-demo-noops <tezos-protocol-demo-noops/Tezos_embedded_protocol_demo_noops/index.html>` is just a demo
     protocol that does nothing interesting but has the right
-    shape. :package:`tezos-protocol-demo-counter`
-    (:package:`tezos-embedded-protocol-demo-counter`) is another demo
+    shape. :package-api:`tezos-embedded-protocol-demo-counter <tezos-protocol-demo-counter/Tezos_embedded_protocol_demo_counter/index.html>` is another demo
     protocol in which blocks can contain simple operations.
 
 

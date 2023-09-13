@@ -9,8 +9,8 @@
   octez-libs.tezos-clic
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
-  tezos-protocol-002-PsYLVpVv
-  tezos-protocol-002-PsYLVpVv.lifted
+  tezos-protocol-002-PsYLVpVv.protocol
+  tezos-protocol-002-PsYLVpVv.protocol.lifted
   octez-shell-libs.tezos-signer-backends
   octez-libs.tezos-rpc
   uri)

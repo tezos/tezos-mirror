@@ -10,8 +10,8 @@
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-shell-libs.tezos-client-commands
-  tezos-protocol-demo-counter
-  tezos-protocol-demo-counter.lifted)
+  tezos-protocol-demo-counter.protocol
+  tezos-protocol-demo-counter.protocol.lifted)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

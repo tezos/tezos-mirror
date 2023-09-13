@@ -11,7 +11,7 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-protocol-alpha-libs.tezos-client
-  tezos-protocol-alpha)
+  tezos-protocol-alpha.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))

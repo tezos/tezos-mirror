@@ -14,7 +14,7 @@
   octez-shell-libs.tezos-signer-backends
   octez-protocol-018-Proxford-libs.tezos-client
   octez-protocol-018-Proxford-libs.tezos-client.commands
-  tezos-protocol-018-Proxford
+  tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.tezos-protocol-plugin)
  (library_flags (:standard -linkall))
  (flags
