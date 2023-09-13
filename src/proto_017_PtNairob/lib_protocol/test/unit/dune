@@ -18,11 +18,11 @@
   octez-libs.tezos-test-helpers
   octez-protocol-017-PtNairob-libs.tezos-test-helpers
   octez-alcotezt
-  octez-l2-libs.tezos-scoru-wasm-helpers
+  octez-l2-libs.scoru-wasm-helpers
   octez-libs.tezos-stdlib
   octez-libs.tezos-crypto-dal
-  octez-l2-libs.tezos-scoru-wasm
-  octez-l2-libs.tezos-webassembly-interpreter-extra)
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

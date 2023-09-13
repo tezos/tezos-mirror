@@ -7,7 +7,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-error-monad
-  octez-l2-libs.tezos_layer2_store
+  octez-l2-libs.layer2_store
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

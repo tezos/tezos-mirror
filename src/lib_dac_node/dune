@@ -11,7 +11,7 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-libs.tezos-stdlib-unix
-  octez-l2-libs.tezos_layer2_store
+  octez-l2-libs.layer2_store
   octez-libs.tezos-rpc-http-server
   tezos-dac-lib
   tezos-dac-client-lib)

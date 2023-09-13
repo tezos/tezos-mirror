@@ -9,7 +9,7 @@
   octez-libs.tezos-stdlib
   octez-libs.tezos-crypto
   octez-libs.tezos-lwt-result-stdlib
-  octez-l2-libs.tezos-scoru-wasm
+  octez-l2-libs.scoru-wasm
   data-encoding
   bls12-381
   octez-libs.octez-plonk)
