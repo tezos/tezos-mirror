@@ -279,4 +279,30 @@ mod typecheck_tests {
         assert!(stack == expected_stack);
         assert!(gas.milligas() == 10000 - 440 - 440 - 100 - 60 * 2);
     }
+
+    #[test]
+    fn test_loop_stacks_not_equal_length() {
+        let mut stack = VecDeque::from([Type::Bool, Type::Int]);
+        let mut gas = Gas::new(10000);
+        assert!(
+            typecheck_instruction(
+                &Loop(parse("{PUSH int 1; PUSH bool True}").unwrap()),
+                &mut gas,
+                &mut stack
+            ) == Err(TcError::StacksNotEqual)
+        );
+    }
+
+    #[test]
+    fn test_loop_stacks_not_equal_types() {
+        let mut stack = VecDeque::from([Type::Bool, Type::Int]);
+        let mut gas = Gas::new(10000);
+        assert!(
+            typecheck_instruction(
+                &Loop(parse("{DROP; PUSH bool False; PUSH bool True}").unwrap()),
+                &mut gas,
+                &mut stack
+            ) == Err(TcError::StacksNotEqual)
+        );
+    }
 }
