@@ -117,7 +117,8 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         initial_tick = Sc_rollup.Tick.to_z initial_tick;
       }
   in
-  let* () = Node_context.save_l2_head node_ctxt l2_block in
+  let* () = Node_context.save_l2_block node_ctxt l2_block in
+  let* () = Node_context.set_l2_head node_ctxt l2_block in
   return l2_block
 
 let initialize_node_context ?(constants = default_constants) kind ~boot_sector =

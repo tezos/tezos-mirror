@@ -97,6 +97,9 @@ Smart Rollup node
   kernel logs should be written (this file is in
   ``<data-dir>/simulation_kernel_logs``). (MR :gl:`!9606`)
 
+- Fixed an issue where the rollup node could forget to update its L2 head for a
+  block. (MR :gl:`!9868`)
+
 Smart Rollup client
 -------------------
 

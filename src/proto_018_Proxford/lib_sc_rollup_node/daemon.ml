@@ -80,8 +80,124 @@ let exit_after_proto_migration node_ctxt ?predecessor head =
       let*! _ = Lwt_exit.exit_and_wait 0 in
       return_unit
 
-let rec process_head (daemon_components : (module Daemon_components.S))
+let rec process_l1_block (daemon_components : (module Daemon_components.S))
     (node_ctxt : _ Node_context.t) ~catching_up (head : Layer1.header) =
+  let open Lwt_result_syntax in
+  if before_origination node_ctxt head then return `Nothing
+  else
+    let* l2_head = Node_context.find_l2_block node_ctxt head.hash in
+    match l2_head with
+    | Some l2_head ->
+        (* Already processed *)
+        return (`Already_processed l2_head)
+    | None -> (
+        (* New head *)
+        let*! () = Daemon_event.head_processing head.hash head.level in
+        let* predecessor =
+          Node_context.get_predecessor_header_opt node_ctxt head
+        in
+        match predecessor with
+        | None ->
+            (* Predecessor not available on the L1, which means the block does not
+               exist in the chain. *)
+            return `Nothing
+        | Some predecessor ->
+            let* () = exit_on_other_proto node_ctxt ~predecessor head in
+            let* () =
+              update_l2_chain
+                daemon_components
+                node_ctxt
+                ~catching_up:true
+                predecessor
+            in
+            let* ctxt = previous_context node_ctxt ~predecessor in
+            let* () =
+              Node_context.save_protocol_info node_ctxt head ~predecessor
+            in
+            let* inbox_hash, inbox, inbox_witness, messages =
+              Inbox.process_head node_ctxt ~predecessor head
+            in
+            let inbox_witness =
+              Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
+                inbox_witness
+            in
+            let inbox_hash =
+              Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash
+            in
+            let* () =
+              when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
+              Dal_slots_tracker.process_head
+                node_ctxt
+                (Layer1.head_of_header head)
+            in
+            let* () = process_l1_block_operations node_ctxt head in
+            (* Avoid storing and publishing commitments if the head is not final. *)
+            (* Avoid triggering the pvm execution if this has been done before for
+               this head. *)
+            let* ctxt, _num_messages, num_ticks, initial_tick =
+              Interpreter.process_head
+                (module Rollup_node_plugin.Plugin)
+                node_ctxt
+                ctxt
+                ~predecessor
+                head
+                (inbox, messages)
+            in
+            let*! context_hash = Context.commit ctxt in
+            let* commitment_hash =
+              Publisher.process_head
+                (module Rollup_node_plugin.Plugin)
+                node_ctxt
+                ~predecessor:predecessor.hash
+                head
+                ctxt
+            in
+            let commitment_hash =
+              Option.map
+                Sc_rollup_proto_types.Commitment_hash.to_octez
+                commitment_hash
+            in
+            let* () =
+              unless (catching_up && Option.is_none commitment_hash)
+              @@ fun () -> Inbox.same_as_layer_1 node_ctxt head.hash inbox
+            in
+            let level = head.level in
+            let* previous_commitment_hash =
+              if level = node_ctxt.genesis_info.level then
+                (* Previous commitment for rollup genesis is itself. *)
+                return node_ctxt.genesis_info.commitment_hash
+              else
+                let+ pred =
+                  Node_context.get_l2_block node_ctxt predecessor.hash
+                in
+                Sc_rollup_block.most_recent_commitment pred.header
+            in
+            let header =
+              Sc_rollup_block.
+                {
+                  block_hash = head.hash;
+                  level;
+                  predecessor = predecessor.hash;
+                  commitment_hash;
+                  previous_commitment_hash;
+                  context = context_hash;
+                  inbox_witness;
+                  inbox_hash;
+                }
+            in
+            let l2_block =
+              Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+            in
+            let* () =
+              Node_context.mark_finalized_level
+                node_ctxt
+                Int32.(sub head.level (of_int node_ctxt.block_finality_time))
+            in
+            let* () = Node_context.save_l2_block node_ctxt l2_block in
+            return (`New l2_block))
+
+and update_l2_chain daemon_components node_ctxt ~catching_up
+    (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* () =
@@ -89,102 +205,18 @@ let rec process_head (daemon_components : (module Daemon_components.S))
       node_ctxt
       {Layer1.hash = head.hash; level = head.level}
   in
-  let* already_processed = Node_context.is_processed node_ctxt head.hash in
-  unless (already_processed || before_origination node_ctxt head) @@ fun () ->
-  let*! () = Daemon_event.head_processing head.hash head.level in
-  let* predecessor = Node_context.get_predecessor_header_opt node_ctxt head in
-  match predecessor with
-  | None ->
-      (* Predecessor not available on the L1, which means the block does not
-         exist in the chain. *)
-      return_unit
-  | Some predecessor ->
-      let* () = exit_on_other_proto node_ctxt ~predecessor head in
-      let* () =
-        process_head daemon_components node_ctxt ~catching_up:true predecessor
-      in
-      let* ctxt = previous_context node_ctxt ~predecessor in
-      let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
-      let* inbox_hash, inbox, inbox_witness, messages =
-        Inbox.process_head node_ctxt ~predecessor head
-      in
-      let inbox_witness =
-        Sc_rollup_proto_types.Merkelized_payload_hashes_hash.to_octez
-          inbox_witness
-      in
-      let inbox_hash = Sc_rollup_proto_types.Inbox_hash.to_octez inbox_hash in
-      let* () =
-        when_ (Node_context.dal_supported node_ctxt) @@ fun () ->
-        Dal_slots_tracker.process_head node_ctxt (Layer1.head_of_header head)
-      in
-      let* () = process_l1_block_operations node_ctxt head in
-      (* Avoid storing and publishing commitments if the head is not final. *)
-      (* Avoid triggering the pvm execution if this has been done before for
-         this head. *)
-      let* ctxt, _num_messages, num_ticks, initial_tick =
-        Interpreter.process_head
-          (module Rollup_node_plugin.Plugin)
-          node_ctxt
-          ctxt
-          ~predecessor
-          head
-          (inbox, messages)
-      in
-      let*! context_hash = Context.commit ctxt in
-      let* commitment_hash =
-        Publisher.process_head
-          (module Rollup_node_plugin.Plugin)
-          node_ctxt
-          ~predecessor:predecessor.hash
-          head
-          ctxt
-      in
-      let commitment_hash =
-        Option.map
-          Sc_rollup_proto_types.Commitment_hash.to_octez
-          commitment_hash
-      in
-      let* () =
-        unless (catching_up && Option.is_none commitment_hash) @@ fun () ->
-        Inbox.same_as_layer_1 node_ctxt head.hash inbox
-      in
-      let level = head.level in
-      let* previous_commitment_hash =
-        if level = node_ctxt.genesis_info.level then
-          (* Previous commitment for rollup genesis is itself. *)
-          return node_ctxt.genesis_info.commitment_hash
-        else
-          let+ pred = Node_context.get_l2_block node_ctxt predecessor.hash in
-          Sc_rollup_block.most_recent_commitment pred.header
-      in
-      let header =
-        Sc_rollup_block.
-          {
-            block_hash = head.hash;
-            level;
-            predecessor = predecessor.hash;
-            commitment_hash;
-            previous_commitment_hash;
-            context = context_hash;
-            inbox_witness;
-            inbox_hash;
-          }
-      in
-      let l2_block =
-        Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
-      in
-      let* () =
-        Node_context.mark_finalized_level
-          node_ctxt
-          Int32.(sub head.level (of_int node_ctxt.block_finality_time))
-      in
-      let* () = Node_context.save_l2_head node_ctxt l2_block in
+  let* done_ = process_l1_block daemon_components node_ctxt ~catching_up head in
+  match done_ with
+  | `Nothing -> return_unit
+  | `Already_processed l2_block -> Node_context.set_l2_head node_ctxt l2_block
+  | `New l2_block ->
+      let* () = Node_context.set_l2_head node_ctxt l2_block in
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
+      Metrics.Inbox.set_process_time process_time ;
       let*! () =
         Daemon_event.new_head_processed head.hash head.level process_time
       in
-      Metrics.Inbox.set_process_time process_time ;
       return_unit
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
@@ -221,7 +253,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
              false
              trace ->
         (* The reorganization could not be computed entirely because of missing
-           info on the Layer 1. We fallback to a recursive process_head. *)
+           info on the Layer 1. We fallback to a recursive process_l1_block. *)
         Ok {Reorg.no_reorg with new_chain = [stripped_head]}
     | _ -> reorg
   in
@@ -244,7 +276,7 @@ let on_layer_1_head (daemon_components : (module Daemon_components.S)) node_ctxt
         Layer1_helpers.prefetch_tezos_blocks node_ctxt.l1_ctxt to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
-        process_head daemon_components node_ctxt ~catching_up header)
+        update_l2_chain daemon_components node_ctxt ~catching_up header)
       new_chain_prefetching
   in
   let* () = Publisher.publish_commitments () in
@@ -423,7 +455,7 @@ let run node_ctxt configuration
       | e -> error_to_degraded_mode e)
 
 module Internal_for_tests = struct
-  (** Same as {!process_head} but only builds and stores the L2 block
+  (** Same as {!update_l2_chain} but only builds and stores the L2 block
         corresponding to [messages]. It is used by the unit tests to build an L2
         chain. *)
   let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
@@ -490,7 +522,8 @@ module Internal_for_tests = struct
     let l2_block =
       Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
     in
-    let* () = Node_context.save_l2_head node_ctxt l2_block in
+    let* () = Node_context.save_l2_block node_ctxt l2_block in
+    let* () = Node_context.set_l2_head node_ctxt l2_block in
     return l2_block
 end
 
