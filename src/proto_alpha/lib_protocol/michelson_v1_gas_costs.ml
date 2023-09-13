@@ -41,7 +41,8 @@ module S = Saturation_repr
 (* model N_IPairing_check_bls12_381 *)
 (* when benchmarking, compile bls12-381 without ADX *)
 let cost_N_IPairing_check_bls12_381 size =
-  S.add (S.safe_int 450_000) (S.mul (S.safe_int 342_500) (S.safe_int size))
+  let open S.Syntax in
+  S.safe_int 450_000 + (S.safe_int 342_500 * S.safe_int size)
 
 (* generated code is not usable: the const is not on a grid point *)
 (* model N_ILsl_nat *)
@@ -175,7 +176,7 @@ let cost_N_ISet_update size1 size2 =
 
 let cost_mul size1 size2 =
   let open S.Syntax in
-  let a = S.add (S.safe_int size1) (S.safe_int size2) in
+  let a = S.safe_int size1 + S.safe_int size2 in
   let v0 = a * log2 a in
   S.safe_int 55 + (v0 lsr 1) + (v0 lsr 2) + (v0 lsr 4)
 
