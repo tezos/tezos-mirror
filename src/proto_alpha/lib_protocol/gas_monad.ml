@@ -93,6 +93,13 @@ let run ctxt m =
       let ctxt = update_context new_gas_counter outdated_ctxt in
       (res, ctxt)
 
+let run_unaccounted (m : ('a, error trace) t) : 'a tzresult =
+  let open Result_syntax in
+  let* res, _new_gas_counter =
+    run_on_gas_counter Local_gas_counter.max_gas_counter m
+  in
+  res
+
 type no_error = |
 
 let run_pure ctxt (m : ('a, no_error) t) : ('a * context) tzresult =

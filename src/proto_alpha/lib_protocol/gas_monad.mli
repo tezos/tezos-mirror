@@ -75,6 +75,10 @@ val run_pure :
   ('a, no_error) t ->
   ('a * Alpha_context.context) tzresult
 
+(** [run_unaccounted m] is a context-free variant of [run] in which
+    gas consumptions are ignored. *)
+val run_unaccounted : ('a, error trace) t -> 'a tzresult
+
 (** [record_trace_level ~error_details f m] returns a new gas-monad value that
      when run, records trace levels using [f]. This function has no effect in
     the case of a gas-exhaustion error or if [error_details] is [Fast]. *)
