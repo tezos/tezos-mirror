@@ -37,6 +37,7 @@ type execute_outbox_message_result = {
   paid_storage_size_diff : Z.t;
   ticket_receipt : Ticket_receipt.t;
   operations : Script_typed_ir.packed_internal_operation list;
+  whitelist_update : Sc_rollup.Whitelist.update option;
 }
 
 type origination_result = {

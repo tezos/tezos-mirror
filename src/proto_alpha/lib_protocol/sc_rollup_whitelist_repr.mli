@@ -39,3 +39,7 @@ type last_whitelist_update = {
 }
 
 val last_whitelist_update_encoding : last_whitelist_update Data_encoding.t
+
+type update = Public | Private of t
+
+val update_encoding : update Data_encoding.t

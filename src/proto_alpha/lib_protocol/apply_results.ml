@@ -119,6 +119,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_execute_outbox_message_result : {
       balance_updates : Receipt.balance_updates;
       ticket_receipt : Ticket_receipt.t;
+      whitelist_update : Sc_rollup.Whitelist.update option;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
@@ -764,9 +765,10 @@ module Manager_result = struct
         .sc_rollup_execute_outbox_message_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj5
             (req "balance_updates" Receipt.balance_updates_encoding)
             (req "ticket_updates" Ticket_receipt.encoding)
+            (opt "whitelist_update" Sc_rollup.Whitelist.update_encoding)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (dft "paid_storage_size_diff" z Z.zero))
       ~select:(function
@@ -780,22 +782,26 @@ module Manager_result = struct
             {
               balance_updates;
               ticket_receipt;
+              whitelist_update;
               consumed_gas;
               paid_storage_size_diff;
             } ->
             ( balance_updates,
               ticket_receipt,
+              whitelist_update,
               consumed_gas,
               paid_storage_size_diff ))
       ~inj:
         (fun ( balance_updates,
                ticket_receipt,
+               whitelist_update,
                consumed_gas,
                paid_storage_size_diff ) ->
         Sc_rollup_execute_outbox_message_result
           {
             balance_updates;
             ticket_receipt;
+            whitelist_update;
             consumed_gas;
             paid_storage_size_diff;
           })

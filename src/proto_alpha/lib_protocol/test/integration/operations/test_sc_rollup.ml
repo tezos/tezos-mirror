@@ -1609,7 +1609,12 @@ let test_execute_message_override_applied_messages_slot () =
       make_transaction_output ~outbox_level ~message_index transactions
     in
     let* ( Sc_rollup_operations.
-             {operations = _; ticket_receipt = _; paid_storage_size_diff},
+             {
+               operations = _;
+               ticket_receipt = _;
+               whitelist_update = _;
+               paid_storage_size_diff;
+             },
            incr ) =
       execute_outbox_message_without_proof_validation
         incr

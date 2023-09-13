@@ -58,3 +58,23 @@ let last_whitelist_update_encoding =
       (obj2
          (req "message_index" n)
          (req "outbox_level" Raw_level_repr.encoding)))
+
+type update = Public | Private of t
+
+let update_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Public"
+        (obj1 (req "kind" (constant "public")))
+        (function Public -> Some () | _ -> None)
+        (fun () -> Public);
+      case
+        (Tag 1)
+        ~title:"Private"
+        (obj2 (req "kind" (constant "update")) (req "whitelist" encoding))
+        (function Private whitelist -> Some ((), whitelist) | _ -> None)
+        (fun ((), whitelist) -> Private whitelist);
+    ]
