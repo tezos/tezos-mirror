@@ -95,7 +95,7 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
 
     This function just creates a value of type [t], it does not call {!val:run}.
 
-    The path to the baker binary is chosen from the [protocol].
+   [path] provides the path to the baker binary, the default being the one derived from the [protocol].
 
     The standard output and standard error output of the baker will
     be logged with prefix [name] and color [color].
@@ -139,6 +139,7 @@ val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
  *)
 val create :
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
@@ -175,6 +176,7 @@ val create :
  *)
 val create_from_uris :
   protocol:Protocol.t ->
+  ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->

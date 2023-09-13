@@ -93,14 +93,15 @@ let liquidity_baking_votefile ?path vote =
       ]) ;
   votefile
 
-let create_from_uris ~protocol ?name ?color ?event_pipe ?runner
-    ?(delegates = []) ?votefile ?(liquidity_baking_toggle_vote = Some Pass)
-    ?(force_apply = false) ?(remote_mode = false) ?operations_pool
-    ?dal_node_rpc_endpoint ?minimal_nanotez_per_gas_unit ~base_dir
-    ~node_data_dir ~node_rpc_endpoint () =
+let create_from_uris ~protocol ?(path = Protocol.baker protocol) ?name ?color
+    ?event_pipe ?runner ?(delegates = []) ?votefile
+    ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
+    ?(remote_mode = false) ?operations_pool ?dal_node_rpc_endpoint
+    ?minimal_nanotez_per_gas_unit ~base_dir ~node_data_dir ~node_rpc_endpoint ()
+    =
   let baker =
     create
-      ~path:(Protocol.baker protocol)
+      ~path
       ?name
       ?color
       ?event_pipe
@@ -125,7 +126,7 @@ let create_from_uris ~protocol ?name ?color ?event_pipe ?runner
   on_stdout baker (handle_raw_stdout baker) ;
   baker
 
-let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
+let create ~protocol ?path ?name ?color ?event_pipe ?runner ?(delegates = [])
     ?votefile ?(liquidity_baking_toggle_vote = Some Pass) ?(force_apply = false)
     ?(remote_mode = false) ?operations_pool ?dal_node
     ?minimal_nanotez_per_gas_unit node client =
@@ -134,6 +135,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = [])
   in
   create_from_uris
     ~protocol
+    ?path
     ?name
     ?color
     ?event_pipe
