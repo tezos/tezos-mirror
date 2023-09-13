@@ -140,4 +140,9 @@ module Syntax : sig
   (** [let+?] is for mapping the value from result-only expressions into the
       gas-monad. *)
   val ( let+? ) : ('a, 'trace) result -> ('a -> 'b) -> ('b, 'trace) t
+
+  val ( let*$ ) :
+    Alpha_context.Gas.cost -> (unit -> ('a, 'trace) t) -> ('a, 'trace) t
+
+  val ( let+$ ) : Alpha_context.Gas.cost -> (unit -> 'a) -> ('a, 'trace) t
 end
