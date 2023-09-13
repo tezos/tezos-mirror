@@ -14,7 +14,7 @@
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.tezos-client
   tezos-protocol-alpha.parameters
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-protocol-alpha-libs.tezos-protocol-plugin
   octez-shell-libs.tezos-shell-services
   octez-libs.octez-plompiler

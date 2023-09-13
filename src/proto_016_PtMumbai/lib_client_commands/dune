@@ -11,7 +11,7 @@
   tezos-protocol-016-PtMumbai.protocol
   tezos-protocol-016-PtMumbai.parameters
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-mockup
   octez-shell-libs.tezos-mockup-registration
@@ -48,7 +48,7 @@
   octez-libs.tezos-clic
   tezos-protocol-016-PtMumbai.protocol
   tezos-protocol-016-PtMumbai.parameters
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-016-PtMumbai-libs.tezos-client

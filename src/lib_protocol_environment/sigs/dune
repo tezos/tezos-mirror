@@ -3,10 +3,10 @@
 
 (library
  (name tezos_protocol_environment_sigs)
- (public_name octez-proto-libs.tezos-protocol-environment.sigs)
+ (public_name octez-proto-libs.protocol-environment.sigs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment.sigs-internals)
+  octez-proto-libs.protocol-environment.sigs-internals)
  (flags
   (:standard)
   -nostdlib

@@ -2890,12 +2890,14 @@ let _octez_sapling_ctypes_gen =
 
 let tezos_protocol_environment_sigs_internals =
   octez_proto_lib
-    "tezos-protocol-environment.sigs-internals"
+    "protocol-environment.sigs-internals"
+    ~internal_name:"tezos_protocol_environment_sigs_internals"
     ~path:"src/lib_protocol_environment/sigs-internals"
 
 let tezos_protocol_environment_sigs =
   octez_proto_lib
-    "tezos-protocol-environment.sigs"
+    "protocol-environment.sigs"
+    ~internal_name:"tezos_protocol_environment_sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~deps:[tezos_protocol_environment_sigs_internals]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
@@ -2926,7 +2928,8 @@ let tezos_protocol_environment_sigs =
 
 let octez_protocol_environment_structs =
   octez_proto_lib
-    "tezos-protocol-environment.structs"
+    "protocol-environment.structs"
+    ~internal_name:"tezos_protocol_environment_structs"
     ~path:"src/lib_protocol_environment/structs"
     ~deps:
       [
@@ -2941,7 +2944,8 @@ let octez_protocol_environment_structs =
 
 let octez_protocol_environment =
   octez_proto_lib
-    "tezos-protocol-environment"
+    "protocol-environment"
+    ~internal_name:"tezos_protocol_environment"
     ~path:"src/lib_protocol_environment"
     ~documentation:[Dune.[S "package"; S "octez-proto-libs"]]
     ~deps:
@@ -3102,7 +3106,7 @@ let octez_protocol_compiler_lib =
                   V
                     [
                       S
-                        "%{lib:octez-proto-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
+                        "%{lib:octez-proto-libs.protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
                     ];
                 ];
               ];

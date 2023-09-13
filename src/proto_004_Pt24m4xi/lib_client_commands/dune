@@ -9,7 +9,7 @@
   octez-libs.tezos-clic
   tezos-protocol-004-Pt24m4xi.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-004-Pt24m4xi-libs.tezos-client
@@ -36,7 +36,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-004-Pt24m4xi.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-004-Pt24m4xi-libs.tezos-client

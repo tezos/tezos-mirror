@@ -10,7 +10,7 @@
   octez-libs.tezos-clic
   tezos-protocol-010-PtGRANAD.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-010-PtGRANAD-libs.tezos-client
@@ -42,7 +42,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-010-PtGRANAD.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-010-PtGRANAD-libs.tezos-client

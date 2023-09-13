@@ -23,7 +23,7 @@
   octez-libs.tezos-sapling
   octez-protocol-017-PtNairob-libs.tezos-client
   octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

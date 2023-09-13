@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   tezos-protocol-014-PtKathma.protocol)
  (library_flags (:standard -linkall))
  (flags

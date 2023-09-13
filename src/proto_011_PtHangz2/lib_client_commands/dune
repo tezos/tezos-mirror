@@ -10,7 +10,7 @@
   octez-libs.tezos-clic
   tezos-protocol-011-PtHangz2.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-mockup
   octez-shell-libs.tezos-mockup-registration
@@ -46,7 +46,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-011-PtHangz2.protocol
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-shell-libs.tezos-shell-services
   octez-shell-libs.tezos-client-base
   octez-protocol-011-PtHangz2-libs.tezos-client

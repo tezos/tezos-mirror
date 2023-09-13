@@ -12,7 +12,7 @@
   index
   irmin-pack
   octez-shell-libs.tezos-store.shared
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-libs.tezos-context
   octez-shell-libs.tezos-context-ops
   octez-shell-libs.tezos-shell-context
