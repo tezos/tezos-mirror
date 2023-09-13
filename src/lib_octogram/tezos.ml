@@ -2929,6 +2929,7 @@ type 'uri start_octez_baker = {
       (** A list of delegates handled by this baker agent. The baker will handle
           all the delegates in the wallet found in [base_dir] if no
           delegate is given. *)
+  baker_path : 'uri option;
 }
 
 type start_octez_baker_r = {name : string}
@@ -2968,6 +2969,7 @@ module Start_octez_baker = struct
              node_data_dir;
              dal_node_uri;
              delegates;
+             baker_path;
            } ->
         ( name,
           protocol,
@@ -2975,14 +2977,16 @@ module Start_octez_baker = struct
           node_uri,
           node_data_dir,
           dal_node_uri,
-          delegates ))
+          delegates,
+          baker_path ))
       (fun ( name,
              protocol,
              base_dir,
              node_uri,
              node_data_dir,
              dal_node_uri,
-             delegates ) ->
+             delegates,
+             baker_path ) ->
         {
           name;
           protocol;
@@ -2991,15 +2995,17 @@ module Start_octez_baker = struct
           node_data_dir;
           dal_node_uri;
           delegates;
+          baker_path;
         })
-      (obj7
+      (obj8
          (opt "name" string)
          (dft "protocol" Protocol.encoding Protocol.Alpha)
          (req "base_dir" uri_encoding)
          (req "node_uri" uri_encoding)
          (opt "node_data_dir" uri_encoding)
          (opt "dal_node_uri" uri_encoding)
-         (dft "delegates" (list string) []))
+         (dft "delegates" (list string) [])
+         (opt "baker_path" uri_encoding))
 
   let r_encoding =
     let open Data_encoding in
@@ -3016,6 +3022,7 @@ module Start_octez_baker = struct
         node_data_dir;
         dal_node_uri;
         delegates;
+        baker_path;
       } =
     let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
     {
@@ -3026,6 +3033,7 @@ module Start_octez_baker = struct
       node_data_dir = Option.map uri_run node_data_dir;
       dal_node_uri = Option.map uri_run dal_node_uri;
       delegates = List.map run delegates;
+      baker_path = Option.map uri_run baker_path;
     }
 
   let resolve ~self resolver
@@ -3037,6 +3045,7 @@ module Start_octez_baker = struct
         node_data_dir;
         dal_node_uri;
         delegates;
+        baker_path;
       } =
     let file_agent_uri = Remote_procedure.file_agent_uri in
     {
@@ -3048,6 +3057,8 @@ module Start_octez_baker = struct
       dal_node_uri =
         Option.map (resolve_dal_rpc_global_uri ~self ~resolver) dal_node_uri;
       delegates;
+      baker_path =
+        Option.map (resolve_dal_rpc_global_uri ~self ~resolver) baker_path;
     }
 
   let run state
@@ -3059,6 +3070,7 @@ module Start_octez_baker = struct
         node_data_dir;
         delegates;
         dal_node_uri;
+        baker_path;
       } =
     let client = Agent_state.http_client state in
     (* Get the L1 node's data-dir and RPC endpoint. *)
@@ -3081,6 +3093,15 @@ module Start_octez_baker = struct
             "Should provide a node data dir for a node given as foreign \
              endpoint"
     in
+    let* baker_path =
+      match baker_path with
+      | None -> return None
+      | Some baker_path ->
+          let* baker_path =
+            Http_client.local_path_from_agent_uri client baker_path
+          in
+          return @@ Some baker_path
+    in
     (* Get the wallet's base-dir. *)
     let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
     (* Get the DAL node's RPC endpoint. *)
@@ -3091,6 +3112,7 @@ module Start_octez_baker = struct
     let octez_baker =
       Baker.create_from_uris
         ?name
+        ?path:baker_path
         ~protocol
         ~base_dir
         ~node_data_dir
