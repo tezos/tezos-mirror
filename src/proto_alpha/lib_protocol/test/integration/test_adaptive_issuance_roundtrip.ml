@@ -500,6 +500,51 @@ let apply_rewards block state : State.t tzresult Lwt.t =
   let* () = check_all_balances block state in
   return state
 
+let check_issuance_rpc block : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  (* We assume one block per minute *)
+  let* rewards_per_block = Context.get_issuance_per_minute (B block) in
+  let* total_supply = Context.get_total_supply (B block) in
+  let* expected_issuance = Context.get_ai_expected_issuance (B block) in
+  let* () =
+    match expected_issuance with
+    | ei :: _ ->
+        (* We assume only the fixed portion is issued *)
+        Assert.equal_tez
+          ~loc:__LOC__
+          rewards_per_block
+          ei.baking_reward_fixed_portion
+    | _ -> failwith "expected_issuance rpc: unexpected value"
+  in
+  let* yearly_rate = Context.get_ai_current_yearly_rate (B block) in
+  let* yearly_rate_exact = Context.get_ai_current_yearly_rate_exact (B block) in
+  let yr = float_of_string yearly_rate in
+  let yre = Q.to_float yearly_rate_exact in
+  (* Precision for yearly rate is 0.001 *)
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      (fun x y -> Float.(abs (x -. y) <= 0.001))
+      "Yearly rate (float)"
+      Format.pp_print_float
+      yr
+      yre
+  in
+  (* Divided by 525_600 minutes per year, x100 because rpc returns a pct *)
+  let issuance_from_rate =
+    Tez.(mul_q total_supply Q.(div yearly_rate_exact ~$525_600_00) |> of_q)
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Tez.equal
+      "Issuance"
+      Tez.pp
+      rewards_per_block
+      issuance_from_rate
+  in
+  return_unit
+
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
@@ -526,6 +571,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
           assert false)
     | Some baker -> baker
   in
+  let* () = check_issuance_rpc block in
   let policy = Block.By_account baker.pkh in
   let state, operations = State.pop_pending_operations state in
   let* block = Block.bake ~policy ~adaptive_issuance_vote ~operations block in

@@ -51,6 +51,8 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
+  let of_q a = Q.to_bigint a |> of_z
+
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
 
