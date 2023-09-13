@@ -85,6 +85,13 @@ variables:
   # https://gitlab.com/tezos/docker-images/ci-docker
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.6.0"
 
+.image_template__alpine:
+  # The Alpine version should be kept up to date with the version used
+  # for the `build_deps_image_name` images and specified in the
+  # variable `alpine_version` in `scripts/version.sh`. This is checked
+  # by the jobs `trigger` and `sanity_ci`.
+  image: alpine:3.17
+
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
@@ -111,7 +118,7 @@ stages:
 # this error: 'Jobs config should contain at least one visible job'
 trigger:
   extends:
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__alpine
   stage: trigger
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == "tezos" && $CI_MERGE_REQUEST_ASSIGNEES !~ /nomadic-margebot/'
