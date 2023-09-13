@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name injector_main)
+ (name octez_injector_server)
  (public_name octez-injector-server)
  (package octez-injector-server)
  (instrumentation (backend bisect_ppx))
