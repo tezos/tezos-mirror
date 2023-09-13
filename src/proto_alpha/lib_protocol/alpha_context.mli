@@ -4787,10 +4787,10 @@ module Parameters : sig
   }
 
   type bootstrap_smart_rollup = {
-    address : Sc_rollup_repr.Address.t;
-    pvm_kind : Sc_rollups.Kind.t;
+    address : Sc_rollup.Address.t;
+    pvm_kind : Sc_rollup.Kind.t;
     boot_sector : string;
-    parameters_ty : Script_repr.lazy_expr;
+    parameters_ty : Script.lazy_expr;
   }
 
   type t = {
