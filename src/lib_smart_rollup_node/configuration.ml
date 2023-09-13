@@ -43,12 +43,17 @@ type mode =
   | Operator
   | Custom of operation_kind list
 
-type purpose = Operating | Batching | Cementing | Recovering
+type purpose =
+  | Operating
+  | Batching
+  | Cementing
+  | Recovering
+  | Executing_outbox
 
 let operation_kinds =
   [Publish; Add_messages; Cement; Timeout; Refute; Execute_outbox_message]
 
-let purposes = [Operating; Batching; Cementing; Recovering]
+let purposes = [Operating; Batching; Cementing; Recovering; Executing_outbox]
 
 module Operation_kind_map = Map.Make (struct
   type t = operation_kind
@@ -307,6 +312,7 @@ let string_of_purpose = function
   | Batching -> "batching"
   | Cementing -> "cementing"
   | Recovering -> "recovering"
+  | Executing_outbox -> "executing_outbox"
 
 let purpose_of_string = function
   (* For backward compability:
@@ -318,6 +324,7 @@ let purpose_of_string = function
   | "batching" | "add_messages" -> Some Batching
   | "cementing" | "cement" -> Some Cementing
   | "recovering" -> Some Recovering
+  | "executing_outbox" -> Some Executing_outbox
   | _ -> None
 
 let purpose_of_string_exn s =
@@ -819,6 +826,7 @@ let operation_kinds_of_purpose = function
   | Cementing -> [Cement]
   | Operating -> [Publish; Refute; Timeout]
   | Recovering -> [Recover]
+  | Executing_outbox -> [Execute_outbox_message]
 
 (* Maps a list of operation kinds to their corresponding purposes,
    based on their presence in the input list. *)
@@ -841,8 +849,8 @@ let purposes_of_mode mode =
   | Batcher -> [Batching]
   | Accuser -> [Operating]
   | Bailout -> [Operating; Cementing; Recovering]
-  | Maintenance -> [Operating; Cementing]
-  | Operator -> [Operating; Cementing; Batching]
+  | Maintenance -> [Operating; Cementing; Executing_outbox]
+  | Operator -> [Operating; Cementing; Executing_outbox; Batching]
   | Custom op_kinds -> purposes_of_operation_kinds op_kinds
 
 let operation_kinds_of_mode mode =
