@@ -5072,35 +5072,33 @@ end = struct
       in
       let _pbt =
         let list =
-          (* The first item of each tuple is the index N for the runtestN alias.
-             Those aliases are used to split into multiple CI jobs. *)
           [
-            (1, "liquidity_baking_pbt", true);
-            (1, "saturation_fuzzing", true);
-            (1, "test_merkle_list", N.(number >= 013));
-            (1, "test_gas_properties", true);
-            (2, "test_sampler", N.(number >= 012));
-            (2, "test_script_comparison", true);
-            (2, "test_tez_repr", true);
-            (2, "test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
-            (2, "test_bitset", N.(number >= 013));
-            (2, "test_sc_rollup_tick_repr", N.(number >= 016));
-            (2, "test_sc_rollup_encoding", N.(number >= 016));
-            (2, "test_sc_rollup_inbox", N.(number >= 017));
-            (3, "refutation_game_pbt", N.(number == 013));
-            (3, "test_refutation_game", N.(number >= 016));
-            (3, "test_carbonated_map", N.(number >= 013));
-            (3, "test_zk_rollup_encoding", N.(number >= 015));
-            (3, "test_dal_slot_proof", N.(number >= 016));
-            (3, "test_compare_operations", N.(number >= 015));
-            (3, "test_operation_encoding", N.(number >= 016));
-            (3, "test_balance_updates_encoding", N.(number >= 018));
-            (3, "test_bytes_conversion", N.(number >= 016));
+            ("liquidity_baking_pbt", true);
+            ("saturation_fuzzing", true);
+            ("test_merkle_list", N.(number >= 013));
+            ("test_gas_properties", true);
+            ("test_sampler", N.(number >= 012));
+            ("test_script_comparison", true);
+            ("test_tez_repr", true);
+            ("test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
+            ("test_bitset", N.(number >= 013));
+            ("test_sc_rollup_tick_repr", N.(number >= 016));
+            ("test_sc_rollup_encoding", N.(number >= 016));
+            ("test_sc_rollup_inbox", N.(number >= 017));
+            ("refutation_game_pbt", N.(number == 013));
+            ("test_refutation_game", N.(number >= 016));
+            ("test_carbonated_map", N.(number >= 013));
+            ("test_zk_rollup_encoding", N.(number >= 015));
+            ("test_dal_slot_proof", N.(number >= 016));
+            ("test_compare_operations", N.(number >= 015));
+            ("test_operation_encoding", N.(number >= 016));
+            ("test_balance_updates_encoding", N.(number >= 018));
+            ("test_bytes_conversion", N.(number >= 016));
           ]
-          |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
+          |> conditional_list
         in
         tezt
-          (List.map snd list)
+          list
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
