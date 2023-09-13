@@ -570,7 +570,7 @@ module Delegate_sampler_state :
 module Issuance_bonus :
   Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value = Int64.t
+     and type value = Issuance_bonus_repr.t
      and type t := Raw_context.t
 
 (** Multiplicative coefficient for rewards under Adaptive Issuance

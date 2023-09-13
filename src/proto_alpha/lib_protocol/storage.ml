@@ -1203,7 +1203,7 @@ module Cycle = struct
       (struct
         let name = ["issuance_bonus"]
       end)
-      (Encoding.Int64)
+      (Issuance_bonus_repr)
 
   module Issuance_coeff =
     Indexed_context.Make_map

@@ -22,17 +22,7 @@ type t = private Q.t
 
 val zero : t
 
-(** Getting a bonus out of int64 encoded repr.
-    It will fail if the decoding doesn't provide a value that is valid wrt
-    protocol's parametric constants
-  *)
-val of_int64_repr :
-  constants:Constants_parametric_repr.adaptive_rewards_params ->
-  int64 ->
-  t tzresult
-
-(** Encoding into an int *)
-val to_int64_repr : t -> int64
+val encoding : t Data_encoding.t
 
 (** Getting a bonus out of rationnal.
     It will fail if the decoding doesn't provide a value that is valid wrt
@@ -42,3 +32,5 @@ val of_Q :
   constants:Constants_parametric_repr.adaptive_rewards_params ->
   Q.t ->
   t tzresult
+
+val of_int64_repr : int64 -> Q.t
