@@ -175,6 +175,13 @@ let nth_block ~full_transaction_object _n =
   in
   return (block tx)
 
+let block_by_hash ~full_transaction_object _hash =
+  let tx =
+    if full_transaction_object then TxFull [transaction_object]
+    else TxHash [transaction_hash]
+  in
+  return (block tx)
+
 let transaction_receipt _tx_hash = return (Some (transaction_receipt ()))
 
 let transaction_object _tx_hash = return (Some transaction_object)

@@ -294,11 +294,11 @@ end)
 module Get_block_by_hash = MethodMaker (struct
   open Ethereum_types
 
-  type input = hash * bool
+  type input = block_hash * bool
 
   type output = block
 
-  let input_encoding = Data_encoding.tup2 hash_encoding Data_encoding.bool
+  let input_encoding = Data_encoding.tup2 block_hash_encoding Data_encoding.bool
 
   let output_encoding = block_encoding
 

@@ -24,6 +24,7 @@
 - `eth_sendRawTransaction` checks if the chain id is correct. (!9752)
 - Use different files to store kernel logs, differenciate the different kind of
   simulations. (!9664)
+- Add support for `eth_getBlockByHash`. (!10061)
 
 ### Bug fixes
 

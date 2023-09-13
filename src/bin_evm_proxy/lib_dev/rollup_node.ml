@@ -360,6 +360,13 @@ module RPC = struct
         TxFull objects
     | TxFull _ -> return transactions
 
+  let populate_tx_objects ~full_transaction_object base block =
+    let open Lwt_result_syntax in
+    if full_transaction_object then
+      let* transactions = full_transactions block.transactions base in
+      return {block with transactions}
+    else return block
+
   let blocks_by_number ~full_transaction_object ~number base =
     let open Lwt_result_syntax in
     let* (Ethereum_types.Block_height level) = block_number base number in
@@ -380,11 +387,7 @@ module RPC = struct
         in
         match block_opt with
         | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-        | Some block ->
-            if full_transaction_object then
-              let* transactions = full_transactions block.transactions base in
-              return {block with transactions}
-            else return block)
+        | Some block -> populate_tx_objects ~full_transaction_object base block)
 
   let current_block base ~full_transaction_object =
     blocks_by_number
@@ -397,6 +400,18 @@ module RPC = struct
       ~full_transaction_object
       ~number:Durable_storage_path.Block.(Nth n)
       base
+
+  let block_by_hash base ~full_transaction_object block_hash =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      inspect_durable_and_decode_opt
+        base
+        (Durable_storage_path.Block.by_hash block_hash)
+        Ethereum_types.block_from_rlp
+    in
+    match block_opt with
+    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+    | Some block -> populate_tx_objects ~full_transaction_object base block
 
   let txpool _ () =
     Lwt.return_ok {pending = AddressMap.empty; queued = AddressMap.empty}
@@ -512,6 +527,11 @@ module type S = sig
   val nth_block :
     full_transaction_object:bool -> Z.t -> Ethereum_types.block tzresult Lwt.t
 
+  val block_by_hash :
+    full_transaction_object:bool ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.block tzresult Lwt.t
+
   val transaction_receipt :
     Ethereum_types.hash ->
     Ethereum_types.transaction_receipt option tzresult Lwt.t
@@ -554,6 +574,8 @@ end) : S = struct
   let current_block_number = RPC.current_block_number Base.base
 
   let nth_block = RPC.nth_block Base.base
+
+  let block_by_hash = RPC.block_by_hash Base.base
 
   let transaction_receipt = RPC.transaction_receipt Base.base
 

@@ -216,7 +216,7 @@ module Get_block_by_number :
 
 module Get_block_by_hash :
   METHOD
-    with type m_input = Ethereum_types.hash * bool
+    with type m_input = Ethereum_types.block_hash * bool
      and type m_output = Ethereum_types.block
 
 module Get_code :
