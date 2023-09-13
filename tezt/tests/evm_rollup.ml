@@ -814,6 +814,15 @@ let erc20 =
     bin = kernel_inputs_path ^ "/erc20tok.bin";
   }
 
+(** The info for the "loop.sol" contract.
+    See [src/kernel_evm/benchmarks/scripts/benchmarks/contracts/loop.sol] *)
+let loop =
+  {
+    label = "loop";
+    abi = kernel_inputs_path ^ "/loop.abi";
+    bin = kernel_inputs_path ^ "/loop.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   Protocol.register_test
@@ -2916,6 +2925,31 @@ let test_rpc_getUncleByBlockArgAndIndex =
   assert (Option.is_none uncle) ;
   unit
 
+let test_simulation_eip2200 =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "loop"; "simulation"; "eip2200"]
+    ~title:"Simulation is EIP2200 resilient"
+  @@ fun protocol ->
+  let* ({sc_rollup_node; node; client; endpoint; _} as full_evm_setup) =
+    setup_past_genesis ~admin:None protocol
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* loop_address, _tx = deploy ~contract:loop ~sender full_evm_setup in
+  (* If we support EIP-2200, the simulation gives an amount of gas
+     insufficient for the execution. As we do the simulation with an
+     enormous gas limit, we never trigger EIP-2200. *)
+  let call =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:loop.label
+      ~address:loop_address
+      ~method_call:"loop(5)"
+  in
+  let* _tx = wait_for_application ~sc_rollup_node ~node ~client call () in
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2967,7 +3001,8 @@ let register_evm_proxy_server ~protocols =
   test_reboot protocols ;
   test_rpc_getBlockTransactionCountBy protocols ;
   test_rpc_getUncleCountByBlock protocols ;
-  test_rpc_getUncleByBlockArgAndIndex protocols
+  test_rpc_getUncleByBlockArgAndIndex protocols ;
+  test_simulation_eip2200 protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
