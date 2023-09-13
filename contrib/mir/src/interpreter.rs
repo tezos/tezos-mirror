@@ -14,6 +14,12 @@ pub fn interpret(ast: &AST, stack: &mut IStack) {
     }
 }
 
+fn unreachable_state() -> ! {
+    // If the typechecking of the program being interpreted was successful and if this is reached
+    // during interpreting, then the typechecking should be broken, and needs to be fixed.
+    panic!("Unreachable state reached during interpreting, possibly broken typechecking!")
+}
+
 fn interpret_one(i: &Instruction, stack: &mut IStack) {
     use Instruction::*;
     use Value::*;
@@ -29,7 +35,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
             _ => unimplemented!(),
         },
         Dip(opt_height, nested) => {
-            let protected_height: usize = opt_height.unwrap_or(1);;
+            let protected_height: usize = opt_height.unwrap_or(1);
             let mut live = stack.split_off(protected_height);
             interpret(nested, &mut live);
             stack.append(&mut live);
@@ -46,7 +52,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
             [NumberValue(i), ..] => {
                 stack[0] = BooleanValue(*i > 0);
             }
-            _ => panic!("Unexpected stack during instruction!"),
+            _ => unreachable_state(),
         },
         If(nested_t, nested_f) => {
             if let Some(BooleanValue(b)) = stack.pop_front() {
@@ -56,13 +62,13 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
                     interpret(nested_f, stack);
                 }
             } else {
-                panic!("Unexpected stack during instruction!");
+                unreachable_state();
             }
         }
         Instruction::Int => match stack.make_contiguous() {
             [NumberValue(_), ..] => {}
             _ => {
-                panic!("Unexpected stack during instruction!");
+                unreachable_state();
             }
         },
         Loop(nested) => loop {
@@ -73,7 +79,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
                     break;
                 }
             } else {
-                panic!("Unexpected stack during instruction!");
+                unreachable_state();
             }
         },
         Push(_, v) => {
