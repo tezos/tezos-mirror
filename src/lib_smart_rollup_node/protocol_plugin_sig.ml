@@ -199,6 +199,10 @@ module type LAYER1_HELPERS = sig
     #Client_context.full ->
     Address.t ->
     Signature.public_key_hash list option tzresult Lwt.t
+
+  (** Retrieve information about the last whitelist update on L1. *)
+  val find_last_whitelist_update :
+    #Client_context.full -> Address.t -> (Z.t * Int32.t) option tzresult Lwt.t
 end
 
 (** Protocol specific functions for processing L1 blocks. *)

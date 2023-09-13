@@ -232,3 +232,5 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
 let find_whitelist _cctxt _rollup_address :
     Signature.public_key_hash trace option tzresult Lwt.t =
   return None
+
+let find_last_whitelist_update _cctxt _rollup_address = return_none
