@@ -80,9 +80,9 @@ let test_gas_exhaustion () =
   with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
     let open Gas_monad.Syntax in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
+    let*$ () = Saturation_repr.safe_int 10 in
     let* y = GM.return 2 in
     GM.return (x + y)
   in
@@ -94,9 +94,9 @@ let test_gas_exhaustion_before_error () =
   with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
     let open Gas_monad.Syntax in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
+    let*$ () = Saturation_repr.safe_int 10 in
     let* () = GM.of_result (Error "Oh no") in
     let* y = GM.return 2 in
     GM.return (x + y)
@@ -109,9 +109,9 @@ let test_successful_with_remaining_gas () =
   let gas_monad =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* y = GM.return 2 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     GM.return (x + y)
   in
   assert_success ~loc:__LOC__ ctxt gas_monad ~result:3 ~remaining_gas:0
@@ -123,9 +123,9 @@ let test_successful_with_spare_gas () =
   let gas_monad =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* y = GM.return 2 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 3) in
+    let*$ () = Saturation_repr.safe_int 3 in
     GM.return (x + y)
   in
   assert_success ~loc:__LOC__ ctxt gas_monad ~result:3 ~remaining_gas:2
@@ -136,10 +136,10 @@ let test_inner_error () =
   let gas_monad =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* () = GM.of_result (Error "Oh no") in
     let* y = GM.return 2 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
+    let*$ () = Saturation_repr.safe_int 10 in
     GM.return (x + y)
   in
   assert_inner_errors
@@ -157,10 +157,10 @@ let test_unlimited () =
   let gas_monad =
     let open Gas_monad.Syntax in
     let* x = GM.return 1 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
+    let*$ () = Saturation_repr.safe_int 5 in
     let* y = GM.return 2 in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 100) in
-    let* () = GM.consume_gas (Saturation_repr.safe_int 3) in
+    let*$ () = Saturation_repr.safe_int 100 in
+    let*$ () = Saturation_repr.safe_int 3 in
     GM.return (x + y)
   in
   assert_success

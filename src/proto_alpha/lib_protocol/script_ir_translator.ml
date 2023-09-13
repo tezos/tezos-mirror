@@ -170,9 +170,7 @@ let pack_comparable_data ctxt ty data =
 
 let hash_bytes bytes =
   let open Gas_monad.Syntax in
-  let+ () =
-    Gas_monad.consume_gas (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
-  in
+  let+$ () = Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes in
   Script_expr_hash.(hash_bytes [bytes])
 
 let hash_comparable_data ctxt ty data =
@@ -197,7 +195,7 @@ let check_dupable_ty ctxt loc ty =
   let rec aux : type a ac. location -> (a, ac) ty -> (unit, error) Gas_monad.t =
    fun loc ty ->
     let open Gas_monad.Syntax in
-    let* () = Gas_monad.consume_gas Typecheck_costs.check_dupable_cycle in
+    let*$ () = Typecheck_costs.check_dupable_cycle in
     match ty with
     | Unit_t -> return_unit
     | Int_t -> return_unit
@@ -444,7 +442,7 @@ let ty_eq :
       | Chest_key_t, _ -> not_equal ()
     in
     let open Gas_monad.Syntax in
-    let* () = Gas_monad.consume_gas (Typecheck_costs.ty_eq ty1 ty2) in
+    let*$ () = Typecheck_costs.ty_eq ty1 ty2 in
     Gas_monad.of_result @@ help ty1 ty2
 
 (* Same as ty_eq but for stacks.
@@ -574,7 +572,7 @@ let rec parse_ty :
       ~allow_ticket
       ~ret
       node ->
-    let* () = Gas_monad.consume_gas Typecheck_costs.parse_type_cycle in
+    let*$ () = Typecheck_costs.parse_type_cycle in
     if Compare.Int.(stack_depth > 10000) then
       tzfail Typechecking_too_many_recursive_calls
     else
@@ -982,7 +980,7 @@ and parse_any_ty :
 
 and parse_big_map_ty ~stack_depth ~legacy big_map_loc args map_annot =
   let open Gas_monad.Syntax in
-  let* () = Gas_monad.consume_gas Typecheck_costs.parse_type_cycle in
+  let*$ () = Typecheck_costs.parse_type_cycle in
   match args with
   | [key_ty; value_ty] ->
       let*? () = check_type_annot big_map_loc map_annot in
@@ -1263,7 +1261,7 @@ let find_entrypoint (type full fullc error_context error_trace)
       Entrypoint.t ->
       (t ex_ty_cstr, unit) Gas_monad.t =
    fun ty entrypoints entrypoint ->
-    let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
+    let*$ () = Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
     | _, {at_node = Some {name; original_type_expr}; _}
       when Entrypoint.(name = entrypoint) ->
@@ -4852,7 +4850,7 @@ and parse_contract :
                  or (ticket cty). *)
               let typecheck =
                 let open Gas_monad.Syntax in
-                let* () = Gas_monad.consume_gas Typecheck_costs.ty_eq_prim in
+                let*$ () = Typecheck_costs.ty_eq_prim in
                 match arg with
                 | Unit_t ->
                     return (Typed_implicit destination : arg typed_contract)
