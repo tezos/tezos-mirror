@@ -7,6 +7,7 @@
             octez-shell-libs.tezos-shell
             octez-libs.tezos-rpc-http-server
             octez-shell-libs.tezos-protocol-updater
+            octez_node_config
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-protocol-genesis.embedded-protocol
             tezos-protocol-016-PtMumbai.embedded-protocol
@@ -20,5 +21,6 @@
                    -open Tezos_shell
                    -open Tezos_store
                    -open Tezos_protocol_updater
+                   -open Octez_node_config
                    -linkall
                    (:include %{workspace_root}/macos-link-flags.sexp))))
