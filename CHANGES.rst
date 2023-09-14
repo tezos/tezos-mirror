@@ -70,6 +70,15 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Added RPC ``/describe?recurse=true`` to retrieve schema of RPCs for the rollup
+  node. (MR :gl:`!10118`)
+
+- Added RPC ``/openapi?protocol={ProtoHash}`` to retrieve the OpenAPI
+  specification for RPCs of the rollup node. (MR :gl:`!10118`)
+
+- Introduced a new command ``generate openapi``, to generate the OpenAPI JSON
+  specification and output it to stdout. (MR :gl:`!10118`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
