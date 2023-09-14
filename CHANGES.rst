@@ -333,6 +333,8 @@ Smart Rollup node
 - **Breaking change** RPC ``/global/helpers/proof/outbox`` is moved to
   ``/global/block/head/helpers/proof/outbox``. (MR :gl:`!9233`)
 
+- Fixed an issue where the rollup node could forget to update its L2 head for a
+  block. (MR :gl:`!9868`)
 
 Smart Rollup client
 -------------------

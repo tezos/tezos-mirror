@@ -304,6 +304,9 @@ let handle_event sc_node {name; value; timestamp = _} =
   | "sc_rollup_node_layer_1_new_head_processed.v0" ->
       let level = JSON.(value |-> "level" |> as_int) in
       update_level sc_node level
+  | "sc_rollup_node_layer_1_new_heads_processed.v0" ->
+      let level = JSON.(value |-> "to" |> as_int) in
+      update_level sc_node level
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ~base_dir
