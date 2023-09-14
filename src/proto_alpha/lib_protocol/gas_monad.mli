@@ -75,7 +75,7 @@ val record_trace_eval :
   ('a, 'error_trace) t ->
   ('a, 'error_trace) t
 
-(** [fail e] is [return (Error e)] . *)
+(** [fail e] is [of_result (Error e)] . *)
 val fail : 'trace -> ('a, 'trace) t
 
 (** Syntax module for the {!Gas_monad}. This is intended to be opened locally in
@@ -104,7 +104,7 @@ module Syntax : sig
   (** [return_false] is [return false] . *)
   val return_false : (bool, 'trace) t
 
-  (** [fail e] is [return (Error e)] . *)
+  (** [fail e] is [of_result (Error e)] . *)
   val fail : 'trace -> ('a, 'trace) t
 
   (** [let*] is a binding operator alias for {!bind}. *)
