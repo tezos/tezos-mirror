@@ -1077,7 +1077,7 @@ let test_expected_error =
            ~expected_error:[Inconsistent_number_of_bootstrap_accounts]
            (exec (fun _ -> failwith "")))
 
-let init_constants ?reward_per_block () =
+let init_constants ?reward_per_block ?(deactivate_dynamic = false) () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   let default_constants = Default_parameters.constants_test in
@@ -1096,12 +1096,24 @@ let init_constants ?reward_per_block () =
   let minimal_block_delay = Protocol.Alpha_context.Period.one_minute in
   let cost_per_byte = Tez.zero in
   let consensus_threshold = 0 in
+  let adaptive_issuance = default_constants.adaptive_issuance in
+  let adaptive_rewards_params =
+    if deactivate_dynamic then
+      {
+        adaptive_issuance.adaptive_rewards_params with
+        max_bonus =
+          Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero;
+      }
+    else adaptive_issuance.adaptive_rewards_params
+  in
+  let adaptive_issuance = {adaptive_issuance with adaptive_rewards_params} in
   {
     default_constants with
     consensus_threshold;
     issuance_weights;
     minimal_block_delay;
     cost_per_byte;
+    adaptive_issuance;
   }
 
 (** Initialization of scenarios with 3 cases:
