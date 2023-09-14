@@ -7585,10 +7585,10 @@ let _octez_snoop =
 let _octez_injector_server =
   public_exe
     "octez-injector-server"
-    ~internal_name:"injector_main"
+    ~internal_name:"octez_injector_server"
     ~path:"contrib/octez_injector_server"
     ~synopsis:"Octez injector"
-    ~release_status:Experimental
+    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~linkall:true
     ~deps:

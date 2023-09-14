@@ -108,6 +108,10 @@ release:
 experimental-release:
 	@$(MAKE) build PROFILE=release OCTEZ_EXECUTABLES?="$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES)"
 
+.PHONY: build-additional-tezt-test-dependency-executables
+build-additional-tezt-test-dependency-executables:
+	@dune build contrib/octez_injector_server/octez_injector_server.exe
+
 .PHONY: strip
 strip: all
 	@chmod +w $(ALL_EXECUTABLES)
@@ -297,23 +301,23 @@ build-simulation-scenario:
 	@cp -f _build/default/devtools/testnet_experiment_tools/simulation_scenario.exe $(OCTEZ_BIN_DIR)/simulation-scenario
 
 .PHONY: test-tezt
-test-tezt:
+test-tezt: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
 
 .PHONY: test-tezt-i
-test-tezt-i:
+test-tezt-i: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
 
 .PHONY: test-tezt-c
-test-tezt-c:
+test-tezt-c: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
 
 .PHONY: test-tezt-v
-test-tezt-v:
+test-tezt-v: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
 .PHONY: test-tezt-coverage
-test-tezt-coverage:
+test-tezt-coverage: build-additional-tezt-test-dependency-executables
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --keep-going --test-timeout 1800
 
 .PHONY: test-code
