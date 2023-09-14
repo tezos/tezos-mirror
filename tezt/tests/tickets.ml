@@ -883,7 +883,7 @@ let assert_sc_rollup_ticket_balance client ~sc_rollup ~ticketer ~content_type
            content)
   in
   let* actual =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.post_chain_block_context_smart_rollups_smart_rollup_ticket_balance
          ~sc_rollup
          ~data

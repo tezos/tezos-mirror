@@ -44,7 +44,7 @@ let num_bootstrap_accounts = Array.length Account.Bootstrap.keys
 
 let rpc_get_timestamp node block_level =
   let* header =
-    RPC.call node
+    Node.RPC.call node
     @@ RPC.get_chain_block_header ~block:(string_of_int block_level) ()
   in
   let timestamp_s = JSON.(header |-> "timestamp" |> as_string) in
@@ -99,7 +99,7 @@ let nodes_measure_levels nodes levels =
         return (block_timestamp -. start_block_timestamp)
       in
       let* round =
-        RPC.call node
+        Node.RPC.call node
         @@ RPC.get_chain_block_helper_round ~block:(string_of_int level) ()
       in
       Log.info

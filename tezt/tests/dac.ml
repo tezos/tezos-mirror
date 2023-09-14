@@ -949,7 +949,7 @@ module Full_infrastructure = struct
     (* 4. The signature of the root hash is requested again via the
           client `get certificate` command. *)
     let* get_certificate =
-      RPC.call
+      Dac_node.RPC.call
         coordinator_node
         (Dac_rpc.V0.get_serialized_certificate
            ~hex_root_hash:(`Hex expected_rh))
@@ -1993,7 +1993,7 @@ module Tx_kernel_e2e = struct
     let* () = Client.bake_for_and_wait client in
     (* Run the rollup node, ensure origination succeeds. *)
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup_address
     in
@@ -2163,7 +2163,7 @@ module Tx_kernel_e2e = struct
 
     (* Run the rollup node, ensure origination succeeds. *)
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup_address
     in
@@ -2398,14 +2398,14 @@ module V1_API = struct
       (* TODO https://gitlab.com/tezos/tezos/-/issues/5671
          Once we have "PUT v1/preimage" we should use a call to [V1] api here
          instead. *)
-      RPC.call
+      Dac_node.RPC.call
         coordinator_node
         (Dac_rpc.V0.Coordinator.post_preimage ~payload:"test")
     in
     let* response =
-      RPC.call_raw coordinator_node @@ Dac_rpc.V1.get_pages root_hash
+      Dac_node.RPC.call_raw coordinator_node @@ Dac_rpc.V1.get_pages root_hash
     in
-    return @@ RPC.check_string_response ~code:404 response
+    return @@ RPC_core.check_string_response ~code:404 response
 end
 
 (** [Api_regression] is a module that encapsulates schema regression tests of
@@ -2570,7 +2570,7 @@ module Api_regression = struct
       in
       (* We put the sample signature to Coordinator node. *)
       let* () =
-        RPC.call
+        Dac_node.RPC.call
           coordinator_node
           (Dac_rpc.V0.put_dac_member_signature
              ~hex_root_hash:root_hash

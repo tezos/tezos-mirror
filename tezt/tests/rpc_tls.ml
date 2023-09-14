@@ -30,7 +30,10 @@ let node_tls () =
   let rpc_tls = Node.{certificate_path; key_path} in
   let* node = Node.init ~rpc_tls [] in
   Log.info "Check that a curl call to a node RPC fails without --cacert" ;
-  let get_version_url = RPC.(make_uri node get_version |> Uri.to_string) in
+  let get_version_url =
+    RPC_core.make_uri (Node.as_foreign_rpc_endpoint node) Node.RPC.get_version
+    |> Uri.to_string
+  in
   let* () =
     let*? process = Curl.get get_version_url in
     Process.check_error process

@@ -109,7 +109,7 @@ type sc_rollup_constants = {
 
 let get_sc_rollup_constants client =
   let* json =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let open JSON in
   let origination_size = json |-> "smart_rollup_origination_size" |> as_int in
@@ -536,7 +536,7 @@ let commitment_info_first_published_at_level
 
 let get_staked_on_commitment ~sc_rollup ~staker client =
   let* json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC
        .get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
          ~sc_rollup
@@ -750,7 +750,7 @@ let test_rollup_get_genesis_info ~kind =
     last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
   in
   let* genesis_info =
-    RPC.Client.call tezos_client
+    Client.RPC.call tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -969,7 +969,7 @@ let parse_inbox json =
 
 let get_inbox_from_tezos_node client =
   let* inbox =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_smart_rollups_all_inbox ()
   in
   parse_inbox inbox
@@ -1281,7 +1281,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   let*! queue = Sc_rollup_client.batcher_queue sc_rollup_client in
   Check.((queue = []) (list (tuple2 string string)))
     ~error_msg:"Queue is %L should be %empty R." ;
-  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
   let contents1 =
     check_l1_block_contains
       ~kind:"smart_rollup_add_messages"
@@ -1297,7 +1297,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   in
   (* We bake to trigger second injection by injector. *)
   let* () = Client.bake_for_and_wait client in
-  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* block = Client.RPC.call client @@ RPC.get_chain_block () in
   let contents2 =
     check_l1_block_contains
       ~kind:"smart_rollup_add_messages"
@@ -1313,7 +1313,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup_client sc_rollup node client
   Check.((incl_count = List.length hashes1 + List.length hashes2) int)
     ~error_msg:"Only %L messages are included instead of %R." ;
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -1347,7 +1347,7 @@ let test_rollup_list ~kind =
   @@ fun protocol ->
   let* _node, client = setup_l1 protocol in
   let* rollups =
-    RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
   let () =
     match rollups with
@@ -1363,7 +1363,7 @@ let test_rollup_list ~kind =
       String_set.empty
   in
   let* rollups =
-    RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
   let rollups = String_set.of_list rollups in
   Check.(
@@ -1445,7 +1445,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     ~kind
   @@ fun _protocol sc_rollup_node sc_rollup_client sc_rollup _node client ->
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -1491,7 +1491,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   @@ fun protocol sc_rollup_node sc_rollup_client sc_rollup _tezos_node client
     ->
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -1629,7 +1629,7 @@ let test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to =
     Log.info
       "Checking that last commitment in the new protocol was published on L1" ;
     let* _commitment_on_l1 =
-      RPC.Client.call tezos_client
+      Client.RPC.call tezos_client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
            ~sc_rollup
            ~hash:last_l2_commitment
@@ -1754,7 +1754,7 @@ let check_commitment_eq (commitment, name) (expected_commitment, exp_name) =
 
 let tezos_client_get_commitment client sc_rollup commitment_hash =
   let* json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
          ~sc_rollup
          ~hash:commitment_hash
@@ -1816,7 +1816,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_client sc_rollup _node
      levels_to_finalise`.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -1951,7 +1951,7 @@ let commitment_not_published_if_non_final _protocol sc_rollup_node
      neither stored but not published.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2017,7 +2017,7 @@ let commitments_messages_reset kind _protocol sc_rollup_node sc_rollup_client
      commitments are stored and published by the rollup node.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2100,7 +2100,7 @@ let commitment_stored_robust_to_failures protocol sc_rollup_node
      two rollup nodes.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2191,7 +2191,7 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
      no messages and no ticks.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2346,7 +2346,7 @@ let commitments_reorgs ~switch_l1_node ~kind _protocol sc_rollup_node
 let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
     node1 client1 =
   let* genesis_info =
-    RPC.Client.call ~hooks client1
+    Client.RPC.call ~hooks client1
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2376,8 +2376,8 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
   let* () = Client.Admin.kick_peer client1 ~peer:identity2 in
   let* () = send_text_messages client1 ["message1"]
   and* () = send_text_messages client2 ["message2"] in
-  let* header1 = RPC.Client.call client1 @@ RPC.get_chain_block_header ()
-  and* header2 = RPC.Client.call client2 @@ RPC.get_chain_block_header () in
+  let* header1 = Client.RPC.call client1 @@ RPC.get_chain_block_header ()
+  and* header2 = Client.RPC.call client2 @@ RPC.get_chain_block_header () in
   let level1 = JSON.(header1 |-> "level" |> as_int) in
   let level2 = JSON.(header2 |-> "level" |> as_int) in
   let hash1 = JSON.(header1 |-> "hash" |> as_string) in
@@ -2435,7 +2435,7 @@ let commitments_reproposal _protocol sc_rollup_node sc_rollup_client sc_rollup
   (* exactly one level left to finalize the commitment in the node. *)
   let* () = bake_levels (block_finality_time + 2) client1 in
   let* commitment =
-    RPC.Client.call client1
+    Client.RPC.call client1
     @@ RPC
        .get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
          ~sc_rollup
@@ -2452,11 +2452,11 @@ type balances = {liquid : int; frozen : int}
 
 let contract_balances ~pkh client =
   let* liquid =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
   in
   let* frozen =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:pkh ()
   in
   return {liquid = Tez.to_mutez liquid; frozen = Tez.to_mutez frozen}
@@ -2512,7 +2512,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup_client
   let challenge_window = constants.challenge_window_in_blocks in
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2670,7 +2670,7 @@ let first_published_level_is_global protocol sc_rollup_node sc_rollup_client
     sc_rollup node client =
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2822,7 +2822,7 @@ let _test_reinject_failed_commitment ~protocol:_ ~kind =
   let* {stake_amount; _} = get_sc_rollup_constants client in
   let check_committed id =
     let* deposit_json =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ()
     in
     Check.(
@@ -2855,7 +2855,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   @@ fun _protocol rollup_node rollup_client sc_rollup _tezos_node tezos_client
     ->
   let* genesis_info =
-    RPC.Client.call ~hooks tezos_client
+    Client.RPC.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -2864,7 +2864,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
     JSON.(genesis_info |-> "commitment_hash" |> as_string)
   in
   let* init_commitment =
-    RPC.Client.call ~hooks tezos_client
+    Client.RPC.call ~hooks tezos_client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
          ~sc_rollup
          ~hash:genesis_commitment_hash
@@ -2914,7 +2914,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   in
   let genesis_state_hash ~sc_rollup tezos_client =
     let* genesis_info =
-      RPC.Client.call ~hooks tezos_client
+      Client.RPC.call ~hooks tezos_client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup
     in
@@ -2922,7 +2922,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
       JSON.(genesis_info |-> "commitment_hash" |> as_string)
     in
     let* commitment =
-      RPC.Client.call ~hooks tezos_client
+      Client.RPC.call ~hooks tezos_client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_commitment
            ~sc_rollup
            ~hash:commitment_hash
@@ -3159,7 +3159,7 @@ let test_consecutive_commitments _protocol _rollup_node _rollup_client sc_rollup
   in
   (* As we did no publish any commitment yet, this is supposed to fail. *)
   let*? process =
-    RPC.Client.spawn tezos_client
+    Client.RPC.spawn tezos_client
     @@ RPC
        .get_chain_block_context_smart_rollups_smart_rollup_staker_staked_on_commitment
          ~sc_rollup
@@ -3476,7 +3476,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
   let keep_going client =
     let* games =
       retry @@ fun () ->
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
            ~staker:bootstrap1_key
            sc_rollup_address
@@ -3521,14 +3521,14 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
   let* {stake_amount; _} = get_sc_rollup_constants client in
   let* honest_deposit_json =
     retry @@ fun () ->
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap1_key ()
   in
   let* loser_deposits_json =
     Lwt_list.map_p
       (fun id ->
         retry @@ fun () ->
-        RPC.Client.call client
+        Client.RPC.call client
         @@ RPC.get_chain_block_context_contract_frozen_bonds ~id ())
       loser_keys
   in
@@ -3921,7 +3921,7 @@ let check_op_included ~__LOC__ =
     JSON.(op |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
   in
   fun ~oph client ->
-    let* head = RPC.Client.call client @@ RPC.get_chain_block () in
+    let* head = Client.RPC.call client @@ RPC.get_chain_block () in
     (* Operations in a block are encoded as a list of lists of operations
        [ consensus; votes; anonymous; manager ]. Manager operations are
        at index 3 in the list. *)
@@ -4959,7 +4959,7 @@ let test_rpcs ~kind
   (* Head block hash endpoint test *)
   let* level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node level in
-  let* l1_block_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+  let* l1_block_hash = Client.RPC.call client @@ RPC.get_chain_block_hash () in
   let*! l2_block_hash =
     Sc_rollup_client.rpc_get
       ~hooks
@@ -4970,7 +4970,7 @@ let test_rpcs ~kind
   Check.((l1_block_hash = l2_block_hash) string)
     ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
   let* l1_block_hash_5 =
-    RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"5" ()
+    Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
   let*! l2_block_hash_5 =
     Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "5"; "hash"]
@@ -5142,7 +5142,7 @@ let test_rpcs ~kind
       setup_rollup ~protocol ~alias:"rollup2" ~kind ~whitelist node client
     in
     let* retrieved_whitelist =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist
            sc_rollup
     in
@@ -5167,7 +5167,7 @@ let test_messages_processed_by_commitment ~kind =
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -5650,7 +5650,7 @@ let test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to =
   in
   let scenario_after tezos_client ~sc_rollup (playerB, playerC) =
     let* opponents =
-      RPC.Client.call tezos_client
+      Client.RPC.call tezos_client
       @@ RPC.get_chain_block_context_raw_json
            ~path:
              [
@@ -5892,7 +5892,7 @@ let test_bootstrap_smart_rollup_originated =
   let bootstrap_smart_rollups = [bootstrap_arith; bootstrap_wasm] in
   let* _node, client = setup_l1 ~bootstrap_smart_rollups protocol in
   let* rollups =
-    RPC.Client.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_smart_rollups_all ()
   in
   let bootstrap_smart_rollups_addresses =
     List.map (fun Protocol.{address; _} -> address) bootstrap_smart_rollups
@@ -5925,7 +5925,7 @@ let test_bootstrap_private_smart_rollup_originated =
     setup_l1 ~bootstrap_smart_rollups ~whitelist_enable:true protocol
   in
   let* found_whitelist =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist
          bootstrap_arith.address
   in
@@ -6388,7 +6388,7 @@ let bailout_mode_not_publish ~kind =
     "The node has submitted the recover_bond operation, and the operator is no \
      longer staked." ;
   let* frozen_balance =
-    RPC.Client.call tezos_client
+    Client.RPC.call tezos_client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:operator ()
   in
   let () =

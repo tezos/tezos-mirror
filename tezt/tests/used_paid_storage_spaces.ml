@@ -45,7 +45,7 @@ type space_values = {
 (* Gather used and paid storage spaces for a [contract] and a [client], both as
    a client CLI and an RPC. *)
 let get_space_values contract client =
-  let call_rpc rpc = RPC.Client.call client @@ rpc contract in
+  let call_rpc rpc = Client.RPC.call client @@ rpc contract in
   let* used_from_client = Client.used_storage_space ~contract client in
   let* used_from_RPC =
     call_rpc RPC.get_chain_block_context_contract_storage_used_space

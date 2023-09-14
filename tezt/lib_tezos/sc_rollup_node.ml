@@ -360,7 +360,7 @@ let unsafe_wait_sync ?path_client ?timeout sc_node =
     | Node node -> Node.get_level node
     | endpoint ->
         let* level =
-          RPC.Client.call (Client.create ?path:path_client ~endpoint ())
+          Client.RPC.call (Client.create ?path:path_client ~endpoint ())
           @@ RPC.get_chain_block_helper_current_level ()
         in
         return level.level

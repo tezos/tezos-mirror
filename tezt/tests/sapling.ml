@@ -170,7 +170,7 @@ module Helpers = struct
 
   let balance_tz1 (client, _contract) pkh =
     let* balance_tez =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
     in
     return balance_tez

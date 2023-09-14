@@ -72,7 +72,7 @@ let get_blocks_response_time ~executors ~protocol =
   @@ fun () ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   Long_test.time_lwt ~repeat:20 response_time_measurement @@ fun () ->
-  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
+  let* _ = Client.RPC.call client @@ RPC.get_chain_block () in
   unit
 
 let register ~executors ~protocols =

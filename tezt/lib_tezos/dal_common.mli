@@ -93,21 +93,15 @@ module RPC_legacy : sig
   type remote_uri_provider = Foreign_endpoint.t
 
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
-  val slot_pages : string -> (default_uri_provider, string list) RPC_core.t
+  val slot_pages : string -> string list RPC_core.t
 
   (** [shard ~slot_header ~shard_id] gets a shard from
         a given slot header and shard id *)
-  val shard :
-    slot_header:string ->
-    shard_id:int ->
-    (default_uri_provider, string) RPC_core.t
+  val shard : slot_header:string -> shard_id:int -> string RPC_core.t
 
   (** [shards ~slot_header shard_ids] gets a subset of shards from a given
         slot header *)
-  val shards :
-    slot_header:string ->
-    int list ->
-    (default_uri_provider, string list) RPC_core.t
+  val shards : slot_header:string -> int list -> string list RPC_core.t
 end
 
 module RPC : sig
@@ -142,52 +136,42 @@ module RPC : sig
 
   (** Call RPC "POST /commitments" to store a slot and retrun the commitment
         in case of success. *)
-  val post_commitment :
-    Helpers.slot -> (default_uri_provider, commitment) RPC_core.t
+  val post_commitment : Helpers.slot -> commitment RPC_core.t
 
   (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
         whose commitment is given. *)
   val patch_commitment :
-    commitment ->
-    slot_level:int ->
-    slot_index:int ->
-    (default_uri_provider, unit) RPC_core.t
+    commitment -> slot_level:int -> slot_index:int -> unit RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
-  val get_commitment_slot :
-    commitment -> (default_uri_provider, Helpers.slot) RPC_core.t
+  val get_commitment_slot : commitment -> Helpers.slot RPC_core.t
 
   (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
         shards of the slot whose commitment is given, using the current DAL
         parameters. Note that [with_proof], whose default value is [false], is
         provided as input to the RPC. *)
-  val put_commitment_shards :
-    ?with_proof:bool -> commitment -> (default_uri_provider, unit) RPC_core.t
+  val put_commitment_shards : ?with_proof:bool -> commitment -> unit RPC_core.t
 
   type commitment_proof = string
 
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)
-  val get_commitment_proof :
-    commitment -> (default_uri_provider, commitment_proof) RPC_core.t
+  val get_commitment_proof : commitment -> commitment_proof RPC_core.t
 
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
         the commitment associated to the given level and index. *)
   val get_level_index_commitment :
-    slot_level:int ->
-    slot_index:int ->
-    (default_uri_provider, commitment) RPC_core.t
+    slot_level:int -> slot_index:int -> commitment RPC_core.t
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-  val patch_profiles :
-    operator_profiles -> (default_uri_provider, unit) RPC_core.t
+  val patch_profiles : operator_profiles -> unit RPC_core.t
 
   (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)
-  val get_profiles : unit -> (default_uri_provider, profiles) RPC_core.t
+  val get_profiles : unit -> profiles RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
         statuses know about the given commitment. The resulting list can be filtered by a
@@ -196,19 +180,19 @@ module RPC : sig
     ?slot_level:int ->
     ?slot_index:int ->
     commitment ->
-    (default_uri_provider, slot_header list) RPC_core.t
+    slot_header list RPC_core.t
 
   (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
         to get shard ids assigned to the given public key hash at the given
         level. *)
   val get_assigned_shard_indices :
-    level:int -> pkh:string -> (default_uri_provider, int list) RPC_core.t
+    level:int -> pkh:string -> int list RPC_core.t
 
   (** Call RPC "GET /levels/<published_level>/headers?status" to get the known
         headers with the given published level. *)
   val get_published_level_headers :
-    ?status:string -> int -> (default_uri_provider, slot_header list) RPC_core.t
+    ?status:string -> int -> slot_header list RPC_core.t
 
   type slot_set = bool list
 
@@ -223,9 +207,7 @@ module RPC : sig
         attestation_lag]) and all the shards assigned to the given attester at
         level [level] are available in the DAL node's store. *)
   val get_attestable_slots :
-    attester:Account.key ->
-    attested_level:int ->
-    (default_uri_provider, attestable_slots) RPC_core.t
+    attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 
   module type CALLERS = sig
     type input_uri_provider
@@ -236,7 +218,7 @@ module RPC : sig
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       'result Lwt.t
 
     (** See {!RPC_core.call_raw} *)
@@ -245,7 +227,7 @@ module RPC : sig
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       string RPC_core.response Lwt.t
 
     (** See {!RPC_core.call_json} *)
@@ -254,7 +236,7 @@ module RPC : sig
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       JSON.t RPC_core.response Lwt.t
   end
 

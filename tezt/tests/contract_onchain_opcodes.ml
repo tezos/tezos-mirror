@@ -85,7 +85,7 @@ let get_storage client ~contract =
   return (String.trim storage)
 
 let get_storage_json client ~contract =
-  RPC.Client.call ~hooks client
+  Client.RPC.call ~hooks client
   @@ RPC.get_chain_block_context_contract_storage ~id:contract ()
 
 let check_storage ~__LOC__ client ~contract expected_storage =
@@ -151,7 +151,7 @@ let test_now protocol client =
        the minimum time between blocks. *)
     let* minimal_block_delay =
       let* constants =
-        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+        Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
       in
       return JSON.(constants |-> "minimal_block_delay" |> as_int)
     in

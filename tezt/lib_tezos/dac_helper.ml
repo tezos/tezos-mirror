@@ -361,11 +361,11 @@ let scenario_with_layer1_node ?(tags = ["dac"; "layer1"]) ?commitment_period
 module Call_endpoint = struct
   module V0 = struct
     let get_preimage dac_node page_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_preimage page_hash)
 
     let put_dac_member_signature dac_node ~hex_root_hash ~dac_member_pkh
         ~signature =
-      RPC.call
+      Dac_node.RPC.call
         dac_node
         (Dac_rpc.V0.put_dac_member_signature
            ~hex_root_hash
@@ -373,23 +373,27 @@ module Call_endpoint = struct
            ~signature)
 
     let get_missing_page dac_node ~hex_root_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_missing_page ~hex_root_hash)
 
     let get_certificate dac_node ~hex_root_hash =
-      RPC.call dac_node (Dac_rpc.V0.get_certificate ~hex_root_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V0.get_certificate ~hex_root_hash)
 
     module Coordinator = struct
       let post_preimage dac_node ~payload =
-        RPC.call dac_node (Dac_rpc.V0.Coordinator.post_preimage ~payload)
+        Dac_node.RPC.call
+          dac_node
+          (Dac_rpc.V0.Coordinator.post_preimage ~payload)
     end
   end
 
   module V1 = struct
     let get_pages dac_node page_hash =
-      RPC.call dac_node (Dac_rpc.V1.get_pages page_hash)
+      Dac_node.RPC.call dac_node (Dac_rpc.V1.get_pages page_hash)
   end
 
-  let get_health_live dac_node = RPC.call dac_node Dac_rpc.get_health_live
+  let get_health_live dac_node =
+    Dac_node.RPC.call dac_node Dac_rpc.get_health_live
 
-  let get_health_ready dac_node = RPC.call dac_node Dac_rpc.get_health_ready
+  let get_health_ready dac_node =
+    Dac_node.RPC.call dac_node Dac_rpc.get_health_ready
 end

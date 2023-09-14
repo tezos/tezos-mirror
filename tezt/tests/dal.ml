@@ -375,7 +375,7 @@ let dal_attestation ?level ?(force = false) ~signer ~nb_slots availability
     match level with Some level -> return level | None -> Client.level client
   in
   let* slots =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
          ~level
          ~delegate:signer.Account.public_key_hash
@@ -416,7 +416,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
   let*? process =
-    RPC.(Client.spawn client @@ get_chain_block_context_dal_shards ())
+    Client.RPC.spawn client @@ RPC.get_chain_block_context_dal_shards ()
   in
   let* () =
     Process.check_error
@@ -443,11 +443,11 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       Mempool.classified_typ
       ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
   let* () = Client.bake_for_and_wait client in
-  let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
+  let* block_metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
   if block_metadata.dal_attestation <> None then
     Test.fail "Did not expect to find \"dal_attestation\"" ;
   let* bytes =
-    RPC.Client.call client @@ RPC.get_chain_block_context_raw_bytes ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_raw_bytes ()
   in
   if not JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
@@ -457,7 +457,7 @@ let test_one_committee_per_epoch _protocol parameters _cryptobox node _client
     _bootstrap_key =
   let blocks_per_epoch = parameters.Dal.Parameters.blocks_per_epoch in
   let* current_level =
-    RPC.(call node @@ get_chain_block_helper_current_level ())
+    Node.RPC.(call node @@ get_chain_block_helper_current_level ())
   in
   (* The test assumes we are at a level when an epoch starts. And
      that is indeed the case. *)
@@ -576,7 +576,7 @@ let check_manager_operation_status result expected_status oph =
 
 let check_dal_raw_context node =
   let* dal_raw_json =
-    RPC.(call node @@ get_chain_block_context_raw_json ~path:["dal"] ())
+    Node.RPC.(call node @@ get_chain_block_context_raw_json ~path:["dal"] ())
   in
   if JSON.is_null dal_raw_json then
     Test.fail "Expected the context to contain information under /dal key."
@@ -585,7 +585,7 @@ let check_dal_raw_context node =
       JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
     in
     let* confirmed_slots_opt =
-      RPC.(
+      Node.RPC.(
         call node
         @@ get_chain_block_context_dal_confirmed_slot_headers_history ())
     in
@@ -671,12 +671,12 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       ~error_msg:"Expected all the operations to be applied. Got %L") ;
   let* () = Client.bake_for_and_wait client in
   let* bytes =
-    RPC.Client.call client @@ RPC.get_chain_block_context_raw_bytes ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_raw_bytes ()
   in
   if JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Expected the context to contain some information about the DAL" ;
   let* operations_result =
-    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+    Client.RPC.call client @@ RPC.get_chain_block_operations ()
   in
   let fees_error =
     Failed {error_id = "proto.alpha.dal_publish_slot_header_duplicate"}
@@ -714,7 +714,7 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       client
   in
   let* () = Client.bake_for_and_wait client in
-  let* metadata = RPC.(call node @@ get_chain_block_metadata ()) in
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
   let attestation =
     match metadata.dal_attestation with
     | None ->
@@ -761,7 +761,7 @@ let test_slots_attestation_operation_behavior _protocol parameters cryptobox
     unit
   in
   let check_slots_availability ~__LOC__ ~attested =
-    let* metadata = RPC.(call node @@ get_chain_block_metadata ()) in
+    let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
     let dal_attestation =
       (* Field is part of the encoding when the feature flag is true *)
       Option.get metadata.dal_attestation
@@ -1006,7 +1006,8 @@ let get_commitment_succeeds expected_commitment response =
       "The value of a stored commitment should match the one computed locally \
        (current = %L, expected = %R)"
 
-let get_commitment_not_found _commit r = RPC.check_string_response ~code:404 r
+let get_commitment_not_found _commit r =
+  RPC_core.check_string_response ~code:404 r
 
 let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
   let test check_result ~query_string (slot_index, commit) =
@@ -1363,7 +1364,7 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
   let failing_post_slot_rpc slot =
     let* response = Dal_RPC.(call_raw dal_node @@ post_commitment slot) in
     return
-    @@ RPC.check_string_response
+    @@ RPC_core.check_string_response
          ~body_rex:"dal.node.invalid_slot_size"
          ~code:500
          response
@@ -1402,7 +1403,7 @@ let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
       Dal_RPC.(
         call_raw dal_node @@ patch_commitment commit ~slot_level ~slot_index)
     in
-    return @@ RPC.check_string_response ~code:404 response
+    return @@ RPC_core.check_string_response ~code:404 response
   in
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
@@ -1436,7 +1437,7 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     let* response =
       Dal_RPC.(call_raw dal_node @@ get_commitment_slot commitment)
     in
-    return @@ RPC.check_string_response ~code:404 response
+    return @@ RPC_core.check_string_response ~code:404 response
   in
   let* _commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
   (* commit = _commitment already tested in /POST test. *)
@@ -1573,7 +1574,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
 
   Log.info "Step 2: run rollup node for an originated rollup" ;
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup_address
   in
@@ -1775,7 +1776,7 @@ let check_saved_value_in_pvm ~name ~expected_value sc_client =
 
 let rollup_node_interprets_dal_pages ~protocol client sc_rollup sc_rollup_node =
   let* genesis_info =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
          sc_rollup
   in
@@ -1937,7 +1938,9 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   in
   let* level = Node.get_level node in
   Log.info "Assert that the slot was attested." ;
-  let* {dal_attestation; _} = RPC.(call node @@ get_chain_block_metadata ()) in
+  let* {dal_attestation; _} =
+    Node.RPC.(call node @@ get_chain_block_metadata ())
+  in
   Check.((Some [|true|] = dal_attestation) (option (array bool)))
     ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
   Log.info "Wait for the rollup node to catch up to the latest level." ;
@@ -1974,7 +1977,7 @@ let test_dal_node_test_patch_profile _protocol _parameters _cryptobox _node
     _client dal_node =
   let check_bad_attester_pkh_encoding profile =
     let* response = Dal_RPC.(call_raw dal_node @@ patch_profiles [profile]) in
-    return @@ RPC.check_string_response ~code:400 response
+    return @@ RPC_core.check_string_response ~code:400 response
   in
   let patch_profile_rpc profile =
     Dal_RPC.(call dal_node (patch_profiles [profile]))
@@ -2007,7 +2010,7 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
     node _client dal_node =
   let pkh = Constant.bootstrap1.public_key_hash in
   let* level =
-    RPC.(call node @@ get_chain_block_helper_current_level ())
+    Node.RPC.(call node @@ get_chain_block_helper_current_level ())
     |> Lwt.map (fun level -> level.RPC.level)
   in
   let* committee_from_l1 = Dal.Committee.at_level node ~level in
@@ -3580,7 +3583,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
   and description = "test plugin update"
   and scenario ~migration_level client node dal_node =
     let* current_level =
-      let* json = RPC.(call node @@ get_chain_block_header_shell ()) in
+      let* json = Node.RPC.(call node @@ get_chain_block_header_shell ()) in
       JSON.(json |-> "level" |> as_int |> return)
     in
 
@@ -3698,7 +3701,7 @@ module Tx_kernel_e2e = struct
     let* () = Client.bake_for_and_wait client in
     Log.info "Run the rollup node and ensure origination succeeds." ;
     let* genesis_info =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup_address
     in

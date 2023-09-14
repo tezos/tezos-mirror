@@ -31,7 +31,7 @@ module V0 : sig
   (** [get_preimage hash] requests the preimage of hash, consisting of a
       single page, from cctxt. When the request succeeds, the raw page will be
       returned as a sequence of bytes. *)
-  val get_preimage : string -> (Dac_node.t, string) RPC_core.t
+  val get_preimage : string -> string RPC_core.t
 
   (** [make_put_dac_member_sigature_request_body ~dac_member_pkh ~root_hash signature]
       creates a JSON body for "PUT v0/dac_member_signature". *)
@@ -48,21 +48,20 @@ module V0 : sig
     hex_root_hash:Hex.t ->
     dac_member_pkh:string ->
     signature:Tezos_crypto.Aggregate_signature.t ->
-    (Dac_node.t, unit) RPC_core.t
+    unit RPC_core.t
 
   (** [get_missing_page ~hex_root_hash] calls
       "GET v0/missing_page/[page_hash]" endpoint. *)
-  val get_missing_page : hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+  val get_missing_page : hex_root_hash:Hex.t -> string RPC_core.t
 
   (** [get_certificate ~hex_root_hash] fetches the DAC certificate
       for the provided [hex_root_hash]. *)
   val get_certificate :
-    hex_root_hash:Hex.t -> (Dac_node.t, int * string * string * int) RPC_core.t
+    hex_root_hash:Hex.t -> (int * string * string * int) RPC_core.t
 
-  (** [get_serialized_certificate ~hex_root_hash] fetches the DAC certificate for the 
+  (** [get_serialized_certificate ~hex_root_hash] fetches the DAC certificate for the
       provided [hex_root_hash] with SDK kernel compatible [root_hash] encoding. *)
-  val get_serialized_certificate :
-    hex_root_hash:Hex.t -> (Dac_node.t, string) RPC_core.t
+  val get_serialized_certificate : hex_root_hash:Hex.t -> string RPC_core.t
 
   module Coordinator : sig
     (** [post_preimage ~payload] sends a [payload] to the DAC [Coordinator] via
@@ -70,18 +69,18 @@ module V0 : sig
         produced by [Merkle_tree_V0] pagination scheme. On the backend side it
         also pushes root page hash of the preimage to all the subscribed
         DAC Members and Observers. *)
-    val post_preimage : payload:string -> (Dac_node.t, string) RPC_core.t
+    val post_preimage : payload:string -> string RPC_core.t
   end
 end
 
-(** [get_health_live] returns [true] if 
+(** [get_health_live] returns [true] if
     [Node_context.get_status cctxt] is [Starting] or [Ready]. *)
-val get_health_live : (Dac_node.t, bool) RPC_core.t
+val get_health_live : bool RPC_core.t
 
-(** [get_health_ready] returns [true] if 
+(** [get_health_ready] returns [true] if
     [Node_context.get_status cctxt] is [Ready]
     and fail with [tzfail Dac_node_not_ready] otherwise. *)
-val get_health_ready : (Dac_node.t, bool) RPC_core.t
+val get_health_ready : bool RPC_core.t
 
 (** [V1] is a second major DAC API release which is currently work in progress. *)
 module V1 : sig
@@ -89,5 +88,5 @@ module V1 : sig
       single page, from cctxt. When the request succeeds, the raw page will be
       returned as a sequence of bytes. This is achieved by calling
       "GET v1/pages". *)
-  val get_pages : string -> (Dac_node.t, string) RPC_core.t
+  val get_pages : string -> string RPC_core.t
 end

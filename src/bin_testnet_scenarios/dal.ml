@@ -166,7 +166,7 @@ let scenario network =
   let* () = Wallet.Airdrop.distribute_money client keys in
   let* () = Dal_node.run dal_node in
   let* proto_parameters =
-    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let block_times =
     JSON.(
@@ -273,7 +273,7 @@ let scenario network =
     in
     let attested_level = string_of_int (level + lag) in
     let* metadata =
-      RPC.call node (RPC.get_chain_block_metadata ~block:attested_level ())
+      Node.RPC.(call node @@ get_chain_block_metadata ~block:attested_level ())
     in
     let pp_array fmt a =
       for i = 0 to Array.length a - 1 do
@@ -315,12 +315,12 @@ let scenario network =
         node_attestation ;
     let num_published = List.length slot_headers in
     let* ops =
-      RPC.call
-        node
-        (RPC.get_chain_block_operations_validation_pass
-           ~block:attested_level
-           ~validation_pass:0
-           ())
+      Node.RPC.(
+        call node
+        @@ get_chain_block_operations_validation_pass
+             ~block:attested_level
+             ~validation_pass:0
+             ())
     in
     let attestations =
       List.filter

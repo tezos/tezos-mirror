@@ -51,6 +51,11 @@ let rpc_host injector =
 
 let rpc_port injector = Option.get @@ Uri.port injector.persistent_state.uri
 
+let as_foreign_rpc_endpoint (t : t) =
+  let host = rpc_host t in
+  let port = rpc_port t in
+  Foreign_endpoint.{scheme = "http"; host; port}
+
 let data_dir injector = injector.persistent_state.data_dir
 
 let spawn_command injector =
@@ -129,6 +134,30 @@ let run injector =
   run injector {ready = false} arguments ~on_terminate ?runner
 
 module RPC = struct
+  let call ?log_request ?log_response_status ?log_response_body node rpc =
+    RPC_core.call
+      ?log_request
+      ?log_response_status
+      ?log_response_body
+      (as_foreign_rpc_endpoint node)
+      rpc
+
+  let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
+    RPC_core.call_raw
+      ?log_request
+      ?log_response_status
+      ?log_response_body
+      (as_foreign_rpc_endpoint node)
+      rpc
+
+  let call_json ?log_request ?log_response_status ?log_response_body node rpc =
+    RPC_core.call_json
+      ?log_request
+      ?log_response_status
+      ?log_response_body
+      (as_foreign_rpc_endpoint node)
+      rpc
+
   type status =
     | Pending
     | Injected of {injected_oph : string; injected_op_index : int}
@@ -139,13 +168,7 @@ module RPC = struct
         level : int;
       }
 
-  let make ?data ?query_string =
-    RPC.make
-      ?data
-      ?query_string
-      ~get_host:rpc_host
-      ~get_port:rpc_port
-      ~get_scheme:(Fun.const "http")
+  let make ?data ?query_string = RPC_core.make ?data ?query_string
 
   let add_pending_transaction ?parameters amount destination =
     let operation =

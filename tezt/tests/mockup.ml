@@ -925,7 +925,7 @@ let test_transfer_rpc =
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let get_balance (key : Account.key) =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:key.public_key_hash ()
   in
   let giver = Account.Bootstrap.keys.(0) in
@@ -1137,13 +1137,13 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
     (* Fetch default values *)
     let* parametric_constants =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_constants_parametric ()
     in
     (* Fetch schema, used to move from default values *)
     let* parametric_constants_schema =
       let* json =
-        RPC.Client.schema client
+        Client.RPC.schema client
         @@ RPC.get_chain_block_context_constants_parametric ()
       in
       return JSON.(json |-> "output")

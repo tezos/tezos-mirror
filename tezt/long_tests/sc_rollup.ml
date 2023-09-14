@@ -138,7 +138,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
   let go ~protocol ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      Client.RPC.call ~hooks client
       @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
            sc_rollup
     in

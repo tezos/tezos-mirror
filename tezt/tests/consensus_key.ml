@@ -47,7 +47,7 @@ module Helpers = struct
       Check.(tuple5 int int int int bool)
 
   let get_current_level client =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
 
   let check_current_level client expected_level =
     let* level = get_current_level client in
@@ -400,7 +400,7 @@ let test_update_consensus_key =
   in
   let* () =
     let* json =
-      RPC.get_chain_mempool_pending_operations () |> RPC.Client.call client
+      RPC.get_chain_mempool_pending_operations () |> Client.RPC.call client
     in
     let replaced_op = JSON.(json |-> "branch_delayed" |> geti 0) in
     let replaced_op_kind =
@@ -456,17 +456,17 @@ let update_consensus_key ?(expect_failure = false)
       client
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate src.public_key_hash
   in
   let* () = Client.bake_for_and_wait ~keys:[baker] client in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate src.public_key_hash
   in
   let* () = bake_n_cycles (preserved_cycles + 1) client in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate src.public_key_hash
   in
   unit
@@ -510,7 +510,7 @@ let consensus_key_typ : consensus_key Check.typ =
 
 let get_consensus_key client (delegate : Account.key) : consensus_key Lwt.t =
   let* delegate_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
   in
   return
@@ -549,7 +549,7 @@ let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
     ~(consensus_key : Account.key) client =
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
   let* () =
@@ -562,17 +562,17 @@ let register_key_as_delegate ?(expect_failure = false)
   in
   let* () = Client.bake_for_and_wait ~keys:[baker] client in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
   (* Wait for consensus key to be active *)
   let* () = bake_n_cycles (preserved_cycles + 1) client in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate owner.public_key_hash
   in
   unit
@@ -785,23 +785,23 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
     update_consensus_key ~baker ~src:delegate ~consensus_key:consensus client
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:delegate.public_key_hash
          ()
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:consensus.public_key_hash
          ()
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:destination.public_key_hash
          ()
@@ -817,23 +817,23 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
       client
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_delegate delegate.public_key_hash
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:delegate.public_key_hash
          ()
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:consensus.public_key_hash
          ()
   in
   let* _ =
-    RPC.Client.call ~hooks client
+    Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract_balance
          ~id:destination.public_key_hash
          ()

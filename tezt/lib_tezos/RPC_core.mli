@@ -26,16 +26,21 @@
 (** RPC description type and functions to call RPCs. *)
 
 (** HTTP request methods. *)
-type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
+type verb = GET | PUT | POST | PATCH | DELETE
+
+(** Data type for RPCs. *)
+type data = Data of JSON.u | File of string
 
 (** RPC descriptions.
 
-    ['endpoint] is the type the target endpoint.
-    ['result] is the type of values returned by the RPC after decoding. *)
-type ('endpoint, 'result) t
-
-(** Data type for RPCs. *)
-type data = Client.data
+['result] is the type of values returned by the RPC after decoding. *)
+type 'result t = {
+  verb : verb;
+  path : string list;
+  query_string : (string * string) list;
+  data : data option;
+  decode : JSON.t -> 'result;
+}
 
 (** Make an RPC description.
 
@@ -56,32 +61,26 @@ type data = Client.data
       If you do not want to define it, use [Fun.id] (to return a [JSON.t])
       or [ignore] (to ignore the response body).
 
-    - [get_host], [get_port] and [get_scheme] are callbacks to extract host, port and
-      scheme from the endpoint to build the targeted url.
-
     Use one of the [call] functions below to actually call the RPC. *)
 val make :
   ?data:data ->
   ?query_string:(string * string) list ->
-  get_host:('endpoint -> string) ->
-  get_port:('endpoint -> int) ->
-  get_scheme:('endpoint -> string) ->
   verb ->
   string list ->
   (JSON.t -> 'result) ->
-  ('endpoint, 'result) t
+  'result t
 
 (** [make_uri endpoint rpc] returns the URI of the RPC [rpc] at [endpoint]. *)
-val make_uri : 'endpoint -> ('endpoint, 'result) t -> Uri.t
+val make_uri : Foreign_endpoint.t -> 'result t -> Uri.t
 
 (** Parse and decode a response body using the decode function of an RPC description.
 
     [origin] is used in error messages.
     Its default value is ["RPC response"]. *)
-val decode_raw : ?origin:string -> ('endpoint, 'result) t -> string -> 'result
+val decode_raw : ?origin:string -> 'result t -> string -> 'result
 
 (** Decode a response body using the decode function of an RPC description. *)
-val decode : ('endpoint, 'result) t -> JSON.t -> 'result
+val decode : 'result t -> JSON.t -> 'result
 
 (** RPC responses. *)
 type 'a response = {
@@ -121,8 +120,8 @@ val call :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  'endpoint ->
-  ('endpoint, 'result) t ->
+  Foreign_endpoint.t ->
+  'result t ->
   'result Lwt.t
 
 (** Call an RPC, but do not parse its response body.
@@ -132,8 +131,8 @@ val call_raw :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  'endpoint ->
-  ('endpoint, 'result) t ->
+  Foreign_endpoint.t ->
+  'result t ->
   string response Lwt.t
 
 (** Call an RPC, but do not decode its response body, only parse as JSON.
@@ -144,102 +143,6 @@ val call_json :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  'endpoint ->
-  ('endpoint, 'result) t ->
+  Foreign_endpoint.t ->
+  'result t ->
   JSON.t response Lwt.t
-
-module Client : sig
-  type nonrec 'result t = (Node.t, 'result) t
-
-  (** Perform RPC calls using [octez-client]. *)
-
-  (** RPC calls performed this way are slower and should only be used to test
-      the [rpc] command of the client. *)
-
-  (** Call an RPC using [octez-client rpc].
-
-      The response body is parsed as JSON, then decoded using the decode function
-      of the RPC description.
-
-      The following arguments:
-      - [log_command];
-      - [log_status_on_exit];
-      - [log_output];
-      - [better_errors];
-      - [endpoint];
-      - [hooks];
-      - [env];
-      - [protocol_hash];
-      are passed to [Client.rpc]. *)
-  val call :
-    ?log_command:bool ->
-    ?log_status_on_exit:bool ->
-    ?log_output:bool ->
-    ?better_errors:bool ->
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?env:string String_map.t ->
-    ?protocol_hash:string ->
-    Client.t ->
-    'result t ->
-    'result Lwt.t
-
-  (** Call an RPC, but do not parse the client output. *)
-  val call_raw :
-    ?log_command:bool ->
-    ?log_status_on_exit:bool ->
-    ?log_output:bool ->
-    ?better_errors:bool ->
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?env:string String_map.t ->
-    ?protocol_hash:string ->
-    Client.t ->
-    'result t ->
-    string Lwt.t
-
-  (** Call an RPC, but do not decode the client output, only parse it. *)
-  val call_json :
-    ?log_command:bool ->
-    ?log_status_on_exit:bool ->
-    ?log_output:bool ->
-    ?better_errors:bool ->
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?env:string String_map.t ->
-    ?protocol_hash:string ->
-    Client.t ->
-    'result t ->
-    JSON.t Lwt.t
-
-  (** Get the schema of an RPC as JSON. *)
-  val schema :
-    ?log_command:bool ->
-    ?log_status_on_exit:bool ->
-    ?log_output:bool ->
-    ?better_errors:bool ->
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?env:string String_map.t ->
-    ?protocol_hash:string ->
-    Client.t ->
-    'result t ->
-    JSON.t Lwt.t
-
-  (** Same as [call_raw], but do not wait for the process to exit.
-
-      Because this function is mostly used to test error cases, the response body
-      is not decoded. *)
-  val spawn :
-    ?log_command:bool ->
-    ?log_status_on_exit:bool ->
-    ?log_output:bool ->
-    ?better_errors:bool ->
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?env:string String_map.t ->
-    ?protocol_hash:string ->
-    Client.t ->
-    'result t ->
-    JSON.t Runnable.process
-end

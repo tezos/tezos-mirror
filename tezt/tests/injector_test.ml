@@ -13,10 +13,11 @@ let add_pending_transaction =
   let transaction_amount = ref 100L in
   fun injector ->
     let* injector_operation_hash =
-      RPC.call injector
-      @@ Injector.RPC.add_pending_transaction
-           !transaction_amount
-           Account.Bootstrap.keys.(1).public_key_hash
+      Injector.RPC.(
+        call injector
+        @@ add_pending_transaction
+             !transaction_amount
+             Account.Bootstrap.keys.(1).public_key_hash)
     in
     transaction_amount := Int64.succ !transaction_amount ;
     return injector_operation_hash
@@ -27,11 +28,12 @@ let add_pending_contract_call =
   let counter = ref 0L in
   fun injector contract ->
     let* injector_operation_hash =
-      RPC.call injector
-      @@ Injector.RPC.add_pending_transaction
-           ~parameters:(String.empty, Int64.to_string !counter)
-           0L
-           contract
+      Injector.RPC.(
+        call injector
+        @@ add_pending_transaction
+             ~parameters:(String.empty, Int64.to_string !counter)
+             0L
+             contract)
     in
     counter := Int64.succ !counter ;
     return injector_operation_hash
@@ -53,7 +55,7 @@ let check_operation_status =
         | Some (last_level, ops_list) when level = last_level -> return ops_list
         | _ ->
             let* ops =
-              RPC.Client.call client
+              Client.RPC.call client
               @@ RPC.get_chain_block_operations ~block:(string_of_int level) ()
             in
             let ops_list = ops |=> 3 |> as_list in
@@ -69,9 +71,7 @@ let check_operation_status =
     in
 
     let check_status op_hash =
-      let* status =
-        RPC.call injector @@ Injector.RPC.operation_status op_hash
-      in
+      let* status = Injector.RPC.(call injector @@ operation_status op_hash) in
       match status with
       | Some Pending -> return [op_hash]
       | Some (Injected _info) ->

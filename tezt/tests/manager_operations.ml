@@ -285,7 +285,7 @@ module Helpers = struct
 
   let gas_limits client =
     let* constants =
-      RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
     in
     let hard_gas_limit_per_operation =
       JSON.(constants |-> "hard_gas_limit_per_operation" |> as_int)
@@ -403,7 +403,7 @@ module Memchecks = struct
     List.map (fun err -> JSON.(err |-> "id" |> as_string)) errs
 
   let is_in_block ?block client oph =
-    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+    let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     Lwt.return
     @@ List.exists (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
@@ -509,7 +509,7 @@ module Memchecks = struct
   let check_status_in_block ~__LOC__ ~who ~oph ~expected_statuses
       ?expected_errors ?block client =
     Log.info "- Checking inclusion and status of operation in %s's block." who ;
-    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
+    let* head = Client.RPC.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     let head_hash = JSON.(head |-> "hash" |> as_string) in
     let op_contents =
@@ -673,7 +673,7 @@ module Memchecks = struct
 
   let check_balance ~__LOC__ {client; _} key amount =
     let* bal =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:key.Account.public_key_hash
            ()
@@ -689,7 +689,7 @@ module Memchecks = struct
 
   let check_revealed ~__LOC__ {client; _} key ~revealed =
     let* res =
-      RPC.Client.call client
+      Client.RPC.call client
       @@ RPC.get_chain_block_context_contract_manager_key
            ~id:key.Account.public_key_hash
            ()
@@ -1212,7 +1212,7 @@ module Simple_transfers = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1245,7 +1245,7 @@ module Simple_transfers = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1286,7 +1286,7 @@ module Simple_transfers = struct
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1323,7 +1323,7 @@ module Simple_transfers = struct
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
@@ -1358,7 +1358,7 @@ module Simple_transfers = struct
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* bal =
-      RPC.Client.call nodes.main.client
+      Client.RPC.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()

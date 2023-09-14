@@ -47,7 +47,7 @@ module Helpers = struct
     return contract
 
   let get_balance pkh client =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
   let supported_signature_schemes = function
@@ -518,7 +518,7 @@ module Transfer = struct
     let check_balance_and_deposits ~__LOC__ (account : Account.key)
         expected_amount =
       let* all_deposits =
-        RPC.Client.call client
+        Client.RPC.call client
         @@ RPC.get_chain_block_context_delegate_frozen_deposits
              account.public_key_hash
       in
@@ -744,7 +744,7 @@ module Signatures = struct
     in
     let* () = Lwt_list.iter_s test accounts in
     let* () = Client.bake_for_and_wait client in
-    let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+    let* block = Client.RPC.call client @@ RPC.get_chain_block () in
     let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
     Check.(
       (List.length ops = List.length (supported_signature_schemes protocol)) int)

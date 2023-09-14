@@ -66,7 +66,7 @@ module Parameters = struct
 
   let from_client client =
     let* json =
-      RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
     in
     from_protocol_parameters json |> return
 end
@@ -86,7 +86,7 @@ module Committee = struct
 
   let at_level node ~level =
     let* json =
-      RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
+      Node.RPC.call node @@ RPC.get_chain_block_context_dal_shards ~level ()
     in
     return
     @@ List.map
@@ -105,25 +105,7 @@ module RPC_legacy = struct
 
   type remote_uri_provider = Foreign_endpoint.t
 
-  let call = RPC_core.call
-
-  let call_raw = RPC_core.call_raw
-
-  let call_json = RPC_core.call_json
-
-  let make ?data ?query_string =
-    RPC.make
-      ?data
-      ?query_string
-      ~get_host:(function
-        | Either.Left node -> Dal_node.rpc_host node
-        | Right fe -> Foreign_endpoint.rpc_host fe)
-      ~get_port:(function
-        | Either.Left node -> Dal_node.rpc_port node
-        | Right fe -> Foreign_endpoint.rpc_port fe)
-      ~get_scheme:(function
-        | Either.Left _node -> "http"
-        | Right fe -> Foreign_endpoint.rpc_scheme fe)
+  let make ?data ?query_string = RPC_core.make ?data ?query_string
 
   (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
   let encode_bytes_to_hex_string raw =
@@ -333,7 +315,7 @@ module Dal_RPC = struct
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       'result Lwt.t
 
     (** See {!RPC_core.call_raw} *)
@@ -342,7 +324,7 @@ module Dal_RPC = struct
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       string RPC_core.response Lwt.t
 
     (** See {!RPC_core.call_json} *)
@@ -351,65 +333,115 @@ module Dal_RPC = struct
       ?log_response_status:bool ->
       ?log_response_body:bool ->
       input_uri_provider ->
-      (default_uri_provider, 'result) RPC_core.t ->
+      'result RPC_core.t ->
       JSON.t RPC_core.response Lwt.t
   end
 
   module Local : CALLERS with type input_uri_provider := local_uri_provider =
   struct
     let call ?log_request ?log_response_status ?log_response_body node rpc =
-      call
+      RPC_core.call
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Left node)
+        (Dal_node.as_foreign_rpc_endpoint node)
         rpc
 
     let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
-      call_raw
+      RPC_core.call_raw
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Left node)
+        (Dal_node.as_foreign_rpc_endpoint node)
         rpc
 
     let call_json ?log_request ?log_response_status ?log_response_body node rpc
         =
-      call_json
+      RPC_core.call_json
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Left node)
+        (Dal_node.as_foreign_rpc_endpoint node)
         rpc
   end
 
   module Remote : CALLERS with type input_uri_provider := remote_uri_provider =
   struct
-    let call ?log_request ?log_response_status ?log_response_body node rpc =
-      call
+    let call ?log_request ?log_response_status ?log_response_body endpoint rpc =
+      RPC_core.call
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Right node)
+        endpoint
         rpc
 
-    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
-      call_raw
+    let call_raw ?log_request ?log_response_status ?log_response_body endpoint
+        rpc =
+      RPC_core.call_raw
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Right node)
+        endpoint
         rpc
 
-    let call_json ?log_request ?log_response_status ?log_response_body node rpc
-        =
-      call_json
+    let call_json ?log_request ?log_response_status ?log_response_body endpoint
+        rpc =
+      RPC_core.call_json
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Either.Right node)
+        endpoint
         rpc
   end
+
+  let call ?log_request ?log_response_status ?log_response_body node_or_endpoint
+      rpc =
+    match node_or_endpoint with
+    | Either.Left node ->
+        Local.call ?log_request ?log_response_status ?log_response_body node rpc
+    | Either.Right endpoint ->
+        Remote.call
+          ?log_request
+          ?log_response_status
+          ?log_response_body
+          endpoint
+          rpc
+
+  let call_raw ?log_request ?log_response_status ?log_response_body
+      node_or_endpoint rpc =
+    match node_or_endpoint with
+    | Either.Left node ->
+        Local.call_raw
+          ?log_request
+          ?log_response_status
+          ?log_response_body
+          node
+          rpc
+    | Either.Right endpoint ->
+        Remote.call_raw
+          ?log_request
+          ?log_response_status
+          ?log_response_body
+          endpoint
+          rpc
+
+  let call_json ?log_request ?log_response_status ?log_response_body
+      node_or_endpoint rpc =
+    match node_or_endpoint with
+    | Either.Left node ->
+        Local.call_json
+          ?log_request
+          ?log_response_status
+          ?log_response_body
+          node
+          rpc
+    | Either.Right endpoint ->
+        Remote.call_json
+          ?log_request
+          ?log_response_status
+          ?log_response_body
+          endpoint
+          rpc
 end
 
 module Helpers = struct
@@ -468,8 +500,12 @@ module Helpers = struct
         client)
 
   let store_slot dal_node_or_endpoint ?with_proof slot =
+    let call = function
+      | Either.Left node -> Dal_RPC.Local.call node
+      | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
+    in
     let* commitment =
-      Dal_RPC.(call dal_node_or_endpoint @@ post_commitment slot)
+      call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
     in
     let* () =
       Dal_RPC.(

@@ -32,7 +32,7 @@
 
 let check_protocol_activation ~migrate_from ~migrate_to ~block client =
   let* migration_block =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block ()
+    Client.RPC.call client @@ RPC.get_chain_block_metadata ~block ()
   in
   Check.(
     (migration_block.protocol = Protocol.hash migrate_from)

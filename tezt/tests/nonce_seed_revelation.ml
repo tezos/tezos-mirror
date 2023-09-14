@@ -118,8 +118,9 @@ let test_nonce_seed_revelation =
     Lwt_list.map_p
       (fun level ->
         let* block =
-          RPC.call ~log_request:false head_node
-          @@ RPC.get_chain_block ~block:(string_of_int level) ()
+          Node.RPC.(
+            call ~log_request:false head_node
+            @@ get_chain_block ~block:(string_of_int level) ())
         in
         let level_info = JSON.(block |-> "metadata" |-> "level_info") in
         return

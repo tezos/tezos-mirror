@@ -125,7 +125,7 @@ let test_injection_and_activation () : unit =
       (fun node ->
         let* (_ : int) = Node.wait_for_level node activation_block_level in
         let* (metadata : RPC.block_metadata) =
-          RPC.Client.call ~protocol_hash:Protocol.genesis_hash client1
+          Client.RPC.call ~protocol_hash:Protocol.genesis_hash client1
           @@ RPC.get_chain_block_metadata ()
         in
         Log.info
@@ -166,7 +166,7 @@ let test_activation () : unit =
 
   Log.info "Check that first protocol has the zeroth protocol hash" ;
   let* metadata =
-    RPC.Client.call ~protocol_hash:Protocol.genesis_hash client
+    Client.RPC.call ~protocol_hash:Protocol.genesis_hash client
     @@ RPC.get_chain_block_metadata ()
   in
   Check.(
@@ -190,7 +190,7 @@ let test_activation () : unit =
 
   Log.info "Check that protocol of activation block is genesis" ;
   let* metadata =
-    RPC.Client.call ~protocol_hash:Protocol.genesis_hash client
+    Client.RPC.call ~protocol_hash:Protocol.genesis_hash client
     @@ RPC.get_chain_block_metadata ()
   in
   Check.(

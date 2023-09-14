@@ -63,7 +63,7 @@ let dal_distribution =
   let* () = Client.bake_for_and_wait client in
   let* number_of_shards =
     let* constants =
-      RPC.Client.call client (RPC.get_chain_block_context_constants ())
+      Client.RPC.call client (RPC.get_chain_block_context_constants ())
     in
     JSON.(constants |-> "dal_parametric" |-> "number_of_shards" |> as_int)
     |> return
@@ -73,14 +73,14 @@ let dal_distribution =
         Array.make number_of_shards Constant.bootstrap1.public_key_hash)
   in
   let* current_level =
-    RPC.Client.call client (RPC.get_chain_block_helper_current_level ())
+    Client.RPC.call client (RPC.get_chain_block_helper_current_level ())
   in
   let rec iter offset =
     let level = current_level.level + offset in
     if offset < 0 then unit
     else
       let* json =
-        RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
+        Node.RPC.call node @@ RPC.get_chain_block_context_dal_shards ~level ()
       in
       List.iter
         (fun json ->

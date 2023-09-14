@@ -84,7 +84,7 @@ let data_to_json =
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
   let* counter_json =
-    RPC.Client.call client
+    Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_counter
          ~id:source.Account.public_key_hash
          ()
@@ -98,7 +98,7 @@ let get_injection_branch ?branch client =
   | Some b -> Lwt.return b
   | None ->
       let block = sf "head~%d" 2 in
-      RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
+      Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
 
 (* Smart constructors *)
 
@@ -234,7 +234,7 @@ let forge_operation ?protocol ~branch ~batch client =
   let* hex =
     match protocol with
     | None ->
-        RPC.Client.call client
+        Client.RPC.call client
         @@ RPC.post_chain_block_helpers_forge_operations ~data:(Data op_json) ()
         >|= JSON.as_string
     | Some p ->
@@ -266,7 +266,7 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
   let* oph_json =
-    RPC.Client.call client @@ inject ~async (Data (`String signed_op))
+    Client.RPC.call client @@ inject ~async (Data (`String signed_op))
   in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
