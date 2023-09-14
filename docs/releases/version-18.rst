@@ -91,4 +91,5 @@ You can also install Octez using Opam by running ``opam install octez``.
 Changelog
 ---------
 
+- `Version 18.0 <../CHANGES.html#version-18-0>`_
 - `Version 18.0~rc1 <../CHANGES.html#version-18-0-rc1>`_

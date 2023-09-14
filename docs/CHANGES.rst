@@ -3,6 +3,22 @@
 Changelog
 '''''''''
 
+Version 18.0
+============
+
+Node
+----
+
+- **Breaking change** Bumped Octez store version from ``5`` to
+  ``6`` to explicit the incompatibility with previous store (and hence Octez) versions. As a result snapshots exported from a v6 store are not compatible with earlier Octez versions. Also, improved the consistency of ``snapshot`` import errors
+  messages (MR :gl:`!10138`)
+
+Smart Rollup node
+-----------------
+
+- Fixed an issue where the rollup node could forget to update its Layer 2 head for a
+  block. (MR :gl:`!9868`)
+
 Version 18.0-rc1
 ================
 
