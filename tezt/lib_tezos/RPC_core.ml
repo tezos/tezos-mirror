@@ -83,8 +83,8 @@ let make_uri endpoint rpc =
     ()
 
 let call_raw ?(log_request = true) ?(log_response_status = true)
-    ?(log_response_body = true) node rpc =
-  let uri = make_uri node rpc in
+    ?(log_response_body = true) endpoint rpc =
+  let uri = make_uri endpoint rpc in
   if log_request then
     Log.debug
       ~color:Log.Color.bold
@@ -119,10 +119,15 @@ let call_raw ?(log_request = true) ?(log_response_status = true)
   if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
   return {body; code = Cohttp.Code.code_of_status response.status}
 
-let call_json ?log_request ?log_response_status ?(log_response_body = true) node
-    rpc =
+let call_json ?log_request ?log_response_status ?(log_response_body = true)
+    endpoint rpc =
   let* response =
-    call_raw node ?log_request ?log_response_status ~log_response_body:false rpc
+    call_raw
+      endpoint
+      ?log_request
+      ?log_response_status
+      ~log_response_body:false
+      rpc
   in
   match JSON.parse ~origin:"RPC response" response.body with
   | exception (JSON.Error _ as exn) ->
