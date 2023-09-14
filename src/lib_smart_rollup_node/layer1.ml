@@ -212,14 +212,35 @@ let fetch_tezos_block (fetch_rpc : fetch_block_rpc) extract_header
     cache_shell_header l1_ctxt hash (extract_header block) ;
     return block
   in
-  let* block = Blocks_cache.bind_or_put blocks_cache hash fetch Lwt.return in
+  let*! block = Blocks_cache.bind_or_put blocks_cache hash fetch Lwt.return in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6292
+     Consider cleaner ways to "prefetch" tezos blocks:
+     - know before where are protocol boundaries
+     - prefetch blocks in binary form *)
   let is_of_expected_protocol =
-    try
-      let (_ : Block_header.shell_header) = extract_header block in
-      true
-    with _ -> false
+    match block with
+    | Error
+        (Tezos_rpc_http.RPC_client_errors.(
+           Request_failed {error = Unexpected_content _; _})
+        :: _) ->
+        (* The promise cached failed to parse the block because it was for the
+           wrong protocol. *)
+        false
+    | Error _ ->
+        (* The promise cached failed for another reason. *)
+        true
+    | Ok block -> (
+        (* We check if we are able to extract the header, which inherently
+           ensures that we are in the correct case of type {!type:block}. *)
+        try
+          let (_ : Block_header.shell_header) = extract_header block in
+          true
+        with _ ->
+          (* This can happen if the blocks for two protocols have the same
+             binary representation. *)
+          false)
   in
-  if is_of_expected_protocol then return block
+  if is_of_expected_protocol then Lwt.return block
   else
     (* It is possible for a value stored in the cache to have been parsed
        with the wrong protocol code because:
