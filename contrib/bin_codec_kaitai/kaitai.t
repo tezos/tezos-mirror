@@ -3,6 +3,7 @@ ground.uint8 test
   meta:
     id: ground__uint8
     endian: be
+  doc: Unsigned 8 bit integers
   seq:
   - id: uint8
     type: u1
@@ -11,6 +12,7 @@ ground.bool test
   meta:
     id: ground__bool
     endian: be
+  doc: Boolean values
   enums:
     bool:
       0: false
@@ -24,6 +26,7 @@ ground.int8 test
   meta:
     id: ground__int8
     endian: be
+  doc: Signed 8 bit integers
   seq:
   - id: int8
     type: s1
@@ -32,6 +35,7 @@ ground.uint16 test
   meta:
     id: ground__uint16
     endian: be
+  doc: Unsigned 16 bit integers
   seq:
   - id: uint16
     type: u2
@@ -40,6 +44,7 @@ ground.int16 test
   meta:
     id: ground__int16
     endian: be
+  doc: Signed 16 bit integers
   seq:
   - id: int16
     type: s2
@@ -48,6 +53,7 @@ ground.int32 test
   meta:
     id: ground__int32
     endian: be
+  doc: Signed 32 bit integers
   seq:
   - id: int32
     type: s4
@@ -56,6 +62,7 @@ ground.int64 test
   meta:
     id: ground__int64
     endian: be
+  doc: Signed 64 bit integers
   seq:
   - id: int64
     type: s8
@@ -64,6 +71,7 @@ ground.int31 test
   meta:
     id: ground__int31
     endian: be
+  doc: Signed 31 bit integers
   seq:
   - id: int31
     type: s4
@@ -72,6 +80,7 @@ ground.float test
   meta:
     id: ground__float
     endian: be
+  doc: Floating point numbers
   seq:
   - id: float
     type: f8
@@ -110,6 +119,7 @@ ground.N test
   meta:
     id: ground__N
     endian: be
+  doc: Arbitrary precision natural numbers
   types:
     group:
       instances:
@@ -130,6 +140,7 @@ ground.Z test
   meta:
     id: ground__Z
     endian: be
+  doc: Arbitrary precision integers
   types:
     group:
       instances:
