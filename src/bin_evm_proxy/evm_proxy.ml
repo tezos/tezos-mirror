@@ -37,6 +37,7 @@ type config = {
   mode : mode;
   cors_origins : string list;
   cors_headers : string list;
+  verbose : bool;
 }
 
 let default_config =
@@ -48,10 +49,11 @@ let default_config =
     mode = Prod;
     cors_origins = [];
     cors_headers = [];
+    verbose = false;
   }
 
 let make_config ?mode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
-    ~rollup_node_endpoint () =
+    ~rollup_node_endpoint ~verbose () =
   {
     rpc_addr = Option.value ~default:default_config.rpc_addr rpc_addr;
     rpc_port = Option.value ~default:default_config.rpc_port rpc_port;
@@ -62,6 +64,7 @@ let make_config ?mode ?rpc_addr ?rpc_port ?debug ?cors_origins ?cors_headers
       Option.value ~default:default_config.cors_origins cors_origins;
     cors_headers =
       Option.value ~default:default_config.cors_headers cors_headers;
+    verbose;
   }
 
 let install_finalizer server =
@@ -121,7 +124,7 @@ let prod_directory ~rollup_node_endpoint =
   in
   return @@ Services.directory rollup_node_config
 
-let dev_directory ~rollup_node_endpoint =
+let dev_directory ~verbose ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let open Evm_proxy_lib_dev in
   let* rollup_node_config =
@@ -136,7 +139,7 @@ let dev_directory ~rollup_node_endpoint =
         let* smart_rollup_address = Mockup.smart_rollup_address in
         return ((module Mockup : Rollup_node.S), smart_rollup_address)
   in
-  return @@ Services.directory rollup_node_config
+  return @@ Services.directory ~verbose rollup_node_config
 
 let start {rpc_addr; rpc_port; debug; cors_origins; cors_headers; _} ~directory
     =
@@ -239,6 +242,13 @@ let mode_arg =
     ~doc:"The EVM proxy server mode, it's either prod or dev."
     Params.mode
 
+let verbose_arg =
+  Tezos_clic.switch
+    ~short:'v'
+    ~long:"verbose"
+    ~doc:"If verbose is set, the proxy will display the responses to RPCs."
+    ()
+
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
@@ -280,14 +290,15 @@ let main_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the RPC server"
-    (args5
+    (args6
        mode_arg
        rpc_addr_arg
        rpc_port_arg
        cors_allowed_origins_arg
-       cors_allowed_headers_arg)
+       cors_allowed_headers_arg
+       verbose_arg)
     (prefixes ["run"; "with"; "endpoint"] @@ rollup_node_endpoint_param @@ stop)
-    (fun (mode, rpc_addr, rpc_port, cors_origins, cors_headers)
+    (fun (mode, rpc_addr, rpc_port, cors_origins, cors_headers, verbose)
          rollup_node_endpoint
          () ->
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -300,12 +311,13 @@ let main_command =
           ?cors_origins
           ?cors_headers
           ~rollup_node_endpoint
+          ~verbose
           ()
       in
       let* directory =
         match config.mode with
         | Prod -> prod_directory ~rollup_node_endpoint
-        | Dev -> dev_directory ~rollup_node_endpoint
+        | Dev -> dev_directory ~verbose:config.verbose ~rollup_node_endpoint
       in
       let* server = start config ~directory in
       let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer server in
