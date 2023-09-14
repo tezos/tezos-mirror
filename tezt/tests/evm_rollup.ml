@@ -1232,6 +1232,29 @@ let test_rpc_web3_clientVersion =
     ~error_msg:"Expected version %%R, got %%L." ;
   unit
 
+let test_rpc_web3_sha3 =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sha3"]
+    ~title:"Check RPC web3_sha3"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  (* From the example provided in
+     https://ethereum.org/en/developers/docs/apis/json-rpc/#web3_sha3 *)
+  let input_data = "0x68656c6c6f20776f726c64" in
+  let expected_reply =
+    "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad"
+  in
+  let* web3_sha3 =
+    Evm_proxy_server.(
+      call_evm_rpc
+        evm_proxy_server
+        {method_ = "web3_sha3"; parameters = `A [`String input_data]})
+  in
+  Check.((JSON.(web3_sha3 |-> "result" |> as_string) = expected_reply) string)
+    ~error_msg:"Expected hash %%R, got %%L." ;
+  unit
+
 let test_simulate =
   Protocol.register_test
     ~__FILE__
@@ -2767,6 +2790,7 @@ let register_evm_proxy_server ~protocols =
   test_chunked_transaction protocols ;
   test_rpc_txpool_content protocols ;
   test_rpc_web3_clientVersion protocols ;
+  test_rpc_web3_sha3 protocols ;
   test_simulate protocols ;
   test_full_blocks protocols ;
   test_latest_block protocols ;
