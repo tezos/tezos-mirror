@@ -186,6 +186,7 @@ module State = struct
     baker : string;
     last_level_rewards : Protocol.Alpha_context.Raw_level.t;
     snapshot_balances : (string * balance) list String.Map.t;
+    saved_rate : Q.t option;
     pending_operations : Protocol.Alpha_context.packed_operation list;
   }
 
@@ -477,6 +478,15 @@ let exec_state f =
       let* state = f input in
       return (block, state))
 
+(** Execute a function that does not modify neither the block nor the state.
+    Usually used for checks/asserts *)
+let exec_unit f =
+  let open Lwt_result_syntax in
+  Action
+    (fun input ->
+      let* () = f input in
+      return input)
+
 (* ======== Baking ======== *)
 
 (** After baking and applying rewards in state *)
@@ -635,7 +645,7 @@ let snapshot_balances snap_name names_list : (t, t) scenarios =
 (** Check balances against a previously defined snapshot *)
 let check_snapshot_balances snap_name : (t, t) scenarios =
   let open Lwt_result_syntax in
-  exec_state (fun (_block, state) ->
+  exec_unit (fun (_block, state) ->
       Log.debug
         ~color:low_debug_color
         "Checking equality of balances between \"%s\" and now"
@@ -649,7 +659,7 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
             ~color:warning_color
             "\"%s\" snapshot not found..."
             snap_name ;
-          return state
+          return_unit
       | Some snapshot_balances ->
           let* () =
             List.iter_es
@@ -660,7 +670,26 @@ let check_snapshot_balances snap_name : (t, t) scenarios =
                 assert_balance_equal ~loc:__LOC__ old_balance new_balance)
               snapshot_balances
           in
-          return state)
+          return_unit)
+
+(** Save the current issuance rate for future use *)
+let save_current_rate : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (block, state) ->
+      let* rate = Context.get_ai_current_yearly_rate_exact (B block) in
+      return {state with State.saved_rate = Some rate})
+
+(** Check that [f saved_rate current_rate] is true. [f] is typically a comparison function *)
+let check_rate_evolution (f : Q.t -> Q.t -> bool) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_unit (fun (block, state) ->
+      let* new_rate = Context.get_ai_current_yearly_rate_exact (B block) in
+      let previous_rate = state.State.saved_rate in
+      match previous_rate with
+      | None -> failwith "check_rate_evolution: no rate previously saved"
+      | Some previous_rate ->
+          if f previous_rate new_rate then return_unit
+          else failwith "check_rate_evolution: assertion failed")
 
 (* ======== Operations ======== *)
 
@@ -774,6 +803,7 @@ let begin_test ~activate_ai
             baker;
             last_level_rewards = init_level;
             snapshot_balances = String.Map.empty;
+            saved_rate = None;
             pending_operations = [];
           }
       in
