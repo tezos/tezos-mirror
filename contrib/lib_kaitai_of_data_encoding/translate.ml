@@ -42,7 +42,7 @@ let rec seq_field_of_data_encoding :
   | Empty -> (enums, [])
   | Ignore -> (enums, [])
   | Constant _ -> (enums, [])
-  | Bool -> (Ground.Enum.add enums Ground.Enum.bool, [Ground.Attr.bool])
+  | Bool -> (Helpers.add_uniq_assoc enums Ground.Enum.bool, [Ground.Attr.bool])
   | Uint8 -> (enums, [Ground.Attr.u1])
   | Conv {encoding; _} -> seq_field_of_data_encoding enums encoding
   | Tup e ->

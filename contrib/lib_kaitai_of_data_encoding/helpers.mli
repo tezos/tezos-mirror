@@ -51,6 +51,15 @@ val default_meta_spec : encoding_name:string -> MetaSpec.t
     @param ~encoding_name is added to meta section as [id]. *)
 val default_class_spec : encoding_name:string -> ClassSpec.t
 
+(** [add_uniq_assoc kvs kv] returns an association list with associations from
+    [kvs] as well as [kv].
+
+    If [kvs] already contains [kv], then [kvs] is returned.
+
+    @raises Invalid_argument if [kvs] includes an association with the same key
+    as but a different value than [kv]. *)
+val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
+
 (** [class_spec_of_attr ~encoding_name ?enums attr] returns a [ClassSpet.t]
     for [attr].
 

@@ -56,5 +56,12 @@ let default_class_spec ~encoding_name =
       enums = [];
     }
 
+let add_uniq_assoc mappings ((k, v) as mapping) =
+  match List.assoc_opt k mappings with
+  | None -> mapping :: mappings
+  | Some vv ->
+      if v = vv then mappings
+      else raise (Invalid_argument "Mappings.add: duplicate keys")
+
 let class_spec_of_attr ~encoding_name ?(enums = []) attr =
   {(default_class_spec ~encoding_name) with seq = [attr]; enums}

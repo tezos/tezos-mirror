@@ -35,11 +35,6 @@ module Enum : sig
 
   (** [bool] is a mapping for boolean type. *)
   val bool : string * EnumSpec.t
-
-  (** [add enums enum] returns a list of enum mappings. If [enums] don't contain
-      [enum], then new list with it is returned, otherwise existing [enums] list
-      is returned. *)
-  val add : map -> string * EnumSpec.t -> map
 end
 
 (** [Attr] is module for getting [AttrSpec.t] of ground types. *)

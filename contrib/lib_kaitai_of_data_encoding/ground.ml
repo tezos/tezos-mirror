@@ -47,20 +47,6 @@ let default_attr_spec =
 module Enum = struct
   type map = (string * Kaitai.Types.EnumSpec.t) list
 
-  let add enums ((k, e) as enum) =
-    let rec add = function
-      | [] -> enum :: enums
-      | ee :: _ when enum = ee ->
-          (* [enum] is already present in [enums] *)
-          enums
-      | (kk, ee) :: _ when String.equal kk k && not (ee = e) ->
-          (* [enum] key is already present in [enums], but for a different
-             [enum]. *)
-          raise (Invalid_argument "Enum.add: duplicate keys")
-      | _ :: enums -> add enums
-    in
-    add enums
-
   let bool =
     ( "bool",
       EnumSpec.
