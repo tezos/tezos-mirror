@@ -495,9 +495,14 @@ let run ~data_dir configuration_override =
       | Services.Types.Bootstrap ->
           (* Bootstrap nodes should always have a mesh size of zero.
              so all grafts are responded with prunes with PX. See:
-             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators *)
+             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
+
+             Additionally, we set [max_sent_iwant_per_heartbeat = 0]
+             so bootstrap nodes do not download any shards via IHave/IWant
+             transfers. *)
           {
             limits with
+            max_sent_iwant_per_heartbeat = 0;
             degree_low = 0;
             degree_high = 0;
             degree_out = 0;
