@@ -144,7 +144,10 @@ module Attr = struct
 
   let fixed_size_header_class_spec =
     {
-      (default_class_spec ~encoding_name:"fixed_bytes") with
+      (* TODO / nice to have: Add a docstring, i.e. [?description]
+                              to custom defined class spec. *)
+      (default_class_spec ~encoding_name:"fixed_bytes" ())
+      with
       seq = u4 ~id:"size" () :: [bytes_limit_type_attr_spec ~id:"value"];
       isTopLevel = false;
     }
@@ -165,32 +168,45 @@ module Attr = struct
 end
 
 module Class = struct
-  let bool ~encoding_name =
-    class_spec_of_attr ~encoding_name ~enums:[Enum.bool] Attr.bool
+  let bool ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description ~enums:[Enum.bool] Attr.bool
 
-  let uint8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u1
+  let uint8 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.u1
 
-  let int8 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s1
+  let int8 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.s1
 
-  let uint16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.u2
+  let uint16 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.u2
 
-  let int16 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s2
+  let int16 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.s2
 
-  let int32 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s4
+  let int32 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.s4
 
-  let int64 ~encoding_name = class_spec_of_attr ~encoding_name Attr.s8
+  let int64 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.s8
 
-  let int31 ~encoding_name = class_spec_of_attr ~encoding_name Attr.int31
+  let int31 ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.int31
 
-  let float ~encoding_name = class_spec_of_attr ~encoding_name Attr.f8
+  let float ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.f8
 
-  let bytes ~encoding_name = class_spec_of_attr ~encoding_name Attr.bytes
+  let bytes ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.bytes
 
-  let string ~encoding_name = class_spec_of_attr ~encoding_name Attr.string
+  let string ~encoding_name ?description () =
+    class_spec_of_attr ~encoding_name ?description Attr.string
 
   let byte_group =
     {
-      (default_class_spec ~encoding_name:"group") with
+      (* TODO/nice to have: Add a docstring, i.e. [?description]
+                            to custom defined class spec. *)
+      (default_class_spec ~encoding_name:"group" ())
+      with
       seq = [{Attr.u1 with id = "b"}];
       instances =
         [
@@ -233,10 +249,13 @@ module Class = struct
           };
     }
 
-  let n ~encoding_name =
-    class_spec_of_attr ~encoding_name repeat_until_end_bytes_group_attr
+  let n ~encoding_name ?description () =
+    class_spec_of_attr
+      ~encoding_name
+      ?description
+      repeat_until_end_bytes_group_attr
 
-  let z ~encoding_name =
+  let z ~encoding_name ?description () =
     let instances =
       [
         ( "is_negative",
@@ -266,6 +285,7 @@ module Class = struct
     in
     class_spec_of_attr
       ~encoding_name
+      ?description
       repeat_until_end_bytes_group_attr
       ~instances
 end

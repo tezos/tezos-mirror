@@ -24,9 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [from_data_encoding ~encoding_name encoding] generates a formal description
-    of [encoding] as a kaitai [ClassSpec].
+(** [from_data_encoding ~encoding_name ?description encoding] generates a
+    formal description of [encoding] as a kaitai [ClassSpec].
 
-    @param [encoding_name] is added to the "meta" section of the class-spec. *)
+    @param [encoding_name] is added to the "meta" section of the class-spec.
+    @param [?description] is added to the "doc" section of the class-spec.  *)
 val from_data_encoding :
-  encoding_name:string -> 'a Data_encoding.t -> Kaitai.Types.ClassSpec.t
+  encoding_name:string ->
+  ?description:string ->
+  'a Data_encoding.t ->
+  Kaitai.Types.ClassSpec.t

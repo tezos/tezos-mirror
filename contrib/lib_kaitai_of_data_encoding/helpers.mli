@@ -48,8 +48,10 @@ val default_meta_spec : encoding_name:string -> MetaSpec.t
 
 (** [default_class_spec ~encoding_name] builds an default (empty) [ClassSpec.t].
 
-    @param ~encoding_name is added to meta section as [id]. *)
-val default_class_spec : encoding_name:string -> ClassSpec.t
+    @param ~encoding_name is added to meta section as [id].
+    @param [?description] is added into [doc] section as [summary]. *)
+val default_class_spec :
+  encoding_name:string -> ?description:string -> unit -> ClassSpec.t
 
 (** [add_uniq_assoc kvs kv] returns an association list with associations from
     [kvs] as well as [kv].
@@ -60,18 +62,20 @@ val default_class_spec : encoding_name:string -> ClassSpec.t
     as but a different value than [kv]. *)
 val add_uniq_assoc : (string * 'a) list -> string * 'a -> (string * 'a) list
 
-(** [class_spec_of_attr ~encoding_name ?enums ?instances attr] returns a
-    [ClassSpec.t] for [attr].
+(** [class_spec_of_attr ~encoding_name ?description ?enums ?instances attr]
+    returns a [ClassSpec.t] for [attr].
 
     In case of [attr] being of [ComplexDataType UserType _] type, then [types]
     section of returned [ClassSpec.t] is automatically populated with
     an appropriate type.
 
     @param ~encoding_name is added to meta section as [id].
+    @param [?description] is used as [doc] section [summary].
     @param ?enums is added to class specification if present.
     @param ?instances is added to class specification if present. *)
 val class_spec_of_attr :
   encoding_name:string ->
+  ?description:string ->
   ?enums:(string * EnumSpec.t) list ->
   ?instances:(string * InstanceSpec.t) list ->
   AttrSpec.t ->

@@ -63,22 +63,27 @@ let rec seq_field_of_data_encoding :
   | _ -> failwith "Not implemented"
 
 let rec from_data_encoding :
-    type a. encoding_name:string -> a Data_encoding.t -> ClassSpec.t =
- fun ~encoding_name {encoding; json_encoding = _} ->
+    type a.
+    encoding_name:string ->
+    ?description:string ->
+    a Data_encoding.t ->
+    ClassSpec.t =
+ fun ~encoding_name ?description {encoding; json_encoding = _} ->
   match encoding with
-  | Bool -> Ground.Class.bool ~encoding_name
-  | Uint8 -> Ground.Class.uint8 ~encoding_name
-  | Int8 -> Ground.Class.int8 ~encoding_name
-  | Uint16 -> Ground.Class.uint16 ~encoding_name
-  | Int16 -> Ground.Class.int16 ~encoding_name
-  | Int32 -> Ground.Class.int32 ~encoding_name
-  | Int64 -> Ground.Class.int64 ~encoding_name
-  | Int31 -> Ground.Class.int31 ~encoding_name
-  | Float -> Ground.Class.float ~encoding_name
-  | Bytes (_kind_length, _) -> Ground.Class.bytes ~encoding_name
-  | String (_kind_length, _) -> Ground.Class.string ~encoding_name
-  | N -> Ground.Class.n ~encoding_name
-  | Z -> Ground.Class.z ~encoding_name
+  | Bool -> Ground.Class.bool ~encoding_name ?description ()
+  | Uint8 -> Ground.Class.uint8 ~encoding_name ?description ()
+  | Int8 -> Ground.Class.int8 ~encoding_name ?description ()
+  | Uint16 -> Ground.Class.uint16 ~encoding_name ?description ()
+  | Int16 -> Ground.Class.int16 ~encoding_name ?description ()
+  | Int32 -> Ground.Class.int32 ~encoding_name ?description ()
+  | Int64 -> Ground.Class.int64 ~encoding_name ?description ()
+  | Int31 -> Ground.Class.int31 ~encoding_name ?description ()
+  | Float -> Ground.Class.float ~encoding_name ?description ()
+  | Bytes (_kind_length, _) -> Ground.Class.bytes ~encoding_name ?description ()
+  | String (_kind_length, _) ->
+      Ground.Class.string ~encoding_name ?description ()
+  | N -> Ground.Class.n ~encoding_name ?description ()
+  | Z -> Ground.Class.z ~encoding_name ?description ()
   | Tup e ->
       (* Naked Tup likely due to [tup1]. We simply ignore this constructor. *)
       from_data_encoding ~encoding_name e
@@ -91,7 +96,7 @@ let rec from_data_encoding :
           (fun i attr -> AttrSpec.{attr with id = Printf.sprintf "field_%d" i})
           seq
       in
-      {(Helpers.default_class_spec ~encoding_name) with seq; enums}
+      {(Helpers.default_class_spec ~encoding_name ()) with seq; enums}
   | Conv {encoding; _} -> from_data_encoding ~encoding_name encoding
   | Describe {encoding; _} ->
       (* TODO: patch the documentation to include available information *)

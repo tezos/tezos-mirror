@@ -40,14 +40,14 @@ let default_meta_spec ~encoding_name =
       imports = [];
     }
 
-let default_class_spec ~encoding_name =
+let default_class_spec ~encoding_name ?description () =
   ClassSpec.
     {
       fileName = None;
       path = [];
       meta = default_meta_spec ~encoding_name;
       isTopLevel = true;
-      doc = default_doc_spec;
+      doc = {default_doc_spec with summary = description};
       toStringExpr = None;
       params = [];
       seq = [];
@@ -77,10 +77,11 @@ let types_field_from_attr_seq attributes =
   in
   List.fold_left add_uniq_assoc [] types
 
-let class_spec_of_attr ~encoding_name ?(enums = []) ?(instances = []) attr =
+let class_spec_of_attr ~encoding_name ?description ?(enums = [])
+    ?(instances = []) attr =
   let types = types_field_from_attr_seq [attr] in
   {
-    (default_class_spec ~encoding_name) with
+    (default_class_spec ~encoding_name ?description ()) with
     seq = [attr];
     enums;
     types;
