@@ -702,29 +702,8 @@ let next_block =
 (** Bake until the end of a cycle *)
 let next_cycle =
   exec (fun input ->
-      let open Lwt_result_syntax in
       Log.info ~color:action_color "[Next cycle]" ;
-      let block, (State.{constants; activate_ai; _} as state) = input in
-      if
-        Tez.(constants.issuance_weights.base_total_issued_per_minute = zero)
-        || not activate_ai
-      then
-        (* Apply rewards in state only after the while cycle ends *)
-        let new_cycle = Cycle.succ (Block.current_cycle block) in
-        let baker = State.find_account state.baker state in
-        let policy = Block.By_account baker.pkh in
-        let* block, state =
-          if state.pending_operations = [] then return (block, state)
-          else bake input
-        in
-        let* block = Block.bake_until_cycle new_cycle ~policy block in
-        (* TODO: other way around ?? *)
-        let state = State.apply_end_cycle new_cycle state in
-        let* state = apply_rewards block state in
-        return (block, state)
-      else
-        (* Apply rewards in state every block *)
-        bake_until_cycle_end_slow input)
+      bake_until_cycle_end_slow input)
 
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
@@ -1080,16 +1059,21 @@ let wait_ai_activation =
   exec (fun (block, state) ->
       let open Lwt_result_syntax in
       Log.info ~color:time_color "Fast forward to AI activation" ;
-      let* block =
+      let* output =
         if state.State.activate_ai then
           let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
-          (* Bake until the activation. *)
-          Block.bake_until_cycle launch_cycle block
+          let rec bake_while (block, state) =
+            let current_cycle = Block.current_cycle block in
+            if Cycle.(current_cycle >= launch_cycle) then return (block, state)
+            else
+              let* input = bake_until_cycle_end_slow (block, state) in
+              bake_while input
+          in
+          bake_while (block, state)
         else assert false
       in
-      let* state = apply_rewards block state in
       Log.info ~color:event_color "AI activated" ;
-      return (block, state))
+      return output)
 
 (** Create an account and give an initial balance funded by [source] *)
 let add_account_with_funds name source amount =
