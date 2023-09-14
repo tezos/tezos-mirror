@@ -397,7 +397,10 @@ let () =
     ~title:"The operator is not in the whitelist"
     ~description:"The operator is not in the whitelist."
     ~pp:(fun ppf () ->
-      Format.pp_print_string ppf "The operator is not in the whitelist")
+      Format.pp_print_string
+        ppf
+        "The operator is not in the whitelist. Please restart the rollup node \
+         in bailout mode if you still have stakes.")
     `Permanent
     Data_encoding.unit
     (function Operator_not_in_whitelist -> Some () | _ -> None)
