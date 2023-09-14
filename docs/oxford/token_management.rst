@@ -82,15 +82,22 @@ The field ``kind`` allows to identify the type of container account, it can have
 * ``"contract"`` represents implicit or originated accounts, and comes with the additional field (also called) ``contract`` whose value is the public key hash of the implicit or originated account.
 * ``"freezer"`` represents frozen accounts, and comes with the additional field ``category`` that can have one of the following values:
 
-  - ``"legacy_deposits"``, ``"legacy_fees"``, or ``"legacy_rewards"`` represent the accounts of frozen deposits, frozen fees or frozen rewards up to protocol HANGZHOU.
+  - ``"deposits"`` represents the accounts of frozen deposits.
+    Accounts in this category are further identified by the additional field
+    ``"staker"`` whose value is either
+    - a ``"contract"`` field, that contains the public key hash of the staker
+    owning the funds and a ``"delegate"`` (public key hash) which gets staking power
+    from the deposit,
+    - or just a ``"delegate"`` to designate collectively the deposits of all
+    stakers delegating to the provided implicit account.
+  - ``"unstaked_deposits"`` represents the accounts of unstaked frozen tokens.
     Accounts in this category are further identified by the following additional fields:
 
-    - the field ``delegate`` contains the public key hash of the delegate who owns the frozen funds
-    - the field ``cycle`` contains the cycle at which the funds have been deposited or granted.
-
-  - ``"deposits"`` represents the accounts of frozen deposits in subsequent protocols (replacing the legacy container account ``"legacy_deposits"`` above).
-    Accounts in this category are further identified by the additional field ``delegate`` whose value is the public key hash of the delegate who owns the frozen funds.
-
+    - the field ``"staker"`` contains the public key hash of the staker who owns the frozen funds
+    - the field ``"cycle"`` contains either the cycle at which the funds have been
+      unstaked or the last unslashable cycle (``MAX_SLASHING_PERIOD +
+      PRESERVED_CYCLES`` before current cycle) if it is greater than the unstaking
+      cycle.
   - ``"bonds"`` represents the accounts of frozen bonds.
     Bonds are like deposits.
     However, they can be associated to implicit or originated accounts, unlike deposits that only apply to implicit accounts that are also delegates.
@@ -141,7 +148,7 @@ For example, a transaction of ``100`` mutez from address ``tz1a...`` to address 
 
 ::
 
-  [ {"kind": "contract", "contract": "tz1a...", "change": "-100", "origin": "block"},
+   [ {"kind": "contract", "contract": "tz1a...", "change": "-100", "origin": "block"},
     {"kind": "contract", "contract": "KT1b...", "change": "100", "origin": "block"}
     {"kind": "contract", "contract": "tz1a...", "change": "-10", "origin": "block"}
     {"kind": "burned", "category": "storage fees", "change": "10", "origin": "block"} ]
@@ -159,17 +166,25 @@ For example, when a manager operation is applied, the account of the payer contr
 
 When all operations of a block have been applied baking fees rewards and bonuses are distributed.
 The total amount of fees collected and the baking rewards are transferred from the container account ``"block fees"`` and the source account ``"baking rewards"``, respectively, to the contract of the payload producer that selected the transactions to be included in the block.
-So, for a total amount of ``1000`` mutez in fees collected and an amount of ``500`` mutez in baking rewards, the following balance updates are generated:
+So, for a total amount of ``1000`` mutez in fees collected and an amount of
+``500`` mutez in baking rewards, assuming that the staking parameter of the
+delegate are such that 50 mutez are frozen and 450 are spendable,
+the following balance updates are generated:
 
 ::
 
   [ {"kind": "accumulator", "category": "block fees", "change": "-1000", ...},
-    {"kind": "minted", "category": "baking rewards", "change": "-500", ...},
-    {"kind": "contract", "contract": "tz1a...", "change": "1500", ...} ]
+    {"kind": "contract", "contract": "tz1a...", "change": "1000", ...}
+    {"kind": "minted", "category": "baking rewards", "change": "-50", ...},
+    {"kind": "freezer", "category": "deposits", "staker": { "delegate": "tz1a..."}, "change": "50", ...},
+    {"kind": "minted", "category": "baking rewards", "change": "-450", ...},
+    {"kind": "contract", "contract": "tz1a...", "change": "450", ...} ]
 
 The baking bonus go to the block proposer that signed and injected the block.
-Hence the amount of the bonus is transferred from the source account ``"baking bonuses"`` to the contract of the block producer.
-For example, the balance updates generated for an amount of ``100`` mutez in baking bonus are:
+Hence the amount of the bonus is transferred from the source account ``"baking
+bonuses"`` to the contract of the block producer and/or to its frozen balance.
+For example, the balance updates generated for an amount of ``100`` mutez in
+baking bonus with 100% sent to spendable balance (``edge_of_baking_over_staking`` set to 1) are:
 
 ::
 
@@ -180,7 +195,7 @@ Attesting, double signing evidence, and nonce revelation rewards
 ----------------------------------------------------------------
 
 Attesting rewards are reflected in balance updates as a transfer of tokens from the ``"attesting rewards"`` source account to the account of the delegate that receives the reward.
-Hence, for a reward of ``100`` mutez, the following two balance updates are generated:
+Hence, for a reward of ``100`` mutez,  the following two balance updates are generated:
 
 ::
 
@@ -201,3 +216,5 @@ For example, for an amount of ``100`` mutez in rewards not distributed due to in
      "change": "100", ...} ]
 
 Double signing evidence rewards and nonce revelation rewards are analogous to attesting rewards, except that the source accounts used are ``"double signing evidence rewards"`` and ``"nonce revelation rewards"``.
+Depending on the staking parameters set by the delegate, some portion of the attesting rewards
+will go to the freezer container, as for baking rewards and bonuses.
