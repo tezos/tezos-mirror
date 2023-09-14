@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::cmp;
+
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
@@ -10,6 +12,20 @@ use crate::storage::{
     store_current_block, store_storage_version, STORAGE_VERSION,
 };
 use tezos_smart_rollup_host::runtime::Runtime;
+
+// The lowest(*) benchmarked number was 14453, but we let some margin in case
+// there is some unexpected overhead.
+// Other reason is that during the reboots, some block can be bigger than others
+// resulting in more ticks consumed.
+//
+// (*): lowest meaning "before reaching the maximum number of ticks"
+pub const MAX_MIGRATABLE_BLOCKS_PER_REBOOT: usize = 10000;
+
+pub enum MigrationStatus {
+    None,
+    InProgress,
+    Done,
+}
 
 mod old_storage {
     use crate::error::Error;
@@ -78,6 +94,68 @@ mod old_storage {
     }
 }
 
+mod migration_block_helpers {
+    use crate::{error::Error, storage::BLOCKS_TO_MIGRATE};
+    use primitive_types::U256;
+    use tezos_smart_rollup_host::{
+        path::RefPath,
+        runtime::{Runtime, RuntimeError},
+    };
+
+    const NEXT_BLOCK_NUMBER_TO_MIGRATE: RefPath =
+        RefPath::assert_from(b"/__migration/block_number");
+
+    pub fn store_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+        block_number: U256,
+    ) -> Result<(), Error> {
+        let mut le_block_number: [u8; 32] = [0; 32];
+        block_number.to_little_endian(&mut le_block_number);
+        host.store_write_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE, &le_block_number)
+            .map_err(Error::from)
+    }
+
+    pub fn read_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+    ) -> Result<U256, Error> {
+        match host.store_read_all(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+            Ok(next_block_number_to_migrate) => {
+                Ok(U256::from_little_endian(&next_block_number_to_migrate))
+            }
+            Err(RuntimeError::PathNotFound) => Ok(U256::zero()),
+            Err(e) => Err(Error::from(e)),
+        }
+    }
+
+    pub fn delete_next_block_number_to_migrate<Host: Runtime>(
+        host: &mut Host,
+    ) -> Result<(), Error> {
+        match host.store_delete(&NEXT_BLOCK_NUMBER_TO_MIGRATE) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+            Err(e) => Err(Error::from(e)),
+        }
+    }
+
+    const TMP_BLOCK_MIGRATION: RefPath = RefPath::assert_from(b"/__migration/blocks");
+
+    pub fn store_old_blocks<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+        host.store_copy(&BLOCKS_TO_MIGRATE, &TMP_BLOCK_MIGRATION)
+            .map_err(Error::from)
+    }
+
+    pub fn commit_block_migration_changes<Host: Runtime>(
+        host: &mut Host,
+        success: bool,
+    ) -> Result<(), Error> {
+        if success {
+            host.store_delete(&TMP_BLOCK_MIGRATION).map_err(Error::from)
+        } else {
+            host.store_move(&TMP_BLOCK_MIGRATION, &BLOCKS_TO_MIGRATE)
+                .map_err(Error::from)
+        }
+    }
+}
+
 // The workflow for migration is the following:
 //
 // - bump `storage::STORAGE_VERSION` by one
@@ -85,7 +163,7 @@ mod old_storage {
 //   needed migration functions
 // - compile the kernel and run all the E2E migration tests to make sure all the
 //   data is still available from the EVM proxy-node.
-fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn migration<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
@@ -96,7 +174,19 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
 
         // Migrate L2Block storage
         let head_number = read_current_block_number(host)?;
-        for number in 0..(head_number.as_usize() + 1) {
+        let next_block_number_to_migrate =
+            migration_block_helpers::read_next_block_number_to_migrate(host)?.as_usize();
+        if next_block_number_to_migrate == 0 {
+            migration_block_helpers::store_old_blocks(host)?
+        }
+
+        let max_migration_threshold =
+            next_block_number_to_migrate + MAX_MIGRATABLE_BLOCKS_PER_REBOOT - 1;
+        let last_block_to_migrate =
+            cmp::min(max_migration_threshold, head_number.as_usize());
+        let keep_migrating = max_migration_threshold < head_number.as_usize();
+
+        for number in next_block_number_to_migrate..(last_block_to_migrate + 1) {
             let block = old_storage::read_and_remove_l2_block(host, number.into())?;
 
             if number == head_number.as_usize() {
@@ -106,17 +196,39 @@ fn migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
                 store_block_by_hash(host, &block)?
             }
         }
-        // MIGRATION CODE - END
-        store_storage_version(host, STORAGE_VERSION)?
+
+        if keep_migrating {
+            migration_block_helpers::store_next_block_number_to_migrate(
+                host,
+                (last_block_to_migrate + 1).into(),
+            )?;
+            host.mark_for_reboot()?;
+            return Ok(MigrationStatus::InProgress);
+        } else {
+            migration_block_helpers::delete_next_block_number_to_migrate(host)?;
+
+            // MIGRATION CODE - END
+            store_storage_version(host, STORAGE_VERSION)?;
+            migration_block_helpers::commit_block_migration_changes(host, true)?;
+            return Ok(MigrationStatus::Done);
+        }
     }
-    Ok(())
+    Ok(MigrationStatus::None)
 }
 
-pub fn storage_migration<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    if migration(host).is_err() {
+pub fn storage_migration<Host: Runtime>(
+    host: &mut Host,
+) -> Result<MigrationStatus, Error> {
+    let migration_result = migration(host);
+    migration_result.map_err(|_| {
         // Something went wrong during the migration.
         // The fallback mechanism is triggered to retrograde to the previous kernel.
-        Err(Error::UpgradeError(Fallback))?
-    }
-    Ok(())
+
+        // We revert every changes made by the migration.
+        // The following **CAN NOT** fail. We can not recover from it if
+        // an error occurs.
+        let _ = migration_block_helpers::commit_block_migration_changes(host, false);
+
+        Error::UpgradeError(Fallback)
+    })
 }
