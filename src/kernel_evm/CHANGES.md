@@ -31,6 +31,7 @@
 - Add an optional `--verbose` argument. Displays the responses to requests before
   returning them. (!10116)
 - Add support for `eth_getBlockTransactionCountByHash` and `eth_getBlockTransactionCountByNumber`. (!10101)
+- Add support for `web3_sha3`. (!10112)
 
 
 ### Bug fixes
