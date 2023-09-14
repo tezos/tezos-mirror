@@ -82,7 +82,7 @@ let double_attestation_init
       unit Lwt.t) consensus_name protocol () =
   let* node, client = Client.init_with_protocol ~protocol `Client () in
   let* accuser = Accuser.init ~event_level:`Debug ~protocol node in
-  let* () = repeat 5 (fun () -> Client.bake_for client) in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Recover available slots for %s." Constant.bootstrap1.alias ;
   let* slots =
     RPC.Client.call client
@@ -318,7 +318,7 @@ let operation_too_old =
        accuser. *)
     Accuser.init ~preserved_levels:0 ~event_level:`Debug ~protocol node
   in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =
@@ -343,7 +343,7 @@ let operation_too_old =
     JSON.(content |-> "block_payload_hash" |> as_string)
   in
   Log.info "Bake 1 block." ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   Log.info
     "Craft and inject an attestation 1 level in the past and wait for \
      [consensus_operation_too_old.v0] event from the accuser." ;
@@ -382,7 +382,7 @@ let operation_too_far_in_future =
   let* accuser =
     Accuser.init ~preserved_levels:2 ~event_level:`Debug ~protocol node
   in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Inject valid attestation." ;
   let waiter = Node.wait_for_request ~request:`Inject node in
   let* () =

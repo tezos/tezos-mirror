@@ -250,6 +250,7 @@ let test_simple_baking_event =
   Log.info "Transferring %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   Client.bake_for ~keys:[giver] client
 
 let transfer_expected_to_fail ~giver ~receiver ~amount client =
@@ -337,6 +338,7 @@ let test_multiple_baking =
       let amount = Tez.of_int amount in
       let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
       let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
+      (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
       let* () = Client.bake_for ~keys:[baker] client in
       let* alice_balance = Client.get_balance_for ~account:alice client in
       let* bob_balance = Client.get_balance_for ~account:bob client in
@@ -598,6 +600,7 @@ let test_empty_block_baking =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
   Log.info "Baking pending operations..." ;
+  (* Note: [bake_for_and_wait] is unneeded (and unusable) in mockup mode. *)
   Client.bake_for ~keys:[giver] client
 
 let test_storage_from_file =

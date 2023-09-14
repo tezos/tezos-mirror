@@ -138,7 +138,7 @@ module MakeHelpers () = struct
         ()
     in
     Log.info "Activated protocol." ;
-    let* () = Client.bake_for client in
+    let* () = Client.bake_for_and_wait client in
     return (client, node)
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4290

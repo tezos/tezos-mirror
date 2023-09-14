@@ -55,14 +55,6 @@ module Helpers = struct
       ~error_msg:"expected current_period = %R, got %L" ;
     unit
 
-  let bake_and_wait_block node client =
-    let* level = Node.get_level node in
-    let* () =
-      Client.bake_for ~context_path:(Node.data_dir node // "context") client
-    in
-    let* _i = Node.wait_for_level node (level + 1) in
-    Lwt.return_unit
-
   let bake_n_cycles ?keys n client =
     let rec loop n =
       if n = 0 then unit
