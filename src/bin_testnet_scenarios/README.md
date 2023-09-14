@@ -40,3 +40,14 @@ data-dir you can provide the path:
 This also mean that you cannot run scenarios in parallel and need to stop
 your own node.
 
+You can also specify a client data dir, if you have one available. You
+can provide the path with:
+
+```
+{
+  "protocol": "alpha",
+  "network": "https://teztnets.xyz/mondaynet-2023-MM-DD",
+  "client-dir": /home/.tezos-client-testnet"
+}
+```
+Any keys and addresses known to the client will be accessible.

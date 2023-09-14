@@ -76,7 +76,9 @@ let setup_octez_node ~(testnet : Testnet.t) ?runner () =
   in
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
-  let client = Client.create ~endpoint:(Node node) () in
+  let client =
+    Client.create ?base_dir:testnet.client_dir ~endpoint:(Node node) ()
+  in
   Log.info "Wait for node to be bootstrapped" ;
   let* () = Client.bootstrapped client in
   Log.info "Node bootstrapped" ;
