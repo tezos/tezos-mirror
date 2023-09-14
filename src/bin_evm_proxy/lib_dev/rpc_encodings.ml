@@ -513,6 +513,20 @@ module Web3_clientVersion = MethodMaker (struct
   let method_ = "web3_clientVersion"
 end)
 
+module Web3_sha3 = MethodMaker (struct
+  open Ethereum_types
+
+  type input = hex
+
+  type output = hash
+
+  let input_encoding = Data_encoding.tup1 hex_encoding
+
+  let output_encoding = hash_encoding
+
+  let method_ = "web3_sha3"
+end)
+
 let methods : (module METHOD) list =
   [
     (module Kernel_version);
@@ -539,6 +553,7 @@ let methods : (module METHOD) list =
     (module Get_estimate_gas);
     (module Txpool_content);
     (module Web3_clientVersion);
+    (module Web3_sha3);
   ]
 
 module Input = struct
