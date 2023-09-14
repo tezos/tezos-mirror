@@ -75,7 +75,8 @@ let begin_validation_and_application ctxt chain_id mode ~predecessor =
   return (validation_state, application_state)
 
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
-    ?(policy = Block.By_round 0) (predecessor : Block.t) =
+    ?(policy = Block.By_round 0) ?liquidity_baking_toggle_vote
+    ?adaptive_issuance_vote (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
   >>=? fun (delegate, _consensus_key, round, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
@@ -103,6 +104,8 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
   in
   Block.Forge.contents
     ?seed_nonce_hash
+    ?adaptive_issuance_vote
+    ?liquidity_baking_toggle_vote
     ~payload_hash:Block_payload_hash.zero
     ~payload_round
     shell
