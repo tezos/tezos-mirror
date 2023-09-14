@@ -319,6 +319,16 @@ module Arg = struct
       ()
 end
 
+module Query = struct
+  type proto_query = {protocol : Protocol_hash.t option}
+
+  let proto_query : proto_query Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun protocol -> {protocol})
+    |+ opt_field "protocol" Protocol_hash.rpc_arg (fun p -> p.protocol)
+    |> seal
+end
+
 module type PREFIX = sig
   type prefix
 
@@ -458,4 +468,21 @@ module Local = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_hash)
+end
+
+module Root = struct
+  open Tezos_rpc.Path
+
+  include Make_services (struct
+    type prefix = unit
+
+    let prefix = root
+  end)
+
+  let openapi =
+    Tezos_rpc.Service.get_service
+      ~description:"OpenAPI specification of RPCs for rollup node"
+      ~query:Query.proto_query
+      ~output:Data_encoding.json
+      (path / "openapi")
 end
