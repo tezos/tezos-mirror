@@ -14,10 +14,10 @@
   qcheck-alcotest
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-micheline
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
+  octez-protocol-018-Proxford-libs.plugin
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-018-Proxford.parameters
-  octez-protocol-018-Proxford-libs.tezos-test-helpers)
+  octez-protocol-018-Proxford-libs.test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

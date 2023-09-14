@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.tezos-client)
+ (public_name octez-protocol-018-Proxford-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,10 +15,10 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.proxy
   octez-shell-libs.signer-backends
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin
+  octez-protocol-018-Proxford-libs.plugin
   tezos-protocol-018-Proxford.parameters
   octez-libs.tezos-rpc
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup
+  octez-protocol-018-Proxford-libs.smart-rollup
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

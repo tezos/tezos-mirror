@@ -9,9 +9,9 @@
   octez-libs.tezos-base
   tezos-protocol-017-PtNairob.protocol
   octez-injector
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-shell-libs.client-base
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin)
+  octez-protocol-017-PtNairob-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

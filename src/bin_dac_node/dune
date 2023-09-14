@@ -25,11 +25,11 @@
   irmin-pack
   irmin-pack.unix
   irmin
-  octez-protocol-017-PtNairob-libs.tezos-dac
-  octez-protocol-018-Proxford-libs.tezos-dac
-  (select void_for_linking-octez-protocol-alpha-libs-tezos-dac from
-   (octez-protocol-alpha-libs.tezos-dac -> void_for_linking-octez-protocol-alpha-libs-tezos-dac.empty)
-   (-> void_for_linking-octez-protocol-alpha-libs-tezos-dac.empty)))
+  octez-protocol-017-PtNairob-libs.dac
+  octez-protocol-018-Proxford-libs.dac
+  (select void_for_linking-octez-protocol-alpha-libs-dac from
+   (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-dac.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -49,5 +49,4 @@
 
 (rule
  (action
-  (progn
-   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-dac.empty ""))))
+  (progn (write-file void_for_linking-octez-protocol-alpha-libs-dac.empty ""))))

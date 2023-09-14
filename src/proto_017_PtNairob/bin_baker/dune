@@ -10,9 +10,9 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-017-PtNairob.protocol
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-017-PtNairob-libs.tezos-baking-commands
+  octez-protocol-017-PtNairob-libs.baking-commands
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.client-base-unix)
  (link_flags

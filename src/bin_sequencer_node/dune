@@ -13,7 +13,7 @@
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-commands
   octez-smart-rollup-node-lib
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   octez_smart_rollup_node_alpha
   octez_smart_rollup_sequencer)
  (link_flags

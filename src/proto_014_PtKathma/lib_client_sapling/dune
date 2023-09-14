@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_sapling_014_PtKathma)
- (public_name octez-protocol-014-PtKathma-libs.tezos-client.sapling)
+ (public_name octez-protocol-014-PtKathma-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -12,10 +12,10 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends
-  octez-protocol-014-PtKathma-libs.tezos-client
-  octez-protocol-014-PtKathma-libs.tezos-client.commands
+  octez-protocol-014-PtKathma-libs.client
+  octez-protocol-014-PtKathma-libs.client.commands
   tezos-protocol-014-PtKathma.protocol
-  octez-protocol-014-PtKathma-libs.tezos-protocol-plugin)
+  octez-protocol-014-PtKathma-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

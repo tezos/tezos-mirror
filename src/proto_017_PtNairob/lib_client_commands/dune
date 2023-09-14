@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_017_PtNairob_commands)
- (public_name octez-protocol-017-PtNairob-libs.tezos-client.commands)
+ (public_name octez-protocol-017-PtNairob-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -17,11 +17,11 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.mockup-commands
   octez-shell-libs.client-base
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-shell-libs.client-commands
   octez-libs.tezos-rpc
   octez-shell-libs.client-base-unix
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
+  octez-protocol-017-PtNairob-libs.plugin
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -40,8 +40,7 @@
 
 (library
  (name tezos_client_017_PtNairob_commands_registration)
- (public_name
-  octez-protocol-017-PtNairob-libs.tezos-client.commands-registration)
+ (public_name octez-protocol-017-PtNairob-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -51,12 +50,12 @@
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-017-PtNairob-libs.tezos-client.commands
-  octez-protocol-017-PtNairob-libs.tezos-client.sapling
+  octez-protocol-017-PtNairob-libs.client.commands
+  octez-protocol-017-PtNairob-libs.client.sapling
   octez-libs.tezos-rpc
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin)
+  octez-protocol-017-PtNairob-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

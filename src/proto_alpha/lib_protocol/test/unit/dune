@@ -9,14 +9,14 @@
   octez-libs.tezos-base
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   octez-shell-libs.client-base
   tezos-protocol-alpha.parameters
   octez-proto-libs.protocol-environment
   octez-libs.tezos-stdlib-unix
   tezos-protocol-alpha.protocol
   octez-libs.tezos-test-helpers
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers
   octez-libs.tezos-stdlib

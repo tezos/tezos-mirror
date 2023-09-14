@@ -3,17 +3,17 @@
 
 (library
  (name tezos_dal_alpha)
- (public_name octez-protocol-alpha-libs.tezos-dal)
+ (public_name octez-protocol-alpha-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-protocol-compiler.registerer
   octez-libs.tezos-stdlib-unix
   tezos-dal-node-lib
-  octez-protocol-alpha-libs.tezos-client
-  octez-protocol-alpha-libs.tezos-protocol-plugin
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.plugin
   tezos-protocol-alpha.embedded-protocol
-  octez-protocol-alpha-libs.tezos-layer2-utils
+  octez-protocol-alpha-libs.layer2-utils
   tezos-protocol-alpha.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

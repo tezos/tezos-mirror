@@ -7,10 +7,10 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-protocol-alpha-libs.tezos-dal
+  octez-protocol-alpha-libs.dal
   tezos-protocol-alpha.protocol
   octez-libs.tezos-base-test-helpers
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

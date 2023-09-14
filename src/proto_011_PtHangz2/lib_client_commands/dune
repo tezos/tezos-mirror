@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_011_PtHangz2_commands)
- (public_name octez-protocol-011-PtHangz2-libs.tezos-client.commands)
+ (public_name octez-protocol-011-PtHangz2-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -16,11 +16,11 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.mockup-commands
   octez-shell-libs.client-base
-  octez-protocol-011-PtHangz2-libs.tezos-client
+  octez-protocol-011-PtHangz2-libs.client
   octez-shell-libs.client-commands
   octez-libs.tezos-rpc
   octez-shell-libs.client-base-unix
-  octez-protocol-011-PtHangz2-libs.tezos-protocol-plugin
+  octez-protocol-011-PtHangz2-libs.plugin
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -39,8 +39,7 @@
 
 (library
  (name tezos_client_011_PtHangz2_commands_registration)
- (public_name
-  octez-protocol-011-PtHangz2-libs.tezos-client.commands-registration)
+ (public_name octez-protocol-011-PtHangz2-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -49,12 +48,12 @@
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-011-PtHangz2-libs.tezos-client
+  octez-protocol-011-PtHangz2-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-011-PtHangz2-libs.tezos-client.commands
-  octez-protocol-011-PtHangz2-libs.tezos-client.sapling
+  octez-protocol-011-PtHangz2-libs.client.commands
+  octez-protocol-011-PtHangz2-libs.client.sapling
   octez-libs.tezos-rpc
-  octez-protocol-011-PtHangz2-libs.tezos-protocol-plugin)
+  octez-protocol-011-PtHangz2-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

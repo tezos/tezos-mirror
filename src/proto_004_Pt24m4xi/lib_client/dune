@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_004_Pt24m4xi)
- (public_name octez-protocol-004-Pt24m4xi-libs.tezos-client)
+ (public_name octez-protocol-004-Pt24m4xi-libs.client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic

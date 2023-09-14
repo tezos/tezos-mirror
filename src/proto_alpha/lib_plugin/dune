@@ -3,12 +3,12 @@
 
 (library
  (name tezos_protocol_plugin_alpha)
- (public_name octez-protocol-alpha-libs.tezos-protocol-plugin)
+ (public_name octez-protocol-alpha-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-protocol-alpha.protocol
-  octez-protocol-alpha-libs.tezos-smart-rollup)
+  octez-protocol-alpha-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -21,12 +21,12 @@
 
 (library
  (name tezos_protocol_plugin_alpha_registerer)
- (public_name octez-protocol-alpha-libs.tezos-protocol-plugin-registerer)
+ (public_name octez-protocol-alpha-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-protocol-alpha.embedded-protocol
-  octez-protocol-alpha-libs.tezos-protocol-plugin
+  octez-protocol-alpha-libs.plugin
   octez-shell-libs.validation)
  (flags
   (:standard)

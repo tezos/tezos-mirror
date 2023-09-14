@@ -9,9 +9,9 @@
   octez-libs.tezos-base
   tezos-protocol-018-Proxford.protocol
   octez-injector
-  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-base
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin)
+  octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

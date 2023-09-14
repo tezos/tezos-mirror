@@ -68,76 +68,76 @@
   (select void_for_linking-tezos-protocol-007-PsDELPH1-embedded-protocol from
    (tezos-protocol-007-PsDELPH1.embedded-protocol -> void_for_linking-tezos-protocol-007-PsDELPH1-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-007-PsDELPH1-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin-registerer from
+   (octez-protocol-007-PsDELPH1-libs.plugin-registerer -> void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-008-PtEdoTez-embedded-protocol from
    (tezos-protocol-008-PtEdoTez.embedded-protocol -> void_for_linking-tezos-protocol-008-PtEdoTez-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-008-PtEdoTez-embedded-protocol.empty))
   (select void_for_linking-tezos-protocol-008-PtEdo2Zk-embedded-protocol from
    (tezos-protocol-008-PtEdo2Zk.embedded-protocol -> void_for_linking-tezos-protocol-008-PtEdo2Zk-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-008-PtEdo2Zk-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-008-PtEdo2Zk-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin-registerer from
+   (octez-protocol-008-PtEdo2Zk-libs.plugin-registerer -> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-009-PsFLoren-embedded-protocol from
    (tezos-protocol-009-PsFLoren.embedded-protocol -> void_for_linking-tezos-protocol-009-PsFLoren-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-009-PsFLoren-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-009-PsFLoren-libs-plugin-registerer from
+   (octez-protocol-009-PsFLoren-libs.plugin-registerer -> void_for_linking-octez-protocol-009-PsFLoren-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-009-PsFLoren-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-010-PtGRANAD-embedded-protocol from
    (tezos-protocol-010-PtGRANAD.embedded-protocol -> void_for_linking-tezos-protocol-010-PtGRANAD-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-010-PtGRANAD-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-010-PtGRANAD-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin-registerer from
+   (octez-protocol-010-PtGRANAD-libs.plugin-registerer -> void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-011-PtHangz2-embedded-protocol from
    (tezos-protocol-011-PtHangz2.embedded-protocol -> void_for_linking-tezos-protocol-011-PtHangz2-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-011-PtHangz2-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-011-PtHangz2-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-011-PtHangz2-libs-plugin-registerer from
+   (octez-protocol-011-PtHangz2-libs.plugin-registerer -> void_for_linking-octez-protocol-011-PtHangz2-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-011-PtHangz2-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-012-Psithaca-embedded-protocol from
    (tezos-protocol-012-Psithaca.embedded-protocol -> void_for_linking-tezos-protocol-012-Psithaca-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-012-Psithaca-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-012-Psithaca-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-012-Psithaca-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-012-Psithaca-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-012-Psithaca-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-012-Psithaca-libs-plugin-registerer from
+   (octez-protocol-012-Psithaca-libs.plugin-registerer -> void_for_linking-octez-protocol-012-Psithaca-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-012-Psithaca-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-013-PtJakart-embedded-protocol from
    (tezos-protocol-013-PtJakart.embedded-protocol -> void_for_linking-tezos-protocol-013-PtJakart-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-013-PtJakart-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-013-PtJakart-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-013-PtJakart-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-013-PtJakart-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-013-PtJakart-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-013-PtJakart-libs-plugin-registerer from
+   (octez-protocol-013-PtJakart-libs.plugin-registerer -> void_for_linking-octez-protocol-013-PtJakart-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-013-PtJakart-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-014-PtKathma-embedded-protocol from
    (tezos-protocol-014-PtKathma.embedded-protocol -> void_for_linking-tezos-protocol-014-PtKathma-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-014-PtKathma-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-014-PtKathma-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-014-PtKathma-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-014-PtKathma-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-014-PtKathma-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-014-PtKathma-libs-plugin-registerer from
+   (octez-protocol-014-PtKathma-libs.plugin-registerer -> void_for_linking-octez-protocol-014-PtKathma-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-014-PtKathma-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-015-PtLimaPt-embedded-protocol from
    (tezos-protocol-015-PtLimaPt.embedded-protocol -> void_for_linking-tezos-protocol-015-PtLimaPt-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-015-PtLimaPt-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-015-PtLimaPt-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin-registerer from
+   (octez-protocol-015-PtLimaPt-libs.plugin-registerer -> void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin-registerer.empty))
   (select void_for_linking-tezos-protocol-016-PtMumbai-embedded-protocol from
    (tezos-protocol-016-PtMumbai.embedded-protocol -> void_for_linking-tezos-protocol-016-PtMumbai-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-016-PtMumbai-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-016-PtMumbai-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-protocol-plugin-registerer.empty))
+  (select void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer from
+   (octez-protocol-016-PtMumbai-libs.plugin-registerer -> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty))
   tezos-protocol-017-PtNairob.embedded-protocol
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin-registerer
+  octez-protocol-017-PtNairob-libs.plugin-registerer
   tezos-protocol-018-Proxford.embedded-protocol
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin-registerer
+  octez-protocol-018-Proxford-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
-  (select void_for_linking-octez-protocol-alpha-libs-tezos-protocol-plugin-registerer from
-   (octez-protocol-alpha-libs.tezos-protocol-plugin-registerer -> void_for_linking-octez-protocol-alpha-libs-tezos-protocol-plugin-registerer.empty)
-   (-> void_for_linking-octez-protocol-alpha-libs-tezos-protocol-plugin-registerer.empty)))
+  (select void_for_linking-octez-protocol-alpha-libs-plugin-registerer from
+   (octez-protocol-alpha-libs.plugin-registerer -> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -177,28 +177,28 @@
    (write-file void_for_linking-tezos-protocol-005-PsBabyM1-embedded-protocol.empty "")
    (write-file void_for_linking-tezos-protocol-006-PsCARTHA-embedded-protocol.empty "")
    (write-file void_for_linking-tezos-protocol-007-PsDELPH1-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-007-PsDELPH1-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-007-PsDELPH1-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-008-PtEdoTez-embedded-protocol.empty "")
    (write-file void_for_linking-tezos-protocol-008-PtEdo2Zk-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-008-PtEdo2Zk-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-008-PtEdo2Zk-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-009-PsFLoren-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-009-PsFLoren-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-009-PsFLoren-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-010-PtGRANAD-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-010-PtGRANAD-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-010-PtGRANAD-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-011-PtHangz2-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-011-PtHangz2-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-011-PtHangz2-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-012-Psithaca-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-012-Psithaca-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-012-Psithaca-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-013-PtJakart-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-013-PtJakart-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-013-PtJakart-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-014-PtKathma-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-014-PtKathma-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-014-PtKathma-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-015-PtLimaPt-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-016-PtMumbai-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-tezos-protocol-plugin-registerer.empty "")
+   (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
-   (write-file void_for_linking-octez-protocol-alpha-libs-tezos-protocol-plugin-registerer.empty ""))))
+   (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 
 (install
  (package octez-node)

@@ -10,11 +10,11 @@
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-017-PtNairob.protocol
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
+  octez-protocol-017-PtNairob-libs.plugin
   tezos-protocol-017-PtNairob.parameters
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http
@@ -25,9 +25,9 @@
   tezos-dac-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
-  octez-protocol-017-PtNairob-libs.tezos-smart-rollup
-  octez-protocol-017-PtNairob-libs.tezos-smart-rollup-layer2
-  octez-protocol-017-PtNairob-libs.tezos-layer2-utils
+  octez-protocol-017-PtNairob-libs.smart-rollup
+  octez-protocol-017-PtNairob-libs.smart-rollup-layer2
+  octez-protocol-017-PtNairob-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tezos-tree-encoding

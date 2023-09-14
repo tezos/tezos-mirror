@@ -8,17 +8,17 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.tezos-test-helpers
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  octez-protocol-alpha-libs.tezos-smart-rollup
+  octez-protocol-alpha-libs.smart-rollup
   octez-libs.tezos-crypto-dal
   octez-libs.tezos-base-test-helpers
   tezos-protocol-alpha.parameters)

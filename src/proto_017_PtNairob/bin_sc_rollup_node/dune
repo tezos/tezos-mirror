@@ -14,7 +14,7 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-commands
-  octez-protocol-017-PtNairob-libs.tezos-client
+  octez-protocol-017-PtNairob-libs.client
   octez-smart-rollup-node-lib
   octez_smart_rollup_node_PtNairob)
  (link_flags

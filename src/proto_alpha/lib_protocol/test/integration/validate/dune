@@ -10,11 +10,11 @@
   octez-libs.tezos-base
   tezos-protocol-alpha.protocol
   qcheck-alcotest
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   octez-libs.tezos-test-helpers
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-libs.tezos-base-test-helpers
-  octez-protocol-alpha-libs.tezos-protocol-plugin)
+  octez-protocol-alpha-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

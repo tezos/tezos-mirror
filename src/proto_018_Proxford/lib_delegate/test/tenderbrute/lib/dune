@@ -3,14 +3,14 @@
 
 (library
  (name tenderbrute_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.tezos-baking.tenderbrute)
+ (public_name octez-protocol-018-Proxford-libs.baking.tenderbrute)
  (libraries
   data-encoding
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   tezos-protocol-018-Proxford.protocol
   octez-shell-libs.client-base
-  octez-protocol-018-Proxford-libs.tezos-client)
+  octez-protocol-018-Proxford-libs.client)
  (flags
   (:standard)
   -open Data_encoding

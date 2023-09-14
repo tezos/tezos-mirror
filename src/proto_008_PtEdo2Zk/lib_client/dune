@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_008_PtEdo2Zk)
- (public_name octez-protocol-008-PtEdo2Zk-libs.tezos-client)
+ (public_name octez-protocol-008-PtEdo2Zk-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -13,7 +13,7 @@
   tezos-protocol-008-PtEdo2Zk.protocol
   tezos-protocol-008-PtEdo2Zk.protocol.lifted
   octez-shell-libs.signer-backends
-  octez-protocol-008-PtEdo2Zk-libs.tezos-protocol-plugin
+  octez-protocol-008-PtEdo2Zk-libs.plugin
   octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))

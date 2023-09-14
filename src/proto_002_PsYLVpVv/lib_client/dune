@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_002_PsYLVpVv)
- (public_name octez-protocol-002-PsYLVpVv-libs.tezos-client)
+ (public_name octez-protocol-002-PsYLVpVv-libs.client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
