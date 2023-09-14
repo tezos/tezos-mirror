@@ -148,6 +148,7 @@ Platform developers are also provided reference materials for internal APIs of O
    introduction/test_networks
    introduction/get_troubleshooting
    introduction/support
+   BREAKING CHANGES <introduction/breaking_changes>
 
 .. toctree::
    :maxdepth: 2
