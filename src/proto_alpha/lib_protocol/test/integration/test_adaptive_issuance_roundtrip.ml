@@ -1410,15 +1410,6 @@ module Roundtrip = struct
     (* Now possible *)
     --> stake "staker" amount
 
-  let test_wait_with_rewards =
-    let constants = init_constants ~reward_per_block:1_000_000_000L () in
-    begin_test ~activate_ai:true constants []
-    --> (Tag "block step" --> wait_n_blocks 200
-        |+ Tag "cycle step" --> wait_n_cycles 20
-        |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
-           --> (Tag "block step" --> wait_n_blocks 100
-               |+ Tag "cycle step" --> wait_n_cycles 10))
-
   let tests =
     tests_of_scenarios
     @@ [
@@ -1435,8 +1426,22 @@ module Roundtrip = struct
          ("Test change delegate", change_delegate);
          ("Test unset delegate", unset_delegate);
          ("Test forbid costake", forbid_costaking);
-         ("Test wait with rewards", test_wait_with_rewards);
        ]
+end
+
+module Rewards = struct
+  let test_wait_with_rewards =
+    let constants = init_constants ~reward_per_block:1_000_000_000L () in
+    begin_test ~activate_ai:true constants ["delegate"]
+    --> set_baker "delegate"
+    --> (Tag "block step" --> wait_n_blocks 200
+        |+ Tag "cycle step" --> wait_n_cycles 20
+        |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
+           --> (Tag "block step" --> wait_n_blocks 100
+               |+ Tag "cycle step" --> wait_n_cycles 10))
+
+  let tests =
+    tests_of_scenarios @@ [("Test wait with rewards", test_wait_with_rewards)]
 end
 
 let tests =
@@ -1445,7 +1450,7 @@ let tests =
        ("Test expected error in assert failure", test_expected_error);
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ])
-  @ Roundtrip.tests
+  @ Roundtrip.tests @ Rewards.tests
 
 let () =
   Alcotest_lwt.run
