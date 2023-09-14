@@ -4598,6 +4598,8 @@ module Protocol : sig
 
   val baking_exn : t -> target
 
+  val test_helpers_exn : t -> target
+
   val genesis : t
 
   val demo_noops : t
@@ -4809,6 +4811,8 @@ end = struct
 
   let octez_injector p = p.octez_injector
 
+  let test_helpers_exn p = mandatory "test_helpers" p p.test_helpers
+
   (* N as in "protocol number in the Alpha family". *)
   module N = struct
     (* This function is asymmetrical on purpose: we don't want to compare
@@ -4928,7 +4932,7 @@ end = struct
             ("test_typechecking", true);
             ("test_lambda_normalization", N.(number >= 016));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -4982,7 +4986,7 @@ end = struct
             ("test_transfer_ticket", N.(number >= 016));
             ("test_tx_rollup", N.(number <= 016));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -5047,7 +5051,7 @@ end = struct
             ("test_storage", true);
             ("test_token", true);
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -5072,35 +5076,33 @@ end = struct
       in
       let _pbt =
         let list =
-          (* The first item of each tuple is the index N for the runtestN alias.
-             Those aliases are used to split into multiple CI jobs. *)
           [
-            (1, "liquidity_baking_pbt", true);
-            (1, "saturation_fuzzing", true);
-            (1, "test_merkle_list", N.(number >= 013));
-            (1, "test_gas_properties", true);
-            (2, "test_sampler", N.(number >= 012));
-            (2, "test_script_comparison", true);
-            (2, "test_tez_repr", true);
-            (2, "test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
-            (2, "test_bitset", N.(number >= 013));
-            (2, "test_sc_rollup_tick_repr", N.(number >= 016));
-            (2, "test_sc_rollup_encoding", N.(number >= 016));
-            (2, "test_sc_rollup_inbox", N.(number >= 017));
-            (3, "refutation_game_pbt", N.(number == 013));
-            (3, "test_refutation_game", N.(number >= 016));
-            (3, "test_carbonated_map", N.(number >= 013));
-            (3, "test_zk_rollup_encoding", N.(number >= 015));
-            (3, "test_dal_slot_proof", N.(number >= 016));
-            (3, "test_compare_operations", N.(number >= 015));
-            (3, "test_operation_encoding", N.(number >= 016));
-            (3, "test_balance_updates_encoding", N.(number >= 018));
-            (3, "test_bytes_conversion", N.(number >= 016));
+            ("liquidity_baking_pbt", true);
+            ("saturation_fuzzing", true);
+            ("test_merkle_list", N.(number >= 013));
+            ("test_gas_properties", true);
+            ("test_sampler", N.(number >= 012));
+            ("test_script_comparison", true);
+            ("test_tez_repr", true);
+            ("test_tx_rollup_l2_encoding", N.(number >= 013 && number <= 016));
+            ("test_bitset", N.(number >= 013));
+            ("test_sc_rollup_tick_repr", N.(number >= 016));
+            ("test_sc_rollup_encoding", N.(number >= 016));
+            ("test_sc_rollup_inbox", N.(number >= 017));
+            ("refutation_game_pbt", N.(number == 013));
+            ("test_refutation_game", N.(number >= 016));
+            ("test_carbonated_map", N.(number >= 013));
+            ("test_zk_rollup_encoding", N.(number >= 015));
+            ("test_dal_slot_proof", N.(number >= 016));
+            ("test_compare_operations", N.(number >= 015));
+            ("test_operation_encoding", N.(number >= 016));
+            ("test_balance_updates_encoding", N.(number >= 018));
+            ("test_bytes_conversion", N.(number >= 016));
           ]
-          |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
+          |> conditional_list
         in
         tezt
-          (List.map snd list)
+          list
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
@@ -5167,7 +5169,7 @@ end = struct
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
           ]
-          |> List.filter_map (fun (n, b) -> if b then Some n else None)
+          |> conditional_list
         in
         tezt
           modules
@@ -8169,6 +8171,33 @@ let _octez_codec_kaitai =
           :: [S "package" :: [S "octez-codec"]];
         ]
 
+let tezos_time_measurement =
+  external_lib ~opam:"" "tezos-time-measurement" V.True
+
+let _tezt_long_test =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"tezt/long_tests"
+    ~bisect_ppx:No
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_performance_regression |> open_;
+        octez_lwt_result_stdlib |> open_;
+        Protocol.(test_helpers_exn alpha);
+        octez_micheline;
+        octez_openapi;
+        Protocol.(main alpha);
+        qcheck_core;
+        tezos_time_measurement;
+        data_encoding;
+        octez_event_logging |> open_;
+        octez_test_helpers |> open_;
+      ]
+
 (* Add entries to this function to declare that some dune and .opam files are
    not generated by the manifest on purpose.
 
@@ -8207,7 +8236,6 @@ let exclude filename =
   | "opam-repository" :: _ -> true
   (* Tezt is only partially managed by the manifest.
      There is no real good reason for that but only the core Tezt library is released. *)
-  | "tezt" :: "long_tests" :: _ -> true
   | "tezt" :: "manual_tests" :: _ -> true
   | "tezt" :: "remote_tests" :: _ -> true
   | "tezt" :: "snoop" :: _ -> true
