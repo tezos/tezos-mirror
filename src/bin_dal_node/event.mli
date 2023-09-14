@@ -64,7 +64,7 @@ val configuration_loaded : unit t
 
 val stored_slot_content : Cryptobox.Commitment.t t
 
-val stored_slot_shards : (Cryptobox.Commitment.t * int) t
+val stored_slot_shard : (Cryptobox.Commitment.t * int) t
 
 val decoding_data_failed : Types.kind t
 

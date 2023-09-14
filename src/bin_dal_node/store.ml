@@ -108,7 +108,9 @@ module Shards = struct
     in
     let* () = write_values shards_store shards |> Errors.other_lwt_result in
     let*! () =
-      Event.(emit stored_slot_shards (commitment, Seq.length shards))
+      List.of_seq shards
+      |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
+             Event.(emit stored_slot_shard (commitment, index)))
     in
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4974
 

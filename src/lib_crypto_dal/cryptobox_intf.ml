@@ -45,6 +45,8 @@ module type COMMITMENT = sig
 
   val pp : Format.formatter -> t -> unit
 
+  val pp_short : Format.formatter -> t -> unit
+
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
