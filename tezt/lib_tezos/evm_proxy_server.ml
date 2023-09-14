@@ -184,11 +184,11 @@ let batch_requests requests =
    function on purpose, to ensure both encoding are supported by the server. *)
 let call_evm_rpc proxy_server request =
   let endpoint = endpoint proxy_server in
-  RPC.Curl.post endpoint (build_request request) |> Runnable.run
+  Curl.post endpoint (build_request request) |> Runnable.run
 
 let batch_evm_rpc proxy_server requests =
   let endpoint = endpoint proxy_server in
-  RPC.Curl.post endpoint (batch_requests requests) |> Runnable.run
+  Curl.post endpoint (batch_requests requests) |> Runnable.run
 
 let extract_result json = JSON.(json |-> "result")
 

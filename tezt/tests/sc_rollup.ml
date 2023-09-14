@@ -721,7 +721,7 @@ let test_rollup_node_running ~kind =
          sc_rollup_from_client)
   else
     let url = "http://" ^ metrics_addr ^ "/metrics" in
-    let*! metrics = RPC.Curl.get_raw url in
+    let*! metrics = Curl.get_raw url in
     let regexp = Str.regexp "\\(#HELP.*\n.*#TYPE.*\n.*\\)+" in
     if not (Str.string_match regexp metrics 0) then
       Test.fail "Unable to read metrics"

@@ -260,7 +260,7 @@ let call_rpc ~smart_rollup_node ~service =
   let url =
     Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint smart_rollup_node) service
   in
-  let*! response = RPC.Curl.get url in
+  let*! response = Curl.get url in
   return response
 
 type bootstrap_smart_rollup_setup = {

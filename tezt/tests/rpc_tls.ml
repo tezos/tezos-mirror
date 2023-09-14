@@ -32,12 +32,12 @@ let node_tls () =
   Log.info "Check that a curl call to a node RPC fails without --cacert" ;
   let get_version_url = RPC.(make_uri node get_version |> Uri.to_string) in
   let* () =
-    let*? process = RPC.Curl.get get_version_url in
+    let*? process = Curl.get get_version_url in
     Process.check_error process
   in
   Log.info "Check that a curl to a node RPC works with --cacert" ;
   let*! (_ : JSON.t) =
-    RPC.Curl.get ~args:["--cacert"; certificate_path] get_version_url
+    Curl.get ~args:["--cacert"; certificate_path] get_version_url
   in
   unit
 

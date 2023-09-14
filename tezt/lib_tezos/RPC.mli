@@ -29,13 +29,6 @@
     It does not contain any RPC definition: those are in this module. *)
 include module type of RPC_core
 
-(** [RPC_legacy] contains RPCs implemented using a deprecated approach
-    that does not allow to use cohttp. If you need to call functions
-    from [RPC_legacy], it is recommended to port them to this module
-    in order to be able to use cohttp, which is more efficient than using
-    the client. *)
-include module type of RPC_legacy
-
 (** {2 Naming Conventions} *)
 
 (** Functions in this module are named after the RPC they implement.

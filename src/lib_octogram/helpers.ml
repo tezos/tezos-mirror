@@ -84,7 +84,7 @@ let download ?dir ?runner url filename =
     | None -> Temp.file ?runner filename
   in
   let*! _ =
-    RPC.Curl.get_raw
+    Curl.get_raw
       ?runner
       ~args:["--fail"; "--keepalive-time"; "2"; "--output"; path]
       url

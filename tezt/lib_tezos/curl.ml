@@ -24,54 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Curl = struct
-  let parse url process =
-    let* output = Process.check_and_read_stdout process in
-    return (JSON.parse ~origin:url output)
+let parse url process =
+  let* output = Process.check_and_read_stdout process in
+  return (JSON.parse ~origin:url output)
 
-  let get ?runner ?(args = []) url =
-    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
-    Runnable.{value = process; run = parse url}
+let get ?runner ?(args = []) url =
+  let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
+  Runnable.{value = process; run = parse url}
 
-  let get_raw ?runner ?(args = []) url =
-    let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
-    Runnable.{value = process; run = Process.check_and_read_stdout}
+let get_raw ?runner ?(args = []) url =
+  let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
+  Runnable.{value = process; run = Process.check_and_read_stdout}
 
-  let post ?runner ?(args = []) url data =
-    let process =
-      Process.spawn
-        ?runner
-        "curl"
-        (args
-        @ [
-            "-X";
-            "POST";
-            "-H";
-            "Content-Type: application/json";
-            "-s";
-            url;
-            "-d";
-            JSON.encode data;
-          ])
-    in
-    Runnable.{value = process; run = parse url}
+let post ?runner ?(args = []) url data =
+  let process =
+    Process.spawn
+      ?runner
+      "curl"
+      (args
+      @ [
+          "-X";
+          "POST";
+          "-H";
+          "Content-Type: application/json";
+          "-s";
+          url;
+          "-d";
+          JSON.encode data;
+        ])
+  in
+  Runnable.{value = process; run = parse url}
 
-  let post_raw ?runner ?(args = []) url data =
-    let process =
-      Process.spawn
-        ?runner
-        "curl"
-        (args
-        @ [
-            "-X";
-            "POST";
-            "-H";
-            "Content-Type: application/json";
-            "-s";
-            url;
-            "-d";
-            JSON.encode data;
-          ])
-    in
-    Runnable.{value = process; run = Process.check_and_read_stdout}
-end
+let post_raw ?runner ?(args = []) url data =
+  let process =
+    Process.spawn
+      ?runner
+      "curl"
+      (args
+      @ [
+          "-X";
+          "POST";
+          "-H";
+          "Content-Type: application/json";
+          "-s";
+          url;
+          "-d";
+          JSON.encode data;
+        ])
+  in
+  Runnable.{value = process; run = Process.check_and_read_stdout}

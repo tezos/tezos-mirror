@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 include RPC_core
-include RPC_legacy
 
 type 'a t = (Node.t, 'a) RPC_core.t
 

@@ -24,41 +24,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Legacy node RPCs. *)
-
-(** THIS MODULE IS DEPRECATED: ITS FUNCTIONS SHOULD BE PORTED TO THE NEW RPC
-    ENGINE (IN [RPC.ml], USING MODULE [RPC_core]). *)
-
-module Curl : sig
-  (** [get url] returns a runnable requesting [url] with curl.
+(** [get url] returns a runnable requesting [url] with curl.
 
       The response is parsed and returned as JSON.
 
       Fails if [curl] is not found in path.
   *)
-  val get :
-    ?runner:Runner.t -> ?args:string list -> string -> JSON.t Runnable.process
+val get :
+  ?runner:Runner.t -> ?args:string list -> string -> JSON.t Runnable.process
 
-  (** Same as [get] but does not parse the returned value *)
-  val get_raw :
-    ?runner:Runner.t -> ?args:string list -> string -> string Runnable.process
+(** Same as [get] but does not parse the returned value *)
+val get_raw :
+  ?runner:Runner.t -> ?args:string list -> string -> string Runnable.process
 
-  (** [post url data] returns a runnable posting [data] to [url] with curl.
+(** [post url data] returns a runnable posting [data] to [url] with curl.
 
       The response is parsed and returned as JSON.
 
       Fails if [curl] is not found in path. *)
-  val post :
-    ?runner:Runner.t ->
-    ?args:string list ->
-    string ->
-    JSON.t ->
-    JSON.t Runnable.process
+val post :
+  ?runner:Runner.t ->
+  ?args:string list ->
+  string ->
+  JSON.t ->
+  JSON.t Runnable.process
 
-  val post_raw :
-    ?runner:Runner.t ->
-    ?args:string list ->
-    string ->
-    JSON.t ->
-    string Runnable.process
-end
+val post_raw :
+  ?runner:Runner.t ->
+  ?args:string list ->
+  string ->
+  JSON.t ->
+  string Runnable.process

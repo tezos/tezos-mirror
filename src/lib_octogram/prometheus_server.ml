@@ -184,7 +184,7 @@ let with_session_status agent k =
 
 let post ?(body = `String "") agent route =
   Runnable.run
-  @@ RPC.Curl.post_raw
+  @@ Curl.post_raw
        ~args:["-g"]
        (sf
           "http://localhost:%d/%s"

@@ -29,7 +29,7 @@
 let download ?runner url filename =
   Log.info "Download %s" url ;
   let path = Tezt.Temp.file filename in
-  let*! _ = RPC.Curl.get_raw ?runner ~args:["--output"; path] url in
+  let*! _ = Curl.get_raw ?runner ~args:["--output"; path] url in
   Log.info "%s downloaded" url ;
   Lwt.return path
 

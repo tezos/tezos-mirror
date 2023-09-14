@@ -67,7 +67,7 @@ let hex_256_of n = Printf.sprintf "%064x" n
 let evm_proxy_server_version proxy_server =
   let endpoint = Evm_proxy_server.endpoint proxy_server in
   let get_version_url = endpoint ^ "/version" in
-  RPC.Curl.get get_version_url
+  Curl.get get_version_url
 
 let get_transaction_status ~endpoint ~tx =
   let* receipt = Eth_cli.get_receipt ~endpoint ~tx in
