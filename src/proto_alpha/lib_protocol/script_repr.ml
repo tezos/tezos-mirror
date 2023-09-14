@@ -245,9 +245,10 @@ let stable_force_decode_cost lexpr =
         (Data_encoding.Binary.length expr_encoding v)
 
 let force_decode lexpr =
+  let open Result_syntax in
   match Data_encoding.force_decode lexpr with
-  | Some v -> ok v
-  | None -> error Lazy_script_decode
+  | Some v -> return v
+  | None -> tzfail Lazy_script_decode
 
 let force_bytes_cost expr =
   (* Estimating the cost directly from the bytes would be cheaper, but

@@ -57,12 +57,13 @@ let () =
 let empty = String_tag ""
 
 let of_string v =
+  let open Result_syntax in
   let rec check_printable_ascii i =
-    if Compare.Int.(i < 0) then ok (String_tag v)
+    if Compare.Int.(i < 0) then return (String_tag v)
     else
       match v.[i] with
       | '\n' | '\x20' .. '\x7E' -> check_printable_ascii (i - 1)
-      | _ -> error @@ Non_printable_character (i, v)
+      | _ -> tzfail @@ Non_printable_character (i, v)
   in
   check_printable_ascii (String.length v - 1)
 
