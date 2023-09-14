@@ -251,7 +251,9 @@ let liquidity_baking_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 (** [get_cached_contracts client] retrieves the cached scripts, except
     the liquidity baking CPMM script. *)
 let get_cached_contracts client =
-  let* contracts = RPC.Script_cache.get_cached_contracts client in
+  let* contracts =
+    RPC.Client.call client @@ RPC.get_chain_block_context_cache_contracts_all ()
+  in
   let all =
     JSON.(
       as_list contracts

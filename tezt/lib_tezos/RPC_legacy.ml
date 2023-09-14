@@ -24,38 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctxt_type = Bytes | Json
-
-module Seed = struct
-  let get_seed ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "seed"] in
-    let* json = Client.rpc ?endpoint ?hooks POST path client in
-    return (JSON.as_string json)
-
-  let get_seed_status ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "seed_computation"]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
-module Script_cache = struct
-  let get_cached_contracts ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
-let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] @ path
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
 module Curl = struct
   let parse url process =
     let* output = Process.check_and_read_stdout process in

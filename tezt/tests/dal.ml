@@ -406,7 +406,9 @@ let test_feature_flag _protocol _parameters _cryptobox node client
   let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
   if block_metadata.dal_attestation <> None then
     Test.fail "Did not expect to find \"dal_attestation\"" ;
-  let* bytes = RPC_legacy.raw_bytes client in
+  let* bytes =
+    RPC.Client.call client @@ RPC.get_chain_block_context_raw_bytes ()
+  in
   if not JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
@@ -653,7 +655,9 @@ let test_slot_management_logic _protocol parameters cryptobox node client
       Mempool.classified_typ
       ~error_msg:"Expected all the operations to be applied. Got %L") ;
   let* () = Client.bake_for_and_wait client in
-  let* bytes = RPC_legacy.raw_bytes client in
+  let* bytes =
+    RPC.Client.call client @@ RPC.get_chain_block_context_raw_bytes ()
+  in
   if JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Expected the context to contain some information about the DAL" ;
   let* operations_result =
