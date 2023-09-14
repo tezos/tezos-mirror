@@ -563,4 +563,8 @@ module Internal_for_tests : sig
       unsafe to use outside of tests as it breaks the abstraction barrier
       provided by the [Node_context]. *)
   val unsafe_get_store : 'a t -> 'a Store.t
+
+  (** Create a dummy context to generate OpenAPI specification. *)
+  val openapi_context :
+    #Client_context.full -> Protocol_hash.t -> Store_sigs.rw t tzresult Lwt.t
 end

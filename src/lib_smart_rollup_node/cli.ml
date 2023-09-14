@@ -424,3 +424,18 @@ let cors_allowed_origins_arg =
     ~placeholder:"ALLOWED_ORIGINS"
     ~doc:"List of accepted cors origins."
     string_list
+
+let protocol_hash_parameter =
+  Tezos_clic.parameter (fun (_cctxt : Client_context.full) p ->
+      Lwt.return (Protocol_hash.of_b58check p))
+
+let protocol_hash_arg =
+  Tezos_clic.arg
+    ~long:"protocol"
+    ~short:'P'
+    ~placeholder:"Proto"
+    ~doc:
+      "Protocol hash in base58-check. If not provided, the export will be for \
+       the last registered protocol in the rollup node which may be different \
+       between different versions of the node."
+    protocol_hash_parameter

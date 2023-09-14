@@ -1236,4 +1236,53 @@ module Internal_for_tests = struct
       }
 
   let unsafe_get_store node_ctxt = node_ctxt.store
+
+  let openapi_context cctxt protocol =
+    let current_protocol =
+      {
+        hash = protocol;
+        proto_level = 0;
+        constants =
+          Rollup_constants.
+            {
+              minimal_block_delay = 0L;
+              delay_increment_per_round = 0L;
+              sc_rollup =
+                {
+                  challenge_window_in_blocks = 0;
+                  commitment_period_in_blocks = 0;
+                  reveal_activation_level =
+                    Some
+                      {
+                        blake2B = 0l;
+                        metadata = 0l;
+                        dal_page = 0l;
+                        dal_parameters = 0l;
+                      };
+                  max_number_of_stored_cemented_commitments = 0;
+                };
+              dal =
+                {
+                  feature_enable = false;
+                  attestation_lag = 0;
+                  number_of_slots = 0;
+                  cryptobox_parameters =
+                    {
+                      redundancy_factor = 0;
+                      page_size = 0;
+                      slot_size = 0;
+                      number_of_shards = 0;
+                    };
+                };
+            };
+      }
+    in
+    Lwt_utils_unix.with_tempdir "smart-rollup-node-openapi" @@ fun data_dir ->
+    let open Lwt_result_syntax in
+    let* node_ctxt =
+      create_node_context cctxt current_protocol ~data_dir Wasm_2_0_0
+    in
+    let*! () = Context.close node_ctxt.context in
+    let* () = Store.close node_ctxt.store in
+    return node_ctxt
 end

@@ -475,3 +475,14 @@ let directory node_ctxt =
               e)
   in
   add_describe dir
+
+let generate_openapi ?protocol cctxt =
+  let open Lwt_result_syntax in
+  let protocol =
+    Option.value_f protocol ~default:Protocol_plugins.last_registered
+  in
+  let* node_ctxt =
+    Node_context.Internal_for_tests.openapi_context cctxt protocol
+  in
+  let _, dir = build_protocol_directory node_ctxt protocol in
+  generate_openapi dir protocol
