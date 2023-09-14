@@ -187,6 +187,7 @@ module State = struct
     last_level_rewards : Protocol.Alpha_context.Raw_level.t;
     snapshot_balances : (string * balance) list String.Map.t;
     saved_rate : Q.t option;
+    burn_rewards : bool;
     pending_operations : Protocol.Alpha_context.packed_operation list;
   }
 
@@ -584,7 +585,31 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* () = check_issuance_rpc block in
   let policy = Block.By_account baker.pkh in
   let state, operations = State.pop_pending_operations state in
-  let* block = Block.bake ~policy ~adaptive_issuance_vote ~operations block in
+  let* block =
+    if state.burn_rewards then
+      (* Incremental mode *)
+      let* i =
+        Incremental.begin_construction ~policy ~adaptive_issuance_vote block
+      in
+      let* block' =
+        Block.bake ~policy ~adaptive_issuance_vote ~operations block
+      in
+      let* block_rewards = Context.get_issuance_per_minute (B block') in
+      let baker = State.find_account state.baker state in
+      let ctxt = Incremental.alpha_ctxt i in
+      let* context, _ =
+        Lwt_result_wrap_syntax.wrap
+          (Protocol.Alpha_context.Token.transfer
+             ctxt
+             (`Contract baker.contract)
+             `Burned
+             block_rewards)
+      in
+      let i = Incremental.set_alpha_ctxt i context in
+      let* i = List.fold_left_es Incremental.add_operation i operations in
+      Incremental.finalize_block i
+    else Block.bake ~policy ~adaptive_issuance_vote ~operations block
+  in
   (* TODO: mistake ? The baking parameters apply before we reach the new cycle... *)
   let new_current_cycle = Block.current_cycle block in
   let state =
@@ -597,7 +622,12 @@ let bake ?baker : t -> t tzresult Lwt.t =
         (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
       State.apply_end_cycle new_current_cycle state)
   in
-  let* state = apply_rewards block state in
+  let* state =
+    if state.burn_rewards then
+      let* () = check_all_balances block state in
+      return state
+    else apply_rewards block state
+  in
   return (block, state)
 
 (** Bake until the end of a cycle, using [bake] instead of [Block.bake]
@@ -718,7 +748,7 @@ let exec_op f =
 (* ======== Definition of basic actions ======== *)
 
 (** Initialize the test, given some initial parameters *)
-let begin_test ~activate_ai
+let begin_test ~activate_ai ?(burn_rewards = false)
     (constants : Protocol.Alpha_context.Constants.Parametric.t)
     delegates_name_list : (unit, t) scenarios =
   exec (fun () ->
@@ -783,6 +813,7 @@ let begin_test ~activate_ai
             last_level_rewards = init_level;
             snapshot_balances = String.Map.empty;
             saved_rate = None;
+            burn_rewards;
             pending_operations = [];
           }
       in
