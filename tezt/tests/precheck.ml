@@ -72,8 +72,10 @@ let precheck_block =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let n1 = Node.create [Private_mode] in
-  let ring = Cluster.create ~name:"ring" 4 [Private_mode] in
+  let n1 = Node.create [Private_mode; Synchronisation_threshold 0] in
+  let ring =
+    Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
+  in
   let n2 = List.hd ring in
   Cluster.ring ring ;
   Cluster.connect [n1] [n2] ;
@@ -171,7 +173,7 @@ let propagate_precheckable_bad_block =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let node_client = Node.create [] in
+  let node_client = Node.create [Private_mode; Synchronisation_threshold 0] in
   let ring =
     Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
   in
@@ -284,7 +286,7 @@ let propagate_precheckable_bad_block_payload =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let node_client = Node.create [] in
+  let node_client = Node.create [Private_mode; Synchronisation_threshold 0] in
   let ring =
     Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
   in
