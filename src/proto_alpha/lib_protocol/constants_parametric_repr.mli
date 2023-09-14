@@ -107,7 +107,7 @@ type zk_rollup = {
 type adaptive_rewards_params = {
   issuance_ratio_min : (* Maximum yearly issuance rate *) Q.t;
   issuance_ratio_max : (* Minimum yearly issuance rate *) Q.t;
-  max_bonus : (* Maximum issuance bonus value *) int64;
+  max_bonus : (* Maximum issuance bonus value *) Q.t;
   growth_rate : (* Bonus value's groth rate *) int64;
   center_dz : (* Center for bonus *) Q.t;
   radius_dz :

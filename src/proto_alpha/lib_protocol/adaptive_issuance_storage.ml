@@ -144,11 +144,7 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
   (* The bonus reward is truncated between [0] and [max_bonus] *)
   (* It is done in a way that the bonus does not increase if the coeff
      would already be above the [reward_pct_max] *)
-  let max_bonus =
-    Compare.Q.min
-      base_reward_coeff_dist_to_max
-      (Issuance_bonus_repr.of_int64_repr max_bonus)
-  in
+  let max_bonus = Compare.Q.min base_reward_coeff_dist_to_max max_bonus in
   (* [dist] is the distance from [stake_ratio] to [48%,52%] *)
   let unsigned_dist =
     Q.(max zero (abs (stake_ratio - center_dz) - radius_dz))

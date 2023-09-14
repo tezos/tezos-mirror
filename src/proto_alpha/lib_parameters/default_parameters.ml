@@ -263,7 +263,7 @@ let constants_mainnet =
           {
             issuance_ratio_min = Q.(5 // 10000);
             issuance_ratio_max = Q.(1 // 20);
-            max_bonus = 50_000_000_000_000L;
+            max_bonus = Q.(5 // 100);
             growth_rate = 115_740_740L;
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);

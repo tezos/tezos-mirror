@@ -137,7 +137,7 @@ type zk_rollup = {
 type adaptive_rewards_params = {
   issuance_ratio_min : Q.t;
   issuance_ratio_max : Q.t;
-  max_bonus : int64;
+  max_bonus : Q.t;
   growth_rate : int64;
   center_dz : Q.t;
   radius_dz : Q.t;
@@ -329,6 +329,18 @@ let center_encoding =
              and 1")
       (obj2 (req "numerator" z) (req "denominator" z)))
 
+let max_bonus_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero && num <= den) then
+          Ok (Q.make num den)
+        else
+          Error
+            "Invalid Reward Parameter: max_bonus can only be between 0 and 1")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
 let radius_encoding =
   Data_encoding.(
     conv_with_guard
@@ -374,7 +386,7 @@ let adaptive_rewards_params_encoding =
     (obj6
        (req "issuance_ratio_min" extremum_encoding)
        (req "issuance_ratio_max" extremum_encoding)
-       (req "max_bonus" int64)
+       (req "max_bonus" max_bonus_encoding)
        (req "growth_rate" int64)
        (req "center_dz" center_encoding)
        (req "radius_dz" radius_encoding))

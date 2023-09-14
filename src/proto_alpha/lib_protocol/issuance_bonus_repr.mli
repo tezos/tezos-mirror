@@ -33,4 +33,4 @@ val of_Q :
   Q.t ->
   t tzresult
 
-val of_int64_repr : int64 -> Q.t
+val migrate_max_bonus_from_O_to_P : int64 -> Q.t

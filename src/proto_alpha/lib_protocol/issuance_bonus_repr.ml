@@ -24,7 +24,7 @@ let encoding =
 
 let check_bounds (constants : Constants_parametric_repr.adaptive_rewards_params)
     q =
-  Q.(q >= zero && q <= of_int64_repr constants.max_bonus)
+  Q.(q >= zero && q <= constants.max_bonus)
   [@@inline always]
 
 type error += Out_of_bounds_bonus
@@ -32,3 +32,5 @@ type error += Out_of_bounds_bonus
 let of_Q ~(constants : Constants_parametric_repr.adaptive_rewards_params) q =
   if check_bounds constants q then error Out_of_bounds_bonus else ok q
   [@@inline always]
+
+let migrate_max_bonus_from_O_to_P = of_int64_repr
