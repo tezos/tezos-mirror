@@ -12,7 +12,7 @@
 (library
  (name teztale_lib)
  (public_name teztale.lib)
- (libraries octez-libs.tezos-base)
+ (libraries octez-libs.base)
  (flags
   (:standard
    (:include macos-link-flags.sexp)
