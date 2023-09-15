@@ -38,7 +38,7 @@ module Simple = struct
       ~msg:
         "Slot header for index {slot_index} was published at block \
          {published_hash}. The slot header has been confirmed at \
-         {confirmed_hash}. The slot contents will be downloaded."
+         {confirmed_hash}. The slot contents will be downloaded"
       ~level:Notice
       ("slot_index", Dal.Slot_index.encoding)
       ("published_hash", Block_hash.encoding)

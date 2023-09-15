@@ -48,7 +48,7 @@ module Simple = struct
       ~msg:
         "Intended failure at level {level} for message indexed {message_index} \
          and at the tick {message_tick} of message processing (internal = \
-         {internal})."
+         {internal})"
       ~level:Notice
       ("level", Data_encoding.int31)
       ("message_index", Data_encoding.int31)

@@ -35,7 +35,7 @@ struct
     declare_1
       ~section
       ~name:"queue"
-      ~msg:"adding {nb_messages} to queue"
+      ~msg:"Adding {nb_messages} to queue"
       ~level:Notice
       ("nb_messages", Data_encoding.int31)
 
@@ -43,7 +43,7 @@ struct
     declare_2
       ~section
       ~name:"batched"
-      ~msg:"batched {nb_messages} messages into {nb_batches} batches"
+      ~msg:"Batched {nb_messages} messages into {nb_batches} batches"
       ~level:Notice
       ("nb_batches", Data_encoding.int31)
       ("nb_messages", Data_encoding.int31)
@@ -57,7 +57,7 @@ struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"[Warning]: Request {view} failed ({worker_status}): {errors}"
         ~level:Warning
         ("view", Request.encoding)
         ~pp1:Request.pp

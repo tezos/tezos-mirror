@@ -41,7 +41,7 @@ module Make
         declare_1
           ~section
           ~name:"monitoring_error"
-          ~msg:"error (ignored) in monitoring: {error}"
+          ~msg:"[Warning] (ignored) in monitoring: {error}"
           ~level:Warning
           ("error", trace_encoding)
 
@@ -93,7 +93,7 @@ module Make
       let request_failed =
         declare_3
           ~name:"request_failed"
-          ~msg:"request {view} failed ({worker_status}): {errors}"
+          ~msg:"[Warning] Request {view} failed ({worker_status}): {errors}"
           ~level:Warning
           ("view", Request.encoding)
           ~pp1:Request.pp
@@ -125,21 +125,21 @@ module Make
       let new_tezos_head =
         declare_1
           ~name:"new_tezos_head"
-          ~msg:"processing new Tezos head {head}"
+          ~msg:"Processing new Tezos head {head}"
           ~level:Debug
           ("head", Block_hash.encoding)
 
       let cannot_compute_reorg =
         declare_1
           ~name:"cannot_compute_reorg"
-          ~msg:"Cannot compute reorg for new block {head}"
+          ~msg:"[Warning] Cannot compute reorg for new block {head}"
           ~level:Warning
           ("head", Block_hash.encoding)
 
       let injecting_pending =
         declare_1
           ~name:"injecting_pending"
-          ~msg:"injecting {count} pending operations"
+          ~msg:"Injecting {count} pending operations"
           ~level:Notice
           ("count", Data_encoding.int31)
 
@@ -161,7 +161,7 @@ module Make
         declare_1
           ~name:"number_of_operations_in_queue"
           ~msg:
-            "injector's queue: there is currently {number_of_operations} \
+            "Injector's queue: there is currently {number_of_operations} \
              operations waiting to be injected"
           ~level:Info
           ("number_of_operations", Data_encoding.int31)
@@ -170,7 +170,7 @@ module Make
         declare_1
           ~name:"considered_operations_info"
           ~msg:
-            "injector's queue: the following operations are being considered \
+            "Injector's queue: the following operations are being considered \
              for injection {operations}"
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
@@ -180,7 +180,7 @@ module Make
         declare_1
           ~name:"dropped_operations"
           ~msg:
-            "dropping operations: the following operations are dropped \
+            "Dropping operations: the following operations are dropped \
              {operations}"
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
@@ -189,7 +189,7 @@ module Make
       let simulating_operations =
         declare_2
           ~name:"simulating_operations"
-          ~msg:"simulating operations (force = {force}): {operations}"
+          ~msg:"Simulating operations (force = {force}): {operations}"
           ~level:Debug
           ("operations", Data_encoding.list Operation.encoding)
           ("force", Data_encoding.bool)
@@ -199,7 +199,7 @@ module Make
         declare_3
           ~name:"discard_error_operation"
           ~msg:
-            "discarding operation {operation} failing {count} times with \
+            "Discarding operation {operation} failing {count} times with \
              {error}"
           ~level:Notice
           ("operation", Operation.encoding)
@@ -227,7 +227,7 @@ module Make
       let add_pending =
         declare_1
           ~name:"add_pending"
-          ~msg:"add {operation} to pending"
+          ~msg:"Add {operation} to pending"
           ~level:Notice
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
@@ -235,7 +235,7 @@ module Make
       let retry_operation =
         declare_1
           ~name:"retry_operation"
-          ~msg:"retry {operation}"
+          ~msg:"Retry {operation}"
           ~level:Notice
           ("operation", Operation.encoding)
           ~pp1:Operation.pp
@@ -243,7 +243,7 @@ module Make
       let included =
         declare_3
           ~name:"included"
-          ~msg:"included operations of {block} at level {level}: {operations}"
+          ~msg:"Included operations of {block} at level {level}: {operations}"
           ~level:Notice
           ("block", Block_hash.encoding)
           ("level", Data_encoding.int32)
@@ -253,7 +253,7 @@ module Make
       let revert_operations =
         declare_1
           ~name:"revert_operations"
-          ~msg:"reverting operations: {operations}"
+          ~msg:"Reverting operations: {operations}"
           ~level:Notice
           ("operations", Data_encoding.list Inj_operation.Hash.encoding)
           ~pp1:pp_operations_hash_list
@@ -261,14 +261,14 @@ module Make
       let confirmed_level =
         declare_1
           ~name:"confirmed_level"
-          ~msg:"confirmed Tezos level {level}"
+          ~msg:"Confirmed Tezos level {level}"
           ~level:Notice
           ("level", Data_encoding.int32)
 
       let loaded_from_disk =
         declare_2
           ~name:"loaded_from_disk"
-          ~msg:"loaded {nb} elements in {kind} from disk"
+          ~msg:"Loaded {nb} elements in {kind} from disk"
           ~level:Notice
           ("nb", Data_encoding.int31)
           ("kind", Data_encoding.string)
@@ -276,7 +276,7 @@ module Make
       let corrupted_operation_on_disk =
         declare_2
           ~name:"corrupted_operation_on_disk"
-          ~msg:"ignoring unreadable file {file} on disk: {error}"
+          ~msg:"[Warning] Ignoring unreadable file {file} on disk: {error}"
           ~level:Warning
           ("file", Data_encoding.string)
           ("error", Error_monad.trace_encoding)
@@ -286,14 +286,16 @@ module Make
       let inject_wait =
         declare_1
           ~name:"inject_wait"
-          ~msg:"waiting {delay} seconds to trigger injection"
+          ~msg:"Waiting {delay} seconds to trigger injection"
           ~level:Notice
           ("delay", Data_encoding.float)
 
       let never_included =
         declare_2
           ~name:"never_included"
-          ~msg:"{operation} was never included in a block after {ttl} blocks"
+          ~msg:
+            "[Warning] {operation} was never included in a block after {ttl} \
+             blocks"
           ~level:Warning
           ("operation", Operation.encoding)
           ("ttl", Data_encoding.int31)

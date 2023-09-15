@@ -38,7 +38,7 @@ module Simple = struct
       ~msg:
         "A conflict has been found with our commitment {our_commitment_hash} \
          at level {level} with staker {other} that hash issued commitment \
-         {their_commitment_hash} both based on {parent_commitment_hash}."
+         {their_commitment_hash} both based on {parent_commitment_hash}"
       ~level:Notice
       ("our_commitment_hash", Octez_smart_rollup.Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
@@ -53,7 +53,7 @@ module Simple = struct
       ~msg:
         "A potential conflict has been found with our commitment \
          {our_commitment_hash} at level {level} with staker {other} that hash \
-         issued commitment {their_commitment_hash}."
+         issued commitment {their_commitment_hash}"
       ~level:Notice
       ("our_commitment_hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
@@ -64,8 +64,7 @@ module Simple = struct
     declare_1
       ~section
       ~name:"sc_rollup_node_timeout_detected"
-      ~msg:
-        "The rollup node has detected that opponent {other} can be timed out."
+      ~msg:"The rollup node has detected that opponent {other} can be timed out"
       ~level:Notice
       ("other", Signature.Public_key_hash.encoding)
 
@@ -75,7 +74,7 @@ module Simple = struct
       ~name:"sc_rollup_node_computed_dissection"
       ~msg:
         "Computed dissection against {opponent} between ticks {start_tick} and \
-         {end_tick}: {dissection}."
+         {end_tick}: {dissection}"
       ~level:Debug
       ("opponent", Signature.Public_key_hash.encoding)
       ("start_tick", Data_encoding.z)
@@ -94,7 +93,7 @@ module Simple = struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"Request {view} failed ({worker_status}): {errors}"
         ~level:Notice
         ("view", Request.encoding)
         ~pp1:Request.pp
@@ -128,7 +127,7 @@ module Simple = struct
         ~section
         ~name:"player_started"
         ~msg:
-          "refutation player started to play against {opponent}, defenfing \
+          "Refutation player started to play against {opponent}, defenfing \
            commitment {commitment}"
         ~level:Notice
         ("opponent", Signature.Public_key_hash.encoding)
@@ -140,7 +139,7 @@ module Simple = struct
       declare_1
         ~section
         ~name:"player_stopped"
-        ~msg:"refutation player for opponent {opponent} has been stopped"
+        ~msg:"Refutation player for opponent {opponent} has been stopped"
         ~level:Notice
         ("opponent", Signature.Public_key_hash.encoding)
         ~pp1:Signature.Public_key_hash.pp

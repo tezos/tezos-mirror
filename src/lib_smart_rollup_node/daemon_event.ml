@@ -89,7 +89,9 @@ module Simple = struct
     declare_3
       ~section
       ~name:"sc_rollup_daemon_included_failed_operation"
-      ~msg:"Operation {operation} was included as {status} with error {error}"
+      ~msg:
+        "[Warning]: Operation {operation} was included as {status} with error \
+         {error}"
       ~level:Warning
       ("operation", L1_operation.encoding)
       ( "status",
@@ -128,7 +130,7 @@ module Simple = struct
     declare_1
       ~section
       ~name:"sc_rollup_daemon_error"
-      ~msg:"Fatal daemon error: {error}"
+      ~msg:"[Fatal daemon error]: {error}"
       ~level:Fatal
       ("error", trace_encoding)
       ~pp1:pp_print_trace
@@ -138,8 +140,8 @@ module Simple = struct
       ~section
       ~name:"sc_rollup_daemon_degraded_mode"
       ~msg:
-        "Entering degraded mode: only playing refutation game to defend \
-         commitments."
+        "[Daemon error]: entering degraded mode - only playing refutation game \
+         to defend commitments"
       ~level:Error
       ()
 
@@ -147,8 +149,10 @@ module Simple = struct
     declare_0
       ~section
       ~name:"sc_rollup_daemon_exit_bailout_mode"
-      ~msg:"Stakes have been recovered, and the node is exiting safely now."
-      ~level:Error
+      ~msg:
+        "Exit bailout mode - stakes have been recovered, and the node is \
+         exiting safely now"
+      ~level:Notice
       ()
 end
 

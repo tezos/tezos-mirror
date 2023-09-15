@@ -68,7 +68,7 @@ module Simple = struct
     declare_2
       ~section
       ~name:"starting_metrics_server"
-      ~msg:"starting metrics server on {host}:{port}"
+      ~msg:"Starting metrics server on {host}:{port}"
       ~level:Notice
       ("host", Data_encoding.string)
       ("port", Data_encoding.uint16)
@@ -78,7 +78,7 @@ module Simple = struct
       ~section
       ~name:"metrics_ended"
       ~level:Error
-      ~msg:"metrics server ended with error {stacktrace}"
+      ~msg:"[Error]: Metrics server ended with error {stacktrace}"
       ("stacktrace", Data_encoding.string)
 
   let kernel_debug =
@@ -105,8 +105,8 @@ module Simple = struct
       ~name:"dal_enabled_no_node"
       ~level:Warning
       ~msg:
-        "Warning: DAL is enabled in the protocol but no DAL node was provided \
-         for the rollup node."
+        "[Warning]: DAL is enabled in the protocol but no DAL node was \
+         provided for the rollup node"
       ()
 
   let waiting_first_block =
@@ -114,7 +114,7 @@ module Simple = struct
       ~section
       ~name:"waiting_first_block"
       ~level:Notice
-      ~msg:"Waiting for first block of protocol {protocol} to appear."
+      ~msg:"Waiting for first block of protocol {protocol} to appear"
       ("protocol", Protocol_hash.encoding)
 
   let received_first_block =
@@ -122,7 +122,7 @@ module Simple = struct
       ~section
       ~name:"received_first_block"
       ~level:Notice
-      ~msg:"First block of protocol {protocol} received: {block}."
+      ~msg:"First block of protocol {protocol} received: {block}"
       ("block", Block_hash.encoding)
       ("protocol", Protocol_hash.encoding)
 
@@ -131,7 +131,7 @@ module Simple = struct
       ~section
       ~name:"detected_protocol_migration"
       ~level:Notice
-      ~msg:"Detected protocol migration, the rollup node will now stop."
+      ~msg:"Detected protocol migration, the rollup node will now stop"
       ()
 
   let acquiring_lock =
@@ -166,7 +166,7 @@ module Simple = struct
       ~level:Info
       ~msg:
         "An attempt to launch context GC was made, but a previous GC run has \
-         not yet finished. No action was taken."
+         not yet finished. No action was taken"
       ()
 
   let ending_gc =

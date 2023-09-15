@@ -89,7 +89,7 @@ module Simple = struct
     declare_1
       ~section
       ~name:"sc_rollup_node_recover_bond"
-      ~msg:"Recover bond for {staker}."
+      ~msg:"Recover bond for {staker}"
       ~level:Notice
       ("staker", Signature.Public_key_hash.encoding)
 
@@ -112,7 +112,7 @@ module Simple = struct
       declare_3
         ~section
         ~name:"request_failed"
-        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~msg:"[Warning] Request {view} failed ({worker_status}): {errors}"
         ~level:Warning
         ("view", Request.encoding)
         ~pp1:Request.pp
