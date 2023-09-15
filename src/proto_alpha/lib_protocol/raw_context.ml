@@ -1087,8 +1087,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               issuance_ratio_max =
                 c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
               max_bonus;
-              growth_rate =
-                c.adaptive_issuance.adaptive_rewards_params.growth_rate;
+              (* 0.01% per 1% per day *)
+              growth_rate = Q.(1 // 100);
               center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
               radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
             }

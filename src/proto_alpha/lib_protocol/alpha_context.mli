@@ -843,7 +843,7 @@ module Constants : sig
       issuance_ratio_min : Q.t;
       issuance_ratio_max : Q.t;
       max_bonus : Issuance_bonus_repr.max_bonus;
-      growth_rate : int64;
+      growth_rate : Q.t;
       center_dz : Q.t;
       radius_dz : Q.t;
     }

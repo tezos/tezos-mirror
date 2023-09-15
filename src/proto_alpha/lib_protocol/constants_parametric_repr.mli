@@ -108,7 +108,7 @@ type adaptive_rewards_params = {
   issuance_ratio_min : (* Maximum yearly issuance rate *) Q.t;
   issuance_ratio_max : (* Minimum yearly issuance rate *) Q.t;
   max_bonus : (* Maximum issuance bonus value *) Issuance_bonus_repr.max_bonus;
-  growth_rate : (* Bonus value's groth rate *) int64;
+  growth_rate : (* Bonus value's growth rate *) Q.t;
   center_dz : (* Center for bonus *) Q.t;
   radius_dz :
     (* Minimum distance from center required for non-zero growth *) Q.t;

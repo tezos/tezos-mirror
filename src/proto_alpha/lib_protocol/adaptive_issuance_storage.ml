@@ -155,12 +155,11 @@ let compute_bonus ~seconds_per_cycle ~total_supply ~total_frozen_stake
     if Compare.Q.(stake_ratio >= center_dz) then Q.neg unsigned_dist
     else unsigned_dist
   in
-  let q_growth_rate = Q.of_int64 growth_rate in
   let q_seconds_per_cycle = Q.of_int64 seconds_per_cycle in
+  let q_days_per_cycle = Q.div q_seconds_per_cycle (Q.of_int 86_400) in
   let q_previous_bonus = (previous_bonus :> Q.t) in
   let new_bonus =
-    Q.(
-      add q_previous_bonus (mul q_dist (mul q_growth_rate q_seconds_per_cycle)))
+    Q.(add q_previous_bonus (mul q_dist (mul growth_rate q_days_per_cycle)))
   in
   let new_bonus = Q.max new_bonus Q.zero in
   let new_bonus = Q.min new_bonus max_new_bonus in

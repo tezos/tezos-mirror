@@ -266,7 +266,8 @@ let constants_mainnet =
             max_bonus =
               Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn
                 Q.(5 // 100);
-            growth_rate = 115_740_740L;
+            (* 0.01% per 1% per day *)
+            growth_rate = Q.(1 // 100);
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
