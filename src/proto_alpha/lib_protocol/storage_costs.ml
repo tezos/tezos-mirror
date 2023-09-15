@@ -32,9 +32,11 @@ include Storage_costs_generated
 *)
 let read_access ~path_length ~read_bytes =
   let open Saturation_repr in
-  let base_cost = safe_int (200_000 + (5000 * path_length)) in
+  let open S.Syntax in
   Gas_limit_repr.atomic_step_cost
-    (add base_cost (mul (safe_int 2) (safe_int read_bytes)))
+  @@ safe_int 200_000
+     + (safe_int 5000 * safe_int path_length)
+     + (safe_int 2 * safe_int read_bytes)
 
 (* The model for write accesses is the following:
 
@@ -42,8 +44,9 @@ let read_access ~path_length ~read_bytes =
 *)
 let write_access ~written_bytes =
   let open Saturation_repr in
+  let open S.Syntax in
   Gas_limit_repr.atomic_step_cost
-    (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
+  @@ (safe_int 200_000 + (safe_int 4 * safe_int written_bytes))
 
 (* generated code is not usable: the coeff is not generatable *)
 (* model storage/List_key_values *)

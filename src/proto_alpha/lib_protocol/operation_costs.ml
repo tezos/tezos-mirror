@@ -25,18 +25,18 @@
 
 open Alpha_context
 module S = Saturation_repr
-module S_syntax = S.Syntax
 module I = Michelson_v1_gas.Cost_of.Interpreter
 
 (* TODO:
    https://gitlab.com/tezos/tezos/-/issues/5141
    benchmark this. *)
 let serialization_cost size =
-  let open S_syntax in
+  let open S.Syntax in
   let v0 = S.safe_int size in
   v0 lsl 5
 
 let check_signature_cost (algo : I.algo) (operation : _ operation) =
+  let open S.Syntax in
   let size = Operation.unsigned_operation_length operation in
   Gas.atomic_step_cost
-    S_syntax.(serialization_cost size + I.check_signature_on_algo algo size)
+    (serialization_cost size + I.check_signature_on_algo algo size)
