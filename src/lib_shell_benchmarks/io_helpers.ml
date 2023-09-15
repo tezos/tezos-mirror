@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020-2021 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 DaiLambda, Inc. <contact@dailambda.jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,10 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** Helpers for loading contexts, saving contexts, writing to contexts, etc.
-    Also contains the [Key_map] module, heavily used for preparing benchmarks
-    and computing statistics. *)
 
 let assert_ok ~msg = function
   | Ok x -> x
@@ -92,11 +89,8 @@ let with_context ~base_dir ~context_hash f =
     let* () = Tezos_context.Context.close index in
     Lwt.return res)
 
-let prepare_base_dir base_dir =
-  Unix.unlink base_dir ;
-  Unix.mkdir base_dir 0o700
+let prepare_base_dir base_dir = Unix.unlink base_dir
 
-(* This function updates the context with random bytes at a given depth. *)
 let initialize_key rng_state context path storage_size =
   let bytes = Base_samplers.uniform_bytes rng_state ~nbytes:storage_size in
   Tezos_protocol_environment.Context.add context path bytes
@@ -107,8 +101,6 @@ let commit_and_reload base_dir index context =
   let* () = Tezos_context.Context.close index in
   load_context_from_disk_lwt base_dir context_hash
 
-(** Maps from string lists to bytes. No balancing. A key cannot be a prefix
-    or a suffix to another key. *)
 module Key_map = struct
   module String_map = String.Map
 
@@ -301,3 +293,45 @@ let rec copy_rec source dest =
         source ;
       set_infos dest infos
   | _ -> prerr_endline ("Can't cope with special file " ^ source)
+
+let split_absolute_path s =
+  (* Must start with / *)
+  if s = "" || s.[0] <> '/' then None
+  else
+    let ss = String.split_no_empty '/' s in
+    (* Must not contain ., .. *)
+    if List.exists (function "." | ".." -> true | _ -> false) ss then None
+    else Some ss
+
+let load_head_block data_dir =
+  let chain_id = "NetXdQprcVkpa" in
+  let genesis =
+    let config =
+      let fn_config =
+        Printf.sprintf "%s/store/chain_%s/config.json" data_dir chain_id
+      in
+      let config =
+        Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.read_file fn_config
+      in
+      match Data_encoding.Json.from_string config with
+      | Error s -> Stdlib.failwith s
+      | Ok config ->
+          Data_encoding.Json.destruct
+            Tezos_store_shared.Store_types.chain_config_encoding
+            config
+    in
+    config.genesis
+  in
+  let open Lwt_result_syntax in
+  let open Tezos_store.Store in
+  let* store =
+    init
+      ~store_dir:(Filename.concat data_dir "store")
+      ~context_dir:(Filename.concat data_dir "context")
+      ~allow_testchains:false
+      genesis
+  in
+  let chain_store = main_chain_store store in
+  let*! head = Chain.current_head chain_store in
+  let*! () = close_store store in
+  return (Block.level head, Block.hash head, Block.context_hash head)

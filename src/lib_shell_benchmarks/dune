@@ -13,6 +13,7 @@
   octez-libs.tezos-crypto
   octez-libs.tezos-context
   octez-shell-libs.tezos-shell-context
+  octez-shell-libs.tezos-store
   octez-libs.tezos-micheline)
  (library_flags (:standard -linkall))
  (flags

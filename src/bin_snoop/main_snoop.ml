@@ -926,6 +926,68 @@ module Auto_build = struct
         mich_fn ;
       None)
 
+  let get_head_context_hash data_dir =
+    match
+      Lwt_main.run @@ Tezos_shell_benchmarks.Io_helpers.load_head_block data_dir
+    with
+    | Error e ->
+        Format.eprintf
+          "Error: %a@."
+          Tezos_error_monad.Error_monad.pp_print_trace
+          e ;
+        Format.eprintf "Failed to find a Tezos context at %s@." data_dir ;
+        exit 1
+    | Ok res -> res
+
+  (* Assumes the data files are found in [_snoop/tezos_node] *)
+  let make_io_read_random_key_benchmark_config dest ns =
+    let open Tezos_shell_benchmarks.Io_benchmarks.Read_random_key_bench in
+    let data_dir = "_snoop/tezos-node" in
+    let context_dir = Filename.concat data_dir "context" in
+    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    Format.eprintf
+      "Using %s, Context_hash: %a; Block: %ld %a@."
+      context_dir
+      Context_hash.pp
+      context_hash
+      level
+      Block_hash.pp
+      block_hash ;
+    let config =
+      {
+        existing_context = (context_dir, context_hash);
+        subdirectory = "/contracts/index";
+      }
+    in
+    let json = Data_encoding.Json.construct config_encoding config in
+    Config.(save_config dest (build [(ns, json)])) ;
+    Some dest
+
+  (* Assumes the data files are found in [_snoop/tezos_node] *)
+  let make_io_write_random_keys_benchmark_config dest ns =
+    let open Tezos_shell_benchmarks.Io_benchmarks.Write_random_keys_bench in
+    let data_dir = "_snoop/tezos-node" in
+    let context_dir = Filename.concat data_dir "context" in
+    let level, block_hash, context_hash = get_head_context_hash data_dir in
+    Format.eprintf
+      "Using %s, Context_hash: %a; Block: %ld %a@."
+      context_dir
+      Context_hash.pp
+      context_hash
+      level
+      Block_hash.pp
+      block_hash ;
+    let config =
+      {
+        default_config with
+        existing_context = (context_dir, context_hash);
+        subdirectory = "/contracts/index";
+      }
+    in
+    let json = Data_encoding.Json.construct config_encoding config in
+    Config.(save_config dest (build [(ns, json)])) ;
+    Some dest
+
   (* Benchmark specific config overrides *)
   let override_measure_options ~outdir ~bench_name measure_options =
     let open Measure in
@@ -956,11 +1018,21 @@ module Auto_build = struct
             dest
             bench_name
             "_snoop/michelson_data/data.mich"
+      | ["."; "io"; "READ_RANDOM_KEY"] ->
+          make_io_read_random_key_benchmark_config dest bench_name
+      | ["."; "io"; "WRITE_RANDOM_KEYS"] ->
+          make_io_write_random_keys_benchmark_config dest bench_name
       | _ -> None
     in
     (* override [bench_number] and [nsamples] for intercept and TIMER_LATENCY *)
     let bench_number, nsamples =
       match Namespace.to_list bench_name with
+      | "." :: "io" :: _ ->
+          (* Currently, IO benchmarks reloads the context and purges the disk cache only
+             once for each benchmark.  [nsamples] must be 1 otherwise the second and later
+             samples are executed with the caches available.
+          *)
+          (bench_number, 1)
       | ["."; "interpreter"; "N_IOpen_chest"; "intercept"] ->
           (* Timings of [IOpen_chest] are highly affected by hidden randomness
              of [puzzle].  We need multiple [bench_number] to avoid this effect.
