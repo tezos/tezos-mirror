@@ -42,7 +42,7 @@ type cost = Saturation_repr.may_saturate Saturation_repr.t
  *)
 let find_cost ~compare_key_cost ~size =
   (* intercept: carbonated_map/find/intercept *)
-  let intercept = S.safe_int 50 in
+  let intercept = cost_find_intercept in
   let size = S.safe_int size in
   let compare_cost = log2 size * compare_key_cost in
   (* traversal_overhead: carbonated_map/find/traversal_overhead *)
