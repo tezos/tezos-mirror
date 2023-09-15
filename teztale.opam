@@ -10,6 +10,7 @@ depends: [
   "caqti-driver-sqlite3"
   "caqti-driver-postgresql"
   "dune" { >= "2.7" }
+  "ezgzip"
   "octez-shell-libs"
   "safepass"
   "tls-lwt"

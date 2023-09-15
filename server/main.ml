@@ -142,11 +142,7 @@ let with_caqti_error x f =
           let body = Caqti_error.show e in
           Cohttp_lwt_unix.Server.respond_error ~body ())
 
-(** Returns [data] as JSON (encoded via [encoding]) to the client *)
-let reply_json ?(status = `OK) ?headers:(headers_arg = []) encoding data =
-  let body =
-    Ezjsonm.value_to_string (Data_encoding.Json.construct encoding data)
-  in
+let reply_json0 ?(status = `OK) ?headers:(headers_arg = []) body =
   let headers =
     Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
   in
@@ -158,9 +154,42 @@ let reply_json ?(status = `OK) ?headers:(headers_arg = []) encoding data =
   in
   Cohttp_lwt_unix.Server.respond_string ~headers ~status ~body ()
 
+let reply_compressed_json0 ?status ?(headers = []) encoding data =
+  let body =
+    Ezjsonm.value_to_string (Data_encoding.Json.construct encoding data)
+  in
+  let compressed = Ezgzip.compress body in
+  let headers = ("Content-Encoding", "gzip") :: headers in
+  reply_json0 ?status ~headers compressed
+
+(** Returns [data] as JSON (encoded via [encoding]) to the client *)
+let reply_json ?status ?headers encoding data =
+  reply_json0
+    ?status
+    ?headers
+    (Ezjsonm.value_to_string (Data_encoding.Json.construct encoding data))
+
 (** Same as {!reply_json} with extra "Access-Control-Allow-Origin: *" header. *)
-let reply_public_json encoding data =
-  reply_json ~headers:[("Access-Control-Allow-Origin", "*")] encoding data
+let reply_public_json ?status ?(headers = []) encoding data =
+  reply_json
+    ?status
+    ~headers:(("Access-Control-Allow-Origin", "*") :: headers)
+    encoding
+    data
+
+let reply_compressed_json ?status ?(headers = []) encoding data =
+  reply_compressed_json0
+    ?status
+    ~headers:(("Content-Encoding", "gzip") :: headers)
+    encoding
+    data
+
+let reply_public_compressed_json ?status ?(headers = []) encoding data =
+  reply_compressed_json
+    ?status
+    ~headers:(("Access-Control-Allow-Origin", "*") :: headers)
+    encoding
+    data
 
 let get_stats db_pool =
   let query =
@@ -672,7 +701,9 @@ let routes :
                    db_pool
                    (Int32.of_string min, Int32.of_string max))
                 (fun data ->
-                  reply_public_json Teztale_lib.Data.batch_encoding data)) );
+                  reply_public_compressed_json
+                    Teztale_lib.Data.batch_encoding
+                    data)) );
     ( Re.seq
         [
           Re.str "/";
