@@ -127,6 +127,95 @@ let test_reward_coeff_ratio () =
   in
   return_unit
 
+let test_compute_bonus () =
+  let open Delegate.Rewards.Internal_for_tests in
+  let open Lwt_result_wrap_syntax in
+  let assert_fun ~loc ~f a b = Assert.equal ~loc f "" Q.pp_print a b in
+  let assert_eq ~loc a b = Assert.equal ~loc Q.equal "" Q.pp_print a b in
+  let reward_params =
+    Default_parameters.constants_test.adaptive_issuance.adaptive_rewards_params
+  in
+  (* For simplicity, one cycle = one day *)
+  let seconds_per_cycle = 86_400L in
+  let compute_bonus frozen total previous =
+    assert (frozen <= total) ;
+    Lwt_main.run
+      (let total_supply = Tez_repr.of_mutez_exn total in
+       let total_frozen_stake = Tez_repr.of_mutez_exn frozen in
+       let*?@ previous_bonus =
+         Issuance_bonus_repr.of_Q ~max_bonus:reward_params.max_bonus previous
+       in
+       let*?@ bonus =
+         compute_bonus
+           ~seconds_per_cycle
+           ~total_supply
+           ~total_frozen_stake
+           ~previous_bonus
+           ~reward_params
+       in
+       return (bonus :> Q.t))
+    |> Result.value_f ~default:(fun () -> assert false)
+  in
+  let small_bonus = Q.(1 // 200) (* 0.5% *) in
+  (* Test deadzone *)
+  let* () =
+    assert_eq ~loc:__LOC__ (compute_bonus 48L 100L small_bonus) small_bonus
+  in
+  let* () =
+    assert_eq ~loc:__LOC__ (compute_bonus 52L 100L small_bonus) small_bonus
+  in
+  let* () =
+    assert_fun
+      ~loc:__LOC__
+      ~f:Q.gt
+      (compute_bonus 47_9999L 100_0000L small_bonus)
+      small_bonus
+  in
+  let* () =
+    assert_fun
+      ~loc:__LOC__
+      ~f:Q.lt
+      (compute_bonus 52_0001L 100_0000L small_bonus)
+      small_bonus
+  in
+  (* Test variation amplitude *)
+  let variation = Q.(1 // 10_000) (* 0.01% *) in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_bonus 47L 100L small_bonus)
+      (Q.add small_bonus variation)
+  in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_bonus 40L 100L small_bonus)
+      (Q.add small_bonus (Q.mul variation (Q.of_int 8)))
+  in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_bonus 53L 100L small_bonus)
+      (Q.sub small_bonus variation)
+  in
+  let* () =
+    assert_eq
+      ~loc:__LOC__
+      (compute_bonus 60L 100L small_bonus)
+      (Q.sub small_bonus (Q.mul variation (Q.of_int 8)))
+  in
+  (* Test bounds *)
+  let max_bonus = (reward_params.max_bonus :> Q.t) in
+  let* () = assert_eq ~loc:__LOC__ (compute_bonus 60L 100L Q.zero) Q.zero in
+  let* () =
+    assert_fun
+      ~loc:__LOC__
+      ~f:Q.leq
+      (compute_bonus 40L 100L max_bonus)
+      max_bonus
+  in
+  return_unit
+
 let tests =
   Tztest.
     [
@@ -138,6 +227,10 @@ let tests =
         "adaptive issuance - reward coeff ratio computation"
         `Quick
         test_reward_coeff_ratio;
+      tztest
+        "adaptive issuance - reward bonus computation"
+        `Quick
+        test_compute_bonus;
     ]
 
 let () =
