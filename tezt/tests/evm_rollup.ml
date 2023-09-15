@@ -2208,8 +2208,11 @@ let test_rpc_sendRawTransaction =
     ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
   unit
 
+let by_block_arg_string by =
+  match by with `Hash -> "Hash" | `Number -> "Number"
+
 let get_transaction_by_block_arg_and_index_request ~by arg index =
-  let by = match by with `Hash -> "Hash" | `Number -> "Number" in
+  let by = by_block_arg_string by in
   Evm_proxy_server.
     {
       method_ = "eth_getTransactionByBlock" ^ by ^ "AndIndex";
@@ -2710,10 +2713,7 @@ let test_reboot =
   unit
 
 let block_transaction_count_by ~by arg =
-  let method_ =
-    "eth_getBlockTransactionCountBy"
-    ^ match by with `Hash -> "Hash" | `Number -> "Number"
-  in
+  let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in
   Evm_proxy_server.{method_; parameters = `A [`String arg]}
 
 let get_block_transaction_count_by proxy_server ~by arg =
@@ -2775,6 +2775,51 @@ let test_rpc_getBlockTransactionCountBy =
        got %L" ;
   unit
 
+let uncle_count_by_block_arg_request ~by arg =
+  let method_ = "eth_getUncleCountByBlock" ^ by_block_arg_string by in
+  Evm_proxy_server.{method_; parameters = `A [`String arg]}
+
+let get_uncle_count_by_block_arg proxy_server ~by arg =
+  let* uncle_count =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (uncle_count_by_block_arg_request ~by arg)
+  in
+  return JSON.(uncle_count |-> "result" |> as_int64)
+
+let test_rpc_getUncleCountByBlock =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_uncle_count_by_block"]
+    ~title:
+      "RPC methods eth_getUncleCountByBlockHash and \
+       eth_getUncleCountByBlockNumber"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let* block =
+    Eth_cli.get_block ~block_id:"0" ~endpoint:evm_proxy_server_endpoint
+  in
+  let* uncle_count =
+    get_uncle_count_by_block_arg
+      evm_proxy_server
+      ~by:`Hash
+      (Option.get block.hash)
+  in
+  Check.((uncle_count = Int64.zero) int64)
+    ~error_msg:
+      "Expected %R uncles with eth_getUncleCountByBlockHash, but got %L" ;
+  let* uncle_count =
+    get_uncle_count_by_block_arg
+      evm_proxy_server
+      ~by:`Number
+      (Int32.to_string block.number)
+  in
+  Check.((uncle_count = Int64.zero) int64)
+    ~error_msg:
+      "Expected %R uncles with eth_getUncleCountByBlockNumber, but got %L" ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2823,7 +2868,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
   test_reboot protocols ;
-  test_rpc_getBlockTransactionCountBy protocols
+  test_rpc_getBlockTransactionCountBy protocols ;
+  test_rpc_getUncleCountByBlock protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;
