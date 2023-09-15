@@ -41,3 +41,5 @@ val ( +? ) : t -> t -> t tzresult
     function is applied on a [Stake_repr.t], the limits should already
     have been applied using [apply_limits] if necessary. *)
 val staking_weight : t -> int64
+
+val compare : t -> t -> int

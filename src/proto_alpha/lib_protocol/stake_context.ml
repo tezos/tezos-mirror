@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let compare _ctxt s1 s2 =
-  Int64.compare (Stake_repr.staking_weight s1) (Stake_repr.staking_weight s2)
-
 let apply_limits ctxt staking_parameters
     {Full_staking_balance_repr.own_frozen; staked_frozen; delegated} =
   let open Result_syntax in

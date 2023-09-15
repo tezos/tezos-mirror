@@ -40,5 +40,3 @@ val baking_weight :
   Staking_parameters_repr.t ->
   Full_staking_balance_repr.t ->
   int64 tzresult
-
-val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int
