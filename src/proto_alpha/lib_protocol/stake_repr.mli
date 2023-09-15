@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 (** Stake of a delegate. *)
-type t = private {frozen : Tez_repr.t; delegated : Tez_repr.t}
+type t = private {frozen : Tez_repr.t; weighted_delegated : Tez_repr.t}
 
 val zero : t
 
-val make : frozen:Tez_repr.t -> delegated:Tez_repr.t -> t
+val make : frozen:Tez_repr.t -> weighted_delegated:Tez_repr.t -> t
 
 val encoding : t Data_encoding.t
 

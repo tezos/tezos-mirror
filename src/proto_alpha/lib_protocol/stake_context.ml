@@ -25,15 +25,10 @@
 
 open Stake_repr
 
-let staking_weight ctxt {frozen; delegated} =
+let staking_weight _ctxt {frozen; weighted_delegated} =
   let frozen = Tez_repr.to_mutez frozen in
-  let delegated = Tez_repr.to_mutez delegated in
-  let edge_of_staking_over_delegation =
-    Constants_storage.adaptive_issuance_edge_of_staking_over_delegation ctxt
-  in
-  if Constants_storage.adaptive_issuance_enable ctxt then
-    Int64.(add frozen (div delegated (of_int edge_of_staking_over_delegation)))
-  else Int64.add frozen delegated
+  let weighted_delegated = Tez_repr.to_mutez weighted_delegated in
+  Int64.add frozen weighted_delegated
 
 let compare ctxt s1 s2 =
   Int64.compare (staking_weight ctxt s1) (staking_weight ctxt s2)
@@ -42,7 +37,10 @@ let voting_weight ctxt
     {Full_staking_balance_repr.own_frozen; staked_frozen; delegated} =
   let open Result_syntax in
   let+ frozen = Tez_repr.(own_frozen +? staked_frozen) in
-  staking_weight ctxt (Stake_repr.make ~frozen ~delegated)
+  let (* we are cheating here but that's fine *) weighted_delegated =
+    delegated
+  in
+  staking_weight ctxt (Stake_repr.make ~frozen ~weighted_delegated)
 
 let apply_limits ctxt staking_parameters
     {Full_staking_balance_repr.own_frozen; staked_frozen; delegated} =
@@ -90,8 +88,18 @@ let apply_limits ctxt staking_parameters
     | Ok max_allowed_delegated -> Tez_repr.min max_allowed_delegated delegated
     | Error _max_allowed_delegated_overflows -> delegated
   in
+  let* weighted_delegated =
+    if Constants_storage.adaptive_issuance_enable ctxt then
+      let edge_of_staking_over_delegation =
+        Int64.of_int
+          (Constants_storage.adaptive_issuance_edge_of_staking_over_delegation
+             ctxt)
+      in
+      Tez_repr.(delegated /? edge_of_staking_over_delegation)
+    else return delegated
+  in
   let+ frozen = Tez_repr.(own_frozen +? allowed_staked_frozen) in
-  Stake_repr.make ~frozen ~delegated
+  Stake_repr.make ~frozen ~weighted_delegated
 
 let baking_weight ctxt staking_parameters f =
   let open Result_syntax in

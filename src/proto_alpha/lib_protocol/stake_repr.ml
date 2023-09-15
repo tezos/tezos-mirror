@@ -22,23 +22,26 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6380
+   Stitching is needed for current Stake_repr *)
+type t = {frozen : Tez_repr.t; weighted_delegated : Tez_repr.t}
 
-let make ~frozen ~delegated = {frozen; delegated}
+let make ~frozen ~weighted_delegated = {frozen; weighted_delegated}
 
 let get_frozen {frozen; _} = frozen
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {frozen; delegated} -> (frozen, delegated))
-    (fun (frozen, delegated) -> {frozen; delegated})
+    (fun {frozen; weighted_delegated} -> (frozen, weighted_delegated))
+    (fun (frozen, weighted_delegated) -> {frozen; weighted_delegated})
     (obj2 (req "frozen" Tez_repr.encoding) (req "delegated" Tez_repr.encoding))
 
-let zero = make ~frozen:Tez_repr.zero ~delegated:Tez_repr.zero
+let zero = make ~frozen:Tez_repr.zero ~weighted_delegated:Tez_repr.zero
 
-let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
+let ( +? ) {frozen = f1; weighted_delegated = d1}
+    {frozen = f2; weighted_delegated = d2} =
   let open Result_syntax in
   let* frozen = Tez_repr.(f1 +? f2) in
-  let+ delegated = Tez_repr.(d1 +? d2) in
-  {frozen; delegated}
+  let+ weighted_delegated = Tez_repr.(d1 +? d2) in
+  {frozen; weighted_delegated}

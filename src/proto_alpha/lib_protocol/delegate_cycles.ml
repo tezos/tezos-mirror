@@ -72,7 +72,7 @@ let update_initial_frozen_deposits ctxt ~new_cycle =
   let* ctxt, delegates_to_remove =
     List.fold_left_es
       (fun (ctxt, delegates_to_remove)
-           (delegate, Stake_repr.{frozen; delegated = _}) ->
+           (delegate, Stake_repr.{frozen; weighted_delegated = _}) ->
         let delegates_to_remove =
           Signature.Public_key_hash.Set.remove delegate delegates_to_remove
         in

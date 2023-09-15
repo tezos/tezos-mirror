@@ -89,22 +89,20 @@ Preconditions:
  - 0 <= [edge_of_baking_over_staking_billionth]  <= 1_000_000_000
 *)
 let compute_reward_distrib ~stake ~edge_of_baking_over_staking_billionth
-    ~edge_of_staking_over_delegation ~(rewards : Tez_repr.t) =
-  let ({frozen; delegated} : Stake_repr.t) = stake in
+    ~edge_of_staking_over_delegation:_ ~(rewards : Tez_repr.t) =
+  let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
   (* convert into Q *)
-  let delegated = (* >= 0 *) Q.of_int64 @@ Tez_repr.to_mutez delegated in
+  let weighted_delegated =
+    (* >= 0 *) Q.of_int64 @@ Tez_repr.to_mutez weighted_delegated
+  in
   let frozen = (* >= 0 *) Q.of_int64 @@ Tez_repr.to_mutez frozen in
   let baking_over_staking_edge (* 0 <= baking_over_staking_edge <= 1 *) =
     Q.(of_int32 edge_of_baking_over_staking_billionth / of_int 1_000_000_000)
-  in
-  let edge_of_staking_over_delegation (* > 0 ? *) =
-    Q.of_int edge_of_staking_over_delegation
   in
   let rewards_q = Q.of_int64 @@ Tez_repr.to_mutez rewards in
   (* compute in Q *)
   let to_frozen =
     let open Q in
-    let weighted_delegated = delegated / edge_of_staking_over_delegation in
     let total_stake = weighted_delegated + frozen in
     if total_stake <= zero then zero
     else
