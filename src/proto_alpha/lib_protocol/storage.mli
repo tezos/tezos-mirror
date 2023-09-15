@@ -511,7 +511,7 @@ module Stake : sig
   module Staking_balance :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Stake_repr.Full.t
+       and type value = Full_staking_balance_repr.t
        and type snapshot = int
        and type t := Raw_context.t
 

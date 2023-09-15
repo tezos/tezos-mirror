@@ -31,7 +31,7 @@
 val apply_limits :
   Raw_context.t ->
   Staking_parameters_repr.t ->
-  Stake_repr.Full.t ->
+  Full_staking_balance_repr.t ->
   Stake_repr.t tzresult
 
 (** The weight of a staker or a set of stakers. When adaptive
@@ -42,13 +42,14 @@ val apply_limits :
 val staking_weight : Raw_context.t -> Stake_repr.t -> int64
 
 (** The weight of a delegate used for voting rights. *)
-val voting_weight : Raw_context.t -> Stake_repr.Full.t -> int64 tzresult
+val voting_weight :
+  Raw_context.t -> Full_staking_balance_repr.t -> int64 tzresult
 
 (** The weight of a baker used for baking and attesting rights. *)
 val baking_weight :
   Raw_context.t ->
   Staking_parameters_repr.t ->
-  Stake_repr.Full.t ->
+  Full_staking_balance_repr.t ->
   int64 tzresult
 
 val compare : Raw_context.t -> Stake_repr.t -> Stake_repr.t -> int

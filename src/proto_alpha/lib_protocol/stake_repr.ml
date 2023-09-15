@@ -100,5 +100,3 @@ let ( +? ) {frozen = f1; delegated = d1} {frozen = f2; delegated = d2} =
   let* frozen = Tez_repr.(f1 +? f2) in
   let+ delegated = Tez_repr.(d1 +? d2) in
   {frozen; delegated}
-
-module Full = Full_staking_balance_repr

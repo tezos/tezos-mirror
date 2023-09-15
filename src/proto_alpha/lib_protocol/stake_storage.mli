@@ -35,7 +35,9 @@
 *)
 
 val get_full_staking_balance :
-  Raw_context.t -> Signature.public_key_hash -> Stake_repr.Full.t tzresult Lwt.t
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Full_staking_balance_repr.t tzresult Lwt.t
 
 val remove_delegated_stake :
   Raw_context.t ->
@@ -87,7 +89,10 @@ val fold :
 val fold_snapshot :
   Raw_context.t ->
   index:int ->
-  f:(Signature.Public_key_hash.t * Stake_repr.Full.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:
+    (Signature.Public_key_hash.t * Full_staking_balance_repr.t ->
+    'a ->
+    'a tzresult Lwt.t) ->
   init:'a ->
   'a tzresult Lwt.t
 

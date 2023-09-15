@@ -53,5 +53,3 @@ val encoding : t Data_encoding.t
 val get_frozen : t -> Tez_repr.t
 
 val ( +? ) : t -> t -> t tzresult
-
-module Full = Full_staking_balance_repr
