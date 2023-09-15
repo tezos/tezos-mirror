@@ -5,6 +5,3 @@ This is a package containing some libraries related to the Tezos protocol.
 It contains the following libraries:
 
 - {{!module-Tezos_protocol_environment}Tezos_protocol_environment}
-- {{!module-Tezos_protocol_environment_sigs}Tezos_protocol_environment_sigs}
-- {{!module-Tezos_protocol_environment_sigs_internals}Tezos_protocol_environment_sigs_internals}
-- {{!module-Tezos_protocol_environment_structs}Tezos_protocol_environment_structs}
