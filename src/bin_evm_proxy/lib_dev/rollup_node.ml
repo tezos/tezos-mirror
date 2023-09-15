@@ -51,6 +51,7 @@ let encode_transaction ~smart_rollup_address kind =
 
 let make_evm_inbox_transactions tx_raw =
   let open Result_syntax in
+  let tx_raw = Ethereum_types.hex_to_bytes tx_raw in
   (* Maximum size describes the maximum size of [tx_raw] to fit
      in a simple transaction. *)
   let transaction_tag_size = 1 in
@@ -82,7 +83,6 @@ let make_evm_inbox_transactions tx_raw =
 
 let make_encoded_messages ~smart_rollup_address tx_raw =
   let open Result_syntax in
-  let tx_raw = Ethereum_types.hash_to_bytes tx_raw in
   let* tx_hash, messages = make_evm_inbox_transactions tx_raw in
   let messages =
     List.map
@@ -116,7 +116,7 @@ module Durable_storage_path = struct
 
     let code = "/code"
 
-    let account (Address s) = accounts ^ "/" ^ s
+    let account (Address (Hex s)) = accounts ^ "/" ^ s
 
     let balance address = account address ^ balance
 
@@ -134,7 +134,7 @@ module Durable_storage_path = struct
 
     let number = "/number"
 
-    let by_hash (Block_hash hash) = blocks ^ "/" ^ hash
+    let by_hash (Block_hash (Hex hash)) = blocks ^ "/" ^ hash
 
     let current_number = blocks ^ "/current" ^ number
 
@@ -283,8 +283,8 @@ module RPC = struct
     let+ answer = call_service ~base durable_state_value () {key} () in
     match answer with
     | Some bytes ->
-        bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hash_of_string
-    | None -> Ethereum_types.Hash ""
+        bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
+    | None -> Ethereum_types.Hex ""
 
   let inject_raw_transaction base tx =
     let open Lwt_result_syntax in
@@ -301,7 +301,8 @@ module RPC = struct
       make_encoded_messages ~smart_rollup_address tx_raw
     in
     let* () = List.iter_es (inject_raw_transaction base) messages in
-    return (Ethereum_types.Hash Hex.(of_string tx_hash |> show))
+    return
+      (Ethereum_types.Hash Hex.(of_string tx_hash |> show |> hex_of_string))
 
   exception Invalid_block_structure of string
 
@@ -328,7 +329,7 @@ module RPC = struct
   let current_block_number base () =
     block_number base Durable_storage_path.Block.Current
 
-  let transaction_receipt base (Hash tx_hash) =
+  let transaction_receipt base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
     let+ bytes =
       inspect_durable_and_decode_opt
@@ -340,7 +341,7 @@ module RPC = struct
     | Some bytes -> Some (Ethereum_types.transaction_receipt_from_rlp bytes)
     | None -> None
 
-  let transaction_object base (Hash tx_hash) =
+  let transaction_object base (Hash (Hex tx_hash)) =
     let open Lwt_result_syntax in
     let+ bytes =
       inspect_durable_and_decode_opt
@@ -481,8 +482,7 @@ module RPC = struct
     in
     Simulation.gas_estimation r
 
-  let is_tx_valid base tx_raw =
-    let (Hash tx_raw) = tx_raw in
+  let is_tx_valid base (Hex tx_raw) =
     let open Lwt_result_syntax in
     let*? messages = Simulation.encode_tx tx_raw in
     let insight_requests =
@@ -514,10 +514,10 @@ module type S = sig
 
   val nonce : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
-  val code : Ethereum_types.address -> Ethereum_types.hash tzresult Lwt.t
+  val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
 
   val inject_raw_transaction :
-    smart_rollup_address:string -> hash -> hash tzresult Lwt.t
+    smart_rollup_address:string -> hex -> hash tzresult Lwt.t
 
   val current_block :
     full_transaction_object:bool -> Ethereum_types.block tzresult Lwt.t
@@ -553,7 +553,7 @@ module type S = sig
   val estimate_gas :
     Ethereum_types.call -> Ethereum_types.quantity tzresult Lwt.t
 
-  val is_tx_valid : Ethereum_types.hash -> (unit, string) result tzresult Lwt.t
+  val is_tx_valid : Ethereum_types.hex -> (unit, string) result tzresult Lwt.t
 end
 
 module Make (Base : sig
