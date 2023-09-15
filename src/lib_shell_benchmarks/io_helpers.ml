@@ -61,6 +61,12 @@ let commit context =
          (Int64.of_int (int_of_float @@ Unix.gettimeofday ())))
     context
 
+let flush context =
+  let open Lwt.Syntax in
+  let context = Tezos_shell_context.Shell_context.unwrap_disk_context context in
+  let+ context = Tezos_context.Context.flush context in
+  Tezos_shell_context.Shell_context.wrap_disk_context context
+
 let prepare_empty_context base_dir =
   let open Lwt_result_syntax in
   let* index, context, _context_hash = prepare_genesis base_dir in
@@ -458,3 +464,52 @@ let with_memory_restriction gib f =
   let res = f restrict in
   List.iter Dummy_memory.deallocate !blocks ;
   res
+
+let fill_disk_cache ~rng ~restrict_memory context keys_list =
+  let open Lwt.Syntax in
+  let nkeys =
+    List.fold_left (fun acc keys -> acc + Array.length keys) 0 keys_list
+  in
+  Format.eprintf "Filling the disk cache...@." ;
+  (* Allocate memory to restrict the size of disk cache *)
+  let rec fill_cache context = function
+    | 0 -> Lwt.return context
+    | n ->
+        let i = Random.State.int rng nkeys in
+        let rec get_ith i = function
+          | [] -> invalid_arg "get_ith"
+          | keys :: keys_list ->
+              let len = Array.length keys in
+              if len <= i then get_ith (i - len) keys_list else keys.(i)
+        in
+        let* _ =
+          Tezos_protocol_environment.Context.find
+            context
+            (fst @@ get_ith i keys_list)
+        in
+        fill_cache context (n - 1)
+  in
+  let rec loop context cond n =
+    let* context = flush context in
+    let* context = fill_cache context 10000 in
+    restrict_memory () ;
+    let meminfo = Meminfo.get () in
+    match cond with
+    | `End_in 0 -> Lwt.return_unit
+    | `End_in m -> loop context (`End_in (m - 1)) (n + 1)
+    | `Caching _ when n >= 20 ->
+        Format.eprintf "Filling the disk cache: enough tried@." ;
+        Lwt.return_unit
+    | `Caching _
+      when meminfo.memAvailable - meminfo.buffers - meminfo.cached
+           < 1024_00 (* 100MiB *) ->
+        (* Most of the [MemAvailable] is now used for the buffer and cache. *)
+        Format.eprintf "Filling the disk cache: reaching a fixed point@." ;
+        (* We loop 5 more times *)
+        loop context (`End_in 5) (n + 1)
+    | `Caching _ -> loop context (`Caching meminfo.cached) (n + 1)
+  in
+  let* () = loop context (`Caching 0) 0 in
+  let meminfo = Meminfo.get () in
+  Format.eprintf "%a@." Meminfo.pp meminfo ;
+  Lwt.return_unit
