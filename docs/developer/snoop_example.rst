@@ -241,7 +241,7 @@ of the grid used when prettifying constants (in nanoseconds).
 
 .. code-block:: JSON
 
-   { "precision": 5, "max_relative_error": 0.1, "cast_mode": "Round", "inverse_scaling": 3, "resolution": 5 }
+   { "precision": 6, "max_relative_error": 0.1, "cast_mode": "Round", "inverse_scaling": 10, "resolution": 5 }
 
 Calling the tool:
 
