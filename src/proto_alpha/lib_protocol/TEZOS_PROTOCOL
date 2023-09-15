@@ -116,6 +116,7 @@
         "Sapling_repr",
         "Lazy_storage_kind",
         "Full_staking_balance_repr",
+        "Staker_repr",
         "Stake_repr",
         "Receipt_repr",
         "Migration_repr",
