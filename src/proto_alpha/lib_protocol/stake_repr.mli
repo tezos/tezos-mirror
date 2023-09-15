@@ -36,3 +36,8 @@ val encoding : t Data_encoding.t
 val get_frozen : t -> Tez_repr.t
 
 val ( +? ) : t -> t -> t tzresult
+
+(** The weight of a staker or a set of stakers. Since this
+    function is applied on a [Stake_repr.t], the limits should already
+    have been applied using [apply_limits] if necessary. *)
+val staking_weight : t -> int64

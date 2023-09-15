@@ -45,3 +45,8 @@ let ( +? ) {frozen = f1; weighted_delegated = d1}
   let* frozen = Tez_repr.(f1 +? f2) in
   let+ weighted_delegated = Tez_repr.(d1 +? d2) in
   {frozen; weighted_delegated}
+
+let staking_weight {frozen; weighted_delegated} =
+  let frozen = Tez_repr.to_mutez frozen in
+  let weighted_delegated = Tez_repr.to_mutez weighted_delegated in
+  Int64.add frozen weighted_delegated
