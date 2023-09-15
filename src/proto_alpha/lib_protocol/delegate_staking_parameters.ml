@@ -79,17 +79,15 @@ type reward_distrib = {to_frozen : Tez_repr.t; to_spendable : Tez_repr.t}
 
 (** Compute the reward distribution between frozen and spendable according to:
     - the [stake] of the delegate composed of the [frozen] deposits and the
-      [delegated] tokens.
+      [weighted_delegated] tokens.
     - the [edge_of_baking_over_staking_billionth] parameter set by the baker in 1_000_000_000th
-    - the [edge_of_staking_over_delegation] constant.
     - the [rewards] to be distributed
 
 Preconditions:
- - [edge_of_staking_over_delegation] > 0
  - 0 <= [edge_of_baking_over_staking_billionth]  <= 1_000_000_000
 *)
 let compute_reward_distrib ~stake ~edge_of_baking_over_staking_billionth
-    ~edge_of_staking_over_delegation:_ ~(rewards : Tez_repr.t) =
+    ~(rewards : Tez_repr.t) =
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
   (* convert into Q *)
   let weighted_delegated =
@@ -130,16 +128,10 @@ let compute_reward_distrib ctxt delegate stake rewards =
   let edge_of_baking_over_staking_billionth =
     delegate_parameter.edge_of_baking_over_staking_billionth
   in
-  let edge_of_staking_over_delegation =
-    if Constants_storage.adaptive_issuance_enable ctxt then
-      Constants_storage.adaptive_issuance_edge_of_staking_over_delegation ctxt
-    else 1
-  in
   Lwt.return
   @@ compute_reward_distrib
        ~stake
        ~edge_of_baking_over_staking_billionth
-       ~edge_of_staking_over_delegation
        ~rewards
 
 let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
