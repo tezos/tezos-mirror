@@ -44,9 +44,10 @@ end
 
 module Make_encoder (V : VALUE) : ENCODER with type t := V.t = struct
   let of_bytes ~key b =
+    let open Result_syntax in
     match Data_encoding.Binary.of_bytes_opt V.encoding b with
-    | None -> error (Raw_context.Storage_error (Corrupted_data (key ())))
-    | Some v -> Ok v
+    | None -> tzfail (Raw_context.Storage_error (Corrupted_data (key ())))
+    | Some v -> return v
 
   let to_bytes v =
     match Data_encoding.Binary.to_bytes_opt V.encoding v with
@@ -63,9 +64,10 @@ let encode_len_value bytes =
   Data_encoding.(Binary.to_bytes_exn int31) length
 
 let decode_len_value key len =
+  let open Result_syntax in
   match Data_encoding.(Binary.of_bytes_opt int31) len with
-  | None -> error (Raw_context.Storage_error (Corrupted_data key))
-  | Some len -> ok len
+  | None -> tzfail (Raw_context.Storage_error (Corrupted_data key))
+  | Some len -> return len
 
 module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
   Raw_context.T with type t = C.t and type local_context = C.local_context =
@@ -168,29 +170,51 @@ struct
   include Make_encoder (V)
 
   let get t =
-    C.get t N.name >>=? fun b ->
+    let open Lwt_result_syntax in
+    let* b = C.get t N.name in
     let key () = C.absolute_key t N.name in
-    Lwt.return (of_bytes ~key b)
+    let*? v = of_bytes ~key b in
+    return v
 
   let find t =
-    C.find t N.name >|= function
-    | None -> Result.return_none
+    let open Lwt_result_syntax in
+    let*! bytes_opt = C.find t N.name in
+    match bytes_opt with
+    | None -> return_none
     | Some b ->
         let key () = C.absolute_key t N.name in
-        of_bytes ~key b >|? fun v -> Some v
+        let*? v = of_bytes ~key b in
+        return_some v
 
-  let init t v = C.init t N.name (to_bytes v) >|=? fun t -> C.project t
+  let init t v =
+    let open Lwt_result_syntax in
+    let+ t = C.init t N.name (to_bytes v) in
+    C.project t
 
-  let update t v = C.update t N.name (to_bytes v) >|=? fun t -> C.project t
+  let update t v =
+    let open Lwt_result_syntax in
+    let+ t = C.update t N.name (to_bytes v) in
+    C.project t
 
-  let add t v = C.add t N.name (to_bytes v) >|= fun t -> C.project t
+  let add t v =
+    let open Lwt_syntax in
+    let+ t = C.add t N.name (to_bytes v) in
+    C.project t
 
   let add_or_remove t v =
-    C.add_or_remove t N.name (Option.map to_bytes v) >|= fun t -> C.project t
+    let open Lwt_syntax in
+    let+ t = C.add_or_remove t N.name (Option.map to_bytes v) in
+    C.project t
 
-  let remove t = C.remove t N.name >|= fun t -> C.project t
+  let remove t =
+    let open Lwt_syntax in
+    let+ t = C.remove t N.name in
+    C.project t
 
-  let remove_existing t = C.remove_existing t N.name >|=? fun t -> C.project t
+  let remove_existing t =
+    let open Lwt_result_syntax in
+    let+ t = C.remove_existing t N.name in
+    C.project t
 
   let () =
     let open Storage_description in
@@ -245,11 +269,20 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   let mem s i = C.mem s (I.to_path i [])
 
-  let add s i = C.add s (I.to_path i []) inited >|= fun t -> C.project t
+  let add s i =
+    let open Lwt_syntax in
+    let+ t = C.add s (I.to_path i []) inited in
+    C.project t
 
-  let remove s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
+  let remove s i =
+    let open Lwt_syntax in
+    let+ t = C.remove s (I.to_path i []) in
+    C.project t
 
-  let clear s = C.remove s [] >|= fun t -> C.project t
+  let clear s =
+    let open Lwt_syntax in
+    let+ t = C.remove s [] in
+    C.project t
 
   let fold s ~order ~init ~f =
     C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
@@ -262,14 +295,18 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
     fold s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
   let () =
+    let open Lwt_result_syntax in
     let open Storage_description in
     let unpack = unpack I.args in
     register_value (* TODO fixme 'elements...' *)
       ~get:(fun c ->
         let c, k = unpack c in
-        mem c k >>= function true -> return_some true | false -> return_none)
+        let*! result = mem c k in
+        match result with true -> return_some true | false -> return_none)
       (register_indexed_subcontext
-         ~list:(fun c -> elements c >|= ok)
+         ~list:(fun c ->
+           let*! result = elements c in
+           return result)
          C.description
          I.args)
       Data_encoding.bool
@@ -298,39 +335,62 @@ struct
     | Some root -> return @@ C.Tree.is_empty root
 
   let get s i =
-    C.get s (I.to_path i []) >>=? fun b ->
+    let open Lwt_result_syntax in
+    let* b = C.get s (I.to_path i []) in
     let key () = C.absolute_key s (I.to_path i []) in
-    Lwt.return (of_bytes ~key b)
+    let*? v = of_bytes ~key b in
+    return v
 
   let find s i =
-    C.find s (I.to_path i []) >|= function
-    | None -> Result.return_none
+    let open Lwt_result_syntax in
+    let*! bytes_opt = C.find s (I.to_path i []) in
+    match bytes_opt with
+    | None -> return_none
     | Some b ->
         let key () = C.absolute_key s (I.to_path i []) in
-        of_bytes ~key b >|? fun v -> Some v
+        let*? v = of_bytes ~key b in
+        return_some v
 
   let update s i v =
-    C.update s (I.to_path i []) (to_bytes v) >|=? fun t -> C.project t
-
-  let init s i v =
-    C.init s (I.to_path i []) (to_bytes v) >|=? fun t -> C.project t
-
-  let add s i v = C.add s (I.to_path i []) (to_bytes v) >|= fun t -> C.project t
-
-  let add_or_remove s i v =
-    C.add_or_remove s (I.to_path i []) (Option.map to_bytes v) >|= fun t ->
+    let open Lwt_result_syntax in
+    let+ t = C.update s (I.to_path i []) (to_bytes v) in
     C.project t
 
-  let remove s i = C.remove s (I.to_path i []) >|= fun t -> C.project t
+  let init s i v =
+    let open Lwt_result_syntax in
+    let+ t = C.init s (I.to_path i []) (to_bytes v) in
+    C.project t
+
+  let add s i v =
+    let open Lwt_syntax in
+    let+ t = C.add s (I.to_path i []) (to_bytes v) in
+    C.project t
+
+  let add_or_remove s i v =
+    let open Lwt_syntax in
+    let+ t = C.add_or_remove s (I.to_path i []) (Option.map to_bytes v) in
+    C.project t
+
+  let remove s i =
+    let open Lwt_syntax in
+    let+ t = C.remove s (I.to_path i []) in
+    C.project t
 
   let remove_existing s i =
-    C.remove_existing s (I.to_path i []) >|=? fun t -> C.project t
+    let open Lwt_result_syntax in
+    let+ t = C.remove_existing s (I.to_path i []) in
+    C.project t
 
-  let clear s = C.remove s [] >|= fun t -> C.project t
+  let clear s =
+    let open Lwt_syntax in
+    let+ t = C.remove s [] in
+    C.project t
 
   let fold s ~order ~init ~f =
+    let open Lwt_syntax in
     C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
-        C.Tree.to_value tree >>= function
+        let* bytes_opt = C.Tree.to_value tree in
+        match bytes_opt with
         | Some v -> (
             match I.of_path file with
             | None -> assert false
@@ -338,8 +398,8 @@ struct
                 let key () = C.absolute_key s file in
                 match of_bytes ~key v with
                 | Ok v -> f path v acc
-                | Error _ -> Lwt.return acc))
-        | None -> Lwt.return acc)
+                | Error _ -> return acc))
+        | None -> return acc)
 
   let fold_keys s ~order ~init ~f =
     fold s ~order ~init ~f:(fun k _ acc -> f k acc)
@@ -352,6 +412,7 @@ struct
     fold_keys s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
   let () =
+    let open Lwt_result_syntax in
     let open Storage_description in
     let unpack = unpack I.args in
     register_value
@@ -359,7 +420,9 @@ struct
         let c, k = unpack c in
         find c k)
       (register_indexed_subcontext
-         ~list:(fun c -> keys c >|= ok)
+         ~list:(fun c ->
+           let*! result = keys c in
+           return result)
          C.description
          I.args)
       V.encoding
@@ -394,98 +457,133 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     C.consume_gas c (Storage_costs.read_access ~path_length ~read_bytes:0)
 
   let existing_size c i =
-    C.find c (len_key i) >|= function
-    | None -> ok (0, false)
-    | Some len -> decode_len_value (len_key i) len >|? fun len -> (len, true)
+    let open Lwt_result_syntax in
+    let*! bytes_opt = C.find c (len_key i) in
+    match bytes_opt with
+    | None -> return (0, false)
+    | Some len ->
+        let*? len = decode_len_value (len_key i) len in
+        return (len, true)
 
   let consume_read_gas get c i =
+    let open Lwt_result_syntax in
     let len_key = len_key i in
-    get c len_key >>=? fun len ->
+    let* len = get c len_key in
     let path_length = List.length @@ C.absolute_key c len_key in
-    Lwt.return
-      ( decode_len_value len_key len >>? fun read_bytes ->
-        let cost = Storage_costs.read_access ~path_length ~read_bytes in
-        C.consume_gas c cost )
+    let*? read_bytes = decode_len_value len_key len in
+    let cost = Storage_costs.read_access ~path_length ~read_bytes in
+    let*? t = C.consume_gas c cost in
+    return t
 
   (* For the future: here, we bill a generic cost for encoding the value
      to bytes. It would be cleaner for users of this functor to provide
      gas costs for the encoding. *)
   let consume_serialize_write_gas set c i v =
+    let open Lwt_result_syntax in
     let bytes = to_bytes v in
     let len = Bytes.length bytes in
-    C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len) >>?= fun c ->
+    let*? c = C.consume_gas c (Gas_limit_repr.alloc_mbytes_cost len) in
     let cost = Storage_costs.write_access ~written_bytes:len in
-    C.consume_gas c cost >>?= fun c ->
-    set c (len_key i) (encode_len_value bytes) >|=? fun c -> (c, bytes)
+    let*? c = C.consume_gas c cost in
+    let+ c = set c (len_key i) (encode_len_value bytes) in
+    (c, bytes)
 
   let consume_remove_gas del c i =
-    C.consume_gas c (Storage_costs.write_access ~written_bytes:0) >>?= fun c ->
+    let open Lwt_result_syntax in
+    let*? c = C.consume_gas c (Storage_costs.write_access ~written_bytes:0) in
     del c (len_key i)
 
   let mem s i =
+    let open Lwt_result_syntax in
     let key = data_key i in
-    consume_mem_gas s key >>?= fun s ->
-    C.mem s key >|= fun exists -> ok (C.project s, exists)
+    let*? s = consume_mem_gas s key in
+    let*! exists = C.mem s key in
+    return (C.project s, exists)
 
   let is_empty s =
+    let open Lwt_result_syntax in
     let root_key = [] in
-    consume_mem_gas s root_key >>?= fun s ->
-    C.find_tree s root_key >>= function
+    let*? s = consume_mem_gas s root_key in
+    let*! root_opt = C.find_tree s root_key in
+    match root_opt with
     | None -> return @@ (C.project s, true)
     | Some root ->
         let is_empty = C.Tree.is_empty root in
         return @@ (C.project s, is_empty)
 
   let get_unprojected s i =
-    consume_read_gas C.get s i >>=? fun s ->
-    C.get s (data_key i) >>=? fun b ->
+    let open Lwt_result_syntax in
+    let* s = consume_read_gas C.get s i in
+    let* b = C.get s (data_key i) in
     let key () = C.absolute_key s (data_key i) in
-    Lwt.return (of_bytes ~key b >|? fun v -> (s, v))
+    let*? v = of_bytes ~key b in
+    return (s, v)
 
-  let get s i = get_unprojected s i >|=? fun (s, v) -> (C.project s, v)
+  let get s i =
+    let open Lwt_result_syntax in
+    let+ s, v = get_unprojected s i in
+    (C.project s, v)
 
   let find s i =
+    let open Lwt_result_syntax in
     let key = data_key i in
-    consume_mem_gas s key >>?= fun s ->
-    C.mem s key >>= fun exists ->
-    if exists then get s i >|=? fun (s, v) -> (s, Some v)
+    let*? s = consume_mem_gas s key in
+    let*! exists = C.mem s key in
+    if exists then
+      let+ s, v = get s i in
+      (s, Some v)
     else return (C.project s, None)
 
   let update s i v =
-    existing_size s i >>=? fun (prev_size, _) ->
-    consume_serialize_write_gas C.update s i v >>=? fun (s, bytes) ->
-    C.update s (data_key i) bytes >|=? fun t ->
+    let open Lwt_result_syntax in
+    let* prev_size, _ = existing_size s i in
+    let* s, bytes = consume_serialize_write_gas C.update s i v in
+    let+ t = C.update s (data_key i) bytes in
     let size_diff = Bytes.length bytes - prev_size in
     (C.project t, size_diff)
 
   let init s i v =
-    consume_serialize_write_gas C.init s i v >>=? fun (s, bytes) ->
-    C.init s (data_key i) bytes >|=? fun t ->
+    let open Lwt_result_syntax in
+    let* s, bytes = consume_serialize_write_gas C.init s i v in
+    let+ t = C.init s (data_key i) bytes in
     let size = Bytes.length bytes in
     (C.project t, size)
 
   let add s i v =
-    let add s i v = C.add s i v >|= ok in
-    existing_size s i >>=? fun (prev_size, existed) ->
-    consume_serialize_write_gas add s i v >>=? fun (s, bytes) ->
-    add s (data_key i) bytes >|=? fun t ->
+    let open Lwt_result_syntax in
+    let add s i v =
+      let*! ctxt = C.add s i v in
+      return ctxt
+    in
+    let* prev_size, existed = existing_size s i in
+    let* s, bytes = consume_serialize_write_gas add s i v in
+    let+ t = add s (data_key i) bytes in
     let size_diff = Bytes.length bytes - prev_size in
     (C.project t, size_diff, existed)
 
   let remove s i =
-    let remove s i = C.remove s i >|= ok in
-    existing_size s i >>=? fun (prev_size, existed) ->
-    consume_remove_gas remove s i >>=? fun s ->
-    remove s (data_key i) >|=? fun t -> (C.project t, prev_size, existed)
+    let open Lwt_result_syntax in
+    let remove s i =
+      let*! ctxt = C.remove s i in
+      return ctxt
+    in
+    let* prev_size, existed = existing_size s i in
+    let* s = consume_remove_gas remove s i in
+    let+ t = remove s (data_key i) in
+    (C.project t, prev_size, existed)
 
   let clear s =
-    C.consume_gas s (Storage_costs.write_access ~written_bytes:0) >>?= fun s ->
-    C.remove s [] >>= fun t -> return (C.project t)
+    let open Lwt_result_syntax in
+    let*? s = C.consume_gas s (Storage_costs.write_access ~written_bytes:0) in
+    let*! t = C.remove s [] in
+    return (C.project t)
 
   let remove_existing s i =
-    existing_size s i >>=? fun (prev_size, _) ->
-    consume_remove_gas C.remove_existing s i >>=? fun s ->
-    C.remove_existing s (data_key i) >|=? fun t -> (C.project t, prev_size)
+    let open Lwt_result_syntax in
+    let* prev_size, _ = existing_size s i in
+    let* s = consume_remove_gas C.remove_existing s i in
+    let+ t = C.remove_existing s (data_key i) in
+    (C.project t, prev_size)
 
   let add_or_remove s i v =
     match v with None -> remove s i | Some v -> add s i v
@@ -497,44 +595,46 @@ module Make_indexed_carbonated_data_storage_INTERNAL
      [offset] is passed.
   *)
   let list_key_values ?(offset = 0) ?(length = max_int) s =
+    let open Lwt_result_syntax in
     let root = [] in
     let depth = `Eq I.path_length in
-    C.length s root >>= fun size ->
+    let*! size = C.length s root in
     (* Regardless of the [length] argument, all elements stored in the context
        are traversed. We therefore pay a gas cost proportional to the number of
        elements, given by [size], upfront. We also pay gas for decoding elements
        whenever they are loaded in the body of the fold. *)
-    C.consume_gas s (Storage_costs.list_key_values_traverse ~size) >>?= fun s ->
-    C.fold
-      s
-      root
-      ~depth
-      ~order:`Sorted
-      ~init:(ok (s, [], offset, length))
-      ~f:(fun file tree acc ->
-        match (C.Tree.kind tree, acc) with
-        | `Tree, Ok (s, rev_values, offset, length) -> (
-            if Compare.Int.(length <= 0) then
-              (* Keep going until the end, we have no means of short-circuiting *)
-              Lwt.return acc
-            else if Compare.Int.(offset > 0) then
-              (* Offset (first element) not reached yet *)
-              let offset = pred offset in
-              Lwt.return (Ok (s, rev_values, offset, length))
-            else
-              (* Nominal case *)
-              match I.of_path file with
-              | None -> assert false
-              | Some key ->
-                  (* This also accounts for gas for loading the element. *)
-                  get_unprojected s key >|=? fun (s, value) ->
-                  (s, (key, value) :: rev_values, 0, pred length))
-        | _ ->
-            (* Even if we run out of gas or fail in some other way, we still
-               traverse the whole tree. In this case there is no context to
-               update. *)
-            Lwt.return acc)
-    >|=? fun (s, rev_values, _offset, _length) ->
+    let*? s = C.consume_gas s (Storage_costs.list_key_values_traverse ~size) in
+    let+ s, rev_values, _offset, _length =
+      C.fold
+        s
+        root
+        ~depth
+        ~order:`Sorted
+        ~init:(Ok (s, [], offset, length))
+        ~f:(fun file tree acc ->
+          match (C.Tree.kind tree, acc) with
+          | `Tree, Ok (s, rev_values, offset, length) -> (
+              if Compare.Int.(length <= 0) then
+                (* Keep going until the end, we have no means of short-circuiting *)
+                Lwt.return acc
+              else if Compare.Int.(offset > 0) then
+                (* Offset (first element) not reached yet *)
+                let offset = pred offset in
+                Lwt.return (Ok (s, rev_values, offset, length))
+              else
+                (* Nominal case *)
+                match I.of_path file with
+                | None -> assert false
+                | Some key ->
+                    (* This also accounts for gas for loading the element. *)
+                    let+ s, value = get_unprojected s key in
+                    (s, (key, value) :: rev_values, 0, pred length))
+          | _ ->
+              (* Even if we run out of gas or fail in some other way, we still
+                 traverse the whole tree. In this case there is no context to
+                 update. *)
+              Lwt.return acc)
+    in
     (C.project s, List.rev rev_values)
 
   let fold_keys_unaccounted s ~order ~init ~f =
@@ -563,13 +663,17 @@ module Make_indexed_carbonated_data_storage_INTERNAL
 
   let () =
     let open Storage_description in
+    let open Lwt_result_syntax in
     let unpack = unpack I.args in
     register_value (* TODO export consumed gas ?? *)
       ~get:(fun c ->
         let c, k = unpack c in
-        find c k >|=? fun (_, v) -> v)
+        let+ _, v = find c k in
+        v)
       (register_indexed_subcontext
-         ~list:(fun c -> keys_unaccounted c >|= ok)
+         ~list:(fun c ->
+           let*! result = keys_unaccounted c in
+           return result)
          C.description
          I.args)
       V.encoding
@@ -657,13 +761,18 @@ module Make_indexed_data_snapshotable_storage
   let err_missing_key key = Raw_context.storage_error (Missing_key (key, Copy))
 
   let snapshot s id =
-    C.find_tree s data_name >>= function
+    let open Lwt_result_syntax in
+    let*! tree_opt = C.find_tree s data_name in
+    match tree_opt with
     | None -> Lwt.return (err_missing_key data_name)
     | Some tree ->
-        C.add_tree s (snapshot_path id) tree >|= (fun t -> C.project t) >|= ok
+        let*! t = C.add_tree s (snapshot_path id) tree in
+        return (C.project t)
 
   let fold_snapshot s id ~order ~init ~f =
-    C.find_tree s (snapshot_path id) >>= function
+    let open Lwt_result_syntax in
+    let*! tree_opt = C.find_tree s (snapshot_path id) in
+    match tree_opt with
     | None -> Lwt.return (err_missing_key data_name)
     | Some tree ->
         C_data.Tree.fold
@@ -673,8 +782,9 @@ module Make_indexed_data_snapshotable_storage
           ~order
           ~init:(Ok init)
           ~f:(fun file tree acc ->
-            acc >>?= fun acc ->
-            C.Tree.to_value tree >>= function
+            let*? acc in
+            let*! bytes_opt = C.Tree.to_value tree in
+            match bytes_opt with
             | Some v -> (
                 match I.of_path file with
                 | None -> assert false
@@ -686,7 +796,9 @@ module Make_indexed_data_snapshotable_storage
             | None -> return acc)
 
   let delete_snapshot s id =
-    C.remove s (snapshot_path id) >|= fun t -> C.project t
+    let open Lwt_syntax in
+    let+ t = C.remove s (snapshot_path id) in
+    C.project t
 end
 
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
@@ -705,7 +817,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   type local_context = C.local_context
 
-  let clear t = C.remove t [] >|= fun t -> C.project t
+  let clear t =
+    let open Lwt_syntax in
+    let+ t = C.remove t [] in
+    C.project t
 
   let is_empty i =
     let open Lwt_syntax in
@@ -729,17 +844,24 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   let err_missing_key key = Raw_context.storage_error (Missing_key (key, Copy))
 
   let copy t ~from ~to_ =
+    let open Lwt_result_syntax in
     let from = I.to_path from [] in
     let to_ = I.to_path to_ [] in
-    C.find_tree t from >>= function
+    let*! tree_opt = C.find_tree t from in
+    match tree_opt with
     | None -> Lwt.return (err_missing_key from)
-    | Some tree -> C.add_tree t to_ tree >|= ok
+    | Some tree ->
+        let*! ctxt = C.add_tree t to_ tree in
+        return ctxt
 
   let remove t k = C.remove t (I.to_path k [])
 
   let description =
+    let open Lwt_result_syntax in
     Storage_description.register_indexed_subcontext
-      ~list:(fun c -> keys c >|= ok)
+      ~list:(fun c ->
+        let*! result = keys c in
+        return result)
       C.description
       I.args
 
@@ -786,48 +908,70 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.list t ?offset ?length (to_key i k)
 
     let init c k v =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.init t (to_key i k) v >|=? fun t -> pack t i
+      let+ t = C.init t (to_key i k) v in
+      pack t i
 
     let init_tree c k v =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.init_tree t (to_key i k) v >|=? fun t -> pack t i
+      let+ t = C.init_tree t (to_key i k) v in
+      pack t i
 
     let update c k v =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.update t (to_key i k) v >|=? fun t -> pack t i
+      let+ t = C.update t (to_key i k) v in
+      pack t i
 
     let update_tree c k v =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.update_tree t (to_key i k) v >|=? fun t -> pack t i
+      let+ t = C.update_tree t (to_key i k) v in
+      pack t i
 
     let add c k v =
+      let open Lwt_syntax in
       let t, i = unpack c in
-      C.add t (to_key i k) v >|= fun t -> pack t i
+      let+ t = C.add t (to_key i k) v in
+      pack t i
 
     let add_tree c k v =
+      let open Lwt_syntax in
       let t, i = unpack c in
-      C.add_tree t (to_key i k) v >|= fun t -> pack t i
+      let+ t = C.add_tree t (to_key i k) v in
+      pack t i
 
     let add_or_remove c k v =
+      let open Lwt_syntax in
       let t, i = unpack c in
-      C.add_or_remove t (to_key i k) v >|= fun t -> pack t i
+      let+ t = C.add_or_remove t (to_key i k) v in
+      pack t i
 
     let add_or_remove_tree c k v =
+      let open Lwt_syntax in
       let t, i = unpack c in
-      C.add_or_remove_tree t (to_key i k) v >|= fun t -> pack t i
+      let+ t = C.add_or_remove_tree t (to_key i k) v in
+      pack t i
 
     let remove_existing c k =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.remove_existing t (to_key i k) >|=? fun t -> pack t i
+      let+ t = C.remove_existing t (to_key i k) in
+      pack t i
 
     let remove_existing_tree c k =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.remove_existing_tree t (to_key i k) >|=? fun t -> pack t i
+      let+ t = C.remove_existing_tree t (to_key i k) in
+      pack t i
 
     let remove c k =
+      let open Lwt_syntax in
       let t, i = unpack c in
-      C.remove t (to_key i k) >|= fun t -> pack t i
+      let+ t = C.remove t (to_key i k) in
+      pack t i
 
     let fold ?depth c k ~order ~init ~f =
       let t, i = unpack c in
@@ -866,8 +1010,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     type error += Operation_quota_exceeded = C.Operation_quota_exceeded
 
     let consume_gas c g =
+      let open Result_syntax in
       let t, i = unpack c in
-      C.consume_gas t g >>? fun t -> ok (pack t i)
+      let* t = C.consume_gas t g in
+      return (pack t i)
 
     let check_enough_gas c g =
       let t, _i = unpack c in
@@ -880,14 +1026,17 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.length t
 
     let with_local_context c k f =
+      let open Lwt_result_syntax in
       let t, i = unpack c in
-      C.with_local_context t (to_key i k) f >|=? fun (t, res) -> (pack t i, res)
+      let+ t, res = C.with_local_context t (to_key i k) f in
+      (pack t i, res)
 
     module Local_context = C.Local_context
   end
 
   let with_local_context s i f =
-    Raw_context.with_local_context (pack s i) [] f >|=? fun (c, x) ->
+    let open Lwt_result_syntax in
+    let+ c, x = Raw_context.with_local_context (pack s i) [] f in
     let s, _ = unpack c in
     (s, x)
 
@@ -904,30 +1053,38 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let mem s i = Raw_context.mem (pack s i) N.name
 
     let add s i =
-      Raw_context.add (pack s i) N.name inited >|= fun c ->
+      let open Lwt_syntax in
+      let+ c = Raw_context.add (pack s i) N.name inited in
       let s, _ = unpack c in
       C.project s
 
     let remove s i =
-      Raw_context.remove (pack s i) N.name >|= fun c ->
+      let open Lwt_syntax in
+      let+ c = Raw_context.remove (pack s i) N.name in
       let s, _ = unpack c in
       C.project s
 
     let clear s =
-      fold_keys s ~init:s ~order:`Sorted ~f:(fun i s ->
-          Raw_context.remove (pack s i) N.name >|= fun c ->
-          let s, _ = unpack c in
-          s)
-      >|= fun t -> C.project t
+      let open Lwt_syntax in
+      let+ t =
+        fold_keys s ~init:s ~order:`Sorted ~f:(fun i s ->
+            let+ c = Raw_context.remove (pack s i) N.name in
+            let s, _ = unpack c in
+            s)
+      in
+      C.project t
 
     let fold s ~order ~init ~f =
+      let open Lwt_syntax in
       fold_keys s ~order ~init ~f:(fun i acc ->
-          mem s i >>= function true -> f i acc | false -> Lwt.return acc)
+          let* result = mem s i in
+          match result with true -> f i acc | false -> Lwt.return acc)
 
     let elements s =
       fold s ~order:`Sorted ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
     let () =
+      let open Lwt_result_syntax in
       let open Storage_description in
       let unpack = unpack I.args in
       let description =
@@ -937,7 +1094,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
-          mem c k >>= function true -> return_some true | false -> return_none)
+          let*! result = mem c k in
+          match result with true -> return_some true | false -> return_none)
         (register_named_subcontext description N.name)
         Data_encoding.bool
   end
@@ -970,66 +1128,85 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let mem s i = Raw_context.mem (pack s i) N.name
 
     let get s i =
-      Raw_context.get (pack s i) N.name >>=? fun b ->
+      let open Lwt_result_syntax in
+      let* b = Raw_context.get (pack s i) N.name in
       let key () = Raw_context.absolute_key (pack s i) N.name in
-      Lwt.return (of_bytes ~key b)
+      let*? v = of_bytes ~key b in
+      return v
 
     let find s i =
-      Raw_context.find (pack s i) N.name >|= function
-      | None -> Result.return_none
+      let open Lwt_result_syntax in
+      let*! bytes_opt = Raw_context.find (pack s i) N.name in
+      match bytes_opt with
+      | None -> return_none
       | Some b ->
           let key () = Raw_context.absolute_key (pack s i) N.name in
-          of_bytes ~key b >|? fun v -> Some v
+          let*? v = of_bytes ~key b in
+          return_some v
 
     let update s i v =
-      Raw_context.update (pack s i) N.name (to_bytes v) >|=? fun c ->
+      let open Lwt_result_syntax in
+      let+ c = Raw_context.update (pack s i) N.name (to_bytes v) in
       let s, _ = unpack c in
       C.project s
 
     let init s i v =
-      Raw_context.init (pack s i) N.name (to_bytes v) >|=? fun c ->
+      let open Lwt_result_syntax in
+      let+ c = Raw_context.init (pack s i) N.name (to_bytes v) in
       let s, _ = unpack c in
       C.project s
 
     let add s i v =
-      Raw_context.add (pack s i) N.name (to_bytes v) >|= fun c ->
+      let open Lwt_syntax in
+      let+ c = Raw_context.add (pack s i) N.name (to_bytes v) in
       let s, _ = unpack c in
       C.project s
 
     let add_or_remove s i v =
-      Raw_context.add_or_remove (pack s i) N.name (Option.map to_bytes v)
-      >|= fun c ->
+      let open Lwt_syntax in
+      let+ c =
+        Raw_context.add_or_remove (pack s i) N.name (Option.map to_bytes v)
+      in
       let s, _ = unpack c in
       C.project s
 
     let remove s i =
-      Raw_context.remove (pack s i) N.name >|= fun c ->
+      let open Lwt_syntax in
+      let+ c = Raw_context.remove (pack s i) N.name in
       let s, _ = unpack c in
       C.project s
 
     let remove_existing s i =
-      Raw_context.remove_existing (pack s i) N.name >|=? fun c ->
+      let open Lwt_result_syntax in
+      let+ c = Raw_context.remove_existing (pack s i) N.name in
       let s, _ = unpack c in
       C.project s
 
     let clear s =
-      fold_keys s ~order:`Sorted ~init:s ~f:(fun i s ->
-          Raw_context.remove (pack s i) N.name >|= fun c ->
-          let s, _ = unpack c in
-          s)
-      >|= fun t -> C.project t
+      let open Lwt_syntax in
+      let+ t =
+        fold_keys s ~order:`Sorted ~init:s ~f:(fun i s ->
+            let+ c = Raw_context.remove (pack s i) N.name in
+            let s, _ = unpack c in
+            s)
+      in
+      C.project t
 
     let fold s ~order ~init ~f =
+      let open Lwt_syntax in
       fold_keys s ~order ~init ~f:(fun i acc ->
-          get s i >>= function Error _ -> Lwt.return acc | Ok v -> f i v acc)
+          let* value_opt = get s i in
+          match value_opt with Error _ -> return acc | Ok v -> f i v acc)
 
     let bindings s =
       fold s ~order:`Sorted ~init:[] ~f:(fun p v acc ->
           Lwt.return ((p, v) :: acc))
 
     let fold_keys s ~order ~init ~f =
+      let open Lwt_syntax in
       fold_keys s ~order ~init ~f:(fun i acc ->
-          mem s i >>= function false -> Lwt.return acc | true -> f i acc)
+          let* result = mem s i in
+          match result with false -> return acc | true -> f i acc)
 
     let keys s =
       fold_keys s ~order:`Sorted ~init:[] ~f:(fun p acc ->
@@ -1055,16 +1232,21 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       let mem local = Raw_context.Local_context.mem local N.name
 
       let get local =
-        Raw_context.Local_context.get local N.name >|= fun r ->
+        let open Lwt_result_syntax in
+        let* r = Raw_context.Local_context.get local N.name in
         let key () = Raw_context.Local_context.absolute_key local N.name in
-        r >>? of_bytes ~key
+        let*? v = of_bytes ~key r in
+        return v
 
       let find local =
-        Raw_context.Local_context.find local N.name >|= function
-        | None -> Result.return_none
+        let open Lwt_result_syntax in
+        let*! bytes_opt = Raw_context.Local_context.find local N.name in
+        match bytes_opt with
+        | None -> return_none
         | Some b ->
             let key () = Raw_context.Local_context.absolute_key local N.name in
-            of_bytes ~key b >|? fun v -> Some v
+            let*? v = of_bytes ~key b in
+            return_some v
 
       let init local v =
         Raw_context.Local_context.init local N.name (to_bytes v)
@@ -1113,79 +1295,112 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
         (Storage_costs.read_access ~path_length ~read_bytes:0)
 
     let existing_size c =
-      Raw_context.find c len_name >|= function
-      | None -> ok (0, false)
-      | Some len -> decode_len_value len_name len >|? fun len -> (len, true)
+      let open Lwt_result_syntax in
+      let*! bytes_opt = Raw_context.find c len_name in
+      match bytes_opt with
+      | None -> return (0, false)
+      | Some len ->
+          let*? len = decode_len_value len_name len in
+          return (len, true)
 
     let consume_read_gas get c =
+      let open Lwt_result_syntax in
       let path_length = List.length (Raw_context.absolute_key c N.name) + 1 in
-      get c len_name >>=? fun len ->
-      Lwt.return
-        ( decode_len_value len_name len >>? fun read_bytes ->
-          Raw_context.consume_gas
-            c
-            (Storage_costs.read_access ~path_length ~read_bytes) )
+      let* len = get c len_name in
+      let*? read_bytes = decode_len_value len_name len in
+      let*? c =
+        Raw_context.consume_gas
+          c
+          (Storage_costs.read_access ~path_length ~read_bytes)
+      in
+      return c
 
     let consume_write_gas set c v =
+      let open Lwt_result_syntax in
       let bytes = to_bytes v in
       let len = Bytes.length bytes in
-      Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:len)
-      >>?= fun c ->
-      set c len_name (encode_len_value bytes) >|=? fun c -> (c, bytes)
+      let*? c =
+        Raw_context.consume_gas
+          c
+          (Storage_costs.write_access ~written_bytes:len)
+      in
+      let+ c = set c len_name (encode_len_value bytes) in
+      (c, bytes)
 
     let consume_remove_gas del c =
-      Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:0)
-      >>?= fun c -> del c len_name
+      let open Lwt_result_syntax in
+      let*? c =
+        Raw_context.consume_gas c (Storage_costs.write_access ~written_bytes:0)
+      in
+      del c len_name
 
     let mem s i =
-      consume_mem_gas (pack s i) >>?= fun c ->
-      Raw_context.mem c data_name >|= fun res -> ok (Raw_context.project c, res)
+      let open Lwt_result_syntax in
+      let*? c = consume_mem_gas (pack s i) in
+      let*! res = Raw_context.mem c data_name in
+      return (Raw_context.project c, res)
 
     let get s i =
-      consume_read_gas Raw_context.get (pack s i) >>=? fun c ->
-      Raw_context.get c data_name >>=? fun b ->
+      let open Lwt_result_syntax in
+      let* c = consume_read_gas Raw_context.get (pack s i) in
+      let* b = Raw_context.get c data_name in
       let key () = Raw_context.absolute_key c data_name in
-      Lwt.return (of_bytes ~key b >|? fun v -> (Raw_context.project c, v))
+      let*? v = of_bytes ~key b in
+      return (Raw_context.project c, v)
 
     let find s i =
-      consume_mem_gas (pack s i) >>?= fun c ->
+      let open Lwt_result_syntax in
+      let*? c = consume_mem_gas (pack s i) in
       let s, _ = unpack c in
-      Raw_context.mem (pack s i) data_name >>= fun exists ->
-      if exists then get s i >|=? fun (s, v) -> (s, Some v)
+      let*! exists = Raw_context.mem (pack s i) data_name in
+      if exists then
+        let+ s, v = get s i in
+        (s, Some v)
       else return (C.project s, None)
 
     let update s i v =
-      existing_size (pack s i) >>=? fun (prev_size, _) ->
-      consume_write_gas Raw_context.update (pack s i) v >>=? fun (c, bytes) ->
-      Raw_context.update c data_name bytes >|=? fun c ->
+      let open Lwt_result_syntax in
+      let* prev_size, _ = existing_size (pack s i) in
+      let* c, bytes = consume_write_gas Raw_context.update (pack s i) v in
+      let+ c = Raw_context.update c data_name bytes in
       let size_diff = Bytes.length bytes - prev_size in
       (Raw_context.project c, size_diff)
 
     let init s i v =
-      consume_write_gas Raw_context.init (pack s i) v >>=? fun (c, bytes) ->
-      Raw_context.init c data_name bytes >|=? fun c ->
+      let open Lwt_result_syntax in
+      let* c, bytes = consume_write_gas Raw_context.init (pack s i) v in
+      let+ c = Raw_context.init c data_name bytes in
       let size = Bytes.length bytes in
       (Raw_context.project c, size)
 
     let add s i v =
-      let add c k v = Raw_context.add c k v >|= ok in
-      existing_size (pack s i) >>=? fun (prev_size, existed) ->
-      consume_write_gas add (pack s i) v >>=? fun (c, bytes) ->
-      add c data_name bytes >|=? fun c ->
+      let open Lwt_result_syntax in
+      let add c k v =
+        let*! ctxt = Raw_context.add c k v in
+        return ctxt
+      in
+      let* prev_size, existed = existing_size (pack s i) in
+      let* c, bytes = consume_write_gas add (pack s i) v in
+      let+ c = add c data_name bytes in
       let size_diff = Bytes.length bytes - prev_size in
       (Raw_context.project c, size_diff, existed)
 
     let remove s i =
-      let remove c k = Raw_context.remove c k >|= ok in
-      existing_size (pack s i) >>=? fun (prev_size, existed) ->
-      consume_remove_gas remove (pack s i) >>=? fun c ->
-      remove c data_name >|=? fun c ->
+      let open Lwt_result_syntax in
+      let remove c k =
+        let*! ctxt = Raw_context.remove c k in
+        return ctxt
+      in
+      let* prev_size, existed = existing_size (pack s i) in
+      let* c = consume_remove_gas remove (pack s i) in
+      let+ c = remove c data_name in
       (Raw_context.project c, prev_size, existed)
 
     let remove_existing s i =
-      existing_size (pack s i) >>=? fun (prev_size, _) ->
-      consume_remove_gas Raw_context.remove_existing (pack s i) >>=? fun c ->
-      Raw_context.remove_existing c data_name >|=? fun c ->
+      let open Lwt_result_syntax in
+      let* prev_size, _ = existing_size (pack s i) in
+      let* c = consume_remove_gas Raw_context.remove_existing (pack s i) in
+      let+ c = Raw_context.remove_existing c data_name in
       (Raw_context.project c, prev_size)
 
     let add_or_remove s i v =
@@ -1194,10 +1409,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let mem_unaccounted s i = Raw_context.mem (pack s i) data_name
 
     let fold_keys_unaccounted s ~order ~init ~f =
+      let open Lwt_syntax in
       fold_keys s ~order ~init ~f:(fun i acc ->
-          mem_unaccounted s i >>= function
-          | false -> Lwt.return acc
-          | true -> f i acc)
+          let* result = mem_unaccounted s i in
+          match result with false -> return acc | true -> f i acc)
 
     let keys_unaccounted s =
       fold_keys_unaccounted s ~order:`Sorted ~init:[] ~f:(fun p acc ->
@@ -1205,6 +1420,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let () =
       let open Storage_description in
+      let open Lwt_result_syntax in
       let unpack = unpack I.args in
       let description =
         if R.ghost then Storage_description.create ()
@@ -1213,7 +1429,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
-          find c k >|=? fun (_, v) -> v)
+          let+ _, v = find c k in
+          v)
         (register_named_subcontext description N.name)
         V.encoding
   end
