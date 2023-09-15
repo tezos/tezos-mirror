@@ -14,7 +14,7 @@ open S.Syntax
 let cost_compare_int = S.safe_int 5
 
 (* model carbonated_map/find *)
-(* fun size -> ((50. + ((log2 size) * 2.18333333333)) + ((log2 size) * 2.)) *)
+(* fun size -> (50. + ((log2 size) * 2.18333333333)) + ((log2 size) * 2.) *)
 let cost_find size =
   let size = S.safe_int size in
   let v0 = log2 size in
@@ -28,7 +28,7 @@ let cost_find size =
 let cost_find_intercept = S.safe_int 50
 
 (* model carbonated_map/fold *)
-(* fun size -> (50. + (24. * size)) *)
+(* fun size -> 50. + (24. * size) *)
 let cost_fold size =
   let size = S.safe_int size in
   let v0 = size in

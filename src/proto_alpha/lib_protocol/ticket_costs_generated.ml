@@ -10,7 +10,7 @@ module S = Saturation_repr
 open S.Syntax
 
 (* model tickets/COLLECT_TICKETS_STEP *)
-(* fun size -> (0. + (80. * size)) *)
+(* fun size -> 0. + (80. * size) *)
 let cost_COLLECT_TICKETS_STEP size =
   let size = S.safe_int size in
   let v0 = size in
@@ -25,7 +25,7 @@ let cost_COMPARE_CONTRACT = S.safe_int 10
 let cost_COMPARE_TICKET_HASH = S.safe_int 10
 
 (* model tickets/TYPE_HAS_TICKETS *)
-(* fun size -> (10. + (6. * size)) *)
+(* fun size -> 10. + (6. * size) *)
 let cost_TYPE_HAS_TICKETS size =
   let v0 = size in
   S.safe_int 10 + (v0 * S.safe_int 6)

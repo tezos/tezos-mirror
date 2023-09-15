@@ -132,6 +132,23 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
   let if_ cond ift iff = Exp.ifthenelse cond ift (Some iff)
 end
 
+(* Very similar to Codegen but for human eyes *)
+module Comment : Costlang.S with type 'a repr = Parsetree.expression = struct
+  include Codegen
+  open Ast_helper
+  open Codegen_helpers
+
+  let int i = Exp.constant (Const.int i)
+
+  let float f = Exp.constant @@ Const.float (string_of_float f)
+
+  let sat_sub x y = call ["sub"] [x; y]
+
+  let max x y = call ["max"] [x; y]
+
+  let min x y = call ["min"] [x; y]
+end
+
 let detach_funcs =
   let open Parsetree in
   let rec aux acc expr =
@@ -407,9 +424,12 @@ let codegen (Model.Model model) (sol : solution)
     let module Transform = Subst (struct
       let subst = subst
     end) in
-    let module X = Transform (Pp) in
+    let module X = Transform (Comment) in
     let module M = M.Def (X) in
     let expr = X.prj M.model in
+    (* Need to think the indentation by the comment head *)
+    let expr = Format.asprintf "(* @[%a@]" Pprintast.expression expr in
+    let expr = Stdlib.Option.get @@ String.remove_prefix ~prefix:"(* " expr in
     ["model " ^ Namespace.to_string model_name; expr]
   in
   let fun_name = function_name model_name in
