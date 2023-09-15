@@ -137,7 +137,6 @@ type error +=
       got : Distributed_db_version.Name.t;
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
-  | Wrong_snapshot_file of {filename : string}
 
 type snapshot_format = Tar | Raw
 

@@ -88,7 +88,6 @@ type error +=
       stored : History_mode.t;
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
-  | Wrong_snapshot_file of {filename : string}
   | Invalid_chain_store_export of Chain_id.t * string
   | Cannot_export_snapshot_format
 
@@ -543,20 +542,6 @@ let () =
     (function
       | Inconsistent_imported_block (got, exp) -> Some (got, exp) | _ -> None)
     (fun (got, exp) -> Inconsistent_imported_block (got, exp)) ;
-  register_error_kind
-    `Permanent
-    ~id:"Snapshot.wrong_snapshot_file"
-    ~title:"Wrong snapshot file"
-    ~description:"Error while opening snapshot file"
-    ~pp:(fun ppf filename ->
-      Format.fprintf
-        ppf
-        "Failed to read snapshot file %s. The provided file is inconsistent or \
-         is from Octez 12 (or before) and it cannot be imported anymore."
-        filename)
-    Data_encoding.(obj1 (req "filename" string))
-    (function Wrong_snapshot_file {filename} -> Some filename | _ -> None)
-    (fun filename -> Wrong_snapshot_file {filename}) ;
   register_error_kind
     `Permanent
     ~id:"Snapshot.invalid_chain_store_export"
@@ -1376,7 +1361,12 @@ end = struct
     let files = None in
     Lwt.return {current_pos = 0L; data_pos; fd; files}
 
-  let close_in t = Lwt_unix.close t.fd
+  let close_in t =
+    Lwt.catch
+      (fun () -> Lwt_unix.close t.fd)
+      (function
+        | Unix.(Unix_error (EBADF, _, _)) -> Lwt.return_unit
+        | exn -> Lwt.fail exn)
 
   (*[list_files tar] returns the list of files contained in the
      [tar]. *)
@@ -3052,15 +3042,14 @@ module Make_snapshot_loader (Loader : LOADER) : Snapshot_loader = struct
   let load_snapshot_header ~snapshot_path =
     let open Lwt_syntax in
     let* loader = load snapshot_path in
-    trace (Wrong_snapshot_file {filename = snapshot_path})
-    @@ protect
-         (fun () ->
-           Lwt.finalize
-             (fun () -> Loader.load_snapshot_header loader)
-             (fun () -> close loader))
-         ~on_error:(fun err ->
-           let* () = close loader in
-           Lwt.return_error err)
+    protect
+      (fun () ->
+        Lwt.finalize
+          (fun () -> Loader.load_snapshot_header loader)
+          (fun () -> close loader))
+      ~on_error:(fun err ->
+        let* () = close loader in
+        Lwt.return_error err)
 end
 
 module type IMPORTER = sig
