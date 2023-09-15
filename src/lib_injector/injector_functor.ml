@@ -358,7 +358,6 @@ module Make (Parameters : PARAMETERS) = struct
       emit_event_loaded "injected_operations"
       @@ Injected_operations.length injected_operations
     in
-
     let* included_operations =
       Included_operations.load_from_disk
         ~warn_unreadable
@@ -453,6 +452,11 @@ module Make (Parameters : PARAMETERS) = struct
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state oph ~injection_level operations =
     let open Lwt_result_syntax in
+    let*! () =
+      Event.(emit1 injected_ops)
+        state
+        (List.map (fun (_, o) -> o.Inj_operation.operation) operations)
+    in
     let infos =
       List.map
         (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))

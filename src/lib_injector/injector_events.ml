@@ -211,10 +211,18 @@ module Make
       let injected =
         declare_2
           ~name:"injected"
-          ~msg:"injected {nb} operations in {oph}"
+          ~msg:"Injected {nb} operations in {oph}"
           ~level:Notice
           ("nb", Data_encoding.int31)
           ("oph", Operation_hash.encoding)
+
+      let injected_ops =
+        declare_1
+          ~name:"injected_ops"
+          ~msg:"Injected operations: {operations}"
+          ~level:Notice
+          ("operations", Data_encoding.list Operation.encoding)
+          ~pp1:pp_operations_list
 
       let add_pending =
         declare_1
