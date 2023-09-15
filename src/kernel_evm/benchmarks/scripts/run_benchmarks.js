@@ -129,6 +129,7 @@ async function analyze_profiler_output(path) {
     kernel_run_ticks = await get_ticks(path, "kernel_run");
     run_transaction_ticks = await get_ticks(path, "run_transaction");
     signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
+    sputnik_runtime_ticks = await get_ticks(path, "11evm_runtime7Runtime3run");
     store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
@@ -141,6 +142,7 @@ async function analyze_profiler_output(path) {
         interpreter_init_ticks: interpreter_init_ticks,
         interpreter_decode_ticks: interpreter_decode_ticks,
         fetch_blueprint_ticks: fetch_blueprint_ticks,
+        sputnik_runtime_ticks: sputnik_runtime_ticks,
     };
 }
 
@@ -169,6 +171,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     gas_costs = run_benchmark_result.gas_costs;
     kernel_run_ticks = run_benchmark_result.kernel_run_ticks;
     run_transaction_ticks = run_benchmark_result.run_transaction_ticks;
+    sputnik_runtime_ticks = run_benchmark_result.sputnik_runtime_ticks
     signature_verification_ticks = run_benchmark_result.signature_verification_ticks;
     store_transaction_object_ticks = run_benchmark_result.store_transaction_object_ticks;
     interpreter_init_ticks = run_benchmark_result.interpreter_init_ticks;
@@ -178,21 +181,27 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
 
     unaccounted_ticks = sumArray(kernel_run_ticks) - sumArray(run_transaction_ticks) - sumArray(signature_verification_ticks) - sumArray(store_transaction_object_ticks) - sumArray(fetch_blueprint_ticks)
     console.log(`Number of transactions: ${tx_status.length}`)
+    run_time_index = 0;
     for (var j = 0; j < tx_status.length; j++) {
         if (tx_status[j].includes("OK")) {
-            rows.push([benchmark_name, gas_costs[j], run_transaction_ticks[j], signature_verification_ticks[j], store_transaction_object_ticks[j], "", "", "", "", "", tx_status[j]]);
+            sputnik_runtime_tick = (gas_costs[j] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
+            rows.push([benchmark_name, gas_costs[j], run_transaction_ticks[j], sputnik_runtime_tick, signature_verification_ticks[j], store_transaction_object_ticks[j], "", "", "", "", "", tx_status[j]]);
         } else {
             // we can expect no gas cost, no storage of the tx object, and no run transaction, but there will be signature verification
             // invalide transaction detected: ERROR_NONCE and ERROR_SIGNATURE, in both case `caller` is called.
-            rows.push([benchmark_name, "", "", signature_verification_ticks[j], "", "", "", "", "", "", tx_status[j]]);
+            rows.push([benchmark_name, "", "", "", signature_verification_ticks[j], "", "", "", "", "", "", tx_status[j]]);
 
         }
     }
 
-    for (var j = 0; j < kernel_run_ticks.length; j++) {
-        rows.push([benchmark_name + "(all)", "", "", "", "", interpreter_init_ticks[j], interpreter_decode_ticks[j], fetch_blueprint_ticks[j], kernel_run_ticks[j], "", ""]);
+    if (run_time_index !== sputnik_runtime_ticks.length) {
+        console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
-    rows.push([benchmark_name + "(all)", "", "", "", "", "", "", "", "", unaccounted_ticks, ""]);
+
+    for (var j = 0; j < kernel_run_ticks.length; j++) {
+        rows.push([benchmark_name + "(all)", "", "", "","", "", interpreter_init_ticks[j], interpreter_decode_ticks[j], fetch_blueprint_ticks[j], kernel_run_ticks[j], "", ""]);
+    }
+    rows.push([benchmark_name + "(all)", "", "", "", "", "", "", "", "", "", unaccounted_ticks, ""]);
     return rows;
 }
 
@@ -204,7 +213,7 @@ function output_filename() {
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: [${benchmark_scripts.join('\n  ')}]`);
-    var fields = ["benchmark_name", "gas_cost", "run_transaction_ticks", "signature_verification_ticks", "store_transaction_object_ticks", "interpreter_init_ticks", "interpreter_decode_ticks", "fetch_blueprint_ticks", "kernel_run_ticks", "unaccounted_ticks", "status"];
+    var fields = ["benchmark_name", "gas_cost", "run_transaction_ticks", "sputnik_runtime_ticks", "signature_verification_ticks", "store_transaction_object_ticks", "interpreter_init_ticks", "interpreter_decode_ticks", "fetch_blueprint_ticks", "kernel_run_ticks", "unaccounted_ticks", "status"];
     let output = output_filename();
     console.log(`Output in ${output}`);
     fs.writeFileSync(output, fields.join(",") + "\n");
