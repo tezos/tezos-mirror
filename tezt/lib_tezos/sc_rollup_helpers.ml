@@ -270,7 +270,8 @@ type bootstrap_smart_rollup_setup = {
 }
 
 let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
-    ?(parameters_ty = "string") ?base_installee ~installee ?config () =
+    ?(parameters_ty = "string") ?whitelist ?base_installee ~installee ?config ()
+    =
   (* Create a temporary directory to store the preimages. *)
   let smart_rollup_node_data_dir = Temp.dir (name ^ "-data-dir") in
 
@@ -296,7 +297,7 @@ let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
   in
 
   let bootstrap_smart_rollup : Protocol.bootstrap_smart_rollup =
-    {address; pvm_kind = "wasm_2_0_0"; boot_sector; parameters_ty}
+    {address; pvm_kind = "wasm_2_0_0"; boot_sector; parameters_ty; whitelist}
   in
 
   return

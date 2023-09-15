@@ -107,6 +107,7 @@ type bootstrap_smart_rollup = {
   pvm_kind : string;
   boot_sector : string;
   parameters_ty : Ezjsonm.value;
+  whitelist : string list option;
 }
 
 let default_bootstrap_balance = 4_000_000_000_000
@@ -162,14 +163,22 @@ let write_parameter_file :
     else
       let bootstrap_smart_rollups =
         List.map
-          (fun {address; pvm_kind; boot_sector; parameters_ty} ->
+          (fun {address; pvm_kind; boot_sector; parameters_ty; whitelist} ->
             `O
-              [
-                ("address", `String address);
-                ("pvm_kind", `String pvm_kind);
-                ("kernel", `String boot_sector);
-                ("parameters_ty", parameters_ty);
-              ])
+              ([
+                 ("address", `String address);
+                 ("pvm_kind", `String pvm_kind);
+                 ("kernel", `String boot_sector);
+                 ("parameters_ty", parameters_ty);
+               ]
+              @
+              match whitelist with
+              | Some whitelist ->
+                  [
+                    ( "whitelist",
+                      `A (List.map (fun key -> `String key) whitelist) );
+                  ]
+              | None -> []))
           bootstrap_smart_rollups
       in
       match bootstrap_smart_rollups with

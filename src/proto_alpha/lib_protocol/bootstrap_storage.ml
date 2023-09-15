@@ -149,7 +149,7 @@ let init_contract ~typecheck_smart_contract (ctxt, balance_updates)
   (ctxt, new_balance_updates @ balance_updates)
 
 let init_smart_rollup ~typecheck_smart_rollup ctxt
-    ({address; boot_sector; pvm_kind; parameters_ty} :
+    ({address; boot_sector; pvm_kind; parameters_ty; whitelist} :
       Parameters_repr.bootstrap_smart_rollup) =
   let open Lwt_result_syntax in
   let*? ctxt =
@@ -180,6 +180,7 @@ let init_smart_rollup ~typecheck_smart_rollup ctxt
       ~genesis_commitment
       ~parameters_ty
       ~address
+      ?whitelist
   in
   return ctxt
 

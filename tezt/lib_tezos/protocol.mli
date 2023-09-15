@@ -116,6 +116,7 @@ type bootstrap_smart_rollup = {
   pvm_kind : string;
   boot_sector : string;
   parameters_ty : Ezjsonm.value;
+  whitelist : string list option;
 }
 
 type bootstrap_contract = {
