@@ -37,7 +37,7 @@ module Cache_costs = struct
   (* Cost of calling [Environment_cache.update]. *)
   let cache_update ~cache_size_in_bytes =
     let approx_card = approximate_cardinal cache_size_in_bytes in
-    Cache_repr_costs.cost_CACHE_UPDATE approx_card
+    Cache_repr_costs.cache_update_cost approx_card
 
   (* Cost of calling [Environment_cache.find].
      This overapproximates [cache_find] slightly. *)

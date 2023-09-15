@@ -95,7 +95,7 @@ Contract memorized as sender.
 
 ./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
-Estimated gas: 1278.699 units (will add 100 for safety)
+Estimated gas: 1278.785 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -128,7 +128,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.731 units (will add 100 for safety)
+Estimated gas: 2948.860 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'

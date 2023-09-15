@@ -26,13 +26,5 @@
 
 include Cache_repr_costs_generated
 
-(* generated code is not usable: the model is different *)
-(* model cache/CACHE_UPDATE *)
-let cost_CACHE_UPDATE size =
-  let open S.Syntax in
-  let size = S.safe_int size in
-  let v0 = log2 size in
-  S.safe_int 600 + (v0 * S.safe_int 43)
-
-let cost_CACHE_UPDATE size =
+let cache_update_cost size =
   cost_CACHE_UPDATE size |> Gas_limit_repr.atomic_step_cost
