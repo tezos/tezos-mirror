@@ -54,20 +54,4 @@ val get_frozen : t -> Tez_repr.t
 
 val ( +? ) : t -> t -> t tzresult
 
-module Full : sig
-  type t = private {
-    own_frozen : Tez_repr.t;
-    staked_frozen : Tez_repr.t;
-    delegated : Tez_repr.t;
-  }
-
-  val make :
-    own_frozen:Tez_repr.t ->
-    staked_frozen:Tez_repr.t ->
-    delegated:Tez_repr.t ->
-    t
-
-  val zero : t
-
-  val encoding : t Data_encoding.t
-end
+module Full = Full_staking_balance_repr
