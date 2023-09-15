@@ -290,6 +290,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -348,6 +349,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -400,6 +402,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -596,6 +599,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -637,6 +641,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -768,6 +773,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -814,6 +820,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -861,6 +868,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -911,6 +919,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -956,6 +965,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: Some(vec![0u8; 32]),
+            withdrawals: vec![],
         });
 
         assert_eq!(expected_result, result);
@@ -1128,6 +1138,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         // assert that call fails
@@ -1203,6 +1214,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         // assert that call fails
@@ -1309,6 +1321,7 @@ mod test {
             new_address: None,
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(result, expected_result);
@@ -1399,6 +1412,7 @@ mod test {
             new_address: None,
             logs: vec![log_record1],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(result, expected_result);
@@ -1478,6 +1492,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: Some(vec![]),
+            withdrawals: vec![],
         });
 
         assert_eq!(result, expected_result);
@@ -1578,6 +1593,7 @@ mod test {
             new_address: None,
             logs: vec![],
             result: None,
+            withdrawals: vec![],
         });
 
         assert_eq!(result, expected_result);
