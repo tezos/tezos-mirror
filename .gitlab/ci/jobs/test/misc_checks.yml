@@ -13,3 +13,16 @@ misc_checks:
     - ./scripts/ci/take_ownership.sh
     - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
+
+kaitai_checks:
+  extends:
+    - .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 0
+  needs: [trigger]
+  needs:
+    - "build_x86_64-released"
+  before_script:
+    - . ./scripts/version.sh
+  script:
+    - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files
