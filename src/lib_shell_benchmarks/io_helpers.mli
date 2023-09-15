@@ -109,6 +109,18 @@ val copy_rec : string -> string -> unit
 *)
 val split_absolute_path : string -> string list option
 
+(** Purge disk cache.
+
+    This function assumes Linux OS and [purge_disk_cache.exe] is placed
+    at the current directory, owned by root with setuid.
+    The source code for [purge_disk_cache.exe] is available at
+    [devtools/benchmarks-tools/purge_disk_cache/].
+
+    Even if the function fails to execute the command, it does NOT fail but
+    prints just a warning.
+*)
+val purge_disk_cache : unit -> unit
+
 (** [load_head_block data_dir] takes the path of the Tezos node data directory
     (typically [$HOME/.tezos-node]) and returns the information of the current head.
 *)

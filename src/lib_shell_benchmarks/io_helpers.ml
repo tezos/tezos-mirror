@@ -68,6 +68,13 @@ let prepare_empty_context base_dir =
   let*! () = Tezos_context.Context.close index in
   return context_hash
 
+let purge_disk_cache () =
+  Format.eprintf "Purging disk cache@." ;
+  let command = "./purge_disk_cache.exe" in
+  match Sys.command command with
+  | 0 -> ()
+  | n -> Format.eprintf "Warning: failed to execute %s: code: %d" command n
+
 let load_context_from_disk_lwt base_dir context_hash =
   let open Lwt_syntax in
   let* index = Tezos_context.Context.init ~readonly:false base_dir in
