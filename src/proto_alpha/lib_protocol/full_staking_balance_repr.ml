@@ -31,3 +31,9 @@ let encoding =
        (req "own_frozen" Tez_repr.encoding)
        (req "staked_frozen" Tez_repr.encoding)
        (req "delegated" Tez_repr.encoding))
+
+let voting_weight {own_frozen; staked_frozen; delegated} =
+  let open Result_syntax in
+  let* frozen = Tez_repr.(own_frozen +? staked_frozen) in
+  let+ all = Tez_repr.(frozen +? delegated) in
+  Tez_repr.to_mutez all

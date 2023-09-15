@@ -17,3 +17,6 @@ val make :
 val zero : t
 
 val encoding : t Data_encoding.t
+
+(** The weight of a delegate used for voting rights. *)
+val voting_weight : t -> Int64.t tzresult
