@@ -607,32 +607,37 @@ module Version = struct
    * - 1: snapshot exported with storage 0.0.1 to 0.0.4
    * - 2: snapshot exported with storage 0.0.4 to 0.0.6
    * - 3: snapshot exported with storage 0.0.7
-   * - 4: snapshot exported with storage 0.0.8 to current
+   * - 4: snapshot exported with storage 0.0.8
    * - 5: snapshot exported with new protocol tables and "à la GC"
-       context (storage 2.0 to current)*)
+       context (storage 2.0)
+   * - 6: new context representation introduced by irmin 3.7.2
+   *)
 
+  (* Used for old snapshot format versions *)
   let legacy_version = 4
 
-  let current_version = 5
+  let current_version = 6
 
   (* List of versions that are supported *)
   let supported_versions =
-    [(legacy_version, `Legacy); (current_version, `Current)]
+    [
+      (legacy_version, `Legacy_format); (5, `Legacy); (current_version, `Current);
+    ]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
     | Some _ -> true
     | None -> false
 
-  (* Returns true if the given version is considered as legacy. *)
-  let is_legacy version =
+  (* Returns true if the given version uses a legacy data format. *)
+  let is_legacy_format version =
     let open Lwt_result_syntax in
     match List.assq_opt version supported_versions with
     | None ->
         tzfail
           (Inconsistent_version_import
              {expected = List.map fst supported_versions; got = version})
-    | Some `Legacy -> return_true
+    | Some `Legacy_format -> return_true
     | Some _ -> return_false
 end
 
@@ -2919,8 +2924,8 @@ module Raw_loader : LOADER = struct
   let load_snapshot_header t =
     let open Lwt_result_syntax in
     let* version = load_snapshot_version t in
-    let* is_legacy = Version.is_legacy version in
-    if is_legacy then
+    let* is_legacy_format = Version.is_legacy_format version in
+    if is_legacy_format then
       let* legacy_metadata = load_snapshot_legacy_metadata t in
       return (Snapshot_header.Legacy (version, legacy_metadata))
     else
@@ -3019,8 +3024,8 @@ module Tar_loader : LOADER = struct
   let load_snapshot_header t =
     let open Lwt_result_syntax in
     let* version = load_snapshot_version t in
-    let* is_legacy = Version.is_legacy version in
-    if is_legacy then
+    let* is_legacy_format = Version.is_legacy_format version in
+    if is_legacy_format then
       let* legacy_metadata = load_snapshot_legacy_metadata t in
       return (Snapshot_header.Legacy (version, legacy_metadata))
     else
@@ -3160,9 +3165,9 @@ module Raw_importer : IMPORTER = struct
     match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
     | None -> (
-        let* is_legacy = Version.is_legacy t.version in
+        let* is_legacy_format = Version.is_legacy_format t.version in
         let* res =
-          if is_legacy then
+          if is_legacy_format then
             Data_encoding.Binary.of_string_opt
               legacy_block_data_encoding
               block_data
@@ -3251,8 +3256,8 @@ module Raw_importer : IMPORTER = struct
     in
     let*! table_bytes = Lwt_utils_unix.read_file protocol_tbl_filename in
     let* res =
-      let* is_legacy = Version.is_legacy t.version in
-      if is_legacy then
+      let* is_legacy_format = Version.is_legacy_format t.version in
+      if is_legacy_format then
         (* Use the legacy encoding *)
         match
           Data_encoding.Binary.of_string_opt
@@ -3518,9 +3523,9 @@ module Tar_importer : IMPORTER = struct
     let*! o = Onthefly.load_from_filename t.tar ~filename in
     match o with
     | Some str -> (
-        let* is_legacy = Version.is_legacy t.version in
+        let* is_legacy_format = Version.is_legacy_format t.version in
         let* res =
-          if is_legacy then
+          if is_legacy_format then
             Data_encoding.Binary.of_string_opt legacy_block_data_encoding str
             |> Option.map
                  (fun
@@ -3600,8 +3605,8 @@ module Tar_importer : IMPORTER = struct
     match o with
     | Some str -> (
         let* res =
-          let* is_legacy = Version.is_legacy t.version in
-          if is_legacy then
+          let* is_legacy_format = Version.is_legacy_format t.version in
+          if is_legacy_format then
             (* Use the legacy encoding *)
             match
               Data_encoding.Binary.of_string_opt
@@ -4298,7 +4303,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let* protocol_levels =
       restore_protocols snapshot_importer progress_display_mode
     in
-    let* legacy = Version.is_legacy snapshot_version in
+    let* legacy = Version.is_legacy_format snapshot_version in
     (* Restore context *)
     let* block_data, genesis_context_hash, block_validation_result =
       restore_and_apply_context
