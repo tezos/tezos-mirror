@@ -107,7 +107,7 @@ let init_account (ctxt, balance_updates)
               ctxt
               (`Contract contract)
               (`Frozen_deposits
-                (Stake_repr.Single
+                (Staker_repr.Single
                    (Contract_repr.Implicit public_key_hash, public_key_hash)))
               amount_to_freeze)
     | None ->

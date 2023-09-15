@@ -22,8 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-include Staker_repr
-
 type t = {frozen : Tez_repr.t; delegated : Tez_repr.t}
 
 let make ~frozen ~delegated = {frozen; delegated}

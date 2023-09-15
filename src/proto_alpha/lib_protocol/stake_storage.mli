@@ -47,7 +47,7 @@ val remove_delegated_stake :
 
 val remove_frozen_stake :
   Raw_context.t ->
-  Stake_repr.staker ->
+  Staker_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -59,7 +59,7 @@ val add_delegated_stake :
 
 val add_frozen_stake :
   Raw_context.t ->
-  Stake_repr.staker ->
+  Staker_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 

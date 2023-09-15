@@ -37,7 +37,7 @@ val get : Raw_context.t -> Contract_repr.t -> Deposits_repr.t tzresult Lwt.t
     given [staker] increases by [tez]. *)
 val credit_only_call_from_token :
   Raw_context.t ->
-  Stake_repr.staker ->
+  Staker_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -46,7 +46,7 @@ val credit_only_call_from_token :
    represented by [delegate] decreases by [tez].*)
 val spend_only_call_from_token :
   Raw_context.t ->
-  Stake_repr.staker ->
+  Staker_repr.staker ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 

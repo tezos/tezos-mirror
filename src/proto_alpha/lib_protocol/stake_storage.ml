@@ -185,7 +185,7 @@ let remove_shared_frozen_stake ctxt delegate amount =
 
 let remove_frozen_stake ctxt staker amount =
   match staker with
-  | Stake_repr.Single (contract, delegate)
+  | Staker_repr.Single (contract, delegate)
     when Contract_repr.(contract = Implicit delegate) ->
       remove_own_frozen_stake ctxt delegate amount
   | Single (_staker, delegate) ->
@@ -231,7 +231,7 @@ let add_shared_frozen_stake ctxt delegate amount =
 
 let add_frozen_stake ctxt staker amount =
   match staker with
-  | Stake_repr.Single (contract, delegate)
+  | Staker_repr.Single (contract, delegate)
     when Contract_repr.(contract = Implicit delegate) ->
       add_own_frozen_stake ctxt delegate amount
   | Single (_staker, delegate) -> add_staked_frozen_stake ctxt delegate amount

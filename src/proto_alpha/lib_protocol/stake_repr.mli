@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include module type of Staker_repr
-
 (** Stake of a delegate. *)
 type t = private {frozen : Tez_repr.t; delegated : Tez_repr.t}
 

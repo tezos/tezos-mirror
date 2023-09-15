@@ -70,7 +70,7 @@ let update_balance ~f ctxt delegate_contract cycle =
 
 let credit_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
+  let delegate = Staker_repr.staker_delegate staker in
   let delegate_contract = Contract_repr.Implicit delegate in
   let f deposits = Deposits_repr.(deposits +? amount) in
   let* ctxt = Stake_storage.add_delegated_stake ctxt delegate amount in
@@ -78,7 +78,7 @@ let credit_only_call_from_token ctxt staker cycle amount =
 
 let spend_only_call_from_token ctxt staker cycle amount =
   let open Lwt_result_syntax in
-  let delegate = Stake_repr.staker_delegate staker in
+  let delegate = Staker_repr.staker_delegate staker in
   let delegate_contract = Contract_repr.Implicit delegate in
   let f Deposits_repr.{initial_amount; current_amount} =
     let open Result_syntax in
