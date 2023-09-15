@@ -5,8 +5,5 @@ This is a package containing some libraries related to the Tezos 014-PtKathma pr
 It contains the following libraries:
 
 - {{!module-Tezos_client_014_PtKathma}Tezos_client_014_PtKathma}: Protocol specific library for `tezos-client`
-- {{!module-Tezos_client_014_PtKathma_commands}Tezos_client_014_PtKathma_commands}
-- {{!module-Tezos_client_014_PtKathma_commands_registration}Tezos_client_014_PtKathma_commands_registration}
-- {{!module-Tezos_client_sapling_014_PtKathma}Tezos_client_sapling_014_PtKathma}
 - {{!module-Tezos_protocol_plugin_014_PtKathma}Tezos_protocol_plugin_014_PtKathma}: Protocol plugin
 - {{!module-Tezos_protocol_plugin_014_PtKathma_registerer}Tezos_protocol_plugin_014_PtKathma_registerer}: Protocol plugin registerer
