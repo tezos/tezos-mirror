@@ -54,6 +54,11 @@ Node
   of the configuration file. They already had no effect on the node
   anymore. (MR :gl:`!10030`)
 
+- **Breaking change** Bumped the Octez snapshot version from ``5`` to
+  ``6`` to explicit the incompatibility with previous version
+  nodes. Also, improved the consistency of ``snapshot`` import errors
+  messages (MR :gl:`!10138`)
+
 Client
 ------
 
