@@ -44,12 +44,9 @@ let consume_gas_steps ctxt ~num_steps =
 let has_tickets_of_ty_cost ty =
   cost_TYPE_HAS_TICKETS Script_typed_ir.(ty_size ty |> Type_size.to_int)
 
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
-    Approximating 0.066076 x term *)
+(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg] *)
 let negate_cost z =
-  let size = (7 + Z.numbits z) / 8 in
-  let open S.Syntax in
-  S.safe_int 25 + (S.safe_int size lsr 4)
+  Michelson_v1_gas.Cost_of.Interpreter.neg (Script_int.of_zint z)
 
 (** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
 let add_int_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int
