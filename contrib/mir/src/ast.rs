@@ -5,11 +5,32 @@
 /*                                                                            */
 /******************************************************************************/
 
-use crate::ast::*;
-use crate::syntax;
-use lalrpop_util::ParseError;
-use lalrpop_util::lexer::Token;
+#[derive(Debug)]
+pub enum Type {
+    Nat,
+    Int,
+}
 
-pub fn parse(src: &str) -> Result<InstructionBlock,ParseError<usize, Token<'_>, &'static str>> {
-    syntax::instructionBlockParser::new().parse(src)
+#[derive(Debug)]
+pub enum Value {
+    NumberValue(i32),
+}
+
+pub type InstructionBlock = Vec<Instruction>;
+
+#[derive(Debug)]
+pub enum Instruction {
+    Add,
+    Dip(InstructionBlock),
+    DipN(usize, InstructionBlock),
+    Drop,
+    DropN(usize),
+    Dup,
+    DupN(usize),
+    Gt,
+    If(InstructionBlock, InstructionBlock),
+    Int,
+    Loop(InstructionBlock),
+    Push(Type, Value),
+    Swap,
 }
