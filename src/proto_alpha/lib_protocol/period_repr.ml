@@ -93,7 +93,7 @@ module Internal : INTERNAL = struct
     Data_encoding.(
       with_decoding_guard
         (fun t ->
-          if Compare.Int64.(t >= 0L) then Ok ()
+          if Compare.Int64.(t >= 0L) then Result_syntax.return_unit
           else Error "Positive int64 required")
         int64)
 
@@ -133,9 +133,10 @@ type period = Internal.t
 let to_seconds (t : Internal.t) = (t :> int64)
 
 let of_seconds secs =
+  let open Result_syntax in
   match Internal.create secs with
-  | Some v -> ok v
-  | None -> error (Malformed_period secs)
+  | Some v -> return v
+  | None -> tzfail (Malformed_period secs)
 
 let of_seconds_exn t =
   match Internal.create t with
@@ -143,17 +144,19 @@ let of_seconds_exn t =
   | None -> invalid_arg "Period.of_seconds_exn"
 
 let mult i p =
+  let open Result_syntax in
   match Internal.create (Int64.of_int32 i) with
-  | None -> error Invalid_arg
+  | None -> tzfail Invalid_arg
   | Some iper -> (
       match Internal.mult_ iper p with
-      | None -> error Period_overflow
-      | Some res -> ok res)
+      | None -> tzfail Period_overflow
+      | Some res -> return res)
 
 let add p1 p2 =
+  let open Result_syntax in
   match Internal.add_ p1 p2 with
-  | None -> error Period_overflow
-  | Some res -> ok res
+  | None -> tzfail Period_overflow
+  | Some res -> return res
 
 let ( +? ) = add
 

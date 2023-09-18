@@ -121,32 +121,36 @@ let pp ppf (Tez_tag amount) =
 let to_string t = Format.asprintf "%a" pp t
 
 let ( -? ) tez1 tez2 =
+  let open Result_syntax in
   let (Tez_tag t1) = tez1 in
   let (Tez_tag t2) = tez2 in
-  if t2 <= t1 then ok (Tez_tag (Int64.sub t1 t2))
-  else error (Subtraction_underflow (tez1, tez2))
+  if t2 <= t1 then return (Tez_tag (Int64.sub t1 t2))
+  else tzfail (Subtraction_underflow (tez1, tez2))
 
 let sub_opt (Tez_tag t1) (Tez_tag t2) =
   if t2 <= t1 then Some (Tez_tag (Int64.sub t1 t2)) else None
 
 let ( +? ) tez1 tez2 =
+  let open Result_syntax in
   let (Tez_tag t1) = tez1 in
   let (Tez_tag t2) = tez2 in
   let t = Int64.add t1 t2 in
-  if t < t1 then error (Addition_overflow (tez1, tez2)) else ok (Tez_tag t)
+  if t < t1 then tzfail (Addition_overflow (tez1, tez2)) else return (Tez_tag t)
 
 let ( *? ) tez m =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if m < 0L then error (Negative_multiplicator (tez, m))
-  else if m = 0L then ok (Tez_tag 0L)
+  if m < 0L then tzfail (Negative_multiplicator (tez, m))
+  else if m = 0L then return (Tez_tag 0L)
   else if t > Int64.(div max_int m) then
-    error (Multiplication_overflow (tez, m))
-  else ok (Tez_tag (Int64.mul t m))
+    tzfail (Multiplication_overflow (tez, m))
+  else return (Tez_tag (Int64.mul t m))
 
 let ( /? ) tez d =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if d <= 0L then error (Invalid_divisor (tez, d))
-  else ok (Tez_tag (Int64.div t d))
+  if d <= 0L then tzfail (Invalid_divisor (tez, d))
+  else return (Tez_tag (Int64.div t d))
 
 let div2_sub tez =
   let (Tez_tag t) = tez in
@@ -168,14 +172,15 @@ let div_exn t d =
   | Error _ -> invalid_arg "div_exn"
 
 let mul_ratio tez ~num ~den =
+  let open Result_syntax in
   let (Tez_tag t) = tez in
-  if num < 0L then error (Negative_multiplicator (tez, num))
-  else if den <= 0L then error (Invalid_divisor (tez, den))
-  else if num = 0L then ok zero
+  if num < 0L then tzfail (Negative_multiplicator (tez, num))
+  else if den <= 0L then tzfail (Invalid_divisor (tez, den))
+  else if num = 0L then return zero
   else
     let z = Z.(div (mul (of_int64 t) (of_int64 num)) (of_int64 den)) in
-    if Z.fits_int64 z then ok (Tez_tag (Z.to_int64 z))
-    else error (Multiplication_overflow (tez, num))
+    if Z.fits_int64 z then return (Tez_tag (Z.to_int64 z))
+    else tzfail (Multiplication_overflow (tez, num))
 
 let of_mutez t = if t < 0L then None else Some (Tez_tag t)
 

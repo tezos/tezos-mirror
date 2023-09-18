@@ -438,40 +438,44 @@ module BalanceMap = struct
   end)
 
   let update_r key (f : 'a option -> 'b option tzresult) map =
-    f (find key map) >>? function
-    | Some v -> ok (add key v map)
-    | None -> ok (remove key map)
+    let open Result_syntax in
+    let* v_opt = f (find key map) in
+    match v_opt with
+    | Some v -> return (add key v map)
+    | None -> return (remove key map)
 end
 
 let group_balance_updates balance_updates =
-  List.fold_left_e
-    (fun acc (b, update, o) ->
-      (* Do not do anything if the update is zero *)
-      if is_zero_update update then ok acc
-      else
-        BalanceMap.update_r
-          (b, o)
-          (function
-            | None -> ok (Some update)
-            | Some balance -> (
-                match (balance, update) with
-                | Credited a, Debited b | Debited b, Credited a ->
-                    (* Remove the binding since it just fell down to zero *)
-                    if Tez_repr.(a = b) then ok None
-                    else if Tez_repr.(a > b) then
-                      Tez_repr.(a -? b) >>? fun update ->
-                      ok (Some (Credited update))
-                    else
-                      Tez_repr.(b -? a) >>? fun update ->
-                      ok (Some (Debited update))
-                | Credited a, Credited b ->
-                    Tez_repr.(a +? b) >>? fun update ->
-                    ok (Some (Credited update))
-                | Debited a, Debited b ->
-                    Tez_repr.(a +? b) >>? fun update ->
-                    ok (Some (Debited update))))
-          acc)
-    BalanceMap.empty
-    balance_updates
-  >>? fun map ->
-  ok (BalanceMap.fold (fun (b, o) u acc -> (b, u, o) :: acc) map [])
+  let open Result_syntax in
+  let* map =
+    List.fold_left_e
+      (fun acc (b, update, o) ->
+        (* Do not do anything if the update is zero *)
+        if is_zero_update update then return acc
+        else
+          BalanceMap.update_r
+            (b, o)
+            (function
+              | None -> return_some update
+              | Some balance -> (
+                  match (balance, update) with
+                  | Credited a, Debited b | Debited b, Credited a ->
+                      (* Remove the binding since it just fell down to zero *)
+                      if Tez_repr.(a = b) then return_none
+                      else if Tez_repr.(a > b) then
+                        let* update = Tez_repr.(a -? b) in
+                        return_some (Credited update)
+                      else
+                        let* update = Tez_repr.(b -? a) in
+                        return_some (Debited update)
+                  | Credited a, Credited b ->
+                      let* update = Tez_repr.(a +? b) in
+                      return_some (Credited update)
+                  | Debited a, Debited b ->
+                      let* update = Tez_repr.(a +? b) in
+                      return_some (Debited update)))
+            acc)
+      BalanceMap.empty
+      balance_updates
+  in
+  return (BalanceMap.fold (fun (b, o) u acc -> (b, u, o) :: acc) map [])

@@ -61,7 +61,9 @@ let max_value = (1 lsl 16) - 1
 let of_int_do_not_use_except_for_parameters i = i
 
 let of_int i =
-  if Compare.Int.(i < 0 || i > max_value) then error (Invalid_slot i) else ok i
+  let open Result_syntax in
+  if Compare.Int.(i < 0 || i > max_value) then tzfail (Invalid_slot i)
+  else return i
 
 let succ slot = of_int (slot + 1)
 
@@ -75,13 +77,14 @@ module Range = struct
   type t = Interval of {lo : int; hi : int}
 
   let create ~min ~count =
-    error_when (min < 0) (Invalid_slot min) >>? fun () ->
-    error_when (min > max_value) (Invalid_slot min) >>? fun () ->
-    error_when (count < 1) (Invalid_slot count) >>? fun () ->
-    error_when (count > max_value) (Invalid_slot count) >>? fun () ->
+    let open Result_syntax in
+    let* () = error_when (min < 0) (Invalid_slot min) in
+    let* () = error_when (min > max_value) (Invalid_slot min) in
+    let* () = error_when (count < 1) (Invalid_slot count) in
+    let* () = error_when (count > max_value) (Invalid_slot count) in
     let max = min + count - 1 in
-    error_when (max > max_value) (Invalid_slot max) >>? fun () ->
-    ok (Interval {lo = min; hi = max})
+    let* () = error_when (max > max_value) (Invalid_slot max) in
+    return (Interval {lo = min; hi = max})
 
   let fold f init (Interval {lo; hi}) =
     let rec loop ~acc ~next =
@@ -91,18 +94,26 @@ module Range = struct
     loop ~acc:(f init lo) ~next:(lo + 1)
 
   let fold_es f init (Interval {lo; hi}) =
+    let open Lwt_result_syntax in
     let rec loop ~acc ~next =
       if Compare.Int.(next > hi) then return acc
-      else f acc next >>=? fun acc -> loop ~acc ~next:(next + 1)
+      else
+        let* acc = f acc next in
+        loop ~acc ~next:(next + 1)
     in
-    f init lo >>=? fun acc -> loop ~acc ~next:(lo + 1)
+    let* acc = f init lo in
+    loop ~acc ~next:(lo + 1)
 
   let rev_fold_es f init (Interval {lo; hi}) =
+    let open Lwt_result_syntax in
     let rec loop ~acc ~next =
       if Compare.Int.(next < lo) then return acc
-      else f acc next >>=? fun acc -> loop ~acc ~next:(next - 1)
+      else
+        let* acc = f acc next in
+        loop ~acc ~next:(next - 1)
     in
-    f init hi >>=? fun acc -> loop ~acc ~next:(hi - 1)
+    let* acc = f init hi in
+    loop ~acc ~next:(hi - 1)
 end
 
 module Internal_for_tests = struct
