@@ -51,7 +51,10 @@ check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
   extends:
-    - .test_template
+    - .default_settings_template
+    # Requires Python
+    - .image_template__runtime_build_test_dependencies
+  stage: test
   needs: [trigger]
   before_script:
     - . ./scripts/version.sh
