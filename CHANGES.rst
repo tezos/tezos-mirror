@@ -111,6 +111,11 @@ Smart Rollup WASM Debugger
 - Added flag ``--no-kernel-debug`` to deactivate the kernel debug messages. (MR
   :gl:`!9813`)
 
+- Support special directives using ``write_debug`` host function in the
+  profiler, prefixed with ``__wasm_debugger__::``. Support
+  ``start_section(<data>)`` and ``end_section(<data>)`` to count ticks in
+  specific sections. (:gl:`!10149`)
+
 Data Availability Committee (DAC)
 ---------------------------------
 
