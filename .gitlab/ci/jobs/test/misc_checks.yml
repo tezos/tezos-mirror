@@ -1,8 +1,8 @@
 misc_checks:
   extends:
-    - .test_template
-  # These tests are not flaky at all so we overwrite the retry value
-  retry: 0
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies
+  stage: "test"
   needs: [trigger]
   before_script:
     - . ./scripts/version.sh
