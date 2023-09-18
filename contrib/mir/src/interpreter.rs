@@ -8,10 +8,13 @@
 use crate::ast::*;
 use crate::stack::*;
 
-pub fn interpret(ast: &AST, stack: &mut IStack) {
+pub enum InterpretError {}
+
+pub fn interpret(ast: &AST, stack: &mut IStack) -> Result<(), InterpretError> {
     for i in ast {
-        interpret_one(&i, stack);
+        interpret_one(&i, stack)?;
     }
+    Ok(())
 }
 
 fn unreachable_state() -> ! {
@@ -20,7 +23,7 @@ fn unreachable_state() -> ! {
     panic!("Unreachable state reached during interpreting, possibly broken typechecking!")
 }
 
-fn interpret_one(i: &Instruction, stack: &mut IStack) {
+fn interpret_one(i: &Instruction, stack: &mut IStack) -> Result<(), InterpretError> {
     use Instruction::*;
     use Value::*;
 
@@ -37,7 +40,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
         Dip(opt_height, nested) => {
             let protected_height: usize = opt_height.unwrap_or(1);
             let mut live = stack.split_off(protected_height);
-            interpret(nested, &mut live);
+            interpret(nested, &mut live)?;
             stack.append(&mut live);
         }
         Drop(opt_height) => {
@@ -57,9 +60,9 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
         If(nested_t, nested_f) => {
             if let Some(BooleanValue(b)) = stack.pop_front() {
                 if b {
-                    interpret(nested_t, stack);
+                    interpret(nested_t, stack)?;
                 } else {
-                    interpret(nested_f, stack);
+                    interpret(nested_f, stack)?;
                 }
             } else {
                 unreachable_state();
@@ -74,7 +77,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
         Loop(nested) => loop {
             if let Some(BooleanValue(b)) = stack.pop_front() {
                 if b {
-                    interpret(nested, stack);
+                    interpret(nested, stack)?;
                 } else {
                     break;
                 }
@@ -89,6 +92,7 @@ fn interpret_one(i: &Instruction, stack: &mut IStack) {
             stack.swap(0, 1);
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -103,127 +107,157 @@ mod interpreter_tests {
     fn test_add() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(30)]);
-        interpret_one(&Add, &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Add, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_dip() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(10), NumberValue(25)]);
-        interpret_one(&Dip(None, parse("{ADD}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Dip(None, parse("{ADD}").unwrap()), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_dip2() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(10), NumberValue(5)]);
-        interpret_one(&Dip(Some(2), parse("{DROP}").unwrap()), &mut stack);
-       assert!(stack == expected_stack);
+        assert!(interpret_one(&Dip(Some(2), parse("{DROP}").unwrap()), &mut stack,).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_drop() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(5), NumberValue(20)]);
-        interpret_one(&Drop(None), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Drop(None), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
-   #[test]
+    #[test]
     fn test_drop2() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(20)]);
-        interpret_one(&Drop(Some(2)), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Drop(Some(2)), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_dup() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
-        let expected_stack = VecDeque::from([NumberValue(10), NumberValue(10), NumberValue(5), NumberValue(20)]);
-        interpret_one(&Dup(None), &mut stack);
-        assert!(stack == expected_stack);
+        let expected_stack = VecDeque::from([
+            NumberValue(10),
+            NumberValue(10),
+            NumberValue(5),
+            NumberValue(20),
+        ]);
+        assert!(interpret_one(&Dup(None), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_dup2() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(5), NumberValue(20)]);
-        let expected_stack = VecDeque::from([NumberValue(5), NumberValue(10), NumberValue(5), NumberValue(20)]);
-        interpret_one(&Dup(Some(2)), &mut stack);
-        assert!(stack == expected_stack);
+        let expected_stack = VecDeque::from([
+            NumberValue(5),
+            NumberValue(10),
+            NumberValue(5),
+            NumberValue(20),
+        ]);
+        assert!(interpret_one(&Dup(Some(2)), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_gt() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([BooleanValue(true), NumberValue(20)]);
-        interpret_one(&Gt, &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Gt, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_if_t() {
         let mut stack = VecDeque::from([BooleanValue(true), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(20)]);
-        interpret_one(&If(parse("{DROP}").unwrap(), parse("{ADD}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(
+            &If(parse("{DROP}").unwrap(), parse("{ADD}").unwrap()),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_if_f() {
         let mut stack = VecDeque::from([BooleanValue(false), NumberValue(5), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(25)]);
-        interpret_one(&If(parse("{DROP}").unwrap(), parse("{ADD}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(
+            &If(parse("{DROP}").unwrap(), parse("{ADD}").unwrap()),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_int() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
-        interpret_one(&Int, &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Int, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_push() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(0), NumberValue(10), NumberValue(20)]);
-        interpret_one(&Push(Type::Nat, NumberValue(0)), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Push(Type::Nat, NumberValue(0)), &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_loop_0() {
         let mut stack = VecDeque::from([BooleanValue(false), NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
-        interpret_one(&Loop(parse("{PUSH nat 1; ADD; PUSH bool False}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(
+            &Loop(parse("{PUSH nat 1; ADD; PUSH bool False}").unwrap()),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_loop_1() {
         let mut stack = VecDeque::from([BooleanValue(true), NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(11), NumberValue(20)]);
-        interpret_one(&Loop(parse("{PUSH nat 1; ADD; PUSH bool False}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(
+            &Loop(parse("{PUSH nat 1; ADD; PUSH bool False}").unwrap()),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_loop_many() {
         let mut stack = VecDeque::from([BooleanValue(true), NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(0), NumberValue(20)]);
-        interpret_one(&Loop(parse("{PUSH int -1; ADD; DUP; GT}").unwrap()), &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(
+            &Loop(parse("{PUSH int -1; ADD; DUP; GT}").unwrap()),
+            &mut stack,
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     #[test]
     fn test_swap() {
         let mut stack = VecDeque::from([NumberValue(10), NumberValue(20)]);
         let expected_stack = VecDeque::from([NumberValue(20), NumberValue(10)]);
-        interpret_one(&Swap, &mut stack);
-        assert!(stack == expected_stack);
+        assert!(interpret_one(&Swap, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
     }
 }

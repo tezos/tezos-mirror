@@ -7,11 +7,11 @@
 
 mod ast;
 mod gas;
+mod interpreter;
 mod parser;
 mod stack;
 mod syntax;
 mod typechecker;
-mod interpreter;
 
 fn main() {}
 
@@ -21,15 +21,15 @@ mod tests {
 
     use crate::ast::*;
     use crate::gas::Gas;
+    use crate::interpreter;
     use crate::parser;
     use crate::typechecker;
-    use crate::interpreter;
 
     #[test]
     fn interpret_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut istack = VecDeque::from([Value::NumberValue(10)]);
-        interpreter::interpret(&ast, &mut istack);
+        assert!(interpreter::interpret(&ast, &mut istack).is_ok());
         assert!(istack.len() == 1 && istack[0] == Value::NumberValue(55));
     }
 
