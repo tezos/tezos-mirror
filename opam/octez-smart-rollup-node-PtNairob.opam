@@ -26,7 +26,7 @@ depends: [
   "aches-lwt" { >= "1.0.0" }
   "octez-injector"
   "octez-smart-rollup-node-lib"
-  "tezos-version"
+  "octez-version"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }

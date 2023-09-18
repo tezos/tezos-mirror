@@ -7,9 +7,9 @@
   tezt
   tezt-tezos
   octez-shell-libs.client-base-unix
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol)
  (link_flags
@@ -27,9 +27,9 @@
 (library
  (name simulation_scenario_lib)
  (libraries
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-protocol-017-PtNairob-libs.baking
@@ -57,11 +57,11 @@
 (executable
  (name simulation_scenario)
  (libraries
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
   octez-shell-libs.store
-  octez-libs.tezos-clic
+  octez-libs.clic
   octez-shell-libs.store.unix-snapshots
   octez-shell-libs.store.shared
   octez-node-config

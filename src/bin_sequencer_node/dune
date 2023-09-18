@@ -7,8 +7,8 @@
  (package octez-smart-rollup-sequencer-node)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-commands

@@ -7,11 +7,11 @@
  (package octez-injector-server)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-injector
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-rpc-http-server
-  octez-libs.tezos-rpc-http
+  octez-libs.stdlib-unix
+  octez-libs.rpc-http-server
+  octez-libs.rpc-http
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   data-encoding

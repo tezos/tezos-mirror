@@ -6,8 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-clic
+  octez-libs.stdlib
+  octez-libs.clic
   lwt.unix
   octez-alcotezt)
  (library_flags (:standard -linkall))

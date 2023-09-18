@@ -6,9 +6,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   octez-protocol-017-PtNairob-libs.smart-rollup-layer2
   octez_smart_rollup_node_PtNairob
   octez-alcotezt

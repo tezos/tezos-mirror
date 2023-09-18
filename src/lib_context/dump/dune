@@ -6,8 +6,8 @@
  (public_name octez-libs.tezos-context.dump)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.stdlib-unix
   fmt)
  (flags
   (:standard)

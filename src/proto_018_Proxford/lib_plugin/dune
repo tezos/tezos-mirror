@@ -6,7 +6,7 @@
  (public_name octez-protocol-018-Proxford-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.smart-rollup)
  (flags
@@ -24,7 +24,7 @@
  (public_name octez-protocol-018-Proxford-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.embedded-protocol
   octez-protocol-018-Proxford-libs.plugin
   octez-shell-libs.validation)

@@ -6,15 +6,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-micheline
+  octez-libs.base
+  octez-libs.micheline
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   octez-protocol-alpha-libs.bakings.mockup-simulator
   octez-protocol-alpha-libs.baking
   tezos-protocol-alpha.parameters
-  octez-libs.tezos-crypto
+  octez-libs.crypto
   octez-alcotezt
   uri)
  (library_flags (:standard -linkall))

@@ -9,12 +9,12 @@
   tezt
   octez-libs.tezos-context
   octez-alcotezt
-  octez-libs.tezos-base
+  octez-libs.base
   octez-protocol-017-PtNairob-libs.client
   tezos-protocol-017-PtNairob.protocol
   tezos-protocol-017-PtNairob.parameters
   octez-protocol-017-PtNairob-libs.test-helpers
-  octez-libs.tezos-base-test-helpers)
+  octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

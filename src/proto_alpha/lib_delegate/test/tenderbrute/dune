@@ -4,7 +4,7 @@
 (executable
  (name tenderbrute_main)
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-shell-libs.client-base
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol

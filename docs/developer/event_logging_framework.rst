@@ -34,7 +34,7 @@ See for instance
    ``val Simple.emit: 'a Simple.t -> 'a -> (unit, trace) result Lwt.t``.
 
 Please read the guidelines that are documented in
-`the Internal_event.Simple module. <../api/odoc/_html/tezos-event-logging/Tezos_event_logging/Internal_event/Simple/index.html>`__
+`the Internal_event.Simple module. <../api/odoc/_html/octez-libs/Event_logging/Internal_event/Simple/index.html>`__
 
 
 “Heavy” Events

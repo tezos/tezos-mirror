@@ -5,8 +5,8 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.octez-plonk.plonk-test
-  octez-libs.octez-aplonk)
+  octez-libs.plonk.plonk-test
+  octez-libs.aplonk)
  (modules main test_aplonk test_main_protocol))
 
 (rule
@@ -31,6 +31,6 @@
 (executable
  (name bench)
  (libraries
-  octez-libs.octez-plonk.plonk-test
-  octez-libs.octez-aplonk)
+  octez-libs.plonk.plonk-test
+  octez-libs.aplonk)
  (modules bench))

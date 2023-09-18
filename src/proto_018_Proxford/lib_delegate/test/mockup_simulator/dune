@@ -5,12 +5,12 @@
  (name tezos_018_Proxford_mockup_simulator)
  (public_name octez-protocol-018-Proxford-libs.bakings.mockup-simulator)
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
   octez-protocol-018-Proxford-libs.baking
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
   tezos-protocol-018-Proxford.parameters
   octez-shell-libs.mockup

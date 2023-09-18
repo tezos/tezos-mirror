@@ -19,7 +19,7 @@ depends: [
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-injector"
-  "tezos-version"
+  "octez-version"
   "octez-l2-libs"
   "octez-crawler"
 ]

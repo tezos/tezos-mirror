@@ -6,10 +6,10 @@
  (public_name octez-libs.tezos-context.helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib
+  octez-libs.base
+  octez-libs.stdlib
   octez-libs.tezos-context.encoding
-  octez-libs.tezos-context.sigs
+  octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
   irmin
   irmin-pack)

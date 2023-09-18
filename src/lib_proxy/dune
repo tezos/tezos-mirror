@@ -8,11 +8,11 @@
  (libraries
   aches
   aches-lwt
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.client-base
   octez-proto-libs.protocol-environment
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-shell-libs.shell-services
   octez-libs.tezos-context.memory
   uri)

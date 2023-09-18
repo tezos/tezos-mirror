@@ -4,8 +4,8 @@
 (library
  (name yes_wallet_lib)
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base.unix
   lwt.unix
   ezjsonm
   octez-shell-libs.store

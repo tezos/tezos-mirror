@@ -6,7 +6,7 @@
  (public_name tezos-protocol-014-PtKathma.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-proto-libs.protocol-environment
   tezos-protocol-014-PtKathma.protocol)
  (library_flags (:standard -linkall))
@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-014-PtKathma.parameters
   tezos-protocol-014-PtKathma.protocol)
  (link_flags

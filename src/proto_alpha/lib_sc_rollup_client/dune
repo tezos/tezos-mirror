@@ -6,7 +6,7 @@
  (package octez-smart-rollup-client-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   octez-shell-libs.client-commands
   octez-shell-libs.client-base

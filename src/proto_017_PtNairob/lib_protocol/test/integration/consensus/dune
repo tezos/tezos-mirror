@@ -8,10 +8,10 @@
  (libraries
   tezt.core
   octez-alcotezt
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.test-helpers
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   tezos-protocol-017-PtNairob.parameters
   octez-protocol-017-PtNairob-libs.plugin)
  (library_flags (:standard -linkall))

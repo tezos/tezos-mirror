@@ -6,8 +6,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base
+  octez-libs.base-test-helpers
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-libs.tezos-context
@@ -16,16 +16,16 @@
   octez-shell-libs.protocol-updater
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services
-  octez-libs.tezos-requester
+  octez-libs.requester
   octez-shell-libs.shell
   octez-shell-libs.shell-services
   tezos-protocol-demo-noops.embedded-protocol
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.validation
-  octez-libs.tezos-event-logging-test-helpers
-  octez-libs.tezos-test-helpers
+  octez-libs.event-logging-test-helpers
+  octez-libs.test-helpers
   octez-alcotezt
-  tezos-version.value)
+  octez-version.value)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

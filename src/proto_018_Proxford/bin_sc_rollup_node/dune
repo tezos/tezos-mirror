@@ -7,8 +7,8 @@
  (package octez-smart-rollup-node-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   tezos-protocol-018-Proxford.protocol
   octez-shell-libs.shell-services
   octez-shell-libs.client-base

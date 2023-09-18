@@ -72,6 +72,7 @@
 (package (name octez-snoop))
 (package (name octez-store-tests)(allow_empty))
 (package (name octez-testnet-scenarios))
+(package (name octez-version))
 (package (name octogram))
 (package (name scoru-sequencer-test)(allow_empty))
 (package (name tezos-benchmark))
@@ -135,7 +136,6 @@
 (package (name tezos-tooling))
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding-test)(allow_empty))
-(package (name tezos-version))
 (package (name tezt-ethereum)(allow_empty))
 (package (name tezt-tezos))
 ; This file was automatically generated, do not edit.

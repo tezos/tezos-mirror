@@ -5,7 +5,7 @@
 
 (library
  (name bls12_381_signature)
- (public_name octez-libs.octez-bls12-381-signature)
+ (public_name octez-libs.bls12-381-signature)
  (instrumentation (backend bisect_ppx))
  (libraries
   bls12-381)

@@ -6,7 +6,7 @@
  (package tezos-injector-017-PtNairob)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
   octez-injector
   octez-protocol-017-PtNairob-libs.client

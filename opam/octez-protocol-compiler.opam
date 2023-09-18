@@ -15,7 +15,7 @@ depends: [
   "lwt" { >= "5.7.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"
-  "tezos-version"
+  "octez-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

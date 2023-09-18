@@ -16,7 +16,7 @@ depends: [
   "lwt" { >= "5.7.0" }
   "octez-shell-libs"
   "tezos-proxy-server-config"
-  "tezos-version"
+  "octez-version"
   "uri" { >= "3.1.0" }
 ]
 depopts: [

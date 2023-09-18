@@ -4,12 +4,12 @@
 (executable
  (name main)
  (libraries
-  octez-libs.octez-distributed-plonk
-  octez-libs.octez-plonk
-  octez-libs.octez-plonk.aggregation
-  octez-libs.octez-plonk.distribution
-  octez-libs.octez-aplonk
-  octez-libs.octez-plonk.plonk-test))
+  octez-libs.distributed-plonk
+  octez-libs.plonk
+  octez-libs.plonk.aggregation
+  octez-libs.plonk.distribution
+  octez-libs.aplonk
+  octez-libs.plonk.plonk-test))
 
 (rule
  (alias runtest)

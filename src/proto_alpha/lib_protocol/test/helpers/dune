@@ -7,18 +7,18 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   qcheck-alcotest
-  octez-libs.tezos-test-helpers
-  octez-libs.tezos-base
-  octez-libs.tezos-micheline
-  octez-libs.tezos-stdlib-unix
+  octez-libs.test-helpers
+  octez-libs.base
+  octez-libs.micheline
+  octez-libs.stdlib-unix
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client
   tezos-protocol-alpha.parameters
   octez-proto-libs.protocol-environment
   octez-protocol-alpha-libs.plugin
   octez-shell-libs.shell-services
-  octez-libs.octez-plompiler
-  octez-libs.tezos-crypto-dal
+  octez-libs.plompiler
+  octez-libs.crypto-dal
   octez-protocol-alpha-libs.smart-rollup)
  (flags
   (:standard)

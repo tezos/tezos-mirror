@@ -5,15 +5,15 @@
  (name tezos_client_000_Ps9mPmXa)
  (public_name octez-protocol-000-Ps9mPmXa-libs.client)
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   tezos-protocol-000-Ps9mPmXa.protocol
   tezos-protocol-000-Ps9mPmXa.protocol.lifted
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-shell-libs.client-commands
-  octez-libs.tezos-stdlib-unix)
+  octez-libs.stdlib-unix)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

@@ -9,9 +9,9 @@
   lwt-watcher
   lwt-canceler
   prometheus
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-rpc
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.rpc
   octez-libs.tezos-context
   octez-shell-libs.store
   octez-shell-libs.store.shared
@@ -19,15 +19,15 @@
   octez-shell-libs.context-ops
   octez-shell-libs.shell-context
   octez-shell-libs.p2p
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.shell-services
   octez-libs.tezos-p2p-services
   octez-shell-libs.protocol-updater
-  octez-libs.tezos-requester
+  octez-libs.requester
   octez-libs.tezos-workers
   octez-shell-libs.validation
-  octez-libs.tezos-version
-  octez-libs.tezos-crypto-dal.octez-dal-config
+  octez-libs.version
+  octez-libs.crypto-dal.dal-config
   lwt-exit)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

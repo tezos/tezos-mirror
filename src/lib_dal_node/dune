@@ -6,14 +6,14 @@
  (public_name tezos-dal-node-lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base.unix
   tezos-dal-node-services
   octez-shell-libs.client-base
   octez-shell-libs.protocol-updater
   octez-shell-libs.client-base-unix
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-crypto-dal
+  octez-libs.stdlib-unix
+  octez-libs.crypto-dal
   octez-shell-libs.p2p
   octez-libs.tezos-p2p-services)
  (flags

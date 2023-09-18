@@ -5,12 +5,12 @@
  (name tezos_017_PtNairob_mockup_simulator)
  (public_name octez-protocol-017-PtNairob-libs.bakings.mockup-simulator)
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.client
   octez-shell-libs.client-commands
   octez-protocol-017-PtNairob-libs.baking
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
   tezos-protocol-017-PtNairob.parameters
   octez-shell-libs.mockup

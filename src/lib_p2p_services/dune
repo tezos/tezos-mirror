@@ -8,8 +8,8 @@
  (public_name octez-libs.tezos-p2p-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-rpc)
+  octez-libs.base
+  octez-libs.rpc)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

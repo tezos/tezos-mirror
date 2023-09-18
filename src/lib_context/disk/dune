@@ -6,16 +6,16 @@
  (public_name octez-libs.tezos-context.disk)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   bigstringaf
   fmt
   irmin
   irmin-pack
   irmin-pack.unix
   logs.fmt
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-context.sigs
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-libs.context.sigs
   octez-libs.tezos-context.helpers
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.memory

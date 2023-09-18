@@ -6,11 +6,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   octez_smart_rollup_sequencer
-  octez-libs.tezos-base-test-helpers
-  octez-libs.tezos-test-helpers
+  octez-libs.base-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

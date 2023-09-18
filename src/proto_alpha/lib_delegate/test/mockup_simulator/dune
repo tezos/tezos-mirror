@@ -5,12 +5,12 @@
  (name tezos_alpha_mockup_simulator)
  (public_name octez-protocol-alpha-libs.bakings.mockup-simulator)
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client
   octez-shell-libs.client-commands
   octez-protocol-alpha-libs.baking
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
   tezos-protocol-alpha.parameters
   octez-shell-libs.mockup

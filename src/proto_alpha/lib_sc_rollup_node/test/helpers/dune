@@ -6,11 +6,11 @@
  (package tezos-sc-rollup-node-test)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-alpha.protocol
   tezos-protocol-alpha.parameters
   octez-protocol-alpha-libs.client
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   qcheck-alcotest
   qcheck-core
   logs.lwt
