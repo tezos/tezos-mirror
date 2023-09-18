@@ -8305,7 +8305,7 @@ let _octez_codec_kaitai =
 let tezos_time_measurement =
   external_lib ~opam:"" "tezos-time-measurement" V.True
 
-let _tezt_long_test =
+let _tezt_long_tests =
   private_exe
     "main"
     ~opam:""
