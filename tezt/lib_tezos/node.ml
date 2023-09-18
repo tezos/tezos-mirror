@@ -952,29 +952,33 @@ let as_foreign_rpc_endpoint (t : t) =
   Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
 
 module RPC = struct
-  let call ?log_request ?log_response_status ?log_response_body node rpc =
-    RPC_core.call
-      ?log_request
-      ?log_response_status
-      ?log_response_body
-      (as_foreign_rpc_endpoint node)
-      rpc
+  module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
+    let call ?log_request ?log_response_status ?log_response_body node rpc =
+      RPC_core.call
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_foreign_rpc_endpoint node)
+        rpc
 
-  let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
-    RPC_core.call_raw
-      ?log_request
-      ?log_response_status
-      ?log_response_body
-      (as_foreign_rpc_endpoint node)
-      rpc
+    let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
+      RPC_core.call_raw
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_foreign_rpc_endpoint node)
+        rpc
 
-  let call_json ?log_request ?log_response_status ?log_response_body node rpc =
-    RPC_core.call_json
-      ?log_request
-      ?log_response_status
-      ?log_response_body
-      (as_foreign_rpc_endpoint node)
-      rpc
+    let call_json ?log_request ?log_response_status ?log_response_body node rpc
+        =
+      RPC_core.call_json
+        ?log_request
+        ?log_response_status
+        ?log_response_body
+        (as_foreign_rpc_endpoint node)
+        rpc
+  end
 
+  include RPC_callers
   include RPC
 end

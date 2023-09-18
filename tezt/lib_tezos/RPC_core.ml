@@ -78,6 +78,34 @@ let make_uri endpoint rpc =
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
 
+module type CALLERS = sig
+  type uri_provider
+
+  val call :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    'result Lwt.t
+
+  val call_raw :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    string response Lwt.t
+
+  val call_json :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    JSON.t response Lwt.t
+end
+
 let call_raw ?(log_request = true) ?(log_response_status = true)
     ?(log_response_body = true) endpoint rpc =
   let uri = make_uri endpoint rpc in

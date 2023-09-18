@@ -97,7 +97,10 @@ type 'a response = {
 val check_string_response :
   ?body_rex:string -> code:int -> string response -> unit
 
-(** Call an RPC.
+module type CALLERS = sig
+  type uri_provider
+
+  (** Call an RPC.
 
     The response body is parsed as JSON, then decoded using the decode function
     of the RPC description.
@@ -114,35 +117,39 @@ val check_string_response :
     after the RPC call. Default is [true].
 
     If [log_response_body] is [true], log the response body after the RPC call.
+
     For [call] and [call_json], if the response is valid JSON, it is pretty-printed
     with indentation. Default is [true]. *)
-val call :
-  ?log_request:bool ->
-  ?log_response_status:bool ->
-  ?log_response_body:bool ->
-  Foreign_endpoint.t ->
-  'result t ->
-  'result Lwt.t
+  val call :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    'result Lwt.t
 
-(** Call an RPC, but do not parse its response body.
+  (** Call an RPC, but do not parse its response body.
 
     Does not fail if the status code is not a success code. *)
-val call_raw :
-  ?log_request:bool ->
-  ?log_response_status:bool ->
-  ?log_response_body:bool ->
-  Foreign_endpoint.t ->
-  'result t ->
-  string response Lwt.t
+  val call_raw :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    string response Lwt.t
 
-(** Call an RPC, but do not decode its response body, only parse as JSON.
+  (** Call an RPC, but do not decode its response body, only parse as JSON.
 
     Does not fail if the status code is not a success code,
     except if the response body is not valid JSON. *)
-val call_json :
-  ?log_request:bool ->
-  ?log_response_status:bool ->
-  ?log_response_body:bool ->
-  Foreign_endpoint.t ->
-  'result t ->
-  JSON.t response Lwt.t
+  val call_json :
+    ?log_request:bool ->
+    ?log_response_status:bool ->
+    ?log_response_body:bool ->
+    uri_provider ->
+    'result t ->
+    JSON.t response Lwt.t
+end
+
+include CALLERS with type uri_provider := Foreign_endpoint.t

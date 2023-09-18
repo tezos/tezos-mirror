@@ -209,42 +209,9 @@ module RPC : sig
   val get_attestable_slots :
     attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 
-  module type CALLERS = sig
-    type input_uri_provider
+  module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
-    (** See {!RPC_core.call} *)
-    val call :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      'result Lwt.t
-
-    (** See {!RPC_core.call_raw} *)
-    val call_raw :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      string RPC_core.response Lwt.t
-
-    (** See {!RPC_core.call_json} *)
-    val call_json :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      JSON.t RPC_core.response Lwt.t
-  end
-
-  include CALLERS with type input_uri_provider := default_uri_provider
-
-  module Local : CALLERS with type input_uri_provider := local_uri_provider
-
-  module Remote : CALLERS with type input_uri_provider := remote_uri_provider
+  module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider
 end
 
 module Commitment : sig

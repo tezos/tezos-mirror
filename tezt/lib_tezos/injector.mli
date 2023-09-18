@@ -40,30 +40,5 @@ module RPC : sig
 
   val inject : unit -> unit RPC_core.t
 
-  (** See {!RPC_core.call} *)
-  val call :
-    ?log_request:bool ->
-    ?log_response_status:bool ->
-    ?log_response_body:bool ->
-    t ->
-    'result RPC_core.t ->
-    'result Lwt.t
-
-  (** See {!RPC_core.call_raw} *)
-  val call_raw :
-    ?log_request:bool ->
-    ?log_response_status:bool ->
-    ?log_response_body:bool ->
-    t ->
-    'result RPC_core.t ->
-    string RPC_core.response Lwt.t
-
-  (** See {!RPC_core.call_json} *)
-  val call_json :
-    ?log_request:bool ->
-    ?log_response_status:bool ->
-    ?log_response_body:bool ->
-    t ->
-    'result RPC_core.t ->
-    JSON.t RPC_core.response Lwt.t
+  include RPC_core.CALLERS with type uri_provider := t
 end

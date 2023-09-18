@@ -306,38 +306,7 @@ module Dal_RPC = struct
               Attestable_slots (json |> as_list |> List.map as_bool)
           | _ -> failwith "invalid case"))
 
-  module type CALLERS = sig
-    type input_uri_provider
-
-    (** See {!RPC_core.call} *)
-    val call :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      'result Lwt.t
-
-    (** See {!RPC_core.call_raw} *)
-    val call_raw :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      string RPC_core.response Lwt.t
-
-    (** See {!RPC_core.call_json} *)
-    val call_json :
-      ?log_request:bool ->
-      ?log_response_status:bool ->
-      ?log_response_body:bool ->
-      input_uri_provider ->
-      'result RPC_core.t ->
-      JSON.t RPC_core.response Lwt.t
-  end
-
-  module Local : CALLERS with type input_uri_provider := local_uri_provider =
+  module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?log_request ?log_response_status ?log_response_body node rpc =
       RPC_core.call
@@ -365,8 +334,8 @@ module Dal_RPC = struct
         rpc
   end
 
-  module Remote : CALLERS with type input_uri_provider := remote_uri_provider =
-  struct
+  module Remote :
+    RPC_core.CALLERS with type uri_provider := remote_uri_provider = struct
     let call ?log_request ?log_response_status ?log_response_body endpoint rpc =
       RPC_core.call
         ?log_request
@@ -393,55 +362,6 @@ module Dal_RPC = struct
         endpoint
         rpc
   end
-
-  let call ?log_request ?log_response_status ?log_response_body node_or_endpoint
-      rpc =
-    match node_or_endpoint with
-    | Either.Left node ->
-        Local.call ?log_request ?log_response_status ?log_response_body node rpc
-    | Either.Right endpoint ->
-        Remote.call
-          ?log_request
-          ?log_response_status
-          ?log_response_body
-          endpoint
-          rpc
-
-  let call_raw ?log_request ?log_response_status ?log_response_body
-      node_or_endpoint rpc =
-    match node_or_endpoint with
-    | Either.Left node ->
-        Local.call_raw
-          ?log_request
-          ?log_response_status
-          ?log_response_body
-          node
-          rpc
-    | Either.Right endpoint ->
-        Remote.call_raw
-          ?log_request
-          ?log_response_status
-          ?log_response_body
-          endpoint
-          rpc
-
-  let call_json ?log_request ?log_response_status ?log_response_body
-      node_or_endpoint rpc =
-    match node_or_endpoint with
-    | Either.Left node ->
-        Local.call_json
-          ?log_request
-          ?log_response_status
-          ?log_response_body
-          node
-          rpc
-    | Either.Right endpoint ->
-        Remote.call_json
-          ?log_request
-          ?log_response_status
-          ?log_response_body
-          endpoint
-          rpc
 end
 
 module Helpers = struct
