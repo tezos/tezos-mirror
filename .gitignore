@@ -60,6 +60,7 @@ __pycache__
 /octez-injector-server
 /octogram
 /simulation-scenario
+/safety-checker
 
 /src/proto_*/parameters/*-parameters.json
 
