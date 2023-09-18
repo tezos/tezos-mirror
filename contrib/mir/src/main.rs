@@ -35,6 +35,15 @@ mod tests {
     }
 
     #[test]
+    fn interpret_test_gas_consumption() {
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let mut istack = VecDeque::from([Value::NumberValue(5)]);
+        let mut gas = Gas::new(1305);
+        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
+        assert_eq!(gas.milligas(), 0);
+    }
+
+    #[test]
     fn typecheck_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);

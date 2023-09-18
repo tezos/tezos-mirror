@@ -6,15 +6,24 @@
 /******************************************************************************/
 
 use crate::ast::*;
-use crate::gas::Gas;
+use crate::gas::{interpret_cost, Gas, OutOfGas};
 use crate::stack::*;
 
-pub enum InterpretError {}
+pub enum InterpretError {
+    OutOfGas,
+}
+
+impl From<OutOfGas> for InterpretError {
+    fn from(_: OutOfGas) -> Self {
+        InterpretError::OutOfGas
+    }
+}
 
 pub fn interpret(ast: &AST, gas: &mut Gas, stack: &mut IStack) -> Result<(), InterpretError> {
     for i in ast {
         interpret_one(&i, gas, stack)?;
     }
+    gas.consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
 }
 
@@ -31,6 +40,7 @@ fn interpret_one(i: &Instruction, gas: &mut Gas, stack: &mut IStack) -> Result<(
     match i {
         Add => match stack.make_contiguous() {
             [NumberValue(o1), NumberValue(o2), ..] => {
+                gas.consume(interpret_cost::add_int(*o1, *o2))?;
                 let sum = *o1 + *o2;
                 stack.pop_front();
                 stack.pop_front();
@@ -39,26 +49,34 @@ fn interpret_one(i: &Instruction, gas: &mut Gas, stack: &mut IStack) -> Result<(
             _ => unimplemented!(),
         },
         Dip(opt_height, nested) => {
+            gas.consume(interpret_cost::dip(*opt_height))?;
             let protected_height: usize = opt_height.unwrap_or(1);
             let mut live = stack.split_off(protected_height);
             interpret(nested, gas, &mut live)?;
+            gas.consume(interpret_cost::undip(protected_height))?;
             stack.append(&mut live);
         }
         Drop(opt_height) => {
+            gas.consume(interpret_cost::drop(*opt_height))?;
             let drop_height: usize = opt_height.unwrap_or(1);
             *stack = stack.split_off(drop_height);
         }
         Dup(opt_height) => {
+            gas.consume(interpret_cost::dup(*opt_height))?;
             let dup_height: usize = opt_height.unwrap_or(1);
             stack.push_front(stack.get(dup_height - 1).unwrap().clone());
         }
-        Gt => match stack.make_contiguous() {
-            [NumberValue(i), ..] => {
-                stack[0] = BooleanValue(*i > 0);
+        Gt => {
+            gas.consume(interpret_cost::GT)?;
+            match stack.make_contiguous() {
+                [NumberValue(i), ..] => {
+                    stack[0] = BooleanValue(*i > 0);
+                }
+                _ => unreachable_state(),
             }
-            _ => unreachable_state(),
-        },
+        }
         If(nested_t, nested_f) => {
+            gas.consume(interpret_cost::IF)?;
             if let Some(BooleanValue(b)) = stack.pop_front() {
                 if b {
                     interpret(nested_t, gas, stack)?;
@@ -70,26 +88,33 @@ fn interpret_one(i: &Instruction, gas: &mut Gas, stack: &mut IStack) -> Result<(
             }
         }
         Instruction::Int => match stack.make_contiguous() {
-            [NumberValue(_), ..] => {}
+            [NumberValue(_), ..] => gas.consume(interpret_cost::INT_NAT)?,
             _ => {
                 unreachable_state();
             }
         },
-        Loop(nested) => loop {
-            if let Some(BooleanValue(b)) = stack.pop_front() {
-                if b {
-                    interpret(nested, gas, stack)?;
+        Loop(nested) => {
+            gas.consume(interpret_cost::LOOP_ENTER)?;
+            loop {
+                gas.consume(interpret_cost::LOOP)?;
+                if let Some(BooleanValue(b)) = stack.pop_front() {
+                    if b {
+                        interpret(nested, gas, stack)?;
+                    } else {
+                        gas.consume(interpret_cost::LOOP_EXIT)?;
+                        break;
+                    }
                 } else {
-                    break;
+                    unreachable_state();
                 }
-            } else {
-                unreachable_state();
             }
-        },
+        }
         Push(_, v) => {
+            gas.consume(interpret_cost::PUSH)?;
             stack.push_front(v.clone());
         }
         Swap => {
+            gas.consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
     }

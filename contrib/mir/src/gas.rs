@@ -46,8 +46,8 @@ impl Gas {
 }
 
 pub mod tc_cost {
-    // Due to the quirk of Octez implementation, step gas is charged twice as
-    // often as in MIR.
+    // Due to the quirk of the Tezos protocol implementation, step gas is
+    // charged twice as often as in MIR.
     pub const INSTR_STEP: u32 = 220 * 2;
 
     pub const VALUE_STEP: u32 = 100;
@@ -68,6 +68,66 @@ pub mod tc_cost {
         // complexity of comparing types T and U is O(min(|T|, |U|)), as
         // comparison short-circuits at the first mismatch
         (std::cmp::min(sz1, sz2) * 60).try_into().unwrap() // according to Nairobi
+    }
+}
+
+pub mod interpret_cost {
+    pub const DIP: u32 = 10;
+    pub const DROP: u32 = 10;
+    pub const DUP: u32 = 10;
+    pub const GT: u32 = 10;
+    pub const IF: u32 = 10;
+    pub const LOOP: u32 = 10;
+    pub const SWAP: u32 = 10;
+    pub const INT_NAT: u32 = 10;
+    pub const PUSH: u32 = 10;
+
+    pub const INTERPRET_RET: u32 = 15; // corresponds to KNil in the Tezos protocol
+    pub const LOOP_ENTER: u32 = 10; // corresponds to KLoop_in in the Tezos protocol
+    pub const LOOP_EXIT: u32 = 10;
+
+    fn dropn(n: usize) -> u32 {
+        // Approximates 30 + 2.713108*n, copied from the Tezos protocol
+        (30 + (2 * n) + (n >> 1) + (n >> 3)).try_into().unwrap()
+    }
+
+    pub fn drop(mb_n: Option<usize>) -> u32 {
+        mb_n.map(dropn).unwrap_or(DROP)
+    }
+
+    fn dipn(n: usize) -> u32 {
+        // Approximates 15 + 4.05787663635*n, copied from the Tezos protocol
+        (15 + (4 * n)).try_into().unwrap()
+    }
+
+    pub fn dip(mb_n: Option<usize>) -> u32 {
+        mb_n.map(dipn).unwrap_or(DIP)
+    }
+
+    pub fn undip(n: usize) -> u32 {
+        // this is derived by observing gas costs as of Nairobi, as charged by
+        // the Tezos protocol. It seems undip cost is charged as
+        // cost_N_KUndip * n + cost_N_KCons,
+        // where cost_N_KUndip = cost_N_KCons = 10
+        (10 * (n + 1)).try_into().unwrap()
+    }
+
+    fn dupn(n: usize) -> u32 {
+        // Approximates 20 + 1.222263*n, copied from the Tezos protocol
+        (20 + n + (n >> 2)).try_into().unwrap()
+    }
+
+    pub fn dup(mb_n: Option<usize>) -> u32 {
+        mb_n.map(dupn).unwrap_or(DUP)
+    }
+
+    pub fn add_int(i1: i32, i2: i32) -> u32 {
+        // NB: eventually when using BigInts, use BigInt::bits() &c
+        use std::mem::size_of_val;
+        // max is copied from the Tezos protocol, ostensibly adding two big ints depends on
+        // the larger of the two due to result allocation
+        let sz = std::cmp::max(size_of_val(&i1), size_of_val(&i2));
+        (35 + (sz >> 1)).try_into().unwrap()
     }
 }
 
