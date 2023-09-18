@@ -250,6 +250,29 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    /// Have the caller account pay for gas. Returns `Ok(true)` if the payment
+    /// went through; returns `Ok(false)` if `caller` doesn't have the funds.
+    /// Return `Err(...)` in case something is at fault with durable storage or
+    /// runtime.
+    pub fn pre_pay_transactions(
+        &mut self,
+        caller: H160,
+        gas_limit: Option<u64>,
+    ) -> Result<bool, EthereumError> {
+        match gas_limit {
+            Some(gas_limit) => {
+                let amount = U256::from(gas_limit) * self.block.gas_price;
+
+                debug_msg!(self.host, "{:?} pays {:?} for transaction", caller, amount);
+
+                self.get_or_create_account(caller)?
+                    .balance_remove(self.host, amount)
+                    .map_err(EthereumError::from)
+            }
+            None => Ok(true),
+        }
+    }
+
     /// Execute a SputnikVM runtime with this handler
     fn execute(
         &mut self,

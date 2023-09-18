@@ -1152,7 +1152,17 @@ let transfer ?data protocol =
       ~receiver
       full_evm_setup
   in
-  Check.(Wei.(sender_balance_after = sender_balance_before - value) Wei.typ)
+  let* receipt =
+    Eth_cli.get_receipt ~endpoint:full_evm_setup.endpoint ~tx:tx_object.hash
+  in
+  let fees =
+    match receipt with
+    | Some Transaction.{status = true; gasUsed; effectiveGasPrice; _} ->
+        Int32.(to_string (mul gasUsed effectiveGasPrice)) |> Wei.of_string
+    | _ -> Test.fail "Transaction didn't succeed"
+  in
+  Check.(
+    Wei.(sender_balance_after = sender_balance_before - value - fees) Wei.typ)
     ~error_msg:
       "Unexpected sender balance after transfer, should be %R, but got %L" ;
   Check.(Wei.(receiver_balance_after = receiver_balance_before + value) Wei.typ)
@@ -2622,9 +2632,21 @@ let test_reboot =
     setup_past_genesis ~admin:None protocol
   in
   (* Retrieves all the messages and prepare them for the current rollup. *)
+  let transfers =
+    read_file (kernel_inputs_path ^ "/100-loops-transfers")
+    |> String.trim |> String.split_on_char '\n'
+  in
   let txs =
     read_file (kernel_inputs_path ^ "/100-loops")
     |> String.trim |> String.split_on_char '\n'
+  in
+  let* _, _transfer_receipt, _ =
+    send_n_transactions
+      ~sc_rollup_node
+      ~node
+      ~client
+      ~evm_proxy_server
+      transfers
   in
   let* requests, receipt, _hashes =
     send_n_transactions ~sc_rollup_node ~node ~client ~evm_proxy_server txs

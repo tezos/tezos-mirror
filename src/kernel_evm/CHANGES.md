@@ -13,6 +13,7 @@
   address defined in its storage. (!9927)
 - Adds a new type of message in simulation mode, to verify that a transaction is valid by checking if the nonce is neither too low nor too high. (!9679)
 - Simulate if a transaction has a correct chain id. (!9752)
+- Fees are now paid by the sender. (!9480)
 
 ### EVM Node
 

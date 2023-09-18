@@ -225,8 +225,9 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         call_data,
         Some(gas_limit),
         Some(value),
+        true,
     ) {
-        Ok(outcome) => Some(outcome),
+        Ok(outcome) => outcome,
         Err(err) => {
             // TODO: https://gitlab.com/tezos/tezos/-/issues/5665
             // Because the proposal's state is unclear, and we do not have a sequencer

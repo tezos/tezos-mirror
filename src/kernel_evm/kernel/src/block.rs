@@ -618,7 +618,7 @@ mod tests {
         let dest_balance =
             get_balance(&mut host, &mut evm_account_storage, &dest_address);
 
-        assert_eq!(sender_balance, U256::from(9999999999500000000u64));
+        assert_eq!(sender_balance, U256::from(9999999999499979000u64));
         assert_eq!(dest_balance, U256::from(500000000u64))
     }
 
@@ -941,7 +941,7 @@ mod tests {
     #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockHost::default();
-        let evm_account_storage = init_account_storage().unwrap();
+        let mut evm_account_storage = init_account_storage().unwrap();
 
         let caller =
             address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
@@ -953,11 +953,18 @@ mod tests {
         let default_nonce = caller_account.nonce(&host).unwrap();
         assert_eq!(default_nonce, U256::zero(), "default nonce should be 0");
 
+        let tx = dummy_eth_transaction_zero();
+        // Ensures the caller has enough balance to pay for the fees, but not
+        // the transaction itself, otherwise the transaction will not even be
+        // taken into account.
+        let fees = BlockConstants::first_block(U256::from(0)).gas_price * tx.gas_limit;
+        set_balance(&mut host, &mut evm_account_storage, &caller, fees);
+
         // Prepare a invalid transaction, i.e. with not enough funds.
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let transaction = Transaction {
             tx_hash,
-            content: Ethereum(dummy_eth_transaction_zero()),
+            content: Ethereum(tx),
         };
         let queue = Queue {
             proposals: vec![blueprint(vec![transaction])],

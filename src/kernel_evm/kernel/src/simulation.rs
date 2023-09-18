@@ -80,8 +80,11 @@ impl Evaluation {
         Evaluation::decode(&decoder)
     }
 
-    /// Execute the evaluation
-    pub fn run<Host: Runtime>(&self, host: &mut Host) -> Result<ExecutionOutcome, Error> {
+    /// Execute the simulation
+    pub fn run<Host: Runtime>(
+        &self,
+        host: &mut Host,
+    ) -> Result<Option<ExecutionOutcome>, Error> {
         let timestamp = current_timestamp(host);
         let timestamp = U256::from(timestamp.as_u64());
         let block_constants = BlockConstants::first_block(timestamp);
@@ -102,6 +105,7 @@ impl Evaluation {
                 .map(|gas| u64::max(gas, MAX_EVALUATION_GAS))
                 .or(Some(MAX_EVALUATION_GAS)), // gas could be omitted
             self.value,
+            false,
         )
         .map_err(Error::Simulation)?;
         Ok(outcome)
@@ -323,12 +327,17 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
 
 fn store_simulation_outcome<Host: Runtime>(
     host: &mut Host,
-    outcome: ExecutionOutcome,
+    outcome: Option<ExecutionOutcome>,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "outcome={:?} ", outcome);
-    storage::store_simulation_status(host, outcome.is_success)?;
-    storage::store_evaluation_gas(host, outcome.gas_used)?;
-    storage::store_simulation_result(host, outcome.result)
+    match outcome {
+        Some(outcome) => {
+            storage::store_simulation_status(host, outcome.is_success)?;
+            storage::store_evaluation_gas(host, outcome.gas_used)?;
+            storage::store_simulation_result(host, outcome.result)
+        }
+        None => Ok(()),
+    }
 }
 
 fn store_tx_validation_outcome<Host: Runtime>(
@@ -485,8 +494,14 @@ mod tests {
             call_data,
             Some(31000),
             Some(transaction_value),
+            false,
         );
         assert!(outcome.is_ok(), "contract should have been created");
+        let outcome = outcome.unwrap();
+        assert!(
+            outcome.is_some(),
+            "execution should have produced some outcome"
+        );
         outcome.unwrap().new_address.unwrap()
     }
 
@@ -509,6 +524,11 @@ mod tests {
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
+        assert!(
+            outcome.is_some(),
+            "simulation should have produced some outcome"
+        );
+        let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
             outcome.result,
@@ -527,6 +547,11 @@ mod tests {
         let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
+        let outcome = outcome.unwrap();
+        assert!(
+            outcome.is_some(),
+            "simulation should have produced some outcome"
+        );
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
@@ -553,6 +578,11 @@ mod tests {
         let outcome = evaluation.run(&mut host);
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
+        let outcome = outcome.unwrap();
+        assert!(
+            outcome.is_some(),
+            "simulation should have produced some outcome"
+        );
         let outcome = outcome.unwrap();
         assert_eq!(
             Some(vec![0u8; 32]),
@@ -626,6 +656,11 @@ mod tests {
         if let Input::Simple(box_simple) = parsed {
             if let Message::Evaluation(s) = *box_simple {
                 let res = s.run(&mut host).expect("simulation should run");
+                assert!(
+                    res.is_some(),
+                    "Simulation should have produced some outcome"
+                );
+                let res = res.unwrap();
                 return assert!(res.is_success, "simulation should have succeeded");
             }
         }

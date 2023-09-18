@@ -43,6 +43,14 @@ let of_wei_z z = z
 
 let of_eth_int eth = Z.of_string @@ Int.to_string eth ^ wei_pow
 
+let of_eth_string eth =
+  match String.split_on_char '.' (String.trim eth) with
+  | [eth] -> of_string (eth ^ wei_pow)
+  | [eth; decimal] ->
+      let decimal = decimal ^ String.make (shift - String.length decimal) '0' in
+      Z.add (of_string eth) (of_string decimal)
+  | _ -> Test.fail "Invalid ETH amount: %s" eth
+
 let ( + ) = Z.add
 
 let ( - ) = Z.sub
