@@ -3,11 +3,11 @@
 
 (library
  (name tezos_store_real)
- (public_name octez-shell-libs.tezos-store.real)
- (implements octez-shell-libs.tezos-store)
+ (public_name octez-shell-libs.store.real)
+ (implements octez-shell-libs.store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-shell-libs.tezos-store.unix)
+  octez-shell-libs.store.unix)
  (flags
   (:standard)
   -open Tezos_store_unix))

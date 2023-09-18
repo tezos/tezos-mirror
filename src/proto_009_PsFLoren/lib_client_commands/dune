@@ -3,21 +3,21 @@
 
 (library
  (name tezos_client_009_PsFLoren_commands)
- (public_name octez-protocol-009-PsFLoren-libs.tezos-client.commands)
+ (public_name octez-protocol-009-PsFLoren-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-009-PsFLoren.protocol
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
-  octez-protocol-009-PsFLoren-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-009-PsFLoren-libs.client
+  octez-shell-libs.client-commands
   octez-libs.tezos-rpc
-  octez-shell-libs.tezos-client-base-unix
-  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin)
+  octez-shell-libs.client-base-unix
+  octez-protocol-009-PsFLoren-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -35,21 +35,20 @@
 
 (library
  (name tezos_client_009_PsFLoren_commands_registration)
- (public_name
-  octez-protocol-009-PsFLoren-libs.tezos-client.commands-registration)
+ (public_name octez-protocol-009-PsFLoren-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-009-PsFLoren.protocol
-  octez-proto-libs.tezos-protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
-  octez-protocol-009-PsFLoren-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
-  octez-protocol-009-PsFLoren-libs.tezos-client.commands
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-009-PsFLoren-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-009-PsFLoren-libs.client.commands
   octez-libs.tezos-rpc
-  octez-protocol-009-PsFLoren-libs.tezos-protocol-plugin)
+  octez-protocol-009-PsFLoren-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

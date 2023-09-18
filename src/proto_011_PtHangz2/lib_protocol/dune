@@ -6,7 +6,7 @@
  (public_name tezos-protocol-011-PtHangz2.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_011_PtHangz2))
 
@@ -136,8 +136,8 @@
  (public_name tezos-protocol-011-PtHangz2.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-011-PtHangz2.protocol.raw)
  (flags
   (:standard)
@@ -272,8 +272,8 @@
  (public_name tezos-protocol-011-PtHangz2.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-011-PtHangz2.protocol)
  (flags
   (:standard)
@@ -292,8 +292,8 @@
 (library
  (name tezos_protocol_011_PtHangz2_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -51
@@ -413,8 +413,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-011-PtHangz2.protocol
-  octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

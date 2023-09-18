@@ -10,11 +10,11 @@
   octez-libs.tezos-base
   tezos-protocol-018-Proxford.protocol
   qcheck-alcotest
-  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.client
   octez-libs.tezos-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-test-helpers
+  octez-protocol-018-Proxford-libs.test-helpers
   octez-libs.tezos-base-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin)
+  octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

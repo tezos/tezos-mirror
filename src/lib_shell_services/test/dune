@@ -9,7 +9,7 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-shell-libs.tezos-shell-services
+  octez-shell-libs.shell-services
   octez-alcotezt)
  (js_of_ocaml)
  (library_flags (:standard -linkall))

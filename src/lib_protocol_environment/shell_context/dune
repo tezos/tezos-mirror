@@ -3,11 +3,11 @@
 
 (library
  (name tezos_shell_context)
- (public_name octez-shell-libs.tezos-shell-context)
+ (public_name octez-shell-libs.shell-context)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-libs.tezos-context)
  (flags
   (:standard)

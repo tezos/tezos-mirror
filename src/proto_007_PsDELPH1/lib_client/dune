@@ -3,16 +3,16 @@
 
 (library
  (name tezos_client_007_PsDELPH1)
- (public_name octez-protocol-007-PsDELPH1-libs.tezos-client)
+ (public_name octez-protocol-007-PsDELPH1-libs.client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   tezos-protocol-007-PsDELPH1.protocol
   tezos-protocol-007-PsDELPH1.protocol.lifted
-  octez-shell-libs.tezos-signer-backends
-  octez-protocol-007-PsDELPH1-libs.tezos-protocol-plugin
+  octez-shell-libs.signer-backends
+  octez-protocol-007-PsDELPH1-libs.plugin
   octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))

@@ -12,9 +12,9 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-crypto
   octez-libs.tezos-micheline
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.client-base
   octez-libs.tezos-workers
-  octez-shell-libs.tezos-shell
+  octez-shell-libs.shell
   octez-crawler)
  (flags
   (:standard)

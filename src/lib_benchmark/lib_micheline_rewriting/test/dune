@@ -10,7 +10,7 @@
   tezos-micheline-rewriting
   tezos-protocol-alpha.protocol
   octez-libs.tezos-error-monad
-  octez-protocol-alpha-libs.tezos-client)
+  octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

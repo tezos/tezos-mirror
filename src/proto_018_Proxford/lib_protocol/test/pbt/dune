@@ -8,17 +8,17 @@
   tezt.core
   octez-libs.tezos-base
   octez-libs.tezos-micheline
-  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.client
   tezos-protocol-018-Proxford.protocol
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.tezos-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-test-helpers
+  octez-protocol-018-Proxford-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-018-Proxford
   tezos-benchmark-type-inference-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-smart-rollup
+  octez-protocol-018-Proxford-libs.smart-rollup
   octez-libs.tezos-crypto-dal
   octez-libs.tezos-base-test-helpers
   tezos-protocol-018-Proxford.parameters)

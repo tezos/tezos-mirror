@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-l2-libs.tezos-wasmer
+  octez-l2-libs.wasmer
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

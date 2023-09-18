@@ -6,11 +6,11 @@
  (libraries
   tezt
   tezt-tezos
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol)
  (link_flags
   (:standard)

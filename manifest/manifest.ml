@@ -2166,15 +2166,13 @@ module Sub_lib = struct
 
   let make_container () = ref []
 
-  let make_documentation ~package ~public_name ~internal_name ~name ~synopsis =
-    function
+  let make_documentation ~package ~public_name ~name ~synopsis = function
     | Some docs when not (docs = Dune.[[S "package"; S package]]) ->
         {name; synopsis; documentation_type = Page}
     | _ ->
         (* In the case that the documentation stanza is only a package declaration,
                we don't want the page to be used *)
-        if String.contains (Option.value ~default:public_name internal_name) '.'
-        then
+        if String.contains public_name '.' then
           {
             name = String.capitalize_ascii name;
             synopsis;
@@ -2284,13 +2282,7 @@ module Sub_lib = struct
         s
     in
     let registered =
-      make_documentation
-        ~package
-        ~public_name
-        ~internal_name
-        ~name
-        ~synopsis
-        documentation
+      make_documentation ~package ~public_name ~name ~synopsis documentation
     in
     if
       List.exists
