@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
-  octez-l2-libs.octez_smart_rollup_wasm_benchmark_lib)
+  octez-l2-libs.smart_rollup_wasm_benchmark_lib)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)

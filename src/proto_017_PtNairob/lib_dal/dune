@@ -3,17 +3,17 @@
 
 (library
  (name tezos_dal_017_PtNairob)
- (public_name octez-protocol-017-PtNairob-libs.tezos-dal)
+ (public_name octez-protocol-017-PtNairob-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-protocol-compiler.registerer
   octez-libs.tezos-stdlib-unix
   tezos-dal-node-lib
-  octez-protocol-017-PtNairob-libs.tezos-client
-  octez-protocol-017-PtNairob-libs.tezos-protocol-plugin
+  octez-protocol-017-PtNairob-libs.client
+  octez-protocol-017-PtNairob-libs.plugin
   tezos-protocol-017-PtNairob.embedded-protocol
-  octez-protocol-017-PtNairob-libs.tezos-layer2-utils
+  octez-protocol-017-PtNairob-libs.layer2-utils
   tezos-protocol-017-PtNairob.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

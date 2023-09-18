@@ -6,7 +6,7 @@
  (public_name tezos-protocol-012-Psithaca.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_012_Psithaca))
 
@@ -153,8 +153,8 @@
  (public_name tezos-protocol-012-Psithaca.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-012-Psithaca.protocol.raw)
  (flags
   (:standard)
@@ -306,8 +306,8 @@
  (public_name tezos-protocol-012-Psithaca.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-012-Psithaca.protocol)
  (flags
   (:standard)
@@ -326,8 +326,8 @@
 (library
  (name tezos_protocol_012_Psithaca_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -w -51
@@ -464,8 +464,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-012-Psithaca.protocol
-  octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

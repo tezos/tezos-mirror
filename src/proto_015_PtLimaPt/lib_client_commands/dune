@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_015_PtLimaPt_commands)
- (public_name octez-protocol-015-PtLimaPt-libs.tezos-client.commands)
+ (public_name octez-protocol-015-PtLimaPt-libs.client.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -11,17 +11,17 @@
   tezos-protocol-015-PtLimaPt.protocol
   tezos-protocol-015-PtLimaPt.parameters
   octez-libs.tezos-stdlib-unix
-  octez-proto-libs.tezos-protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-mockup
-  octez-shell-libs.tezos-mockup-registration
-  octez-shell-libs.tezos-mockup-commands
-  octez-shell-libs.tezos-client-base
-  octez-protocol-015-PtLimaPt-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-registration
+  octez-shell-libs.mockup-commands
+  octez-shell-libs.client-base
+  octez-protocol-015-PtLimaPt-libs.client
+  octez-shell-libs.client-commands
   octez-libs.tezos-rpc
-  octez-shell-libs.tezos-client-base-unix
-  octez-protocol-015-PtLimaPt-libs.tezos-protocol-plugin
+  octez-shell-libs.client-base-unix
+  octez-protocol-015-PtLimaPt-libs.plugin
   uri)
  (library_flags (:standard -linkall))
  (flags
@@ -40,23 +40,22 @@
 
 (library
  (name tezos_client_015_PtLimaPt_commands_registration)
- (public_name
-  octez-protocol-015-PtLimaPt-libs.tezos-client.commands-registration)
+ (public_name octez-protocol-015-PtLimaPt-libs.client.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-015-PtLimaPt.protocol
   tezos-protocol-015-PtLimaPt.parameters
-  octez-proto-libs.tezos-protocol-environment
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
-  octez-protocol-015-PtLimaPt-libs.tezos-client
-  octez-shell-libs.tezos-client-commands
-  octez-protocol-015-PtLimaPt-libs.tezos-client.commands
-  octez-protocol-015-PtLimaPt-libs.tezos-client.sapling
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-015-PtLimaPt-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-015-PtLimaPt-libs.client.commands
+  octez-protocol-015-PtLimaPt-libs.client.sapling
   octez-libs.tezos-rpc
-  octez-protocol-015-PtLimaPt-libs.tezos-protocol-plugin)
+  octez-protocol-015-PtLimaPt-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

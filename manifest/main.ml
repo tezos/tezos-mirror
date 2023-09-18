@@ -2167,7 +2167,8 @@ let _lazy_containers_tests =
 
 let octez_webassembly_interpreter =
   octez_l2_lib
-    "tezos-webassembly-interpreter"
+    "webassembly-interpreter"
+    ~internal_name:"tezos_webassembly_interpreter"
     ~path:"src/lib_webassembly"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
     ~deps:
@@ -2182,7 +2183,8 @@ let octez_webassembly_interpreter =
 
 let octez_webassembly_interpreter_extra =
   octez_l2_lib
-    "tezos-webassembly-interpreter-extra"
+    "webassembly-interpreter-extra"
+    ~internal_name:"tezos_webassembly_interpreter_extra"
     ~path:"src/lib_webassembly/extra"
     ~license:"Apache-2.0"
     ~extra_authors:["WebAssembly Authors"]
@@ -2343,7 +2345,8 @@ let octez_merkle_proof_encoding =
 
 let octez_shell_services =
   octez_shell_lib
-    "tezos-shell-services"
+    "shell-services"
+    ~internal_name:"tezos_shell_services"
     ~path:"src/lib_shell_services"
     ~synopsis:"Descriptions of RPCs exported by [tezos-shell]"
     ~deps:
@@ -2406,7 +2409,8 @@ let _octez_tooling_opam_lint =
 
 let octez_p2p =
   octez_shell_lib
-    "tezos-p2p"
+    "p2p"
+    ~internal_name:"tezos_p2p"
     ~path:"src/lib_p2p"
     ~synopsis:"Library for a pool of P2P connections"
     ~deps:
@@ -2456,7 +2460,8 @@ let tezt_tezos =
 
 let octez_p2p_test_common =
   octez_shell_lib
-    "tezos_p2p_test_common"
+    "p2p_test_common"
+    ~internal_name:"tezos_p2p_test_common"
     ~path:"src/lib_p2p/test/common"
     ~deps:
       [
@@ -2580,7 +2585,8 @@ let _octez_gossipsub_test =
 
 let octez_wasmer =
   octez_l2_lib
-    "tezos-wasmer"
+    "wasmer"
+    ~internal_name:"tezos_wasmer"
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
     ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; tezos_rust_lib]
@@ -2655,7 +2661,8 @@ let octez_context_memory =
 
 let octez_scoru_wasm =
   octez_l2_lib
-    "tezos-scoru-wasm"
+    "scoru-wasm"
+    ~internal_name:"tezos_scoru_wasm"
     ~path:"src/lib_scoru_wasm"
     ~deps:
       [
@@ -2671,7 +2678,8 @@ let octez_scoru_wasm =
 
 let octez_scoru_wasm_fast =
   octez_l2_lib
-    "tezos-scoru-wasm-fast"
+    "scoru-wasm-fast"
+    ~internal_name:"tezos_scoru_wasm_fast"
     ~path:"src/lib_scoru_wasm/fast"
     ~synopsis:"WASM functionality for SCORU Fast Execution"
     ~deps:
@@ -2890,12 +2898,14 @@ let _octez_sapling_ctypes_gen =
 
 let tezos_protocol_environment_sigs_internals =
   octez_proto_lib
-    "tezos-protocol-environment.sigs-internals"
+    "protocol-environment.sigs-internals"
+    ~internal_name:"tezos_protocol_environment_sigs_internals"
     ~path:"src/lib_protocol_environment/sigs-internals"
 
 let tezos_protocol_environment_sigs =
   octez_proto_lib
-    "tezos-protocol-environment.sigs"
+    "protocol-environment.sigs"
+    ~internal_name:"tezos_protocol_environment_sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~deps:[tezos_protocol_environment_sigs_internals]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
@@ -2926,7 +2936,8 @@ let tezos_protocol_environment_sigs =
 
 let octez_protocol_environment_structs =
   octez_proto_lib
-    "tezos-protocol-environment.structs"
+    "protocol-environment.structs"
+    ~internal_name:"tezos_protocol_environment_structs"
     ~path:"src/lib_protocol_environment/structs"
     ~deps:
       [
@@ -2941,7 +2952,8 @@ let octez_protocol_environment_structs =
 
 let octez_protocol_environment =
   octez_proto_lib
-    "tezos-protocol-environment"
+    "protocol-environment"
+    ~internal_name:"tezos_protocol_environment"
     ~path:"src/lib_protocol_environment"
     ~documentation:[Dune.[S "package"; S "octez-proto-libs"]]
     ~deps:
@@ -2966,7 +2978,8 @@ let octez_protocol_environment =
 
 let octez_shell_context =
   octez_shell_lib
-    "tezos-shell-context"
+    "shell-context"
+    ~internal_name:"tezos_shell_context"
     ~path:"src/lib_protocol_environment/shell_context"
     ~deps:
       [
@@ -2999,7 +3012,8 @@ let _octez_protocol_environment_tests =
 
 let octez_context_ops =
   octez_shell_lib
-    "tezos-context-ops"
+    "context-ops"
+    ~internal_name:"tezos_context_ops"
     ~path:"src/lib_protocol_environment/context_ops"
     ~synopsis:"Backend-agnostic operations on contexts"
     ~deps:
@@ -3102,7 +3116,7 @@ let octez_protocol_compiler_lib =
                   V
                     [
                       S
-                        "%{lib:octez-proto-libs.tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
+                        "%{lib:octez-proto-libs.protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
                     ];
                 ];
               ];
@@ -3174,7 +3188,8 @@ let octez_protocol_compiler_native =
 
 let octez_protocol_updater =
   octez_shell_lib
-    "tezos-protocol-updater"
+    "protocol-updater"
+    ~internal_name:"tezos_protocol_updater"
     ~path:"src/lib_protocol_updater"
     ~synopsis:"Economic-protocol dynamic loading for `octez-node`"
     ~deps:
@@ -3194,7 +3209,8 @@ let octez_protocol_updater =
 
 let octez_validation =
   octez_shell_lib
-    "tezos-validation"
+    "validation"
+    ~internal_name:"tezos_validation"
     ~path:"src/lib_validation"
     ~synopsis:"Library for block validation"
     ~time_measurement_ppx:true
@@ -3214,7 +3230,8 @@ let octez_validation =
 
 let octez_store_shared =
   octez_shell_lib
-    "tezos-store.shared"
+    "store.shared"
+    ~internal_name:"tezos_store_shared"
     ~path:"src/lib_store/shared"
     ~deps:
       [
@@ -3238,7 +3255,8 @@ let octez_store_shared =
 
 let octez_store_unix =
   octez_shell_lib
-    "tezos-store.unix"
+    "store.unix"
+    ~internal_name:"tezos_store_unix"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3281,7 +3299,8 @@ let octez_store_unix =
 
 let octez_store_unix_reconstruction =
   octez_shell_lib
-    "tezos-store.unix-reconstruction"
+    "store.unix-reconstruction"
+    ~internal_name:"tezos_store_unix_reconstruction"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3299,7 +3318,8 @@ let octez_store_unix_reconstruction =
 
 let octez_store_unix_snapshots =
   octez_shell_lib
-    "tezos-store.unix-snapshots"
+    "store.unix-snapshots"
+    ~internal_name:"tezos_store_unix_snapshots"
     ~path:"src/lib_store/unix"
     ~deps:
       [
@@ -3316,7 +3336,8 @@ let octez_store_unix_snapshots =
 
 let octez_store =
   octez_shell_lib
-    "tezos-store"
+    "store"
+    ~internal_name:"tezos_store"
     ~path:"src/lib_store"
     ~synopsis:"Store for `octez-node`"
     ~deps:
@@ -3331,11 +3352,12 @@ let octez_store =
         octez_store_shared |> open_;
       ]
     ~virtual_modules:["store"]
-    ~default_implementation:"octez-shell-libs.tezos-store.real"
+    ~default_implementation:"octez-shell-libs.store.real"
 
 let _octez_store_real =
   octez_shell_lib
-    "tezos-store.real"
+    "store.real"
+    ~internal_name:"tezos_store_real"
     ~path:"src/lib_store/real"
     ~deps:[octez_store_unix |> open_]
     ~implements:octez_store
@@ -3389,7 +3411,8 @@ let _octez_requester_tests =
 
 let octez_shell =
   octez_shell_lib
-    "tezos-shell"
+    "shell"
+    ~internal_name:"tezos_shell"
     ~path:"src/lib_shell"
     ~synopsis:
       "Core of `octez-node` (gossip, validation scheduling, mempool, ...)"
@@ -3499,7 +3522,8 @@ let _octez_rpc_http_server_tests =
 
 let octez_client_base =
   octez_shell_lib
-    "tezos-client-base"
+    "client-base"
+    ~internal_name:"tezos_client_base"
     ~path:"src/lib_client_base"
     ~synopsis:"Tezos: common helpers for `tezos-client`"
     ~deps:
@@ -3546,7 +3570,8 @@ let _bip39_generator =
 
 let octez_signer_services =
   octez_shell_lib
-    "tezos-signer-services"
+    "signer-services"
+    ~internal_name:"tezos_signer_services"
     ~path:"src/lib_signer_services"
     ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-signer`"
     ~deps:
@@ -3560,7 +3585,8 @@ let octez_signer_services =
 
 let octez_signer_backends =
   octez_shell_lib
-    "tezos-signer-backends"
+    "signer-backends"
+    ~internal_name:"tezos_signer_backends"
     ~path:"src/lib_signer_backends"
     ~synopsis:"Tezos: remote-signature backends for `tezos-client`"
     ~deps:
@@ -3596,7 +3622,8 @@ let _octez_signer_backends_tests =
 
 let octez_signer_backends_unix =
   octez_shell_lib
-    "tezos-signer-backends.unix"
+    "signer-backends.unix"
+    ~internal_name:"tezos_signer_backends_unix"
     ~path:"src/lib_signer_backends/unix"
     ~deps:
       [
@@ -3640,7 +3667,8 @@ let _octez_signer_backends_unix_tests =
 
 let octez_client_commands =
   octez_shell_lib
-    "tezos-client-commands"
+    "client-commands"
+    ~internal_name:"tezos_client_commands"
     ~path:"src/lib_client_commands"
     ~synopsis:"Tezos: protocol agnostic commands for `tezos-client`"
     ~deps:
@@ -3662,7 +3690,8 @@ let octez_client_commands =
 
 let octez_mockup_registration =
   octez_shell_lib
-    "tezos-mockup-registration"
+    "mockup-registration"
+    ~internal_name:"tezos_mockup_registration"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: protocol registration for the mockup mode"
     ~deps:
@@ -3677,7 +3706,8 @@ let octez_mockup_registration =
 
 let octez_mockup_proxy =
   octez_shell_lib
-    "tezos-mockup-proxy"
+    "mockup-proxy"
+    ~internal_name:"tezos_mockup_proxy"
     ~path:"src/lib_mockup_proxy"
     ~synopsis:"Tezos: local RPCs"
     ~deps:
@@ -3695,7 +3725,8 @@ let octez_mockup_proxy =
 (* Depends on tezos_p2p to register the relevant RPCs. *)
 let octez_mockup =
   octez_shell_lib
-    "tezos-mockup"
+    "mockup"
+    ~internal_name:"tezos_mockup"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: library of auto-documented RPCs (mockup mode)"
     ~deps:
@@ -3726,7 +3757,8 @@ let octez_mockup =
 
 let octez_mockup_commands =
   octez_shell_lib
-    "tezos-mockup-commands"
+    "mockup-commands"
+    ~internal_name:"tezos_mockup_commands"
     ~path:"src/lib_mockup"
     ~synopsis:"Tezos: library of auto-documented RPCs (commands)"
     ~deps:
@@ -3761,7 +3793,8 @@ let _octez_mockup_tests =
 
 let octez_proxy =
   octez_shell_lib
-    "tezos-proxy"
+    "proxy"
+    ~internal_name:"tezos_proxy"
     ~path:"src/lib_proxy"
     ~synopsis:"Tezos: proxy"
     ~deps:
@@ -3780,7 +3813,8 @@ let octez_proxy =
 
 let octez_proxy_rpc =
   octez_shell_lib
-    "tezos-proxy.rpc"
+    "proxy.rpc"
+    ~internal_name:"tezos_proxy_rpc"
     ~path:"src/lib_proxy/rpc"
     ~deps:
       [
@@ -3878,7 +3912,8 @@ let _octez_proxy_server_config_tests =
 
 let octez_client_base_unix =
   octez_shell_lib
-    "tezos-client-base-unix"
+    "client-base-unix"
+    ~internal_name:"tezos_client_base_unix"
     ~path:"src/lib_client_base_unix"
     ~synopsis:
       "Tezos: common helpers for `tezos-client` (unix-specific fragment)"
@@ -4010,7 +4045,8 @@ let octez_micheline_rewriting =
 
 let octez_shell_benchmarks =
   octez_shell_lib
-    "tezos-shell-benchmarks"
+    "shell-benchmarks"
+    ~internal_name:"tezos_shell_benchmarks"
     ~path:"src/lib_shell_benchmarks"
     ~synopsis:"Tezos: shell benchmarks"
     ~deps:
@@ -4125,9 +4161,10 @@ let _octez_embedded_protocol_packer =
 
 let octez_layer2_store =
   octez_l2_lib
-    "tezos_layer2_store"
+    "layer2_store"
+    ~internal_name:"tezos_layer2_store"
     ~path:"src/lib_layer2_store"
-    ~synopsis:"Tezos: layer2 storage utils"
+    ~synopsis:"layer2 storage utils"
     ~deps:
       [
         index;
@@ -4338,9 +4375,10 @@ let octez_injector_lib =
 
 let octez_smart_rollup_lib =
   octez_l2_lib
-    "octez-smart-rollup"
+    "smart-rollup"
+    ~internal_name:"octez_smart_rollup"
     ~path:"src/lib_smart_rollup"
-    ~synopsis:"Octez: library for Smart Rollups"
+    ~synopsis:"Library for Smart Rollups"
     ~documentation:[Dune.[S "package"; S "octez-l2-libs"]]
     ~deps:
       [
@@ -4381,7 +4419,8 @@ let octez_smart_rollup_node_lib =
 
 let octez_scoru_wasm_helpers =
   octez_l2_lib
-    "tezos-scoru-wasm-helpers"
+    "scoru-wasm-helpers"
+    ~internal_name:"tezos_scoru_wasm_helpers"
     ~path:"src/lib_scoru_wasm/helpers"
     ~synopsis:"Helpers for the smart rollup wasm functionality and debugger"
     ~deps:
@@ -4398,7 +4437,8 @@ let octez_scoru_wasm_helpers =
 
 let octez_scoru_wasm_durable_snapshot =
   octez_l2_lib
-    "tezos_scoru_wasm_durable_snapshot"
+    "scoru_wasm_durable_snapshot"
+    ~internal_name:"tezos_scoru_wasm_durable_snapshot"
     ~path:"src/lib_scoru_wasm/test/durable_snapshot"
     ~synopsis:"Durable storage reference implementation"
     ~deps:
@@ -4411,7 +4451,8 @@ let octez_scoru_wasm_durable_snapshot =
 
 let octez_scoru_wasm_tests_helpers =
   octez_l2_lib
-    "tezos_scoru_wasm_test_helpers"
+    "scoru_wasm_test_helpers"
+    ~internal_name:"tezos_scoru_wasm_test_helpers"
     ~path:"src/lib_scoru_wasm/test/helpers"
     ~synopsis:"Helpers for test of the smart rollup wasm functionality"
     ~deps:
@@ -4434,7 +4475,8 @@ let octez_scoru_wasm_tests_helpers =
 
 let octez_scoru_wasm_benchmark =
   octez_l2_lib
-    "octez_smart_rollup_wasm_benchmark_lib"
+    "smart_rollup_wasm_benchmark_lib"
+    ~internal_name:"octez_smart_rollup_wasm_benchmark_lib"
     ~path:"src/lib_scoru_wasm/bench"
     ~synopsis:"Smart Rollup WASM benchmark library"
     ~deps:
@@ -5737,7 +5779,7 @@ let hash = Protocol.hash
     let octez_sc_rollup =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        "tezos-smart-rollup"
+        "smart-rollup"
         ~internal_name:(sf "tezos_smart_rollup_%s" name_dash)
         ~path:(path // "lib_sc_rollup")
         ~synopsis:
@@ -5749,7 +5791,7 @@ let hash = Protocol.hash
     let plugin =
       only_if (N.(number >= 007) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        "tezos-protocol-plugin"
+        "plugin"
         ~internal_name:(sf "tezos_protocol_plugin_%s" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Protocol plugin"
@@ -5768,7 +5810,7 @@ let hash = Protocol.hash
     let plugin_registerer =
       opt_map plugin @@ fun plugin ->
       octez_protocol_lib
-        "tezos-protocol-plugin-registerer"
+        "plugin-registerer"
         ~internal_name:(sf "tezos_protocol_plugin_%s_registerer" name_dash)
         ~path:(path // "lib_plugin")
         ~synopsis:"Protocol plugin registerer"
@@ -5787,7 +5829,7 @@ let hash = Protocol.hash
     let client =
       only_if not_overridden @@ fun () ->
       octez_protocol_lib
-        "tezos-client"
+        "client"
         ~internal_name:(sf "tezos_client_%s" name_dash)
         ~path:(path // "lib_client")
         ~synopsis:"Protocol specific library for `tezos-client`"
@@ -5819,7 +5861,7 @@ let hash = Protocol.hash
     let test_helpers =
       only_if active @@ fun () ->
       octez_protocol_lib
-        "tezos-test-helpers"
+        "test-helpers"
         ~path:
           (if active then path // "lib_protocol/test/helpers"
           else path // "lib_protocol")
@@ -5904,7 +5946,7 @@ let hash = Protocol.hash
     let client_commands =
       only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        "tezos-client.commands"
+        "client.commands"
         ~internal_name:(sf "tezos_client_%s_commands" name_dash)
         ~path:(path // "lib_client_commands")
         ~deps:
@@ -5939,7 +5981,7 @@ let hash = Protocol.hash
     let client_sapling =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        "tezos-client.sapling"
+        "client.sapling"
         ~internal_name:(sf "tezos_client_sapling_%s" name_underscore)
         ~path:(path // "lib_client_sapling")
         ~deps:
@@ -5961,7 +6003,7 @@ let hash = Protocol.hash
     let client_commands_registration =
       only_if (N.(number >= 001) && not_overridden) @@ fun () ->
       octez_protocol_lib
-        "tezos-client.commands-registration"
+        "client.commands-registration"
         ~internal_name:(sf "tezos_client_%s_commands_registration" name_dash)
         ~path:(path // "lib_client_commands")
         ~deps:
@@ -5991,7 +6033,7 @@ let hash = Protocol.hash
     let baking =
       only_if active @@ fun () ->
       octez_protocol_lib
-        "tezos-baking"
+        "baking"
         ~internal_name:("tezos_baking_" ^ name_dash)
         ~path:(path // "lib_delegate")
         ~synopsis:
@@ -6035,7 +6077,7 @@ let hash = Protocol.hash
     let tenderbrute =
       only_if (active && N.(number >= 013)) @@ fun () ->
       octez_protocol_lib
-        "tezos-baking.tenderbrute"
+        "baking.tenderbrute"
         ~internal_name:(sf "tenderbrute_%s" name_underscore)
         ~path:(path // "lib_delegate/test/tenderbrute/lib")
         ~deps:
@@ -6077,7 +6119,7 @@ let hash = Protocol.hash
       let mockup_simulator =
         only_if N.(number >= 012) @@ fun () ->
         octez_protocol_lib
-          "tezos-bakings.mockup-simulator"
+          "bakings.mockup-simulator"
           ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
           ~path:(path // "lib_delegate/test/mockup_simulator")
           ~deps:
@@ -6126,7 +6168,7 @@ let hash = Protocol.hash
     let baking_commands =
       only_if active @@ fun () ->
       octez_protocol_lib
-        "tezos-baking-commands"
+        "baking-commands"
         ~internal_name:(sf "tezos_baking_%s_commands" name_dash)
         ~path:(path // "lib_delegate")
         ~synopsis:"Protocol-specific commands for baking"
@@ -6156,7 +6198,7 @@ let hash = Protocol.hash
     let baking_commands_registration =
       only_if active @@ fun () ->
       octez_protocol_lib
-        "tezos-baking-commands.registration"
+        "baking-commands.registration"
         ~internal_name:(sf "tezos_baking_%s_commands_registration" name_dash)
         ~path:(path // "lib_delegate")
         ~deps:
@@ -6207,7 +6249,7 @@ let hash = Protocol.hash
     let layer2_utils =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        "tezos-layer2-utils"
+        "layer2-utils"
         ~internal_name:(sf "tezos_layer2_utils_%s" name_dash)
         ~path:(path // "lib_layer2_utils")
         ~synopsis:"Protocol specific library for Layer 2 utils"
@@ -6223,7 +6265,7 @@ let hash = Protocol.hash
     let injector =
       only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       octez_protocol_lib
-        "tezos-injector"
+        "injector"
         ~internal_name:(sf "tezos_injector_%s" name_dash)
         ~path:(path // "lib_injector")
         ~synopsis:"Protocol specific library building injectors"
@@ -6249,7 +6291,7 @@ let hash = Protocol.hash
     let dal =
       only_if (active && N.(number >= 016)) @@ fun () ->
       octez_protocol_lib
-        "tezos-dal"
+        "dal"
         ~internal_name:(sf "tezos_dal_%s" name_dash)
         ~path:(path // "lib_dal")
         ~synopsis:"Protocol specific library for the Data availability Layer"
@@ -6301,7 +6343,7 @@ let hash = Protocol.hash
          plugin cannot be resolved. *)
       only_if (active && N.(number >= 017)) @@ fun () ->
       octez_protocol_lib
-        "tezos-dac"
+        "dac"
         ~internal_name:(sf "tezos_dac_%s" name_dash)
         ~path:(path // "lib_dac_plugin")
         ~synopsis:
@@ -6367,7 +6409,7 @@ let hash = Protocol.hash
     let octez_sc_rollup_layer2 =
       only_if N.(number >= 016) @@ fun () ->
       octez_protocol_lib
-        "tezos-smart-rollup-layer2"
+        "smart-rollup-layer2"
         ~internal_name:(sf "tezos_smart_rollup_layer2_%s" name_dash)
         ~path:(path // "lib_sc_rollup_layer2")
         ~synopsis:"Protocol specific library for `tezos-smart-rollup`"
@@ -6541,7 +6583,7 @@ let hash = Protocol.hash
     let tx_rollup =
       only_if (active && N.(number >= 013 && number <= 015)) @@ fun () ->
       octez_protocol_lib
-        "tezos-tx-rollup"
+        "tx-rollup"
         ~internal_name:(sf "tezos_tx_rollup_%s" name_dash)
         ~path:(path // "lib_tx_rollup")
         ~synopsis:"Protocol specific library for `tezos-tx-rollup`"

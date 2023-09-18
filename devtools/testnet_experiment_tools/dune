@@ -6,11 +6,11 @@
  (libraries
   tezt
   tezt-tezos
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   tezos-protocol-alpha.protocol)
  (link_flags
   (:standard)
@@ -30,19 +30,19 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-base-unix
-  octez-protocol-017-PtNairob-libs.tezos-baking
-  octez-protocol-017-PtNairob-libs.tezos-client
-  octez-protocol-017-PtNairob-libs.tezos-client.commands
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-017-PtNairob-libs.baking
+  octez-protocol-017-PtNairob-libs.client
+  octez-protocol-017-PtNairob-libs.client.commands
   tezos-protocol-017-PtNairob.protocol
-  octez-protocol-018-Proxford-libs.tezos-baking
-  octez-protocol-018-Proxford-libs.tezos-client
-  octez-protocol-018-Proxford-libs.tezos-client.commands
+  octez-protocol-018-Proxford-libs.baking
+  octez-protocol-018-Proxford-libs.client
+  octez-protocol-018-Proxford-libs.client.commands
   tezos-protocol-018-Proxford.protocol
-  octez-protocol-alpha-libs.tezos-baking
-  octez-protocol-alpha-libs.tezos-client
-  octez-protocol-alpha-libs.tezos-client.commands
+  octez-protocol-alpha-libs.baking
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.client.commands
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
@@ -60,13 +60,13 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
-  octez-shell-libs.tezos-store
+  octez-shell-libs.store
   octez-libs.tezos-clic
-  octez-shell-libs.tezos-store.unix-snapshots
-  octez-shell-libs.tezos-store.shared
+  octez-shell-libs.store.unix-snapshots
+  octez-shell-libs.store.shared
   octez-node-config
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
   simulation_scenario_lib)
  (link_flags
   (:standard)

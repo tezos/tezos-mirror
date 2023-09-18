@@ -6,7 +6,7 @@
  (public_name tezos-protocol-018-Proxford.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment)
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Tezos_protocol_environment_018_Proxford))
 
@@ -270,8 +270,8 @@
  (public_name tezos-protocol-018-Proxford.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-018-Proxford.protocol.raw)
  (flags
   (:standard)
@@ -544,8 +544,8 @@
  (public_name tezos-protocol-018-Proxford.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs
   tezos-protocol-018-Proxford.protocol)
  (flags
   (:standard)
@@ -563,8 +563,8 @@
 (library
  (name tezos_protocol_018_Proxford_functor)
  (libraries
-  octez-proto-libs.tezos-protocol-environment
-  octez-proto-libs.tezos-protocol-environment.sigs)
+  octez-proto-libs.protocol-environment
+  octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)
@@ -822,8 +822,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-018-Proxford.protocol
-  octez-shell-libs.tezos-protocol-updater
-  octez-proto-libs.tezos-protocol-environment)
+  octez-shell-libs.protocol-updater
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (modules Registerer))
 

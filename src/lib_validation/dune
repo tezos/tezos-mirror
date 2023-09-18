@@ -3,7 +3,7 @@
 
 (library
  (name tezos_validation)
- (public_name octez-shell-libs.tezos-validation)
+ (public_name octez-shell-libs.validation)
  (instrumentation (backend bisect_ppx))
  (instrumentation (backend tezos-time-measurement))
  (libraries
@@ -11,10 +11,10 @@
   octez-libs.tezos-crypto
   octez-libs.tezos-rpc
   octez-libs.tezos-context
-  octez-shell-libs.tezos-context-ops
-  octez-shell-libs.tezos-shell-context
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-protocol-updater
+  octez-shell-libs.context-ops
+  octez-shell-libs.shell-context
+  octez-shell-libs.shell-services
+  octez-shell-libs.protocol-updater
   octez-libs.tezos-stdlib-unix
   tezos-version.value)
  (flags

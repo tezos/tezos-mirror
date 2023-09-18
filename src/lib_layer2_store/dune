@@ -3,7 +3,7 @@
 
 (library
  (name tezos_layer2_store)
- (public_name octez-l2-libs.tezos_layer2_store)
+ (public_name octez-l2-libs.layer2_store)
  (instrumentation (backend bisect_ppx))
  (libraries
   index

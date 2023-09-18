@@ -3,14 +3,14 @@
 
 (library
  (name tezos_context_ops)
- (public_name octez-shell-libs.tezos-context-ops)
+ (public_name octez-shell-libs.context-ops)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-error-monad
-  octez-proto-libs.tezos-protocol-environment
+  octez-proto-libs.protocol-environment
   octez-libs.tezos-context
-  octez-shell-libs.tezos-shell-context)
+  octez-shell-libs.shell-context)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

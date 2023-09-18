@@ -9,7 +9,7 @@
   octez-libs.tezos-base
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-proxy
+  octez-shell-libs.proxy
   octez-libs.tezos-base-test-helpers
   octez-libs.tezos-test-helpers
   tezos_proxy_test_helpers_shell_services

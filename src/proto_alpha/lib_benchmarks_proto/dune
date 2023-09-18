@@ -17,13 +17,13 @@
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha.protocol
   octez-libs.tezos-crypto
-  octez-shell-libs.tezos-shell-benchmarks
+  octez-shell-libs.shell-benchmarks
   octez-libs.tezos-micheline
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-libs.tezos-sapling
-  octez-protocol-alpha-libs.tezos-client
-  octez-protocol-alpha-libs.tezos-protocol-plugin
-  octez-proto-libs.tezos-protocol-environment)
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.plugin
+  octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

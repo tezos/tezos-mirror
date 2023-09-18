@@ -8,7 +8,7 @@
   tezt-tezos
   tezt-tezos.tezt-performance-regression
   octez-libs.tezos-lwt-result-stdlib
-  octez-protocol-alpha-libs.tezos-test-helpers
+  octez-protocol-alpha-libs.test-helpers
   octez-libs.tezos-micheline
   tezos-openapi
   tezos-protocol-alpha.protocol

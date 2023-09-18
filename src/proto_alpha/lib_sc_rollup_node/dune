@@ -8,13 +8,13 @@
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-base-unix
-  octez-protocol-alpha-libs.tezos-client
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-alpha-libs.client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-alpha.protocol
-  octez-protocol-alpha-libs.tezos-protocol-plugin
+  octez-protocol-alpha-libs.plugin
   tezos-protocol-alpha.parameters
   octez-libs.tezos-rpc
   octez-libs.tezos-rpc-http
@@ -22,15 +22,15 @@
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-alpha-libs.tezos-dac
+  octez-protocol-alpha-libs.dac
   tezos-dac-lib
   tezos-dac-client-lib
-  octez-shell-libs.tezos-shell-services
-  octez-l2-libs.octez-smart-rollup
-  octez-protocol-alpha-libs.tezos-smart-rollup
-  octez-protocol-alpha-libs.tezos-smart-rollup-layer2
-  octez-protocol-alpha-libs.tezos-layer2-utils
-  octez-l2-libs.tezos_layer2_store
+  octez-shell-libs.shell-services
+  octez-l2-libs.smart-rollup
+  octez-protocol-alpha-libs.smart-rollup
+  octez-protocol-alpha-libs.smart-rollup-layer2
+  octez-protocol-alpha-libs.layer2-utils
+  octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tezos-tree-encoding
   data-encoding
@@ -41,8 +41,8 @@
   aches-lwt
   octez-injector
   octez-smart-rollup-node-lib
-  octez-l2-libs.tezos-scoru-wasm
-  octez-l2-libs.tezos-scoru-wasm-fast
+  octez-l2-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
   octez-libs.tezos-crypto-dal
   tezos-version.value)
  (flags

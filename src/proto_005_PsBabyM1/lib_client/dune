@@ -3,15 +3,15 @@
 
 (library
  (name tezos_client_005_PsBabyM1)
- (public_name octez-protocol-005-PsBabyM1-libs.tezos-client)
+ (public_name octez-protocol-005-PsBabyM1-libs.client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
-  octez-shell-libs.tezos-shell-services
-  octez-shell-libs.tezos-client-base
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
   tezos-protocol-005-PsBabyM1.protocol
   tezos-protocol-005-PsBabyM1.protocol.lifted
-  octez-shell-libs.tezos-signer-backends
+  octez-shell-libs.signer-backends
   octez-libs.tezos-rpc
   uri)
  (library_flags (:standard -linkall))

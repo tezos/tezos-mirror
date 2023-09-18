@@ -7,8 +7,8 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-shell-libs.tezos-mockup-commands
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.mockup-commands
+  octez-shell-libs.client-base-unix
   octez-libs.tezos-base-test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))

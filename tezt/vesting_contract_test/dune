@@ -1,7 +1,7 @@
 (executable
  (name main)
  (libraries octez-libs.tezos-stdlib
-            octez-protocol-alpha-libs.tezos-test-helpers
+            octez-protocol-alpha-libs.test-helpers
             octez-libs.tezos-micheline
             tezos-protocol-alpha.protocol
             tezt-tezos

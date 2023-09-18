@@ -12,8 +12,8 @@
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-rpc-http-server
   octez-libs.tezos-rpc-http
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
   data-encoding
   (select void_for_linking-octez_injector_PtNairob from
    (octez_injector_PtNairob -> void_for_linking-octez_injector_PtNairob.empty)

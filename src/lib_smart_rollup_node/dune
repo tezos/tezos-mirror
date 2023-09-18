@@ -10,8 +10,8 @@
   octez-libs.tezos-base.unix
   octez-libs.tezos-stdlib-unix
   octez-libs.tezos-crypto
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-client-base-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
   cohttp-lwt-unix
   octez-node-config
   prometheus-app
@@ -20,10 +20,10 @@
   tezos-dac-client-lib
   octez-injector
   tezos-version.value
-  octez-l2-libs.tezos_layer2_store
+  octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tezos-workers
-  octez-l2-libs.octez-smart-rollup)
+  octez-l2-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

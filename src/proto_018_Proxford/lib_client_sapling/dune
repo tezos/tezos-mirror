@@ -3,19 +3,19 @@
 
 (library
  (name tezos_client_sapling_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.tezos-client.sapling)
+ (public_name octez-protocol-018-Proxford-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
   octez-libs.tezos-crypto
   octez-libs.tezos-stdlib-unix
-  octez-shell-libs.tezos-client-base
-  octez-shell-libs.tezos-signer-backends
-  octez-protocol-018-Proxford-libs.tezos-client
-  octez-protocol-018-Proxford-libs.tezos-client.commands
+  octez-shell-libs.client-base
+  octez-shell-libs.signer-backends
+  octez-protocol-018-Proxford-libs.client
+  octez-protocol-018-Proxford-libs.client.commands
   tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.tezos-protocol-plugin)
+  octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
