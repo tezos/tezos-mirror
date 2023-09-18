@@ -178,7 +178,7 @@ let pp_call ppf = function
 (** [initial_eval_call] is `kernel_run` function call. *)
 let initial_eval_call = Function Constants.wasm_entrypoint
 
-(** [update_on_decode current_tick current_call_context] starts and stop
+(** [update_on_decode current_tick current_call_state] starts and stop
     `internal` calls related to the {Decode} step of the PVM. *)
 let update_on_decode current_tick current_time (current_node, call_stack) =
   let open Lwt_syntax in
@@ -204,7 +204,7 @@ let update_on_decode current_tick current_time (current_node, call_stack) =
            call_stack
   | _ -> return_none
 
-(** [update_on_link current_tick current_call_context] starts and stop
+(** [update_on_link current_tick current_call_state] starts and stop
     `internal` call to the {Link} step of the PVM. *)
 let update_on_link current_tick current_time (current_node, call_stack) module_
     imports_offset =
@@ -222,7 +222,7 @@ let update_on_link current_tick current_time (current_node, call_stack) module_
          call_stack
   else return_none
 
-(** [update_on_init current_tick current_call_context] starts and stop
+(** [update_on_init current_tick current_call_state] starts and stop
     `internal` call to the {Init} step of the PVM. *)
 let update_on_init current_tick current_time (current_node, call_stack) =
   let open Lwt_syntax in
@@ -262,7 +262,7 @@ let update_on_instr current_tick current_time current_node call_stack symbols =
            call_stack)
   | _ -> Lwt.return_none
 
-(** [update_on_eval current_tick current_call_context] handle function calls and
+(** [update_on_eval current_tick current_call_state] handle function calls and
     end during the evaluation. *)
 let update_on_eval current_tick current_time (current_node, call_stack) symbols
     =
@@ -300,8 +300,8 @@ let update_on_eval current_tick current_time (current_node, call_stack) symbols
       @@ end_function_call current_tick current_time current_node call_stack
   | _ -> return_none
 
-(** [update_call_stack current_tick current_context_call symbols state] returns
-    the call context changes for any state. Returns [None] if no change
+(** [update_call_stack current_tick current_state_call symbols state] returns
+    the call state changes for any state. Returns [None] if no change
     happened. *)
 let update_call_stack current_tick current_time (current_node, call_stack)
     symbols state =
@@ -336,7 +336,11 @@ let update_call_stack current_tick current_time (current_node, call_stack)
   | _ -> return_none
 
 module State : sig
-  (** The profiling context is the internal state built by the profiler. It is
+  (** Kinds of special `write_debug` messages the profiler can handle. Messages
+     are of the form `__wasm_debugger__::<debug_call>(<data>)` *)
+  type debug_call = Start_section of string | End_section of string
+
+  (** The profiling state is the internal state built by the profiler. It is
       defined as mutable as it is updated by side effects during the
       profiling. *)
   type t = private {
@@ -344,31 +348,41 @@ module State : sig
       function_call call_stack * function_call call_stack list;
     mutable kernel_runs : function_call call_stack option list;
     mutable sections : (Z.t * string) list;
+    mutable debug_call : debug_call option;
   }
 
   type should_compute := Wasm_pvm_state.Internal_state.pvm_state -> bool Lwt.t
 
   (** [init ~symbols ~current_time] initializes the profiler state and returns
-      the instrumented `should_compute` function expected by the WASM PVM. This
-      function updates the profiler state by side effects during the
-      compilation. *)
+      the instrumented `should_compute` function expected by the WASM PVM and
+      the instrumented `write_debug` backend. This function updates the profiler
+      state by side effects during the compilation. *)
   val init :
     symbols:string Custom_section.FuncMap.t ->
     with_time:bool ->
     reveal_builtins:Builtins.reveals option ->
-    t * should_compute
+    write_debug:Builtins.write_debug option ->
+    t * should_compute * Builtins.write_debug option
 
   val finalized_runs : t -> function_call call_stack option list
 end = struct
+  type debug_call = Start_section of string | End_section of string
+
   type t = {
     mutable call_stack :
       function_call call_stack * function_call call_stack trace;
     mutable kernel_runs : function_call call_stack option trace;
     mutable sections : (Z.t * string) list;
+    mutable debug_call : debug_call option;
   }
 
   let init_profiling_state () =
-    {call_stack = (Toplevel [], []); kernel_runs = []; sections = []}
+    {
+      call_stack = (Toplevel [], []);
+      kernel_runs = [];
+      sections = [];
+      debug_call = None;
+    }
 
   (* Successive kernel runs are pushed on the stack. If one of the unresolved
      function calls stack is not empty at the end of a kernel run,
@@ -391,6 +405,74 @@ end = struct
        [])
       profiler_state.kernel_runs
 
+  (** Specific debug calls semantics.
+
+      The profiler adds some semantics to `write_debug` calls starting with
+      `__wasm_debugger__`. These calls can be interpreted to print information
+      that are specific to the profiling, such as the current tick or ticks
+      elapsed between two given points. *)
+
+  let parse_debug_call call =
+    let open Option_syntax in
+    let* fct = Re.Group.get_opt call 1 in
+    let* params = Re.Group.get_opt call 2 in
+    match fct with
+    | "start_section" -> Some (Start_section params)
+    | "end_section" -> Some (End_section params)
+    | _ -> None
+
+  let debugger_calls =
+    Re.compile (Re.Perl.re "__wasm_debugger__::(\\w*)\\(([\x00-\xff]*)\\)")
+
+  let is_debug_call s =
+    Option.bind (Re.exec_opt debugger_calls s) parse_debug_call
+
+  let reset_debug_call state = state.debug_call <- None
+
+  let start_section pvm_state profiler_state data =
+    profiler_state.sections <-
+      (pvm_state.Wasm_pvm_state.Internal_state.current_tick, data)
+      :: profiler_state.sections
+
+  let close_section pvm_state profiler_state end_data =
+    match profiler_state.sections with
+    | (start_tick, start_data) :: sections ->
+        let tick =
+          Z.sub pvm_state.Wasm_pvm_state.Internal_state.current_tick start_tick
+        in
+        Format.printf
+          "__wasm_debugger__::Section{ticks:%s;data:(0x%s,0x%s)}\n%!"
+          (Z.to_string tick)
+          (Hex.of_string start_data |> Hex.show)
+          (Hex.of_string end_data |> Hex.show) ;
+        profiler_state.sections <- sections
+    | [] -> ()
+
+  let handle_debug_call pvm_state profiler_state =
+    match profiler_state.debug_call with
+    | Some (Start_section data) ->
+        start_section pvm_state profiler_state data ;
+        reset_debug_call profiler_state
+    | Some (End_section end_data) ->
+        close_section pvm_state profiler_state end_data ;
+        reset_debug_call profiler_state
+    | None -> ()
+
+  (* Instruments the given `write_debug` backend to handle the specific debug
+     commands. *)
+  let build_write_debug write_debug profiler_state =
+    match write_debug with
+    | Some (Builtins.Printer f) ->
+        Some
+          (Builtins.Printer
+             (fun s ->
+               match is_debug_call s with
+               | Some c ->
+                   profiler_state.debug_call <- Some c ;
+                   Lwt.return_unit
+               | None -> f s))
+    | w -> w
+
   (* [update_state_on_step profiler_state pvm_state symbols current_time] updates the
      callstack according to the current instruction. *)
   let update_state_on_step profiler_state pvm_state symbols current_time =
@@ -403,6 +485,7 @@ end = struct
         symbols
         pvm_state.tick_state
     in
+    handle_debug_call pvm_state profiler_state ;
     Option.iter
       (fun (current_node, current_call_stack) ->
         profiler_state.call_stack <- (current_node, current_call_stack))
@@ -422,7 +505,7 @@ end = struct
     | Input_required | Reveal_required _ -> return_false
     | _ -> return_true
 
-  let init ~symbols ~with_time ~reveal_builtins =
+  let init ~symbols ~with_time ~reveal_builtins ~write_debug =
     let profiler_state = init_profiling_state () in
     (* [current_time] is defined as a closure instead as a direct call to avoid
        calling it at each tick and avoid a non necessary system call. *)
@@ -434,7 +517,8 @@ end = struct
         symbols
         current_time
         reveal_builtins
-        profiler_state )
+        profiler_state,
+      build_write_debug write_debug profiler_state )
 end
 
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
@@ -444,8 +528,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       symbols tree =
     let open Lwt_syntax in
     (* Initialize the state and the instrumented `should_compute` function. *)
-    let profiler_state, instrumented_should_compute =
-      State.init ~symbols ~with_time ~reveal_builtins
+    let profiler_state, instrumented_should_compute, instrumented_write_debug =
+      State.init ~symbols ~with_time ~reveal_builtins ~write_debug
     in
 
     let rec eval_until_input_requested accumulated_ticks tree =
@@ -456,7 +540,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       let run () =
         let* tree, ticks =
           Wasm_utils.Wasm.Internal_for_tests.compute_step_many_until
-            ?write_debug
+            ?write_debug:instrumented_write_debug
             ?reveal_builtins
             ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
             instrumented_should_compute
