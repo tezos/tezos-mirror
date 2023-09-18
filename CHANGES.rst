@@ -234,6 +234,11 @@ Node
 - Operations posting invalid WASM proofs are now discarded earlier by the
   Nairobi mempool plugin. (MR :gl:`!`)
 
+- **Breaking change** Bumped the Octez snapshot version from ``5`` to
+  ``6`` to explicit the incompatibility with previous version
+  nodes. Also, improved the consistency of ``snapshot`` import errors
+  messages (MR :gl:`!10138`)
+
 Client
 ------
 - Adding client commands to generate, open and verify a time-lock.
