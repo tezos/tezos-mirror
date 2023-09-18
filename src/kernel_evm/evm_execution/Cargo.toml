@@ -8,6 +8,7 @@
 name = "evm-execution"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
