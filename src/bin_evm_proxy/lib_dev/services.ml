@@ -95,7 +95,7 @@ let get_transaction_from_index block index
       | Some hash -> Rollup_node_rpc.transaction_object hash)
   | TxFull l -> return @@ List.nth_opt l index
 
-let dispatch_input
+let dispatch_input ~verbose
     ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
     =
   let open Lwt_result_syntax in
@@ -221,19 +221,27 @@ let dispatch_input
         return (Web3_clientVersion.Output (Ok client_version))
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
-  return (output, id)
 
-let dispatch ctx dir =
+  let response = (output, id) in
+  if verbose then
+    Data_encoding.Json.construct Output.encoding response
+    |> Data_encoding.Json.to_string |> Printf.printf "%s\n%!" ;
+  return response
+
+let dispatch ~verbose ctx dir =
   Directory.register0 dir dispatch_service (fun () input ->
       let open Lwt_result_syntax in
       match input with
       | Singleton input ->
-          let+ output = dispatch_input ctx input in
+          let+ output = dispatch_input ~verbose ctx input in
           Singleton output
       | Batch inputs ->
-          let+ outputs = List.map_es (dispatch_input ctx) inputs in
+          let+ outputs = List.map_es (dispatch_input ~verbose ctx) inputs in
           Batch outputs)
 
-let directory ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
+let directory ~verbose
+    ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
   Directory.empty |> version
-  |> dispatch ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)
+  |> dispatch
+       ~verbose
+       ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address)

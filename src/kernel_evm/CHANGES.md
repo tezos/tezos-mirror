@@ -26,7 +26,8 @@
   simulations. (!9664)
 - Add support for `eth_getBlockByHash`. (!10061)
 - Add support for `eth_getTransactionByBlockHashAndIndex` and `eth_getTransactionByBlockNumberAndIndex`. (!10068)
-
+- Add an optional `--verbose` argument. Displays the responses to requests before
+  returning them. (!10116)
 
 ### Bug fixes
 
