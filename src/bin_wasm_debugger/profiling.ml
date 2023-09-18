@@ -335,56 +335,119 @@ let update_call_stack current_tick current_time (current_node, call_stack)
         step_kont
   | _ -> return_none
 
+module State : sig
+  (** The profiling context is the internal state built by the profiler. It is
+      defined as mutable as it is updated by side effects during the
+      profiling. *)
+  type t = private {
+    mutable call_stack :
+      function_call call_stack * function_call call_stack list;
+    mutable kernel_runs : function_call call_stack option list;
+    mutable sections : (Z.t * string) list;
+  }
+
+  type should_compute := Wasm_pvm_state.Internal_state.pvm_state -> bool Lwt.t
+
+  (** [init ~symbols ~current_time] initializes the profiler state and returns
+      the instrumented `should_compute` function expected by the WASM PVM. This
+      function updates the profiler state by side effects during the
+      compilation. *)
+  val init :
+    symbols:string Custom_section.FuncMap.t ->
+    with_time:bool ->
+    reveal_builtins:Builtins.reveals option ->
+    t * should_compute
+
+  val finalized_runs : t -> function_call call_stack option list
+end = struct
+  type t = {
+    mutable call_stack :
+      function_call call_stack * function_call call_stack trace;
+    mutable kernel_runs : function_call call_stack option trace;
+    mutable sections : (Z.t * string) list;
+  }
+
+  let init_profiling_state () =
+    {call_stack = (Toplevel [], []); kernel_runs = []; sections = []}
+
+  (* Successive kernel runs are pushed on the stack. If one of the unresolved
+     function calls stack is not empty at the end of a kernel run,
+     its result might be inconsistent and the profiling has failed. *)
+  let push_kernel_run profiler_state =
+    match profiler_state.call_stack with
+    | (Toplevel _ as run), [] ->
+        profiler_state.kernel_runs <- Some run :: profiler_state.kernel_runs ;
+        profiler_state.call_stack <- (Toplevel [], [])
+    | _ ->
+        profiler_state.kernel_runs <- None :: profiler_state.kernel_runs ;
+        profiler_state.call_stack <- (Toplevel [], [])
+
+  let finalized_runs profiler_state =
+    (List.fold_left
+       (fun runs graph ->
+         match graph with
+         | Some (Toplevel l) -> Some (Toplevel (List.rev l)) :: runs
+         | n -> n :: runs)
+       [])
+      profiler_state.kernel_runs
+
+  (* [update_state_on_step profiler_state pvm_state symbols current_time] updates the
+     callstack according to the current instruction. *)
+  let update_state_on_step profiler_state pvm_state symbols current_time =
+    let open Lwt_syntax in
+    let+ updated_stack =
+      update_call_stack
+        pvm_state.Wasm_pvm_state.Internal_state.current_tick
+        current_time
+        profiler_state.call_stack
+        symbols
+        pvm_state.tick_state
+    in
+    Option.iter
+      (fun (current_node, current_call_stack) ->
+        profiler_state.call_stack <- (current_node, current_call_stack))
+      updated_stack ;
+    if pvm_state.tick_state = Snapshot || pvm_state.tick_state = Collect then
+      push_kernel_run profiler_state
+
+  let instrument_should_compute symbols current_time reveal_builtins
+      profiler_state pvm_state =
+    let open Lwt_syntax in
+    let* () =
+      update_state_on_step profiler_state pvm_state symbols current_time
+    in
+    let* input_request_val = Wasm_vm.get_info pvm_state in
+    match input_request_val.input_request with
+    | Reveal_required _ when reveal_builtins <> None -> return_true
+    | Input_required | Reveal_required _ -> return_false
+    | _ -> return_true
+
+  let init ~symbols ~with_time ~reveal_builtins =
+    let profiler_state = init_profiling_state () in
+    (* [current_time] is defined as a closure instead as a direct call to avoid
+       calling it at each tick and avoid a non necessary system call. *)
+    let current_time () =
+      if with_time then Some (Time.System.now () |> Ptime.to_span) else None
+    in
+    ( profiler_state,
+      instrument_should_compute
+        symbols
+        current_time
+        reveal_builtins
+        profiler_state )
+end
+
 module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   (** [eval_and_profile ?write_debug ?reveal_builtins symbols tree] profiles a
     kernel up to the next result, and returns the call stack. *)
   let eval_and_profile ?write_debug ?reveal_builtins ~with_time ~no_reboot
       symbols tree =
     let open Lwt_syntax in
-    (* The call context is built as a side effect of the evaluation. *)
-    let call_stack = ref (Toplevel [], []) in
-
-    (* Successive kernel runs are pushed on the stack. If one the unresolved
-       function calls stack is not empty at the end of a kernel, this implies
-       its result might be inconsistent and the profiling has failed. *)
-    let kernel_runs = ref [] in
-    let push_kernel_run () =
-      match !call_stack with
-      | (Toplevel _ as run), [] ->
-          kernel_runs := Some run :: !kernel_runs ;
-          call_stack := (Toplevel [], [])
-      | _ ->
-          kernel_runs := None :: !kernel_runs ;
-          call_stack := (Toplevel [], [])
-    in
-    (* [current_time] is defined as a closure instead as a direct call to avoid
-       calling it at each tick and avoid a non necessary system call. *)
-    let current_time () =
-      if with_time then Some (Time.System.now () |> Ptime.to_span) else None
+    (* Initialize the state and the instrumented `should_compute` function. *)
+    let profiler_state, instrumented_should_compute =
+      State.init ~symbols ~with_time ~reveal_builtins
     in
 
-    let compute_and_snapshot pvm_state =
-      let* updated_stack =
-        update_call_stack
-          pvm_state.Wasm_pvm_state.Internal_state.current_tick
-          current_time
-          !call_stack
-          symbols
-          pvm_state.tick_state
-      in
-      Option.iter
-        (fun (current_node, current_call_stack) ->
-          call_stack := (current_node, current_call_stack))
-        updated_stack ;
-
-      let* input_request_val = Wasm_vm.get_info pvm_state in
-      if pvm_state.tick_state = Snapshot || pvm_state.tick_state = Collect then
-        push_kernel_run () ;
-      match input_request_val.input_request with
-      | Reveal_required _ when reveal_builtins <> None -> return_true
-      | Input_required | Reveal_required _ -> return_false
-      | _ -> return_true
-    in
     let rec eval_until_input_requested accumulated_ticks tree =
       let* pvm_state =
         Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
@@ -396,7 +459,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ?write_debug
             ?reveal_builtins
             ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
-            compute_and_snapshot
+            instrumented_should_compute
             tree
         in
         let* pvm_state =
@@ -415,15 +478,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
       | Input_required | Reveal_required _ -> return (tree, accumulated_ticks)
     in
     let+ tree, ticks = eval_until_input_requested Z.zero tree in
-    let kernel_runs =
-      (List.fold_left
-         (fun runs graph ->
-           match graph with
-           | Some (Toplevel l) -> Some (Toplevel (List.rev l)) :: runs
-           | n -> n :: runs)
-         [])
-        !kernel_runs
-    in
+    let kernel_runs = State.finalized_runs profiler_state in
     (tree, ticks, kernel_runs)
 end
 
