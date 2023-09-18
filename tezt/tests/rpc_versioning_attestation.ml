@@ -576,7 +576,7 @@ module Mempool = struct
   let monitor_mempool node ~use_legacy_name =
     let monitor_operations_url =
       RPC_core.make_uri
-        (Node.as_foreign_rpc_endpoint node)
+        (Node.as_rpc_endpoint node)
         (RPC.get_chain_mempool_monitor_operations
            ~refused:true
            ~version:(if use_legacy_name then "0" else "1")
@@ -595,7 +595,7 @@ module Mempool = struct
   let check_invalid_monitor_mempool_version node =
     let monitor_operations_url =
       RPC_core.make_uri
-        (Node.as_foreign_rpc_endpoint node)
+        (Node.as_rpc_endpoint node)
         (RPC.get_chain_mempool_monitor_operations ~refused:true ~version:"2" ())
       |> Uri.to_string
     in

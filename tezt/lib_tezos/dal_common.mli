@@ -79,18 +79,18 @@ module Helpers : sig
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
   val store_slot :
-    (Dal_node.t, Foreign_endpoint.t) Either.t ->
+    (Dal_node.t, Endpoint.t) Either.t ->
     ?with_proof:bool ->
     slot ->
     (string * string) Lwt.t
 end
 
 module RPC_legacy : sig
-  type default_uri_provider = (Dal_node.t, Foreign_endpoint.t) Either.t
+  type default_uri_provider = (Dal_node.t, Endpoint.t) Either.t
 
   type local_uri_provider = Dal_node.t
 
-  type remote_uri_provider = Foreign_endpoint.t
+  type remote_uri_provider = Endpoint.t
 
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
   val slot_pages : string -> string list RPC_core.t

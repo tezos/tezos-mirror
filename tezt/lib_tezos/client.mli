@@ -32,7 +32,7 @@ module Time = Tezos_base.Time.System
 type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Proxy_server of Proxy_server.t  (** A proxy server *)
-  | Foreign_endpoint of Foreign_endpoint.t  (** A service not managed by Tezt *)
+  | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
 (** A string representation of an endpoint suitable to be used as a CLI
     argument (e.g., [http://localhost:5893]). *)
@@ -2916,7 +2916,7 @@ val publish_dal_commitment :
 
 (** Return the information stored in the given endpoint as a foreign
     endpoint. *)
-val as_foreign_endpoint : endpoint -> Foreign_endpoint.t
+val as_foreign_endpoint : endpoint -> Endpoint.t
 
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)

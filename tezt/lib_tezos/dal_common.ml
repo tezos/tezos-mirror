@@ -99,11 +99,11 @@ module Committee = struct
 end
 
 module RPC_legacy = struct
-  type default_uri_provider = (Dal_node.t, Foreign_endpoint.t) Either.t
+  type default_uri_provider = (Dal_node.t, Endpoint.t) Either.t
 
   type local_uri_provider = Dal_node.t
 
-  type remote_uri_provider = Foreign_endpoint.t
+  type remote_uri_provider = Endpoint.t
 
   let make ?data ?query_string = RPC_core.make ?data ?query_string
 
@@ -313,7 +313,7 @@ module Dal_RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Dal_node.as_foreign_rpc_endpoint node)
+        (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
@@ -321,7 +321,7 @@ module Dal_RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Dal_node.as_foreign_rpc_endpoint node)
+        (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_json ?log_request ?log_response_status ?log_response_body node rpc
@@ -330,7 +330,7 @@ module Dal_RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (Dal_node.as_foreign_rpc_endpoint node)
+        (Dal_node.as_rpc_endpoint node)
         rpc
   end
 

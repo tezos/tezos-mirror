@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A foreign endpoint points to a services that is not managed by Tezt.*)
+(** RPC endpoints. *)
 
 type t = {host : string; scheme : string; port : int}
 
@@ -33,8 +33,8 @@ val rpc_port : t -> int
 
 val rpc_scheme : t -> string
 
-(** Encode the given foreign endpoint as a string value. *)
+(** Encode the given endpoint as a string value. *)
 val as_string : t -> string
 
-(** Encode the given foreign endpoint as a {!Uri.t} *)
+(** Encode the given endpoint as a {!Uri.t} *)
 val to_uri : t -> Uri.t

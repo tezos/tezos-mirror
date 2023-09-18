@@ -187,11 +187,11 @@ val create_from_uris :
   ?force_apply:bool ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
-  ?dal_node_rpc_endpoint:Foreign_endpoint.t ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
   ?minimal_nanotez_per_gas_unit:int ->
   base_dir:string ->
   node_data_dir:string ->
-  node_rpc_endpoint:Foreign_endpoint.t ->
+  node_rpc_endpoint:Endpoint.t ->
   unit ->
   t
 

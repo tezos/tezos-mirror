@@ -39,7 +39,7 @@ let positive_int_of_string level =
 let parse_endpoint str =
   match str =~*** rex {|^(https?)://(.*):(\d+)|} with
   | Some (scheme, host, port_str) ->
-      Foreign_endpoint.{host; scheme; port = int_of_string port_str}
+      Endpoint.{host; scheme; port = int_of_string port_str}
   | None -> (
       match str =~** rex {|^(.*):(\d+)|} with
       | Some (host, port_str) ->
@@ -140,9 +140,7 @@ let () = Agent_state.register_key (module Dal_node_key)
 
 let mk_rpc_config endpoint =
   let open RPC_client_unix in
-  let rpc_config =
-    {default_config with endpoint = Foreign_endpoint.to_uri endpoint}
-  in
+  let rpc_config = {default_config with endpoint = Endpoint.to_uri endpoint} in
   new http_ctxt rpc_config Tezos_rpc_http.Media_type.all_media_types
 
 (* Returns the current level of the node whose endpoint is given. We use
@@ -156,7 +154,7 @@ let current_level endpoint =
   | Error _e ->
       Test.fail
         "Monitoring L1 blocks with RPC server %s failed when calling the RPC!"
-        (Foreign_endpoint.as_string endpoint)
+        (Endpoint.as_string endpoint)
   | Ok (stream, stopper) -> (
       let* v = Lwt_stream.get stream in
       match v with
@@ -164,7 +162,7 @@ let current_level endpoint =
           stopper () ;
           Test.fail
             "Monitoring L1 blocks with RPC server %s failed. Stream closed!"
-            (Foreign_endpoint.as_string endpoint)
+            (Endpoint.as_string endpoint)
       | Some (_hash, {shell = {level; _}; _}) -> return @@ Int32.to_int level)
 
 (* This function fetches L1 blocks (heads) published to the stream returned by
@@ -179,7 +177,7 @@ let wait_for_l1_level_on_endpoint target_level endpoint =
       Test.fail
         "Monitoring L1 level %d with RPC server %s failed when calling the RPC!"
         target_level
-        (Foreign_endpoint.as_string endpoint)
+        (Endpoint.as_string endpoint)
   | Ok (stream, stopper) ->
       let rec loop () =
         let* v = Lwt_stream.get stream in
@@ -189,7 +187,7 @@ let wait_for_l1_level_on_endpoint target_level endpoint =
             Test.fail
               "Monitoring L1 level %d with RPC server %s failed. Stream closed!"
               target_level
-              (Foreign_endpoint.as_string endpoint)
+              (Endpoint.as_string endpoint)
         | Some (_hash, {shell = {level; _}; _}) ->
             let level = Int32.to_int level in
             if level >= target_level then (
@@ -203,7 +201,7 @@ let wait_for_l1_level cli_endpoint level =
   match cli_endpoint with
   | Client.Node node -> Node.wait_for_level node level
   | Client.Proxy_server proxy_server ->
-      Proxy_server.as_foreign_rpc_endpoint proxy_server
+      Proxy_server.as_rpc_endpoint proxy_server
       |> wait_for_l1_level_on_endpoint level
   | Client.Foreign_endpoint endpoint ->
       wait_for_l1_level_on_endpoint level endpoint
@@ -217,8 +215,7 @@ let octez_endpoint state endpoint =
 let dal_foreign_endpoint state endpoint =
   match endpoint with
   | Uri.Owned {name = node} ->
-      Dal_node.as_foreign_rpc_endpoint
-        (Agent_state.find (Dal_node_k node) state)
+      Dal_node.as_rpc_endpoint (Agent_state.find (Dal_node_k node) state)
   | Remote {endpoint} -> parse_endpoint endpoint
 
 let dac_rpc_info state mode endpoint =
@@ -228,7 +225,7 @@ let dac_rpc_info state mode endpoint =
       ("127.0.0.1", Dac_node.rpc_port dac_node)
   | Remote {endpoint} ->
       let foreign = parse_endpoint endpoint in
-      (Foreign_endpoint.rpc_host foreign, Foreign_endpoint.rpc_port foreign)
+      (Endpoint.rpc_host foreign, Endpoint.rpc_port foreign)
 
 let dac_endpoint state mode endpoint =
   match endpoint with
@@ -3082,7 +3079,7 @@ module Start_octez_baker = struct
           in
           Lwt.return (node_data_dir, fe)
       | None, Client.Node node ->
-          Lwt.return (Node.data_dir node, Node.as_foreign_rpc_endpoint node)
+          Lwt.return (Node.data_dir node, Node.as_rpc_endpoint node)
       | _, Client.Proxy_server _ ->
           Test.fail "Proxy_server not supported as a Node endpoint for baking"
       | Some _, Client.Node _ ->

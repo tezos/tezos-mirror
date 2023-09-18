@@ -51,10 +51,10 @@ let rpc_host injector =
 
 let rpc_port injector = Option.get @@ Uri.port injector.persistent_state.uri
 
-let as_foreign_rpc_endpoint (t : t) =
+let as_rpc_endpoint (t : t) =
   let host = rpc_host t in
   let port = rpc_port t in
-  Foreign_endpoint.{scheme = "http"; host; port}
+  Endpoint.{scheme = "http"; host; port}
 
 let data_dir injector = injector.persistent_state.data_dir
 
@@ -139,7 +139,7 @@ module RPC = struct
       ?log_request
       ?log_response_status
       ?log_response_body
-      (as_foreign_rpc_endpoint node)
+      (as_rpc_endpoint node)
       rpc
 
   let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
@@ -147,7 +147,7 @@ module RPC = struct
       ?log_request
       ?log_response_status
       ?log_response_body
-      (as_foreign_rpc_endpoint node)
+      (as_rpc_endpoint node)
       rpc
 
   let call_json ?log_request ?log_response_status ?log_response_body node rpc =
@@ -155,7 +155,7 @@ module RPC = struct
       ?log_request
       ?log_response_status
       ?log_response_body
-      (as_foreign_rpc_endpoint node)
+      (as_rpc_endpoint node)
       rpc
 
   type status =

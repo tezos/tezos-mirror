@@ -499,10 +499,10 @@ let with_sleeping_node ?rpc_port ?(rpc_address = localhost) ~timeout f =
     (fun () -> f (rpc_address, rpc_port))
     (fun () -> return (stopper ()))
 
-let as_foreign_rpc_endpoint (t : t) =
+let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Foreign_endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
 
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct
@@ -511,7 +511,7 @@ module RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (as_foreign_rpc_endpoint node)
+        (as_rpc_endpoint node)
         rpc
 
     let call_raw ?log_request ?log_response_status ?log_response_body node rpc =
@@ -519,7 +519,7 @@ module RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (as_foreign_rpc_endpoint node)
+        (as_rpc_endpoint node)
         rpc
 
     let call_json ?log_request ?log_response_status ?log_response_body node rpc
@@ -528,7 +528,7 @@ module RPC = struct
         ?log_request
         ?log_response_status
         ?log_response_body
-        (as_foreign_rpc_endpoint node)
+        (as_rpc_endpoint node)
         rpc
   end
 

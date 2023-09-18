@@ -71,7 +71,7 @@ val make :
   'result t
 
 (** [make_uri endpoint rpc] returns the URI of the RPC [rpc] at [endpoint]. *)
-val make_uri : Foreign_endpoint.t -> 'result t -> Uri.t
+val make_uri : Endpoint.t -> 'result t -> Uri.t
 
 (** Parse and decode a response body using the decode function of an RPC description.
 
@@ -152,4 +152,4 @@ module type CALLERS = sig
     JSON.t response Lwt.t
 end
 
-include CALLERS with type uri_provider := Foreign_endpoint.t
+include CALLERS with type uri_provider := Endpoint.t

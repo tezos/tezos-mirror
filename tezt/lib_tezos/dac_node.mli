@@ -235,6 +235,6 @@ val with_sleeping_node :
   unit Lwt.t
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
-val as_foreign_rpc_endpoint : t -> Foreign_endpoint.t
+val as_rpc_endpoint : t -> Endpoint.t
 
 module RPC : RPC_core.CALLERS with type uri_provider := t

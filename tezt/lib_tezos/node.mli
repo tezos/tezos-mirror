@@ -577,7 +577,7 @@ val upgrade_storage : t -> unit Lwt.t
 val get_version : t -> string Lwt.t
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
-val as_foreign_rpc_endpoint : t -> Foreign_endpoint.t
+val as_rpc_endpoint : t -> Endpoint.t
 
 module RPC : sig
   include RPC_core.CALLERS with type uri_provider := t

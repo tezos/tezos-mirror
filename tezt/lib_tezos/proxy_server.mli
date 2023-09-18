@@ -97,4 +97,4 @@ val on_event : t -> (event -> unit) -> unit
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Expose the RPC server address of this proxy server as a foreign endpoint. *)
-val as_foreign_rpc_endpoint : t -> Foreign_endpoint.t
+val as_rpc_endpoint : t -> Endpoint.t

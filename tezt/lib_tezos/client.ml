@@ -30,14 +30,14 @@ open Cli_arg
 type endpoint =
   | Node of Node.t
   | Proxy_server of Proxy_server.t
-  | Foreign_endpoint of Foreign_endpoint.t
+  | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Proxy_server ps -> Proxy_server.rpc_port ps
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_port fe
+  | Foreign_endpoint fe -> Endpoint.rpc_port fe
 
 type mode =
   | Client of endpoint option * media_type option
@@ -105,7 +105,7 @@ let runner endpoint =
 let scheme = function
   | Node n -> Node.rpc_scheme n
   | Proxy_server _ -> Proxy_server.rpc_scheme
-  | Foreign_endpoint fe -> Foreign_endpoint.rpc_scheme fe
+  | Foreign_endpoint fe -> Endpoint.rpc_scheme fe
 
 let address ?(hostname = false) ?from peer =
   (* We locally overload the runner function to fake a runner for foreign
@@ -122,7 +122,7 @@ let address ?(hostname = false) ?from peer =
      in the case where [from] has the same address as [peer]. *)
   let runner = function
     | Foreign_endpoint endpoint ->
-        Some (Runner.create ~address:(Foreign_endpoint.rpc_host endpoint) ())
+        Some (Runner.create ~address:(Endpoint.rpc_host endpoint) ())
     | peer -> runner peer
   in
   match from with
@@ -4082,10 +4082,10 @@ let publish_dal_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~commitment
   {value = process; run = parse}
 
 let as_foreign_endpoint = function
-  | Node node -> Node.as_foreign_rpc_endpoint node
+  | Node node -> Node.as_rpc_endpoint node
   | Foreign_endpoint fe -> fe
   | Proxy_server ps ->
-      Foreign_endpoint.
+      Endpoint.
         {
           scheme = Proxy_server.rpc_scheme;
           host = Proxy_server.rpc_host;

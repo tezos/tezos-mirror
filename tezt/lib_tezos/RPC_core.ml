@@ -71,9 +71,9 @@ let check_string_response ?(body_rex = "") ~code (response : string response) =
 
 let make_uri endpoint rpc =
   Uri.make
-    ~scheme:(Foreign_endpoint.rpc_scheme endpoint)
-    ~host:(Foreign_endpoint.rpc_host endpoint)
-    ~port:(Foreign_endpoint.rpc_port endpoint)
+    ~scheme:(Endpoint.rpc_scheme endpoint)
+    ~host:(Endpoint.rpc_host endpoint)
+    ~port:(Endpoint.rpc_port endpoint)
     ~path:(String.concat "/" rpc.path)
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
