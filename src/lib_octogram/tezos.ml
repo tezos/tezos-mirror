@@ -666,6 +666,7 @@ type 'uri generate_protocol_parameters_file = {
   balance_updates : (string * string) list;
   dal : dal_parameters;
   minimal_block_delay : string option;
+  path_client : 'uri option;
 }
 
 type generate_protocol_parameters_r = {filename : string}
@@ -707,6 +708,7 @@ module Generate_protocol_parameters_file = struct
              balance_updates;
              dal;
              minimal_block_delay;
+             path_client;
            } ->
         ( base_file,
           output_file_name,
@@ -716,7 +718,8 @@ module Generate_protocol_parameters_file = struct
           default_balance,
           balance_updates,
           dal,
-          minimal_block_delay ))
+          minimal_block_delay,
+          path_client ))
       (fun ( base_file,
              output_file_name,
              wallet,
@@ -725,7 +728,8 @@ module Generate_protocol_parameters_file = struct
              default_balance,
              balance_updates,
              dal,
-             minimal_block_delay ) ->
+             minimal_block_delay,
+             path_client ) ->
         {
           base_file;
           output_file_name;
@@ -736,8 +740,9 @@ module Generate_protocol_parameters_file = struct
           balance_updates;
           dal;
           minimal_block_delay;
+          path_client;
         })
-      (obj9
+      (obj10
          (req "base_file" uri_encoding)
          (opt "output_file_name" string)
          (opt "wallet" uri_encoding)
@@ -746,7 +751,8 @@ module Generate_protocol_parameters_file = struct
          (opt "default_balance" string)
          (dft "balance_updates" (list (tup2 string string)) [])
          (req "dal" dal_parameters_encoding)
-         (opt "minimal_block_delay" string))
+         (opt "minimal_block_delay" string)
+         (opt "path_client" uri_encoding))
 
   let r_encoding =
     let open Data_encoding in
@@ -789,6 +795,11 @@ module Generate_protocol_parameters_file = struct
         (fun (alias, balance) -> (alias, run balance))
         base.balance_updates
     in
+    let path_client =
+      Option.map
+        (Remote_procedure.global_uri_of_string ~self ~run)
+        base.path_client
+    in
     {
       base_file;
       output_file_name;
@@ -799,16 +810,22 @@ module Generate_protocol_parameters_file = struct
       balance_updates;
       dal;
       minimal_block_delay;
+      path_client;
     }
 
   let resolve ~self resolver base =
     let base_file =
       Remote_procedure.file_agent_uri ~self ~resolver base.base_file
     in
+    let path_client =
+      Option.map
+        (Remote_procedure.file_agent_uri ~self ~resolver)
+        base.path_client
+    in
     let wallet =
       base.wallet |> Option.map (resolve_octez_rpc_global_uri ~self ~resolver)
     in
-    {base with base_file; wallet}
+    {base with base_file; wallet; path_client}
 
   let run state
       {
@@ -821,11 +838,23 @@ module Generate_protocol_parameters_file = struct
         balance_updates;
         dal;
         minimal_block_delay;
+        path_client;
       } =
     let* base_file =
       Http_client.local_path_from_agent_uri
         (Agent_state.http_client state)
         base_file
+    in
+    let* path_client =
+      match path_client with
+      | None -> return None
+      | Some path_client ->
+          let* path_client =
+            Http_client.local_path_from_agent_uri
+              (Agent_state.http_client state)
+              path_client
+          in
+          return @@ Some path_client
     in
     let* base_dir =
       match wallet with
@@ -838,7 +867,7 @@ module Generate_protocol_parameters_file = struct
           in
           return (Some dir)
     in
-    let client = Client.create ?base_dir () in
+    let client = Client.create ?path:path_client ?base_dir () in
     let* all_addresses = Client.list_known_addresses client in
     let filter_by_prefix prefix =
       List.filter_map
