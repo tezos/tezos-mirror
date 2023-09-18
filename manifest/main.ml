@@ -7036,6 +7036,7 @@ let _git_gas_diff =
   public_exe
     "git-gas-diff"
     ~path:"devtools/git-gas-diff/bin"
+    ~release_status:Unreleased
     ~synopsis:"Internal dev tools"
     ~internal_name:"main"
     ~opam:"internal-devtools"
@@ -7047,6 +7048,7 @@ let _gas_parameter_diff =
   public_exe
     "gas_parameter_diff"
     ~path:"devtools/gas_parameter_diff/bin"
+    ~release_status:Unreleased
     ~synopsis:"Internal dev tools"
     ~internal_name:"main"
     ~opam:"internal-devtools"
@@ -7061,6 +7063,7 @@ let _benchmark_tools_purge_disk_cache =
     ~synopsis:"Internal dev tools"
     ~internal_name:"purge_disk_cache"
     ~opam:"internal-devtools"
+    ~release_status:Unreleased
     ~deps:[]
     ~static:false
     ~bisect_ppx:No
@@ -7105,6 +7108,7 @@ let get_contracts_lib =
   private_lib
     "get_contracts_lib"
     ~path:("devtools" // "get_contracts")
+    ~release_status:Unreleased
     ~synopsis:"Generic tool to extract smart contracts from node's context."
     ~opam:""
     ~deps:
@@ -7122,6 +7126,7 @@ let _get_contracts =
   private_exe
     "get_contracts"
     ~path:("devtools" // "get_contracts")
+    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~synopsis:"A script to extract smart contracts from a node."
     ~opam:""
@@ -7166,6 +7171,7 @@ let yes_wallet_lib =
   private_lib
     "yes_wallet_lib"
     ~path:("devtools" // "yes_wallet")
+    ~release_status:Unreleased
     ~synopsis:"A development tool for extracting baker keys from a context."
     ~opam:""
     ~deps:
@@ -7187,6 +7193,7 @@ let _yes_wallet =
   private_exe
     "yes_wallet"
     ~path:("devtools" // "yes_wallet")
+    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~synopsis:
       "A script extracting delegates' keys from a context into a wallet."
@@ -7199,6 +7206,7 @@ let _yes_wallet_test =
   private_exe
     "bench_signature_perf"
     ~path:("devtools" // "yes_wallet" // "test")
+    ~release_status:Unreleased
     ~synopsis:"Tests for yes_wallet tool"
     ~opam:""
     ~deps:
@@ -7217,6 +7225,7 @@ let _testnet_experiment_tools =
   private_exe
     "testnet_experiment_tools"
     ~path:("devtools" // "testnet_experiment_tools")
+    ~release_status:Unreleased
     ~synopsis:
       "Suite of tools to support the execution of stresstests on testnets"
     ~bisect_ppx:No
@@ -7284,6 +7293,7 @@ let simulation_scenario_lib =
   private_lib
     "simulation_scenario_lib"
     ~path:("devtools" // "testnet_experiment_tools")
+    ~release_status:Unreleased
     ~synopsis:"Simulation scenario lib"
     ~opam:""
     ~deps:
@@ -7303,6 +7313,7 @@ let _simulation_scenario =
   private_exe
     "simulation_scenario"
     ~path:("devtools" // "testnet_experiment_tools")
+    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~synopsis:
       "A script creating a simulation scenario from a tezos node directory."
@@ -7329,6 +7340,7 @@ let simdal_lib =
   private_lib
     "simdal"
     ~path:("devtools" // "simdal" // "lib")
+    ~release_status:Unreleased
     ~synopsis:"P2P simulator library"
     ~opam:""
     ~deps:[ocamlgraph; prbnmcn_stats; unix]
@@ -7339,6 +7351,7 @@ let _simdal =
   private_exes
     ["sim"; "concat"]
     ~path:("devtools" // "simdal" // "bin")
+    ~release_status:Unreleased
     ~synopsis:"DAL/P2P simulator"
     ~opam:""
     ~deps:[simdal_lib]
@@ -7629,6 +7642,7 @@ let _tztop =
   public_exe
     "tztop"
     ~path:"devtools/tztop"
+    ~release_status:Unreleased
     ~internal_name:"tztop_main"
     ~opam:"internal-devtools"
     ~modes:[Byte]
@@ -8109,6 +8123,7 @@ let kaitai =
   public_lib
     "kaitai"
     ~path:"contrib/kaitai-ocaml/src"
+    ~release_status:Unreleased
     ~deps:[yaml]
     ~synopsis:"OCaml library for reading Kaitai spec files"
 
@@ -8120,6 +8135,7 @@ let _kaitai_test =
     "kaitai_test"
     ~opam:"kaitai"
     ~path:"contrib/kaitai-ocaml/test"
+    ~release_status:Unreleased
     ~inline_tests:ppx_expect
     ~deps:[kaitai]
 
@@ -8127,6 +8143,7 @@ let kaitai_of_data_encoding =
   public_lib
     "kaitai-of-data-encoding"
     ~path:"contrib/lib_kaitai_of_data_encoding"
+    ~release_status:Unreleased
     ~synopsis:"Kaitai spec generator for data-encoding library"
     ~deps:[yaml; data_encoding; kaitai]
     ~bisect_ppx:No
@@ -8136,6 +8153,7 @@ let _kaitai_of_data_encoding_test =
     "kaitai_of_data_encoding_test"
     ~opam:"kaitai-of-data-encoding"
     ~path:"contrib/lib_kaitai_of_data_encoding/test"
+    ~release_status:Unreleased
     ~deps:[yaml; data_encoding; kaitai; kaitai_of_data_encoding]
     ~bisect_ppx:No
     ~inline_tests:ppx_expect
@@ -8144,10 +8162,10 @@ let _octez_codec_kaitai =
   public_exe
     "octez-codec-kaitai"
     ~path:"contrib/bin_codec_kaitai"
+    ~release_status:Unreleased
     ~internal_name:"codec"
     ~synopsis:
       "Tezos: `octez-codec-kaitai` binary to generate kaitai descriptions"
-    ~release_status:Unreleased
     ~with_macos_security_framework:true
     ~deps:
       ([
