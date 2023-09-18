@@ -25,7 +25,10 @@
 
 (** Extention of the open type [error] with the errors that could be raised by
     the DAL node. *)
-type error += Decoding_failed of Types.kind | Profile_incompatibility
+type error +=
+  | Decoding_failed of Types.kind
+  | Profile_incompatibility
+  | Invalid_slot_index of {slot_index : int; number_of_slots : int}
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)

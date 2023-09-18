@@ -74,6 +74,18 @@ let add_operator_profiles t proto_parameters gs_worker
       in
       Some (Operator operator_sets)
 
+let validate_slot_indexes t ~number_of_slots =
+  let open Result_syntax in
+  match t with
+  | Bootstrap -> return_unit
+  | Operator o -> (
+      match
+        Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) o.producers
+      with
+      | Some slot_index ->
+          tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
+      | None -> return_unit)
+
 (* TODO https://gitlab.com/tezos/tezos/-/issues/5934
    We need a mechanism to ease the tracking of newly added/removed topics. *)
 let join_topics_for_producer gs_worker committee producers =

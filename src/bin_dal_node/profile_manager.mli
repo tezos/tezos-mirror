@@ -45,6 +45,12 @@ val add_operator_profiles :
   Services.Types.operator_profiles ->
   t option
 
+(** Checks that each producer profile only refers to slot indexes strictly
+    smaller than [number_of_slots]. This may not be the case when the profile
+    context is first built because there is no information about the number of
+    slots. Returns an [Invalid_slot_index] error if the check fails. *)
+val validate_slot_indexes : t -> number_of_slots:int -> unit tzresult
+
 (** [on_new_head t proto_parameters gs_worker committee] performs profile-related
     actions that depend on the current head, more precisely on the current committee. *)
 val on_new_head :
