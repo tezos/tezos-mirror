@@ -25,8 +25,10 @@ COPY --chown=tezos:nogroup scripts/alphanet_version src/bin_client/bash-completi
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION_NON_MIN} as stripper
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/octez-* /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/simulation-scenario /home/tezos/bin/
+COPY --chown=tezos:nogroup --from=intermediate /home/tezos/bin/safety-checker /home/tezos/bin
 RUN chmod +rw /home/tezos/bin/octez* && strip /home/tezos/bin/octez*
 RUN chmod +rw /home/tezos/bin/simulation-scenario && strip /home/tezos/bin/simulation-scenario
+RUN chmod +rw /home/tezos/bin/safety-checker && strip /home/tezos/bin/safety-checker
 # hadolint ignore=DL3003,DL4006,SC2046
 RUN cd /home/tezos/bin && for b in $(ls octez*); do ln -s "$b" $(echo "$b" | sed 's/^octez/tezos/'); done
 
