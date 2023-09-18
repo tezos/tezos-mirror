@@ -10,11 +10,11 @@
 use account_storage::{AccountStorageError, EthereumAccountStorage};
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
-use debug::debug_msg;
 use evm::executor::stack::PrecompileFailure;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 
@@ -127,9 +127,7 @@ pub fn run_transaction<'a, Host>(
 where
     Host: Runtime,
 {
-    debug_msg!(host, "Going to run an Ethereum transaction");
-    debug_msg!(host, " - from address: {}", caller);
-    debug_msg!(host, " - to address: {:?}", address);
+    log!(host, Info, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
 
     let mut handler = handler::EvmHandler::<'_, Host>::new(
         host,
@@ -171,7 +169,7 @@ where
     } else {
         // caller was unable to pay for the gas limit
         if pay_for_gas {
-            debug_msg!(host, "Caller was unable to pre-pay the transaction")
+            log!(host, Info, "Caller was unable to pre-pay the transaction")
         };
         Ok(None)
     }

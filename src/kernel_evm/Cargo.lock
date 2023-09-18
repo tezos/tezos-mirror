@@ -449,6 +449,7 @@ dependencies = [
  "rlp",
  "sha2 0.10.6",
  "sha3",
+ "tezos-evm-logging",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
