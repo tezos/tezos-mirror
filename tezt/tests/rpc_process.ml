@@ -89,4 +89,102 @@ let test_kill =
   let* (_ : bool) = head_can_be_requested ~expected_level:1 client in
   unit
 
-let register ~protocols = test_kill protocols
+let test_forward =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"RPC process forward"
+    ~tags:["rpc"; "process"; "forward"]
+  @@ fun protocol ->
+  Log.info "Test that some specific RPCs are still forwarded to the node." ;
+  let* node, client =
+    Client.init_with_protocol
+      ~event_sections_levels:[("rpc-process", `Debug)]
+      ~protocol
+      `Client
+      ()
+  in
+  let wait_for_forwarding ~rpc_prefix =
+    let filter json =
+      if String.starts_with ~prefix:rpc_prefix (JSON.as_string json) then
+        Some ()
+      else None
+    in
+    let where = sf "rpc_prefix = %s" rpc_prefix in
+    Node.wait_for ~where node "forwarding_rpc.v0" filter
+  in
+  let test_rpc ?error ~rpc_prefix rpc =
+    Log.info "Test %s" rpc_prefix ;
+    let waiter = wait_for_forwarding ~rpc_prefix in
+    let* () =
+      match error with
+      | None ->
+          let* _ = Node.RPC.call node rpc in
+          unit
+      | Some msg ->
+          let*? process = Client.RPC.spawn client rpc in
+          Process.check_error ~msg:(rex msg) process
+    in
+    waiter
+  in
+  let* () =
+    test_rpc (RPC.get_chain_chain_id ()) ~rpc_prefix:"/chains/main/chain_id"
+  in
+  let* () =
+    test_rpc
+      (RPC.get_chain_chain_id ~chain:"test" ())
+      ~rpc_prefix:"/chains/test/chain_id"
+      ~error:"No service found at this URL"
+  in
+  let* () =
+    test_rpc
+      (RPC.get_chain_chain_id ~chain:"nonexistent" ())
+      ~rpc_prefix:"/chains/nonexistent/chain_id"
+      ~error:"Cannot parse chain identifier"
+  in
+  let* () =
+    test_rpc
+      (RPC.post_chain_mempool_filter ~data:(Data (Ezjsonm.from_string "{}")) ())
+      ~rpc_prefix:"/chains/main/mempool/filter"
+  in
+  let* () =
+    test_rpc
+      RPC.nonexistent_path
+      ~rpc_prefix:"/nonexistent/path"
+      ~error:"No service found at this URL"
+  in
+  let test_streaming_rpc ~rpc_prefix rpc =
+    Log.info "Test streaming RPC: %s" rpc_prefix ;
+    let waiter = wait_for_forwarding ~rpc_prefix in
+    let url =
+      RPC_core.make_uri (Node.as_rpc_endpoint node) rpc |> Uri.to_string
+    in
+    let*? _process = Curl.get url in
+    waiter
+  in
+  let* () =
+    test_streaming_rpc
+      (RPC.get_chain_mempool_monitor_operations ())
+      ~rpc_prefix:"/chains/main/mempool/monitor_operations"
+  in
+  let* () =
+    test_streaming_rpc
+      (RPC.get_monitor_heads_chain ())
+      ~rpc_prefix:"/monitor/heads/main"
+  in
+  let* () =
+    test_streaming_rpc
+      (RPC.get_monitor_heads_chain ~chain:"test" ())
+      ~rpc_prefix:"/monitor/heads/test"
+  in
+  let* () =
+    test_streaming_rpc
+      RPC.get_monitor_validated_blocks
+      ~rpc_prefix:"/monitor/validated_blocks"
+  in
+  test_streaming_rpc
+    RPC.get_monitor_applied_blocks
+    ~rpc_prefix:"/monitor/applied_blocks"
+
+let register ~protocols =
+  test_kill protocols ;
+  test_forward protocols
