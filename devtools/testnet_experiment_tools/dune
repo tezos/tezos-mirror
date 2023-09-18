@@ -85,3 +85,22 @@
   -open Tezos_client_base_unix
   -open Simulation_scenario_lib)
  (modules simulation_scenario))
+
+(executable
+ (name safety_checker)
+ (libraries
+  octez-libs.base
+  octez-shell-libs.store
+  octez-libs.clic
+  octez-node-config)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_store
+  -open Octez_node_config)
+ (modules safety_checker))

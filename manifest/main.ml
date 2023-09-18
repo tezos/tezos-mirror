@@ -7412,6 +7412,26 @@ let _simulation_scenario =
     ~bisect_ppx:No
     ~linkall:true
 
+let _safety_checker =
+  private_exe
+    "safety_checker"
+    ~path:("devtools" // "testnet_experiment_tools")
+    ~with_macos_security_framework:true
+    ~release_status:Unreleased
+    ~synopsis:
+      "A script for checking the safety of the reducing block time experiment."
+    ~opam:""
+    ~deps:
+      [
+        octez_base |> open_ |> open_ ~m:"TzPervasives";
+        octez_store |> open_;
+        octez_clic;
+        octez_node_config |> open_;
+      ]
+    ~modules:["safety_checker"]
+    ~bisect_ppx:No
+    ~linkall:true
+
 let simdal_lib =
   private_lib
     "simdal"
