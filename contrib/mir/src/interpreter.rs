@@ -9,6 +9,7 @@ use crate::ast::*;
 use crate::gas::{interpret_cost, Gas, OutOfGas};
 use crate::stack::*;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum InterpretError {
     OutOfGas,
 }
