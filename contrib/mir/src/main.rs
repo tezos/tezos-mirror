@@ -29,7 +29,8 @@ mod tests {
     fn interpret_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut istack = VecDeque::from([Value::NumberValue(10)]);
-        assert!(interpreter::interpret(&ast, &mut istack).is_ok());
+        let mut gas = Gas::default();
+        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
         assert!(istack.len() == 1 && istack[0] == Value::NumberValue(55));
     }
 
