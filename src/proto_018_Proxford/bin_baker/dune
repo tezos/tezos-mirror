@@ -10,9 +10,9 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.tezos-client
+  octez-protocol-018-Proxford-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-018-Proxford-libs.tezos-baking-commands
+  octez-protocol-018-Proxford-libs.baking-commands
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.client-base-unix)
  (link_flags

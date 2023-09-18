@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_016_PtMumbai)
- (public_name octez-protocol-016-PtMumbai-libs.tezos-client)
+ (public_name octez-protocol-016-PtMumbai-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,10 +15,10 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.proxy
   octez-shell-libs.signer-backends
-  octez-protocol-016-PtMumbai-libs.tezos-protocol-plugin
+  octez-protocol-016-PtMumbai-libs.plugin
   tezos-protocol-016-PtMumbai.parameters
   octez-libs.tezos-rpc
-  octez-protocol-016-PtMumbai-libs.tezos-smart-rollup
+  octez-protocol-016-PtMumbai-libs.smart-rollup
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

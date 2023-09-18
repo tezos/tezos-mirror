@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_alpha)
- (public_name octez-protocol-alpha-libs.tezos-client)
+ (public_name octez-protocol-alpha-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,10 +15,10 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.proxy
   octez-shell-libs.signer-backends
-  octez-protocol-alpha-libs.tezos-protocol-plugin
+  octez-protocol-alpha-libs.plugin
   tezos-protocol-alpha.parameters
   octez-libs.tezos-rpc
-  octez-protocol-alpha-libs.tezos-smart-rollup
+  octez-protocol-alpha-libs.smart-rollup
   uri)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

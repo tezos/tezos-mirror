@@ -10,9 +10,9 @@
   octez-libs.tezos-base
   octez-libs.tezos-clic
   tezos-protocol-alpha.protocol
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-alpha-libs.tezos-baking-commands
+  octez-protocol-alpha-libs.baking-commands
   octez-libs.tezos-stdlib-unix
   octez-shell-libs.client-base-unix)
  (link_flags

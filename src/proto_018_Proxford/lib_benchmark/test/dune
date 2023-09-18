@@ -15,7 +15,7 @@
   tezos-benchmark
   tezos-benchmark-type-inference-018-Proxford
   tezos-benchmark-018-Proxford
-  octez-protocol-018-Proxford-libs.tezos-test-helpers
+  octez-protocol-018-Proxford-libs.test-helpers
   octez-libs.tezos-error-monad
   prbnmcn-stats)
  (link_flags

@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_013_PtJakart)
- (public_name octez-protocol-013-PtJakart-libs.tezos-client)
+ (public_name octez-protocol-013-PtJakart-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
@@ -15,7 +15,7 @@
   octez-shell-libs.mockup-registration
   octez-shell-libs.proxy
   octez-shell-libs.signer-backends
-  octez-protocol-013-PtJakart-libs.tezos-protocol-plugin
+  octez-protocol-013-PtJakart-libs.plugin
   tezos-protocol-013-PtJakart.parameters
   octez-libs.tezos-rpc
   uri)

@@ -7,10 +7,10 @@
  (libraries
   tezt.core
   octez-libs.tezos-base
-  octez-protocol-018-Proxford-libs.tezos-dal
+  octez-protocol-018-Proxford-libs.dal
   tezos-protocol-018-Proxford.protocol
   octez-libs.tezos-base-test-helpers
-  octez-protocol-018-Proxford-libs.tezos-test-helpers
+  octez-protocol-018-Proxford-libs.test-helpers
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

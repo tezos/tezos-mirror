@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA)
- (public_name octez-protocol-006-PsCARTHA-libs.tezos-client)
+ (public_name octez-protocol-006-PsCARTHA-libs.client)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic

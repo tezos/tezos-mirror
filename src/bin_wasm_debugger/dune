@@ -12,7 +12,7 @@
   octez-libs.tezos-tree-encoding
   octez-libs.tezos-base.unix
   yaml
-  octez-protocol-alpha-libs.tezos-client
+  octez-protocol-alpha-libs.client
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
   octez-l2-libs.webassembly-interpreter

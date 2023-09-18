@@ -3,12 +3,12 @@
 
 (library
  (name tezos_layer2_utils_018_Proxford)
- (public_name octez-protocol-018-Proxford-libs.tezos-layer2-utils)
+ (public_name octez-protocol-018-Proxford-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.tezos-base
   tezos-protocol-018-Proxford.protocol
-  octez-protocol-018-Proxford-libs.tezos-client)
+  octez-protocol-018-Proxford-libs.client)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))

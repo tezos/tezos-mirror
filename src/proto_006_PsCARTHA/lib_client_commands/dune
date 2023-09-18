@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA_commands)
- (public_name octez-protocol-006-PsCARTHA-libs.tezos-client.commands)
+ (public_name octez-protocol-006-PsCARTHA-libs.client.commands)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -12,7 +12,7 @@
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-006-PsCARTHA-libs.tezos-client
+  octez-protocol-006-PsCARTHA-libs.client
   octez-shell-libs.client-commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
@@ -30,8 +30,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA_commands_registration)
- (public_name
-  octez-protocol-006-PsCARTHA-libs.tezos-client.commands-registration)
+ (public_name octez-protocol-006-PsCARTHA-libs.client.commands-registration)
  (libraries
   octez-libs.tezos-base
   octez-libs.tezos-clic
@@ -39,9 +38,9 @@
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-006-PsCARTHA-libs.tezos-client
+  octez-protocol-006-PsCARTHA-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-006-PsCARTHA-libs.tezos-client.commands
+  octez-protocol-006-PsCARTHA-libs.client.commands
   octez-libs.tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
