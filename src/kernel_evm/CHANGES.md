@@ -14,6 +14,7 @@
 - Adds a new type of message in simulation mode, to verify that a transaction is valid by checking if the nonce is neither too low nor too high. (!9679)
 - Simulate if a transaction has a correct chain id. (!9752)
 - Fees are now paid by the sender. (!9480)
+- Unused gas is refunded after succesful transactions. (!9915)
 
 ### EVM Node
 

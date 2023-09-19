@@ -273,6 +273,31 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    /// Repay unused gas
+    pub fn repay_gas(
+        &mut self,
+        caller: H160,
+        unused_gas: Option<u64>,
+    ) -> Result<(), EthereumError> {
+        match unused_gas {
+            Some(unused_gas) => {
+                let amount = U256::from(unused_gas) * self.block.gas_price;
+
+                debug_msg!(
+                    self.host,
+                    "{:?} refunded {:?} for transaction",
+                    caller,
+                    amount
+                );
+
+                self.get_or_create_account(caller)?
+                    .balance_add(self.host, amount)
+                    .map_err(EthereumError::from)
+            }
+            None => Ok(()),
+        }
+    }
+
     /// Execute a SputnikVM runtime with this handler
     fn execute(
         &mut self,
