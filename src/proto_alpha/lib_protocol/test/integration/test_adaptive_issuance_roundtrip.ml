@@ -1463,8 +1463,85 @@ module Rewards = struct
            --> (Tag "block step" --> wait_n_blocks 100
                |+ Tag "cycle step" --> wait_n_cycles 10))
 
+  let test_ai_curve_activation_time =
+    let constants =
+      init_constants
+        ~reward_per_block:1_000_000_000L
+        ~deactivate_dynamic:true
+        ()
+    in
+    let pc = constants.preserved_cycles in
+    begin_test ~activate_ai:true ~burn_rewards:true constants [""]
+    --> next_block --> save_current_rate (* before AI rate *)
+    --> wait_ai_activation
+    (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
+    --> check_rate_evolution Q.equal
+    --> wait_n_cycles pc
+    --> check_rate_evolution Q.equal
+    --> next_cycle
+    (* The new rate should be active now. With the chosen constants, it should be lower.
+       We go from 1000tz per day to (at most) 5% of 4_000_000tz per year *)
+    --> check_rate_evolution Q.gt
+
+  let test_static =
+    let constants =
+      init_constants
+        ~reward_per_block:1_000_000_000L
+        ~deactivate_dynamic:true
+        ()
+    in
+    let rate_var_lag = constants.preserved_cycles in
+    (* All rewards in liquid *)
+    let init_params =
+      {
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.one;
+      }
+    in
+    let delta = Amount (Tez.of_mutez 20_000_000_000L) in
+    let cycle_stake =
+      save_current_rate --> stake "delegate" delta --> next_cycle
+      --> check_rate_evolution Q.gt
+    in
+    let cycle_unstake =
+      save_current_rate --> unstake "delegate" delta --> next_cycle
+      --> check_rate_evolution Q.lt
+    in
+    let cycle_stable =
+      save_current_rate --> next_cycle --> check_rate_evolution Q.equal
+    in
+    begin_test ~activate_ai:true ~burn_rewards:true constants ["delegate"]
+    --> set_delegate_params "delegate" init_params
+    --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
+    --> save_current_rate --> wait_ai_activation
+    --> (Tag "increase stake, decrease rate" --> next_cycle
+         --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
+         --> loop 10 cycle_stake
+        |+ Tag "decrease stake, increase rate" --> next_cycle
+           --> loop rate_var_lag (unstake "delegate" delta --> next_cycle)
+           --> loop 10 cycle_unstake
+        |+ Tag "stable stake, stable rate" --> next_cycle
+           --> wait_n_cycles rate_var_lag --> loop 10 cycle_stable
+        |+ Tag "test timing" --> wait_n_cycles rate_var_lag
+           --> check_rate_evolution Q.equal
+           --> next_cycle --> check_rate_evolution Q.gt --> save_current_rate
+           --> (Tag "increase stake" --> stake "delegate" delta
+                --> wait_n_cycles rate_var_lag
+                --> check_rate_evolution Q.equal
+                --> next_cycle --> check_rate_evolution Q.gt
+               |+ Tag "decrease stake" --> unstake "delegate" delta
+                  --> wait_n_cycles rate_var_lag
+                  --> check_rate_evolution Q.equal
+                  --> next_cycle --> check_rate_evolution Q.lt))
+
   let tests =
-    tests_of_scenarios @@ [("Test wait with rewards", test_wait_with_rewards)]
+    tests_of_scenarios
+    @@ [
+         ("Test wait with rewards", test_wait_with_rewards);
+         ("Test ai curve activation time", test_ai_curve_activation_time);
+         ("Test static rate", test_static);
+       ]
 end
 
 let tests =
