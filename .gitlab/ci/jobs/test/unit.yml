@@ -63,6 +63,8 @@ unit:proto-x86_64:
 unit:webassembly-x86_64:
   extends:
   - .unit_test_template_x86_64
+  # The wasm tests are written in Python
+  - .image_template__runtime_build_test_dependencies
   variables:
     MAKE_TARGETS: test-webassembly
   # TODO: https://gitlab.com/tezos/tezos/-/issues/4663
