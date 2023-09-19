@@ -49,6 +49,7 @@
 - Add a reboot scheduling for the migration phase. (!10064)
 - Add withdrawals to the transaction stack in the EVM handler. (!9905)
 - Make it possible for any precompiled contract to generate withdrawals. (!9910)
+- Nested transactions give unused gas back to parent transaction after completion. (!9877)
 
 ## Version 4c111dcae061bea6c3616429a0ea1262ce6c174f
 
