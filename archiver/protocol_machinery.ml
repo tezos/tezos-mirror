@@ -60,9 +60,7 @@ module type PROTOCOL_SERVICES = sig
   val baker_and_cycle :
     wrap_full ->
     Block_hash.t ->
-    (Tezos_crypto.Signature.public_key_hash * (Int32.t * Int32.t * Int32.t))
-    tzresult
-    Lwt.t
+    (Tezos_crypto.Signature.public_key_hash * Data.cycle_info) tzresult Lwt.t
 
   val block_round : Block_header.t -> int tzresult
 
@@ -72,11 +70,12 @@ module type PROTOCOL_SERVICES = sig
   val get_block_info :
     wrap_full ->
     Int32.t ->
-    (Tezos_crypto.Signature.public_key_hash
-    * Time.Protocol.t
-    * int
-    * Block_hash.t
-    * Block_hash.t option)
+    ((Tezos_crypto.Signature.public_key_hash
+     * Time.Protocol.t
+     * int
+     * Block_hash.t
+     * Block_hash.t option)
+    * Data.cycle_info)
     tzresult
     Lwt.t
 end

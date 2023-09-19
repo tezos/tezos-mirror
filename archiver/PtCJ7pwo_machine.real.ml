@@ -111,6 +111,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           op_stream,
         stopper )
 
+  let cycle_info (metadata : Block_services.block_metadata) =
+    Data.
+      {
+        cycle =
+          Protocol.Alpha_context.Cycle.to_int32
+            metadata.protocol_data.level.cycle;
+        cycle_position = metadata.protocol_data.level.cycle_position;
+        cycle_size = 0l;
+      }
+
   let baker_and_cycle cctxt hash =
     let* metadata =
       Block_services.metadata
@@ -120,11 +130,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ()
     in
     return
-      ( public_key_hash_of_v0 metadata.protocol_data.baker,
-        ( Tezos_raw_protocol_001_PtCJ7pwo.Alpha_context.Cycle.to_int32
-            metadata.protocol_data.level.cycle,
-          metadata.protocol_data.level.cycle_position,
-          0l ) )
+      (public_key_hash_of_v0 metadata.protocol_data.baker, cycle_info metadata)
 
   let baking_right cctxt level priority =
     let* baking_rights =
@@ -190,11 +196,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Block_services.metadata ~chain:cctxt#chain ~block:(`Level level) cctxt ()
     in
     return
-      ( public_key_hash_of_v0 metadata.protocol_data.baker,
-        header.shell.timestamp,
-        header.protocol_data.contents.priority,
-        header.hash,
-        Some header.shell.predecessor )
+      ( ( public_key_hash_of_v0 metadata.protocol_data.baker,
+          header.shell.timestamp,
+          header.protocol_data.contents.priority,
+          header.hash,
+          Some header.shell.predecessor ),
+        cycle_info metadata )
 end
 
 module M = General_archiver.Define (Services)

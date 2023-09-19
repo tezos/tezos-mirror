@@ -105,8 +105,8 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let block_of ctxt level =
     let cctx = Services.wrap_full ctxt in
-    let* block_info = Services.get_block_info cctx level in
-    block_data cctx block_info None []
+    let* block_info, cycle_info = Services.get_block_info cctx level in
+    block_data cctx block_info (Some cycle_info) []
 
   let () = Protocol_hash.Table.add block_machine Services.hash block_of
 
@@ -133,14 +133,12 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     let cctx = Services.wrap_full ctxt in
     let timestamp = header.Block_header.shell.Block_header.timestamp in
     let*? round = Services.block_round header in
-    let* delegate, (cycle, cycle_position, cycle_size) =
-      Services.baker_and_cycle cctx hash
-    in
+    let* delegate, cycle_info = Services.baker_and_cycle cctx hash in
     let predecessor = Some header.Block_header.shell.Block_header.predecessor in
     block_data
       cctx
       (delegate, timestamp, round, hash, predecessor)
-      (Some Data.{cycle; cycle_position; cycle_size})
+      (Some cycle_info)
       reception_times
 
   let () =
