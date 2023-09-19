@@ -110,7 +110,15 @@ end
 
 let table = Worker.create_table Queue
 
-let _, worker_waker = Lwt.task ()
+let worker_promise, worker_waker = Lwt.task ()
+
+type error += No_tx_pool
+
+let worker =
+  lazy
+    (match Lwt.state worker_promise with
+    | Lwt.Return worker -> Ok worker
+    | Lwt.Fail _ | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
 
 let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
   let open Lwt_result_syntax in
@@ -122,3 +130,11 @@ let start ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) =
       (module Handlers)
   in
   Lwt.wakeup worker_waker worker
+
+let shutdown () =
+  let w = Lazy.force worker in
+  match w with
+  | Error _ ->
+      (* There is no tx-pool, nothing to do *)
+      Lwt.return_unit
+  | Ok w -> Worker.shutdown w
