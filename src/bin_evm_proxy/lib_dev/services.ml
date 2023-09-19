@@ -245,6 +245,13 @@ let dispatch_input ~verbose
         return (Txpool_content.Output (Ok txpool))
     | Web3_clientVersion.Input _ ->
         return (Web3_clientVersion.Output (Ok client_version))
+    | Web3_sha3.Input (Some data) ->
+        let open Ethereum_types in
+        let (Hex h) = data in
+        let bytes = Hex.to_bytes_exn (`Hex h) in
+        let hash_bytes = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
+        let hash = Hex.of_bytes hash_bytes |> Hex.show in
+        return (Web3_sha3.Output (Ok (Hash (Hex hash))))
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
 

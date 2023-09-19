@@ -287,3 +287,8 @@ module Txpool_content :
 
 module Web3_clientVersion :
   METHOD with type m_input = unit and type m_output = string
+
+module Web3_sha3 :
+  METHOD
+    with type m_input = Ethereum_types.hex
+     and type m_output = Ethereum_types.hash
