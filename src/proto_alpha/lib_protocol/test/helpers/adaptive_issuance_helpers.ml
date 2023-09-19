@@ -504,6 +504,10 @@ let add_frozen_rewards amount account_name account_map =
   in
   update_account ~f account_name account_map
 
+let apply_burn amount src_name account_map =
+  let f src = {src with liquid = Tez.(src.liquid -! amount)} in
+  update_account ~f src_name account_map
+
 let apply_transfer amount src_name dst_name account_map =
   match
     (String.Map.find src_name account_map, String.Map.find dst_name account_map)

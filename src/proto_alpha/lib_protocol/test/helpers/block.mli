@@ -62,7 +62,7 @@ type baking_mode = Application | Baking
 
 type error += No_slots_found_for of Signature.Public_key_hash.t
 
-(** Returns (account, round, timestamp) of the next baker given
+(** Returns (account, consensus_key, round, timestamp) of the next baker given
     a policy, defaults to By_round 0. *)
 val get_next_baker :
   ?policy:baker_policy ->
