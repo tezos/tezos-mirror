@@ -2820,6 +2820,56 @@ let test_rpc_getUncleCountByBlock =
       "Expected %R uncles with eth_getUncleCountByBlockNumber, but got %L" ;
   unit
 
+let uncle_by_block_arg_and_index_request ~by arg index =
+  let by = by_block_arg_string by in
+  Evm_proxy_server.
+    {
+      method_ = "eth_getUncleByBlock" ^ by ^ "AndIndex";
+      parameters = `A [`String arg; `String index];
+    }
+
+let get_uncle_by_block_arg_and_index ~by proxy_server arg index =
+  let* block =
+    Evm_proxy_server.call_evm_rpc
+      proxy_server
+      (uncle_by_block_arg_and_index_request ~by arg index)
+  in
+  let result = JSON.(block |-> "result") in
+  if JSON.is_null result then return None
+  else return @@ Some (result |> Block.of_json)
+
+let test_rpc_getUncleByBlockArgAndIndex =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "get_uncle_by_block_arg_and_index"]
+    ~title:
+      "RPC methods eth_getUncleByBlockHashAndIndex and \
+       eth_getUncleByBlockNumberAndIndex"
+  @@ fun protocol ->
+  let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
+  let evm_proxy_server_endpoint = Evm_proxy_server.endpoint evm_proxy_server in
+  let block_id = "0" in
+  let* block =
+    Eth_cli.get_block ~block_id ~endpoint:evm_proxy_server_endpoint
+  in
+  let* uncle =
+    get_uncle_by_block_arg_and_index
+      ~by:`Hash
+      evm_proxy_server
+      (Option.get block.hash)
+      block_id
+  in
+  assert (Option.is_none uncle) ;
+  let* uncle =
+    get_uncle_by_block_arg_and_index
+      ~by:`Number
+      evm_proxy_server
+      (Int32.to_string block.number)
+      block_id
+  in
+  assert (Option.is_none uncle) ;
+  unit
+
 let register_evm_proxy_server ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_proxy_server_connection protocols ;
@@ -2869,7 +2919,8 @@ let register_evm_proxy_server ~protocols =
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
   test_reboot protocols ;
   test_rpc_getBlockTransactionCountBy protocols ;
-  test_rpc_getUncleCountByBlock protocols
+  test_rpc_getUncleCountByBlock protocols ;
+  test_rpc_getUncleByBlockArgAndIndex protocols
 
 let register ~protocols =
   register_evm_proxy_server ~protocols ;

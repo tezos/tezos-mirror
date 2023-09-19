@@ -221,6 +221,12 @@ let dispatch_input ~verbose
         return
           (Get_transaction_by_block_number_and_index.Output
              (Ok transaction_object))
+    | Get_uncle_by_block_hash_and_index.Input (Some (_hash, _index)) ->
+        (* A block cannot have uncles. *)
+        return (Get_uncle_by_block_hash_and_index.Output (Ok None))
+    | Get_uncle_by_block_number_and_index.Input (Some (_number, _index)) ->
+        (* A block cannot have uncles. *)
+        return (Get_uncle_by_block_number_and_index.Output (Ok None))
     | Send_raw_transaction.Input (Some tx_raw) -> (
         let* is_valid = Rollup_node_rpc.is_tx_valid tx_raw in
         match is_valid with

@@ -284,6 +284,16 @@ module Get_transaction_by_block_number_and_index :
     with type m_input = Ethereum_types.block_param * Ethereum_types.quantity
      and type m_output = Ethereum_types.transaction_object option
 
+module Get_uncle_by_block_hash_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_hash * Ethereum_types.quantity
+     and type m_output = Ethereum_types.block option
+
+module Get_uncle_by_block_number_and_index :
+  METHOD
+    with type m_input = Ethereum_types.block_param * Ethereum_types.quantity
+     and type m_output = Ethereum_types.block option
+
 module Send_raw_transaction :
   METHOD
     with type m_input = Ethereum_types.hex
