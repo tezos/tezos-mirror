@@ -33,6 +33,7 @@ type t = {
   public_directory : string option;
   admins : (string * string) list;
   users : (string * string) list;
+  max_batch_size : int32;
 }
 
 let tls_conf_encoding =
@@ -65,11 +66,35 @@ let login_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {db_uri; network_interfaces; public_directory; admins; users} ->
-      (db_uri, network_interfaces, public_directory, admins, users))
-    (fun (db_uri, network_interfaces, public_directory, admins, users) ->
-      {db_uri; network_interfaces; public_directory; admins; users})
-    (obj5
+    (fun {
+           db_uri;
+           network_interfaces;
+           public_directory;
+           admins;
+           users;
+           max_batch_size;
+         } ->
+      ( db_uri,
+        network_interfaces,
+        public_directory,
+        admins,
+        users,
+        max_batch_size ))
+    (fun ( db_uri,
+           network_interfaces,
+           public_directory,
+           admins,
+           users,
+           max_batch_size ) ->
+      {
+        db_uri;
+        network_interfaces;
+        public_directory;
+        admins;
+        users;
+        max_batch_size;
+      })
+    (obj6
        (req
           ~description:
             "Uri to reach the database: sqlite3:path or postgresql://host:port"
@@ -84,4 +109,5 @@ let encoding =
              used (i.e. no default value)."
           string)
        (req "admins" (list login_encoding))
-       (req "users" (list login_encoding)))
+       (req "users" (list login_encoding))
+       (dft "max_batch_size" int32 0l))

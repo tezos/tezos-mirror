@@ -634,6 +634,7 @@ let import_callback db_pool g data =
 let routes :
     (Re.re
     * (Re.Group.t ->
+      conf:Config.t ->
       admins:(string * Bcrypt.hash) list ->
       users:(string * Bcrypt.hash) list ref ->
       (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt.Pool.t ->
@@ -644,33 +645,33 @@ let routes :
     list =
   [
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"],
-      fun g ~admins:_ ~users db_pool header meth body ->
+      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun _source ->
             with_data
               Teztale_lib.Consensus_ops.rights_encoding
               body
               (endorsing_rights_callback db_pool g)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"],
-      fun g ~admins:_ ~users db_pool header meth body ->
+      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Data.block_data_encoding
               body
               (block_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"],
-      fun g ~admins:_ ~users db_pool header meth body ->
+      fun g ~conf:_ ~admins:_ ~users db_pool header meth body ->
         post_only_endpoint !users header meth (fun source ->
             with_data
               Teztale_lib.Consensus_ops.delegate_ops_encoding
               body
               (operations_callback db_pool g source)) );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/import"],
-      fun g ~admins ~users:_ db_pool header meth body ->
+      fun g ~conf:_ ~admins ~users:_ db_pool header meth body ->
         post_only_endpoint admins header meth (fun _source ->
             with_data Teztale_lib.Data.encoding body (import_callback db_pool g))
     );
     ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"],
-      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let level = Int32.of_string (Re.Group.get g 1) in
             with_caqti_error
@@ -686,13 +687,16 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str ".json";
         ],
-      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~conf ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let min = Re.Group.get g 1 in
             let max = Re.Group.get g 2 in
             let min' = int_of_string min in
             let max' = int_of_string max in
-            if min' > max' || max' - min' > 1000 then
+            if
+              min' > max'
+              || max' - min' > Int32.to_int conf.Config.max_batch_size
+            then
               let body = "Invalid block range." in
               Cohttp_lwt_unix.Server.respond_error ~body ()
             else
@@ -712,7 +716,7 @@ let routes :
           Re.group (Re.rep1 Re.digit);
           Re.str "/anomalies.json";
         ],
-      fun g ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->
             let first_level = int_of_string (Re.Group.get g 1) in
             let last_level = int_of_string (Re.Group.get g 2) in
@@ -741,7 +745,7 @@ let routes :
                   ~body
                   ())) );
     ( Re.str "/user",
-      fun _g ~admins ~users db_pool header meth body ->
+      fun _g ~conf:_ ~admins ~users db_pool header meth body ->
         let reply_ok login () =
           reply_json
             Data_encoding.(obj2 (req "status" string) (req "login" string))
@@ -770,18 +774,18 @@ let routes :
             | `OPTIONS -> options_respond methods
             | _ -> method_not_allowed_respond methods) );
     ( Re.str "/users",
-      fun _g ~admins:_ ~users:_ db_pool _header meth _body ->
+      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () -> get_users db_pool) );
     ( Re.str "/stats.json",
-      fun _g ~admins:_ ~users:_ db_pool _header _meth _body -> get_stats db_pool
-    );
+      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
+        get_stats db_pool );
     ( Re.str "/head.json",
-      fun _g ~admins:_ ~users:_ db_pool _header _meth _body -> get_head db_pool
-    );
+      fun _g ~conf:_ ~admins:_ ~users:_ db_pool _header _meth _body ->
+        get_head db_pool );
   ]
   |> List.map (fun (r, fn) -> (r |> Re.whole_string |> Re.compile, fn))
 
-let callback ~public ~admins ~users db_pool _connection request body =
+let callback ~conf ~admins ~users db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
   let uri = Cohttp.Request.uri request in
@@ -792,9 +796,9 @@ let callback ~public ~admins ~users db_pool _connection request body =
         match Re.exec_opt r path with Some g -> Some (fn g) | None -> None)
       routes
   with
-  | Some fn -> fn ~admins ~users db_pool header meth body
+  | Some fn -> fn ~conf ~admins ~users db_pool header meth body
   | None -> (
-      match public with
+      match conf.Config.public_directory with
       | None -> Cohttp_lwt_unix.Server.respond_not_found ()
       | Some docroot ->
           let path = match path with "" | "/" -> "/index.html" | _ -> path in
@@ -818,7 +822,7 @@ let print_location f ((fl, fc), (tl, tc)) =
     else Format.fprintf f "line %i characters %i-%i" fl fc tc
   else Format.fprintf f "lines %i-%i characters %i-%i" fl tl fc tc
 
-let config =
+let conf =
   if Array.length Sys.argv < 2 then
     let () =
       Format.eprintf "%s needs a config file as argument@." Sys.executable_name
@@ -854,11 +858,9 @@ let config =
           exit 1)
 
 let () =
-  let uri = Uri.of_string config.Config.db_uri in
+  let uri = Uri.of_string conf.Config.db_uri in
   let users = ref [] in
-  let admins =
-    List.map (fun (u, p) -> (u, Bcrypt.hash p)) config.Config.admins
-  in
+  let admins = List.map (fun (u, p) -> (u, Bcrypt.hash p)) conf.Config.admins in
   let code =
     Lwt_main.run
       (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
@@ -885,7 +887,7 @@ let () =
                           (fun (login, password) ->
                             let password = Bcrypt.hash password in
                             upsert_user pool login password)
-                          config.Config.users))
+                          conf.Config.users))
                     (function
                       | Some e ->
                           Lwt.bind
@@ -937,15 +939,12 @@ let () =
                                               (Cohttp_lwt_unix.Server.make
                                                  ~callback:
                                                    (callback
-                                                      ~public:
-                                                        config
-                                                          .Config
-                                                           .public_directory
+                                                      ~conf
                                                       ~admins
                                                       ~users
                                                       pool)
                                                  ())))
-                                      config.Config.network_interfaces
+                                      conf.Config.network_interfaces
                                   in
                                   Lwt.bind (Lwt.join servers) (fun () ->
                                       Lwt.return 0)))))
