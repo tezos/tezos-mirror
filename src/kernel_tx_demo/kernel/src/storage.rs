@@ -33,8 +33,8 @@ const ID_PATH: RefPath = RefPath::assert_from(b"/id");
 pub enum AccountStorageError {
     /// Tried to take amount of ticket from an account, but the account
     /// does not hold enough funds for this operation.
-    #[error("Account does not hold enough funds {0:?}")]
-    NotEnoughFunds(OwnedPath),
+    #[error("Account does not hold enough funds {0:?}: stored={1}, required={2}")]
+    NotEnoughFunds(OwnedPath, u64, u64),
     /// Some runtime error happened while using the hosts durable storage.
     #[error("Runtime error")]
     RuntimeError(tezos_smart_rollup_host::runtime::RuntimeError),
@@ -216,12 +216,20 @@ impl Account {
                             .map_err(AccountStorageError::from)?;
                         Ok(new_amount)
                     }
-                    None => Err(AccountStorageError::NotEnoughFunds(self.path.clone())),
+                    None => Err(AccountStorageError::NotEnoughFunds(
+                        path.clone(),
+                        old_amount,
+                        amount,
+                    )),
                 }
             }
             Err(PathNotFound | HostErr(StoreNotAValue)) => {
                 if amount != 0 {
-                    Err(AccountStorageError::NotEnoughFunds(self.path.clone()))
+                    Err(AccountStorageError::NotEnoughFunds(
+                        path.clone(),
+                        0_u64,
+                        amount,
+                    ))
                 } else {
                     Ok(0)
                 }
