@@ -49,7 +49,7 @@ include: .gitlab/ci/jobs/test/common.yml
     # because if the CI timeout is reached, there are no artefacts,
     # and thus no logs to investigate.
     # See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818
-    - timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe
+    - timeout -k 60 1860 _build/default/tezt/tests/main.exe
         ${TESTS}
         --color
         --log-buffer-size 5000
@@ -67,7 +67,7 @@ include: .gitlab/ci/jobs/test/common.yml
 tezt:
   extends:
     - .test_template
-    - .image_template__runtime_build_e2etest_dependencies_template
+    - .image_template__runtime_e2etest_dependencies
     - .template__coverage_files
     - .tezt_template
   variables:
@@ -94,7 +94,7 @@ tezt:static-binaries:
   extends:
     # Expansion of .integration_template but without coverage.
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
+    - .image_template__runtime_e2etest_dependencies
     - .tezt_template
   dependencies:
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from
@@ -116,7 +116,7 @@ tezt:static-binaries:
   # is a subset, so this should not reduce apparent coverage.
   script:
     - 'echo "TESTS: ${TESTS}, JUNIT: ${JUNIT}, CI_NODE_INDEX: ${CI_NODE_INDEX}, CI_NODE_TOTAL: ${CI_NODE_TOTAL}"'
-    - timeout --kill-after 60 1860 _build/default/tezt/tests/main.exe
+    - timeout -k 60 1860 _build/default/tezt/tests/main.exe
         ${TESTS}
         --color
         --log-buffer-size 5000

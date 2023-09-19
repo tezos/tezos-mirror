@@ -2,7 +2,9 @@
 
 set -eu
 
-COVERAGE_MERGED=$(echo "$CI_JOB_NAME" | tr --squeeze-repeats '[\/_ @[]+' '-')
+# Pass [-s] to [tr] to squeeze repeat (use short option) for BusyBox
+# compatibility.
+COVERAGE_MERGED=$(echo "$CI_JOB_NAME" | tr -s '[\/_ @[]+' '-')
 
 # If the ci--no-coverage label is set, we do not attempt to merge the coverage files
 if echo "${CI_MERGE_REQUEST_LABELS:-}" | grep -q '\(^\|,\)ci--no-coverage\($\|,\)' ; then
