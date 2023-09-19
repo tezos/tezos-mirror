@@ -324,6 +324,28 @@ let update_ema ctxt ~vote =
   in
   (ctxt, launch_cycle, new_ema)
 
+let migrate_adaptive_issuance_storages_from_O_to_P ctxt =
+  let open Lwt_result_syntax in
+  let* activation = Storage.Adaptive_issuance.Activation.get ctxt in
+  let edge_of_staking_over_delegation =
+    Int64.of_int
+      (Constants_storage.adaptive_issuance_edge_of_staking_over_delegation ctxt)
+  in
+  match activation with
+  | None -> return ctxt
+  | Some activation_cycle ->
+      (* Distributions selected at the end of cycle C will be used for cycle
+         C+1+Preserved_cycles, so AI weighting only takes effect
+         preserved_cycles+1 after AI activation cycle. *)
+      let cycle_of_first_distribution_set_after_activation =
+        Cycle_repr.(
+          add (succ activation_cycle) (Constants_storage.preserved_cycles ctxt))
+      in
+      Stake_storage.migrate_storage_to_weighted_value_for_O_to_P
+        ctxt
+        (Stake_repr.migrate_stake_from_O_to_P ~edge_of_staking_over_delegation)
+        ~from_cycle:cycle_of_first_distribution_set_after_activation
+
 module For_RPC = struct
   let get_reward_coeff = get_reward_coeff
 end
