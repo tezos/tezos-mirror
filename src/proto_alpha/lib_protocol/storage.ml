@@ -1196,14 +1196,13 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
-  (* Unit = 1_000_000_000_000_000L, defined in [adaptive_issuance_storage.ml] *)
   module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
       (struct
         let name = ["issuance_bonus"]
       end)
-      (Encoding.Int64)
+      (Issuance_bonus_repr)
 
   module Issuance_coeff =
     Indexed_context.Make_map

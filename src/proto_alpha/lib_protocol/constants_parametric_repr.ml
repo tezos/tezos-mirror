@@ -137,8 +137,8 @@ type zk_rollup = {
 type adaptive_rewards_params = {
   issuance_ratio_min : Q.t;
   issuance_ratio_max : Q.t;
-  max_bonus : int64;
-  growth_rate : int64;
+  max_bonus : Issuance_bonus_repr.max_bonus;
+  growth_rate : Q.t;
   center_dz : Q.t;
   radius_dz : Q.t;
 }
@@ -340,6 +340,15 @@ let radius_encoding =
             "Invalid Reward Parameter: dead zone radius must be non-negative")
       (obj2 (req "numerator" z) (req "denominator" z)))
 
+let growth_rate_encoding =
+  Data_encoding.(
+    conv_with_guard
+      (fun Q.{num; den} -> (num, den))
+      (fun (num, den) ->
+        if Compare.Z.(num >= Z.zero && den > Z.zero) then Ok (Q.make num den)
+        else Error "Invalid Reward Parameter: growth rate must be non-negative")
+      (obj2 (req "numerator" z) (req "denominator" z)))
+
 let adaptive_rewards_params_encoding =
   let open Data_encoding in
   conv
@@ -374,8 +383,8 @@ let adaptive_rewards_params_encoding =
     (obj6
        (req "issuance_ratio_min" extremum_encoding)
        (req "issuance_ratio_max" extremum_encoding)
-       (req "max_bonus" int64)
-       (req "growth_rate" int64)
+       (req "max_bonus" Issuance_bonus_repr.max_bonus_encoding)
+       (req "growth_rate" growth_rate_encoding)
        (req "center_dz" center_encoding)
        (req "radius_dz" radius_encoding))
 

@@ -62,7 +62,8 @@
   "adaptive_rewards_params":
     { "issuance_ratio_min": { "numerator": "1", "denominator": "2000" },
       "issuance_ratio_max": { "numerator": "1", "denominator": "20" },
-      "max_bonus": "50000000000000", "growth_rate": "115740740",
+      "max_bonus": "50000000000000",
+      "growth_rate": { "numerator": "1", "denominator": "100" },
       "center_dz": { "numerator": "1", "denominator": "2" },
       "radius_dz": { "numerator": "1", "denominator": "50" } } }
 

@@ -967,6 +967,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return result
     | Oxford_018 ->
         let*! c = get_previous_protocol_constants ctxt in
+        let*? max_bonus =
+          Issuance_bonus_repr.migrate_max_bonus_from_O_to_P
+            c.adaptive_issuance.adaptive_rewards_params.max_bonus
+        in
+
         let cryptobox_parameters =
           {
             Dal.page_size = c.dal.cryptobox_parameters.page_size;
@@ -1081,9 +1086,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                 c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_min;
               issuance_ratio_max =
                 c.adaptive_issuance.adaptive_rewards_params.issuance_ratio_max;
-              max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
-              growth_rate =
-                c.adaptive_issuance.adaptive_rewards_params.growth_rate;
+              max_bonus;
+              (* 0.01% per 1% per day *)
+              growth_rate = Q.(1 // 100);
               center_dz = c.adaptive_issuance.adaptive_rewards_params.center_dz;
               radius_dz = c.adaptive_issuance.adaptive_rewards_params.radius_dz;
             }

@@ -263,8 +263,11 @@ let constants_mainnet =
           {
             issuance_ratio_min = Q.(5 // 10000);
             issuance_ratio_max = Q.(1 // 20);
-            max_bonus = 50_000_000_000_000L;
-            growth_rate = 115_740_740L;
+            max_bonus =
+              Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn
+                Q.(5 // 100);
+            (* 0.01% per 1% per day *)
+            growth_rate = Q.(1 // 100);
             center_dz = Q.(1 // 2);
             radius_dz = Q.(1 // 50);
           };
