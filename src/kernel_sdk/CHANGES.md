@@ -12,6 +12,7 @@
   `OutboxMessage<Expr: Michelson>` encoding, behind the `proto-alpha` feature flag.
 - The implementation of `write_debug` in the `MockHost` no longer prefixes the debug message
   with `DEBUG:` and do not print a newline by default.
+- Correctly initialise `MockHost::reboots_remaining` flag for testing outside of `run_level` api.
 
 ### Installer client/kernel
 
