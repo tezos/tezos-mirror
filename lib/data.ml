@@ -194,8 +194,6 @@ module Block = struct
     validation_time : Time.System.t option;
   }
 
-  type cycle_info = {cycle : int32; cycle_position : int32; cycle_size : int32}
-
   type t = {
     hash : Block_hash.t;
     predecessor : Block_hash.t option;
@@ -204,7 +202,6 @@ module Block = struct
     timestamp : Time.Protocol.t;
     reception_times : reception list;
     nonce : unit option;
-    cycle_info : cycle_info option;
   }
 
   let reception_encoding =
@@ -219,18 +216,6 @@ module Block = struct
          (opt "application" Time.System.encoding)
          (opt "validation" Time.System.encoding))
 
-  let cycle_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun {cycle; cycle_position; cycle_size} ->
-        (cycle, cycle_position, cycle_size))
-      (fun (cycle, cycle_position, cycle_size) ->
-        {cycle; cycle_position; cycle_size})
-      (obj3
-         (req "cycle" int32)
-         (req "cycle_position" int32)
-         (req "cycle_size" int32))
-
   let encoding =
     let open Data_encoding in
     conv
@@ -242,35 +227,17 @@ module Block = struct
              reception_times;
              timestamp;
              nonce;
-             cycle_info;
            } ->
-        ( hash,
-          predecessor,
-          delegate,
-          round,
-          reception_times,
-          timestamp,
-          nonce,
-          cycle_info ))
+        (hash, predecessor, delegate, round, reception_times, timestamp, nonce))
       (fun ( hash,
              predecessor,
              delegate,
              round,
              reception_times,
              timestamp,
-             nonce,
-             cycle_info ) ->
-        {
-          hash;
-          predecessor;
-          delegate;
-          round;
-          reception_times;
-          timestamp;
-          nonce;
-          cycle_info;
-        })
-      (obj8
+             nonce ) ->
+        {hash; predecessor; delegate; round; reception_times; timestamp; nonce})
+      (obj7
          (req "hash" Block_hash.encoding)
          (opt "predecessor" Block_hash.encoding)
          (dft
@@ -280,12 +247,25 @@ module Block = struct
          (dft "round" int32 0l)
          (dft "reception_times" (list reception_encoding) [])
          (dft "timestamp" Time.Protocol.encoding Time.Protocol.epoch)
-         (opt "nonce" unit)
-         (opt "cycle_info" cycle_info_encoding))
+         (opt "nonce" unit))
 end
 
+type cycle_info = {cycle : int32; cycle_position : int32; cycle_size : int32}
+
+let cycle_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {cycle; cycle_position; cycle_size} ->
+      (cycle, cycle_position, cycle_size))
+    (fun (cycle, cycle_position, cycle_size) ->
+      {cycle; cycle_position; cycle_size})
+    (obj3
+       (req "cycle" int32)
+       (req "cycle_position" int32)
+       (req "cycle_size" int32))
+
 type t = {
-  cycle_info : Block.cycle_info option;
+  cycle_info : cycle_info option;
   blocks : Block.t list;
   delegate_operations : Delegate_operations.t list;
   unaccurate : bool;
@@ -299,7 +279,7 @@ let encoding =
     (fun (cycle_info, blocks, delegate_operations, unaccurate) ->
       {cycle_info; blocks; delegate_operations; unaccurate})
     (obj4
-       (opt "cycle_info" Block.cycle_info_encoding)
+       (opt "cycle_info" cycle_info_encoding)
        (dft "blocks" (list Block.encoding) [])
        (* TODO: change name? *)
        (dft "endorsements" (list Delegate_operations.encoding) [])
@@ -310,11 +290,17 @@ let empty =
 
 let block_data_encoding =
   let open Data_encoding in
-  merge_objs
-    Block.encoding
-    (obj2
-       (req "endorsements" (list Consensus_ops.block_op_encoding))
-       (dft "preendorsements" (list Consensus_ops.block_op_encoding) []))
+  conv
+    (fun (block_info, cycle_info, (att, preatt)) ->
+      (block_info, (cycle_info, att, preatt)))
+    (fun (block_info, (cycle_info, att, preatt)) ->
+      (block_info, cycle_info, (att, preatt)))
+    (merge_objs
+       Block.encoding
+       (obj3
+          (opt "cycle_info" cycle_info_encoding)
+          (req "endorsements" (list Consensus_ops.block_op_encoding))
+          (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])))
 
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)

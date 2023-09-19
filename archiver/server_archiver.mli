@@ -31,6 +31,7 @@ type chunk =
   | Block of
       Int32.t (* level *)
       * (Data.Block.t
+        * Data.cycle_info option
         * (Consensus_ops.block_op list (* endos *)
           * Consensus_ops.block_op list (* preendos *)))
   | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops

@@ -346,16 +346,8 @@ let endorsing_rights_callback db_pool g rights =
 
 let block_callback db_pool g source
     ( Teztale_lib.Data.Block.
-        {
-          delegate;
-          timestamp;
-          reception_times;
-          round;
-          hash;
-          predecessor;
-          cycle_info;
-          _;
-        },
+        {delegate; timestamp; reception_times; round; hash; predecessor; _},
+      cycle_info,
       (endorsements, preendorsements) ) =
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -371,8 +363,7 @@ let block_callback db_pool g source
         in
         let* () =
           match cycle_info with
-          | Some Teztale_lib.Data.Block.{cycle; cycle_position = _; cycle_size}
-            ->
+          | Some Teztale_lib.Data.{cycle; cycle_position = _; cycle_size} ->
               Db.exec Sql_requests.maybe_insert_cycle (cycle, level, cycle_size)
           | _ -> Lwt.return_ok ()
         in

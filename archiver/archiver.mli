@@ -46,7 +46,9 @@ module type S = sig
      operations. *)
   val add_block :
     level:Int32.t ->
-    Data.Block.t * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
+    Data.Block.t
+    * Data.cycle_info option
+    * (Consensus_ops.block_op list * Consensus_ops.block_op list) ->
     unit
 
   val add_rights : level:Int32.t -> Consensus_ops.rights -> unit

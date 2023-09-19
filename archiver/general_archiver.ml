@@ -83,7 +83,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
-  let block_info_data (delegate, timestamp, round, hash, predecessor) cycle_info
+  let block_info_data (delegate, timestamp, round, hash, predecessor)
       reception_times =
     Data.Block.
       {
@@ -93,14 +93,14 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
         hash;
         predecessor;
         nonce = None;
-        cycle_info;
         reception_times;
       }
 
   let block_data cctx ((_, _, _, hash, _) as info) cycle_info reception_times =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
     return
-      ( block_info_data info cycle_info reception_times,
+      ( block_info_data info reception_times,
+        cycle_info,
         split_endorsements_preendorsements operations )
 
   let block_of ctxt level =
@@ -119,8 +119,8 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     return
       ( block_info_data
           (delegate, timestamp, round, hash, predecessor)
-          None
           reception_times,
+        None,
         ([], []) )
 
   let () =
@@ -140,7 +140,7 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
     block_data
       cctx
       (delegate, timestamp, round, hash, predecessor)
-      (Some {cycle; cycle_position; cycle_size})
+      (Some Data.{cycle; cycle_position; cycle_size})
       reception_times
 
   let () =
@@ -386,6 +386,7 @@ module Loops (Archiver : Archiver.S) = struct
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
+                                        _cycle_info,
                                         (endorsements, preendorsements) ) as
                                      block_data) =
                                   get_applied_block

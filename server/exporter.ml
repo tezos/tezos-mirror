@@ -37,7 +37,6 @@ let parse_block_row ((hash, predecessor, delegate), (round, timestamp)) acc =
         reception_times = [];
         timestamp;
         nonce = None;
-        cycle_info = None;
       }
     acc
 
@@ -56,7 +55,6 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
               reception_times;
               timestamp;
               nonce;
-              cycle_info;
             } ->
           Some
             Teztale_lib.Data.Block.
@@ -69,7 +67,6 @@ let parse_block_reception_row (hash, application_time, validation_time, source)
                   {source; application_time; validation_time} :: reception_times;
                 timestamp;
                 nonce;
-                cycle_info;
               }
       | None -> None)
     acc
@@ -87,8 +84,7 @@ let select_cycle_info db_pool level =
         (function
           | Error e -> Error e
           | Ok (Some (cycle, cycle_position, cycle_size)) ->
-              Ok
-                (Some Teztale_lib.Data.Block.{cycle; cycle_position; cycle_size})
+              Ok (Some Teztale_lib.Data.{cycle; cycle_position; cycle_size})
           | Ok None -> Ok None)
         (Db.find_opt cycle_request level))
     db_pool

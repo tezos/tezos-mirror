@@ -135,6 +135,7 @@ let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
       (fun (Data.Block.{hash; _} as block) ->
         let v =
           ( block,
+            data.Data.cycle_info,
             ( Option.value (Block_hash.Map.find hash pred_ops_map) ~default:[],
               Option.value (Block_hash.Map.find hash ops_map) ~default:[] ) )
         in

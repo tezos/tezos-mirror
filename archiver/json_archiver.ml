@@ -321,7 +321,6 @@ let dump_included_in_block path block_level block_hash block_predecessor
             reception_times;
             timestamp;
             nonce = None;
-            cycle_info = None;
           }
         :: infos.Data.blocks
       in
@@ -493,7 +492,7 @@ type chunk =
       * Time.Protocol.t
       * Data.Block.reception list
       * Tezos_crypto.Signature.Public_key_hash.t
-      * Data.Block.cycle_info option
+      * Data.cycle_info option
       * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
@@ -531,7 +530,7 @@ let stop () = chunk_feeder None
 let add_mempool ?unaccurate ~level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level (block, (endos, preendos)) =
+let add_block ~level (block, cycle_info, (endos, preendos)) =
   chunk_feeder
     (Some
        (Block
@@ -542,7 +541,7 @@ let add_block ~level (block, (endos, preendos)) =
             block.timestamp,
             block.reception_times,
             block.delegate,
-            block.cycle_info,
+            cycle_info,
             endos @ preendos )))
 
 (* not used *)
