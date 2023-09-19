@@ -22,6 +22,18 @@ let check_bounds ~max_bonus q = Q.(q >= zero && q <= max_bonus)
 
 type error += Out_of_bounds_bonus
 
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"out_of_bound_issuance_bonus"
+    ~title:"Out of bound issuance bonus"
+    ~description:"Computed issuance bonus is out of bound"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Computed issuance bonus is out of bound")
+    Data_encoding.unit
+    (function Out_of_bounds_bonus -> Some () | _ -> None)
+    (fun () -> Out_of_bounds_bonus)
+
 let of_Q ~max_bonus q =
   let open Result_syntax in
   if check_bounds ~max_bonus q then return q else tzfail Out_of_bounds_bonus
