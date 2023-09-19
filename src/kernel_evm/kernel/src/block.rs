@@ -83,9 +83,21 @@ fn compute<Host: Runtime>(
                     receipt_info,
                     host,
                 )?;
+                log!(
+                    host,
+                    Debug,
+                    "Estimated ticks after tx: {}",
+                    block_in_progress.estimated_ticks
+                );
             }
             None => {
                 block_in_progress.account_for_invalid_transaction();
+                log!(
+                    host,
+                    Debug,
+                    "Estimated ticks after tx: {}",
+                    block_in_progress.estimated_ticks
+                );
             }
         };
     }
@@ -131,7 +143,7 @@ pub fn produce<Host: Runtime>(
                 log!(
                     host,
                     Info,
-                    "Ask for reboot, ticks consumed: {}",
+                    "Ask for reboot. Estimated ticks: {}",
                     &block_in_progress.estimated_ticks
                 );
                 storage::store_block_in_progress(host, &block_in_progress)?;
@@ -152,6 +164,7 @@ pub fn produce<Host: Runtime>(
             }
         }
     }
+    log!(host, Debug, "Estimated ticks: {}", tick_counter.c);
     Ok(())
 }
 
