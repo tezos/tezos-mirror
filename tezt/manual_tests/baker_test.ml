@@ -310,7 +310,6 @@ let baker_early_preattestation_test =
     Operation.inject_operations
       ~request:`Inject
       ~use_tmp_file:true
-      ~protocol:Protocol.Alpha
       ~force:false
       ops
       client1
