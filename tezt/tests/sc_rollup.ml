@@ -1739,9 +1739,10 @@ let check_published_commitment_in_l1 ?(allow_non_published = false)
     (published_commitment, "published") ;
   unit
 
-let test_commitment_scenario ?commitment_period ?challenge_window
+let test_commitment_scenario ?supports ?commitment_period ?challenge_window
     ?(extra_tags = []) ~variant =
   test_full_scenario
+    ?supports
     ?commitment_period
     ?challenge_window
     {
@@ -3142,6 +3143,9 @@ let test_cement_ignore_commitment ~kind =
   let commitment_period = 3 in
   let challenge_window = 3 in
   test_commitment_scenario
+  (* this test can be removed when oxford is activated because the
+     commitment in the cement operation have been removed. *)
+    ~supports:Protocol.(Until_protocol 17)
     ~commitment_period
     ~challenge_window
     ~kind
