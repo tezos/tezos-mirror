@@ -753,11 +753,9 @@ let ir_model instr_or_cont =
       | N_KMap_exit_body -> (nlogm_model, update_alloc_model) |> m2 name
       | N_KLog -> (const1_model, const1_model) |> m2 name)
 
-let gas_unit_per_allocation_word = 4
-
 module SynthesizeTimeAlloc : Model.Binary_operation = struct
   module Def (X : Costlang.S) = struct
-    let op time alloc = X.(max time (alloc * int gas_unit_per_allocation_word))
+    let op time alloc = X.(max time alloc)
   end
 end
 
