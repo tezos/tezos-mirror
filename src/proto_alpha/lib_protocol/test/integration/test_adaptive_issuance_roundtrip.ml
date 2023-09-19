@@ -36,6 +36,31 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
+(** For [assert_failure], when expected error does not match the actual error.
+    First error is the expected error, the second is the actual error. *)
+type error += Unexpected_error of (error trace * error trace)
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Temporary
+    ~id:"adaptive_issuance_integration_test.unexpected_error"
+    ~title:"Unexpected error"
+    ~description:"Expected error does not match actual error"
+    ~pp:(fun ppf (expected, actual) ->
+      Format.fprintf
+        ppf
+        "Unexpected error:@.%a@.Expected:@.%a@."
+        (Format.pp_print_list pp)
+        actual
+        (Format.pp_print_list pp)
+        expected)
+    (obj2
+       (req "expected" (list error_encoding))
+       (req "actual" (list error_encoding)))
+    (function Unexpected_error (a, b) -> Some (a, b) | _ -> None)
+    (fun (a, b) -> Unexpected_error (a, b))
+
 let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in
   let pc = constants.preserved_cycles in
@@ -456,7 +481,7 @@ let end_test : ('a, unit) scenarios =
 
 (** Transforms scenarios into Alcotest tests *)
 let tests_of_scenarios :
-    (string * (unit, t) scenarios) list -> unit Alcotest_lwt.test_case list =
+    (string * (unit, 't) scenarios) list -> unit Alcotest_lwt.test_case list =
  fun scenarios ->
   List.map (fun (s, x) -> Tag s --> x --> end_test) scenarios |> function
   | [] -> []
@@ -526,7 +551,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let policy = Block.By_account baker.pkh in
   let state, operations = State.pop_pending_operations state in
   let* block = Block.bake ~policy ~adaptive_issuance_vote ~operations block in
-  (* TODO: mistake ? They apply before we reach the new cycle... *)
+  (* TODO: mistake ? The baking parameters apply before we reach the new cycle... *)
   let new_current_cycle = Block.current_cycle block in
   let state =
     if Protocol.Alpha_context.Cycle.(current_cycle = new_current_cycle) then
@@ -893,27 +918,35 @@ let finalize_unstake src_name : (t, t) scenarios =
 
 (* ======== Misc functions ========*)
 
-let check_failure_aux : ('a -> 'b) -> 'a -> 'a tzresult Lwt.t =
+let check_failure_aux ?expected_error :
+    ('a -> 'b tzresult Lwt.t) -> 'a -> 'a tzresult Lwt.t =
  fun f input ->
-  Log.info ~color:assert_block_color "Entering failling scenario..." ;
+  Log.info ~color:assert_block_color "Entering failing scenario..." ;
   let* output = f input in
   match output with
   | Ok _ -> failwith "Unexpected success"
-  | Error _ ->
-      Log.info ~color:assert_block_color "Rollback" ;
-      return input
+  | Error e -> (
+      match expected_error with
+      | None ->
+          Log.info ~color:assert_block_color "Rollback" ;
+          return input
+      | Some exp_e ->
+          if e = exp_e then (
+            Log.info ~color:assert_block_color "Rollback" ;
+            return input)
+          else fail (Unexpected_error (exp_e, e)))
 
-let check_fail_and_rollback :
+let check_fail_and_rollback ?expected_error :
     ('a, 'b) single_scenario -> 'a -> 'a tzresult Lwt.t =
- fun sc input -> check_failure_aux (run_scenario sc) input
+ fun sc input -> check_failure_aux ?expected_error (run_scenario sc) input
 
 (** Useful function to test expected failures: runs the given branch until it fails,
     then rollbacks to before execution. Fails if the given branch Succeeds *)
-let assert_failure : ('a, 'b) scenarios -> ('a, 'a) scenarios =
+let assert_failure ?expected_error : ('a, 'b) scenarios -> ('a, 'a) scenarios =
  fun scenarios ->
   match unfold_scenarios scenarios with
   | [] -> Empty
-  | [(sc, _, _)] -> exec (check_fail_and_rollback sc)
+  | [(sc, _, _)] -> exec (check_fail_and_rollback ?expected_error sc)
   | _ ->
       exec (fun _ ->
           failwith "Error: assert_failure used with branching scenario")
@@ -1002,6 +1035,20 @@ let add_account_with_funds name source amount =
 
 (* ======== Scenarios ======== *)
 
+let test_expected_error =
+  assert_failure
+    ~expected_error:[Exn (Failure "")]
+    (exec (fun _ -> failwith ""))
+  --> assert_failure
+        ~expected_error:
+          [
+            Unexpected_error
+              ([Inconsistent_number_of_bootstrap_accounts], [Exn (Failure "")]);
+          ]
+        (assert_failure
+           ~expected_error:[Inconsistent_number_of_bootstrap_accounts]
+           (exec (fun _ -> failwith "")))
+
 let init_constants ?reward_per_block () =
   let reward_per_block = Option.value ~default:0L reward_per_block in
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
@@ -1056,7 +1103,7 @@ let init_scenario ?reward_per_block () =
                 (Amount (Tez.of_mutez 2_000_000_000_000L))
           --> set_delegate "staker" (Some "delegate"))
    --> wait_ai_activation
-  |+ Tag "AI disactivated, self stake"
+  |+ Tag "AI deactivated, self stake"
      --> begin_test ~activate_ai:false ~self_stake:true)
   --> next_block
 
@@ -1308,7 +1355,12 @@ module Roundtrip = struct
 end
 
 let tests =
-  (tests_of_scenarios @@ [("Test init", init_scenario ())]) @ Roundtrip.tests
+  (tests_of_scenarios
+  @@ [
+       ("Test expected error in assert failure", test_expected_error);
+       ("Test init", init_scenario () --> Action (fun _ -> return_unit));
+     ])
+  @ Roundtrip.tests
 
 let () =
   Alcotest_lwt.run
