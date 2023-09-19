@@ -36,6 +36,7 @@ tezos-smart-rollup-mock.workspace = true
 
 [features]
 default = ["tx-kernel"]
+debug   = []
 testing = [
   "rand",
   "proptest",
