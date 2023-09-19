@@ -4,6 +4,7 @@ ometrics-code-quality-default:
   stage: test
   extends:
     - .template__code_quality
+    - .image_template__alpine
     # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
     # In short, GitLab requires a code quality report from the target branch.
     # As ometrics tries to find code quality issues against the target branch
