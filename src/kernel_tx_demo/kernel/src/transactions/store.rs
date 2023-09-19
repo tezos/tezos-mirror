@@ -17,6 +17,8 @@ pub(crate) const DAC_PAYLOAD_PATH_PREFIX: RefPath = RefPath::assert_from(b"/kern
 
 pub(crate) const DAC_ITERATOR_STATE_PREFIX: RefPath = RefPath::assert_from(b"/kernel/dac/iterator");
 
+pub(crate) const DAL_PAYLOAD_PATH: RefPath = RefPath::assert_from(b"/kernel/dal/payload");
+
 pub(crate) fn dac_payload_path(idx: u32) -> Result<OwnedPath, PathError> {
     concat(
         &DAC_PAYLOAD_PATH_PREFIX,

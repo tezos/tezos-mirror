@@ -14,6 +14,7 @@
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
 
+pub mod dal;
 pub mod inbox;
 pub mod storage;
 pub mod transactions;
@@ -36,7 +37,7 @@ use tezos_smart_rollup_encoding::inbox::{InboxMessage, InternalInboxMessage, Tra
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
 use transactions::external_inbox::ProcessExtMsgError;
 use transactions::process::execute_one_operation;
-use transactions::store::CACHED_MESSAGES_STORE_PREFIX;
+use transactions::store::{CACHED_MESSAGES_STORE_PREFIX, DAL_PAYLOAD_PATH};
 
 use crate::inbox::InboxDeposit;
 use crate::storage::{
@@ -107,6 +108,7 @@ where
         if let Err(_err) = filter_inbox_message(
             host,
             &mut account_storage,
+            message.level,
             message.as_ref(),
             &mut counter,
             &rollup_address,
@@ -149,6 +151,7 @@ enum TransactionError<'a> {
 fn filter_inbox_message<'a, Host: Runtime>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
+    _inbox_level: u32,
     inbox_message: &'a [u8],
     counter: &mut u32,
     rollup_address: &SmartRollupHash,
@@ -159,6 +162,34 @@ fn filter_inbox_message<'a, Host: Runtime>(
     .map_err(TransactionError::MalformedInboxMessage)?;
 
     match message {
+        InboxMessage::Internal(_msg @ InternalInboxMessage::StartOfLevel) => {
+            #[cfg(feature = "debug")]
+            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            #[cfg(feature = "dal")]
+            {
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/6270
+                // Make DAL parameters available to the kernel.
+                let attestation_lag = 4;
+                let slot_size = 32768;
+                let page_size = 128;
+                let num_pages = slot_size / page_size;
+                let published_level = (_inbox_level - attestation_lag) as i32;
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/6390
+                // Make it possible to dynamically change tracked slot indexes.
+                // TODO: https://gitlab.com/tezos/tezos/-/issues/6400
+                // Make it possible to track multiple slot indexes.
+                let slot_index = 0;
+                dal::store_dal_slot(
+                    host,
+                    published_level,
+                    num_pages,
+                    page_size,
+                    slot_index,
+                    DAL_PAYLOAD_PATH.into(),
+                );
+            }
+            Ok(())
+        }
         InboxMessage::Internal(InternalInboxMessage::Transfer(Transfer {
             payload,
             destination,
@@ -186,9 +217,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
         }
 
         InboxMessage::Internal(
-            _msg @ (InternalInboxMessage::StartOfLevel
-            | InternalInboxMessage::EndOfLevel
-            | InternalInboxMessage::InfoPerLevel(..)),
+            _msg @ (InternalInboxMessage::EndOfLevel | InternalInboxMessage::InfoPerLevel(..)),
         ) => {
             #[cfg(feature = "debug")]
             debug_msg!(host, "InboxMetadata: {}\n", _msg);
