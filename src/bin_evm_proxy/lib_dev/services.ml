@@ -95,6 +95,13 @@ let get_transaction_from_index block index
       | Some hash -> Rollup_node_rpc.transaction_object hash)
   | TxFull l -> return @@ List.nth_opt l index
 
+let block_transaction_count block =
+  Ethereum_types.quantity_of_z @@ Z.of_int
+  @@
+  match block.Ethereum_types.transactions with
+  | TxHash l -> List.length l
+  | TxFull l -> List.length l
+
 let dispatch_input ~verbose
     ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
     =
@@ -151,6 +158,25 @@ let dispatch_input ~verbose
     | Get_transaction_count.Input (Some (address, _)) ->
         let* nonce = Rollup_node_rpc.nonce address in
         return (Get_transaction_count.Output (Ok nonce))
+    | Get_block_transaction_count_by_hash.Input (Some block_hash) ->
+        let* block =
+          Rollup_node_rpc.block_by_hash
+            ~full_transaction_object:false
+            block_hash
+        in
+        return
+          (Get_block_transaction_count_by_hash.Output
+             (Ok (block_transaction_count block)))
+    | Get_block_transaction_count_by_number.Input (Some block_param) ->
+        let* block =
+          get_block_by_number
+            ~full_transaction_object:false
+            block_param
+            (module Rollup_node_rpc)
+        in
+        return
+          (Get_block_transaction_count_by_number.Output
+             (Ok (block_transaction_count block)))
     | Get_transaction_receipt.Input (Some tx_hash) ->
         let* receipt = Rollup_node_rpc.transaction_receipt tx_hash in
         return (Get_transaction_receipt.Output (Ok receipt))
