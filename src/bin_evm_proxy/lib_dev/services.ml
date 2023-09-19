@@ -106,8 +106,7 @@ let dispatch_input ~verbose
     ((module Rollup_node_rpc : Rollup_node.S), smart_rollup_address) (input, id)
     =
   let open Lwt_result_syntax in
-  let* output =
-    match input with
+  let dispatch_input_aux : type w. w input -> w output tzresult Lwt.t = function
     (* INTERNAL RPCs *)
     | Kernel_version.Input _ ->
         let* kernel_version = Rollup_node_rpc.kernel_version () in
@@ -146,7 +145,7 @@ let dispatch_input ~verbose
         let* block =
           Rollup_node_rpc.block_by_hash ~full_transaction_object block_hash
         in
-        return (Get_block_by_number.Output (Ok block))
+        return (Get_block_by_hash.Output (Ok block))
     | Get_block_by_hash.Input None ->
         return
           (Get_block_by_hash.Output
@@ -254,22 +253,27 @@ let dispatch_input ~verbose
         return (Web3_sha3.Output (Ok (Hash (Hex hash))))
     | _ -> Error_monad.failwith "Unsupported method\n%!"
   in
-
-  let response = (output, id) in
+  let* output = dispatch_input_aux input in
   if verbose then
-    Data_encoding.Json.construct Output.encoding response
+    Data_encoding.Json.construct Output.encoding (Output.Box output, id)
     |> Data_encoding.Json.to_string |> Printf.printf "%s\n%!" ;
-  return response
+  return (output, id)
 
 let dispatch ~verbose ctx dir =
   Directory.register0 dir dispatch_service (fun () input ->
       let open Lwt_result_syntax in
       match input with
-      | Singleton input ->
-          let+ output = dispatch_input ~verbose ctx input in
-          Singleton output
+      | Singleton (Box input, rpc) ->
+          let+ output, rpc = dispatch_input ~verbose ctx (input, rpc) in
+          Singleton (Output.Box output, rpc)
       | Batch inputs ->
-          let+ outputs = List.map_es (dispatch_input ~verbose ctx) inputs in
+          let+ outputs =
+            List.map_es
+              (fun (Input.Box input, rpc) ->
+                let+ output, rpc = dispatch_input ~verbose ctx (input, rpc) in
+                (Output.Box output, rpc))
+              inputs
+          in
           Batch outputs)
 
 let directory ~verbose
