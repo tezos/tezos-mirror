@@ -28,7 +28,7 @@
 .build_static_binaries_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_dependencies_template
+    - .image_template__runtime_build_dependencies
   stage: build
   variables:
     ARCH: ""

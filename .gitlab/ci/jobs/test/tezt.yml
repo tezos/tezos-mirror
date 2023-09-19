@@ -94,7 +94,7 @@ tezt:static-binaries:
   extends:
     # Expansion of .integration_template but without coverage.
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
     - .tezt_template
   dependencies:
     # Fetch src/proto_*/parameters/*.json and tezt/tests/main.exe from

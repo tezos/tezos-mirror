@@ -3,7 +3,7 @@
 .opam_template:
   extends:
     - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies_template
+    - .image_template__runtime_prebuild_dependencies
   stage: packaging
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
   # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
@@ -40,7 +40,7 @@
 opam:prepare:
   extends:
     - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies_template
+    - .image_template__runtime_prebuild_dependencies
     - .rules_template__trigger_exec_opam_batch_1
   stage: packaging
   needs: [trigger]

@@ -2,7 +2,7 @@ include: .gitlab/ci/jobs/publish/common.yml
 
 opam:release:
   extends:
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
   stage: publish_release
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

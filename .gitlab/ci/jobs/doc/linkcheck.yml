@@ -1,7 +1,7 @@
 documentation:linkcheck:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__runtime_build_test_dependencies
   stage: doc
   needs: []
   rules:

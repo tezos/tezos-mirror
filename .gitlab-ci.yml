@@ -62,16 +62,16 @@ variables:
   RUNTEZTALIAS: "false"
 
 # Image templates
-.image_template__runtime_build_e2etest_dependencies_template:
+.image_template__runtime_build_e2etest_dependencies:
   image: ${build_deps_image_name}:runtime-build-e2etest-dependencies--${build_deps_image_version}
 
-.image_template__runtime_build_test_dependencies_template:
+.image_template__runtime_build_test_dependencies:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
 
-.image_template__runtime_build_dependencies_template:
+.image_template__runtime_build_dependencies:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
 
-.image_template__runtime_prebuild_dependencies_template:
+.image_template__runtime_prebuild_dependencies:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
 # Match GitLab executors version and directly use the Docker socket
