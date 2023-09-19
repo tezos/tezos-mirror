@@ -12,8 +12,7 @@ let faucet = require('./players/faucet.json');
 let player1 = require('./players/player1.json');
 let player2 = require('./players/player2.json');
 
-let contract_path = path.resolve(__dirname, '..', '..', '..', "solidy_examples");
-let contract = compile_contract_file(contract_path, "erc20tok.sol")[0];
+let contract = compile_contract_file(contracts_directory, "erc20tok.sol")[0];
 let create_data = contract.bytecode;
 
 const transfer_token = function (to, amount) {
