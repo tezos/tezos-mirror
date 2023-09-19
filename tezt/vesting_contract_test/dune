@@ -1,8 +1,8 @@
 (executable
  (name main)
- (libraries octez-libs.tezos-stdlib
+ (libraries octez-libs.stdlib
             octez-protocol-alpha-libs.test-helpers
-            octez-libs.tezos-micheline
+            octez-libs.micheline
             tezos-protocol-alpha.protocol
             tezt-tezos
             ptime)

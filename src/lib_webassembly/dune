@@ -6,11 +6,11 @@
  (public_name octez-l2-libs.webassembly-interpreter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-lwt-result-stdlib
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-error-monad
+  octez-libs.lwt-result-stdlib
+  octez-libs.stdlib
+  octez-libs.error-monad
   zarith
-  octez-libs.tezos-lazy-containers)
+  octez-libs.lazy-containers)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)

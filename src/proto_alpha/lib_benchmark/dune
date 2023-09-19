@@ -5,15 +5,15 @@
  (name tezos_benchmark_alpha)
  (public_name tezos-benchmark-alpha)
  (libraries
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-base
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-micheline
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha.protocol
-  octez-libs.tezos-crypto
+  octez-libs.crypto
   tezos-protocol-alpha.parameters
   hashcons
   octez-protocol-alpha-libs.test-helpers

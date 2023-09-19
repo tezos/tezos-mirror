@@ -6,8 +6,8 @@
  (public_name octez-protocol-017-PtNairob-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   tezos-protocol-017-PtNairob.protocol
@@ -17,7 +17,7 @@
   octez-shell-libs.signer-backends
   octez-protocol-017-PtNairob-libs.plugin
   tezos-protocol-017-PtNairob.parameters
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-protocol-017-PtNairob-libs.smart-rollup
   uri)
  (inline_tests (flags -verbose) (modes native))

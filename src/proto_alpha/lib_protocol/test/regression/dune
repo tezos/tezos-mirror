@@ -6,13 +6,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-base
+  octez-libs.base
   tezt-tezos
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.plugin
   octez-protocol-alpha-libs.test-helpers
-  octez-libs.tezos-micheline)
+  octez-libs.micheline)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

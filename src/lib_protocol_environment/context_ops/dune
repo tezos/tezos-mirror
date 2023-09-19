@@ -6,8 +6,8 @@
  (public_name octez-shell-libs.context-ops)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-error-monad
+  octez-libs.base
+  octez-libs.error-monad
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context
   octez-shell-libs.shell-context)

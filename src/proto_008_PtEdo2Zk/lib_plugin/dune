@@ -6,7 +6,7 @@
  (public_name octez-protocol-008-PtEdo2Zk-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-008-PtEdo2Zk.protocol)
  (flags
   (:standard)
@@ -22,7 +22,7 @@
  (public_name octez-protocol-008-PtEdo2Zk-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-008-PtEdo2Zk.embedded-protocol
   octez-protocol-008-PtEdo2Zk-libs.plugin
   octez-shell-libs.validation)

@@ -4,8 +4,8 @@
 (library
  (name get_contracts_lib)
  (libraries
-  octez-libs.tezos-micheline
-  octez-libs.tezos-base
+  octez-libs.micheline
+  octez-libs.base
   octez-shell-libs.store
   tezos-protocol-017-PtNairob.protocol
   octez-protocol-017-PtNairob-libs.client
@@ -23,8 +23,8 @@
 (executable
  (name get_contracts)
  (libraries
-  octez-libs.tezos-micheline
-  octez-libs.tezos-base
+  octez-libs.micheline
+  octez-libs.base
   get_contracts_lib)
  (link_flags
   (:standard)

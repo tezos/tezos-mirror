@@ -6,12 +6,12 @@
  (public_name octez-node-config)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
   octez-shell-libs.shell-services
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-server
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
   octez-libs.tezos-context
   octez-shell-libs.store
   octez-shell-libs.validation)

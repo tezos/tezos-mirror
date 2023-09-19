@@ -8,13 +8,13 @@
  (public_name octez-shell-libs.shell-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-rpc
+  octez-libs.base
+  octez-libs.rpc
   octez-libs.tezos-p2p-services
-  octez-libs.tezos-version
-  octez-libs.tezos-context.sigs
+  octez-libs.version
+  octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
-  octez-libs.tezos-crypto-dal.octez-dal-config)
+  octez-libs.crypto-dal.dal-config)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

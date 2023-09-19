@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.octez-srs-extraction
+  octez-libs.srs-extraction
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags

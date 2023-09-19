@@ -3,14 +3,14 @@
 
 (library
  (name tezos_error_monad)
- (public_name octez-libs.tezos-error-monad)
+ (public_name octez-libs.error-monad)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-stdlib
+  octez-libs.stdlib
   data-encoding
   lwt-canceler
   lwt
-  octez-libs.tezos-lwt-result-stdlib)
+  octez-libs.lwt-result-stdlib)
  (js_of_ocaml)
  (flags
   (:standard)

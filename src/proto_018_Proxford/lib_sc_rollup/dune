@@ -6,7 +6,7 @@
  (public_name octez-protocol-018-Proxford-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))

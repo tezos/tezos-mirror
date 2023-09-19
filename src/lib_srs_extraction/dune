@@ -3,10 +3,10 @@
 
 (library
  (name octez_srs_extraction)
- (public_name octez-libs.octez-srs-extraction)
+ (public_name octez-libs.srs-extraction)
  (libraries
   bls12-381
-  octez-libs.octez-bls12-381-polynomial)
+  octez-libs.bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_bls12_381_polynomial)
@@ -15,11 +15,11 @@
 (executable
  (name srs_extraction_main)
  (libraries
-  octez-libs.octez-srs-extraction
+  octez-libs.srs-extraction
   cmdliner
   unix
   bls12-381
-  octez-libs.octez-bls12-381-polynomial)
+  octez-libs.bls12-381-polynomial)
  (flags
   (:standard)
   -open Octez_srs_extraction

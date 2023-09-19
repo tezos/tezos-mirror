@@ -6,10 +6,10 @@
  (package tezos-scoru-wasm-regressions)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-helpers
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.smart-rollup
   tezos-protocol-alpha.parameters

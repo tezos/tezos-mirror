@@ -23,7 +23,7 @@ depends: [
   "octez-proto-libs"
   "octez-protocol-compiler"
   "lwt-exit"
-  "tezos-version"
+  "octez-version"
   "aches-lwt" { >= "1.0.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "irmin-pack" { >= "3.7.2" & < "3.8.0" }

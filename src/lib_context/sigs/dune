@@ -5,11 +5,11 @@
 
 (library
  (name tezos_context_sigs)
- (public_name octez-libs.tezos-context.sigs)
+ (public_name octez-libs.context.sigs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib)
+  octez-libs.base
+  octez-libs.stdlib)
  (js_of_ocaml)
  (flags
   (:standard)

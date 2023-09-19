@@ -6,7 +6,7 @@
  (public_name octez-protocol-009-PsFLoren-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-009-PsFLoren.protocol)
  (flags
   (:standard)
@@ -22,7 +22,7 @@
  (public_name octez-protocol-009-PsFLoren-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-009-PsFLoren.embedded-protocol
   octez-protocol-009-PsFLoren-libs.plugin
   octez-shell-libs.validation)

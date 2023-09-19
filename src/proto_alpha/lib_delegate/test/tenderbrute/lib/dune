@@ -6,8 +6,8 @@
  (public_name octez-protocol-alpha-libs.baking.tenderbrute)
  (libraries
   data-encoding
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.base
+  octez-libs.base.unix
   tezos-protocol-alpha.protocol
   octez-shell-libs.client-base
   octez-protocol-alpha-libs.client)

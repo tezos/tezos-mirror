@@ -13,7 +13,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 test_version() {
   rm -f _build/default/src/lib_version/generated_git_info.ml
-  res=$(dune exec tezos-version ||:)
+  res=$(dune exec octez-version ||:)
   if [ "$res" != "$1" ]
   then
     echo "Expected version '$1', got '$res' => FAIL"

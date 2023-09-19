@@ -5,14 +5,14 @@
  (name tezos_client_003_PsddFKi3)
  (public_name octez-protocol-003-PsddFKi3-libs.client)
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
   tezos-protocol-003-PsddFKi3.protocol
   tezos-protocol-003-PsddFKi3.protocol.lifted
   octez-shell-libs.signer-backends
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags

@@ -9,9 +9,9 @@
   tezt-tezos.tezt-performance-regression
   uri
   hex
-  octez-libs.tezos-crypto-dal
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
+  octez-libs.crypto-dal
+  octez-libs.base
+  octez-libs.base.unix
   cohttp-lwt-unix)
  (flags
   (:standard)

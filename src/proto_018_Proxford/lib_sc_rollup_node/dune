@@ -6,8 +6,8 @@
  (package octez-smart-rollup-node-Proxford)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-protocol-018-Proxford-libs.client
@@ -16,9 +16,9 @@
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.plugin
   tezos-protocol-018-Proxford.parameters
-  octez-libs.tezos-rpc
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-server
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
@@ -32,7 +32,7 @@
   octez-protocol-018-Proxford-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-crawler
-  octez-libs.tezos-tree-encoding
+  octez-libs.tree-encoding
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -43,8 +43,8 @@
   octez-smart-rollup-node-lib
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
-  octez-libs.tezos-crypto-dal
-  tezos-version.value)
+  octez-libs.crypto-dal
+  octez-version.value)
  (flags
   (:standard)
   -open Tezos_base

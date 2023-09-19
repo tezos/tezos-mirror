@@ -7,13 +7,13 @@
  (libraries
   tezt.core
   octez-alcotezt
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-018-Proxford.protocol
   qcheck-alcotest
   octez-protocol-018-Proxford-libs.client
-  octez-libs.tezos-test-helpers
+  octez-libs.test-helpers
   octez-protocol-018-Proxford-libs.test-helpers
-  octez-libs.tezos-base-test-helpers
+  octez-libs.base-test-helpers
   octez-protocol-018-Proxford-libs.plugin)
  (library_flags (:standard -linkall))
  (flags

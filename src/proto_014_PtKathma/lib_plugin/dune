@@ -6,7 +6,7 @@
  (public_name octez-protocol-014-PtKathma-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-014-PtKathma.protocol)
  (flags
   (:standard)
@@ -22,7 +22,7 @@
  (public_name octez-protocol-014-PtKathma-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   tezos-protocol-014-PtKathma.embedded-protocol
   octez-protocol-014-PtKathma-libs.plugin
   octez-shell-libs.validation)

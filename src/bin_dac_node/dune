@@ -7,18 +7,18 @@
  (package octez-dac-node)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-clic
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-commands
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-server
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
   octez-shell-libs.protocol-updater
-  octez-libs.tezos-rpc-http-client-unix
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-stdlib
+  octez-libs.rpc-http-client-unix
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
   tezos-dac-lib
   tezos_dac_node_lib
   octez-l2-libs.layer2_store

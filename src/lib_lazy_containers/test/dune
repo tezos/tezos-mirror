@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-lazy-containers
+  octez-libs.lazy-containers
   qcheck-core
   qcheck-alcotest
   lwt.unix

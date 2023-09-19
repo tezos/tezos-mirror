@@ -5,15 +5,15 @@
  (name tezos_benchmark_018_Proxford)
  (public_name tezos-benchmark-018-Proxford)
  (libraries
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-base
-  octez-libs.tezos-error-monad
-  octez-libs.tezos-micheline
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark
   tezos-benchmark-type-inference-018-Proxford
   tezos-protocol-018-Proxford.protocol
-  octez-libs.tezos-crypto
+  octez-libs.crypto
   tezos-protocol-018-Proxford.parameters
   hashcons
   octez-protocol-018-Proxford-libs.test-helpers

@@ -6,10 +6,10 @@
  (public_name octez-protocol-016-PtMumbai-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-clic
-  octez-libs.tezos-crypto
-  octez-libs.tezos-stdlib-unix
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.crypto
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends
   octez-protocol-016-PtMumbai-libs.client

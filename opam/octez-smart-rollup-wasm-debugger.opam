@@ -14,7 +14,7 @@ depends: [
   "yaml" { >= "3.1.0" }
   "octez-protocol-alpha-libs"
   "octez-l2-libs"
-  "tezos-version"
+  "octez-version"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

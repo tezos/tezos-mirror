@@ -5,8 +5,8 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.octez-plonk.aggregation
-  octez-libs.octez-plonk.plonk-test)
+  octez-libs.plonk.aggregation
+  octez-libs.plonk.plonk-test)
  (modules main test_polynomial_commitment))
 
 (rule

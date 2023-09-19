@@ -8,7 +8,7 @@
   tezt.core
   octez-alcotezt
   bls12-381
-  octez-libs.octez-bls12-381-hash)
+  octez-libs.bls12-381-hash)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

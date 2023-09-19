@@ -6,14 +6,14 @@
  (public_name octez-shell-libs.client-base-unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-clic
-  octez-libs.tezos-rpc
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-client-unix
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.rpc-http-client-unix
   octez-shell-libs.shell-services
-  octez-libs.tezos-stdlib-unix
+  octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-commands
   octez-shell-libs.mockup
@@ -22,7 +22,7 @@
   octez-shell-libs.proxy
   octez-shell-libs.proxy.rpc
   octez-shell-libs.signer-backends.unix
-  tezos-version.value
+  octez-version.value
   lwt-exit
   uri)
  (library_flags (:standard -linkall))

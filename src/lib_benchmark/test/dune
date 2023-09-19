@@ -7,11 +7,11 @@
  (libraries
   tezt.core
   octez-alcotezt
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-micheline
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix
+  octez-libs.micheline
+  octez-libs.crypto
   tezos-benchmark
   tezos-benchmark-examples)
  (library_flags (:standard -linkall))

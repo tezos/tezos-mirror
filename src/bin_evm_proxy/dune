@@ -7,12 +7,12 @@
  (package octez-evm-proxy)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-base.unix
-  octez-libs.tezos-clic
-  octez-libs.tezos-rpc-http
-  octez-libs.tezos-rpc-http-server
-  tezos-version.value
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.clic
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-version.value
   evm_proxy_lib)
  (link_flags
   (:standard)

@@ -6,10 +6,10 @@
  (public_name octez-shell-libs.proxy.rpc)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
+  octez-libs.base
   octez-shell-libs.client-base
   octez-shell-libs.mockup-proxy
-  octez-libs.tezos-rpc
+  octez-libs.rpc
   octez-shell-libs.proxy
   uri)
  (flags

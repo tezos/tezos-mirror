@@ -7,8 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-shell-libs.shell-services
-  octez-libs.tezos-base
-  octez-libs.tezos-version
+  octez-libs.base
+  octez-libs.version
   index
   irmin-pack
   octez-shell-libs.store.shared
@@ -18,9 +18,9 @@
   octez-shell-libs.shell-context
   octez-shell-libs.validation
   octez-shell-libs.protocol-updater
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-stdlib
-  octez-libs.tezos-crypto
+  octez-libs.stdlib-unix
+  octez-libs.stdlib
+  octez-libs.crypto
   lwt-watcher
   aches
   aches-lwt
@@ -58,9 +58,9 @@
  (public_name octez-shell-libs.store.unix-reconstruction)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-libs.crypto
   octez-shell-libs.shell-services
   octez-shell-libs.protocol-updater
   octez-shell-libs.validation
@@ -86,9 +86,9 @@
  (public_name octez-shell-libs.store.unix-snapshots)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix
-  octez-libs.tezos-crypto
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-libs.crypto
   octez-shell-libs.shell-services
   octez-libs.tezos-context
   octez-shell-libs.validation

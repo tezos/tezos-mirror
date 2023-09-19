@@ -3,11 +3,11 @@
 
 (library
  (name tezos_base_p2p_identity_file)
- (public_name octez-libs.tezos-base.p2p-identity-file)
+ (public_name octez-libs.base.p2p-identity-file)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.tezos-base
-  octez-libs.tezos-stdlib-unix)
+  octez-libs.base
+  octez-libs.stdlib-unix)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
