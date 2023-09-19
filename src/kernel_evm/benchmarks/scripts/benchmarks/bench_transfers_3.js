@@ -31,4 +31,4 @@ for (player1 of players) {
     }
 }
 
-utils.print_bench([txs_1, txs_2])
+utils.print_bench([txs_1.concat(txs_2)])

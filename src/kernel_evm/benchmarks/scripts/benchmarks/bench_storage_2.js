@@ -41,4 +41,4 @@ for (player1 of players) {
 
 // first set of messages: initialisation
 // second set of messages: calls
-utils.print_bench([txs_1, txs_2])
+utils.print_bench([txs_1.concat(txs_2)])
