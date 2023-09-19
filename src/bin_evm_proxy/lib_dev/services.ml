@@ -176,6 +176,12 @@ let dispatch_input ~verbose
         return
           (Get_block_transaction_count_by_number.Output
              (Ok (block_transaction_count block)))
+    | Get_uncle_count_by_block_hash.Input (Some _block_hash) ->
+        (* A block cannot have uncles. *)
+        return (Get_uncle_count_by_block_hash.Output (Ok (Qty Z.zero)))
+    | Get_uncle_count_by_block_number.Input (Some _block_param) ->
+        (* A block cannot have uncles. *)
+        return (Get_uncle_count_by_block_number.Output (Ok (Qty Z.zero)))
     | Get_transaction_receipt.Input (Some tx_hash) ->
         let* receipt = Rollup_node_rpc.transaction_receipt tx_hash in
         return (Get_transaction_receipt.Output (Ok receipt))

@@ -254,6 +254,16 @@ module Get_block_transaction_count_by_number :
     with type m_input = Ethereum_types.block_param
      and type m_output = Ethereum_types.quantity
 
+module Get_uncle_count_by_block_hash :
+  METHOD
+    with type m_input = Ethereum_types.block_hash
+     and type m_output = Ethereum_types.quantity
+
+module Get_uncle_count_by_block_number :
+  METHOD
+    with type m_input = Ethereum_types.block_param
+     and type m_output = Ethereum_types.quantity
+
 module Get_transaction_receipt :
   METHOD
     with type m_input = Ethereum_types.hash
