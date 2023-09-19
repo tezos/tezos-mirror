@@ -208,9 +208,13 @@ and update_l2_chain daemon_components node_ctxt ~catching_up
   let* done_ = process_l1_block daemon_components node_ctxt ~catching_up head in
   match done_ with
   | `Nothing -> return_unit
-  | `Already_processed l2_block -> Node_context.set_l2_head node_ctxt l2_block
+  | `Already_processed l2_block ->
+      let return_l2 = Node_context.set_l2_head node_ctxt l2_block in
+      Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
+      return_l2
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
+      Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
       Metrics.Inbox.set_process_time process_time ;
@@ -524,6 +528,7 @@ module Internal_for_tests = struct
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in
+    let () = Lwt_watcher.notify node_ctxt.global_block_watcher l2_block in
     return l2_block
 end
 

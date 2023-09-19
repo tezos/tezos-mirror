@@ -64,6 +64,7 @@ type 'a t = {
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
   mutable current_protocol : current_protocol;
+  global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
 }
 
 type rw = [`Read | `Write] t
@@ -209,6 +210,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
     else return (Event.kernel_debug, fun () -> return_unit)
   in
+  let global_block_watcher = Lwt_watcher.create_input () in
   return
     {
       config = configuration;
@@ -235,6 +237,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       kernel_debug_logger;
       finaliser = kernel_debug_finaliser;
       current_protocol;
+      global_block_watcher;
     }
 
 let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
@@ -1033,6 +1036,7 @@ module Internal_for_tests = struct
             };
         ]
     in
+    let global_block_watcher = Lwt_watcher.create_input () in
     return
       {
         config;
@@ -1059,5 +1063,6 @@ module Internal_for_tests = struct
         context;
         kernel_debug_logger = Event.kernel_debug;
         finaliser = (fun () -> Lwt.return_unit);
+        global_block_watcher;
       }
 end

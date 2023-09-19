@@ -67,6 +67,13 @@ module Make_sub_directory (S : PARAM) : sig
     (S.subcontext -> 'param1 -> 'query -> 'input -> 'output tzresult Lwt.t) ->
     unit
 
+  (** Register an endpoint that specifies how to process incoming queries and inputs;
+      this function is intended for handling asynchronous contexts. *)
+  val gen_register0 :
+    ([< Resto.meth], 'prefix, 'prefix, 'query, 'input, 'output) Service.t ->
+    (S.subcontext -> 'query -> 'input -> 'output Tezos_rpc.Answer.t Lwt.t) ->
+    unit
+
   (** Build sub-directory with registered endpoints with respect to
       Node_context. *)
   val build_sub_directory : S.context -> S.prefix Tezos_rpc.Directory.t
