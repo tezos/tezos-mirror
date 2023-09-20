@@ -6,6 +6,8 @@
 /******************************************************************************/
 
 use crate::ast::*;
+use crate::gas;
+use crate::gas::{Gas, OutOfGas};
 use crate::stack::*;
 use std::collections::VecDeque;
 
@@ -15,30 +17,31 @@ pub enum TcError {
     GenericTcError,
     StackTooShort,
     StacksNotEqual,
+    OutOfGas,
 }
 
-impl From<StackTooShort> for TcError {
-    fn from(_: StackTooShort) -> Self {
-        TcError::StackTooShort
+impl From<OutOfGas> for TcError {
+    fn from(_: OutOfGas) -> Self {
+        TcError::OutOfGas
     }
 }
 
-impl From<StacksNotEqual> for TcError {
-    fn from(_: StacksNotEqual) -> Self {
-        TcError::StacksNotEqual
-    }
-}
-
-pub fn typecheck(ast: &AST, stack: &mut TypeStack) -> Result<(), TcError> {
+pub fn typecheck(ast: &AST, gas: &mut Gas, stack: &mut TypeStack) -> Result<(), TcError> {
     for i in ast {
-        typecheck_instruction(&i, stack)?;
+        typecheck_instruction(&i, gas, stack)?;
     }
     Ok(())
 }
 
-fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> Result<(), TcError> {
+fn typecheck_instruction(
+    i: &Instruction,
+    gas: &mut Gas,
+    stack: &mut TypeStack,
+) -> Result<(), TcError> {
     use Instruction::*;
     use Type::*;
+
+    gas.consume(gas::tc_cost::INSTR_STEP)?;
 
     match i {
         Add => match stack.make_contiguous() {
@@ -53,16 +56,19 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> Result<(), T
         Dip(opt_height, nested) => {
             let protected_height: usize = opt_height.unwrap_or(1);
 
+            gas.consume(gas::tc_cost::dip_n(opt_height))?;
+
             ensure_stack_len(stack, protected_height)?;
             // Here we split the stack into protected and live segments, and after typechecking
             // nested code with the live segment, we append the protected and the potentially
             // modified live segment as the result stack.
             let mut live = stack.split_off(protected_height);
-            typecheck(nested, &mut live)?;
+            typecheck(nested, gas, &mut live)?;
             stack.append(&mut live);
         }
         Drop(opt_height) => {
             let drop_height: usize = opt_height.unwrap_or(1);
+            gas.consume(gas::tc_cost::drop_n(opt_height))?;
             ensure_stack_len(&stack, drop_height)?;
             *stack = stack.split_off(drop_height);
         }
@@ -88,11 +94,11 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> Result<(), T
                 // the two branches with.
                 let mut t_stack: TypeStack = VecDeque::from(t.to_owned());
                 let mut f_stack: TypeStack = VecDeque::from(t.to_owned());
-                typecheck(nested_t, &mut t_stack)?;
-                typecheck(nested_f, &mut f_stack)?;
+                typecheck(nested_t, gas, &mut t_stack)?;
+                typecheck(nested_f, gas, &mut f_stack)?;
                 // If both stacks are same after typecheck, then make result
                 // stack using one of them and return success.
-                ensure_stacks_eq(t_stack.make_contiguous(), f_stack.make_contiguous())?;
+                ensure_stacks_eq(gas, t_stack.make_contiguous(), f_stack.make_contiguous())?;
                 *stack = t_stack;
             }
             _ => return Err(TcError::GenericTcError),
@@ -108,23 +114,17 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> Result<(), T
             [Bool, t @ ..] => {
                 let mut live: TypeStack = VecDeque::from(t.to_owned());
                 // Clone the tail and typecheck the nested body using it.
-                typecheck(nested, &mut live)?;
-                match live.make_contiguous() {
-                    // ensure the result stack has a bool on top.
-                    [Bool, r @ ..] => {
-                        // If the starting tail and result tail match
-                        // then the typecheck is complete. pop the bool
-                        // off the original stack to form the final result.
-                        ensure_stacks_eq(&t, &r)?;
-                        stack.pop_front();
-                    }
-                    _ => return Err(TcError::GenericTcError),
-                }
+                typecheck(nested, gas, &mut live)?;
+                // If the starting stack and result stack match
+                // then the typecheck is complete. pop the bool
+                // off the original stack to form the final result.
+                ensure_stacks_eq(gas, live.make_contiguous(), stack.make_contiguous())?;
+                stack.pop_front();
             }
             _ => return Err(TcError::GenericTcError),
         },
         Push(t, v) => {
-            typecheck_value(&t, &v)?;
+            typecheck_value(gas, &t, &v)?;
             stack.push_front(t.to_owned());
         }
         Swap => {
@@ -135,9 +135,10 @@ fn typecheck_instruction(i: &Instruction, stack: &mut TypeStack) -> Result<(), T
     Ok(())
 }
 
-fn typecheck_value(t: &Type, v: &Value) -> Result<(), TcError> {
+fn typecheck_value(gas: &mut Gas, t: &Type, v: &Value) -> Result<(), TcError> {
     use Type::*;
     use Value::*;
+    gas.consume(gas::tc_cost::VALUE_STEP)?;
     match (t, v) {
         (Nat, NumberValue(n)) if *n >= 0 => Ok(()),
         (Int, NumberValue(_)) => Ok(()),
@@ -158,89 +159,150 @@ mod typecheck_tests {
     fn test_dup() {
         let mut stack = VecDeque::from([Type::Nat]);
         let expected_stack = VecDeque::from([Type::Nat, Type::Nat]);
-        typecheck_instruction(&Dup(Some(1)), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Dup(Some(1)), &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_dup_n() {
         let mut stack = VecDeque::from([Type::Nat, Type::Int]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat, Type::Int]);
-        typecheck_instruction(&Dup(Some(2)), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Dup(Some(2)), &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_swap() {
         let mut stack = VecDeque::from([Type::Nat, Type::Int]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat]);
-        typecheck_instruction(&Swap, &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Swap, &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_int() {
         let mut stack = VecDeque::from([Type::Nat]);
         let expected_stack = VecDeque::from([Type::Int]);
-        typecheck_instruction(&Int, &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Int, &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_drop() {
         let mut stack = VecDeque::from([Type::Nat]);
         let expected_stack = VecDeque::from([]);
-        typecheck(&parse("{DROP}").unwrap(), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck(&parse("{DROP}").unwrap(), &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_drop_n() {
         let mut stack = VecDeque::from([Type::Nat, Type::Int]);
         let expected_stack = VecDeque::from([]);
-        typecheck_instruction(&Drop(Some(2)), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Drop(Some(2)), &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440 - 2 * 50);
     }
 
     #[test]
     fn test_push() {
         let mut stack = VecDeque::from([Type::Nat]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat]);
-        typecheck_instruction(&Push(Type::Int, Value::NumberValue(1)), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(
+            &Push(Type::Int, Value::NumberValue(1)),
+            &mut gas,
+            &mut stack,
+        )
+        .unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440 - 100);
     }
 
     #[test]
     fn test_gt() {
         let mut stack = VecDeque::from([Type::Int]);
         let expected_stack = VecDeque::from([Type::Bool]);
-        typecheck_instruction(&Gt, &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Gt, &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_dip() {
         let mut stack = VecDeque::from([Type::Int, Type::Bool]);
         let expected_stack = VecDeque::from([Type::Int, Type::Nat, Type::Bool]);
-        typecheck_instruction(&Dip(Some(1), parse("{PUSH nat 6}").unwrap()), &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(
+            &Dip(Some(1), parse("{PUSH nat 6}").unwrap()),
+            &mut gas,
+            &mut stack,
+        )
+        .unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440 - 440 - 100 - 50);
     }
 
     #[test]
     fn test_add() {
         let mut stack = VecDeque::from([Type::Int, Type::Int]);
         let expected_stack = VecDeque::from([Type::Int]);
-        typecheck_instruction(&Add, &mut stack).unwrap();
+        let mut gas = Gas::new(10000);
+        typecheck_instruction(&Add, &mut gas, &mut stack).unwrap();
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440);
     }
 
     #[test]
     fn test_loop() {
         let mut stack = VecDeque::from([Type::Bool, Type::Int]);
         let expected_stack = VecDeque::from([Type::Int]);
-        assert!(
-            typecheck_instruction(&Loop(parse("{PUSH bool True}").unwrap()), &mut stack).is_ok()
-        );
+        let mut gas = Gas::new(10000);
+        assert!(typecheck_instruction(
+            &Loop(parse("{PUSH bool True}").unwrap()),
+            &mut gas,
+            &mut stack
+        )
+        .is_ok());
         assert!(stack == expected_stack);
+        assert!(gas.milligas() == 10000 - 440 - 440 - 100 - 60 * 2);
+    }
+
+    #[test]
+    fn test_loop_stacks_not_equal_length() {
+        let mut stack = VecDeque::from([Type::Bool, Type::Int]);
+        let mut gas = Gas::new(10000);
+        assert!(
+            typecheck_instruction(
+                &Loop(parse("{PUSH int 1; PUSH bool True}").unwrap()),
+                &mut gas,
+                &mut stack
+            ) == Err(TcError::StacksNotEqual)
+        );
+    }
+
+    #[test]
+    fn test_loop_stacks_not_equal_types() {
+        let mut stack = VecDeque::from([Type::Bool, Type::Int]);
+        let mut gas = Gas::new(10000);
+        assert!(
+            typecheck_instruction(
+                &Loop(parse("{DROP; PUSH bool False; PUSH bool True}").unwrap()),
+                &mut gas,
+                &mut stack
+            ) == Err(TcError::StacksNotEqual)
+        );
     }
 }

@@ -12,10 +12,22 @@ pub enum Type {
     Bool,
 }
 
+impl Type {
+    /// Returns abstract size of the type representation. Used for gas cost
+    /// estimation.
+    pub fn size_for_gas(&self) -> usize {
+        match self {
+            Type::Nat => 1,
+            Type::Int => 1,
+            Type::Bool => 1,
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub enum Value {
     NumberValue(i32),
-    BooleanValue(bool)
+    BooleanValue(bool),
 }
 
 pub type InstructionBlock = Vec<Instruction>;
