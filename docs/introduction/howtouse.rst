@@ -271,6 +271,8 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
+The behaviour of the client can be customized using various mechanims, including command-line options, a configuration file, and environment variables. For details, refer to :doc:`../user/setup-client`.
+
 A Simple Wallet
 ~~~~~~~~~~~~~~~
 
@@ -621,25 +623,6 @@ cycle as many delegates receive back part of their unfrozen accounts.
 
 
 You can find more info in the :doc:`RPCs' page <../active/rpc>`.
-
-Environment variables for the client
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The behavior of the client can be configured using the following environment variables:
-
-- ``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER``: Setting this variable to "YES" (or: "yes", "Y", "y") disables the warning displayed by the client at startup when it is not launched on Mainnet.
-- ``TEZOS_CLIENT_DIR``: This variable may be used to supply the client data directory (by default, ``~/.tezos-client``).
-  Its value is overridden by option ``-d``.
-- ``TEZOS_SIGNER_*``: These variables are used for connecting the client to a remote :ref:`signer <signer>` (see there for details).
-- ``TEZOS_CLIENT_RPC_TIMEOUT_SECONDS``: This variable controls how long (in seconds, as an integer)
-  the client will wait for a response from the node, for each of the two RPC calls made during startup.
-  If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
-  The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
-  (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
-- ``TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS``: This variable specifies
-  custom HTTP headers to use with the ``--operations-pool`` option. Only the Host
-  header is supported as of now (see description in `rfc2616, section 14.23
-  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_
 
 Other binaries
 --------------
