@@ -111,7 +111,7 @@ let listings_encoding =
 let get_current_voting_power_free ctxt delegate =
   let open Lwt_result_syntax in
   let* stake = Storage.Stake.Staking_balance.get ctxt delegate in
-  Lwt.return @@ Stake_context.voting_weight ctxt stake
+  Lwt.return @@ Full_staking_balance_repr.voting_weight stake
 
 let update_listings ctxt =
   let open Lwt_result_syntax in

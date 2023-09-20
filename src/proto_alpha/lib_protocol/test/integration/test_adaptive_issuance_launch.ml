@@ -85,21 +85,22 @@ let assert_voting_power ~loc block delegate ~ai_enabled ~expected_staked
     Int64.of_int
       constants.parametric.adaptive_issuance.edge_of_staking_over_delegation
   in
-  let expected_power =
+  let expected_voting_power = Int64.add expected_frozen expected_liquid in
+  let expected_baking_power =
     if ai_enabled then
       Int64.add
         expected_frozen
         (Int64.div expected_liquid edge_of_staking_over_delegation)
-    else Int64.add expected_frozen expected_liquid
+    else expected_voting_power
   in
   let* actual_voting_power =
     Context.get_current_voting_power (B block) delegate
   in
-  let* () = Assert.equal_int64 ~loc actual_voting_power expected_power in
+  let* () = Assert.equal_int64 ~loc actual_voting_power expected_voting_power in
   let* actual_baking_power =
     Context.get_current_baking_power (B block) delegate
   in
-  Assert.equal_int64 ~loc actual_baking_power expected_power
+  Assert.equal_int64 ~loc actual_baking_power expected_baking_power
 
 (* Test that:
    - the EMA of the adaptive issuance vote reaches the threshold after the

@@ -1322,7 +1322,7 @@ module Stake = struct
          end))
          (Int31_index)
       (Public_key_hash_index)
-      (Stake_repr.Full)
+      (Full_staking_balance_repr)
 
   module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage

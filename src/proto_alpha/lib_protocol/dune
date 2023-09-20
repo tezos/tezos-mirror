@@ -137,6 +137,8 @@
   Parameters_repr
   Sapling_repr
   Lazy_storage_kind
+  Full_staking_balance_repr
+  Staker_repr
   Stake_repr
   Receipt_repr
   Migration_repr
@@ -424,6 +426,8 @@
   parameters_repr.ml parameters_repr.mli
   sapling_repr.ml
   lazy_storage_kind.ml lazy_storage_kind.mli
+  full_staking_balance_repr.ml full_staking_balance_repr.mli
+  staker_repr.ml staker_repr.mli
   stake_repr.ml stake_repr.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
@@ -713,6 +717,8 @@
   parameters_repr.ml parameters_repr.mli
   sapling_repr.ml
   lazy_storage_kind.ml lazy_storage_kind.mli
+  full_staking_balance_repr.ml full_staking_balance_repr.mli
+  staker_repr.ml staker_repr.mli
   stake_repr.ml stake_repr.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
@@ -986,6 +992,8 @@
   parameters_repr.ml parameters_repr.mli
   sapling_repr.ml
   lazy_storage_kind.ml lazy_storage_kind.mli
+  full_staking_balance_repr.ml full_staking_balance_repr.mli
+  staker_repr.ml staker_repr.mli
   stake_repr.ml stake_repr.mli
   receipt_repr.ml receipt_repr.mli
   migration_repr.ml migration_repr.mli
