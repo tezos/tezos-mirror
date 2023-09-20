@@ -454,12 +454,7 @@ let do_runlike_command ?event_level ?event_sections_levels node arguments =
 
 let run ?(legacy = false) ?(restart = false) ?mode ?event_level
     ?event_sections_levels ?loser_mode node rollup_address extra_arguments =
-  let* () =
-    if restart then
-      let* () = terminate node in
-      return ()
-    else return ()
-  in
+  let* () = if restart then terminate node else return () in
   let cmd =
     if legacy then
       let args = legacy_node_args ?loser_mode node rollup_address in

@@ -302,6 +302,8 @@ let degraded_refutation_mode state =
   let*! () = message "Shutting down Commitment Publisher@." in
   let*! () = Publisher.shutdown () in
   Layer1.iter_heads state.node_ctxt.l1_ctxt @@ fun head ->
+  let* predecessor = Node_context.get_predecessor_header state.node_ctxt head in
+  let* () = Node_context.save_protocol_info state.node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up:false state head in
   let module Plugin = (val state.plugin) in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
@@ -380,27 +382,16 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         | Error err ->
             Event.(metrics_ended (Format.asprintf "%a" pp_print_trace err)))
       (fun exn -> Event.(metrics_ended_dont_wait (Printexc.to_string exn))) ;
-    let* () =
-      (* If the rollup is private and node can publish commitment check that the
-         operator is in the whitelist. *)
-      let operator =
-        Node_context.get_operator node_ctxt Configuration.Operating
-      in
-      let* whitelist =
-        Plugin.Layer1_helpers.find_whitelist
-          node_ctxt.cctxt
-          configuration.sc_rollup_address
-      in
-      match (operator, whitelist) with
-      | Some operator, Some whitelist ->
-          (* The operator's role is to publish commitments and a whitelist exists:
-             return an error if the operator is not in the whitelist. *)
-          fail_unless
-            (List.mem ~equal:Signature.Public_key_hash.equal operator whitelist)
-            Rollup_node_errors.Operator_not_in_whitelist
-      | _ ->
-          (* The rollup is public or the node is not publishing commmitment. *)
-          return_unit
+    let* whitelist =
+      Plugin.Layer1_helpers.find_whitelist
+        node_ctxt.cctxt
+        configuration.sc_rollup_address
+    in
+    let*? () =
+      match whitelist with
+      | Some whitelist ->
+          Node_context.check_op_in_whitelist_or_bailout_mode node_ctxt whitelist
+      | None -> Result_syntax.return_unit
     in
     let*! () =
       Event.node_is_ready

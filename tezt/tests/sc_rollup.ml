@@ -6002,29 +6002,38 @@ let test_private_rollup_node_publish_in_whitelist =
   bake_levels levels tezos_client
 
 let test_private_rollup_node_publish_not_in_whitelist =
+  let operator = Constant.bootstrap1.alias in
   test_full_scenario
     ~supports:(From_protocol 019)
     ~whitelist_enable:true
     ~whitelist:[Constant.bootstrap2.public_key_hash]
-    ~operator:Constant.bootstrap1.alias
+    ~operator
+    ~mode:Operator
     {
       variant = None;
-      tags = ["whitelist"];
+      tags = ["whitelist"; "bla"];
       description =
         "Rollup node fails to start if the operator is not in the whitelist";
     }
     ~kind:"arith"
-  @@ fun _protocol
-             rollup_node
-             _rollup_client
-             sc_rollup
-             _tezos_node
-             _tezos_client ->
+  @@ fun _protocol rollup_node _rollup_client sc_rollup tezos_node client ->
   let node_process = Sc_rollup_node.spawn_run rollup_node sc_rollup [] in
-  Process.check_error
-    node_process
-    ~exit_code:1
-    ~msg:(rex ".*The operator is not in the whitelist.*")
+  let* () =
+    Process.check_error
+      node_process
+      ~exit_code:1
+      ~msg:(rex ".*The operator is not in the whitelist.*")
+  in
+  let* () = Sc_rollup_node.kill rollup_node in
+  let rollup_node =
+    Sc_rollup_node.create
+      Bailout
+      tezos_node
+      ~base_dir:(Client.base_dir client)
+      ~default_operator:operator
+  in
+  let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+  unit
 
 let test_rollup_whitelist_update ~kind =
   let commitment_period = 2 and challenge_window = 5 in

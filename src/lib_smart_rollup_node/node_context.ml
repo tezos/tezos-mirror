@@ -88,6 +88,16 @@ let is_loser {loser_mode; _} = loser_mode <> Loser_mode.no_failures
 let can_inject {mode; _} (op_kind : Configuration.operation_kind) =
   Configuration.can_inject mode op_kind
 
+let check_op_in_whitelist_or_bailout_mode (node_ctxt : _ t) whitelist =
+  let operator = get_operator node_ctxt Configuration.Operating in
+  match operator with
+  | Some operator ->
+      error_unless
+        (is_bailout node_ctxt
+        || List.mem ~equal:Signature.Public_key_hash.equal operator whitelist)
+        Rollup_node_errors.Operator_not_in_whitelist
+  | None -> Result_syntax.return_unit
+
 let get_fee_parameter node_ctxt operation_kind =
   Configuration.Operation_kind_map.find operation_kind node_ctxt.fee_parameters
   |> Option.value

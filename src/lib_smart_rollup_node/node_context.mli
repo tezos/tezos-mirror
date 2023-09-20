@@ -132,6 +132,14 @@ val is_loser : _ t -> bool
     be injected based on the configuration settings. *)
 val can_inject : _ t -> Configuration.operation_kind -> bool
 
+(** [check_op_in_whitelist_or_bailout_mode node_ctxt whitelist] Checks
+    when the rollup node is operating if the operator is in the
+    whitelist or if the rollup node is in bailout mode.  Bailout mode
+    does not publish any commitment but still defends previously
+    commited one. *)
+val check_op_in_whitelist_or_bailout_mode :
+  _ t -> Signature.Public_key_hash.t list -> unit tzresult
+
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
     configured for this purpose, returns the default fee parameter for this
