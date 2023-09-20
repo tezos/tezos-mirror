@@ -132,15 +132,33 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           op_stream,
         stopper )
 
-  let cycle_info (metadata : Block_services.block_metadata) =
-    Data.
-      {
-        cycle =
-          Protocol.Alpha_context.Cycle.to_int32
-            metadata.protocol_data.level_info.cycle;
-        cycle_position = metadata.protocol_data.level_info.cycle_position;
-        cycle_size = 0l;
-      }
+  let cycles_size =
+    let ans = ref None in
+    fun cctxt ref_block ->
+      match !ans with
+      | Some x -> return x
+      | None ->
+          let* constants =
+            Protocol.Alpha_services.Constants.parametric cctxt ref_block
+          in
+          let out =
+            constants
+              .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
+          in
+          ans := Some out ;
+          return out
+
+  let cycle_info (metadata : Block_services.block_metadata) cctxt ref_block =
+    let* cycle_size = cycles_size cctxt ref_block in
+    return
+      Data.
+        {
+          cycle =
+            Protocol.Alpha_context.Cycle.to_int32
+              metadata.protocol_data.level_info.cycle;
+          cycle_position = metadata.protocol_data.level_info.cycle_position;
+          cycle_size;
+        }
 
   let baker_and_cycle cctxt hash =
     let* metadata =
@@ -150,7 +168,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cctxt
         ()
     in
-    return (metadata.protocol_data.baker.delegate, cycle_info metadata)
+    let* cycle_info =
+      cycle_info metadata cctxt (cctxt#chain, `Hash (hash, 0))
+    in
+    return (metadata.protocol_data.baker.delegate, cycle_info)
 
   let baking_right cctxt level round =
     let* baking_rights =
@@ -260,13 +281,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Block_services.metadata ~chain:cctxt#chain ~block:(`Level level) cctxt ()
     in
     let*? round = raw_block_round header.shell in
+    let* cycle_info = cycle_info metadata cctxt (cctxt#chain, `Level level) in
     return
       ( ( metadata.protocol_data.baker.delegate,
           header.shell.timestamp,
           round,
           header.hash,
           Some header.shell.predecessor ),
-        cycle_info metadata )
+        cycle_info )
 end
 
 module M = General_archiver.Define (Services)
