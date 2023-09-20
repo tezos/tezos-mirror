@@ -162,6 +162,11 @@ let z_parameter =
         return v
       with _ -> cctxt#error "Invalid number, must be a non negative number.")
 
+let int32_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
+      try Lwt_result.return (Int32.of_string p)
+      with _ -> cctxt#error "Cannot read int")
+
 module Binary_dependent_args (P : sig
   val binary_name : string
 end) =
@@ -327,6 +332,13 @@ let positive_int_parameter =
       | None | Some _ ->
           cctxt#error "Expected a valid positive integer, provided %s instead" p)
 
+let positive_int32_parameter =
+  Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->
+      match Int32.of_string_opt p with
+      | Some i when Compare.Int32.(i > 0l) -> Lwt_result.return i
+      | None | Some _ ->
+          cctxt#error "Expected a valid positive integer, provided %s instead" p)
+
 let index_buffer_size_arg =
   Tezos_clic.arg
     ~long:"index-buffer-size"
@@ -363,3 +375,14 @@ let no_degraded_arg : (bool, Client_context.full) Tezos_clic.arg =
       "Prevent the rollup node from entering degraded mode on error. The \
        rollup node will instead stop."
     ()
+
+let gc_frequency_arg =
+  Tezos_clic.arg
+    ~long:"gc-frequency"
+    ~placeholder:"blocks"
+    ~doc:
+      (Format.sprintf
+         "The number of blocks between each launch of the garbage collection. \
+          Default value is %ld."
+         Configuration.default_gc_parameters.frequency_in_blocks)
+    positive_int32_parameter
