@@ -239,27 +239,41 @@ let common_node_args ~loser_mode ~allow_degraded sc_node =
       in
       ["--dal-node"; endpoint]
 
-let node_args ~loser_mode ~allow_degraded sc_node rollup_address =
+let optional_args ?gc_frequency () =
+  match gc_frequency with
+  | None -> []
+  | Some frequency -> ["--gc-frequency"; Int.to_string frequency]
+
+let node_args ~loser_mode ~allow_degraded ?gc_frequency sc_node rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ( mode,
     ["for"; rollup_address; "with"; "operators"]
     @ operators_params sc_node
-    @ common_node_args ~loser_mode ~allow_degraded sc_node )
+    @ common_node_args ~loser_mode ~allow_degraded sc_node
+    @ optional_args ?gc_frequency () )
 
 let legacy_node_args ~loser_mode ~allow_degraded sc_node rollup_address =
   let mode = string_of_mode sc_node.persistent_state.mode in
   ["--mode"; mode; "--rollup"; rollup_address]
   @ common_node_args ~loser_mode ~allow_degraded sc_node
 
-let spawn_config_init sc_node ?(force = false) ?loser_mode rollup_address =
+let spawn_config_init sc_node ?(force = false) ?loser_mode ?gc_frequency
+    rollup_address =
   let mode, args =
-    node_args ~loser_mode ~allow_degraded:true sc_node rollup_address
+    node_args
+      ~loser_mode
+      ~allow_degraded:true
+      ?gc_frequency
+      sc_node
+      rollup_address
   in
   spawn_command sc_node @@ ["init"; mode; "config"] @ args
   @ if force then ["--force"] else []
 
-let config_init sc_node ?force ?loser_mode rollup_address =
-  let process = spawn_config_init sc_node ?force ?loser_mode rollup_address in
+let config_init sc_node ?force ?loser_mode ?gc_frequency rollup_address =
+  let process =
+    spawn_config_init sc_node ?force ?loser_mode ?gc_frequency rollup_address
+  in
   let* output = Process.check_and_read_stdout process in
   match
     output =~* rex "Smart rollup node configuration written in ([^\n]*)"

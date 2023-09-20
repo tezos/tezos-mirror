@@ -45,6 +45,8 @@ type mode =
   | Accuser
   | Bailout
 
+type event = {name : string; value : JSON.t; timestamp : float}
+
 (** Returns the associated {!mode}, fails if the mode is not valid. *)
 val mode_of_string : string -> mode
 
@@ -211,13 +213,23 @@ val kill : t -> unit Lwt.t
     [octez-sc-rollup-node-alpha config init].  Returns the name of the resulting
     configuration file. *)
 val config_init :
-  t -> ?force:bool -> ?loser_mode:string -> string -> string Lwt.t
+  t ->
+  ?force:bool ->
+  ?loser_mode:string ->
+  ?gc_frequency:int ->
+  string ->
+  string Lwt.t
 
 (** Initialize the rollup node configuration file with
     [octez-sc-rollup-node-alpha config init] and return the corresponding
     process. *)
 val spawn_config_init :
-  t -> ?force:bool -> ?loser_mode:string -> string -> Process.t
+  t ->
+  ?force:bool ->
+  ?loser_mode:string ->
+  ?gc_frequency:int ->
+  string ->
+  Process.t
 
 module Config_file : sig
   (** Sc node configuration files. *)
@@ -278,6 +290,9 @@ val wait_sync : ?path_client:string -> t -> timeout:float -> int Lwt.t
     returned. [where], if present, should describe the constraint that [filter]
     applies. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Add a callback to be called whenever the daemon emits an event. *)
+val on_event : t -> (event -> unit) -> unit
 
 (** Stops the rollup node and restart it, connected to another Tezos Layer 1
     node. *)
