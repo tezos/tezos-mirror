@@ -302,7 +302,7 @@ let cost_N_IAdd_bls12_381_g1 = S.safe_int 900
 let cost_N_IAdd_bls12_381_g2 = S.safe_int 2470
 
 (* model interpreter/N_IAdd_int *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IAdd_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -310,7 +310,7 @@ let cost_N_IAdd_int size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IAdd_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IAdd_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -318,7 +318,7 @@ let cost_N_IAdd_nat size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IAdd_seconds_to_timestamp *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IAdd_seconds_to_timestamp size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -330,7 +330,7 @@ let cost_N_IAdd_seconds_to_timestamp size1 size2 =
 let cost_N_IAdd_tez = S.safe_int 20
 
 (* model interpreter/N_IAdd_timestamp_to_seconds *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IAdd_timestamp_to_seconds size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -350,7 +350,7 @@ let cost_N_IAmount = S.safe_int 10
 let cost_N_IAnd = S.safe_int 10
 
 (* model interpreter/N_IAnd_bytes *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.min size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
 let cost_N_IAnd_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -358,7 +358,7 @@ let cost_N_IAnd_bytes size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IAnd_int_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.min size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
 let cost_N_IAnd_int_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -366,7 +366,7 @@ let cost_N_IAnd_int_nat size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IAnd_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.min size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (min size1 size2)) *)
 let cost_N_IAnd_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -486,7 +486,7 @@ let cost_N_ICheck_signature_secp256k1 size =
   S.safe_int 51600 + ((v0 lsr 3) + v0)
 
 (* model interpreter/N_IComb *)
-(* fun size -> 40. + (3.25 * (S.sub size 2)) *)
+(* fun size -> 40. + (3.25 * (sub size 2)) *)
 let cost_N_IComb size =
   let size = S.safe_int size in
   let v0 = S.sub size (S.safe_int 2) in
@@ -539,7 +539,7 @@ let cost_N_ICons_pair = S.safe_int 10
 let cost_N_ICons_some = S.safe_int 10
 
 (* model interpreter/N_IDiff_timestamps *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IDiff_timestamps size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -582,7 +582,7 @@ let cost_N_IDup = S.safe_int 10
 (* model interpreter/N_IEdiv_int *)
 (* fun size1 ->
      fun size2 ->
-       let q = S.sub size1 size2 in
+       let q = sub size1 size2 in
        ((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
          150. *)
 let cost_N_IEdiv_int size1 size2 =
@@ -600,7 +600,7 @@ let cost_N_IEdiv_int size1 size2 =
 (* model interpreter/N_IEdiv_nat *)
 (* fun size1 ->
      fun size2 ->
-       let q = S.sub size1 size2 in
+       let q = sub size1 size2 in
        ((((0.0010986328125 * q) * size2) + (1.25 * size1)) + (12. * q)) +
          150. *)
 let cost_N_IEdiv_nat size1 size2 =
@@ -711,8 +711,8 @@ let cost_N_IIs_nat = S.safe_int 10
      fun content_size_y ->
        fun amount_size_x ->
          fun amount_size_y ->
-           (88.1705426747 + (0. * (S.min content_size_x content_size_y))) +
-             (0.0788934824125 * (S.max amount_size_x amount_size_y)) *)
+           (88.1705426747 + (0. * (min content_size_x content_size_y))) +
+             (0.0788934824125 * (max amount_size_x amount_size_y)) *)
 let cost_N_IJoin_tickets _content_size_x _content_size_y amount_size_x
     amount_size_y =
   let amount_size_x = S.safe_int amount_size_x in
@@ -777,7 +777,7 @@ let cost_N_ILoop_out = S.safe_int 5
 
 (* model interpreter/N_ILsr_bytes *)
 (* fun size1 ->
-     fun size2 -> let q = S.sub size1 (size2 * 0.125) in 55. + (0.75 * q) *)
+     fun size2 -> let q = sub size1 (size2 * 0.125) in 55. + (0.75 * q) *)
 let cost_N_ILsr_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -913,7 +913,7 @@ let cost_N_INow = S.safe_int 10
 
 (* model interpreter/N_IOpen_chest *)
 (* fun size1 ->
-     fun size2 -> (919000. + (22528. * (S.sub size1 1))) + (3.25 * size2) *)
+     fun size2 -> (919000. + (22528. * (sub size1 1))) + (3.25 * size2) *)
 let cost_N_IOpen_chest size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -936,7 +936,7 @@ let cost_N_IOpt_map_some = S.safe_int 0
 let cost_N_IOr = S.safe_int 10
 
 (* model interpreter/N_IOr_bytes *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IOr_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -944,7 +944,7 @@ let cost_N_IOr_bytes size1 size2 =
   S.safe_int 35 + (v0 lsr 1)
 
 (* model interpreter/N_IOr_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IOr_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1034,7 +1034,7 @@ let cost_N_ISlice_string size =
 let cost_N_ISource = S.safe_int 10
 
 (* model interpreter/N_ISplit_ticket *)
-(* fun size1 -> fun size2 -> 40. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 40. + (0.5 * (max size1 size2)) *)
 let cost_N_ISplit_ticket size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1046,7 +1046,7 @@ let cost_N_ISplit_ticket size1 size2 =
 let cost_N_IString_size = S.safe_int 15
 
 (* model interpreter/N_ISub_int *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_ISub_int size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1062,7 +1062,7 @@ let cost_N_ISub_tez = S.safe_int 15
 let cost_N_ISub_tez_legacy = S.safe_int 20
 
 (* model interpreter/N_ISub_timestamp_seconds *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_ISub_timestamp_seconds size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1082,7 +1082,7 @@ let cost_N_ITicket = S.safe_int 10
 let cost_N_ITotal_voting_power = S.safe_int 450
 
 (* model interpreter/N_IUncomb *)
-(* fun size -> 30. + (4. * (S.sub size 2)) *)
+(* fun size -> 30. + (4. * (sub size 2)) *)
 let cost_N_IUncomb size =
   let size = S.safe_int size in
   let v0 = S.sub size (S.safe_int 2) in
@@ -1109,7 +1109,7 @@ let cost_N_IVoting_power = S.safe_int 640
 let cost_N_IXor = S.safe_int 15
 
 (* model interpreter/N_IXor_bytes *)
-(* fun size1 -> fun size2 -> 40. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 40. + (0.5 * (max size1 size2)) *)
 let cost_N_IXor_bytes size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
@@ -1117,7 +1117,7 @@ let cost_N_IXor_bytes size1 size2 =
   S.safe_int 40 + (v0 lsr 1)
 
 (* model interpreter/N_IXor_nat *)
-(* fun size1 -> fun size2 -> 35. + (0.5 * (S.max size1 size2)) *)
+(* fun size1 -> fun size2 -> 35. + (0.5 * (max size1 size2)) *)
 let cost_N_IXor_nat size1 size2 =
   let size1 = S.safe_int size1 in
   let size2 = S.safe_int size2 in
