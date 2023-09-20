@@ -185,3 +185,9 @@ module Rollup : sig
   val check_or_set_address :
     'a mode -> 'a index -> Octez_smart_rollup.Address.t -> unit tzresult Lwt.t
 end
+
+module Internal_for_tests : sig
+  (** [get_a_tree key] provides a value of internal type [tree] which can be
+      used as a state to be set in the context directly. *)
+  val get_a_tree : string -> tree Lwt.t
+end

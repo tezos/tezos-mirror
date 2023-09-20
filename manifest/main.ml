@@ -4461,6 +4461,23 @@ let octez_smart_rollup_node_lib =
         octez_smart_rollup_lib |> open_;
       ]
 
+let _octez_smart_rollup_node_lib_test =
+  tezt
+    ["test_context_gc"]
+    ~path:"src/lib_smart_rollup_node/test/"
+    ~opam:"tezos-smart-rollup-node-lib-test"
+    ~synopsis:"Tests for the smart rollup node library"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_smart_rollup_node_lib |> open_;
+        octez_layer2_store |> open_;
+        octez_base_test_helpers |> open_;
+        octez_stdlib_unix |> open_;
+        alcotezt;
+      ]
+
 let octez_scoru_wasm_helpers =
   octez_l2_lib
     "scoru-wasm-helpers"

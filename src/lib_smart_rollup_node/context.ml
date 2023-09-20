@@ -379,3 +379,9 @@ let load :
     | Read_write -> Version.check_and_set index
   in
   index
+
+module Internal_for_tests = struct
+  let get_a_tree key =
+    let tree = IStore.Tree.empty () in
+    IStore.Tree.add tree [key] Bytes.empty
+end
