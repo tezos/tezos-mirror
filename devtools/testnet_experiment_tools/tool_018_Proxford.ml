@@ -363,8 +363,6 @@ type injected_operation = {
   modified_hash : Operation_hash.t;
 }
 
-let op_per_mempool = 1000
-
 type t = {
   last_injected_op_per_manager : injected_operation ManagerMap.t;
   operation_queues : (Operation_hash.t * packed_operation) Queue.t ManagerMap.t;
@@ -373,7 +371,7 @@ type t = {
 let pp_state fmt {last_injected_op_per_manager; operation_queues} =
   Format.fprintf
     fmt
-    "%d injected operations pending, %d queues left"
+    "%d injected operations pending, %d manager queues left"
     (ManagerMap.cardinal last_injected_op_per_manager)
     (ManagerMap.cardinal operation_queues)
 
@@ -381,7 +379,7 @@ let pp_initial_state fmt {operation_queues; _} =
   Format.(
     fprintf
       fmt
-      "@[<v 2>%d queues:@ %a@]@."
+      "@[<v 2>%d manager queues:@ %a@]@."
       (ManagerMap.cardinal operation_queues)
       (pp_print_list ~pp_sep:pp_print_cut (fun fmt (manager, queue) ->
            Format.fprintf
@@ -565,59 +563,94 @@ let choose_and_inject_operations cctxt state prohibited_managers n =
         | End -> return (!cpt, !errors, !updated_state) | exn -> Lwt.fail exn)
   in
   Format.printf
-    "%d new manager operations injected, %d errorneous operation queues \
+    "%d new manager operations injected, %d erroneous operation manager queues \
      discarded@."
     nb_injected
     nb_erroneous ;
   return new_state
 
-let start_injector cctxt ~operations_file_path =
+let start_injector cctxt ~op_per_mempool ~operations_file_path =
   let* state = init ~operations_file_path in
   Format.printf "Starting injector@." ;
-  let* applied_stream, _stopper = Monitor_services.applied_blocks cctxt () in
-  let*! current_head_opt = Lwt_stream.get applied_stream in
-  let ((_chain, _bh, header, _opll) as _current_head) =
+  let* head_stream, _stopper = Monitor_services.heads cctxt `Main in
+  let block_stream =
+    Lwt_stream.map_s
+      (fun (bh, header) ->
+        let*! opl =
+          Protocol_client_context.Alpha_block_services.Operations
+          .operations_in_pass
+            cctxt
+            ~metadata:`Always
+            ~block:(`Hash (bh, 0))
+            Operation_repr.manager_pass
+        in
+        let opl = WithExceptions.Result.get_ok ~loc:__LOC__ opl in
+        Lwt.return (header, opl))
+      head_stream
+  in
+  let*! current_head_opt = Lwt_stream.get block_stream in
+  let ((header, _mopl) as _current_head) =
     WithExceptions.Option.get ~loc:__LOC__ current_head_opt
   in
   let current_level = header.shell.level in
   let rec loop state current_level =
-    let*! r = Lwt_stream.get applied_stream in
+    let*! r = Lwt_stream.get block_stream in
     match r with
     | None -> failwith "Head stream ended: lost connection with node?"
-    | Some (_chain, _bh, header, _opll)
+    | Some (header, _opll)
       when Compare.Int32.(header.shell.level <= current_level) ->
         (* reorg *)
+        Format.printf "New head with non-increasing level: ignoring@." ;
         loop state current_level
-    | Some (_chain, _bh, _header, opll) as _new_head ->
-        let included_manager_hashes =
-          Stdlib.List.nth opll Operation_repr.manager_pass
-          |> List.map Tezos_base.Operation.hash
-          |> Operation_hash.Set.of_list
+    | Some (_header, mopl) as _new_head ->
+        Format.printf
+          "New increasing head received with %d included operations@."
+          (List.length mopl) ;
+        let* mempool =
+          Protocol_client_context.Alpha_block_services.Mempool
+          .pending_operations
+            cctxt
+            ~validated:true
+            ~refused:false
+            ~outdated:false
+            ~branch_refused:false
+            ~branch_delayed:false
+            ~validation_passes:[Operation_repr.manager_pass]
+            ()
         in
-        let last_injected_op_per_manager = state.last_injected_op_per_manager in
+        let live_operations =
+          Operation_hash.Set.(
+            union
+              (of_list
+                 (List.map
+                    fst
+                    (Operation_hash.Map.bindings mempool.unprocessed)))
+              (of_list (List.map fst mempool.validated)))
+        in
+        Format.printf
+          "%d manager operations still live in the mempool@."
+          (Operation_hash.Set.cardinal live_operations) ;
         let new_last_injected, prohibited_managers =
+          let last_injected_op_per_manager =
+            state.last_injected_op_per_manager
+          in
           ManagerMap.fold
             (fun manager {modified_hash; _} (new_last_injected, acc) ->
-              if Operation_hash.Set.mem modified_hash included_manager_hashes
-              then (ManagerMap.remove manager new_last_injected, acc)
-              else (new_last_injected, ManagerSet.add manager acc))
+              if Operation_hash.Set.mem modified_hash live_operations then
+                (new_last_injected, ManagerSet.add manager acc)
+              else (ManagerMap.remove manager new_last_injected, acc))
             last_injected_op_per_manager
             (last_injected_op_per_manager, ManagerSet.empty)
         in
         let state =
           {state with last_injected_op_per_manager = new_last_injected}
         in
-        let nb_included_operations =
-          Operation_hash.Set.cardinal included_manager_hashes
-        in
         let nb_missing_operations =
-          if nb_included_operations = 0 then op_per_mempool
-          else min op_per_mempool nb_included_operations
+          op_per_mempool
+          - ManagerMap.cardinal state.last_injected_op_per_manager
         in
         Format.printf
-          "New increasing head received with %d manager operations: injecting \
-           %d new operations...@."
-          nb_included_operations
+          "Injecting %d new manager operations...@."
           nb_missing_operations ;
         let* state =
           choose_and_inject_operations

@@ -25,7 +25,10 @@
 
 module type PROTO_TOOL = sig
   val start_injector :
-    Client_context.full -> operations_file_path:string -> unit tzresult Lwt.t
+    Client_context.full ->
+    op_per_mempool:int ->
+    operations_file_path:string ->
+    unit tzresult Lwt.t
 
   val sync_node :
     Client_context.full ->
