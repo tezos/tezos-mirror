@@ -104,7 +104,7 @@ let join_topics_for_producer gs_worker committee producers =
    Especially important for bootstrap nodes as the cross product can grow quite large. *)
 let join_topics_for_bootstrap proto_parameters gs_worker committee =
   (* Join topics for all combinations of (all slots) * (all pkh in comittee) *)
-  for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots do
+  for slot_index = 0 to proto_parameters.Dal_plugin.number_of_slots - 1 do
     Signature.Public_key_hash.Map.iter
       (fun pkh _shards ->
         let topic = Gossipsub.{slot_index; pkh} in

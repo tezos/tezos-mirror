@@ -350,7 +350,7 @@ let update_known_peers dal_node known_peers =
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
 
 let wait_for_stored_slot dal_node slot_header =
-  Dal_node.wait_for dal_node "stored_slot_shards.v0" (fun e ->
+  Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
       if JSON.(e |-> "commitment" |> as_string) = slot_header then Some ()
       else None)
 

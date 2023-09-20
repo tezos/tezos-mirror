@@ -663,9 +663,10 @@ type 'uri generate_protocol_parameters_file = {
   pk_revealed_accounts_prefix : string option;
   pk_unrevealed_accounts_prefix : string option;
   default_balance : string option;
-  balance_updates : (string * int) list;
+  balance_updates : (string * string) list;
   dal : dal_parameters;
   minimal_block_delay : string option;
+  path_client : 'uri option;
 }
 
 type generate_protocol_parameters_r = {filename : string}
@@ -707,6 +708,7 @@ module Generate_protocol_parameters_file = struct
              balance_updates;
              dal;
              minimal_block_delay;
+             path_client;
            } ->
         ( base_file,
           output_file_name,
@@ -716,7 +718,8 @@ module Generate_protocol_parameters_file = struct
           default_balance,
           balance_updates,
           dal,
-          minimal_block_delay ))
+          minimal_block_delay,
+          path_client ))
       (fun ( base_file,
              output_file_name,
              wallet,
@@ -725,7 +728,8 @@ module Generate_protocol_parameters_file = struct
              default_balance,
              balance_updates,
              dal,
-             minimal_block_delay ) ->
+             minimal_block_delay,
+             path_client ) ->
         {
           base_file;
           output_file_name;
@@ -736,17 +740,19 @@ module Generate_protocol_parameters_file = struct
           balance_updates;
           dal;
           minimal_block_delay;
+          path_client;
         })
-      (obj9
+      (obj10
          (req "base_file" uri_encoding)
          (opt "output_file_name" string)
          (opt "wallet" uri_encoding)
          (opt "pk_revealed_accounts_prefix" string)
          (opt "pk_unrevealed_accounts_prefix" string)
          (opt "default_balance" string)
-         (dft "balance_updates" (list (tup2 string int31)) [])
+         (dft "balance_updates" (list (tup2 string string)) [])
          (req "dal" dal_parameters_encoding)
-         (opt "minimal_block_delay" string))
+         (opt "minimal_block_delay" string)
+         (opt "path_client" uri_encoding))
 
   let r_encoding =
     let open Data_encoding in
@@ -784,6 +790,16 @@ module Generate_protocol_parameters_file = struct
       }
     in
     let minimal_block_delay = Option.map run base.minimal_block_delay in
+    let balance_updates =
+      List.map
+        (fun (alias, balance) -> (alias, run balance))
+        base.balance_updates
+    in
+    let path_client =
+      Option.map
+        (Remote_procedure.global_uri_of_string ~self ~run)
+        base.path_client
+    in
     {
       base_file;
       output_file_name;
@@ -791,19 +807,25 @@ module Generate_protocol_parameters_file = struct
       pk_revealed_accounts_prefix;
       pk_unrevealed_accounts_prefix;
       default_balance;
-      balance_updates = base.balance_updates;
+      balance_updates;
       dal;
       minimal_block_delay;
+      path_client;
     }
 
   let resolve ~self resolver base =
     let base_file =
       Remote_procedure.file_agent_uri ~self ~resolver base.base_file
     in
+    let path_client =
+      Option.map
+        (Remote_procedure.file_agent_uri ~self ~resolver)
+        base.path_client
+    in
     let wallet =
       base.wallet |> Option.map (resolve_octez_rpc_global_uri ~self ~resolver)
     in
-    {base with base_file; wallet}
+    {base with base_file; wallet; path_client}
 
   let run state
       {
@@ -816,11 +838,23 @@ module Generate_protocol_parameters_file = struct
         balance_updates;
         dal;
         minimal_block_delay;
+        path_client;
       } =
     let* base_file =
       Http_client.local_path_from_agent_uri
         (Agent_state.http_client state)
         base_file
+    in
+    let* path_client =
+      match path_client with
+      | None -> return None
+      | Some path_client ->
+          let* path_client =
+            Http_client.local_path_from_agent_uri
+              (Agent_state.http_client state)
+              path_client
+          in
+          return @@ Some path_client
     in
     let* base_dir =
       match wallet with
@@ -833,7 +867,7 @@ module Generate_protocol_parameters_file = struct
           in
           return (Some dir)
     in
-    let client = Client.create ?base_dir () in
+    let client = Client.create ?path:path_client ?base_dir () in
     let* all_addresses = Client.list_known_addresses client in
     let filter_by_prefix prefix =
       List.filter_map
@@ -851,15 +885,19 @@ module Generate_protocol_parameters_file = struct
       | None -> []
       | Some prefix -> filter_by_prefix prefix
     in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6377
+
+       Reading the public_keys, public_key_hashes and secret_keys files would be
+       more time-efficient in case we have many keys.*)
     let to_accounts =
-      Lwt_list.map_p (fun alias -> Client.show_address ~alias client)
+      Lwt_list.map_s (fun alias -> Client.show_address ~alias client)
     in
     let* pk_revealed_accounts = to_accounts pk_aliases in
     let* pk_unrevealed_accounts = to_accounts pkh_aliases in
     let default_balance =
       match default_balance with
-      | None -> Protocol.default_bootstrap_balance
-      | Some str -> int_of_string str
+      | None -> string_of_int Protocol.default_bootstrap_balance
+      | Some str -> str
     in
     let bootstrap_accounts_overrides =
       let json_accounts : JSON.u list =
@@ -875,7 +913,7 @@ module Generate_protocol_parameters_file = struct
                    (* We pass the public key of the account, therefore it will
                       not have to be revealed later. *)
                    `String account.public_key;
-                   `String (string_of_int balance);
+                   `String balance;
                  ]))
         @ (pk_unrevealed_accounts
           |> List.map (fun (account : Account.key) ->
@@ -890,7 +928,7 @@ module Generate_protocol_parameters_file = struct
                         therefore the public key will be considered as not yet
                         revealed for these accounts. *)
                      `String account.public_key_hash;
-                     `String (string_of_int balance);
+                     `String balance;
                    ]))
       in
       let key = ["bootstrap_accounts"] in
@@ -2891,6 +2929,7 @@ type 'uri start_octez_baker = {
       (** A list of delegates handled by this baker agent. The baker will handle
           all the delegates in the wallet found in [base_dir] if no
           delegate is given. *)
+  baker_path : 'uri option;
 }
 
 type start_octez_baker_r = {name : string}
@@ -2930,6 +2969,7 @@ module Start_octez_baker = struct
              node_data_dir;
              dal_node_uri;
              delegates;
+             baker_path;
            } ->
         ( name,
           protocol,
@@ -2937,14 +2977,16 @@ module Start_octez_baker = struct
           node_uri,
           node_data_dir,
           dal_node_uri,
-          delegates ))
+          delegates,
+          baker_path ))
       (fun ( name,
              protocol,
              base_dir,
              node_uri,
              node_data_dir,
              dal_node_uri,
-             delegates ) ->
+             delegates,
+             baker_path ) ->
         {
           name;
           protocol;
@@ -2953,15 +2995,17 @@ module Start_octez_baker = struct
           node_data_dir;
           dal_node_uri;
           delegates;
+          baker_path;
         })
-      (obj7
+      (obj8
          (opt "name" string)
          (dft "protocol" Protocol.encoding Protocol.Alpha)
          (req "base_dir" uri_encoding)
          (req "node_uri" uri_encoding)
          (opt "node_data_dir" uri_encoding)
          (opt "dal_node_uri" uri_encoding)
-         (dft "delegates" (list string) []))
+         (dft "delegates" (list string) [])
+         (opt "baker_path" uri_encoding))
 
   let r_encoding =
     let open Data_encoding in
@@ -2978,6 +3022,7 @@ module Start_octez_baker = struct
         node_data_dir;
         dal_node_uri;
         delegates;
+        baker_path;
       } =
     let uri_run = Remote_procedure.global_uri_of_string ~self ~run in
     {
@@ -2988,6 +3033,7 @@ module Start_octez_baker = struct
       node_data_dir = Option.map uri_run node_data_dir;
       dal_node_uri = Option.map uri_run dal_node_uri;
       delegates = List.map run delegates;
+      baker_path = Option.map uri_run baker_path;
     }
 
   let resolve ~self resolver
@@ -2999,6 +3045,7 @@ module Start_octez_baker = struct
         node_data_dir;
         dal_node_uri;
         delegates;
+        baker_path;
       } =
     let file_agent_uri = Remote_procedure.file_agent_uri in
     {
@@ -3010,6 +3057,8 @@ module Start_octez_baker = struct
       dal_node_uri =
         Option.map (resolve_dal_rpc_global_uri ~self ~resolver) dal_node_uri;
       delegates;
+      baker_path =
+        Option.map (resolve_dal_rpc_global_uri ~self ~resolver) baker_path;
     }
 
   let run state
@@ -3021,6 +3070,7 @@ module Start_octez_baker = struct
         node_data_dir;
         delegates;
         dal_node_uri;
+        baker_path;
       } =
     let client = Agent_state.http_client state in
     (* Get the L1 node's data-dir and RPC endpoint. *)
@@ -3043,6 +3093,15 @@ module Start_octez_baker = struct
             "Should provide a node data dir for a node given as foreign \
              endpoint"
     in
+    let* baker_path =
+      match baker_path with
+      | None -> return None
+      | Some baker_path ->
+          let* baker_path =
+            Http_client.local_path_from_agent_uri client baker_path
+          in
+          return @@ Some baker_path
+    in
     (* Get the wallet's base-dir. *)
     let* base_dir = Http_client.local_path_from_agent_uri client base_dir in
     (* Get the DAL node's RPC endpoint. *)
@@ -3053,6 +3112,7 @@ module Start_octez_baker = struct
     let octez_baker =
       Baker.create_from_uris
         ?name
+        ?path:baker_path
         ~protocol
         ~base_dir
         ~node_data_dir

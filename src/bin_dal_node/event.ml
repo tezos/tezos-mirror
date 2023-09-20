@@ -169,16 +169,18 @@ let stored_slot_content =
     ~name:"stored_slot_content"
     ~msg:"slot stored: commitment {commitment}"
     ~level:Notice
+    ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
 
-let stored_slot_shards =
+let stored_slot_shard =
   declare_2
     ~section
-    ~name:"stored_slot_shards"
-    ~msg:"slot stored: commitment {commitment}, shards {shards}"
-    ~level:Notice
+    ~name:"stored_slot_shard"
+    ~msg:"stored shard {shard_index} for commitment {commitment}"
+    ~level:Info
+    ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
-    ("shards", Data_encoding.int31)
+    ("shard_index", Data_encoding.int31)
 
 let decoding_data_failed =
   declare_1
