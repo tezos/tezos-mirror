@@ -26,6 +26,8 @@ Please refer to :doc:`Data Availability Committees <../shell/data_availability_c
 
 Octez version 18 improves performance, notably to the block validation process: total validation time is halved on average, resulting in a reduced block propagation time.
 
+v18 also fixes a concurrency issue in the logging infrastructure which can cause the node to become temporarily unresponsive.
+
 As Oxford includes a new Staking mechanism, version 18 of Octez implements new client commands for stake funds management, and to allow delegates to configure their staking policies. See :ref:`Adaptive Issuance and Staking <new_staking_oxford>` for more details.
 
 

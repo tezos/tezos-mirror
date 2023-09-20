@@ -249,6 +249,9 @@ Client
   ``stake``, ``unstake``, ``finalize unstake``, ``set delegate parameters``,
   ``get full balance`` and ``get staked balance``. (MR :gl:`!9642`)
 
+- Fixed a concurrency issue in the logging infrastructure
+  which can cause the node to become temporarily unresponsive. (MR :gl:`!9527`)
+
 Baker
 -----
 
