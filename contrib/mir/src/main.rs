@@ -7,18 +7,49 @@
 
 mod ast;
 mod parser;
+mod stack;
 mod syntax;
+mod typechecker;
 
 fn main() {}
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
+    use crate::ast::*;
     use crate::parser;
+    use crate::typechecker;
+
+    #[test]
+    fn typecheck_test_expect_success() {
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        let mut stack = VecDeque::from([Type::Nat]);
+        assert!(typechecker::typecheck(&ast, &mut stack));
+        assert!(stack == VecDeque::from([Type::Int]));
+    }
+
+    #[test]
+    fn typecheck_test_expect_fail() {
+        let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
+        let mut stack = VecDeque::from([Type::Nat]);
+        assert!(!typechecker::typecheck(&ast, &mut stack));
+    }
 
     #[test]
     fn parser_test_expect_success() {
-        let src = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
-       IF { DIP { PUSH int -1 ; ADD } ;
+        let ast = parser::parse(&FIBONACCI_SRC).unwrap();
+        // use built in pretty printer to validate the expected AST.
+        assert_eq!(format!("{:#?}", ast), AST_PRETTY_EXPECTATION);
+    }
+
+    #[test]
+    fn parser_test_expect_fail() {
+        assert_eq!(&parser::parse(&FIBONACCI_MALFORMED_SRC).unwrap_err().to_string(), "Unrecognized token `GT` found at 133:135\nExpected one of \";\" or \"}\"");
+    }
+
+    const FIBONACCI_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
+           IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
             DUP 3 ;
             GT ;
@@ -26,24 +57,25 @@ mod tests {
             DIP { DROP 2 } }
           { DIP { DROP } } }";
 
-        // use built in pretty printer to validate the expected AST.
-        assert_eq!(format!("{:#?}", parser::parse(&src).unwrap()), EXPECTATION);
-    }
-
-    #[test]
-    fn parser_test_expect_fail() {
-        let src = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
-       IF { DIP { PUSH int -1 ; ADD } ;
+    const FIBONACCI_ILLTYPED_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
+           IF { DIP { PUSH int -1 ; ADD } ;
             PUSH int 1 ;
-            DUP 3
+            DUP 4 ;
             GT ;
             LOOP { SWAP ; DUP 2 ; ADD ; DIP 2 { PUSH int -1 ; ADD } ; DUP 3 ; GT } ;
             DIP { DROP 2 } }
           { DIP { DROP } } }";
 
-        assert_eq!(&parser::parse(&src).unwrap_err().to_string(), "Unrecognized token `GT` found at 129:131\nExpected one of \";\" or \"}\"");
-    }
-    const EXPECTATION: &str = "[
+    const FIBONACCI_MALFORMED_SRC: &str = "{ INT ; PUSH int 0 ; DUP 2 ; GT ;
+           IF { DIP { PUSH int -1 ; ADD } ;
+            PUSH int 1 ;
+            DUP 4
+            GT ;
+            LOOP { SWAP ; DUP 2 ; ADD ; DIP 2 { PUSH int -1 ; ADD } ; DUP 3 ; GT } ;
+            DIP { DROP 2 } }
+          { DIP { DROP } } }";
+
+    const AST_PRETTY_EXPECTATION: &str = "[
     Int,
     Push(
         Int,
@@ -51,13 +83,16 @@ mod tests {
             0,
         ),
     ),
-    DupN(
-        2,
+    Dup(
+        Some(
+            2,
+        ),
     ),
     Gt,
     If(
         [
             Dip(
+                None,
                 [
                     Push(
                         Int,
@@ -74,19 +109,25 @@ mod tests {
                     1,
                 ),
             ),
-            DupN(
-                3,
+            Dup(
+                Some(
+                    3,
+                ),
             ),
             Gt,
             Loop(
                 [
                     Swap,
-                    DupN(
-                        2,
+                    Dup(
+                        Some(
+                            2,
+                        ),
                     ),
                     Add,
-                    DipN(
-                        2,
+                    Dip(
+                        Some(
+                            2,
+                        ),
                         [
                             Push(
                                 Int,
@@ -97,24 +138,32 @@ mod tests {
                             Add,
                         ],
                     ),
-                    DupN(
-                        3,
+                    Dup(
+                        Some(
+                            3,
+                        ),
                     ),
                     Gt,
                 ],
             ),
             Dip(
+                None,
                 [
-                    DropN(
-                        2,
+                    Drop(
+                        Some(
+                            2,
+                        ),
                     ),
                 ],
             ),
         ],
         [
             Dip(
+                None,
                 [
-                    Drop,
+                    Drop(
+                        None,
+                    ),
                 ],
             ),
         ],
