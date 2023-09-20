@@ -25,6 +25,14 @@ mod tests {
     use crate::parser;
     use crate::typechecker;
 
+    fn report_gas<R, F: FnOnce(&mut Gas) -> R>(gas: &mut Gas, f: F) -> R {
+        let initial_milligas = gas.milligas();
+        let r = f(gas);
+        let gas_diff = initial_milligas - gas.milligas();
+        println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000,);
+        r
+    }
+
     #[test]
     fn interpret_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
@@ -39,7 +47,9 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut istack = VecDeque::from([Value::NumberValue(5)]);
         let mut gas = Gas::new(1305);
-        assert!(interpreter::interpret(&ast, &mut gas, &mut istack).is_ok());
+        report_gas(&mut gas, |gas| {
+            assert!(interpreter::interpret(&ast, gas, &mut istack).is_ok());
+        });
         assert_eq!(gas.milligas(), 0);
     }
 
@@ -67,7 +77,9 @@ mod tests {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);
         let mut gas = Gas::new(11460);
-        assert!(typechecker::typecheck(&ast, &mut gas, &mut stack).is_ok());
+        report_gas(&mut gas, |gas| {
+            assert!(typechecker::typecheck(&ast, gas, &mut stack).is_ok());
+        });
         assert_eq!(gas.milligas(), 0);
     }
 

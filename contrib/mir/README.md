@@ -15,3 +15,7 @@ command to build the project.
 You can run the included tests by the following command.
 
 `cargo test`
+
+Some tests print gas consumption information (in addition to testing it), but `cargo test` omits output from successful tests by default. To see it, run
+
+`cargo test -- --show-output`
