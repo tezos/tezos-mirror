@@ -1517,7 +1517,7 @@ let test_eth_call_large =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_call"; "simulate"; "large"]
-    ~title:"Try to call with a large amount of data"
+    ~title:"eth_estimateGas with a large amount of data"
     (fun protocol ->
       (* setup *)
       let* {evm_proxy_server; _} = setup_past_genesis ~admin:None protocol in
@@ -1553,7 +1553,7 @@ let test_estimate_gas =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "eth_estimategas"; "simulate"]
-    ~title:"Try to estimate gas for contract creation"
+    ~title:"eth_estimateGas for contract creation"
     (fun protocol ->
       (* setup *)
       let* {evm_proxy_server; _} = setup_past_genesis protocol ~admin:None in
@@ -1572,7 +1572,7 @@ let test_estimate_gas =
 
       (* Check the RPC returns a `result`. *)
       let r = call_result |> Evm_proxy_server.extract_result in
-      Check.((JSON.as_int r = 21123) int)
+      Check.((JSON.as_int r = 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
       unit)
@@ -1610,7 +1610,7 @@ let test_estimate_gas_additionnal_field =
 
       (* Check the RPC returns a `result`. *)
       let r = call_result |> Evm_proxy_server.extract_result in
-      Check.((JSON.as_int r = 21123) int)
+      Check.((JSON.as_int r = 23423) int)
         ~error_msg:"Expected result greater than %R, but got %L" ;
 
       unit)

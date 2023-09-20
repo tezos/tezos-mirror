@@ -258,6 +258,14 @@ let decode_gas_estimation bytes =
 let gas_estimation json =
   let open Lwt_result_syntax in
   let* simulated_amount = parse_insights decode_gas_estimation json in
+  (* See EIP2200 for reference. But the tl;dr is: we cannot do the
+     opcode SSTORE if we have less than 2300 gas available, even if we don't
+     consume it. The simulated amount then gives an amount of gas insufficient
+     to execute the transaction.
+
+     The extra gas units, i.e. 2300, will be refunded.
+  *)
+  let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
      remove this once the gas is accounted correctly *)
   (* minimum gas for any Ethereum transaction *)
