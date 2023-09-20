@@ -7,6 +7,7 @@ script_dir="$(dirname "$ci_dir")"
 src_dir="$(dirname "$script_dir")"
 cd "$src_dir"
 
+# shellcheck source=scripts/ci/docker_registry.inc.sh
 . "$ci_dir"/docker_registry.inc.sh
 
 username="$1"
