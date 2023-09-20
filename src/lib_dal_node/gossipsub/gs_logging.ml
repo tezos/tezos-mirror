@@ -81,7 +81,7 @@ module Events = struct
       ~msg:
         "Process New_connection from/to {peer} (direct={direct}, \
          outbound={outbound})"
-      ~level:Info
+      ~level:Notice
       ~pp1:P2p_peer.Id.pp
       ("peer", P2p_peer.Id.encoding)
       ("direct", bool)
@@ -92,7 +92,7 @@ module Events = struct
       ~section
       ~name:(prefix "disconnection")
       ~msg:"Process Disconnection of {peer}"
-      ~level:Info
+      ~level:Notice
       ~pp1:P2p_peer.Id.pp
       ("peer", P2p_peer.Id.encoding)
 
