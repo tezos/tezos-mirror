@@ -1,9 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (executable
  (name main)
  (libraries
-   tezt-tezos
-   yes_wallet_lib
-   src_proto_alpha_lib_client_test_tezt_lib)
- (flags (:standard
-          (:include %{workspace_root}/macos-link-flags.sexp)
-          -open Tezt -open Tezt_tezos -open Tezt.Base)))
+  tezt
+  tezt-tezos
+  yes_wallet_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_tezos))

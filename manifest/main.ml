@@ -8305,7 +8305,7 @@ let _octez_codec_kaitai =
 let tezos_time_measurement =
   external_lib ~opam:"" "tezos-time-measurement" V.True
 
-let _tezt_long_test =
+let _tezt_long_tests =
   private_exe
     "main"
     ~opam:""
@@ -8327,6 +8327,18 @@ let _tezt_long_test =
         data_encoding;
         octez_event_logging |> open_;
         octez_test_helpers |> open_;
+      ]
+
+let _tezt_manual_tests =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"tezt/manual_tests"
+    ~bisect_ppx:No
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_; yes_wallet_lib;
       ]
 
 (* Add entries to this function to declare that some dune and .opam files are
@@ -8367,7 +8379,6 @@ let exclude filename =
   | "opam-repository" :: _ -> true
   (* Tezt is only partially managed by the manifest.
      There is no real good reason for that but only the core Tezt library is released. *)
-  | "tezt" :: "manual_tests" :: _ -> true
   | "tezt" :: "remote_tests" :: _ -> true
   | "tezt" :: "snoop" :: _ -> true
   | "tezt" :: "vesting_contract_test" :: _ -> true
