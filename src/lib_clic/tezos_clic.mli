@@ -499,6 +499,53 @@ val args20 :
     'ctx )
   options
 
+(** Include 21 optional parameters *)
+val args21 :
+  ('a, 'ctx) arg ->
+  ('b, 'ctx) arg ->
+  ('c, 'ctx) arg ->
+  ('d, 'ctx) arg ->
+  ('e, 'ctx) arg ->
+  ('f, 'ctx) arg ->
+  ('g, 'ctx) arg ->
+  ('h, 'ctx) arg ->
+  ('i, 'ctx) arg ->
+  ('j, 'ctx) arg ->
+  ('k, 'ctx) arg ->
+  ('l, 'ctx) arg ->
+  ('m, 'ctx) arg ->
+  ('n, 'ctx) arg ->
+  ('o, 'ctx) arg ->
+  ('p, 'ctx) arg ->
+  ('q, 'ctx) arg ->
+  ('r, 'ctx) arg ->
+  ('s, 'ctx) arg ->
+  ('t, 'ctx) arg ->
+  ('u, 'ctx) arg ->
+  ( 'a
+    * 'b
+    * 'c
+    * 'd
+    * 'e
+    * 'f
+    * 'g
+    * 'h
+    * 'i
+    * 'j
+    * 'k
+    * 'l
+    * 'm
+    * 'n
+    * 'o
+    * 'p
+    * 'q
+    * 'r
+    * 's
+    * 't
+    * 'u,
+    'ctx )
+  options
+
 (** Aggregate a set of options into a single value. *)
 val aggregate : ('a, 'ctx) options -> ('a, 'ctx) arg
 
