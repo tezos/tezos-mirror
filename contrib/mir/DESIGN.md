@@ -18,3 +18,54 @@ too hard to switch away from such a basic component later in the project.
 
 We used the Lalrpop library because we had some experience with it, and it seemed
 to work well in our initial trials.
+
+#### Gas consumption
+
+Gas counter is represented as the type `Gas`, containing an `Option<u32>` with the current milligas amount (or `None` after gas exhaustion). A mutable reference to the gas counter is passed to typechecker and interpreter.
+
+A method `consume` is implemented on the `Gas` type, which tries to consume the
+cost passed as an argument; if there is enough gas remaining, the internal
+counter is decreased by the appropriate amount; otherwise an error `OutOfGas` is
+returned, and the internal counter is set to `None`. Any further calls to
+`consume` are considered a logic error, and thus trigger a panic.
+
+It is possible to request the current milligas amount (useful for reporting and
+debugging purposes) using the method `milligas()`. It is a logic error to
+request the current remaining gas after gas exhaustion, and thus triggers a
+panic.
+
+Gas costs are defined in submodules (i.e. namespaces) to avoid naming clashes.
+Constant costs are declared as `const: u32`, while parametric costs are
+implemented as functions returning `Result<u32, OutOfGas>`. In case of overflow,
+`Err(OutOfGas)` is returned.
+
+Gas consumption is done in-line in typechecker and interpreter. Both typechecker
+and interpreter will immediately abort the computation on `OutOfGas` errors and
+return the corresponding version of the error (`TcError::OutOfGas` or
+`InterpretError::OutOfGas` respectively).
+
+The current design is broadly consistent with the design used by the Tezos
+protocol, modulo the mutable reference and triggering a panic on accessing the
+gas counter post exhaustion.
+
+Alternative designs:
+
+- Instead of a mutable reference, `typecheck` and `interpret` could return the
+  remaining gas amount. This is more in line with the approach used by the Tezos
+  protocol, however it's not idiomatic for Rust.
+
+- Gas consumption could, in theory, be handled entirely separately from the main
+  typechecker/interpreter code, however as gas consumption is highly dependent
+  on what typechecker/interpreter actually do, it would lead to a lot of
+  unnecessary code duplication and considerable difficulty in predicting the
+  interpreter's behaviour without doing the interpretation proper.
+
+- There was some discussion related to handling possible gas consumption after
+  `OutOfGas` error is thrown. Alternatives included setting the gas counter to
+  `0` after exhaustion (such that future calls to `consume` would trigger
+  `OutOfGas` again), or leaving it be in some consistent but undefined state
+  (which would simplify the code somewhat).
+
+  Ultimately, trying to consume gas post-exhaustion was deemed to always
+  indicate a logic error, and thus, instead of masking such errors, a decision
+  was made to panic instead.
