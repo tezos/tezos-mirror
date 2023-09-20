@@ -235,6 +235,20 @@ impl EthereumAccount {
             .map_err(AccountStorageError::from)
     }
 
+    pub fn set_nonce(
+        &mut self,
+        host: &mut impl Runtime,
+        nonce: U256,
+    ) -> Result<(), AccountStorageError> {
+        let path = concat(&self.path, &NONCE_PATH)?;
+
+        let mut value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+        nonce.to_little_endian(&mut value_bytes);
+
+        host.store_write(&path, &value_bytes, 0)
+            .map_err(AccountStorageError::from)
+    }
+
     /// Get the **balance** of an account in Wei held by the account.
     pub fn balance(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
         let path = concat(&self.path, &BALANCE_PATH)?;
