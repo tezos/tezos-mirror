@@ -8,7 +8,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["hello"] to "hi"
 trace
-  - location: 12 (just consumed gas: 12.304)
+  - location: 12 (just consumed gas: 12.324)
     [ (Pair "hello" { Elt "hello" "hi" } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair "hello" { Elt "hello" "hi" } None)
@@ -53,7 +53,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["hello"] to "hi"
 trace
-  - location: 12 (just consumed gas: 12.254)
+  - location: 12 (just consumed gas: 12.274)
     [ (Pair "" { Elt "hello" "hi" } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair "" { Elt "hello" "hi" } None)
@@ -99,7 +99,7 @@ big_map diff
   Set map(4)["2"] to "two"
   Set map(4)["1"] to "one"
 trace
-  - location: 12 (just consumed gas: 13.216)
+  - location: 12 (just consumed gas: 13.236)
     [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)
@@ -145,7 +145,7 @@ big_map diff
   Set map(4)["2"] to "two"
   Set map(4)["1"] to "one"
 trace
-  - location: 15 (just consumed gas: 11.708)
+  - location: 15 (just consumed gas: 11.728)
     [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ {}
@@ -181,7 +181,7 @@ big_map diff
   Set map(4)["2"] to "two"
   Set map(4)["1"] to "two"
 trace
-  - location: 15 (just consumed gas: 12.158)
+  - location: 15 (just consumed gas: 12.178)
     [ (Pair { Elt "1" (Some "two") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "1" (Some "two") }
@@ -230,7 +230,7 @@ big_map diff
   Set map(4)["3"] to "three"
   Set map(4)["1"] to "one"
 trace
-  - location: 15 (just consumed gas: 12.178)
+  - location: 15 (just consumed gas: 12.198)
     [ (Pair { Elt "3" (Some "three") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "3" (Some "three") }
@@ -279,7 +279,7 @@ big_map diff
   Unset map(4)["3"]
   Set map(4)["1"] to "one"
 trace
-  - location: 15 (just consumed gas: 12.014)
+  - location: 15 (just consumed gas: 12.034)
     [ (Pair { Elt "3" None } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "3" None }
@@ -327,7 +327,7 @@ big_map diff
   Unset map(4)["2"]
   Set map(4)["1"] to "one"
 trace
-  - location: 15 (just consumed gas: 12.014)
+  - location: 15 (just consumed gas: 12.034)
     [ (Pair { Elt "2" None } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "2" None }
@@ -375,7 +375,7 @@ big_map diff
   Set map(4)["2"] to "two"
   Set map(4)["1"] to "two"
 trace
-  - location: 15 (just consumed gas: 12.158)
+  - location: 15 (just consumed gas: 12.178)
     [ (Pair { Elt "1" (Some "two") } { Elt "1" "one" ; Elt "2" "two" } Unit) ]
   - location: 15 (just consumed gas: 0.010)
     [ { Elt "1" (Some "two") }
@@ -422,7 +422,7 @@ big_map diff
   New map(4) of type (big_map string nat)
   Unset map(4)["hello"]
 trace
-  - location: 13 (just consumed gas: 8.166)
+  - location: 13 (just consumed gas: 8.183)
     [ (Pair "hello" None {}) ]
   - location: 13 (just consumed gas: 0.010)
     [ "hello"
@@ -457,7 +457,7 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["hello"] to 4
 trace
-  - location: 13 (just consumed gas: 8.266)
+  - location: 13 (just consumed gas: 8.283)
     [ (Pair "hello" (Some 4) {}) ]
   - location: 13 (just consumed gas: 0.010)
     [ "hello"
@@ -492,7 +492,7 @@ big_map diff
   New map(4) of type (big_map string nat)
   Unset map(4)["hello"]
 trace
-  - location: 13 (just consumed gas: 9.196)
+  - location: 13 (just consumed gas: 9.213)
     [ (Pair "hello" None { Elt "hello" 4 }) ]
   - location: 13 (just consumed gas: 0.010)
     [ "hello"
@@ -527,7 +527,7 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["hello"] to 5
 trace
-  - location: 13 (just consumed gas: 9.296)
+  - location: 13 (just consumed gas: 9.313)
     [ (Pair "hello" (Some 5) { Elt "hello" 4 }) ]
   - location: 13 (just consumed gas: 0.010)
     [ "hello"
@@ -563,7 +563,7 @@ big_map diff
   Set map(4)["hello"] to 4
   Set map(4)["hi"] to 5
 trace
-  - location: 13 (just consumed gas: 9.266)
+  - location: 13 (just consumed gas: 9.283)
     [ (Pair "hi" (Some 5) { Elt "hello" 4 }) ]
   - location: 13 (just consumed gas: 0.010)
     [ "hi"
@@ -599,7 +599,7 @@ big_map diff
   Set map(4)["2"] to 2
   Unset map(4)["1"]
 trace
-  - location: 13 (just consumed gas: 10.054)
+  - location: 13 (just consumed gas: 10.071)
     [ (Pair "1" None { Elt "1" 1 ; Elt "2" 2 }) ]
   - location: 13 (just consumed gas: 0.010)
     [ "1"
@@ -635,7 +635,7 @@ big_map diff
   Set map(4)["2"] to 2
   Unset map(4)["1"]
 trace
-  - location: 13 (just consumed gas: 10.054)
+  - location: 13 (just consumed gas: 10.071)
     [ (Pair "1" None { Elt "1" 1 ; Elt "2" 2 }) ]
   - location: 13 (just consumed gas: 0.010)
     [ "1"
@@ -672,7 +672,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["2"] to "two"
 trace
-  - location: 43 (just consumed gas: 59.425)
+  - location: 43 (just consumed gas: 59.598)
     [ (Pair (Left Unit) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Left Unit)
@@ -716,7 +716,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["3"] to "three"
 trace
-  - location: 43 (just consumed gas: 62.713)
+  - location: 43 (just consumed gas: 62.886)
     [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
@@ -752,7 +752,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 43 (just consumed gas: 60.065)
+  - location: 43 (just consumed gas: 60.238)
     [ (Pair (Right (Left (Right Unit))) (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Right (Left (Right Unit)))
@@ -790,7 +790,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["foo"] to "bar"
 trace
-  - location: 43 (just consumed gas: 58.203)
+  - location: 43 (just consumed gas: 58.376)
     [ (Pair (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))) (Right Unit)) ]
   - location: 43 (just consumed gas: 0.010)
     [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))
@@ -926,7 +926,7 @@ big_map diff
   Set map(4)["3"] to "three"
   Set map(4)["1"] to "one"
 trace
-  - location: 43 (just consumed gas: 60.333)
+  - location: 43 (just consumed gas: 60.506)
     [ (Pair (Right (Right (Right (Left { Pair "3" "three" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)
@@ -1015,7 +1015,7 @@ big_map diff
   New map(4) of type (big_map string string)
   Unset map(4)["1"]
 trace
-  - location: 43 (just consumed gas: 60.069)
+  - location: 43 (just consumed gas: 60.242)
     [ (Pair (Right (Right (Right (Right { "1" }))))
             (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))) ]
   - location: 43 (just consumed gas: 0.010)

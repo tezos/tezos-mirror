@@ -8,7 +8,7 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["foo"] to 1
 trace
-  - location: 12 (just consumed gas: 10.658)
+  - location: 12 (just consumed gas: 10.676)
     [ (Pair "bar" { Elt "foo" 1 } None) ]
   - location: 12 (just consumed gas: 0.010)
     [ "bar"
