@@ -51,6 +51,15 @@ let data_dir_arg =
       if Sys.file_exists dn && Sys.is_directory dn then return dn
       else failwith "%s does not exists or is not a directory" dn )
 
+let data_dir_param =
+  let open Lwt_result_syntax in
+  param
+    ~name:"data-dir"
+    ~desc:"Octez data directory path"
+    ( parameter @@ fun _ dn ->
+      if Sys.file_exists dn && Sys.is_directory dn then return dn
+      else failwith "%s does not exists or is not a directory" dn )
+
 let output_dir_arg =
   let open Lwt_result_syntax in
   default_arg
@@ -96,6 +105,16 @@ let op_per_mempool_arg =
     ~long:"op-per-mempool"
     ~default:"2500"
     ~placeholder:"integer"
+    ( parameter @@ fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i > 0 -> return i
+      | _ -> failwith "Parameter should be a positive integer literal" )
+
+let block_time_param =
+  let open Lwt_result_syntax in
+  param
+    ~name:"block-time-target"
+    ~desc:"Block time target (in seconds)"
     ( parameter @@ fun _ s ->
       match int_of_string_opt s with
       | Some i when i > 0 -> return i
@@ -234,30 +253,97 @@ let extract_history ~data_dir ~output_dir =
   Format.printf "Total manager operations extracted: %a@." pp_spaced_int !total ;
   return_unit
 
-let find_proto_tool (cctxt : Client_context.full) =
+let find_proto_tool protocol =
   let open Lwt_result_syntax in
-  let* {current_protocol; _} =
-    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
-  in
-  match Protocol_hash.Map.find current_protocol !Sigs.all with
+  match Protocol_hash.Map.find protocol !Sigs.all with
   | Some x -> return x
   | None ->
       failwith
         "No simulation tool found corresponding to %a"
         Protocol_hash.pp
-        current_protocol
+        protocol
 
 let sync_node (cctxt : Client_context.full) round_duration_target =
   let open Lwt_result_syntax in
-  let* (module Tool) = find_proto_tool cctxt in
+  let* {current_protocol; _} =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
+  in
+  let* (module Tool) = find_proto_tool current_protocol in
   let*! () = cctxt#message "Synchronizing the node to a low round time." in
   Tool.sync_node cctxt ?round_duration_target ()
 
 let run_injector (cctxt : Client_context.full) ~op_per_mempool
     ~operations_file_path =
   let open Lwt_result_syntax in
-  let* (module Tool) = find_proto_tool cctxt in
+  let* {current_protocol; _} =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
+  in
+  let* (module Tool) = find_proto_tool current_protocol in
   Tool.start_injector cctxt ~op_per_mempool ~operations_file_path
+
+let patch_block_time ~data_dir ~block_time_target =
+  let open Lwt_result_syntax in
+  let open Tezos_store_unix in
+  use_data_dir data_dir @@ fun () ->
+  (* 1. Initialize storage *)
+  let* _, config = Shared_arg.resolve_data_dir_and_config_file ~data_dir () in
+  let* store =
+    Store.init
+      ~readonly:false
+      ~store_dir:(data_dir // "store")
+      ~context_dir:(data_dir // "context")
+      ~allow_testchains:false
+      config.blockchain_network.genesis
+  in
+  (* 2. Read current chain's head and checkout its context *)
+  let chain_store = Store.main_chain_store store in
+  let*! head = Store.Chain.current_head chain_store in
+  let*! (resulting_head_ctxt : Tezos_protocol_environment.Context.t) =
+    Store.Block.context_exn chain_store head
+  in
+  let*! current_protocol = Store.Block.protocol_hash_exn chain_store head in
+  let* (module Tool : Sigs.PROTO_TOOL) = find_proto_tool current_protocol in
+  (* 3. Modify, in a protocol-specific way, the existing constants to
+     match the desired block time *)
+  let* patched_ctxt =
+    Tool.patch_block_time
+      resulting_head_ctxt
+      ~head_level:(Store.Block.level head)
+      ~block_time_target
+  in
+  (* 4. Shadow the current head's resulting context by commiting the
+     modified one associated so that the new constants are now the one
+     used. *)
+  let*! patched_ctxt_hash =
+    Tezos_context_ops.Context_ops.commit
+      ~time:(Store.Block.timestamp head)
+      ~message:"patched_context"
+      patched_ctxt
+  in
+  let block_store = Store.Unsafe.get_block_store chain_store in
+  let*! opt =
+    List.find_map_s
+      (fun fbs ->
+        let*! res_opt =
+          Floating_block_store.read_block_and_info fbs (Store.Block.hash head)
+        in
+        Option.map_s
+          (fun (block, info) -> Lwt.return (fbs, block, info))
+          res_opt)
+      (Block_store.floating_block_stores block_store)
+  in
+  let head_fbs, head_repr, head_info =
+    WithExceptions.Option.get ~loc:__LOC__ opt
+  in
+  let* () =
+    Floating_block_store.append_block
+      head_fbs
+      ~flush:true
+      {head_info with resulting_context_hash = patched_ctxt_hash}
+      head_repr
+  in
+  let*! () = Store.close_store store in
+  return_unit
 
 let commands =
   let open Lwt_result_syntax in
@@ -314,6 +400,20 @@ let commands =
       (prefixes ["run"; "simulation"] @@ operations_file_param @@ stop)
       (fun op_per_mempool operations_file_path (cctxt : Client_context.full) ->
         let* () = run_injector cctxt ~op_per_mempool ~operations_file_path in
+        return_unit);
+    command
+      ~group
+      ~desc:
+        "Patch the chain's state of an octez-node data directory with a user \
+         defined block time by overwriting protocol constants. This command \
+         cannot be run twice on a same octez-node data directory. Warning: all \
+         testnet nodes must apply this patch otherwise they will fail to agree \
+         on the new resulting chain's state."
+      no_options
+      (prefixes ["patch"; "time"]
+      @@ data_dir_param @@ prefix "to" @@ block_time_param @@ stop)
+      (fun () data_dir block_time_target (_cctxt : Client_context.full) ->
+        let* () = patch_block_time ~data_dir ~block_time_target in
         return_unit);
   ]
 

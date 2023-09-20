@@ -676,10 +676,229 @@ let start_injector cctxt ~op_per_mempool ~operations_file_path =
   in
   loop state current_level
 
+(* Block time "hot-patch" *)
+
+type cycle_era = {
+  first_level : Raw_level_repr.t;
+  first_cycle : Cycle_repr.t;
+  blocks_per_cycle : int32;
+  blocks_per_commitment : int32;
+}
+
+(* Copy-paste of the protocol abstracted cycle_eras type and
+   encoding *)
+
+type cycle_eras = cycle_era list
+
+let cycle_eras_encoding =
+  let open Result_syntax in
+  let create_cycle_eras cycle_eras =
+    match cycle_eras with
+    | [] -> assert false
+    | newest_era :: older_eras ->
+        let rec aux {first_level; first_cycle; _} older_eras =
+          match older_eras with
+          | ({
+               first_level = first_level_of_previous_era;
+               first_cycle = first_cycle_of_previous_era;
+               _;
+             } as previous_era)
+            :: even_older_eras ->
+              if
+                Raw_level_repr.(first_level > first_level_of_previous_era)
+                && Cycle_repr.(first_cycle > first_cycle_of_previous_era)
+              then aux previous_era even_older_eras
+              else assert false
+          | [] -> return_unit
+        in
+        let* () = aux newest_era older_eras in
+        return cycle_eras
+  in
+  let cycle_era_encoding =
+    let open Data_encoding in
+    conv
+      (fun {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment} ->
+        (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment))
+      (fun (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment) ->
+        {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment})
+      (obj4
+         (req
+            "first_level"
+            ~description:"The first level of a new cycle era."
+            Raw_level_repr.encoding)
+         (req
+            "first_cycle"
+            ~description:"The first cycle of a new cycle era."
+            Cycle_repr.encoding)
+         (req
+            "blocks_per_cycle"
+            ~description:
+              "The value of the blocks_per_cycle constant used during the \
+               cycle era starting with first_level."
+            int32)
+         (req
+            "blocks_per_commitment"
+            ~description:
+              "The value of the blocks_per_commitment constant used during the \
+               cycle era starting with first_level."
+            int32))
+  in
+  Data_encoding.conv_with_guard
+    (fun eras -> eras)
+    (fun eras ->
+      match create_cycle_eras eras with
+      | Ok eras -> Ok eras
+      | Error _ -> Error "Invalid cycle eras")
+    (Data_encoding.list cycle_era_encoding)
+
+let patch_block_time ctxt ~head_level ~block_time_target =
+  let pf = Format.printf in
+  let open Environment in
+  let patch_flag_key = ["patch_flag"] in
+  let* () =
+    let*! opt = Context.find ctxt patch_flag_key in
+    match opt with
+    | Some _ ->
+        failwith
+          "The context was already patched with a custom block time. The patch \
+           must be applied on a fresh context."
+    | None -> return_unit
+  in
+  let constants_key = ["v1"; "constants"] in
+  let* (constants : Constants_parametric_repr.t) =
+    let*! opt = Context.find ctxt constants_key in
+    match opt with
+    | None -> failwith "Internal error: cannot read constants in context."
+    | Some bytes -> (
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Constants_parametric_repr.encoding
+            bytes
+        with
+        | None -> failwith "Internal error: cannot parse constants in context."
+        | Some constants -> return constants)
+  in
+  let current_block_time =
+    Int64.to_int @@ Period_repr.to_seconds constants.minimal_block_delay
+  in
+  let speedup_ratio = float current_block_time /. float block_time_target in
+  let blocks_per_cycle =
+    float (Int32.to_int constants.blocks_per_cycle) *. speedup_ratio
+    |> int_of_float |> Int32.of_int
+  in
+  let hard_gas_limit_per_block =
+    let patched_block_gas_limit =
+      let b_gas_lim_f =
+        Gas_limit_repr.Arith.integral_to_z constants.hard_gas_limit_per_block
+        |> Z.to_int |> float
+      in
+      b_gas_lim_f /. speedup_ratio
+      |> int_of_float |> Gas_limit_repr.Arith.integral_of_int_exn
+    in
+    Gas_limit_repr.Arith.max
+      constants.hard_gas_limit_per_operation
+      patched_block_gas_limit
+  in
+  let proof_of_work_threshold =
+    Int64.shift_right
+      constants.proof_of_work_threshold
+      (max 0 (log speedup_ratio /. log 2. |> int_of_float))
+  in
+  let max_operations_time_to_live =
+    float constants.max_operations_time_to_live *. speedup_ratio |> int_of_float
+  in
+  let minimal_block_delay =
+    Period_repr.of_seconds_exn (Int64.of_int block_time_target)
+  in
+  let delay_increment_per_round =
+    Period_repr.of_seconds_exn (Int64.of_int (max 1 (block_time_target / 2)))
+  in
+  let blocks_per_commitment = constants.blocks_per_commitment in
+  pf "Block time speed up ratio: %.2f%%@." (speedup_ratio *. 100.) ;
+  pf
+    "Minimal block delay: %a -> %a@."
+    Period_repr.pp
+    constants.minimal_block_delay
+    Period_repr.pp
+    minimal_block_delay ;
+  pf
+    "Delay increment per round: %a -> %a@."
+    Period_repr.pp
+    constants.delay_increment_per_round
+    Period_repr.pp
+    delay_increment_per_round ;
+  pf "Block per cycle: %ld -> %ld@." constants.blocks_per_cycle blocks_per_cycle ;
+  pf
+    "Hard gas limit per block: %a -> %a (minimum = hard gas limit per op. = \
+     %a)@."
+    Gas_limit_repr.Arith.pp
+    constants.hard_gas_limit_per_block
+    Gas_limit_repr.Arith.pp
+    hard_gas_limit_per_block
+    Gas_limit_repr.Arith.pp
+    constants.hard_gas_limit_per_operation ;
+  pf
+    "Proof of work difficulty: %.1f -> %.1f@."
+    (log (float (Int64.to_int constants.proof_of_work_threshold)))
+    (log (float (Int64.to_int proof_of_work_threshold))) ;
+  pf
+    "Max operations time to live: %d -> %d@."
+    constants.max_operations_time_to_live
+    max_operations_time_to_live ;
+  let patched_constants =
+    {
+      constants with
+      Constants_parametric_repr.minimal_block_delay;
+      delay_increment_per_round;
+      blocks_per_cycle;
+      hard_gas_limit_per_block;
+      proof_of_work_threshold;
+      max_operations_time_to_live;
+    }
+    |> Data_encoding.Binary.to_bytes_exn Constants_parametric_repr.encoding
+  in
+  let cycle_eras_key = ["v1"; "cycle_eras"] in
+  let* patched_cycle_eras =
+    let*! opt = Context.find ctxt cycle_eras_key in
+    match opt with
+    | None -> failwith "Internal error: cannot read cycle eras in context."
+    | Some bytes -> (
+        match Data_encoding.Binary.of_bytes_opt cycle_eras_encoding bytes with
+        | Some (latest_era :: _rest as l) ->
+            let head_level = Raw_level_repr.of_int32_exn head_level in
+            let cycle =
+              let level_position_in_era =
+                Raw_level_repr.diff head_level latest_era.first_level
+              in
+              let cycles_since_era_start =
+                Int32.div level_position_in_era latest_era.blocks_per_cycle
+              in
+              Cycle_repr.add
+                latest_era.first_cycle
+                (Int32.to_int cycles_since_era_start)
+            in
+            let cycle_eras =
+              {
+                first_level = head_level;
+                first_cycle = cycle;
+                blocks_per_cycle;
+                blocks_per_commitment;
+              }
+              :: l
+            in
+            return
+              (Data_encoding.Binary.to_bytes_exn cycle_eras_encoding cycle_eras)
+        | _ -> failwith "Internal error: cannot parse cycle eras in context.")
+  in
+  let*! ctxt = Context.add ctxt constants_key patched_constants in
+  let*! ctxt = Context.add ctxt cycle_eras_key patched_cycle_eras in
+  let*! ctxt = Context.add ctxt patch_flag_key Bytes.empty in
+  return ctxt
+
 module Tool : Sigs.PROTO_TOOL = struct
   let sync_node = sync_node
 
   let start_injector = start_injector
-end
 
-let () = Sigs.register Protocol.hash (module Tool)
+  let patch_block_time = patch_block_time
+end

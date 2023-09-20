@@ -7392,6 +7392,9 @@ let simulation_scenario_lib =
          octez_base_unix;
          octez_client_base |> open_;
          octez_client_base_unix |> open_;
+         octez_store |> open_;
+         octez_store_shared |> open_;
+         octez_context |> open_;
        ]
       @ List.flatten proto_deps)
     ~modules:("sigs" :: proto_tools)
