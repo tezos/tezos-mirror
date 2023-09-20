@@ -50,6 +50,7 @@ type operation = {
          or provide a field `min_attester_slot : int / int32` *)
   attestation : t;
   level : Raw_level_repr.t;
+  slot : Slot_repr.t;
 }
 
 let encoding = Bitset.encoding

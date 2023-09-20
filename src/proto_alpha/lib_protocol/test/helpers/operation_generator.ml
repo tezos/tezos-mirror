@@ -389,10 +389,16 @@ let generate_attestation =
 
 let generate_dal_attestation =
   let open QCheck2.Gen in
-  let+ attester = random_pkh in
+  let* attester = random_pkh in
+  let+ slot = gen_slot in
   Dal_attestation
     Dal.Attestation.
-      {attester; attestation = Dal.Attestation.empty; level = Raw_level.root}
+      {
+        attester;
+        attestation = Dal.Attestation.empty;
+        level = Raw_level.root;
+        slot;
+      }
 
 let generate_vdf_revelation =
   let open QCheck2.Gen in

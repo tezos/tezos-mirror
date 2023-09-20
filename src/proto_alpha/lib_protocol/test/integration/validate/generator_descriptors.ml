@@ -629,22 +629,50 @@ let attestation_descriptor =
   }
 
 (* TODO: #4917 remove direct dependency of the alpha_context. *)
-let dal_attestation ctxt current_level delegate =
+(* Build a DAL attestation for the given [delegate] and the given [block]'s
+   level (to be included in the block at the next level), if possible. Otherwise
+   returns [None]. It is possible to build one if: [delegate] is part of the DAL
+   committee for the current epoch, and [delegate] is part of the TB committee
+   for the current level. Recall that the slot to be included in the attestation
+   is the delegate's first TB slot at the current level. *)
+let dal_attestation ctxt delegate block =
   let open Lwt_result_syntax in
-  let level = Alpha_context.Level.from_raw ctxt current_level in
-  let* committee = Dal_apply.compute_committee ctxt level in
+  let*? level = Context.get_level (B block) in
+  let* committee =
+    Alpha_context.Level.from_raw ctxt level
+    |> Dal_apply.compute_committee ctxt
+    >|= Environment.wrap_tzresult
+  in
   match
     Environment.Signature.Public_key_hash.Map.find
       delegate
       committee.pkh_to_shards
   with
   | None -> return_none
-  | Some _interval ->
-      (* The content of the attestation does not matter for covalidity. *)
-      let attestation = Dal.Attestation.empty in
-      return_some
-        (Dal_attestation
-           {attester = delegate; attestation; level = current_level})
+  | Some _interval -> (
+      let* slots = Context.get_attester_slot (B block) delegate in
+      match slots with
+      | None -> return_none
+      | Some slots -> (
+          match List.hd slots with
+          | None -> assert false
+          | Some slot ->
+              (* The content of the attestation does not matter for covalidity. *)
+              let attestation = Dal.Attestation.empty in
+              let branch = block.Block.header.shell.predecessor in
+              let* signer = Account.find delegate in
+              let op =
+                Single
+                  (Dal_attestation
+                     {attester = delegate; attestation; level; slot})
+              in
+              Op.sign
+                ~watermark:
+                  Operation.(to_watermark (Dal_attestation Chain_id.zero))
+                signer.sk
+                branch
+                (Contents_list op)
+              |> return_some))
 
 let dal_attestation_descriptor =
   let open Lwt_result_syntax in
@@ -654,8 +682,8 @@ let dal_attestation_descriptor =
         let dal = {params.constants.dal with feature_enable = true} in
         let constants = {params.constants with dal} in
         {params with constants});
-    required_cycle = (fun _ -> 0);
-    required_block = (fun _ -> 0);
+    required_cycle = (fun _ -> 1);
+    required_block = (fun _ -> 1);
     prelude = (On 1, fun state -> return ([], state));
     opt_prelude = None;
     candidates_generator =
@@ -665,15 +693,7 @@ let dal_attestation_descriptor =
             let+ incr = Incremental.begin_construction state.block in
             Incremental.alpha_ctxt incr
           in
-          let*? current_level = Context.get_level (B state.block) in
-          let* op =
-            dal_attestation ctxt current_level delegate
-            >|= Environment.wrap_tzresult
-          in
-          return
-            (op
-            |> Option.map (fun op ->
-                   Op.pack_operation (B state.block) None (Single op)))
+          dal_attestation ctxt delegate state.block
         in
         List.filter_map_es gen state.delegates);
   }

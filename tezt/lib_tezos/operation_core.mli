@@ -61,7 +61,7 @@ type t
 
 type operation := t
 
-type consensus_kind = Attestation | Preattestation
+type consensus_kind = Attestation | Preattestation | Dal_attestation
 
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
@@ -230,11 +230,11 @@ module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
 
-  (** [dal_attestation ~attestation ~level] crafts a slot attestation
+  (** [dal_attestation ~attestation ~level ~slot] crafts a slot attestation
      operation to attest at [level] slot headers published at level
      [level - attestation_lag].  For each slot, the value of the
      booleans indicates whether the data is deemed available. *)
-  val dal_attestation : attestation:bool array -> level:int -> t
+  val dal_attestation : attestation:bool array -> level:int -> slot:int -> t
 
   (** [consensus ~kind ~use_legacy_name ~level ~round ~slot ~block_payload_hash]
       crafts a consensus operation with the [kind] at [level] on the [round]

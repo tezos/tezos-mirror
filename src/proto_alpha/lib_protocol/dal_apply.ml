@@ -50,11 +50,9 @@ let slot_of_int_e ~number_of_slots n =
 let validate_attestation ctxt op =
   let open Result_syntax in
   let* () = assert_dal_feature_enabled ctxt in
-  (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4462
+  (* DAL/TODO: https://gitlab.com/tezos/tezos/-/issues/4462
      Reconsider the ordering of checks. *)
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
-     check the signature of the attester as well *)
-  let Dal.Attestation.{attester; attestation; level = given} = op in
+  let Dal.Attestation.{attester; attestation; level = given; slot = _} = op in
   let number_of_slots = Dal.number_of_slots ctxt in
   let* max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
   let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
@@ -89,7 +87,7 @@ let validate_attestation ctxt op =
 let apply_attestation ctxt op =
   let open Result_syntax in
   let* () = assert_dal_feature_enabled ctxt in
-  let Dal.Attestation.{attester; attestation; level = _} = op in
+  let Dal.Attestation.{attester; attestation; level = _; slot = _} = op in
   match Dal.Attestation.shards_of_attester ctxt ~attester with
   | None ->
       (* This should not happen: operation validation should have failed. *)

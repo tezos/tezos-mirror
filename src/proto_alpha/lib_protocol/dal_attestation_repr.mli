@@ -56,14 +56,17 @@ type operation = {
           at the level of the block that contains it. It should be equal to the
           attested slot's published level plus the DAL attestation lag minus
           one. *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4672
-         consider renaming to [attestation_level].
-         Maybe not a great idea, but we could try this:
-         - attestation level: this level ^, the one inside the op;
-         - attested level: its successor, the level of the block
-         - That is, we have:
-             [attestation_level + 1 = attested_level]
-             [published_level + attestation_lag = attested_level] *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4672
+     consider renaming to [attestation_level].
+     Maybe not a great idea, but we could try this:
+     - attestation level: this level ^, the one inside the op;
+     - attested level: its successor, the level of the block
+     - That is, we have:
+         [attestation_level + 1 = attested_level]
+         [published_level + attestation_lag = attested_level] *)
+  slot : Slot_repr.t;
+      (** Similar to {!Operation_repr.consensus_content.slot}. It is the first
+          consensus slot of [attestor] at [level]. *)
 }
 
 val encoding : t Data_encoding.t

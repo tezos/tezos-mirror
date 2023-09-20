@@ -608,12 +608,12 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    operations being of the same kind, we compare their [slot]: the
    The smaller being the better, assuming that the more slots an attester
    has, the smaller is its smallest [slot]. When the pair is equal
-   and comparing an {!Attestation] to a {!Preattestation}, the
+   and comparing an {!Attestation} to a {!Preattestation}, the
    {!Attestation} is better.
 
-   Two {!Dal_attestation} ops are compared in the lexicographic
-   order of the pair of their number of attested slots as available
-   and their attesters.
+   Two {!Dal_attestation} ops are compared in the lexicographic order of the
+   tuple of their level, their number of slots attested as available, their
+   attesters, and their slot.
 
    Two voting operations are compared in the lexicographic order of
    the pair of their [period] and [source]. A {!Proposals} is better
