@@ -75,8 +75,7 @@ let select_cycle_info db_pool level =
   let cycle_request =
     Caqti_request.Infix.(
       Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
-      "SELECT id, l - MAX(level), size FROM cycles, (SELECT ? l) WHERE level \
-       <= l"
+      "SELECT id, $0 - MAX(level), size FROM cycles WHERE level <= $0"
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
