@@ -1103,3 +1103,5 @@ opam:tezt-tezos:
     - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezt-tezos
+
+# Ignoring unreleased package tezt-tx-kernel.
