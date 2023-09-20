@@ -595,20 +595,20 @@ module Cost_of = struct
     let map_mem (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let (module Box) = Script_map.get_module map in
       let per_elt_cost = Box.OPS.key_size elt in
-      Michelson_v1_gas_costs.cost_N_IMap_mem' per_elt_cost Box.size
+      Michelson_v1_gas_costs.cost_N_IMap_mem per_elt_cost Box.size
 
     let map_get = map_mem
 
     let map_update (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let (module Box) = Script_map.get_module map in
       let per_elt_cost = Box.OPS.key_size elt in
-      Michelson_v1_gas_costs.cost_N_IMap_update' per_elt_cost Box.size
+      Michelson_v1_gas_costs.cost_N_IMap_update per_elt_cost Box.size
 
     let map_get_and_update (type k v) (elt : k)
         (map : (k, v) Script_typed_ir.map) =
       let (module Box) = Script_map.get_module map in
       let per_elt_cost = Box.OPS.key_size elt in
-      Michelson_v1_gas_costs.cost_N_IMap_get_and_update' per_elt_cost Box.size
+      Michelson_v1_gas_costs.cost_N_IMap_get_and_update per_elt_cost Box.size
 
     let view_get (elt : Script_string.t) (m : Script_typed_ir.view_map) =
       map_get elt m

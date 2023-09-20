@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 16 (just consumed gas: 146.860)
+  - location: 16 (just consumed gas: 146.861)
     [ (Pair (Pair -1
                   1
                   "foobar"
@@ -358,7 +358,7 @@ trace
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
             "2019-09-09T08:35:33Z"
             "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
-  - location: 73 (just consumed gas: 0.680)
+  - location: 73 (just consumed gas: 0.681)
     [ (Some "foobar")
       "foobar"
       (Pair 0x00aabbcc

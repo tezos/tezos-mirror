@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (just consumed gas: 32.640)
+  - location: 12 (just consumed gas: 32.647)
     [ (Pair (Pair { "B" ; "C" ; "asdf" } { "B" ; "B" ; "asdf" ; "C" }) None) ]
   - location: 12 (just consumed gas: 0.010)
     [ (Pair { "B" ; "C" ; "asdf" } { "B" ; "B" ; "asdf" ; "C" }) ]
@@ -67,7 +67,7 @@ trace
       True
       {}
       { "B" ; "B" ; "asdf" ; "C" } ]
-  - location: 33 (just consumed gas: 0.132)
+  - location: 33 (just consumed gas: 0.050)
     [ { "B" }
       { "B" ; "B" ; "asdf" ; "C" } ]
   - location: 21 (just consumed gas: 0.025)
@@ -105,7 +105,7 @@ trace
       True
       { "B" }
       { "B" ; "B" ; "asdf" ; "C" } ]
-  - location: 33 (just consumed gas: 0.134)
+  - location: 33 (just consumed gas: 0.050)
     [ { "B" ; "C" }
       { "B" ; "B" ; "asdf" ; "C" } ]
   - location: 21 (just consumed gas: 0.025)
@@ -143,7 +143,7 @@ trace
       True
       { "B" ; "C" }
       { "B" ; "B" ; "asdf" ; "C" } ]
-  - location: 33 (just consumed gas: 0.154)
+  - location: 33 (just consumed gas: 0.051)
     [ { "B" ; "C" ; "asdf" }
       { "B" ; "B" ; "asdf" ; "C" } ]
   - location: 21 (just consumed gas: 0.035)
@@ -206,7 +206,7 @@ trace
       { "B" ; "C" ; "asdf" }
       { "B" ; "C" ; "asdf" }
       True ]
-  - location: 57 (just consumed gas: 0.118)
+  - location: 57 (just consumed gas: 0.040)
     [ True
       { "B" ; "C" ; "asdf" }
       True ]
@@ -271,7 +271,7 @@ trace
       { "B" ; "C" ; "asdf" }
       { "B" ; "C" ; "asdf" }
       True ]
-  - location: 57 (just consumed gas: 0.118)
+  - location: 57 (just consumed gas: 0.040)
     [ True
       { "B" ; "C" ; "asdf" }
       True ]
@@ -336,7 +336,7 @@ trace
       { "B" ; "C" ; "asdf" }
       { "B" ; "C" ; "asdf" }
       True ]
-  - location: 57 (just consumed gas: 0.127)
+  - location: 57 (just consumed gas: 0.040)
     [ True
       { "B" ; "C" ; "asdf" }
       True ]
@@ -401,7 +401,7 @@ trace
       { "B" ; "C" ; "asdf" }
       { "B" ; "C" ; "asdf" }
       True ]
-  - location: 57 (just consumed gas: 0.118)
+  - location: 57 (just consumed gas: 0.040)
     [ True
       { "B" ; "C" ; "asdf" }
       True ]

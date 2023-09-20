@@ -54,7 +54,7 @@ trace
   - location: 50 (just consumed gas: 0.010)
     [ -7987
       10 ]
-  - location: 53 (just consumed gas: 0.061)
+  - location: 53 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 54 (just consumed gas: 0.010)
     [ -79870
@@ -72,7 +72,7 @@ trace
   - location: 69 (just consumed gas: 0.010)
     [ -7987
       10 ]
-  - location: 72 (just consumed gas: 0.061)
+  - location: 72 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 73 (just consumed gas: 0.010)
     [ -79870
@@ -90,7 +90,7 @@ trace
   - location: 88 (just consumed gas: 0.010)
     [ 7987
       -10 ]
-  - location: 91 (just consumed gas: 0.061)
+  - location: 91 (just consumed gas: 0.064)
     [ -79870 ]
   - location: 92 (just consumed gas: 0.010)
     [ -79870
@@ -108,7 +108,7 @@ trace
   - location: 107 (just consumed gas: 0.010)
     [ 7987
       10 ]
-  - location: 110 (just consumed gas: 0.061)
+  - location: 110 (just consumed gas: 0.064)
     [ 79870 ]
   - location: 111 (just consumed gas: 0.010)
     [ 79870

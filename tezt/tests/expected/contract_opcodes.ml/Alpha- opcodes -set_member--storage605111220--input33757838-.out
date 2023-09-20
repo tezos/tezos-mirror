@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (just consumed gas: 13.890)
+  - location: 11 (just consumed gas: 13.808)
     [ (Pair "Hi" { "Hi" } None) ]
   - location: 11 (just consumed gas: 0.010)
     [ (Pair "Hi" { "Hi" } None)
@@ -33,7 +33,7 @@ trace
     [ "Hi"
       { "Hi" }
       (Pair "Hi" { "Hi" } None) ]
-  - location: 19 (just consumed gas: 0.119)
+  - location: 19 (just consumed gas: 0.040)
     [ True
       (Pair "Hi" { "Hi" } None) ]
   - location: 20 (just consumed gas: 0.010)
