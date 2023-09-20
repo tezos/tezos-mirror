@@ -801,76 +801,95 @@ let () =
   let admins =
     List.map (fun (u, p) -> (u, Bcrypt.hash p)) config.Config.admins
   in
-  Lwt_main.run
-    (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
-    | Error e -> Lwt_io.eprintl (Caqti_error.show e)
-    | Ok pool ->
-        Lwt.bind (maybe_alter_and_create_tables pool) (function
-            | Error e -> Lwt_io.eprintl (Caqti_error.show e)
-            | Ok () ->
-                let stop, paf = Lwt.task () in
-                let shutdown _ = Lwt.wakeup paf () in
-                let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
-                Lwt.bind
-                  (Lwt.map
-                     (List.find_map (function Error e -> Some e | _ -> None))
-                     (Lwt_list.map_s
-                        (fun (login, password) ->
-                          let password = Bcrypt.hash password in
-                          upsert_user pool login password)
-                        config.Config.users))
-                  (function
-                    | Some e -> Lwt_io.eprintl (Caqti_error.show e)
-                    | None ->
-                        Lwt.bind (refresh_users pool users) (function
-                            | Error e -> Lwt_io.eprintl (Caqti_error.show e)
-                            | Ok () ->
-                                let servers =
-                                  List.map
-                                    (fun con ->
-                                      Lwt.bind
-                                        (Conduit_lwt_unix.init
-                                           ?src:con.Config.source
-                                           ())
-                                        (fun ctx ->
-                                          let ctx =
-                                            Cohttp_lwt_unix.Net.init ~ctx ()
-                                          in
-                                          let mode =
-                                            match con.Config.tls with
-                                            | Some Config.{crt; key} ->
-                                                `TLS
-                                                  ( `Crt_file_path crt,
-                                                    `Key_file_path key,
-                                                    `No_password,
-                                                    `Port con.Config.port )
-                                            | None ->
-                                                `TCP (`Port con.Config.port)
-                                          in
-                                          Format.printf
-                                            "Server listening at %a:%d@."
-                                            (Format.pp_print_option
-                                               ~none:(fun f () ->
-                                                 Format.pp_print_string
-                                                   f
-                                                   "<default>")
-                                               Format.pp_print_string)
-                                            con.Config.source
-                                            con.port ;
-                                          Cohttp_lwt_unix.Server.create
-                                            ~stop
-                                            ~ctx
-                                            ~mode
-                                            (Cohttp_lwt_unix.Server.make
-                                               ~callback:
-                                                 (callback
-                                                    ~public:
-                                                      config
-                                                        .Config.public_directory
-                                                    ~admins
-                                                    ~users
-                                                    pool)
-                                               ())))
-                                    config.Config.network_interfaces
-                                in
-                                Lwt.join servers))))
+  let code =
+    Lwt_main.run
+      (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
+      | Error e ->
+          Lwt.bind
+            (Lwt_io.eprintl (Caqti_error.show e))
+            (fun () -> Lwt.return 1)
+      | Ok pool ->
+          Lwt.bind (maybe_alter_and_create_tables pool) (function
+              | Error e ->
+                  Lwt.bind
+                    (Lwt_io.eprintl (Caqti_error.show e))
+                    (fun () -> Lwt.return 1)
+              | Ok () ->
+                  let stop, paf = Lwt.task () in
+                  let shutdown _ = Lwt.wakeup paf () in
+                  let _ = Sys.signal Sys.sigint (Sys.Signal_handle shutdown) in
+                  Lwt.bind
+                    (Lwt.map
+                       (List.find_map (function
+                           | Error e -> Some e
+                           | _ -> None))
+                       (Lwt_list.map_s
+                          (fun (login, password) ->
+                            let password = Bcrypt.hash password in
+                            upsert_user pool login password)
+                          config.Config.users))
+                    (function
+                      | Some e ->
+                          Lwt.bind
+                            (Lwt_io.eprintl (Caqti_error.show e))
+                            (fun () -> Lwt.return 1)
+                      | None ->
+                          Lwt.bind (refresh_users pool users) (function
+                              | Error e ->
+                                  Lwt.bind
+                                    (Lwt_io.eprintl (Caqti_error.show e))
+                                    (fun () -> Lwt.return 1)
+                              | Ok () ->
+                                  let servers =
+                                    List.map
+                                      (fun con ->
+                                        Lwt.bind
+                                          (Conduit_lwt_unix.init
+                                             ?src:con.Config.source
+                                             ())
+                                          (fun ctx ->
+                                            let ctx =
+                                              Cohttp_lwt_unix.Net.init ~ctx ()
+                                            in
+                                            let mode =
+                                              match con.Config.tls with
+                                              | Some Config.{crt; key} ->
+                                                  `TLS
+                                                    ( `Crt_file_path crt,
+                                                      `Key_file_path key,
+                                                      `No_password,
+                                                      `Port con.Config.port )
+                                              | None ->
+                                                  `TCP (`Port con.Config.port)
+                                            in
+                                            Format.printf
+                                              "Server listening at %a:%d@."
+                                              (Format.pp_print_option
+                                                 ~none:(fun f () ->
+                                                   Format.pp_print_string
+                                                     f
+                                                     "<default>")
+                                                 Format.pp_print_string)
+                                              con.Config.source
+                                              con.port ;
+                                            Cohttp_lwt_unix.Server.create
+                                              ~stop
+                                              ~ctx
+                                              ~mode
+                                              (Cohttp_lwt_unix.Server.make
+                                                 ~callback:
+                                                   (callback
+                                                      ~public:
+                                                        config
+                                                          .Config
+                                                           .public_directory
+                                                      ~admins
+                                                      ~users
+                                                      pool)
+                                                 ())))
+                                      config.Config.network_interfaces
+                                  in
+                                  Lwt.bind (Lwt.join servers) (fun () ->
+                                      Lwt.return 0)))))
+  in
+  exit code
