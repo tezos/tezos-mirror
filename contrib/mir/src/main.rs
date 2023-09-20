@@ -25,7 +25,7 @@ mod tests {
     fn typecheck_test_expect_success() {
         let ast = parser::parse(&FIBONACCI_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);
-        assert!(typechecker::typecheck(&ast, &mut stack));
+        assert!(typechecker::typecheck(&ast, &mut stack).is_ok());
         assert!(stack == VecDeque::from([Type::Int]));
     }
 
@@ -33,7 +33,7 @@ mod tests {
     fn typecheck_test_expect_fail() {
         let ast = parser::parse(&FIBONACCI_ILLTYPED_SRC).unwrap();
         let mut stack = VecDeque::from([Type::Nat]);
-        assert!(!typechecker::typecheck(&ast, &mut stack));
+        assert!(typechecker::typecheck(&ast, &mut stack).is_err());
     }
 
     #[test]
