@@ -154,6 +154,56 @@ let save_config (Node_config.{data_dir; _} as configuration) =
   | Ok () -> Lwt.return_unit
   | Error _e -> Test.fail "Cannot save configuration file"
 
+let default_number_of_nodes = 1
+
+let number_of_nodes =
+  Sys.getenv_opt "NODES" |> Option.map int_of_string
+  |> Option.value ~default:default_number_of_nodes
+
+let write_to_node_dir output_dir node_id json =
+  let* () = ensure_dir_exists output_dir in
+  let file = Filename.concat output_dir node_id in
+  let* res =
+    Lwt_utils_unix.with_atomic_open_out file @@ fun chan ->
+    let content = Data_encoding.Json.to_string json in
+    Lwt_utils_unix.write_string chan content
+  in
+  match res with
+  | Ok () -> Lwt.return_unit
+  | Error _e -> Test.fail "Failed to write to node directory: %s" file
+
+let get_bakers client =
+  let* client_accounts_with_pkhs = Client.list_known_addresses client in
+  let baker_accounts =
+    client_accounts_with_pkhs |> List.map fst
+    |> List.filter (String.starts_with ~prefix:baker_prefix)
+  in
+  Lwt_list.map_s (fun alias -> Client.show_address ~alias client) baker_accounts
+
+let baker_index baker_alias =
+  let start_index = String.length baker_prefix in
+  let baker_index_str =
+    String.sub baker_alias start_index (String.length baker_alias - start_index)
+  in
+  int_of_string baker_index_str
+
+let node_prefix = "node_"
+
+let group_by ~f list =
+  List.fold_left
+    (fun map el ->
+      let key = f el in
+      String_map.update
+        key
+        (fun map_els ->
+          let map_els = Option.value map_els ~default:[] in
+          Some (el :: map_els))
+        map)
+    String_map.empty
+    list
+
+let alias_encoding = Data_encoding.(obj1 (req "alias" @@ string' Plain))
+
 (* These tests can be run locally to generate the data needed to run a
    stresstest. *)
 module Local = struct
@@ -273,7 +323,27 @@ module Local = struct
     in
     Lwt.return_unit
 
-  let generate_manager_operations () = Test.fail "Not implemented"
+  let partition_bakers num_nodes () =
+    let client = Client.create ~base_dir:output_dir () in
+    (* This fetches the account keys although it is not needed. *)
+    let* bakers = get_bakers client in
+    let bakers = List.map (fun {Account.alias; _} -> alias) bakers in
+    let f baker_alias =
+      let baker_index = baker_index baker_alias in
+      let node_index = baker_index mod num_nodes in
+      Format.sprintf "%s%d" node_prefix node_index
+    in
+    let bakers_node_partitions = group_by ~f bakers in
+    let bakers_node_partitions =
+      List.of_seq @@ String_map.to_seq bakers_node_partitions
+    in
+    Lwt_list.iter_s
+      (fun (node_id, bakers) ->
+        let json =
+          Data_encoding.(Json.construct (list alias_encoding) bakers)
+        in
+        write_to_node_dir output_dir node_id json)
+      bakers_node_partitions
 end
 
 (* These tests must be run remotely by the nodes participating in
@@ -306,9 +376,9 @@ let () =
     (Local.generate_network_activation_parameters Protocol.Nairobi) ;
   register
     ~__FILE__
-    ~title:"Generate manager operations"
-    ~tags:["generate_operations"]
-    Local.generate_manager_operations ;
+    ~title:"Partition bakers by node"
+    ~tags:["partition_bakers"]
+    (Local.partition_bakers number_of_nodes) ;
   register
     ~__FILE__
     ~title:"Run stresstest"
