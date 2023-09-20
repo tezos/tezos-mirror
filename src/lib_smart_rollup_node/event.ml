@@ -167,6 +167,62 @@ module Simple = struct
       ~level:Notice
       ~msg:"Acquiring lock on data directory."
       ()
+
+  let calling_gc =
+    declare_1
+      ~section
+      ~name:"calling_gc"
+      ~level:Info
+      ~msg:"A call to garbage collect the context was made at level {level}"
+      ("level", Data_encoding.int32)
+
+  let starting_gc =
+    declare_1
+      ~section
+      ~name:"starting_gc"
+      ~level:Info
+      ~msg:"Starting context garbage collection for commit {context_hash}"
+      ("context_hash", Smart_rollup_context_hash.encoding)
+      ~pp1:Smart_rollup_context_hash.pp
+
+  let gc_already_launched =
+    declare_0
+      ~section
+      ~name:"gc_already_launched"
+      ~level:Info
+      ~msg:
+        "An attempt to launch context GC was made, but a previous GC run has \
+         not yet finished. No action was taken."
+      ()
+
+  let ending_gc =
+    declare_2
+      ~section
+      ~name:"ending_gc"
+      ~level:Info
+      ~msg:
+        "Context garbage collection finished in {duration} (finalised in \
+         {finalisation})"
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
+      ("finalisation", Time.System.Span.encoding)
+
+  let gc_failure =
+    declare_1
+      ~section
+      ~name:"gc_failure"
+      ~level:Warning
+      ~msg:"Context garbage collection failed: {error}"
+      ("error", Data_encoding.string)
+
+  let gc_launch_failure =
+    declare_1
+      ~section
+      ~name:"gc_launch_failure"
+      ~level:Warning
+      ~msg:"Context garbage collection launch failed: {error}"
+      ("error", Data_encoding.string)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -211,3 +267,15 @@ let detected_protocol_migration () =
   Simple.(emit detected_protocol_migration) ()
 
 let acquiring_lock () = Simple.(emit acquiring_lock) ()
+
+let calling_gc level = Simple.(emit calling_gc) level
+
+let starting_gc hash = Simple.(emit starting_gc) hash
+
+let gc_already_launched () = Simple.(emit gc_already_launched) ()
+
+let ending_gc t = Simple.(emit ending_gc) t
+
+let gc_failure msg = Simple.(emit gc_failure) msg
+
+let gc_launch_failure msg = Simple.(emit gc_launch_failure) msg
