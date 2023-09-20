@@ -266,16 +266,7 @@ let gas_estimation json =
      The extra gas units, i.e. 2300, will be refunded.
   *)
   let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/5977
-     remove this once the gas is accounted correctly *)
-  (* minimum gas for any Ethereum transaction *)
-  let min_amount = Z.of_int 21000 in
-  let amount =
-    Z.(
-      if simulated_amount < min_amount then simulated_amount + min_amount
-      else simulated_amount)
-  in
-  return @@ quantity_of_z @@ Z.max simulated_amount amount
+  return (quantity_of_z simulated_amount)
 
 let decode_is_valid bytes =
   match bytes with
