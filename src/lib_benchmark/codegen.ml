@@ -451,17 +451,25 @@ let codegen (Model.Model model) (sol : solution)
   Item {comments; name = Some fun_name; code}
 
 let get_codegen_destination
-    Registration.{model = Model.Model (module M); from = local_models_info} =
-  if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then None
-  else
-    List.find_map
-      (fun Registration.{bench_name; _} ->
-        let open Option_syntax in
-        let* (module B : Benchmark.S) =
-          Registration.find_benchmark bench_name
-        in
-        match B.purpose with Generate_code d -> Some d | _ -> None)
-      local_models_info
+    Registration.
+      {
+        model = Model.Model (module M);
+        from = local_models_info;
+        codegen_destination;
+      } =
+  match codegen_destination with
+  | Some s -> Some s
+  | None ->
+      if Namespace.equal M.name @@ Builtin_models.ns "timer_model" then None
+      else
+        List.find_map
+          (fun Registration.{bench_name; _} ->
+            let open Option_syntax in
+            let* (module B : Benchmark.S) =
+              Registration.find_benchmark bench_name
+            in
+            match B.purpose with Generate_code d -> Some d | _ -> None)
+          local_models_info
 
 let codegen_models models sol transform =
   List.map

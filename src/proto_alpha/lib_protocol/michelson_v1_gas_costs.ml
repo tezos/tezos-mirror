@@ -288,23 +288,6 @@ let cost_SAPLING_DIFF_ENCODING ~nfs ~cms = S.safe_int ((nfs * 22) + (cms * 215))
 
 (* ------------------------------------------------------------------------ *)
 
-(* model N_ILoop_{in,out} *)
-let cost_N_ILoop = S.max cost_N_ILoop_in cost_N_ILoop_out
-
-(* model N_ILoop_left_{in,out} *)
-let cost_N_ILoop_left = S.max cost_N_ILoop_left_in cost_N_ILoop_left_out
-
-(* model N_IOpt_map_{some,none} *)
-let cost_N_IOpt_map = S.max cost_N_IOpt_map_none cost_N_IOpt_map_some
-
-(* model N_ILambda_{lam,lamrec} *)
-let cost_N_ILambda = S.max cost_N_ILambda_lam cost_N_ILambda_lamrec
-
-(* model N_KIter_{empty,nonempty} *)
-let cost_N_KIter = S.max cost_N_KIter_empty cost_N_KIter_nonempty
-
-(* ------------------------------------------------------------------------ *)
-
 (* IDropN and IDupN use non affine models with multiple cases. The inferred
    cost functions are more complex than the following affine functions. *)
 

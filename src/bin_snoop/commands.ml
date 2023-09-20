@@ -1652,7 +1652,7 @@ module Display_info_cmd = struct
 
   let display_model_handler () s () =
     let s = Namespace.of_string s in
-    let {Registration.model = Model.Model m; from = l} =
+    let {Registration.model = Model.Model m; from = l; _} =
       Registration.find_model_exn s
     in
     Format.printf "@.%a@." pp_fancy_model (m, l) ;

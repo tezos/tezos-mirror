@@ -663,6 +663,10 @@ let cost_N_IHalt = S.safe_int 15
 (* 0. *)
 let cost_N_IHalt_alloc = S.safe_int 0
 
+(* model interpreter/N_IHalt_synthesized *)
+(* let time = 15. in let alloc = 0. in max time (alloc * 4) *)
+let cost_N_IHalt_synthesized = S.safe_int 15
+
 (* model interpreter/N_IHash_key *)
 (* 605. *)
 let cost_N_IHash_key = S.safe_int 605
@@ -727,6 +731,10 @@ let cost_N_IKeccak size =
   let v0 = size in
   S.safe_int 1350 + ((v0 lsr 2) + (v0 * S.safe_int 8))
 
+(* model interpreter/N_ILambda *)
+(* max 10. 10. *)
+let cost_N_ILambda = S.safe_int 10
+
 (* model interpreter/N_ILambda_lam *)
 (* 10. *)
 let cost_N_ILambda_lam = S.safe_int 10
@@ -759,9 +767,17 @@ let cost_N_IList_map = S.safe_int 20
 (* 10. *)
 let cost_N_IList_size = S.safe_int 10
 
+(* model interpreter/N_ILoop *)
+(* max 10. 1.01451868265 *)
+let cost_N_ILoop = S.safe_int 10
+
 (* model interpreter/N_ILoop_in *)
 (* 10. *)
 let cost_N_ILoop_in = S.safe_int 10
+
+(* model interpreter/N_ILoop_left *)
+(* max 10. 10. *)
+let cost_N_ILoop_left = S.safe_int 10
 
 (* model interpreter/N_ILoop_left_in *)
 (* 10. *)
@@ -922,6 +938,10 @@ let cost_N_IOpen_chest size1 size2 =
   S.safe_int 919000
   + (v1 * S.safe_int 22528)
   + ((v0 lsr 2) + (v0 * S.safe_int 3))
+
+(* model interpreter/N_IOpt_map *)
+(* max 10. 0. *)
+let cost_N_IOpt_map = S.safe_int 10
 
 (* model interpreter/N_IOpt_map_none *)
 (* 10. *)
@@ -1127,6 +1147,10 @@ let cost_N_IXor_nat size1 size2 =
 (* model interpreter/N_KCons *)
 (* 10. *)
 let cost_N_KCons = S.safe_int 10
+
+(* model interpreter/N_KIter *)
+(* max 10. 10. *)
+let cost_N_KIter = S.safe_int 10
 
 (* model interpreter/N_KIter_empty *)
 (* 10. *)
