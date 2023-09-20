@@ -2423,28 +2423,27 @@ and parse_view :
       {input_ty; output_ty; view_code} ->
     let legacy = elab_conf.legacy in
     let input_ty_loc = location input_ty in
-    let*? res, ctxt =
-      Gas_monad.run ctxt @@ parse_view_input_ty ~stack_depth:0 ~legacy input_ty
-    in
-    let*? (Ex_ty input_ty) =
-      record_trace_eval
-        (fun () ->
-          Ill_formed_type
-            (Some "arg of view", strip_locations input_ty, input_ty_loc))
-        res
-    in
     let output_ty_loc = location output_ty in
     let*? res, ctxt =
       Gas_monad.run ctxt
-      @@ parse_view_output_ty ~stack_depth:0 ~legacy output_ty
+      @@
+      let open Gas_monad.Syntax in
+      let error_details = Informative () in
+      let* input_ty =
+        Gas_monad.record_trace_eval ~error_details (fun () ->
+            Ill_formed_type
+              (Some "arg of view", strip_locations input_ty, input_ty_loc))
+        @@ parse_view_input_ty ~stack_depth:0 ~legacy input_ty
+      in
+      let+ output_ty =
+        Gas_monad.record_trace_eval ~error_details (fun () ->
+            Ill_formed_type
+              (Some "return of view", strip_locations output_ty, output_ty_loc))
+        @@ parse_view_output_ty ~stack_depth:0 ~legacy output_ty
+      in
+      (input_ty, output_ty)
     in
-    let*? (Ex_ty output_ty) =
-      record_trace_eval
-        (fun () ->
-          Ill_formed_type
-            (Some "return of view", strip_locations output_ty, output_ty_loc))
-        res
-    in
+    let*? Ex_ty input_ty, Ex_ty output_ty = res in
     let*? (Ty_ex_c pair_ty) = pair_t input_ty_loc input_ty storage_type in
     let* judgement, ctxt =
       parse_instr
@@ -3248,16 +3247,15 @@ and parse_instr :
       typed ctxt loc instr (Item_t (nat_t, rest))
   (* maps *)
   | Prim (loc, I_EMPTY_MAP, [tk; tv], annot), stack ->
-      let*? tk, ctxt =
+      let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_comparable_ty ~stack_depth:(stack_depth + 1) tk
+        @@
+        let open Gas_monad.Syntax in
+        let* tk = parse_comparable_ty ~stack_depth:(stack_depth + 1) tk in
+        let+ tv = parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy tv in
+        (tk, tv)
       in
-      let*? (Ex_comparable_ty tk) = tk in
-      let*? tv, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy tv
-      in
-      let*? (Ex_ty tv) = tv in
+      let*? Ex_comparable_ty tk, Ex_ty tv = res in
       let*? () = check_var_type_annot loc annot in
       let instr =
         {apply = (fun k -> IEmpty_map (loc, tk, for_logging_only tv, k))}
@@ -3372,16 +3370,17 @@ and parse_instr :
       typed ctxt loc instr (Item_t (nat_t, rest))
   (* big_map *)
   | Prim (loc, I_EMPTY_BIG_MAP, [tk; tv], annot), stack ->
-      let*? tk, ctxt =
+      let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_comparable_ty ~stack_depth:(stack_depth + 1) tk
+        @@
+        let open Gas_monad.Syntax in
+        let* tk = parse_comparable_ty ~stack_depth:(stack_depth + 1) tk in
+        let+ tv =
+          parse_big_map_value_ty ~stack_depth:(stack_depth + 1) ~legacy tv
+        in
+        (tk, tv)
       in
-      let*? (Ex_comparable_ty tk) = tk in
-      let*? tv, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_big_map_value_ty ~stack_depth:(stack_depth + 1) ~legacy tv
-      in
-      let*? (Ex_ty tv) = tv in
+      let*? Ex_comparable_ty tk, Ex_ty tv = res in
       let*? () = check_var_type_annot loc annot in
       let instr = {apply = (fun k -> IEmpty_big_map (loc, tk, tv, k))} in
       let*? ty = big_map_t loc tk tv in
@@ -3599,16 +3598,15 @@ and parse_instr :
           let stack = Item_t (tr, rest) in
           typed_no_lwt ctxt loc instr stack)
   | Prim (loc, I_LAMBDA, [arg; ret; code], annot), stack ->
-      let*? arg, ctxt =
+      let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg
+        @@
+        let open Gas_monad.Syntax in
+        let* arg = parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg in
+        let+ ret = parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret in
+        (arg, ret)
       in
-      let*? (Ex_ty arg) = arg in
-      let*? ret, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret
-      in
-      let*? (Ex_ty ret) = ret in
+      let*? Ex_ty arg, Ex_ty ret = res in
       let*? () = check_kind [Seq_kind] code in
       let*? () = check_var_annot loc annot in
       let* kdescr, ctxt =
@@ -3630,16 +3628,19 @@ and parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; lambda_expr], annot),
       stack ) ->
-      let*? arg, ctxt =
+      let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg_ty_expr
+        @@
+        let open Gas_monad.Syntax in
+        let* arg =
+          parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy arg_ty_expr
+        in
+        let+ ret =
+          parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret_ty_expr
+        in
+        (arg, ret)
       in
-      let*? (Ex_ty arg) = arg in
-      let*? ret, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy ret_ty_expr
-      in
-      let*? (Ex_ty ret) = ret in
+      let*? Ex_ty arg, Ex_ty ret = res in
       let*? () = check_kind [Seq_kind] lambda_expr in
       let*? () = check_var_annot loc annot in
       let*? lambda_rec_ty = lambda_t loc arg ret in
@@ -4113,15 +4114,17 @@ and parse_instr :
   (* annotations *)
   | Prim (loc, I_CAST, [cast_t], annot), (Item_t (t, _) as stack) ->
       let*? () = check_var_annot loc annot in
-      let*? cast_t, ctxt =
+      let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy cast_t
+        @@
+        let open Gas_monad.Syntax in
+        let* (Ex_ty cast_t) =
+          parse_any_ty ~stack_depth:(stack_depth + 1) ~legacy cast_t
+        in
+        let+ Eq = ty_eq ~error_details:(Informative loc) cast_t t in
+        ()
       in
-      let*? (Ex_ty cast_t) = cast_t in
-      let*? eq, ctxt =
-        Gas_monad.run ctxt @@ ty_eq ~error_details:(Informative loc) cast_t t
-      in
-      let*? Eq = eq in
+      let*? () = res in
       (* We can reuse [stack] because [a ty = b ty] means [a = b]. *)
       let instr = {apply = (fun k -> k)} in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4230,27 +4233,34 @@ and parse_instr :
       let*? {arg_type; storage_type; code_field; views}, ctxt =
         parse_toplevel ctxt canonical_code
       in
-      let*? arg_type_with_entrypoints, ctxt =
-        Gas_monad.run ctxt
-        @@ parse_parameter_ty_and_entrypoints
-             ~stack_depth:(stack_depth + 1)
-             ~legacy
-             arg_type
-      in
-      let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-        record_trace
-          (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
-          arg_type_with_entrypoints
-      in
       let*? res, ctxt =
         Gas_monad.run ctxt
-        @@ parse_storage_ty ~stack_depth:(stack_depth + 1) ~legacy storage_type
+        @@
+        let open Gas_monad.Syntax in
+        let error_details = Informative () in
+        let* arg_type =
+          Gas_monad.record_trace_eval ~error_details (fun () ->
+              Ill_formed_type
+                (Some "parameter", canonical_code, location arg_type))
+          @@ parse_parameter_ty_and_entrypoints
+               ~stack_depth:(stack_depth + 1)
+               ~legacy
+               arg_type
+        in
+        let+ storage_type =
+          Gas_monad.record_trace_eval ~error_details (fun () ->
+              Ill_formed_type
+                (Some "storage", canonical_code, location storage_type))
+          @@ parse_storage_ty
+               ~stack_depth:(stack_depth + 1)
+               ~legacy
+               storage_type
+        in
+        (arg_type, storage_type)
       in
-      let*? (Ex_ty storage_type) =
-        record_trace
-          (Ill_formed_type
-             (Some "storage", canonical_code, location storage_type))
-          res
+      let*? ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+              Ex_ty storage_type ) =
+        res
       in
       let*? (Ty_ex_c arg_type_full) = pair_t loc arg_type storage_type in
       let*? (Ty_ex_c ret_type_full) =
@@ -5037,21 +5047,26 @@ let parse_code :
       parse_toplevel ctxt code
     in
     let arg_type_loc = location arg_type in
+    let storage_type_loc = location storage_type in
     let*? res, ctxt =
       Gas_monad.run ctxt
-      @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
+      @@
+      let open Gas_monad.Syntax in
+      let* arg_type =
+        Gas_monad.record_trace_eval ~error_details:(Informative ()) (fun () ->
+            Ill_formed_type (Some "parameter", code, arg_type_loc))
+        @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
+      in
+      let+ storage_type =
+        Gas_monad.record_trace_eval ~error_details:(Informative ()) (fun () ->
+            Ill_formed_type (Some "storage", code, storage_type_loc))
+        @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
+      in
+      (arg_type, storage_type)
     in
-    let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-      record_trace (Ill_formed_type (Some "parameter", code, arg_type_loc)) res
-    in
-    let storage_type_loc = location storage_type in
-    let*? storage_type, ctxt =
-      Gas_monad.run ctxt @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
-    in
-    let*? (Ex_ty storage_type) =
-      record_trace
-        (Ill_formed_type (Some "storage", code, storage_type_loc))
-        storage_type
+    let*? ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+            Ex_ty storage_type ) =
+      res
     in
     let*? (Ty_ex_c arg_type_full) =
       pair_t storage_type_loc arg_type storage_type
@@ -5171,23 +5186,26 @@ let typecheck_code :
     let {arg_type; storage_type; code_field; views} = toplevel in
     let type_map = ref [] in
     let arg_type_loc = location arg_type in
-    let*? arg_type, ctxt =
-      Gas_monad.run ctxt
-      @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
-    in
-    let*? (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) =
-      record_trace
-        (Ill_formed_type (Some "parameter", code, arg_type_loc))
-        arg_type
-    in
     let storage_type_loc = location storage_type in
-    let*? ex_storage_type, ctxt =
-      Gas_monad.run ctxt @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
+    let*? res, ctxt =
+      Gas_monad.run ctxt
+      @@
+      let open Gas_monad.Syntax in
+      let* arg_type =
+        Gas_monad.record_trace_eval ~error_details:(Informative ()) (fun () ->
+            Ill_formed_type (Some "parameter", code, arg_type_loc))
+        @@ parse_parameter_ty_and_entrypoints ~stack_depth:0 ~legacy arg_type
+      in
+      let+ ex_storage_type =
+        Gas_monad.record_trace_eval ~error_details:(Informative ()) (fun () ->
+            Ill_formed_type (Some "storage", code, storage_type_loc))
+        @@ parse_storage_ty ~stack_depth:0 ~legacy storage_type
+      in
+      (arg_type, ex_storage_type)
     in
-    let*? (Ex_ty storage_type) =
-      record_trace
-        (Ill_formed_type (Some "storage", code, storage_type_loc))
-        ex_storage_type
+    let*? ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+            Ex_ty storage_type ) =
+      res
     in
     let*? (Ty_ex_c arg_type_full) =
       pair_t storage_type_loc arg_type storage_type
@@ -5335,12 +5353,13 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   let loc = Micheline.dummy_location in
   let* arg_type, storage_type, views, ctxt =
     if normalize_types then
-      let*? arg_type, ctxt =
+      let*? (arg_type, storage_type), ctxt =
         Gas_monad.run_pure ctxt
-        @@ unparse_parameter_ty ~loc arg_type ~entrypoints
-      in
-      let*? storage_type, ctxt =
-        Gas_monad.run_pure ctxt @@ unparse_ty ~loc storage_type
+        @@
+        let open Gas_monad.Syntax in
+        let* arg_type = unparse_parameter_ty ~loc arg_type ~entrypoints in
+        let+ storage_type = unparse_ty ~loc storage_type in
+        (arg_type, storage_type)
       in
       let+ views, ctxt =
         Script_map.map_es_in_context
