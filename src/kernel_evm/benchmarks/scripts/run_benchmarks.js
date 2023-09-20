@@ -289,6 +289,7 @@ benchmark_scripts = [
     "benchmarks/scenarios/solidity_by_example/bench_minimal_proxy.js",
     "benchmarks/scenarios/solidity_by_example/bench_upgradeable_proxy.js",
     "benchmarks/scenarios/solidity_by_example/bench_binary_exponentiation.js",
+    "benchmarks/bench_erc1155.js"
 ]
 
 run_all_benchmarks(benchmark_scripts);

@@ -52,13 +52,14 @@ exports.create = function (player, amount, data) {
     };
 }
 
-exports.send = function (player, contract_addr, amount, data) {
+exports.send = function (player, contract_addr, amount, data, gasLimit = undefined) {
     let tx = { ...transfer_prototype_json };
     tx.nonce = player.nonce;
     player.nonce += 1;
     tx.to = contract_addr;
     tx.value = amount;
     tx.data = data;
+    tx.gasLimit = gasLimit == undefined ? transfer_prototype_json.gasLimit : gasLimit;
     let rawTx = sign(tx, player.privateKey)
     return rawTx.rawTx;
 }
