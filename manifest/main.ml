@@ -7315,6 +7315,7 @@ let _testnet_experiment_tools =
         tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos;
         octez_client_base_unix |> open_;
+        octez_node_config;
         octez_base;
         octez_base_unix;
         octez_stdlib_unix |> open_;
