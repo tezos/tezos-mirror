@@ -1,23 +1,23 @@
 let
   opam-nix-integration = import (
     fetchTarball {
-      url = "https://github.com/vapourismo/opam-nix-integration/archive/ea79c9787ef571724b49157c003b832b83a133a5.tar.gz";
-      sha256 = "1m2fsb3np0a0mwh8gbpazf4mxcsqc64hiaxx2f9njcksx1hjvsyh";
+      url = "https://github.com/vapourismo/opam-nix-integration/archive/ec0f82a78958461e9ab16eb87c4ae1873c4d9f77.tar.gz";
+      sha256 = "1kh6lz9cr5158m1mrl8hyj1brhi450hil65faqsrcw6nd3a1dang";
     }
   );
 
   rust-overlay = import (
     fetchTarball {
-      url = "https://github.com/oxalica/rust-overlay/archive/b91706f9d5a68fecf97b63753da8e9670dff782b.tar.gz";
-      sha256 = "1c34aihrnwv15l8hyggz92rk347z05wwh00h33iw5yyjxkvb8mqc";
+      url = "https://github.com/oxalica/rust-overlay/archive/e054ca37ee416efe9d8fc72d249ec332ef74b6d4.tar.gz";
+      sha256 = "0vj6k40qqlrxqdr33xpha57mq6ajdzscd8wradzbg4p3mpy7j52c";
     }
   );
 
   pkgs =
     import
     (fetchTarball {
-      url = "https://github.com/NixOS/nixpkgs/archive/6025d713d198ec296eaf27a1f2f78983eccce4d8.tar.gz";
-      sha256 = "0fa6nd1m5lr4fnliw21ppc4qdd4s85x448967333dvmslnvj35xi";
+      url = "https://github.com/NixOS/nixpkgs/archive/cd07839e2e61f8b7c467f20a896c3f9e63a04918.tar.gz";
+      sha256 = "1xr250f9z72v560pkvi25iwclnysjn8h9mw8cdnjl4izq0milmzi";
     })
     {overlays = [opam-nix-integration.overlay rust-overlay];};
 in {
