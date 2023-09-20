@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
 [workspace]
 
-members = ["ethereum", "kernel", "evm_execution", "logging"]
+members = ["ethereum", "kernel", "evm_execution", "evm_evaluation", "logging"]
 
 [workspace.dependencies]
 
